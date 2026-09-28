@@ -17,6 +17,12 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
   (truyền `IsOfficeHost` — Office hiện 4783x thay vì 4782x)
 - `bridge.py`: `APP_PORTS` thêm `word/excel/ppt` (47831-47833); `wps_health`
   nhận tham số `port`
+- **An toàn ghi file (excel-mcp)**: mọi thao tác ghi đi qua file tạm cùng thư
+  mục + `os.replace` (atomic — lỗi giữa chừng không làm hỏng file gốc, vẫn giữ
+  hint khi file bị khóa); docstring cảnh báo openpyxl có thể mất chart/image/pivot
+- **Sandbox `excel_query`**: `SET enable_external_access=false` — SQL không thể
+  `read_csv`/`COPY TO`/`INSTALL`/`ATTACH` (chống prompt injection đọc/ghi file
+  tùy ý); đã test chặn cả 3 đường
 
 ### Added — Office ports + companion Office + excel-mcp nâng cấp (branch `main`)
 - **Port tách theo host**: WPS giữ `Port` 47821-47823; Microsoft Office dùng

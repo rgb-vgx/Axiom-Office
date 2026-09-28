@@ -112,6 +112,12 @@ MCP server Python cho AI agent thao tác Excel qua 2 làn (16 tools):
 Hỗ trợ `.xlsx/.xlsm/.xls/.csv/.tsv`. File lớn: `excel_convert` sang parquet rồi
 query — nhanh hơn ~250x (đo trên file 41k dòng).
 
+An toàn dữ liệu: mọi thao tác ghi dùng file tạm cùng thư mục + `os.replace`
+(atomic — lỗi giữa chừng không làm hỏng file gốc); openpyxl có thể mất
+chart/image/pivot khi resave → file đang mở nên ghi qua làn live. `excel_query`
+bị khóa `enable_external_access=false` — SQL không đọc/ghi được file ngoài
+(chống prompt injection).
+
 ```powershell
 cd tools\excel-mcp
 python -m venv .venv
