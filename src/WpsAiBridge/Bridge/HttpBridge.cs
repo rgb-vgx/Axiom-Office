@@ -30,7 +30,7 @@ namespace WpsAiBridge.Bridge
                 return;
             }
 
-            _port = Config.PortForKind(_host.AppKind);
+            _port = Config.PortForKind(_host.AppKind, _host.IsOfficeHost);
             _listener = new HttpListener();
             _listener.Prefixes.Add("http://localhost:" + _port + "/");
             _listener.Prefixes.Add("http://127.0.0.1:" + _port + "/");

@@ -8,11 +8,13 @@ namespace WpsAiBridge.Host
     {
         private readonly object _app;
         private readonly string _kind;
+        private readonly bool _office;
 
-        public AutomationAppHost(object app, string kind)
+        public AutomationAppHost(object app, string kind, bool office)
         {
             _app = app;
             _kind = kind;
+            _office = office;
         }
 
         public object Application
@@ -23,6 +25,11 @@ namespace WpsAiBridge.Host
         public string AppKind
         {
             get { return _kind; }
+        }
+
+        public bool IsOfficeHost
+        {
+            get { return _office; }
         }
     }
 
@@ -39,24 +46,50 @@ namespace WpsAiBridge.Host
             }
 
             string progId;
+            string logicalKind;
+            bool office;
             switch (kind)
             {
                 case "wps":
                     progId = "KWPS.Application";
+                    logicalKind = "wps";
+                    office = false;
                     break;
                 case "et":
                     progId = "KET.Application";
+                    logicalKind = "et";
+                    office = false;
                     break;
                 case "wpp":
                     progId = "KWPP.Application";
+                    logicalKind = "wpp";
+                    office = false;
+                    break;
+                case "word":
+                    progId = "Word.Application";
+                    logicalKind = "wps";
+                    office = true;
+                    break;
+                case "excel":
+                    progId = "Excel.Application";
+                    logicalKind = "et";
+                    office = true;
+                    break;
+                case "ppt":
+                case "powerpoint":
+                    progId = "PowerPoint.Application";
+                    logicalKind = "wpp";
+                    office = true;
                     break;
                 default:
-                    Console.Error.WriteLine("usage: WpsAiBridge.Host.exe wps|et|wpp [--visible]");
+                    Console.Error.WriteLine("usage: WpsAiBridge.Host.exe wps|et|wpp|word|excel|ppt [--visible]");
+                    Console.Error.WriteLine("  wps|et|wpp : WPS Office components (KWPS/KET/KWPP.Application)");
+                    Console.Error.WriteLine("  word|excel|ppt : Microsoft Office (Word/Excel/PowerPoint.Application)");
                     return 2;
             }
 
             bool visible = Array.IndexOf(args, "--visible") >= 0;
-            Logger.Info("Companion host starting for " + kind + " (progid=" + progId + ", visible=" + visible + ")");
+            Logger.Info("Companion host starting for " + kind + " (progid=" + progId + ", office=" + office + ", visible=" + visible + ")");
 
             Type progType = Type.GetTypeFromProgID(progId, true);
             if (progType == null)
@@ -67,6 +100,16 @@ namespace WpsAiBridge.Host
 
             object app = Activator.CreateInstance(progType);
             dynamic dynamicApp = app;
+            string resolvedName = "";
+            try
+            {
+                resolvedName = (Convert.ToString(dynamicApp.Name) + " " + Convert.ToString(dynamicApp.Version)).Trim();
+            }
+            catch
+            {
+            }
+            Logger.Info("Companion resolved application: " + resolvedName + " (progid=" + progId + ")");
+            Console.WriteLine("Companion resolved application: " + resolvedName);
             try
             {
                 dynamicApp.Visible = visible;
@@ -82,14 +125,14 @@ namespace WpsAiBridge.Host
             {
             }
 
-            var host = new AutomationAppHost(app, kind);
+            var host = new AutomationAppHost(app, logicalKind, office);
             var bridge = new HttpBridge(host);
-            int port = Config.PortForKind(kind);
+            int port = Config.PortForKind(logicalKind, office);
             try
             {
                 bridge.Start();
-                Console.WriteLine("WpsAiBridge.Host ready: app=" + kind + " port=" + port);
-                Logger.Info("Companion host listening: app=" + kind + " port=" + port);
+                Console.WriteLine("WpsAiBridge.Host ready: kind=" + kind + " port=" + port);
+                Logger.Info("Companion host listening: kind=" + kind + " port=" + port);
             }
             catch (Exception ex)
             {

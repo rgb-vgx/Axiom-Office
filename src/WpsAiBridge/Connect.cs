@@ -69,6 +69,11 @@ namespace WpsAiBridge
             }
         }
 
+        public bool IsOfficeHost
+        {
+            get { return DetectOfficeHost(); }
+        }
+
         public void OnConnection(object Application, ext_ConnectMode ConnectMode, object AddInInst, ref Array custom)
         {
             Logger.Info("OnConnection entered: mode=" + ConnectMode + " host=" + HostProcessName());
@@ -139,6 +144,12 @@ namespace WpsAiBridge
             {
                 return "unknown";
             }
+        }
+
+        private static bool DetectOfficeHost()
+        {
+            string name = HostProcessName().ToLowerInvariant();
+            return name.StartsWith("winword") || name.StartsWith("excel") || name.StartsWith("powerpnt");
         }
 
         private static string DetectAppKind(object application)

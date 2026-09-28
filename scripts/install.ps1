@@ -64,18 +64,23 @@ $config = New-Key "Software\WpsAiBridge"
 if ($config.GetValue("Port") -eq $null) {
     $config.SetValue("Port", 47821, [Microsoft.Win32.RegistryValueKind]::DWord)
 }
+if ($config.GetValue("PortOffice") -eq $null) {
+    $config.SetValue("PortOffice", 47831, [Microsoft.Win32.RegistryValueKind]::DWord)
+}
 if ($config.GetValue("Enabled") -eq $null) {
     $config.SetValue("Enabled", 1, [Microsoft.Win32.RegistryValueKind]::DWord)
 }
 $port = $config.GetValue("Port")
+$portOffice = $config.GetValue("PortOffice")
 $config.Close()
 
 Write-Output "Installed WpsAiBridge."
 Write-Output "  DLL:      $dllPath"
 Write-Output "  ProgID:   $progId"
-Write-Output "  HTTP:     http://127.0.0.1:$port/"
-Write-Output "  Config:   HKCU\Software\WpsAiBridge (Port, Token, Enabled)"
+Write-Output "  WPS:      Word $port / Spreadsheets $($port + 1) / Presentation $($port + 2)"
+Write-Output "  Office:   Word $portOffice / Excel $($portOffice + 1) / PowerPoint $($portOffice + 2)"
+Write-Output "  Config:   HKCU\Software\WpsAiBridge (Port, PortOffice, Token, Enabled)"
 Write-Output ""
-Write-Output "Next: open WPS Writer/Spreadsheets/Presentation."
-Write-Output "If the add-in does not load, open Tools tab -> COM Add-ins and enable 'WPS AI Bridge'"
-Write-Output "(WPS blocks uncertified COM add-ins by default; a one-time manual enable is required)."
+Write-Output "Next: open WPS or Microsoft Office (Word/Excel/PowerPoint)."
+Write-Output "Companion: WpsAiBridge.Host.exe wps|et|wpp for WPS, word|excel|ppt for Microsoft Office."
+Write-Output "If the add-in does not load, open Tools tab -> COM Add-ins and enable 'WPS AI Bridge'."

@@ -4,5 +4,6 @@ namespace WpsAiBridge.Bridge
     {
         object Application { get; }
         string AppKind { get; }
+        bool IsOfficeHost { get; }
     }
 }

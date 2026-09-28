@@ -7,15 +7,26 @@ namespace WpsAiBridge.Bridge
     {
         private const string KeyPath = @"Software\WpsAiBridge";
         public const int DefaultPort = 47821;
+        public const int DefaultPortOffice = 47831;
 
         public static int Port
         {
             get { return ReadInt("Port", DefaultPort); }
         }
 
+        public static int PortOffice
+        {
+            get { return ReadInt("PortOffice", DefaultPortOffice); }
+        }
+
         public static int PortForKind(string appKind)
         {
-            int port = Port;
+            return PortForKind(appKind, false);
+        }
+
+        public static int PortForKind(string appKind, bool officeHost)
+        {
+            int port = officeHost ? PortOffice : Port;
             if (appKind == "et")
             {
                 return port + 1;
