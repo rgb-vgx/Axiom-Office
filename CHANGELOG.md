@@ -5,6 +5,22 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Live command pack v2 (tham khảo ppt-mcp / word-mcp-live)
+- **Word** (10 lệnh mới): `insertStyledText`, `formatSelection`,
+  `setParagraphAlignment`, `insertTable` (kèm dữ liệu + style), `insertPageBreak`,
+  `insertImage`, `insertHyperlink`, `heading` (Heading 1-9, tự xuống dòng),
+  `undo`, `exportPdf` — mọi thao tác ghi được bọc trong **Word UndoRecord**
+  (mỗi action của AI = 1 bước Ctrl+Z, pattern từ word-mcp-live)
+- **Excel** (4): `formatRange` (bold/italic/fontSize/fontColor/fillColor/numFmt/
+  horizontal/wrap), `activateSheet`, `exportPdf`, `undo`
+- **PowerPoint** (7): `addSlide` có `layout`, `addText` (fontSize/bold/color/
+  align), `addImage`, `addTable` (kèm dữ liệu), `setNotes` (speaker notes),
+  `deleteSlide`, `exportPdf`
+- Đã kiểm chứng trên **Microsoft Office 2024 thật** (3 app chạy song song):
+  Word chèn bảng/hyperlink/ảnh + PDF (48KB); Excel format + PDF (25KB) +
+  saveAs đúng; PowerPoint slide/text/table/notes + PDF (27KB) + pptx (40KB);
+  heading có paragraph break (`Tieu de\rThan bai.`)
+
 ### Fixed/Added — vòng 2 theo code review (#6 + minors)
 - **Retry khi app bận**: request tự retry khi gặp `RPC_E_CALL_REJECTED` /
   `RPC_E_SERVERCALL_RETRYLATER` / `RPC_E_CALL_CANCELED` / `VBA_E_IGNORE`

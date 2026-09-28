@@ -206,17 +206,37 @@ Response: `{"ok": true, "result": {...}}` hoặc `{"ok": false, "error": "..."}`
 | `writer.replaceAll` | `find`, `replace` | Tìm & thay thế toàn bộ |
 | `writer.selection` | — | Text + vị trí đang chọn |
 | `writer.save` / `writer.saveAs` | `path?` | Lưu / lưu thành file mới |
+| `writer.insertStyledText` | `text`, `bold?`, `italic?`, `underline?`, `size?`, `color?`, `font?` | Chèn text kèm định dạng |
+| `writer.formatSelection` | font (`bold?`... `color?`), `alignment?` | Định dạng vùng đang chọn |
+| `writer.setParagraphAlignment` | `alignment` (left/center/right/justify) | Căn đoạn |
+| `writer.insertTable` | `rows`, `cols`, `values?`, `style?` | Chèn bảng kèm dữ liệu |
+| `writer.insertPageBreak` | — | Ngắt trang |
+| `writer.insertImage` | `path`, `width?`, `height?` | Chèn ảnh tại con trỏ |
+| `writer.insertHyperlink` | `url`, `text?` | Chèn hyperlink |
+| `writer.heading` | `level` (1-9), `text?`, `break?` | Heading style + tự xuống dòng |
+| `writer.undo` | `count?` | Undo (mỗi action AI = 1 bước Ctrl+Z) |
+| `writer.exportPdf` | `path` | Xuất PDF |
 | `et.newWorkbook` | — | Tạo workbook mới |
 | `et.open` | `path` | Mở file .xlsx/.xls/.csv |
 | `et.listSheets` | — | Liệt kê sheet + sheet đang active |
 | `et.readRange` | `range`, `sheet?` | Đọc vùng, ví dụ `A1:C10` |
 | `et.writeRange` | `range`, `values` (ma trận 2D), `sheet?` | Ghi vùng |
 | `et.save` / `et.saveAs` | `path?` | Lưu / lưu thành file mới |
+| `et.formatRange` | `range`, `bold?`, `italic?`, `fontSize?`, `fontColor?`, `fillColor?`, `numFmt?`, `horizontal?`, `wrap?`, `sheet?` | Định dạng vùng |
+| `et.activateSheet` | `sheet` | Chuyển sang sheet khác |
+| `et.exportPdf` | `path` | Xuất PDF |
+| `et.undo` | `count?` | Undo |
 | `wpp.newPresentation` | — | Tạo presentation mới |
 | `wpp.open` | `path` | Mở file .pptx |
 | `wpp.listSlides` | — | Số slide + text trên từng slide |
-| `wpp.addSlide` | — | Thêm slide trống cuối presentation |
+| `wpp.addSlide` | `layout?` (mặc định 12 = blank) | Thêm slide với layout |
 | `wpp.addTextBox` | `slide?`, `text`, `left?`, `top?`, `width?`, `height?` | Thêm textbox |
+| `wpp.addText` | `text`, `slide?`, vị trí/kích thước?, `fontSize?`, `bold?`, `color?`, `align?` | Textbox có định dạng |
+| `wpp.addImage` | `path`, `slide?`, `left?`, `top?`, `width?`, `height?` | Chèn ảnh |
+| `wpp.addTable` | `rows`, `cols`, `values?`, `slide?`, vị trí/kích thước? | Bảng kèm dữ liệu |
+| `wpp.setNotes` | `text`, `slide?` | Speaker notes |
+| `wpp.deleteSlide` | `slide` | Xóa slide |
+| `wpp.exportPdf` | `path` | Xuất PDF |
 | `wpp.save` / `wpp.saveAs` | `path?` | Lưu / lưu thành file mới |
 
 ### Ví dụ
