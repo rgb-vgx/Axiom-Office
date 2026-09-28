@@ -486,10 +486,13 @@ namespace WpsAiBridge.Bridge
 
             int rowCount = rowList.Count;
             int colCount = 1;
-            IList firstRow = rowList[0] as IList;
-            if (firstRow != null)
+            for (int i = 0; i < rowCount; i++)
             {
-                colCount = firstRow.Count;
+                IList probeRow = rowList[i] as IList;
+                if (probeRow != null && probeRow.Count > colCount)
+                {
+                    colCount = probeRow.Count;
+                }
             }
 
             object[,] matrix = new object[rowCount, colCount];
@@ -510,7 +513,15 @@ namespace WpsAiBridge.Bridge
             dynamic app = host.Application;
             dynamic wb = app.ActiveWorkbook;
             dynamic sheet = string.IsNullOrEmpty(sheetName) ? wb.ActiveSheet : wb.Worksheets[sheetName];
-            sheet.Range[address].Value2 = matrix;
+            dynamic target = sheet.Range[address];
+            try
+            {
+                target = target.Resize[rowCount, colCount];
+            }
+            catch
+            {
+            }
+            target.Value2 = matrix;
 
             return new Dictionary<string, object>
             {

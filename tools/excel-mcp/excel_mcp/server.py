@@ -90,14 +90,14 @@ def _safe(callable_):
 
 
 @mcp.tool()
-def wps_health(app: str = "wps") -> str:
-    """Check the live WPS bridge connection. app: wps (Writer), et (Spreadsheets), wpp (Presentation)."""
-    return _safe(lambda: bridge.health(app))
+def wps_health(app: str = "wps", port: int | None = None) -> str:
+    """Check the live bridge. app: wps/et/wpp (WPS Office) or word/excel/ppt (Microsoft Office); or pass an explicit port."""
+    return _safe(lambda: bridge.health(app, port))
 
 
 @mcp.tool()
 def wps_live_command(app: str, action: str, params: dict | None = None, port: int | None = None) -> str:
-    """Send any command to the live WPS bridge (works on the document the user has open). Apps: wps=47821, et=47822, wpp=47823. Examples: action='app.info'; action='et.readRange' params={'range':'A1:C10'}; action='et.writeRange' params={'range':'A1','values':[[1,2],[3,4]]}; action='writer.typeText' params={'text':'hello'}; action='writer.saveAs' params={'path':'C:/tmp/out.docx'}."""
+    """Send any command to the live bridge (works on the document the user has open). Apps: wps=47821, et=47822, wpp=47823 (WPS); word=47831, excel=47832, ppt=47833 (Microsoft Office). Examples: action='app.info'; action='et.readRange' params={'range':'A1:C10'}; action='et.writeRange' params={'range':'A1','values':[[1,2],[3,4]]}; action='writer.typeText' params={'text':'hello'}; action='writer.saveAs' params={'path':'C:/tmp/out.docx'}."""
     return _safe(lambda: bridge.command(app, action, params, port))
 
 

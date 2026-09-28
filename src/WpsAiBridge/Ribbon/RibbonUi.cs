@@ -59,7 +59,7 @@ namespace WpsAiBridge.Ribbon
         private static void ShowStatus(Connect connect)
         {
             string kind = connect.AppKind;
-            int port = Config.PortForKind(kind);
+            int port = Config.PortForKind(kind, connect.IsOfficeHost);
             var sb = new StringBuilder();
             sb.AppendLine("WPS AI Bridge (in-proc add-in)");
             sb.AppendLine();
@@ -74,7 +74,7 @@ namespace WpsAiBridge.Ribbon
 
         private static void CopyUrl(Connect connect)
         {
-            int port = Config.PortForKind(connect.AppKind);
+            int port = Config.PortForKind(connect.AppKind, connect.IsOfficeHost);
             string url = "http://127.0.0.1:" + port + "/";
             try
             {
