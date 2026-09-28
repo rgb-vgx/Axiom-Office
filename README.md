@@ -101,11 +101,17 @@ cùng một DLL, cùng một đăng ký (không cần cài thêm gì):
 Yêu cầu: Office **x64** (kiểm tra `Platform` tại
 `HKLM\SOFTWARE\Microsoft\Office\ClickToRun\Configuration`).
 
-Kiểm tra nhanh (trạng thái: đang được kiểm chứng trên Office 2024 ProPlus x64):
+Kiểm tra nhanh (đã kiểm chứng trên Office 2024 ProPlus x64 — Word/Excel/PowerPoint:
+lifecycle + ribbon + E2E qua bridge):
 
 1. Mở Word/Excel/PowerPoint
 2. `%LOCALAPPDATA%\WpsAiBridge\bridge.log` phải có `OnConnection` + `GetCustomUI`
 3. `http://127.0.0.1:47821/health` (Word) / `47822` (Excel) / `47823` (PowerPoint)
+
+Lưu ý chạy song song WPS + Office: WPS ET và Microsoft Excel **cùng map vào port
+47822** (port theo app kind) — nếu mở cả hai cùng lúc, chỉ một bên bind được.
+Cách xử lý tạm: đổi `Port` base trong registry (ví dụ 47831) trước khi mở app
+thứ hai, xong đổi lại.
 
 Troubleshooting riêng cho Office:
 

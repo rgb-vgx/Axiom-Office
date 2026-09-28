@@ -184,7 +184,16 @@ namespace WpsAiBridge.Bridge
             {
                 return null;
             }
-            if (value is string || value is bool || value is int || value is long || value is double || value is decimal)
+            if (value is int)
+            {
+                int intValue = (int)value;
+                if (intValue == -2146826246 || intValue == -2147352572)
+                {
+                    return null;
+                }
+                return intValue;
+            }
+            if (value is string || value is bool || value is long || value is double || value is decimal)
             {
                 return value;
             }

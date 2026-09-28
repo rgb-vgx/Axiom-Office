@@ -5,6 +5,18 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Verified — Microsoft Office 2024 ProPlus x64 (branch `main`)
+- Word (`WINWORD.EXE`), Excel (`EXCEL.EXE`), PowerPoint (`POWERPNT.EXE`): add-in
+  nạp đầy đủ lifecycle (OnConnection → OnAddInsUpdate → GetCustomUI →
+  OnStartupComplete), ribbon tab hiển thị, bridge hoạt động — không crash,
+  không cần sửa signature nào thêm
+- Excel/PowerPoint đã E2E trên app thật: ghi/đọc range (Excel), tạo slide +
+  textbox + đọc lại (PowerPoint)
+- Fix chuẩn hoá ô trống Excel: VT_ERROR `0x800A07FA` / `0x80020004` giờ trả
+  `null` trong `readRange` (trước đó trả số `-2146826246`)
+- Ghi chú: WPS ET và Excel thật cùng map port 47822 — cần đổi `Port` base khi
+  chạy song song hai hệ
+
 ### Added — Ribbon UI + AI in-app + MCP server (branch `main`)
 - Ribbon tab **"WPS AI Bridge"** (`IRibbonExtensibility.GetCustomUI`, XML chuẩn
   2006/01): nhóm Local bridge (Status / Copy API URL / Open Log) + nhóm AI
