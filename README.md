@@ -122,6 +122,7 @@ bị khóa `enable_external_access=false` — SQL không đọc/ghi được fil
 cd tools\excel-mcp
 python -m venv .venv
 .venv\Scripts\python.exe -m pip install -r requirements.txt
+.venv\Scripts\python.exe -m unittest discover -s tests   # chạy test suite
 .venv\Scripts\python.exe -m excel_mcp.server   # hoặc run.cmd
 ```
 
@@ -253,7 +254,7 @@ print(r.json())
 | `PortOffice` | DWORD | 47831 | Port base cho Microsoft Office (Excel +1, PowerPoint +2) |
 | `Enabled` | DWORD | 1 | 0 = tắt HTTP bridge |
 | `Token` | String | tự sinh khi install (32 hex) | Bắt buộc cho `/cmd` và `/config` (header `X-Auth-Token`); `tools/excel-mcp` tự đọc từ registry |
-| `LlmProvider` / `LlmEndpoint` / `LlmApiKey` / `LlmModel` | String | — | Cấu hình AI cho Ask AI (đặt qua dialog Settings trên ribbon) |
+| `LlmProvider` / `LlmEndpoint` / `LlmApiKey` / `LlmModel` | String | — | Cấu hình AI cho Ask AI (đặt qua dialog Settings trên ribbon; API key được mã hóa DPAPI — key plaintext cũ vẫn đọc được) |
 
 ## Cấu trúc project
 
@@ -282,6 +283,12 @@ scripts/uninstall.ps1       gỡ đăng ký
   `install.ps1` để khôi phục `LoadBehavior=3` và xoá AddinsCL.
 - **Health OK nhưng command lỗi `no active document`**: chưa có document mở —
   gọi `*.newDocument` / `*.newWorkbook` / `*.newPresentation` trước.
+- **App đang bận** (đang gõ trong ô Excel, đang mở dialog...): bridge tự retry
+  các lỗi COM busy (`RPC_E_CALL_REJECTED` / `SERVERCALL_RETRYLATER` /
+  `VBA_E_IGNORE`) tối đa 10 lần (~5s) trước khi trả lỗi — xem log nếu cần.
+- **Ô lỗi trong Excel**: `#DIV/0!` `#VALUE!` `#NAME?` `#REF!` `#NUM!` `#NULL!`
+  trả về đúng tên chuỗi; riêng `#N/A` trùng mã với ô trống qua `Value2` nên
+  vẫn về `null` (giới hạn đã biết của COM).
 - **Port bận**: một app khác đang giữ port — kiểm tra `netstat -ano | findstr 4782`.
 - Kiến trúc WPS 12: mọi component (Writer/ET/WPP) chạy chung binary `wps.exe`
   với flag `/wps`, `/et`, `/wpp` — đừng tin tưởng tên process để phân biệt app,

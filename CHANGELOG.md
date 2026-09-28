@@ -5,6 +5,25 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed/Added — vòng 2 theo code review (#6 + minors)
+- **Retry khi app bận**: request tự retry khi gặp `RPC_E_CALL_REJECTED` /
+  `RPC_E_SERVERCALL_RETRYLATER` / `RPC_E_CALL_CANCELED` / `VBA_E_IGNORE`
+  (0x800AC472 — Excel đang gõ ô) — tối đa 10 lần, backoff luỹ tiến ~5.5s,
+  log mỗi lần retry; an toàn vì lỗi "call rejected" nghĩa là call chưa thực thi
+- **Giá trị lỗi Excel**: `#DIV/0!` `#VALUE!` `#NAME?` `#REF!` `#NUM!` `#NULL!`
+  trả về tên chuỗi thay vì số âm (probe thực tế trên Excel 16.0); `#N/A` trùng
+  mã 0x800A07FA với ô trống qua `Value2` nên vẫn về `null` — giới hạn đã biết
+- **Version đồng bộ**: `BridgeVersion` lấy từ assembly version (health trả
+  `1.0.0` thay vì `0.1.0`)
+- **DPAPI**: `LlmApiKey` mã hóa bằng `ProtectedData` (CurrentUser); key
+  plaintext cũ vẫn đọc được (tương thích ngược); `SettingsForm` lưu qua
+  `WriteSecret`; đã migrate key thật sang dạng mã hóa + `llm-test` gọi LLM
+  qua key DPAPI thành công
+- **Tests**: `tools/excel-mcp/tests/test_file_tools.py` — 9 unit test
+  (roundtrip, show_formula, ragged write, format/table, sheet ops, DuckDB
+  sandbox, locked-file không sót temp, csv) — chạy bằng
+  `python -m unittest discover -s tests`
+
 ### Fixed — bảo mật + đúng đắn (theo code review)
 - **CSRF**: bridge từ chối request có header `Origin`; `POST /cmd` bắt buộc
   `Content-Type: application/json` (chặn browser "simple request"); token
