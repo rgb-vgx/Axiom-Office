@@ -5,13 +5,17 @@ import datetime as _dt
 import json
 import math
 import os
+import re
+from copy import copy
 from typing import Any
 
 import duckdb
 import openpyxl
 import pandas as pd
 import xlrd
+from openpyxl.styles import PatternFill, Side
 from openpyxl.utils import coordinate_to_tuple, get_column_letter, range_boundaries
+from openpyxl.worksheet.table import Table, TableStyleInfo
 
 OPENPYXL_FORMATS = {".xlsx", ".xlsm", ".xltx", ".xltm"}
 XLRD_FORMATS = {".xls"}
@@ -238,7 +242,7 @@ def profile(path: str, sheet: str | None = None) -> dict:
 
 
 def read_range(path: str, sheet: str | None = None, cell_range: str | None = None,
-               offset: int = 0, limit: int = 100) -> dict:
+               offset: int = 0, limit: int = 100, show_formula: bool = False) -> dict:
     if not os.path.exists(path):
         raise FileNotFoundError(path)
     if limit <= 0:
@@ -295,7 +299,7 @@ def read_range(path: str, sheet: str | None = None, cell_range: str | None = Non
             "values": values,
         }
 
-    wb, stream = _openpyxl_load(path, True, True)
+    wb, stream = _openpyxl_load(path, True, not show_formula)
     try:
         ws = wb[sheet] if sheet else wb.active
         max_row = max_row or (ws.max_row or 1)
@@ -523,3 +527,252 @@ def convert(path: str, sheet: str | None = None, to: str = "parquet") -> dict:
     finally:
         connection.close()
     return {"output": output, "rows": len(frame), "columns": list(frame.columns), "format": to}
+
+
+def _load_for_edit(path: str):
+    if not os.path.exists(path):
+        raise FileNotFoundError(path)
+    _check_format(path)
+    kind = _detect_kind(path)
+    if kind == "xls":
+        raise ValueError("editing .xls (BIFF) is not supported - save as xlsx or use the WPS live bridge")
+    if kind == "csv":
+        raise ValueError("this operation requires a workbook format (xlsx/xlsm), not csv/tsv")
+    ext = _ext(path)
+    keep_vba = ext in {".xlsm", ".xltm"}
+    wb, stream = _openpyxl_load(path, False, False, keep_vba=keep_vba)
+    if stream is not None:
+        stream.close()
+    return wb
+
+
+def _save_edit(wb, path: str) -> None:
+    try:
+        wb.save(path)
+    except PermissionError as exc:
+        raise PermissionError(
+            f"cannot write '{path}': file is locked (open in WPS/Excel?) - close it first or use the WPS live bridge"
+        ) from exc
+
+
+def create_sheet(path: str, sheet: str, overwrite: bool = False) -> dict:
+    wb = _load_for_edit(path)
+    try:
+        if sheet in wb.sheetnames:
+            if not overwrite:
+                raise ValueError(f"sheet already exists: {sheet}")
+            del wb[sheet]
+        wb.create_sheet(sheet)
+        _save_edit(wb, path)
+        return {"path": path, "sheet": sheet, "sheets": list(wb.sheetnames)}
+    finally:
+        wb.close()
+
+
+def copy_sheet(path: str, src_sheet: str, dst_sheet: str) -> dict:
+    wb = _load_for_edit(path)
+    try:
+        if src_sheet not in wb.sheetnames:
+            raise ValueError(f"sheet not found: {src_sheet}")
+        if dst_sheet in wb.sheetnames:
+            raise ValueError(f"sheet already exists: {dst_sheet}")
+        target = wb.copy_worksheet(wb[src_sheet])
+        target.title = dst_sheet
+        _save_edit(wb, path)
+        return {"path": path, "src": src_sheet, "dst": dst_sheet, "sheets": list(wb.sheetnames)}
+    finally:
+        wb.close()
+
+
+def rename_sheet(path: str, sheet: str, new_name: str) -> dict:
+    wb = _load_for_edit(path)
+    try:
+        if sheet not in wb.sheetnames:
+            raise ValueError(f"sheet not found: {sheet}")
+        if new_name in wb.sheetnames:
+            raise ValueError(f"sheet already exists: {new_name}")
+        wb[sheet].title = new_name
+        _save_edit(wb, path)
+        return {"path": path, "old": sheet, "new": new_name, "sheets": list(wb.sheetnames)}
+    finally:
+        wb.close()
+
+
+def delete_sheet(path: str, sheet: str) -> dict:
+    wb = _load_for_edit(path)
+    try:
+        if sheet not in wb.sheetnames:
+            raise ValueError(f"sheet not found: {sheet}")
+        if len(wb.sheetnames) <= 1:
+            raise ValueError("cannot delete the only sheet in the workbook")
+        del wb[sheet]
+        _save_edit(wb, path)
+        return {"path": path, "deleted": sheet, "sheets": list(wb.sheetnames)}
+    finally:
+        wb.close()
+
+
+_BORDER_ALIASES = {
+    "thin": "thin", "continuous": "thin", "medium": "medium", "thick": "thick",
+    "dash": "dashed", "dashed": "dashed", "dot": "dotted", "dotted": "dotted",
+    "double": "double", "hair": "hair",
+    "mediumdash": "mediumDashed", "mediumdashed": "mediumDashed",
+    "dashdot": "dashDot", "mediumdashdot": "mediumDashDot",
+    "dashdotdot": "dashDotDot", "mediumdashdotdot": "mediumDashDotDot",
+    "slantdashdot": "slantDashDot", "none": None,
+}
+
+_UNDERLINE_ALIASES = {
+    "none": None, "single": "single", "double": "double",
+    "singleaccounting": "singleAccounting", "doubleaccounting": "doubleAccounting",
+}
+
+_VERT_ALIGN_ALIASES = {
+    "baseline": None, "none": None, "superscript": "superscript", "subscript": "subscript",
+}
+
+
+def _normalize_rgb(value) -> str:
+    if isinstance(value, (list, tuple)):
+        value = value[0] if value else None
+    if not value:
+        raise ValueError("invalid color value (expected '#RRGGBB')")
+    text = str(value).strip().lstrip("#").upper()
+    if len(text) == 6:
+        return text
+    if len(text) == 8:
+        return text[2:]
+    raise ValueError(f"invalid color '{value}' (expected #RRGGBB)")
+
+
+def _apply_cell_style(cell, style: dict) -> None:
+    font_spec = style.get("font")
+    if isinstance(font_spec, dict):
+        font = copy(cell.font)
+        if "bold" in font_spec:
+            font.bold = bool(font_spec["bold"])
+        if "italic" in font_spec:
+            font.italic = bool(font_spec["italic"])
+        if "strike" in font_spec:
+            font.strike = bool(font_spec["strike"])
+        if font_spec.get("size") is not None:
+            font.size = float(font_spec["size"])
+        if font_spec.get("name"):
+            font.name = str(font_spec["name"])
+        if font_spec.get("color"):
+            font.color = _normalize_rgb(font_spec["color"])
+        if "underline" in font_spec:
+            raw = font_spec["underline"]
+            if isinstance(raw, bool):
+                font.underline = "single" if raw else None
+            else:
+                font.underline = _UNDERLINE_ALIASES.get(str(raw).lower(), str(raw))
+        if "vertAlign" in font_spec:
+            font.vertAlign = _VERT_ALIGN_ALIASES.get(str(font_spec["vertAlign"]).lower())
+        cell.font = font
+
+    fill_spec = style.get("fill")
+    if isinstance(fill_spec, dict):
+        pattern = str(fill_spec.get("pattern") or "solid")
+        color = fill_spec.get("color") or fill_spec.get("fgColor")
+        cell.fill = PatternFill(patternType=pattern, fgColor=_normalize_rgb(color))
+
+    border_spec = style.get("border")
+    if isinstance(border_spec, list):
+        border = copy(cell.border)
+        for item in border_spec:
+            if not isinstance(item, dict):
+                continue
+            edge = str(item.get("type") or "").lower()
+            side_style = _BORDER_ALIASES.get(str(item.get("style") or "thin").lower(), "thin")
+            side = Side(style=side_style, color=_normalize_rgb(item.get("color") or "#000000"))
+            if edge in ("left", "right", "top", "bottom"):
+                setattr(border, edge, side)
+            elif edge == "diagonal":
+                border.diagonal = side
+            elif edge == "diagonalup":
+                border.diagonal = side
+                border.diagonalUp = True
+            elif edge == "diagonaldown":
+                border.diagonal = side
+                border.diagonalDown = True
+        cell.border = border
+
+    alignment_spec = style.get("alignment")
+    if isinstance(alignment_spec, dict):
+        alignment = copy(cell.alignment)
+        if "horizontal" in alignment_spec:
+            alignment.horizontal = alignment_spec["horizontal"]
+        if "vertical" in alignment_spec:
+            alignment.vertical = alignment_spec["vertical"]
+        if "wrap" in alignment_spec:
+            alignment.wrap_text = bool(alignment_spec["wrap"])
+        if alignment_spec.get("rotation") is not None:
+            alignment.textRotation = int(alignment_spec["rotation"])
+        cell.alignment = alignment
+
+    num_fmt = style.get("numFmt")
+    decimal_places = style.get("decimalPlaces")
+    if num_fmt:
+        cell.number_format = str(num_fmt)
+    elif decimal_places is not None:
+        places = max(0, min(30, int(decimal_places)))
+        cell.number_format = "0" if places == 0 else "0." + ("0" * places)
+
+
+def format_range(path: str, sheet: str, cell_range: str, styles) -> dict:
+    wb = _load_for_edit(path)
+    try:
+        if sheet not in wb.sheetnames:
+            raise ValueError(f"sheet not found: {sheet}")
+        ws = wb[sheet]
+        min_col, min_row, max_col, max_row = range_boundaries(cell_range)
+        row_count = max_row - min_row + 1
+        col_count = max_col - min_col + 1
+
+        single: dict | None = None
+        matrix: list | None = None
+        if isinstance(styles, dict):
+            single = styles
+        elif isinstance(styles, list):
+            if len(styles) != row_count or any(
+                (not isinstance(row, list)) or len(row) != col_count for row in styles
+            ):
+                raise ValueError("styles matrix size must match the range size")
+            matrix = styles
+        else:
+            raise ValueError("styles must be an object or a 2D array")
+
+        styled = 0
+        for r in range(row_count):
+            for c in range(col_count):
+                spec = single if single is not None else matrix[r][c]
+                if not isinstance(spec, dict):
+                    continue
+                _apply_cell_style(ws.cell(row=min_row + r, column=min_col + c), spec)
+                styled += 1
+        _save_edit(wb, path)
+        return {"path": path, "sheet": sheet, "range": cell_range, "styled_cells": styled}
+    finally:
+        wb.close()
+
+
+def create_table(path: str, sheet: str, cell_range: str, table_name: str) -> dict:
+    if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", table_name or ""):
+        raise ValueError("table_name must start with a letter/underscore and contain only letters, digits, underscores")
+    wb = _load_for_edit(path)
+    try:
+        if sheet not in wb.sheetnames:
+            raise ValueError(f"sheet not found: {sheet}")
+        ws = wb[sheet]
+        existing = list(ws.tables.keys()) if hasattr(ws, "tables") else []
+        if table_name in existing:
+            raise ValueError(f"table already exists: {table_name}")
+        table = Table(displayName=table_name, ref=cell_range)
+        table.tableStyleInfo = TableStyleInfo(name="TableStyleMedium9", showRowStripes=True)
+        ws.add_table(table)
+        _save_edit(wb, path)
+        return {"path": path, "sheet": sheet, "range": cell_range, "table": table_name,
+                "tables": list(ws.tables.keys())}
+    finally:
+        wb.close()

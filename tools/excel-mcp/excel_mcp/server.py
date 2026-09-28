@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import json
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from excel_mcp import bridge, file_tools
 
-mcp = FastMCP("excel-tools")
+mcp = MCPServer("excel-tools")
 
 
 @mcp.tool()
@@ -17,9 +17,45 @@ def excel_profile(path: str, sheet: str | None = None) -> str:
 
 @mcp.tool()
 def excel_read(path: str, cell_range: str | None = None, sheet: str | None = None,
-               offset: int = 0, limit: int = 100) -> str:
-    """Read a block of cells (values only) from a spreadsheet file (.xlsx .xlsm .xls .csv .tsv). cell_range like 'A1:C50'. Page large areas with offset/limit."""
-    return file_tools.to_json(file_tools.read_range(path, sheet, cell_range, offset, limit))
+               offset: int = 0, limit: int = 100, show_formula: bool = False) -> str:
+    """Read a block of cells from a spreadsheet file (.xlsx .xlsm .xls .csv .tsv). cell_range like 'A1:C50'. Page large areas with offset/limit. show_formula=True returns formulas instead of cached values (xlsx/xlsm only)."""
+    return file_tools.to_json(file_tools.read_range(path, sheet, cell_range, offset, limit, show_formula))
+
+
+@mcp.tool()
+def excel_create_sheet(path: str, sheet: str, overwrite: bool = False) -> str:
+    """Create a new worksheet in an existing workbook (.xlsx/.xlsm)."""
+    return file_tools.to_json(file_tools.create_sheet(path, sheet, overwrite))
+
+
+@mcp.tool()
+def excel_copy_sheet(path: str, src_sheet: str, dst_sheet: str) -> str:
+    """Copy a worksheet inside the same workbook (values + styles; charts/images may not be preserved)."""
+    return file_tools.to_json(file_tools.copy_sheet(path, src_sheet, dst_sheet))
+
+
+@mcp.tool()
+def excel_rename_sheet(path: str, sheet: str, new_name: str) -> str:
+    """Rename a worksheet."""
+    return file_tools.to_json(file_tools.rename_sheet(path, sheet, new_name))
+
+
+@mcp.tool()
+def excel_delete_sheet(path: str, sheet: str) -> str:
+    """Delete a worksheet (cannot delete the only sheet in the workbook)."""
+    return file_tools.to_json(file_tools.delete_sheet(path, sheet))
+
+
+@mcp.tool()
+def excel_format_range(path: str, sheet: str, cell_range: str, styles: dict | list) -> str:
+    """Format cells in a range (.xlsx/.xlsm). styles = one style object applied to every cell OR a 2D array matching the range size (null entries skip that cell). Style object keys: font {bold, italic, underline, size, strike, color '#RRGGBB', name, vertAlign}, fill {pattern 'solid', color '#RRGGBB'}, border [{type: left|right|top|bottom|diagonalUp|diagonalDown, style: thin|medium|thick|double|dashed|dotted|hair|mediumDashed|dashDot|... , color}], alignment {horizontal, vertical, wrap, rotation}, numFmt (number format string), decimalPlaces (0-30)."""
+    return file_tools.to_json(file_tools.format_range(path, sheet, cell_range, styles))
+
+
+@mcp.tool()
+def excel_create_table(path: str, sheet: str, cell_range: str, table_name: str) -> str:
+    """Create an Excel table (ListObject) over a range with a header row, e.g. cell_range 'A1:D10'. table_name: letters/digits/underscore."""
+    return file_tools.to_json(file_tools.create_table(path, sheet, cell_range, table_name))
 
 
 @mcp.tool()
