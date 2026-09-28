@@ -5,6 +5,19 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — bảo mật + đúng đắn (theo code review)
+- **CSRF**: bridge từ chối request có header `Origin`; `POST /cmd` bắt buộc
+  `Content-Type: application/json` (chặn browser "simple request"); token
+  ngẫu nhiên 32 hex tự sinh khi chạy `install.ps1`; `bridge.py` tự đọc token
+  từ registry và gửi `X-Auth-Token`
+- **et.writeRange**: dùng `Range.Resize[rowCount, colCount]` — ghi đúng ma trận
+  khi truyền anchor 1 ô ("A1", trước đây Excel thật chỉ ghi được ô đầu); colCount
+  lấy max qua các dòng (ragged rows được pad null thay vì cắt âm thầm)
+- **Ribbon port**: nút Status / Copy API URL hiển thị đúng port theo host
+  (truyền `IsOfficeHost` — Office hiện 4783x thay vì 4782x)
+- `bridge.py`: `APP_PORTS` thêm `word/excel/ppt` (47831-47833); `wps_health`
+  nhận tham số `port`
+
 ### Added — Office ports + companion Office + excel-mcp nâng cấp (branch `main`)
 - **Port tách theo host**: WPS giữ `Port` 47821-47823; Microsoft Office dùng
   `PortOffice` mới (mặc định 47831-47833) — mở song song WPS + Office thật

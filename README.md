@@ -181,6 +181,11 @@ Troubleshooting riêng cho Office:
 Body: `{"action": "<tên>", "params": {...}}`
 Response: `{"ok": true, "result": {...}}` hoặc `{"ok": false, "error": "..."}`
 
+> **Bảo mật**: bridge từ chối mọi request có header `Origin` (chặn CSRF từ trình
+> duyệt); `POST /cmd` bắt buộc `Content-Type: application/json` (chặn "simple
+> request" của browser); token ngẫu nhiên tự sinh khi chạy `install.ps1` và bắt
+> buộc cho `/cmd` + `/config`. `GET /health` không cần token (chỉ đọc).
+
 ### Danh sách command
 
 | Action | Params | Mô tả |
@@ -241,7 +246,7 @@ print(r.json())
 | `Port` | DWORD | 47821 | Port base cho WPS (Spreadsheets +1, Presentation +2) |
 | `PortOffice` | DWORD | 47831 | Port base cho Microsoft Office (Excel +1, PowerPoint +2) |
 | `Enabled` | DWORD | 1 | 0 = tắt HTTP bridge |
-| `Token` | String | (trống) | Nếu đặt, mọi request phải kèm header `X-Auth-Token` |
+| `Token` | String | tự sinh khi install (32 hex) | Bắt buộc cho `/cmd` và `/config` (header `X-Auth-Token`); `tools/excel-mcp` tự đọc từ registry |
 | `LlmProvider` / `LlmEndpoint` / `LlmApiKey` / `LlmModel` | String | — | Cấu hình AI cho Ask AI (đặt qua dialog Settings trên ribbon) |
 
 ## Cấu trúc project
