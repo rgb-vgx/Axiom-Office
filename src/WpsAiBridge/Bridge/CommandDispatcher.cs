@@ -13,15 +13,33 @@ namespace WpsAiBridge.Bridge
 
         private const int MaxComRetries = 10;
 
+        private static int _firstCommandLogged;
+
         public static object Execute(IAppHost host, string action, Dictionary<string, object> p)
         {
+            // ai.ask giữ lệnh suốt các vòng gọi LLM (hàng chục giây); từng tool của nó tự qua ComGate.
+            // ui.askpane chuyển sang UI thread; giữ cổng ở đây có thể deadlock với UI thread đang chờ cổng.
+            bool gated = action != "ai.ask" && action != "ui.askpane";
+            if (Interlocked.Exchange(ref _firstCommandLogged, 1) == 0)
+            {
+                try
+                {
+                    Logger.Info("First bridge command '" + action + "': " + ComGate.Run(delegate { return HostProbe.Describe(host); }));
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error("First bridge command: document state unavailable", ex);
+                }
+            }
             int attempt = 0;
             while (true)
             {
                 attempt++;
                 try
                 {
-                    return ExecuteAction(host, action, p);
+                    return gated
+                        ? ComGate.Run(delegate { return ExecuteAction(host, action, p); })
+                        : ExecuteAction(host, action, p);
                 }
                 catch (COMException ex)
                 {
@@ -45,11 +63,70 @@ namespace WpsAiBridge.Bridge
 
         private static bool IsRetryableComError(COMException ex)
         {
-            int hr = ex.HResult;
-            return hr == unchecked((int)0x80010001)
-                || hr == unchecked((int)0x8001010A)
-                || hr == unchecked((int)0x80010002)
-                || hr == unchecked((int)0x800AC472);
+            return HostProbe.IsRetryable(ex);
+        }
+
+        // Lệnh writer.* luôn nhắm vào tài liệu người dùng đang thấy: nếu ActiveDocument không có cửa sổ
+        // hiển thị (tài liệu ẩn) mà có tài liệu khác đang hiển thị thì kích hoạt tài liệu đó trước.
+        private static void EnsureVisibleWordDocument(IAppHost host, string action)
+        {
+            if (host.AppKind != "wps" || !action.StartsWith("writer.", StringComparison.Ordinal)
+                || action == "writer.newDocument" || action == "writer.open" || action == "writer.closeAll")
+            {
+                return;
+            }
+            dynamic app = host.Application;
+            dynamic active;
+            try
+            {
+                active = app.ActiveDocument;
+            }
+            catch (COMException ex)
+            {
+                if (IsRetryableComError(ex))
+                {
+                    throw;
+                }
+                return;
+            }
+            if (IsWordDocumentVisible(active))
+            {
+                return;
+            }
+            dynamic documents = app.Documents;
+            int count = Convert.ToInt32(documents.Count);
+            for (int i = 1; i <= count; i++)
+            {
+                dynamic doc = documents[i];
+                if (IsWordDocumentVisible(doc))
+                {
+                    Logger.Info("ActiveDocument '" + Convert.ToString(active.FullName) + "' has no visible window; activating '" +
+                        Convert.ToString(doc.FullName) + "' for " + action);
+                    doc.Activate();
+                    return;
+                }
+            }
+        }
+
+        private static bool IsWordDocumentVisible(dynamic doc)
+        {
+            try
+            {
+                dynamic windows = doc.Windows;
+                if (Convert.ToInt32(windows.Count) == 0)
+                {
+                    return false;
+                }
+                return Convert.ToBoolean(windows[1].Visible);
+            }
+            catch (COMException ex)
+            {
+                if (IsRetryableComError(ex))
+                {
+                    throw;
+                }
+                return true;
+            }
         }
 
         public static object Health(IAppHost host, int port)
@@ -90,6 +167,7 @@ namespace WpsAiBridge.Bridge
 
         private static object ExecuteAction(IAppHost host, string action, Dictionary<string, object> p)
         {
+            EnsureVisibleWordDocument(host, action);
             switch (action)
             {
                     case "app.info":
@@ -102,7 +180,10 @@ namespace WpsAiBridge.Bridge
                         {
                             throw new InvalidOperationException("'prompt' is required");
                         }
-                        Ai.LlmResult agentResult = Ai.AiAgent.Run(host, prompt, null);
+                        Ai.LlmResult agentResult = Ai.AiAgent.Run(host, prompt, delegate(string line)
+                        {
+                            Logger.Info("ai.ask progress: " + line);
+                        });
                         var reply = new Dictionary<string, object>();
                         reply["ok"] = agentResult.Ok;
                         if (agentResult.Ok)
@@ -116,6 +197,17 @@ namespace WpsAiBridge.Bridge
                         reply["transcript"] = agentResult.Transcript;
                         reply["seconds"] = agentResult.Seconds;
                         return Ok(reply);
+                    }
+
+                    case "ui.askpane":
+                    {
+                        Connect connect = host as Connect;
+                        if (connect == null)
+                        {
+                            return Err("ui.askpane is only available inside the in-process add-in");
+                        }
+                        bool shown = connect.TryShowTaskPane();
+                        return Ok(new Dictionary<string, object> { { "taskPane", shown } });
                     }
 
                     case "writer.getText":
@@ -152,6 +244,8 @@ namespace WpsAiBridge.Bridge
                         return Ok(WriterUndo(host, p));
                     case "writer.exportPdf":
                         return Ok(WriterExportPdf(host, p));
+                    case "writer.closeAll":
+                        return Ok(WriterCloseAll(host));
                     case "writer.save":
                         return Ok(SaveDocument(host, "wps", null));
                     case "writer.saveAs":
@@ -381,6 +475,7 @@ namespace WpsAiBridge.Bridge
                 { "version", Safe(() => Convert.ToString(app.Version)) }
             };
 
+            info["state"] = Safe(() => HostProbe.Describe(host));
             if (host.AppKind == "wps")
             {
                 info["documents"] = Safe(() => Convert.ToInt32(app.Documents.Count));
@@ -1088,6 +1183,47 @@ namespace WpsAiBridge.Bridge
             dynamic doc = app.ActiveDocument;
             doc.ExportAsFixedFormat(path, 17);
             return new Dictionary<string, object> { { "exported", path } };
+        }
+
+        private static Dictionary<string, object> WriterCloseAll(IAppHost host)
+        {
+            RequireKind(host, "wps");
+            dynamic app = host.Application;
+            int closed = 0;
+            try
+            {
+                app.DisplayAlerts = 0;
+            }
+            catch
+            {
+            }
+            try
+            {
+                dynamic documents = app.Documents;
+                int count = Convert.ToInt32(documents.Count);
+                for (int i = count; i >= 1; i--)
+                {
+                    try
+                    {
+                        documents[i].Close(0);
+                        closed++;
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+            finally
+            {
+                try
+                {
+                    app.DisplayAlerts = -1;
+                }
+                catch
+                {
+                }
+            }
+            return new Dictionary<string, object> { { "closed", closed } };
         }
 
         private static Dictionary<string, object> EtFormatRange(IAppHost host, Dictionary<string, object> p)

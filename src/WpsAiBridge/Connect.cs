@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Windows.Forms;
 using WpsAiBridge.Ai;
 using WpsAiBridge.Bridge;
 using WpsAiBridge.Interop;
@@ -19,6 +20,7 @@ namespace WpsAiBridge
         private string _appKind;
         private object _ctpFactory;
         private object _taskPane;
+        private Control _uiInvoker;
 
         public Connect()
         {
@@ -60,7 +62,53 @@ namespace WpsAiBridge
             Logger.Info("CTPFactoryAvailable: task pane factory ready");
         }
 
-        public void ShowAskAiPane()
+        // Chạy trên UI thread chính của host. ui.askpane đến từ thread HTTP: tạo CTP ở đó thì RCW của
+        // pane thuộc apartment của thread HTTP, mọi lần gọi pane sau này từ UI thread phải vòng qua nó.
+        public T OnUiThread<T>(Func<T> action)
+        {
+            Control invoker = _uiInvoker;
+            if (invoker == null || !invoker.IsHandleCreated || !invoker.InvokeRequired)
+            {
+                return action();
+            }
+            return (T)invoker.Invoke(action);
+        }
+
+        public bool TryShowTaskPane()
+        {
+            return OnUiThread(ShowTaskPaneCore);
+        }
+
+        // Log độ rộng thực của CTP và nới ra nếu host bóp hẹp (WPS: bbs.wps.cn/topic/54548).
+        // CTP Width có thể là point hoặc pixel tùy host nên quy đổi theo tỉ lệ đo được.
+        public bool AdjustTaskPaneWidth(int controlWidthPx, int minWidthPx, int targetWidthPx)
+        {
+            if (_taskPane == null)
+            {
+                return true;
+            }
+            try
+            {
+                dynamic pane = _taskPane;
+                int ctpWidth = Convert.ToInt32(pane.Width);
+                Logger.Info("Task pane width: ctp=" + ctpWidth + " control=" + controlWidthPx + "px (min " + minWidthPx + "px)");
+                if (controlWidthPx <= 0 || ctpWidth <= 0 || controlWidthPx >= minWidthPx)
+                {
+                    return true;
+                }
+                int wanted = (int)Math.Round(targetWidthPx * ((double)ctpWidth / controlWidthPx));
+                pane.Width = wanted;
+                Logger.Info("Task pane width set to " + wanted + ", read back " + Convert.ToInt32(pane.Width));
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("AdjustTaskPaneWidth failed", ex);
+                return true;
+            }
+        }
+
+        private bool ShowTaskPaneCore()
         {
             try
             {
@@ -75,7 +123,7 @@ namespace WpsAiBridge
                     }
                     catch (Exception ex)
                     {
-                        Logger.Error("CreateCTP failed; falling back to dialog", ex);
+                        Logger.Error("CreateCTP failed", ex);
                         _taskPane = null;
                     }
                 }
@@ -83,14 +131,23 @@ namespace WpsAiBridge
                 {
                     dynamic pane = _taskPane;
                     pane.Visible = true;
-                    return;
+                    return true;
                 }
-                Logger.Info("Task pane unavailable; opening floating dialog");
             }
             catch (Exception ex)
             {
-                Logger.Error("ShowAskAiPane failed", ex);
+                Logger.Error("TryShowTaskPane failed", ex);
             }
+            return false;
+        }
+
+        public void ShowAskAiPane()
+        {
+            if (TryShowTaskPane())
+            {
+                return;
+            }
+            Logger.Info("Task pane unavailable; opening floating dialog");
             using (var form = new Ai.AskAiHostForm(this))
             {
                 form.ShowDialog();
@@ -127,6 +184,8 @@ namespace WpsAiBridge
             {
                 _application = Application;
                 Logger.Info("OnConnection: application reference stored");
+                CreateUiInvoker();
+                LogDocumentState("OnConnection");
                 _bridge = new HttpBridge(this);
                 _bridge.Start();
                 Logger.Info("OnConnection: bridge started, done");
@@ -154,6 +213,11 @@ namespace WpsAiBridge
                     _bridge.Stop();
                     _bridge = null;
                 }
+                if (_uiInvoker != null)
+                {
+                    _uiInvoker.Dispose();
+                    _uiInvoker = null;
+                }
             }
             catch (Exception ex)
             {
@@ -173,6 +237,38 @@ namespace WpsAiBridge
         public void OnStartupComplete(ref object custom)
         {
             Logger.Info("OnStartupComplete (host call)");
+            LogDocumentState("OnStartupComplete");
+        }
+
+        private void CreateUiInvoker()
+        {
+            try
+            {
+                _uiInvoker = new Control();
+                IntPtr handle = _uiInvoker.Handle;
+                Logger.Info("OnConnection: UI invoker ready on thread " + System.Threading.Thread.CurrentThread.ManagedThreadId);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("OnConnection: UI invoker failed", ex);
+                _uiInvoker = null;
+            }
+        }
+
+        private void LogDocumentState(string when)
+        {
+            if (_application == null)
+            {
+                return;
+            }
+            try
+            {
+                Logger.Info(when + ": " + HostProbe.Describe(this));
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(when + ": document state unavailable", ex);
+            }
         }
 
         public void OnBeginShutdown(ref object custom)
