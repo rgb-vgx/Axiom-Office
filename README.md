@@ -45,7 +45,11 @@ scripts\build.ps1
 scripts\build-native.ps1
 ```
 
-> Đóng WPS trước khi build (DLL đang được WPS giữ sẽ gây lỗi ghi file).
+> `build.ps1` hỏi Windows Restart Manager xem tiến trình nào đang giữ
+> `WpsAiBridge.dll` / `WpsAiBridge.Host.exe` (Word/Excel/PowerPoint/WPS/companion).
+> Có thì dừng và in tên + pid; `scripts\build.ps1 -Kill` để tự tắt đúng các tiến
+> trình đó (lưu tài liệu trước). Biên dịch ra `bin\Release\.stage` rồi mới chép
+> đè, nên lỗi biên dịch hay file bị lock đều giữ nguyên DLL cũ.
 
 ## Cài đặt / Gỡ
 
@@ -104,13 +108,25 @@ cùng API cho cả Microsoft Office và WPS; nếu host không hỗ trợ sẽ f
 sang cửa sổ nổi). Trong pane:
 
 1. Gõ yêu cầu (ví dụ *"Soạn cho tôi một mẫu đơn xin việc"*, *"Tạo 5 slide giới
-   thiệu công ty"*, *"Bảng điểm cho 5 học sinh"*) → **Ask**
+   thiệu công ty"*, *"Bảng điểm cho 5 học sinh"*) hoặc bấm một gợi ý → **Ask**
+   (Enter gửi, Shift+Enter xuống dòng; Ask chỉ bật khi ô nhập có chữ)
 2. AI chạy **agent mode**: gọi LLM với **tool-calling**, tự thực thi các hành
    động đọc/ghi (`writer.*` / `et.*` / `wpp.*`) **trực tiếp lên tài liệu đang
-   mở** — user thấy nội dung xuất hiện real-time; transcript từng bước hiện
-   trong pane
-3. Với Word, mỗi action của AI là **1 bước Ctrl+Z** (UndoRecord); nút
-   **Insert reply** chèn câu trả lời cuối, **Settings** mở cấu hình LLM
+   mở** — user thấy nội dung xuất hiện real-time; mỗi thao tác hiện thành một
+   dòng (dấu tick xanh / dấu x đỏ + nhãn tiếng Việt + mã action)
+3. Với Word, mỗi action của AI là **1 bước Ctrl+Z** (UndoRecord); link
+   **Chèn trả lời** chèn câu trả lời cuối, **Cài đặt** mở cấu hình LLM
+4. Link **Dừng** ở footer hủy lượt đang chạy ngay (abort request LLM đang chờ);
+   mỗi lượt có trần **5 phút** (`LlmClient.AgentTimeoutMs`), mỗi request LLM 60s.
+   Lỗi hiện thành thẻ có **Thử lại** / **Mở Cài đặt**; chưa cấu hình endpoint/model
+   thì ô nhập bị khoá kèm hướng dẫn
+
+UI vẽ bằng GDI+ theo design tokens trong `PaneTheme` (`Ai/PaneControls.cs`;
+chữ/nền đạt tương phản ≥ 4.5:1, focus ring cho bàn phím, scale theo DPI). Bubble
+nhận Tab/Ctrl+C và có menu chuột phải **Sao chép**. Transcript của mỗi lượt
+luôn có trong `bridge.log` (`AskAiPane: prompt=` / `AskAiPane progress:` /
+`AskAiPane: ok|cancelled` / `AskAiPane failed`) — ghi từ worker nên vẫn còn dấu
+vết kể cả khi pane đã đóng.
 
 Hoạt động với provider OpenAI-compatible và Anthropic (tools); nếu provider
 không hỗ trợ tools, tự fallback về chat thường. Từ bên ngoài, agent có thể gọi
@@ -122,13 +138,19 @@ Ba MCP server Python cùng pattern (làn file + làn live qua bridge):
 
 | Server | Thư mục | Tools | Làn file | Làn live |
 |---|---|---|---|---|
-| Excel | `tools/excel-mcp` | 16 | openpyxl/DuckDB (xlsx/xlsm/xls/csv/tsv) | `wps_live_*` → Excel/WPS ET |
-| Word | `tools/word-mcp` | 19 | python-docx | `word_*` → Word/WPS Writer |
-| PowerPoint | `tools/ppt-mcp` | 15 | python-pptx | `ppt_*` → PowerPoint/WPS WPP |
+| Excel | `tools/excel-mcp` | 17 | openpyxl/DuckDB (xlsx/xlsm/xls/csv/tsv) | `wps_live_*` → Excel/WPS ET |
+| Word | `tools/word-mcp` | 20 | python-docx | `word_*` → Word/WPS Writer |
+| PowerPoint | `tools/ppt-mcp` | 16 | python-pptx | `ppt_*` → PowerPoint/WPS WPP |
+
+Cả 3 server có tool **`office_sessions()`** — liệt kê mọi bridge đang sống (Office +
+WPS, nhiều app cùng lúc) từ session registry: `app`, `family`, `port`, `host`,
+`document`, `healthy`. Truyền `port` lấy từ đây vào `wps_live_command` /
+`word_command` / `ppt_command` để nhắm đúng instance thay vì đoán port. Trong
+code Python: `bridge.sessions()` và `bridge.es_hint()` (URL + ví dụ curl cho `/events`).
 
 ### excel-mcp
 
-MCP server Python cho AI agent thao tác Excel qua 2 làn (16 tools):
+MCP server Python cho AI agent thao tác Excel qua 2 làn (17 tools):
 
 - **Làn file** (không cần app mở): `excel_profile`, `excel_read` (paging,
   `show_formula`), `excel_query` (DuckDB SQL, bảng `data`), `excel_write`,
@@ -258,6 +280,14 @@ Troubleshooting riêng cho Office:
 - Add-in bị disable sau crash (cơ chế Resiliency của Office): xoá entry trong
   `HKCU\Software\Microsoft\Office\16.0\{Word,Excel,PowerPoint}\Resiliency\DisabledItems`
   rồi chạy lại `install.ps1` để khôi phục `LoadBehavior=3`.
+- Sau khi Word crash, lần mở kế tiếp có thể dừng ở hộp thoại *"start in safe
+  mode?"* — add-in chưa nạp nên `/health` không trả lời cho tới khi đóng hộp thoại.
+- Word luôn có một cửa sổ `OpusApp` **ẩn, không title** ngay từ lúc khởi động
+  (có trước cả khi tạo task pane) — đó là cửa sổ của Word, không phải của add-in.
+  `app.info` trả `state` (số tài liệu, tài liệu active, các cửa sổ + visible); log
+  ghi trạng thái này ở `OnConnection`, `OnStartupComplete` và lệnh bridge đầu tiên.
+  Lệnh `writer.*` tự kích hoạt tài liệu có cửa sổ hiển thị nếu `ActiveDocument`
+  là tài liệu ẩn.
 - Companion hiện nhận `KWPS/KET/KWPP.Application` (WPS); hỗ trợ
   `Word/Excel/PowerPoint.Application` cho MS Office đang phát triển —
   xem `docs/office-integration.md` khi có.
@@ -278,7 +308,74 @@ Response: `{"ok": true, "result": {...}}` hoặc `{"ok": false, "error": "..."}`
 > **Bảo mật**: bridge từ chối mọi request có header `Origin` (chặn CSRF từ trình
 > duyệt); `POST /cmd` bắt buộc `Content-Type: application/json` (chặn "simple
 > request" của browser); token ngẫu nhiên tự sinh khi chạy `install.ps1` và bắt
-> buộc cho `/cmd` + `/config`. `GET /health` không cần token (chỉ đọc).
+> buộc cho `/cmd`, `/config`, `/session`, `/events`. `GET /health` không cần token (chỉ đọc).
+
+### `GET /session` (cần token)
+
+Thông tin của chính bridge này, đọc tài liệu đang mở **ngay lúc gọi**:
+
+```json
+{"ok":true,"result":{"pid":5128,"app":"wps","family":"office","port":47831,"host":"WINWORD.EXE",
+ "version":"1.0.0","started":"2026-09-28T21:25:42.965Z","lastSeen":"...","lastSeenEpoch":1790630759.1,
+ "document":"phase1_doc.docx","documentPath":"C:\\...\\phase1_doc.docx","sessionFile":"..."}}
+```
+
+`app` là loại logic (`wps` = Writer/Word, `et` = Spreadsheets/Excel, `wpp` =
+Presentation/PowerPoint); `family` = `office` | `wps`. `document` = `null` khi
+host không có tài liệu nào mở (host bận quá 2s thì trả giá trị đã cache).
+
+### Session registry
+
+Mỗi bridge (add-in in-proc lẫn companion) khi start ghi
+`%LOCALAPPDATA%\WpsAiBridge\sessions\{pid}.json` (cùng nội dung `/session`),
+heartbeat mỗi **25s** (cập nhật `lastSeen` + tên tài liệu) và xoá file khi
+`OnDisconnection` / `Stop()`. Việc đọc tài liệu cho heartbeat chạy nền, chờ tối
+đa 2s và bỏ qua lượt khi bridge đang chạy lệnh trong host — Word bận không làm
+trễ heartbeat. `bridge.sessions()` (Python) prune file khi process đã chết, hoặc
+heartbeat quá 90s mà `/health` cũng không trả lời; bridge đang bận một lệnh dài
+(heartbeat còn mới) vẫn được giữ với `healthy: false`.
+
+### `GET /events` (cần token) — Server-Sent Events
+
+```powershell
+curl.exe -N -H "X-Auth-Token: <token>" http://127.0.0.1:47831/events
+```
+
+```
+event: hello
+data: {"app":"wps","family":"office","port":47831,"pid":5128,"subscribers":1}
+
+event: document
+data: {"app":"wps","name":"phase2_other.docx","fullName":"C:\\...\\phase2_other.docx"}
+
+event: selection
+data: {"app":"wps","text":"m tra hoi q","start":4,"end":15}
+
+event: ping
+data: {"time":"2026-09-28T21:26:27.055Z","subscribers":1}
+```
+
+| Event | Khi nào | Data |
+|---|---|---|
+| `hello` | ngay khi kết nối | `app`, `family`, `port`, `pid`, `subscribers` |
+| `document` | tài liệu active đổi (gửi lại cho subscriber mới) | `app`, `name`, `fullName` (`null` khi không có tài liệu) |
+| `selection` | vùng chọn đổi | Writer/Word: `text` (≤ 200 ký tự), `start`, `end`; ET/Excel: `sheet`, `address`, `text` = giá trị ô trên-trái; WPP/PowerPoint: `slide`, `type` (text/shapes/slides/none), `shape`, `text`, `start`, `end` |
+| `ping` | mỗi 15s | `time`, `subscribers` |
+
+V1 dùng **poll-diff 500ms** (không COM event sink — chạy giống nhau trên Office
+và WPS); poller chỉ chạy khi có subscriber, tối đa **5 subscriber** mỗi bridge
+(cái thứ 6 nhận `503`). Mỗi kết nối có thread ghi riêng nên `/cmd` và các endpoint
+khác không bị chặn. Host bận (hoặc bridge đang chạy lệnh) thì bỏ qua vòng poll
+đó; lỗi COM được log tối đa 1 lần/phút mỗi loại.
+
+### Truy cập COM tuần tự (`ComGate`)
+
+Pump HTTP, agent của pane, heartbeat session và poller SSE đều gọi object model
+của host qua `Bridge/ComGate.cs`: tại một thời điểm chỉ một thread của bridge ở
+trong host. Lệnh `/cmd` và tool của agent chờ tới lượt; heartbeat/poller chỉ chạy
+khi cổng rảnh. Object model Office không an toàn đa luồng — thiếu cổng này Word
+đã crash (AV trong `wwlib.dll`) khi heartbeat đọc `ActiveDocument` đúng lúc
+`ai.ask` đang ghi.
 
 ### Danh sách command
 
@@ -398,6 +495,12 @@ scripts/uninstall.ps1       gỡ đăng ký
   trả về đúng tên chuỗi; riêng `#N/A` trùng mã với ô trống qua `Value2` nên
   vẫn về `null` (giới hạn đã biết của COM).
 - **Port bận**: một app khác đang giữ port — kiểm tra `netstat -ano | findstr 4782`.
+- **Tìm bridge đang sống**: xem `%LOCALAPPDATA%\WpsAiBridge\sessions\*.json` hoặc
+  gọi `office_sessions()` từ MCP server.
+- **Task pane hẹp trên WPS 12**: CTP của WPS mở ra ~250px và áp `Width` trễ; pane
+  tự đo lại sau khi host layout (tối đa 3 lần, mỗi 500ms) và nới về 360px — log
+  `Task pane width: ctp=... control=...px`. Đã kiểm chứng trên WPS 12.1.0.28485
+  (250 → 360px).
 - Kiến trúc WPS 12: mọi component (Writer/ET/WPP) chạy chung binary `wps.exe`
   với flag `/wps`, `/et`, `/wpp` — đừng tin tưởng tên process để phân biệt app,
   bridge dùng COM probe.

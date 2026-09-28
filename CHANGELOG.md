@@ -5,6 +5,77 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Event stream SSE `GET /events` (Phase 2)
+- Mỗi bridge phát Server-Sent Events: `hello`, `document` (tài liệu active đổi),
+  `selection` (Writer: text ≤ 200 ký tự + start/end; ET: sheet + address + giá trị
+  ô trên-trái; WPP: slide/type/shape/text), `ping` mỗi 15s
+- V1 poll-diff 500ms (không COM event sink — chạy giống nhau Office/WPS), poller chỉ
+  chạy khi có subscriber, tối đa 5 subscriber (thứ 6 nhận 503); mỗi kết nối có thread
+  ghi riêng nên `/cmd` không bị chặn (đo: 12 ms trong lúc stream); lỗi COM log tối đa
+  1 lần/phút mỗi loại
+- Python: `bridge.es_hint()` trong cả 3 MCP (URL `/events` + ví dụ curl)
+- Đã verify: Word 47831 (selection khi bôi đen, document khi mở file khác, ping),
+  Excel 47832 (selection theo địa chỉ `$B$2`, `$C$3:$D$5`), WPS Writer 47821
+
+### Added — Session registry + `GET /session` (Phase 1)
+- `Bridge/SessionRegistry.cs`: mỗi bridge ghi `%LOCALAPPDATA%\WpsAiBridge\sessions\{pid}.json`
+  (`pid`, `app`, `family` office|wps, `port`, `host`, `started`, `lastSeen`, `document`),
+  heartbeat 25s, xoá file khi Stop/OnDisconnection; đọc tên tài liệu chạy nền, chờ tối
+  đa 2s, host bận thì giữ giá trị cũ (heartbeat không bao giờ trễ vì Word bận)
+- `GET /session` (cần token): thông tin bridge + tài liệu đọc live lúc gọi
+- Python `bridge.sessions()` trong cả 3 MCP: đọc registry, gọi `/health` (1.5s) để đánh
+  dấu `healthy`, prune khi process chết hoặc heartbeat > 90s mà health cũng fail
+  (bridge đang bận lệnh dài vẫn được giữ, `healthy: false`) + unittest 5 case
+- MCP tool `office_sessions()` cho cả 3 server; docstring `wps_live_command` /
+  `word_command` / `ppt_command` hướng dẫn truyền `port` lấy từ danh sách này
+- Đã verify: Word + Excel cùng lúc → 2 session đúng port/family; WPS Writer → family `wps`;
+  kill Word/WPS → session bị prune; regression `/health` 200, `/cmd` 401/415/403, `ai.ask` ok
+
+### Changed — Ask AI pane thiết kế lại
+- Design tokens `PaneTheme` (màu theo vai trò, font Segoe UI/Semibold tạo một lần, spacing,
+  radius, scale theo DPI); nút Ask/link đổi sang `#4F46E5` vì trắng trên `#6366F1` chỉ đạt
+  4.47:1; viền ô nhập `#8C93A0` (3.09:1)
+- Empty state có tiêu đề theo loại tài liệu + 3 chip gợi ý xếp dọc (theo host Writer/ET/WPP);
+  bubble có "đuôi", nhận Tab/Ctrl+C và menu Sao chép; dòng tool activity (tick xanh / x đỏ +
+  nhãn tiếng Việt + mã action, tooltip là dòng log gốc); typing 3 chấm tôn trọng reduced motion
+- Composer tự cao 2–5 dòng, Ask chỉ bật khi có chữ, khoá kèm hướng dẫn khi chưa cấu hình AI;
+  footer có trạng thái + chấm "đang chạy" + link **Dừng** / **Chèn trả lời**; thẻ lỗi có
+  **Thử lại** / **Mở Cài đặt**; trạng thái xong/lỗi được báo cho trình đọc màn hình
+- `PromptBox`: edit multiline không phát `EN_CHANGE` khi text đặt bằng `WM_SETTEXT` (UIA,
+  automation) — tự báo `TextChanged` để Ask bật
+
+### Fixed
+- **Word crash (AV `wwlib.dll`) khi nhiều thread cùng gọi COM**: heartbeat đọc
+  `ActiveDocument` đúng lúc `ai.ask` đang ghi → cuộc gọi thứ hai được Word dispatch
+  reentrant. `Bridge/ComGate.cs` tuần tự hoá mọi truy cập object model của bridge (Pump,
+  agent của pane, heartbeat, poller); heartbeat/poller bỏ qua lượt khi cổng bận
+- **Agent chạy mãi không kết thúc / kết thúc âm thầm** (BUG-1): trần 5 phút cho cả lượt
+  (`LlmClient.AgentTimeoutMs`), hủy qua `CancellationToken` (abort request LLM đang chờ,
+  không chạy thêm tool); log kết quả ghi ngay trên worker; `BeginInvoke` thất bại và lỗi
+  trong callback UI đều được log thay vì `catch {}`; `ai.ask` log từng tool (`ai.ask progress:`).
+  Không tái hiện được treo trên build hiện tại (cùng prompt bảng điểm: 16.9s, 2 tool calls)
+- **Tài liệu ẩn** (BUG-2): cửa sổ `OpusApp` ẩn không title là của Word, có từ lúc khởi động
+  (trước khi tạo pane). Log trạng thái tài liệu/cửa sổ ở `OnConnection`, `OnStartupComplete`,
+  lệnh bridge đầu tiên và trong `app.info.state`; `writer.*` kích hoạt tài liệu đang hiển thị
+  nếu `ActiveDocument` không có cửa sổ visible
+- **Chip gợi ý không được layout lúc mở pane** (BUG-3): empty state đi qua `ChatList.AddBlock`
+- **Task pane hẹp trên WPS** (BUG-6): pane đo lại độ rộng sau khi host layout, quy đổi đơn vị
+  CTP theo tỉ lệ đo được và nới về 360px; WPS 12.1.0.28485: 250 → 360px
+- `ui.askpane` tạo CTP trên UI thread chính (trước đây chạy trên thread HTTP nên RCW của pane
+  thuộc apartment khác)
+- Danh sách chat không cuộn hết xuống cuối (AutoScroll bỏ qua Padding đáy; scrollbar xuất hiện
+  làm bubble cao thêm): `AutoScrollMargin` + giữ vị trí cuối khi đo lại
+- **Build làm mất DLL** (BUG-8): `build.ps1` hỏi Restart Manager tiến trình nào đang lock DLL/EXE
+  (assembly .NET không hiện trong `Process.Modules`), dừng kèm tên + pid hoặc `-Kill`; biên dịch
+  vào `.stage` rồi mới chép đè; dọn `<guid>_WpsAiBridge.dll` còn sót
+
+### Ideas (chưa làm)
+- Event stream là nền cho timeline/transaction sau này: thêm event `change` (hash nội dung
+  theo đoạn) để agent biết user vừa sửa gì mà không cần đọc lại cả tài liệu
+- Poll-diff đủ cho selection/document; khi cần độ trễ thấp hơn có thể chuyển Writer sang
+  COM event sink (`WindowSelectionChange`) nhưng phải giữ đường poll cho WPS
+
+
 ### Added — Ask AI dạng Task Pane + AI agent thao tác live
 - **Ask AI = task pane dock trong app** (`ICustomTaskPaneConsumer`/`ICTPFactory`
   — cùng API cho Microsoft Office và WPS), fallback cửa sổ nổi nếu host không
