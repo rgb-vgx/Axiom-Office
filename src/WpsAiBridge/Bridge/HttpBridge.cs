@@ -110,6 +110,19 @@ namespace WpsAiBridge.Bridge
                 path = "/";
             }
 
+            string origin = context.Request.Headers["Origin"];
+            if (!string.IsNullOrEmpty(origin))
+            {
+                WriteJson(context, 403, Error("requests with an Origin header are not allowed"));
+                return;
+            }
+
+            if (path == "/health" && context.Request.HttpMethod == "GET")
+            {
+                WriteJson(context, 200, CommandDispatcher.Health(_host, _port));
+                return;
+            }
+
             string token = Config.Token;
             if (!string.IsNullOrEmpty(token))
             {
@@ -121,12 +134,6 @@ namespace WpsAiBridge.Bridge
                 }
             }
 
-            if (path == "/health" && context.Request.HttpMethod == "GET")
-            {
-                WriteJson(context, 200, CommandDispatcher.Health(_host, _port));
-                return;
-            }
-
             if (path == "/config" && context.Request.HttpMethod == "GET")
             {
                 WriteJson(context, 200, CommandDispatcher.ConfigInfo());
@@ -135,6 +142,13 @@ namespace WpsAiBridge.Bridge
 
             if (path == "/cmd" && context.Request.HttpMethod == "POST")
             {
+                string contentType = context.Request.ContentType ?? "";
+                if (contentType.IndexOf("application/json", StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    WriteJson(context, 415, Error("Content-Type must be application/json"));
+                    return;
+                }
+
                 string body = ReadBody(context);
                 Dictionary<string, object> request;
                 try

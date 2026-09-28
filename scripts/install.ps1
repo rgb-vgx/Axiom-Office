@@ -70,6 +70,15 @@ if ($config.GetValue("PortOffice") -eq $null) {
 if ($config.GetValue("Enabled") -eq $null) {
     $config.SetValue("Enabled", 1, [Microsoft.Win32.RegistryValueKind]::DWord)
 }
+$token = $config.GetValue("Token")
+$tokenGenerated = $false
+if ([string]::IsNullOrEmpty($token)) {
+    $bytes = New-Object byte[] 16
+    [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+    $token = -join ($bytes | ForEach-Object { $_.ToString("x2") })
+    $config.SetValue("Token", $token, [Microsoft.Win32.RegistryValueKind]::String)
+    $tokenGenerated = $true
+}
 $port = $config.GetValue("Port")
 $portOffice = $config.GetValue("PortOffice")
 $config.Close()
@@ -80,6 +89,12 @@ Write-Output "  ProgID:   $progId"
 Write-Output "  WPS:      Word $port / Spreadsheets $($port + 1) / Presentation $($port + 2)"
 Write-Output "  Office:   Word $portOffice / Excel $($portOffice + 1) / PowerPoint $($portOffice + 2)"
 Write-Output "  Config:   HKCU\Software\WpsAiBridge (Port, PortOffice, Token, Enabled)"
+if ($tokenGenerated) {
+    Write-Output "  Token:    auto-generated (32 hex) - requests to /cmd and /config must send X-Auth-Token"
+    Write-Output "            (python tools/excel-mcp reads it from the registry automatically)"
+} else {
+    Write-Output "  Token:    existing value kept"
+}
 Write-Output ""
 Write-Output "Next: open WPS or Microsoft Office (Word/Excel/PowerPoint)."
 Write-Output "Companion: WpsAiBridge.Host.exe wps|et|wpp for WPS, word|excel|ppt for Microsoft Office."
