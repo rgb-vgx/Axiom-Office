@@ -5,6 +5,20 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — MCP server Word (`tools/word-mcp`) và PowerPoint (`tools/ppt-mcp`)
+- `word-mcp` (19 tools): làn file python-docx (profile/get_text/find_text/
+  extract_table/create — atomic save) + làn live qua bridge (health, command,
+  read/type/styled text, format_selection, heading, insert_table/image/hyperlink,
+  replace_all, export_pdf, undo, save) — mặc định Microsoft Word, `app="wps"` cho WPS
+- `ppt-mcp` (15 tools): làn file python-pptx (profile/get_text/create/add_slide_file)
+  + làn live (health, command, list/add slide, add_text, add_image, add_table,
+  set_notes, delete_slide, export_pdf, save)
+- Mỗi server: venv riêng, run.cmd, unittest (word 5/5, ppt 4/4), MCP protocol
+  roundtrip pass trên Word/PowerPoint thật
+- **fix**: `writer.undo` dùng `Document.Undo` (Word object model không có
+  `Application.Undo`); undo theo UndoRecord hoạt động end-to-end — `undo x2`
+  hoàn tác heading + table đúng 2 bước về text gốc
+
 ### Added — Live command pack v2 (tham khảo ppt-mcp / word-mcp-live)
 - **Word** (10 lệnh mới): `insertStyledText`, `formatSelection`,
   `setParagraphAlignment`, `insertTable` (kèm dữ liệu + style), `insertPageBreak`,

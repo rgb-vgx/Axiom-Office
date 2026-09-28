@@ -95,7 +95,17 @@ Add-in in-proc thêm tab **"WPS AI Bridge"** trên ribbon (WPS gọi
 Callback của nút đi qua `IDispatch` (class dùng `ClassInterfaceType.AutoDispatch`),
 tag từng nút được log tại `OnButtonAction` trong bridge.log.
 
-## MCP server (`tools/excel-mcp`)
+## MCP servers (`tools/`)
+
+Ba MCP server Python cùng pattern (làn file + làn live qua bridge):
+
+| Server | Thư mục | Tools | Làn file | Làn live |
+|---|---|---|---|---|
+| Excel | `tools/excel-mcp` | 16 | openpyxl/DuckDB (xlsx/xlsm/xls/csv/tsv) | `wps_live_*` → Excel/WPS ET |
+| Word | `tools/word-mcp` | 19 | python-docx | `word_*` → Word/WPS Writer |
+| PowerPoint | `tools/ppt-mcp` | 15 | python-pptx | `ppt_*` → PowerPoint/WPS WPP |
+
+### excel-mcp
 
 MCP server Python cho AI agent thao tác Excel qua 2 làn (16 tools):
 
@@ -135,6 +145,62 @@ python -m venv .venv
       "command": "<repo>\\tools\\excel-mcp\\.venv\\Scripts\\python.exe",
       "args": ["-m", "excel_mcp.server"],
       "env": { "PYTHONPATH": "<repo>\\tools\\excel-mcp" }
+    }
+  }
+}
+```
+
+### word-mcp
+
+```powershell
+cd tools\word-mcp
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+.venv\Scripts\python.exe -m unittest discover -s tests
+.venv\Scripts\python.exe -m word_mcp.server   # hoặc run.cmd
+```
+
+Live tools mặc định gọi Microsoft Word (47831); truyền `app="wps"` để dùng WPS
+Writer (47821). Tools: `word_read_text`, `word_type_text`, `word_insert_styled_text`,
+`word_format_selection`, `word_heading`, `word_insert_table`, `word_insert_image`,
+`word_insert_hyperlink`, `word_replace_all`, `word_export_pdf`, `word_undo`,
+`word_save`, `word_health`, `word_command` (passthrough). Mọi thao tác ghi của AI
+= **1 bước Ctrl+Z** (Word UndoRecord).
+
+```json
+{
+  "mcpServers": {
+    "word-tools": {
+      "command": "<repo>\\tools\\word-mcp\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "word_mcp.server"],
+      "env": { "PYTHONPATH": "<repo>\\tools\\word-mcp" }
+    }
+  }
+}
+```
+
+### ppt-mcp
+
+```powershell
+cd tools\ppt-mcp
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+.venv\Scripts\python.exe -m unittest discover -s tests
+.venv\Scripts\python.exe -m ppt_mcp.server   # hoặc run.cmd
+```
+
+Live mặc định Microsoft PowerPoint (47833); `app="wpp"` cho WPS Presentation
+(47823). Tools: `ppt_list_slides`, `ppt_add_slide`, `ppt_add_text`, `ppt_add_image`,
+`ppt_add_table`, `ppt_set_notes`, `ppt_delete_slide`, `ppt_export_pdf`, `ppt_save`,
+`ppt_health`, `ppt_command` (passthrough).
+
+```json
+{
+  "mcpServers": {
+    "ppt-tools": {
+      "command": "<repo>\\tools\\ppt-mcp\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "ppt_mcp.server"],
+      "env": { "PYTHONPATH": "<repo>\\tools\\ppt-mcp" }
     }
   }
 }
