@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using WpsAiBridge.Bridge;
 
 namespace WpsAiBridge.Ai
@@ -7,6 +8,11 @@ namespace WpsAiBridge.Ai
     internal static class AiAgent
     {
         public static LlmResult Run(IAppHost host, string prompt, Action<string> progress)
+        {
+            return Run(host, prompt, progress, CancellationToken.None);
+        }
+
+        public static LlmResult Run(IAppHost host, string prompt, Action<string> progress, CancellationToken cancel)
         {
             string kind = host.AppKind;
             string appName;
@@ -34,7 +40,7 @@ namespace WpsAiBridge.Ai
             {
                 return OfficeActionTool.Execute(host, name, args);
             };
-            return LlmClient.RunAgent(system, prompt, tools, executor, 8, progress);
+            return LlmClient.RunAgent(system, prompt, tools, executor, 8, progress, cancel);
         }
     }
 }

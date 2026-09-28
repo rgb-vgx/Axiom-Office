@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Text;
+using System.Threading;
 using System.Web.Script.Serialization;
 using WpsAiBridge.Bridge;
 
@@ -16,12 +17,17 @@ namespace WpsAiBridge.Ai
         public string Text;
         public string Error;
         public double Seconds;
+        public bool Cancelled;
+        public bool TimedOut;
         public List<string> Transcript = new List<string>();
     }
 
     internal static class LlmClient
     {
         private const int TimeoutMs = 60000;
+
+        // Trần thời gian cho cả một lượt agent (mọi vòng LLM + tool). Mỗi request HTTP vẫn có TimeoutMs riêng.
+        public const int AgentTimeoutMs = 300000;
 
         public static LlmResult Chat(string systemPrompt, string userPrompt)
         {
@@ -149,7 +155,17 @@ namespace WpsAiBridge.Ai
 
         private static string PostJson(string url, string json, Action<HttpWebRequest> configure, out string error)
         {
+            return PostJson(url, json, configure, CancellationToken.None, out error);
+        }
+
+        private static string PostJson(string url, string json, Action<HttpWebRequest> configure, CancellationToken cancel, out string error)
+        {
             error = null;
+            if (cancel.IsCancellationRequested)
+            {
+                error = "cancelled";
+                return null;
+            }
             try
             {
                 var request = (HttpWebRequest)WebRequest.Create(url);
@@ -164,18 +180,27 @@ namespace WpsAiBridge.Ai
                 }
                 byte[] data = Encoding.UTF8.GetBytes(json);
                 request.ContentLength = data.Length;
-                using (Stream stream = request.GetRequestStream())
+                // Hủy / hết giờ tổng: Abort() làm request đang chờ ném WebException(RequestCanceled) ngay.
+                using (cancel.Register(delegate { request.Abort(); }))
                 {
-                    stream.Write(data, 0, data.Length);
-                }
-                using (var response = (HttpWebResponse)request.GetResponse())
-                using (var reader = new StreamReader(response.GetResponseStream(), Encoding.UTF8))
-                {
-                    return reader.ReadToEnd();
+                    using (Stream stream = request.GetRequestStream())
+                    {
+                        stream.Write(data, 0, data.Length);
+                    }
+                    using (var response = (HttpWebResponse)request.GetResponse())
+                    using (var reader = new StreamReader(response.GetResponseStream(), Encoding.UTF8))
+                    {
+                        return reader.ReadToEnd();
+                    }
                 }
             }
             catch (WebException wex)
             {
+                if (cancel.IsCancellationRequested)
+                {
+                    error = "cancelled";
+                    return null;
+                }
                 string body = "";
                 try
                 {
@@ -273,10 +298,13 @@ namespace WpsAiBridge.Ai
         }
 
         public static LlmResult RunAgent(string systemPrompt, string userPrompt, List<LlmToolDef> tools,
-            Func<string, string, string> executor, int maxIterations, Action<string> progress)
+            Func<string, string, string> executor, int maxIterations, Action<string> progress,
+            CancellationToken cancel = default(CancellationToken))
         {
             var result = new LlmResult();
             var watch = Stopwatch.StartNew();
+            var deadline = new CancellationTokenSource(AgentTimeoutMs);
+            var linked = CancellationTokenSource.CreateLinkedTokenSource(cancel, deadline.Token);
             try
             {
                 string endpoint = (Config.LlmEndpoint ?? "").Trim();
@@ -300,11 +328,11 @@ namespace WpsAiBridge.Ai
 
                 if (Config.LlmProvider == "anthropic")
                 {
-                    RunAnthropicAgent(result, endpoint, apiKey, model, systemPrompt, userPrompt, tools, executor, maxIterations, progress, serializer);
+                    RunAnthropicAgent(result, endpoint, apiKey, model, systemPrompt, userPrompt, tools, executor, maxIterations, progress, serializer, linked.Token);
                 }
                 else
                 {
-                    RunOpenAiAgent(result, endpoint, apiKey, model, systemPrompt, userPrompt, tools, executor, maxIterations, progress, serializer);
+                    RunOpenAiAgent(result, endpoint, apiKey, model, systemPrompt, userPrompt, tools, executor, maxIterations, progress, serializer, linked.Token);
                 }
             }
             catch (Exception ex)
@@ -315,6 +343,22 @@ namespace WpsAiBridge.Ai
             {
                 watch.Stop();
                 result.Seconds = watch.Elapsed.TotalSeconds;
+                if (linked.IsCancellationRequested)
+                {
+                    result.Ok = false;
+                    if (cancel.IsCancellationRequested)
+                    {
+                        result.Cancelled = true;
+                        result.Error = "cancelled by user";
+                    }
+                    else
+                    {
+                        result.TimedOut = true;
+                        result.Error = "agent timed out after " + (AgentTimeoutMs / 1000) + "s";
+                    }
+                }
+                linked.Dispose();
+                deadline.Dispose();
             }
             return result;
         }
@@ -322,7 +366,7 @@ namespace WpsAiBridge.Ai
         private static void RunOpenAiAgent(LlmResult result, string endpoint, string apiKey, string model,
             string systemPrompt, string userPrompt, List<LlmToolDef> tools,
             Func<string, string, string> executor, int maxIterations, Action<string> progress,
-            JavaScriptSerializer serializer)
+            JavaScriptSerializer serializer, CancellationToken cancel)
         {
             var messages = new List<object>();
             messages.Add(new Dictionary<string, object> { { "role", "system" }, { "content", systemPrompt } });
@@ -334,6 +378,10 @@ namespace WpsAiBridge.Ai
 
             for (int iteration = 0; iteration < maxIterations && finalText == null; iteration++)
             {
+                if (cancel.IsCancellationRequested)
+                {
+                    return;
+                }
                 var body = new Dictionary<string, object>();
                 body["model"] = model;
                 body["messages"] = messages.ToArray();
@@ -350,9 +398,13 @@ namespace WpsAiBridge.Ai
                         {
                             request.Headers["Authorization"] = "Bearer " + apiKey;
                         }
-                    }, out error);
+                    }, cancel, out error);
                 if (responseText == null)
                 {
+                    if (cancel.IsCancellationRequested)
+                    {
+                        return;
+                    }
                     if (toolsEnabled && error != null && error.ToLowerInvariant().Contains("tool"))
                     {
                         toolsEnabled = false;
@@ -390,6 +442,10 @@ namespace WpsAiBridge.Ai
                     var function = call.ContainsKey("function") ? call["function"] as Dictionary<string, object> : null;
                     string name = function != null ? Convert.ToString(function["name"]) : "";
                     string arguments = function != null && function.ContainsKey("arguments") ? Convert.ToString(function["arguments"]) : "{}";
+                    if (cancel.IsCancellationRequested)
+                    {
+                        return;
+                    }
                     string execResult = ExecuteTool(executor, name, arguments);
                     AddTranscript(result, progress, ToolLine(name, arguments, execResult));
                     messages.Add(new Dictionary<string, object>
@@ -406,7 +462,7 @@ namespace WpsAiBridge.Ai
         private static void RunAnthropicAgent(LlmResult result, string endpoint, string apiKey, string model,
             string systemPrompt, string userPrompt, List<LlmToolDef> tools,
             Func<string, string, string> executor, int maxIterations, Action<string> progress,
-            JavaScriptSerializer serializer)
+            JavaScriptSerializer serializer, CancellationToken cancel)
         {
             var messages = new List<object>();
             messages.Add(new Dictionary<string, object> { { "role", "user" }, { "content", userPrompt } });
@@ -417,6 +473,10 @@ namespace WpsAiBridge.Ai
 
             for (int iteration = 0; iteration < maxIterations && finalText == null; iteration++)
             {
+                if (cancel.IsCancellationRequested)
+                {
+                    return;
+                }
                 var body = new Dictionary<string, object>();
                 body["model"] = model;
                 body["max_tokens"] = 4096;
@@ -436,9 +496,13 @@ namespace WpsAiBridge.Ai
                             request.Headers["x-api-key"] = apiKey;
                         }
                         request.Headers["anthropic-version"] = "2023-06-01";
-                    }, out error);
+                    }, cancel, out error);
                 if (responseText == null)
                 {
+                    if (cancel.IsCancellationRequested)
+                    {
+                        return;
+                    }
                     if (toolsEnabled && error != null && error.ToLowerInvariant().Contains("tool"))
                     {
                         toolsEnabled = false;
@@ -487,6 +551,10 @@ namespace WpsAiBridge.Ai
                     string id = Convert.ToString(toolUse.ContainsKey("id") ? toolUse["id"] : "");
                     string name = Convert.ToString(toolUse.ContainsKey("name") ? toolUse["name"] : "");
                     string inputJson = toolUse.ContainsKey("input") ? serializer.Serialize(toolUse["input"]) : "{}";
+                    if (cancel.IsCancellationRequested)
+                    {
+                        return;
+                    }
                     string execResult = ExecuteTool(executor, name, inputJson);
                     AddTranscript(result, progress, ToolLine(name, inputJson, execResult));
                     toolResults.Add(new Dictionary<string, object>

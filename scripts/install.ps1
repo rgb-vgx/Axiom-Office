@@ -18,7 +18,7 @@ function New-Key([string]$path) {
     return $currentUser.CreateSubKey($path)
 }
 
-function Register-ComClass([string]$progIdToRegister, [string]$classGuidToRegister) {
+function Register-ComClass([string]$progIdToRegister, [string]$classGuidToRegister, [string]$className) {
     $progKey = New-Key "Software\Classes\$progIdToRegister"
     $progKey.SetValue("", $progIdToRegister, [Microsoft.Win32.RegistryValueKind]::String)
     $progClsid = $progKey.CreateSubKey("CLSID")
@@ -33,7 +33,7 @@ function Register-ComClass([string]$progIdToRegister, [string]$classGuidToRegist
     $inproc.SetValue("CodeBase", $codeBase, [Microsoft.Win32.RegistryValueKind]::String)
     $versioned = $inproc.CreateSubKey($dllVersion)
     $versioned.SetValue("Assembly", "WpsAiBridge, Version=$dllVersion, Culture=neutral, PublicKeyToken=null", [Microsoft.Win32.RegistryValueKind]::String)
-    $versioned.SetValue("Class", $progIdToRegister, [Microsoft.Win32.RegistryValueKind]::String)
+    $versioned.SetValue("Class", $className, [Microsoft.Win32.RegistryValueKind]::String)
     $versioned.SetValue("RuntimeVersion", "v4.0.30319", [Microsoft.Win32.RegistryValueKind]::String)
     $versioned.SetValue("CodeBase", $codeBase, [Microsoft.Win32.RegistryValueKind]::String)
     $versioned.Close()
@@ -41,8 +41,8 @@ function Register-ComClass([string]$progIdToRegister, [string]$classGuidToRegist
     $clsidKey.Close()
 }
 
-Register-ComClass $progId $classGuid
-Register-ComClass "WpsAiBridge.AskAiPane" "{D99F8693-4316-45AF-8916-B70D87DEEF87}"
+Register-ComClass $progId $classGuid $progId
+Register-ComClass "WpsAiBridge.AskAiPane" "{D99F8693-4316-45AF-8916-B70D87DEEF87}" "WpsAiBridge.Ai.AskAiPane"
 
 foreach ($officeApp in @("Word", "Excel", "PowerPoint")) {
     $key = New-Key "Software\Microsoft\Office\$officeApp\Addins\$progId"
