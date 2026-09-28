@@ -60,7 +60,25 @@ namespace WpsAiBridge.Bridge
 
         public static string LlmApiKey
         {
-            get { return ReadString("LlmApiKey", ""); }
+            get
+            {
+                string raw = ReadString("LlmApiKey", "");
+                if (raw.StartsWith("dpapi:", StringComparison.Ordinal))
+                {
+                    try
+                    {
+                        byte[] encrypted = Convert.FromBase64String(raw.Substring(6));
+                        byte[] plain = System.Security.Cryptography.ProtectedData.Unprotect(
+                            encrypted, null, System.Security.Cryptography.DataProtectionScope.CurrentUser);
+                        return System.Text.Encoding.UTF8.GetString(plain);
+                    }
+                    catch
+                    {
+                        return "";
+                    }
+                }
+                return raw;
+            }
         }
 
         public static string LlmModel
@@ -82,6 +100,21 @@ namespace WpsAiBridge.Bridge
             }
             catch
             {
+            }
+        }
+
+        public static void WriteSecret(string name, string value)
+        {
+            try
+            {
+                byte[] plain = System.Text.Encoding.UTF8.GetBytes(value ?? "");
+                byte[] encrypted = System.Security.Cryptography.ProtectedData.Protect(
+                    plain, null, System.Security.Cryptography.DataProtectionScope.CurrentUser);
+                WriteString(name, "dpapi:" + Convert.ToBase64String(encrypted));
+            }
+            catch
+            {
+                WriteString(name, value);
             }
         }
 

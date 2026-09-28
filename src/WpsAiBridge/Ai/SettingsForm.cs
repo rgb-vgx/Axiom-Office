@@ -109,7 +109,7 @@ namespace WpsAiBridge.Ai
             }
             Config.WriteString("LlmProvider", SelectedProvider());
             Config.WriteString("LlmEndpoint", _endpoint.Text.Trim());
-            Config.WriteString("LlmApiKey", _apiKey.Text);
+            Config.WriteSecret("LlmApiKey", _apiKey.Text);
             Config.WriteString("LlmModel", _model.Text.Trim());
             Logger.Info("AI settings saved: provider=" + SelectedProvider() + " endpoint=" + _endpoint.Text.Trim() + " model=" + _model.Text.Trim());
             DialogResult = DialogResult.OK;

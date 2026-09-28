@@ -1,12 +1,56 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Threading;
 
 namespace WpsAiBridge.Bridge
 {
     internal static class CommandDispatcher
     {
-        public const string BridgeVersion = "0.1.0";
+        public static readonly string BridgeVersion =
+            typeof(CommandDispatcher).Assembly.GetName().Version.ToString(3);
+
+        private const int MaxComRetries = 10;
+
+        public static object Execute(IAppHost host, string action, Dictionary<string, object> p)
+        {
+            int attempt = 0;
+            while (true)
+            {
+                attempt++;
+                try
+                {
+                    return ExecuteAction(host, action, p);
+                }
+                catch (COMException ex)
+                {
+                    if (IsRetryableComError(ex) && attempt <= MaxComRetries)
+                    {
+                        int delayMs = Math.Min(100 * attempt, 1000);
+                        Logger.Info("COM call rejected [" + ex.HResult.ToString("X8") + "], retry " + attempt + "/" + MaxComRetries + " in " + delayMs + "ms");
+                        Thread.Sleep(delayMs);
+                        continue;
+                    }
+                    Logger.Error("Action failed: " + action, ex);
+                    return Err(ex.GetType().Name + ": " + ex.Message);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error("Action failed: " + action, ex);
+                    return Err(ex.GetType().Name + ": " + ex.Message);
+                }
+            }
+        }
+
+        private static bool IsRetryableComError(COMException ex)
+        {
+            int hr = ex.HResult;
+            return hr == unchecked((int)0x80010001)
+                || hr == unchecked((int)0x8001010A)
+                || hr == unchecked((int)0x80010002)
+                || hr == unchecked((int)0x800AC472);
+        }
 
         public static object Health(IAppHost host, int port)
         {
@@ -44,12 +88,10 @@ namespace WpsAiBridge.Bridge
             return key.Substring(0, 4) + "..." + key.Substring(key.Length - 4);
         }
 
-        public static object Execute(IAppHost host, string action, Dictionary<string, object> p)
+        private static object ExecuteAction(IAppHost host, string action, Dictionary<string, object> p)
         {
-            try
+            switch (action)
             {
-                switch (action)
-                {
                     case "app.info":
                         return Ok(AppInfo(host));
 
@@ -104,12 +146,6 @@ namespace WpsAiBridge.Bridge
 
                     default:
                         return Err("unknown action: " + action);
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Error("Action failed: " + action, ex);
-                return Err(ex.GetType().Name + ": " + ex.Message);
             }
         }
 
@@ -166,6 +202,27 @@ namespace WpsAiBridge.Bridge
             }
         }
 
+        private static string ExcelErrorName(int code)
+        {
+            switch (code)
+            {
+                case -2146826288:
+                    return "#NULL!";
+                case -2146826281:
+                    return "#DIV/0!";
+                case -2146826273:
+                    return "#VALUE!";
+                case -2146826265:
+                    return "#REF!";
+                case -2146826259:
+                    return "#NAME?";
+                case -2146826252:
+                    return "#NUM!";
+                default:
+                    return null;
+            }
+        }
+
         private static object Safe(Func<object> getter)
         {
             try
@@ -190,6 +247,11 @@ namespace WpsAiBridge.Bridge
                 if (intValue == -2146826246 || intValue == -2147352572)
                 {
                     return null;
+                }
+                string excelError = ExcelErrorName(intValue);
+                if (excelError != null)
+                {
+                    return excelError;
                 }
                 return intValue;
             }

@@ -24,6 +24,7 @@
     <Reference Include="System.Web.Extensions" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Drawing" />
+    <Reference Include="System.Security" />
     <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
   <ItemGroup>
