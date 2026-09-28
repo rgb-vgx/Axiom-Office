@@ -49,6 +49,11 @@ class SessionsTest(unittest.TestCase):
         bridge.sessions(directory=self.dir, timeout=0.2, prune=False)
         self.assertTrue(os.path.exists(path))
 
+    def test_es_hint_points_at_events(self):
+        hint = bridge.es_hint(port=47831)
+        self.assertEqual(hint["url"], "http://127.0.0.1:47831/events")
+        self.assertIn("X-Auth-Token", hint["curl"])
+
 
 if __name__ == "__main__":
     unittest.main()

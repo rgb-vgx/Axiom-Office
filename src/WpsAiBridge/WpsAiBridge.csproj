@@ -38,6 +38,7 @@
     <Compile Include="Ai\DocumentContext.cs" />
     <Compile Include="Ai\SettingsForm.cs" />
     <Compile Include="Ai\AskAiPane.cs" />
+    <Compile Include="Ai\PaneControls.cs" />
     <Compile Include="Ai\OfficeActionTool.cs" />
     <Compile Include="Ai\AiAgent.cs" />
     <Compile Include="Bridge\Logger.cs" />
@@ -45,6 +46,10 @@
     <Compile Include="Bridge\Config.cs" />
     <Compile Include="Bridge\HttpBridge.cs" />
     <Compile Include="Bridge\CommandDispatcher.cs" />
+    <Compile Include="Bridge\ComGate.cs" />
+    <Compile Include="Bridge\HostProbe.cs" />
+    <Compile Include="Bridge\SessionRegistry.cs" />
+    <Compile Include="Bridge\EventStream.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

@@ -15,6 +15,7 @@ namespace WpsAiBridge.Bridge
         private HttpListener _listener;
         private Thread _thread;
         private SessionRegistry _session;
+        private EventStream _events;
         private volatile bool _running;
         private int _port;
 
@@ -44,6 +45,7 @@ namespace WpsAiBridge.Bridge
             _thread.SetApartmentState(ApartmentState.STA);
             _thread.Start();
 
+            _events = new EventStream(_host, _port);
             _session = new SessionRegistry(_host, _port);
             _session.Start();
 
@@ -57,6 +59,11 @@ namespace WpsAiBridge.Bridge
             {
                 _session.Stop();
                 _session = null;
+            }
+            if (_events != null)
+            {
+                _events.Stop();
+                _events = null;
             }
             try
             {
@@ -158,6 +165,19 @@ namespace WpsAiBridge.Bridge
                     return;
                 }
                 WriteJson(context, 200, new Dictionary<string, object> { { "ok", true }, { "result", session.Describe(true) } });
+                return;
+            }
+
+            if (path == "/events" && context.Request.HttpMethod == "GET")
+            {
+                // Stream SSE chạy trên thread riêng; Pump quay lại nhận request khác ngay.
+                EventStream events = _events;
+                if (events == null)
+                {
+                    WriteJson(context, 503, Error("event stream not running"));
+                    return;
+                }
+                events.Accept(context);
                 return;
             }
 

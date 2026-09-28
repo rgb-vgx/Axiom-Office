@@ -136,3 +136,19 @@ def sessions(prune: bool = True, timeout: float = 1.5, directory: str | None = N
         found.append(data)
     found.sort(key=lambda item: (item.get("family") or "", int(item.get("port") or 0)))
     return found
+
+
+def es_hint(app: str | None = None, port: int | None = None) -> dict:
+    """Ghi chú cách subscribe Server-Sent Events của một bridge (GET /events, cần token)."""
+    url = base_url(app or next(iter(APP_PORTS)), port) + "/events" if (app or port) else "http://127.0.0.1:<port>/events"
+    return {
+        "url": url,
+        "events": {
+            "hello": "ngay khi kết nối: app, family, port, pid",
+            "document": "tài liệu active đổi: name, fullName",
+            "selection": "vùng chọn đổi: text (<=200 ký tự), start/end (Writer), sheet/address (ET), slide/shape (WPP)",
+            "ping": "keepalive mỗi 15s",
+        },
+        "curl": 'curl.exe -N -H "X-Auth-Token: <token>" ' + url,
+        "notes": "Poll-diff 500ms, tối đa 5 subscriber mỗi bridge; token ở HKCU\Software\WpsAiBridge\Token.",
+    }
