@@ -25,6 +25,8 @@ $commonArgs = @(
     "/r:$fw\System.dll",
     "/r:$fw\System.Core.dll",
     "/r:$fw\System.Web.Extensions.dll",
+    "/r:$fw\System.Windows.Forms.dll",
+    "/r:$fw\System.Drawing.dll",
     "/r:$fw\Microsoft.CSharp.dll"
 )
 

@@ -3,7 +3,33 @@
 Mọi thay đổi đáng chú ý của project được ghi ở đây.
 Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased] — branch `cpp-native-addin` (f2f0f00)
+## [Unreleased]
+
+### Added — Ribbon UI + AI in-app + MCP server (branch `main`)
+- Ribbon tab **"WPS AI Bridge"** (`IRibbonExtensibility.GetCustomUI`, XML chuẩn
+  2006/01): nhóm Local bridge (Status / Copy API URL / Open Log) + nhóm AI
+  (Ask AI..., Settings); callback qua IDispatch (`ClassInterfaceType.AutoDispatch`)
+- **AI Settings**: dialog cấu hình provider (OpenAI-compatible | Anthropic),
+  endpoint, API key, model; nút Test gọi thử; lưu vào
+  `HKCU\Software\WpsAiBridge` (LlmProvider/LlmEndpoint/LlmApiKey/LlmModel)
+- **Ask AI**: dialog prompt + context (None / Selection / Whole document
+  ≤50k chars), gọi LLM async không treo UI, chèn kết quả vào tài liệu
+  (Insert at cursor); `DocumentContext` đọc toàn văn Writer, used range ET
+  (TSV, xử lý mảng 2D COM lower-bound=1), text các slide WPP
+- `GET /config`: trả provider/endpoint/model + API key đã che (dạng `sk-a...7e5f`)
+- Companion: chế độ `llm-test` kiểm tra cấu hình LLM từ CLI
+- `tools/excel-mcp`: MCP server Python (venv riêng: mcp, openpyxl, xlrd,
+  duckdb, pandas)
+  - Tools file: `excel_profile`, `excel_read` (paging), `excel_query` (DuckDB
+    SQL trên bảng "data"), `excel_write`, `excel_create`, `excel_convert`
+    (parquet/csv)
+  - Tools live: `wps_health`, `wps_live_command`, `wps_live_read_range`,
+    `wps_live_write_range` — gọi HTTP bridge 47821-47823
+  - Hỗ trợ `.xlsx/.xlsm/.xls/.csv/.tsv`; nhận dạng định dạng bằng magic bytes;
+    xử lý file mislabeled (nội dung xlsx nhưng đuôi .xls) qua stream-based
+    openpyxl; ghi .xlsm giữ VBA; PermissionError có hint "file đang mở"
+
+### Branch `cpp-native-addin` (f2f0f00) — WIP port C++ native
 
 ### Added
 - Port add-in in-proc sang C++ native thuần (không CLR):

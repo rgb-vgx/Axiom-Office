@@ -37,6 +37,43 @@ namespace WpsAiBridge.Bridge
             get { return ReadInt("Enabled", 1) != 0; }
         }
 
+        public static string LlmProvider
+        {
+            get { return ReadString("LlmProvider", "openai"); }
+        }
+
+        public static string LlmEndpoint
+        {
+            get { return ReadString("LlmEndpoint", ""); }
+        }
+
+        public static string LlmApiKey
+        {
+            get { return ReadString("LlmApiKey", ""); }
+        }
+
+        public static string LlmModel
+        {
+            get { return ReadString("LlmModel", ""); }
+        }
+
+        public static void WriteString(string name, string value)
+        {
+            try
+            {
+                using (RegistryKey key = Registry.CurrentUser.CreateSubKey(KeyPath))
+                {
+                    if (key != null)
+                    {
+                        key.SetValue(name, value ?? "", RegistryValueKind.String);
+                    }
+                }
+            }
+            catch
+            {
+            }
+        }
+
         private static int ReadInt(string name, int fallback)
         {
             try

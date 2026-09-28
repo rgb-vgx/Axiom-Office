@@ -127,6 +127,12 @@ namespace WpsAiBridge.Bridge
                 return;
             }
 
+            if (path == "/config" && context.Request.HttpMethod == "GET")
+            {
+                WriteJson(context, 200, CommandDispatcher.ConfigInfo());
+                return;
+            }
+
             if (path == "/cmd" && context.Request.HttpMethod == "POST")
             {
                 string body = ReadBody(context);

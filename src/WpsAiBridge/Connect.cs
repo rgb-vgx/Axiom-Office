@@ -3,14 +3,15 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using WpsAiBridge.Bridge;
 using WpsAiBridge.Interop;
+using WpsAiBridge.Ribbon;
 
 namespace WpsAiBridge
 {
     [ComVisible(true)]
     [Guid("F4524DFD-C4F6-4027-8CA6-08B7F7DB4C44")]
     [ProgId("WpsAiBridge.Connect")]
-    [ClassInterface(ClassInterfaceType.None)]
-    public class Connect : IDTExtensibility2, IAppHost
+    [ClassInterface(ClassInterfaceType.AutoDispatch)]
+    public class Connect : IDTExtensibility2, IRibbonExtensibility, IAppHost
     {
         private object _application;
         private HttpBridge _bridge;
@@ -19,6 +20,35 @@ namespace WpsAiBridge
         public Connect()
         {
             Logger.Info("Connect constructor: instance created");
+        }
+
+        public string GetCustomUI(string RibbonID)
+        {
+            Logger.Info("GetCustomUI called: " + RibbonID);
+            return RibbonUi.RibbonXml;
+        }
+
+        public void OnButtonAction(object control)
+        {
+            string tag = "";
+            try
+            {
+                dynamic c = control;
+                tag = Convert.ToString(c.Tag);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("OnButtonAction: cannot read Tag", ex);
+            }
+            Logger.Info("OnButtonAction: tag=" + tag);
+            try
+            {
+                RibbonUi.HandleButton(this, tag);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("OnButtonAction failed", ex);
+            }
         }
 
         public object Application

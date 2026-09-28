@@ -22,12 +22,20 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Web.Extensions" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Drawing" />
     <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Connect.cs" />
     <Compile Include="Probe.cs" />
     <Compile Include="Interop\IDTExtensibility2.cs" />
+    <Compile Include="Interop\IRibbonExtensibility.cs" />
+    <Compile Include="Ribbon\RibbonUi.cs" />
+    <Compile Include="Ai\LlmClient.cs" />
+    <Compile Include="Ai\DocumentContext.cs" />
+    <Compile Include="Ai\SettingsForm.cs" />
+    <Compile Include="Ai\AskAiForm.cs" />
     <Compile Include="Bridge\Logger.cs" />
     <Compile Include="Bridge\IAppHost.cs" />
     <Compile Include="Bridge\Config.cs" />

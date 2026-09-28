@@ -6,3 +6,6 @@ obj/
 *.user
 *.suo
 *.log
+.venv/
+__pycache__/
+*.pyc

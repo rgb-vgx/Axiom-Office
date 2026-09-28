@@ -32,6 +32,12 @@ namespace WpsAiBridge.Host
         private static int Main(string[] args)
         {
             string kind = args.Length > 0 ? args[0].ToLowerInvariant() : "";
+
+            if (kind == "llm-test")
+            {
+                return RunLlmTest();
+            }
+
             string progId;
             switch (kind)
             {
@@ -112,6 +118,22 @@ namespace WpsAiBridge.Host
             {
             }
             return 0;
+        }
+
+        private static int RunLlmTest()
+        {
+            Console.WriteLine("Provider: " + Config.LlmProvider);
+            Console.WriteLine("Endpoint: " + Config.LlmEndpoint);
+            Console.WriteLine("Model:    " + Config.LlmModel);
+            Console.WriteLine("ApiKey:   " + (string.IsNullOrEmpty(Config.LlmApiKey) ? "(empty)" : "***set***"));
+            Ai.LlmResult result = Ai.LlmClient.Chat("You are a connectivity test.", "Reply with a single word: OK");
+            if (result.Ok)
+            {
+                Console.WriteLine("OK (" + result.Seconds.ToString("0.0") + "s): " + (result.Text ?? "").Trim());
+                return 0;
+            }
+            Console.WriteLine("ERROR: " + result.Error);
+            return 1;
         }
     }
 }

@@ -15,7 +15,7 @@ Hai chế độ chạy cùng một protocol, cùng command set:
 
 | Chế độ | Cơ chế | Dùng khi |
 |---|---|---|
-| **In-proc add-in** (`WpsAiBridge.dll`) | COM add-in `IDTExtensibility2` nạp thẳng vào WPS, mở HTTP server trong process WPS | WPS đang mở (điều khiển document đang mở của người dùng) |
+| **In-proc add-in** (`WpsAiBridge.dll`) | COM add-in `IDTExtensibility2` nạp thẳng vào WPS, mở HTTP server trong process WPS + thêm tab **"WPS AI Bridge"** trên ribbon | WPS đang mở (điều khiển document đang mở của người dùng) |
 | **Companion** (`WpsAiBridge.Host.exe`) | Process riêng dùng COM automation (`KWPS/KET/KWPP.Application`) | App chưa mở, hoặc add-in không nạp được |
 
 Port mặc định (đổi qua registry, xem [Cấu hình](#cấu-hình)):
@@ -68,6 +68,20 @@ tra danh sách, và xem log tại `%LOCALAPPDATA%\WpsAiBridge\bridge.log`.
 
 Nếu port đã được add-in in-proc phục vụ, companion tự chuyển sang chế độ idle
 (model bền process) và log lại — cả hai đường đều trả cùng kết quả.
+
+## Ribbon UI
+
+Add-in in-proc thêm tab **"WPS AI Bridge"** trên ribbon (WPS gọi
+`IRibbonExtensibility.GetCustomUI` khi load — xem log) với 3 nút:
+
+| Nút | Chức năng |
+|---|---|
+| **Status** | Hộp thoại hiển thị app, port, API base, health URL, đường dẫn log |
+| **Copy API URL** | Copy `http://127.0.0.1:<port>/` vào clipboard |
+| **Open Log** | Mở `%LOCALAPPDATA%\WpsAiBridge\bridge.log` bằng ứng dụng mặc định |
+
+Callback của nút đi qua `IDispatch` (class dùng `ClassInterfaceType.AutoDispatch`),
+tag từng nút được log tại `OnButtonAction` trong bridge.log.
 
 ## API
 

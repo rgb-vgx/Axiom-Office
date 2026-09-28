@@ -20,6 +20,30 @@ namespace WpsAiBridge.Bridge
             });
         }
 
+        public static object ConfigInfo()
+        {
+            return Ok(new Dictionary<string, object>
+            {
+                { "provider", Config.LlmProvider },
+                { "endpoint", Config.LlmEndpoint },
+                { "model", Config.LlmModel },
+                { "apiKey", MaskKey(Config.LlmApiKey) }
+            });
+        }
+
+        private static string MaskKey(string key)
+        {
+            if (string.IsNullOrEmpty(key))
+            {
+                return "";
+            }
+            if (key.Length <= 8)
+            {
+                return "********";
+            }
+            return key.Substring(0, 4) + "..." + key.Substring(key.Length - 4);
+        }
+
         public static object Execute(IAppHost host, string action, Dictionary<string, object> p)
         {
             try
