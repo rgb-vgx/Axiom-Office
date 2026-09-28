@@ -6,6 +6,7 @@ import json
 import math
 import os
 import re
+import tempfile
 from copy import copy
 from typing import Any
 
@@ -382,6 +383,7 @@ def query(path: str, sql: str, sheet: str | None = None, limit: int = 1000) -> d
     frame = load_sheet_frame(path, sheet)
     connection = duckdb.connect()
     try:
+        connection.execute("SET enable_external_access = false")
         connection.register("data", frame)
         cursor = connection.execute(sql)
         columns = [description[0] for description in cursor.description] if cursor.description else []
@@ -428,14 +430,7 @@ def write_range(path: str, sheet: str, start_cell: str, values: list[list]) -> d
             for c_index, value in enumerate(row):
                 target[col0 - 1 + c_index] = "" if value is None else value
                 written += 1
-        try:
-            with open(path, "w", encoding="utf-8-sig", newline="") as handle:
-                writer = csv.writer(handle)
-                writer.writerows(rows)
-        except PermissionError as exc:
-            raise PermissionError(
-                f"cannot write '{path}': file is locked (open in WPS/Excel?) - close it first or use the WPS live bridge"
-            ) from exc
+        _atomic_csv_write(path, rows)
         return {"saved": path, "sheet": os.path.splitext(os.path.basename(path))[0],
                 "start_cell": start_cell, "written": written}
     keep_vba = ext in {".xlsm", ".xltm"}
@@ -458,12 +453,7 @@ def write_range(path: str, sheet: str, start_cell: str, values: list[list]) -> d
                 cell = ws.cell(row=row0 + r_index, column=col0 + c_index)
                 cell.value = value
                 written += 1
-        try:
-            wb.save(path)
-        except PermissionError as exc:
-            raise PermissionError(
-                f"cannot write '{path}': file is locked (open in WPS/Excel?) - close it first or use the WPS live bridge"
-            ) from exc
+        _save_edit(wb, path)
         return {"saved": path, "sheet": sheet, "start_cell": start_cell, "written": written}
     finally:
         wb.close()
@@ -481,10 +471,7 @@ def create_workbook(path: str, sheets: list[dict]) -> dict:
         if len(sheets) > 1:
             raise ValueError("csv supports a single sheet")
         values = sheets[0].get("values") or []
-        with open(path, "w", encoding="utf-8-sig", newline="") as handle:
-            writer = csv.writer(handle)
-            for row in values:
-                writer.writerow(["" if v is None else v for v in row])
+        _atomic_csv_write(path, [["" if v is None else v for v in row] for row in values])
         return {"created": path, "sheets": [os.path.splitext(os.path.basename(path))[0]]}
 
     wb = openpyxl.Workbook()
@@ -503,7 +490,7 @@ def create_workbook(path: str, sheets: list[dict]) -> dict:
                 for c_index, value in enumerate(row):
                     ws.cell(row=r_index + 1, column=c_index + 1).value = value
             created.append(name)
-        wb.save(path)
+        _save_edit(wb, path)
         return {"created": path, "sheets": created}
     finally:
         wb.close()
@@ -546,13 +533,55 @@ def _load_for_edit(path: str):
     return wb
 
 
-def _save_edit(wb, path: str) -> None:
+def _remove_quietly(temp_path: str) -> None:
     try:
-        wb.save(path)
+        os.remove(temp_path)
+    except OSError:
+        pass
+
+
+def _replace_file(temp_path: str, path: str) -> None:
+    try:
+        os.replace(temp_path, path)
     except PermissionError as exc:
+        _remove_quietly(temp_path)
         raise PermissionError(
             f"cannot write '{path}': file is locked (open in WPS/Excel?) - close it first or use the WPS live bridge"
         ) from exc
+    except Exception:
+        _remove_quietly(temp_path)
+        raise
+
+
+def _make_temp_path(path: str) -> str:
+    directory = os.path.dirname(os.path.abspath(path))
+    handle, temp_path = tempfile.mkstemp(
+        prefix=".~" + os.path.basename(path) + ".", suffix=".tmp", dir=directory
+    )
+    os.close(handle)
+    return temp_path
+
+
+def _atomic_csv_write(path: str, rows) -> None:
+    temp_path = _make_temp_path(path)
+    try:
+        with open(temp_path, "w", encoding="utf-8-sig", newline="") as handle:
+            writer = csv.writer(handle)
+            writer.writerows(rows)
+    except Exception:
+        _remove_quietly(temp_path)
+        raise
+    _replace_file(temp_path, path)
+
+
+def _save_edit(wb, path: str) -> None:
+    temp_path = _make_temp_path(path)
+    try:
+        wb.save(temp_path)
+    except Exception:
+        _remove_quietly(temp_path)
+        raise
+    _replace_file(temp_path, path)
 
 
 def create_sheet(path: str, sheet: str, overwrite: bool = False) -> dict:

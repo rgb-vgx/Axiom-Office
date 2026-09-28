@@ -24,37 +24,37 @@ def excel_read(path: str, cell_range: str | None = None, sheet: str | None = Non
 
 @mcp.tool()
 def excel_create_sheet(path: str, sheet: str, overwrite: bool = False) -> str:
-    """Create a new worksheet in an existing workbook (.xlsx/.xlsm)."""
+    """Create a new worksheet in an existing workbook (.xlsx/.xlsm). Atomic save; openpyxl may drop charts/images/pivots on resave."""
     return file_tools.to_json(file_tools.create_sheet(path, sheet, overwrite))
 
 
 @mcp.tool()
 def excel_copy_sheet(path: str, src_sheet: str, dst_sheet: str) -> str:
-    """Copy a worksheet inside the same workbook (values + styles; charts/images may not be preserved)."""
+    """Copy a worksheet inside the same workbook (values + styles; charts/images may not be preserved). Atomic save."""
     return file_tools.to_json(file_tools.copy_sheet(path, src_sheet, dst_sheet))
 
 
 @mcp.tool()
 def excel_rename_sheet(path: str, sheet: str, new_name: str) -> str:
-    """Rename a worksheet."""
+    """Rename a worksheet. Atomic save; openpyxl may drop charts/images/pivots on resave."""
     return file_tools.to_json(file_tools.rename_sheet(path, sheet, new_name))
 
 
 @mcp.tool()
 def excel_delete_sheet(path: str, sheet: str) -> str:
-    """Delete a worksheet (cannot delete the only sheet in the workbook)."""
+    """Delete a worksheet (cannot delete the only sheet in the workbook). Atomic save; openpyxl may drop charts/images/pivots on resave."""
     return file_tools.to_json(file_tools.delete_sheet(path, sheet))
 
 
 @mcp.tool()
 def excel_format_range(path: str, sheet: str, cell_range: str, styles: dict | list) -> str:
-    """Format cells in a range (.xlsx/.xlsm). styles = one style object applied to every cell OR a 2D array matching the range size (null entries skip that cell). Style object keys: font {bold, italic, underline, size, strike, color '#RRGGBB', name, vertAlign}, fill {pattern 'solid', color '#RRGGBB'}, border [{type: left|right|top|bottom|diagonalUp|diagonalDown, style: thin|medium|thick|double|dashed|dotted|hair|mediumDashed|dashDot|... , color}], alignment {horizontal, vertical, wrap, rotation}, numFmt (number format string), decimalPlaces (0-30)."""
+    """Format cells in a range (.xlsx/.xlsm). styles = one style object applied to every cell OR a 2D array matching the range size (null entries skip that cell). Style object keys: font {bold, italic, underline, size, strike, color '#RRGGBB', name, vertAlign}, fill {pattern 'solid', color '#RRGGBB'}, border [{type: left|right|top|bottom|diagonalUp|diagonalDown, style: thin|medium|thick|double|dashed|dotted|hair|mediumDashed|dashDot|... , color}], alignment {horizontal, vertical, wrap, rotation}, numFmt (number format string), decimalPlaces (0-30). Atomic save; openpyxl may drop charts/images/pivots on resave."""
     return file_tools.to_json(file_tools.format_range(path, sheet, cell_range, styles))
 
 
 @mcp.tool()
 def excel_create_table(path: str, sheet: str, cell_range: str, table_name: str) -> str:
-    """Create an Excel table (ListObject) over a range with a header row, e.g. cell_range 'A1:D10'. table_name: letters/digits/underscore."""
+    """Create an Excel table (ListObject) over a range with a header row, e.g. cell_range 'A1:D10'. table_name: letters/digits/underscore. Atomic save; openpyxl may drop charts/images/pivots on resave."""
     return file_tools.to_json(file_tools.create_table(path, sheet, cell_range, table_name))
 
 
@@ -66,13 +66,13 @@ def excel_query(path: str, sql: str, sheet: str | None = None, limit: int = 1000
 
 @mcp.tool()
 def excel_write(path: str, sheet: str, start_cell: str, values: list[list]) -> str:
-    """Write a 2D block of values into a spreadsheet file at start_cell (e.g. 'B2'), preserving the rest of the file. Supports .xlsx .xlsm (macros kept) .csv .tsv; not .xls. Strings starting with '=' become formulas. Creates the file/sheet if missing."""
+    """Write a 2D block of values into a spreadsheet file at start_cell (e.g. 'B2'), preserving the rest of the file. Supports .xlsx .xlsm (macros kept) .csv .tsv; not .xls. Strings starting with '=' become formulas. Creates the file/sheet if missing. Saves atomically (temp + replace). Note: openpyxl may drop charts/images/pivot tables — for files currently open in WPS/Office use wps_live_write_range."""
     return file_tools.to_json(file_tools.write_range(path, sheet, start_cell, values))
 
 
 @mcp.tool()
 def excel_create(path: str, sheets: list[dict]) -> str:
-    """Create a new spreadsheet file (.xlsx .xlsm .csv .tsv). sheets example: [{"name": "Data", "values": [["Ten", "Diem"], ["An", 9.5]]}]."""
+    """Create a new spreadsheet file (.xlsx .xlsm .csv .tsv). sheets example: [{"name": "Data", "values": [["Ten", "Diem"], ["An", 9.5]]}]. Saves atomically."""
     return file_tools.to_json(file_tools.create_workbook(path, sheets))
 
 
