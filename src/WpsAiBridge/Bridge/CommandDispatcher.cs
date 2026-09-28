@@ -1026,16 +1026,27 @@ namespace WpsAiBridge.Bridge
             RequireKind(host, "wps");
             int count = Math.Max(1, ParamInt(p, "count", 1));
             dynamic app = host.Application;
+            dynamic doc = app.ActiveDocument;
             int undone = 0;
             for (int i = 0; i < count; i++)
             {
                 try
                 {
-                    app.Undo();
+                    doc.Undo(1);
                     undone++;
                 }
-                catch
+                catch (COMException ex)
                 {
+                    if (IsRetryableComError(ex))
+                    {
+                        throw;
+                    }
+                    Logger.Info("writer.undo stopped: " + ex.Message);
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    Logger.Info("writer.undo stopped: " + ex.Message);
                     break;
                 }
             }
@@ -1153,8 +1164,18 @@ namespace WpsAiBridge.Bridge
                     app.Undo();
                     undone++;
                 }
-                catch
+                catch (COMException ex)
                 {
+                    if (IsRetryableComError(ex))
+                    {
+                        throw;
+                    }
+                    Logger.Info("et.undo stopped: " + ex.Message);
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    Logger.Info("et.undo stopped: " + ex.Message);
                     break;
                 }
             }
