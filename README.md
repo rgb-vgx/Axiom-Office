@@ -18,13 +18,14 @@ Hai chế độ chạy cùng một protocol, cùng command set:
 | **In-proc add-in** (`WpsAiBridge.dll`) | COM add-in `IDTExtensibility2` nạp thẳng vào WPS, mở HTTP server trong process WPS + thêm tab **"WPS AI Bridge"** trên ribbon | WPS đang mở (điều khiển document đang mở của người dùng) |
 | **Companion** (`WpsAiBridge.Host.exe`) | Process riêng dùng COM automation (`KWPS/KET/KWPP.Application`) | App chưa mở, hoặc add-in không nạp được |
 
-Port mặc định (đổi qua registry, xem [Cấu hình](#cấu-hình)):
+Port mặc định (đổi qua registry, xem [Cấu hình](#cấu-hình)) — WPS và Microsoft
+Office dùng 2 dải port riêng nên chạy song song không đụng nhau:
 
-| App | Port |
-|---|---|
-| Writer | 47821 |
-| Spreadsheets | 47822 |
-| Presentation | 47823 |
+| App | WPS (`Port`, 47821) | Microsoft Office (`PortOffice`, 47831) |
+|---|---|---|
+| Writer / Word | 47821 | 47831 |
+| Spreadsheets / Excel | 47822 | 47832 |
+| Presentation / PowerPoint | 47823 | 47833 |
 
 ## Yêu cầu
 
@@ -61,12 +62,21 @@ tra danh sách, và xem log tại `%LOCALAPPDATA%\WpsAiBridge\bridge.log`.
 ### Companion
 
 ```powershell
-# Điều khiển Spreadsheets (instance riêng, ẩn)
-& "src\WpsAiBridge\bin\Release\WpsAiBridge.Host.exe" et
+# WPS Office
+& "src\WpsAiBridge\bin\Release\WpsAiBridge.Host.exe" wps   # hoặc: et, wpp
+# Microsoft Office
+& "src\WpsAiBridge\bin\Release\WpsAiBridge.Host.exe" word  # hoặc: excel, ppt
 
-# Hiện cửa sổ WPS (để người dùng quan sát)
-& "...\WpsAiBridge.Host.exe" et --visible
+# Hiện cửa sổ app (để quan sát)
+& "...\WpsAiBridge.Host.exe" excel --visible
 ```
+
+Companion log rõ app nó tạo được (`Companion resolved application: Microsoft Excel 16.0`).
+Lưu ý: một số máy (như máy dev này) WPS đăng ký đè các ProgID
+`Word/Excel/PowerPoint.Application` ở HKCU → companion `word|excel|ppt` sẽ tạo
+WPS compat component (version 12.0) thay vì Office thật; lệnh vẫn chạy đúng
+(object model tương thích). Muốn dùng **Microsoft Office thật**: mở app trực tiếp
+— add-in tự nạp và serve ở dải port Office (47831-47833).
 
 Nếu port đã được add-in in-proc phục vụ, companion tự chuyển sang chế độ idle
 (model bền process) và log lại — cả hai đường đều trả cùng kết quả.
@@ -85,6 +95,44 @@ Add-in in-proc thêm tab **"WPS AI Bridge"** trên ribbon (WPS gọi
 Callback của nút đi qua `IDispatch` (class dùng `ClassInterfaceType.AutoDispatch`),
 tag từng nút được log tại `OnButtonAction` trong bridge.log.
 
+## MCP server (`tools/excel-mcp`)
+
+MCP server Python cho AI agent thao tác Excel qua 2 làn (16 tools):
+
+- **Làn file** (không cần app mở): `excel_profile`, `excel_read` (paging,
+  `show_formula`), `excel_query` (DuckDB SQL, bảng `data`), `excel_write`,
+  `excel_create`, `excel_convert` (parquet/csv), `excel_create_sheet`,
+  `excel_copy_sheet`, `excel_rename_sheet`, `excel_delete_sheet`,
+  `excel_format_range` (font/fill/border/alignment/numFmt/decimalPlaces —
+  schema tham khảo [negokaz/excel-mcp-server](https://github.com/negokaz/excel-mcp-server)),
+  `excel_create_table`
+- **Làn live** (file đang mở trong WPS/Office): `wps_live_command` (passthrough
+  mọi command bridge), `wps_live_read_range`, `wps_live_write_range`, `wps_health`
+
+Hỗ trợ `.xlsx/.xlsm/.xls/.csv/.tsv`. File lớn: `excel_convert` sang parquet rồi
+query — nhanh hơn ~250x (đo trên file 41k dòng).
+
+```powershell
+cd tools\excel-mcp
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+.venv\Scripts\python.exe -m excel_mcp.server   # hoặc run.cmd
+```
+
+Đăng ký với MCP client (Claude Code / Claude Desktop / ...):
+
+```json
+{
+  "mcpServers": {
+    "excel-tools": {
+      "command": "<repo>\\tools\\excel-mcp\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "excel_mcp.server"],
+      "env": { "PYTHONPATH": "<repo>\\tools\\excel-mcp" }
+    }
+  }
+}
+```
+
 ## Microsoft Office
 
 Add-in được thiết kế để chạy trên **cả Microsoft Office lẫn WPS Office** —
@@ -95,8 +143,8 @@ cùng một DLL, cùng một đăng ký (không cần cài thêm gì):
   `AddinsWL` (đó là cơ chế riêng của WPS, MS Office bỏ qua).
 - COM class (`IDTExtensibility2` + `IRibbonExtensibility`) và Ribbon XML
   (schema 2006/01) là chuẩn Office — tab "WPS AI Bridge" xuất hiện tương tự.
-- Bridge ports giữ nguyên: Word 47821 / Excel 47822 / PowerPoint 47823
-  (nhận diện app qua COM probe `Documents` / `Workbooks` / `Presentations`).
+- App kind nhận diện qua COM probe (`Documents` / `Workbooks` / `Presentations`);
+  host là Microsoft Office sẽ dùng dải port **47831-47833** (registry `PortOffice`).
 
 Yêu cầu: Office **x64** (kiểm tra `Platform` tại
 `HKLM\SOFTWARE\Microsoft\Office\ClickToRun\Configuration`).
@@ -106,12 +154,10 @@ lifecycle + ribbon + E2E qua bridge):
 
 1. Mở Word/Excel/PowerPoint
 2. `%LOCALAPPDATA%\WpsAiBridge\bridge.log` phải có `OnConnection` + `GetCustomUI`
-3. `http://127.0.0.1:47821/health` (Word) / `47822` (Excel) / `47823` (PowerPoint)
+3. `http://127.0.0.1:47831/health` (Word) / `47832` (Excel) / `47833` (PowerPoint)
 
-Lưu ý chạy song song WPS + Office: WPS ET và Microsoft Excel **cùng map vào port
-47822** (port theo app kind) — nếu mở cả hai cùng lúc, chỉ một bên bind được.
-Cách xử lý tạm: đổi `Port` base trong registry (ví dụ 47831) trước khi mở app
-thứ hai, xong đổi lại.
+Port tách biệt theo host: WPS dùng `Port` (47821-47823), Microsoft Office dùng
+`PortOffice` (47831-47833) — mở song song cả hai hệ không đụng nhau.
 
 Troubleshooting riêng cho Office:
 
@@ -192,9 +238,11 @@ print(r.json())
 
 | Value | Kiểu | Mặc định | Ý nghĩa |
 |---|---|---|---|
-| `Port` | DWORD | 47821 | Port base (ET +1, WPP +2) |
+| `Port` | DWORD | 47821 | Port base cho WPS (Spreadsheets +1, Presentation +2) |
+| `PortOffice` | DWORD | 47831 | Port base cho Microsoft Office (Excel +1, PowerPoint +2) |
 | `Enabled` | DWORD | 1 | 0 = tắt HTTP bridge |
 | `Token` | String | (trống) | Nếu đặt, mọi request phải kèm header `X-Auth-Token` |
+| `LlmProvider` / `LlmEndpoint` / `LlmApiKey` / `LlmModel` | String | — | Cấu hình AI cho Ask AI (đặt qua dialog Settings trên ribbon) |
 
 ## Cấu trúc project
 

@@ -5,6 +5,24 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Office ports + companion Office + excel-mcp nâng cấp (branch `main`)
+- **Port tách theo host**: WPS giữ `Port` 47821-47823; Microsoft Office dùng
+  `PortOffice` mới (mặc định 47831-47833) — mở song song WPS + Office thật
+  không còn đụng port (bỏ workaround cũ)
+- **Companion hỗ trợ Microsoft Office**: `word|excel|ppt` →
+  `Word/Excel/PowerPoint.Application`; log `Companion resolved application: ...`
+  (cảnh báo khi ProgID bị WPS đăng ký đè ở HKCU — trên máy dev này WPS chiếm
+  cả 3 ProgID, companion sẽ tạo WPS compat component version 12.0; Office thật
+  dùng in-proc add-in khi mở app)
+- **excel-mcp nâng cấp** (tham khảo negokaz/excel-mcp-server): thêm
+  `excel_create_sheet`, `excel_copy_sheet`, `excel_rename_sheet`,
+  `excel_delete_sheet`, `excel_format_range` (font/fill/border/alignment/
+  numFmt/decimalPlaces), `excel_create_table`; `excel_read` thêm
+  `show_formula`; tổng 16 tools; migrate SDK `mcp` 2.x (`MCPServer`)
+- Kiểm chứng trên file thật `bank-additional-full.xlsx` (41k dòng): profile
+  0.01s; query trực tiếp ~5s; convert parquet + query 0.023s; MCP protocol
+  roundtrip 16 tools pass
+
 ### Verified — Microsoft Office 2024 ProPlus x64 (branch `main`)
 - Word (`WINWORD.EXE`), Excel (`EXCEL.EXE`), PowerPoint (`POWERPNT.EXE`): add-in
   nạp đầy đủ lifecycle (OnConnection → OnAddInsUpdate → GetCustomUI →
