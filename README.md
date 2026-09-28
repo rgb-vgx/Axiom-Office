@@ -29,6 +29,8 @@ Port mặc định (đổi qua registry, xem [Cấu hình](#cấu-hình)):
 ## Yêu cầu
 
 - WPS Office 2019+ x64 (dev/test trên WPS 12.1.0.28485, bản quốc tế)
+- (Tuỳ chọn) Microsoft Office x64 — cùng một đăng ký phục vụ cả hai bộ app,
+  xem mục [Microsoft Office](#microsoft-office)
 - .NET Framework 4.8 (cho add-in C# + companion)
 - Build: Visual Studio 2022 Build Tools (không cần full VS)
 
@@ -82,6 +84,37 @@ Add-in in-proc thêm tab **"WPS AI Bridge"** trên ribbon (WPS gọi
 
 Callback của nút đi qua `IDispatch` (class dùng `ClassInterfaceType.AutoDispatch`),
 tag từng nút được log tại `OnButtonAction` trong bridge.log.
+
+## Microsoft Office
+
+Add-in được thiết kế để chạy trên **cả Microsoft Office lẫn WPS Office** —
+cùng một DLL, cùng một đăng ký (không cần cài thêm gì):
+
+- MS Office đọc đúng vị trí `HKCU\Software\Microsoft\Office\{Word,Excel,PowerPoint}\Addins\<ProgID>`
+  mà `install.ps1` đã ghi (`LoadBehavior=3`) — MS Office **không** cần whitelist
+  `AddinsWL` (đó là cơ chế riêng của WPS, MS Office bỏ qua).
+- COM class (`IDTExtensibility2` + `IRibbonExtensibility`) và Ribbon XML
+  (schema 2006/01) là chuẩn Office — tab "WPS AI Bridge" xuất hiện tương tự.
+- Bridge ports giữ nguyên: Word 47821 / Excel 47822 / PowerPoint 47823
+  (nhận diện app qua COM probe `Documents` / `Workbooks` / `Presentations`).
+
+Yêu cầu: Office **x64** (kiểm tra `Platform` tại
+`HKLM\SOFTWARE\Microsoft\Office\ClickToRun\Configuration`).
+
+Kiểm tra nhanh (trạng thái: đang được kiểm chứng trên Office 2024 ProPlus x64):
+
+1. Mở Word/Excel/PowerPoint
+2. `%LOCALAPPDATA%\WpsAiBridge\bridge.log` phải có `OnConnection` + `GetCustomUI`
+3. `http://127.0.0.1:47821/health` (Word) / `47822` (Excel) / `47823` (PowerPoint)
+
+Troubleshooting riêng cho Office:
+
+- Add-in bị disable sau crash (cơ chế Resiliency của Office): xoá entry trong
+  `HKCU\Software\Microsoft\Office\16.0\{Word,Excel,PowerPoint}\Resiliency\DisabledItems`
+  rồi chạy lại `install.ps1` để khôi phục `LoadBehavior=3`.
+- Companion hiện nhận `KWPS/KET/KWPP.Application` (WPS); hỗ trợ
+  `Word/Excel/PowerPoint.Application` cho MS Office đang phát triển —
+  xem `docs/office-integration.md` khi có.
 
 ## API
 
