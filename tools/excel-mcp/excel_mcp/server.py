@@ -96,8 +96,14 @@ def wps_health(app: str = "wps", port: int | None = None) -> str:
 
 
 @mcp.tool()
+def office_sessions() -> str:
+    """List all live Office/WPS bridge sessions: app, port, host, open document."""
+    return _safe(bridge.sessions)
+
+
+@mcp.tool()
 def wps_live_command(app: str, action: str, params: dict | None = None, port: int | None = None) -> str:
-    """Send any command to the live bridge (works on the document the user has open). Apps: wps=47821, et=47822, wpp=47823 (WPS); word=47831, excel=47832, ppt=47833 (Microsoft Office). Examples: action='app.info'; action='writer.insertStyledText' params={'text':'hello','bold':true,'color':'#FF0000'}; action='writer.heading' params={'level':1,'text':'Title'}; action='writer.insertTable' params={'rows':2,'cols':2,'values':[[1,2],[3,4]]}; action='writer.exportPdf' params={'path':'C:/tmp/out.pdf'}; action='et.formatRange' params={'range':'A1:B1','bold':true,'fillColor':'#FFFF00'}; action='et.readRange' params={'range':'A1:C10'}; action='et.writeRange' params={'range':'A1','values':[[1,2],[3,4]]}; action='wpp.addSlide' params={'layout':1}; action='wpp.addText' params={'text':'Hi','fontSize':28,'color':'#FF0000'}; action='wpp.addTable' params={'rows':2,'cols':3}; action='wpp.setNotes' params={'text':'notes'}; action='writer.undo' OR action='et.undo'."""
+    """Send any command to the live bridge (works on the document the user has open). Apps: wps=47821, et=47822, wpp=47823 (WPS); word=47831, excel=47832, ppt=47833 (Microsoft Office). Examples: action='app.info'; action='writer.insertStyledText' params={'text':'hello','bold':true,'color':'#FF0000'}; action='writer.heading' params={'level':1,'text':'Title'}; action='writer.insertTable' params={'rows':2,'cols':2,'values':[[1,2],[3,4]]}; action='writer.exportPdf' params={'path':'C:/tmp/out.pdf'}; action='et.formatRange' params={'range':'A1:B1','bold':true,'fillColor':'#FFFF00'}; action='et.readRange' params={'range':'A1:C10'}; action='et.writeRange' params={'range':'A1','values':[[1,2],[3,4]]}; action='wpp.addSlide' params={'layout':1}; action='wpp.addText' params={'text':'Hi','fontSize':28,'color':'#FF0000'}; action='wpp.addTable' params={'rows':2,'cols':3}; action='wpp.setNotes' params={'text':'notes'}; action='writer.undo' OR action='et.undo'. Tip: call office_sessions() to list every live bridge (Office + WPS) and pass its port here to target that exact instance."""
     return _safe(lambda: bridge.command(app, action, params, port))
 
 

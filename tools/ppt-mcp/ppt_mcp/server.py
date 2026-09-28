@@ -55,8 +55,14 @@ def ppt_health(app: str = "ppt", port: int | None = None) -> str:
 
 
 @mcp.tool()
+def office_sessions() -> str:
+    """List all live Office/WPS bridge sessions: app, port, host, open document."""
+    return _safe(bridge.sessions)
+
+
+@mcp.tool()
 def ppt_command(action: str, params: dict | None = None, app: str = "ppt", port: int | None = None) -> str:
-    """Send any bridge command to the live PowerPoint/WPS session. Examples: wpp.listSlides; wpp.exportPdf params={'path':'C:/tmp/out.pdf'}; wpp.saveAs params={'path':'C:/tmp/out.pptx'}."""
+    """Send any bridge command to the live PowerPoint/WPS session. Examples: wpp.listSlides; wpp.exportPdf params={'path':'C:/tmp/out.pdf'}; wpp.saveAs params={'path':'C:/tmp/out.pptx'}. Tip: call office_sessions() to list every live bridge (Office + WPS) and pass its port here to target that exact instance."""
     return _live(action, params, app, port)
 
 

@@ -62,8 +62,14 @@ def word_health(app: str = "word", port: int | None = None) -> str:
 
 
 @mcp.tool()
+def office_sessions() -> str:
+    """List all live Office/WPS bridge sessions: app, port, host, open document."""
+    return _safe(bridge.sessions)
+
+
+@mcp.tool()
 def word_command(action: str, params: dict | None = None, app: str = "word", port: int | None = None) -> str:
-    """Send any bridge command to the live Word/WPS Writer session. Examples: writer.getText; writer.undo; writer.replaceAll params={'find':'a','replace':'b'}; writer.exportPdf params={'path':'C:/tmp/out.pdf'}."""
+    """Send any bridge command to the live Word/WPS Writer session. Examples: writer.getText; writer.undo; writer.replaceAll params={'find':'a','replace':'b'}; writer.exportPdf params={'path':'C:/tmp/out.pdf'}. Tip: call office_sessions() to list every live bridge (Office + WPS) and pass its port here to target that exact instance."""
     return _live(action, params, app, port)
 
 

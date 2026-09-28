@@ -14,6 +14,7 @@ namespace WpsAiBridge.Bridge
         private readonly JavaScriptSerializer _json = new JavaScriptSerializer();
         private HttpListener _listener;
         private Thread _thread;
+        private SessionRegistry _session;
         private volatile bool _running;
         private int _port;
 
@@ -43,12 +44,20 @@ namespace WpsAiBridge.Bridge
             _thread.SetApartmentState(ApartmentState.STA);
             _thread.Start();
 
+            _session = new SessionRegistry(_host, _port);
+            _session.Start();
+
             Logger.Info(string.Format("HttpBridge listening on http://127.0.0.1:{0}/ (kind={1})", _port, _host.AppKind));
         }
 
         public void Stop()
         {
             _running = false;
+            if (_session != null)
+            {
+                _session.Stop();
+                _session = null;
+            }
             try
             {
                 if (_listener != null)
@@ -137,6 +146,18 @@ namespace WpsAiBridge.Bridge
             if (path == "/config" && context.Request.HttpMethod == "GET")
             {
                 WriteJson(context, 200, CommandDispatcher.ConfigInfo());
+                return;
+            }
+
+            if (path == "/session" && context.Request.HttpMethod == "GET")
+            {
+                SessionRegistry session = _session;
+                if (session == null)
+                {
+                    WriteJson(context, 503, Error("session registry not running"));
+                    return;
+                }
+                WriteJson(context, 200, new Dictionary<string, object> { { "ok", true }, { "result", session.Describe(true) } });
                 return;
             }
 
