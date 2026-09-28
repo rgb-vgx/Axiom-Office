@@ -16,6 +16,7 @@ namespace WpsAiBridge.Ai
         public string Text;
         public string Error;
         public double Seconds;
+        public List<string> Transcript = new List<string>();
     }
 
     internal static class LlmClient
@@ -269,6 +270,312 @@ namespace WpsAiBridge.Ai
                 return s ?? "";
             }
             return s.Substring(0, max) + "...";
+        }
+
+        public static LlmResult RunAgent(string systemPrompt, string userPrompt, List<LlmToolDef> tools,
+            Func<string, string, string> executor, int maxIterations, Action<string> progress)
+        {
+            var result = new LlmResult();
+            var watch = Stopwatch.StartNew();
+            try
+            {
+                string endpoint = (Config.LlmEndpoint ?? "").Trim();
+                if (endpoint.Length == 0)
+                {
+                    result.Error = "Endpoint is not configured";
+                    return result;
+                }
+                if (endpoint.IndexOf("://") < 0)
+                {
+                    endpoint = "http://" + endpoint;
+                }
+                string model = Config.LlmModel;
+                if (string.IsNullOrEmpty(model))
+                {
+                    result.Error = "Model is not configured";
+                    return result;
+                }
+                string apiKey = Config.LlmApiKey;
+                var serializer = new JavaScriptSerializer();
+
+                if (Config.LlmProvider == "anthropic")
+                {
+                    RunAnthropicAgent(result, endpoint, apiKey, model, systemPrompt, userPrompt, tools, executor, maxIterations, progress, serializer);
+                }
+                else
+                {
+                    RunOpenAiAgent(result, endpoint, apiKey, model, systemPrompt, userPrompt, tools, executor, maxIterations, progress, serializer);
+                }
+            }
+            catch (Exception ex)
+            {
+                result.Error = ex.Message;
+            }
+            finally
+            {
+                watch.Stop();
+                result.Seconds = watch.Elapsed.TotalSeconds;
+            }
+            return result;
+        }
+
+        private static void RunOpenAiAgent(LlmResult result, string endpoint, string apiKey, string model,
+            string systemPrompt, string userPrompt, List<LlmToolDef> tools,
+            Func<string, string, string> executor, int maxIterations, Action<string> progress,
+            JavaScriptSerializer serializer)
+        {
+            var messages = new List<object>();
+            messages.Add(new Dictionary<string, object> { { "role", "system" }, { "content", systemPrompt } });
+            messages.Add(new Dictionary<string, object> { { "role", "user" }, { "content", userPrompt } });
+
+            object[] toolDefs = BuildOpenAiTools(tools, serializer);
+            bool toolsEnabled = true;
+            string finalText = null;
+
+            for (int iteration = 0; iteration < maxIterations && finalText == null; iteration++)
+            {
+                var body = new Dictionary<string, object>();
+                body["model"] = model;
+                body["messages"] = messages.ToArray();
+                if (toolsEnabled)
+                {
+                    body["tools"] = toolDefs;
+                }
+
+                string error;
+                string responseText = PostJson(BuildUrl(endpoint, "/chat/completions"), serializer.Serialize(body),
+                    delegate(HttpWebRequest request)
+                    {
+                        if (!string.IsNullOrEmpty(apiKey))
+                        {
+                            request.Headers["Authorization"] = "Bearer " + apiKey;
+                        }
+                    }, out error);
+                if (responseText == null)
+                {
+                    if (toolsEnabled && error != null && error.ToLowerInvariant().Contains("tool"))
+                    {
+                        toolsEnabled = false;
+                        AddTranscript(result, progress, "(provider khong ho tro tools - chay che do thuong)");
+                        continue;
+                    }
+                    result.Error = error;
+                    return;
+                }
+
+                var parsed = Parse(responseText);
+                var message = Dig(parsed, "choices", 0, "message") as Dictionary<string, object>;
+                if (message == null)
+                {
+                    result.Error = "unexpected provider response";
+                    return;
+                }
+                object toolCallsValue;
+                object[] toolCalls = message.TryGetValue("tool_calls", out toolCallsValue) ? toolCallsValue as object[] : null;
+                if (toolCalls == null || toolCalls.Length == 0)
+                {
+                    finalText = message.ContainsKey("content") ? message["content"] as string : null;
+                    break;
+                }
+
+                messages.Add(message);
+                foreach (object item in toolCalls)
+                {
+                    var call = item as Dictionary<string, object>;
+                    if (call == null)
+                    {
+                        continue;
+                    }
+                    string id = Convert.ToString(call.ContainsKey("id") ? call["id"] : "");
+                    var function = call.ContainsKey("function") ? call["function"] as Dictionary<string, object> : null;
+                    string name = function != null ? Convert.ToString(function["name"]) : "";
+                    string arguments = function != null && function.ContainsKey("arguments") ? Convert.ToString(function["arguments"]) : "{}";
+                    string execResult = ExecuteTool(executor, name, arguments);
+                    AddTranscript(result, progress, ToolLine(name, arguments, execResult));
+                    messages.Add(new Dictionary<string, object>
+                    {
+                        { "role", "tool" },
+                        { "tool_call_id", id },
+                        { "content", execResult }
+                    });
+                }
+            }
+            FinishAgent(result, finalText, maxIterations);
+        }
+
+        private static void RunAnthropicAgent(LlmResult result, string endpoint, string apiKey, string model,
+            string systemPrompt, string userPrompt, List<LlmToolDef> tools,
+            Func<string, string, string> executor, int maxIterations, Action<string> progress,
+            JavaScriptSerializer serializer)
+        {
+            var messages = new List<object>();
+            messages.Add(new Dictionary<string, object> { { "role", "user" }, { "content", userPrompt } });
+
+            object[] toolDefs = BuildAnthropicTools(tools, serializer);
+            bool toolsEnabled = true;
+            string finalText = null;
+
+            for (int iteration = 0; iteration < maxIterations && finalText == null; iteration++)
+            {
+                var body = new Dictionary<string, object>();
+                body["model"] = model;
+                body["max_tokens"] = 4096;
+                body["system"] = systemPrompt;
+                body["messages"] = messages.ToArray();
+                if (toolsEnabled)
+                {
+                    body["tools"] = toolDefs;
+                }
+
+                string error;
+                string responseText = PostJson(BuildUrl(endpoint, "/messages"), serializer.Serialize(body),
+                    delegate(HttpWebRequest request)
+                    {
+                        if (!string.IsNullOrEmpty(apiKey))
+                        {
+                            request.Headers["x-api-key"] = apiKey;
+                        }
+                        request.Headers["anthropic-version"] = "2023-06-01";
+                    }, out error);
+                if (responseText == null)
+                {
+                    if (toolsEnabled && error != null && error.ToLowerInvariant().Contains("tool"))
+                    {
+                        toolsEnabled = false;
+                        AddTranscript(result, progress, "(provider khong ho tro tools - chay che do thuong)");
+                        continue;
+                    }
+                    result.Error = error;
+                    return;
+                }
+
+                var contentBlocks = Dig(Parse(responseText), "content") as object[];
+                if (contentBlocks == null)
+                {
+                    result.Error = "unexpected provider response";
+                    return;
+                }
+                var textParts = new List<string>();
+                var toolUses = new List<Dictionary<string, object>>();
+                foreach (object blockItem in contentBlocks)
+                {
+                    var block = blockItem as Dictionary<string, object>;
+                    if (block == null)
+                    {
+                        continue;
+                    }
+                    string type = Convert.ToString(block.ContainsKey("type") ? block["type"] : "");
+                    if (type == "text" && block.ContainsKey("text"))
+                    {
+                        textParts.Add(Convert.ToString(block["text"]));
+                    }
+                    else if (type == "tool_use")
+                    {
+                        toolUses.Add(block);
+                    }
+                }
+                if (toolUses.Count == 0)
+                {
+                    finalText = string.Join("\n", textParts.ToArray());
+                    break;
+                }
+
+                messages.Add(new Dictionary<string, object> { { "role", "assistant" }, { "content", contentBlocks } });
+                var toolResults = new List<object>();
+                foreach (var toolUse in toolUses)
+                {
+                    string id = Convert.ToString(toolUse.ContainsKey("id") ? toolUse["id"] : "");
+                    string name = Convert.ToString(toolUse.ContainsKey("name") ? toolUse["name"] : "");
+                    string inputJson = toolUse.ContainsKey("input") ? serializer.Serialize(toolUse["input"]) : "{}";
+                    string execResult = ExecuteTool(executor, name, inputJson);
+                    AddTranscript(result, progress, ToolLine(name, inputJson, execResult));
+                    toolResults.Add(new Dictionary<string, object>
+                    {
+                        { "type", "tool_result" },
+                        { "tool_use_id", id },
+                        { "content", execResult }
+                    });
+                }
+                messages.Add(new Dictionary<string, object> { { "role", "user" }, { "content", toolResults.ToArray() } });
+            }
+            FinishAgent(result, finalText, maxIterations);
+        }
+
+        private static void FinishAgent(LlmResult result, string finalText, int maxIterations)
+        {
+            if (finalText == null)
+            {
+                finalText = "(da dat gioi han " + maxIterations + " buoc)";
+            }
+            result.Text = finalText;
+            result.Ok = true;
+        }
+
+        private static void AddTranscript(LlmResult result, Action<string> progress, string line)
+        {
+            result.Transcript.Add(line);
+            if (progress != null)
+            {
+                try
+                {
+                    progress(line);
+                }
+                catch
+                {
+                }
+            }
+        }
+
+        private static string ExecuteTool(Func<string, string, string> executor, string name, string arguments)
+        {
+            try
+            {
+                return executor(name, arguments);
+            }
+            catch (Exception ex)
+            {
+                return "{\"ok\":false,\"error\":\"" + ex.Message.Replace("\"", "'") + "\"}";
+            }
+        }
+
+        private static string ToolLine(string name, string arguments, string execResult)
+        {
+            return name + " " + Truncate(arguments, 150) + " -> " + Truncate(execResult, 150);
+        }
+
+        private static object[] BuildOpenAiTools(List<LlmToolDef> tools, JavaScriptSerializer serializer)
+        {
+            var list = new List<object>();
+            foreach (var tool in tools)
+            {
+                list.Add(new Dictionary<string, object>
+                {
+                    { "type", "function" },
+                    { "function", new Dictionary<string, object>
+                        {
+                            { "name", tool.Name },
+                            { "description", tool.Description },
+                            { "parameters", serializer.DeserializeObject(tool.ParametersJson) }
+                        }
+                    }
+                });
+            }
+            return list.ToArray();
+        }
+
+        private static object[] BuildAnthropicTools(List<LlmToolDef> tools, JavaScriptSerializer serializer)
+        {
+            var list = new List<object>();
+            foreach (var tool in tools)
+            {
+                list.Add(new Dictionary<string, object>
+                {
+                    { "name", tool.Name },
+                    { "description", tool.Description },
+                    { "input_schema", serializer.DeserializeObject(tool.ParametersJson) }
+                });
+            }
+            return list.ToArray();
         }
     }
 }

@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using WpsAiBridge.Ai;
 using WpsAiBridge.Bridge;
 using WpsAiBridge.Interop;
 using WpsAiBridge.Ribbon;
@@ -11,11 +12,13 @@ namespace WpsAiBridge
     [Guid("F4524DFD-C4F6-4027-8CA6-08B7F7DB4C44")]
     [ProgId("WpsAiBridge.Connect")]
     [ClassInterface(ClassInterfaceType.AutoDispatch)]
-    public class Connect : IDTExtensibility2, IRibbonExtensibility, IAppHost
+    public class Connect : IDTExtensibility2, IRibbonExtensibility, ICustomTaskPaneConsumer, IAppHost
     {
         private object _application;
         private HttpBridge _bridge;
         private string _appKind;
+        private object _ctpFactory;
+        private object _taskPane;
 
         public Connect()
         {
@@ -48,6 +51,49 @@ namespace WpsAiBridge
             catch (Exception ex)
             {
                 Logger.Error("OnButtonAction failed", ex);
+            }
+        }
+
+        public void CTPFactoryAvailable(object CTPFactoryInst)
+        {
+            _ctpFactory = CTPFactoryInst;
+            Logger.Info("CTPFactoryAvailable: task pane factory ready");
+        }
+
+        public void ShowAskAiPane()
+        {
+            try
+            {
+                AskAiPane.CurrentHost = this;
+                if (_taskPane == null && _ctpFactory != null)
+                {
+                    try
+                    {
+                        dynamic factory = _ctpFactory;
+                        _taskPane = factory.CreateCTP("WpsAiBridge.AskAiPane", "WPS AI Bridge", Type.Missing);
+                        Logger.Info("Task pane created via CTP factory");
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Error("CreateCTP failed; falling back to dialog", ex);
+                        _taskPane = null;
+                    }
+                }
+                if (_taskPane != null)
+                {
+                    dynamic pane = _taskPane;
+                    pane.Visible = true;
+                    return;
+                }
+                Logger.Info("Task pane unavailable; opening floating dialog");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("ShowAskAiPane failed", ex);
+            }
+            using (var form = new Ai.AskAiHostForm(this))
+            {
+                form.ShowDialog();
             }
         }
 

@@ -39,10 +39,7 @@ namespace WpsAiBridge.Ribbon
                     OpenLog();
                     break;
                 case "askAi":
-                    using (var form = new Ai.AskAiForm(connect))
-                    {
-                        form.ShowDialog();
-                    }
+                    connect.ShowAskAiPane();
                     break;
                 case "settings":
                     using (var form = new Ai.SettingsForm())

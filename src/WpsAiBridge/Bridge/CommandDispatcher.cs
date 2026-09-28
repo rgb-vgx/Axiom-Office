@@ -95,6 +95,29 @@ namespace WpsAiBridge.Bridge
                     case "app.info":
                         return Ok(AppInfo(host));
 
+                    case "ai.ask":
+                    {
+                        string prompt = ParamString(p, "prompt", null);
+                        if (string.IsNullOrEmpty(prompt))
+                        {
+                            throw new InvalidOperationException("'prompt' is required");
+                        }
+                        Ai.LlmResult agentResult = Ai.AiAgent.Run(host, prompt, null);
+                        var reply = new Dictionary<string, object>();
+                        reply["ok"] = agentResult.Ok;
+                        if (agentResult.Ok)
+                        {
+                            reply["reply"] = agentResult.Text;
+                        }
+                        else
+                        {
+                            reply["error"] = agentResult.Error;
+                        }
+                        reply["transcript"] = agentResult.Transcript;
+                        reply["seconds"] = agentResult.Seconds;
+                        return Ok(reply);
+                    }
+
                     case "writer.getText":
                         return Ok(WriterGetText(host, p));
                     case "writer.newDocument":

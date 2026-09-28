@@ -18,26 +18,31 @@ function New-Key([string]$path) {
     return $currentUser.CreateSubKey($path)
 }
 
-$progKey = New-Key "Software\Classes\$progId"
-$progKey.SetValue("", $progId, [Microsoft.Win32.RegistryValueKind]::String)
-$progClsid = $progKey.CreateSubKey("CLSID")
-$progClsid.SetValue("", $classGuid, [Microsoft.Win32.RegistryValueKind]::String)
-$progKey.Close()
+function Register-ComClass([string]$progIdToRegister, [string]$classGuidToRegister) {
+    $progKey = New-Key "Software\Classes\$progIdToRegister"
+    $progKey.SetValue("", $progIdToRegister, [Microsoft.Win32.RegistryValueKind]::String)
+    $progClsid = $progKey.CreateSubKey("CLSID")
+    $progClsid.SetValue("", $classGuidToRegister, [Microsoft.Win32.RegistryValueKind]::String)
+    $progKey.Close()
 
-$clsidKey = New-Key "Software\Classes\CLSID\$classGuid"
-$clsidKey.SetValue("", $progId, [Microsoft.Win32.RegistryValueKind]::String)
-$inproc = $clsidKey.CreateSubKey("InprocServer32")
-$inproc.SetValue("", "mscoree.dll", [Microsoft.Win32.RegistryValueKind]::String)
-$inproc.SetValue("ThreadingModel", "Both", [Microsoft.Win32.RegistryValueKind]::String)
-$inproc.SetValue("CodeBase", $codeBase, [Microsoft.Win32.RegistryValueKind]::String)
-$versioned = $inproc.CreateSubKey($dllVersion)
-$versioned.SetValue("Assembly", "WpsAiBridge, Version=$dllVersion, Culture=neutral, PublicKeyToken=null", [Microsoft.Win32.RegistryValueKind]::String)
-$versioned.SetValue("Class", $progId, [Microsoft.Win32.RegistryValueKind]::String)
-$versioned.SetValue("RuntimeVersion", "v4.0.30319", [Microsoft.Win32.RegistryValueKind]::String)
-$versioned.SetValue("CodeBase", $codeBase, [Microsoft.Win32.RegistryValueKind]::String)
-$versioned.Close()
-$inproc.Close()
-$clsidKey.Close()
+    $clsidKey = New-Key "Software\Classes\CLSID\$classGuidToRegister"
+    $clsidKey.SetValue("", $progIdToRegister, [Microsoft.Win32.RegistryValueKind]::String)
+    $inproc = $clsidKey.CreateSubKey("InprocServer32")
+    $inproc.SetValue("", "mscoree.dll", [Microsoft.Win32.RegistryValueKind]::String)
+    $inproc.SetValue("ThreadingModel", "Both", [Microsoft.Win32.RegistryValueKind]::String)
+    $inproc.SetValue("CodeBase", $codeBase, [Microsoft.Win32.RegistryValueKind]::String)
+    $versioned = $inproc.CreateSubKey($dllVersion)
+    $versioned.SetValue("Assembly", "WpsAiBridge, Version=$dllVersion, Culture=neutral, PublicKeyToken=null", [Microsoft.Win32.RegistryValueKind]::String)
+    $versioned.SetValue("Class", $progIdToRegister, [Microsoft.Win32.RegistryValueKind]::String)
+    $versioned.SetValue("RuntimeVersion", "v4.0.30319", [Microsoft.Win32.RegistryValueKind]::String)
+    $versioned.SetValue("CodeBase", $codeBase, [Microsoft.Win32.RegistryValueKind]::String)
+    $versioned.Close()
+    $inproc.Close()
+    $clsidKey.Close()
+}
+
+Register-ComClass $progId $classGuid
+Register-ComClass "WpsAiBridge.AskAiPane" "{D99F8693-4316-45AF-8916-B70D87DEEF87}"
 
 foreach ($officeApp in @("Word", "Excel", "PowerPoint")) {
     $key = New-Key "Software\Microsoft\Office\$officeApp\Addins\$progId"

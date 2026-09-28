@@ -32,11 +32,14 @@
     <Compile Include="Probe.cs" />
     <Compile Include="Interop\IDTExtensibility2.cs" />
     <Compile Include="Interop\IRibbonExtensibility.cs" />
+    <Compile Include="Interop\ICustomTaskPaneConsumer.cs" />
     <Compile Include="Ribbon\RibbonUi.cs" />
     <Compile Include="Ai\LlmClient.cs" />
     <Compile Include="Ai\DocumentContext.cs" />
     <Compile Include="Ai\SettingsForm.cs" />
-    <Compile Include="Ai\AskAiForm.cs" />
+    <Compile Include="Ai\AskAiPane.cs" />
+    <Compile Include="Ai\OfficeActionTool.cs" />
+    <Compile Include="Ai\AiAgent.cs" />
     <Compile Include="Bridge\Logger.cs" />
     <Compile Include="Bridge\IAppHost.cs" />
     <Compile Include="Bridge\Config.cs" />
