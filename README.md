@@ -84,16 +84,37 @@ Nếu port đã được add-in in-proc phục vụ, companion tự chuyển san
 ## Ribbon UI
 
 Add-in in-proc thêm tab **"WPS AI Bridge"** trên ribbon (WPS gọi
-`IRibbonExtensibility.GetCustomUI` khi load — xem log) với 3 nút:
+`IRibbonExtensibility.GetCustomUI` khi load — xem log) với 2 nhóm:
 
 | Nút | Chức năng |
 |---|---|
 | **Status** | Hộp thoại hiển thị app, port, API base, health URL, đường dẫn log |
 | **Copy API URL** | Copy `http://127.0.0.1:<port>/` vào clipboard |
 | **Open Log** | Mở `%LOCALAPPDATA%\WpsAiBridge\bridge.log` bằng ứng dụng mặc định |
+| **Ask AI...** | Mở **task pane dock trong app** (bên phải, cạnh thanh scroll) — xem mục Ask AI |
+| **Settings** | Cấu hình LLM (provider/endpoint/key/model) |
 
 Callback của nút đi qua `IDispatch` (class dùng `ClassInterfaceType.AutoDispatch`),
 tag từng nút được log tại `OnButtonAction` trong bridge.log.
+
+## Ask AI (agent mode)
+
+Ask AI mở dạng **task pane gắn trong ứng dụng** (`ICustomTaskPaneConsumer` —
+cùng API cho cả Microsoft Office và WPS; nếu host không hỗ trợ sẽ fallback
+sang cửa sổ nổi). Trong pane:
+
+1. Gõ yêu cầu (ví dụ *"Soạn cho tôi một mẫu đơn xin việc"*, *"Tạo 5 slide giới
+   thiệu công ty"*, *"Bảng điểm cho 5 học sinh"*) → **Ask**
+2. AI chạy **agent mode**: gọi LLM với **tool-calling**, tự thực thi các hành
+   động đọc/ghi (`writer.*` / `et.*` / `wpp.*`) **trực tiếp lên tài liệu đang
+   mở** — user thấy nội dung xuất hiện real-time; transcript từng bước hiện
+   trong pane
+3. Với Word, mỗi action của AI là **1 bước Ctrl+Z** (UndoRecord); nút
+   **Insert reply** chèn câu trả lời cuối, **Settings** mở cấu hình LLM
+
+Hoạt động với provider OpenAI-compatible và Anthropic (tools); nếu provider
+không hỗ trợ tools, tự fallback về chat thường. Từ bên ngoài, agent có thể gọi
+cùng logic qua bridge command **`ai.ask {prompt}`**.
 
 ## MCP servers (`tools/`)
 
@@ -264,6 +285,7 @@ Response: `{"ok": true, "result": {...}}` hoặc `{"ok": false, "error": "..."}`
 | Action | Params | Mô tả |
 |---|---|---|
 | `app.info` | — | Tên/version app, thông tin document đang mở |
+| `ai.ask` | `prompt` | Chạy AI agent (tool-calling → thao tác live document), trả `reply` + `transcript` |
 | `writer.newDocument` | — | Tạo document mới |
 | `writer.open` | `path` | Mở file .docx/.doc |
 | `writer.getText` | `maxChars?` | Đọc toàn bộ text |

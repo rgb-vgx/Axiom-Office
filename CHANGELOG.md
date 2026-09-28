@@ -5,6 +5,25 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Ask AI dạng Task Pane + AI agent thao tác live
+- **Ask AI = task pane dock trong app** (`ICustomTaskPaneConsumer`/`ICTPFactory`
+  — cùng API cho Microsoft Office và WPS), fallback cửa sổ nổi nếu host không
+  hỗ trợ; pane chat có Ask / Insert reply / Settings, transcript từng bước
+- **Agent mode**: LLM **tool-calling** (OpenAI + Anthropic) gọi tool
+  `office_action` → thực thi `writer.*/et.*/wpp.*` **trực tiếp lên tài liệu đang
+  mở** (real-time trước mặt user); mỗi action Word = 1 Ctrl+Z (UndoRecord);
+  tự fallback chat thường nếu provider không hỗ trợ tools
+- Bridge command mới **`ai.ask {prompt}`** — gọi agent từ bên ngoài qua HTTP
+- Debug notes (ghi lại để đời):
+  - `CTPFactoryAvailable` tham số phải khai báo `object` (marshal trực tiếp
+    `ICTPFactory` fail âm thầm — host vẫn "gọi" nhưng QI lỗi)
+  - `ICustomTaskPaneConsumer` là **dispinterface**: khai báo `IUnknown` →
+    host gọi vtable slot IDispatch → **crash WINWORD** (0xc0000005) ngay sau
+    `OnAddInsUpdate`, trước `GetCustomUI`
+- Đã verify trên Word 2024: prompt *"Soạn cho tôi một mẫu đơn xin việc"* →
+  4 tool calls (getText → insertStyledText header → heading → insertStyledText
+  thân đơn), 41s, docx 1326 ký tự tiếng Việt chuẩn Unicode
+
 ### Added — MCP server Word (`tools/word-mcp`) và PowerPoint (`tools/ppt-mcp`)
 - `word-mcp` (19 tools): làn file python-docx (profile/get_text/find_text/
   extract_table/create — atomic save) + làn live qua bridge (health, command,
