@@ -109,6 +109,26 @@ namespace WpsAiBridge.Bridge
                         return Ok(WriterAppendText(host, p));
                     case "writer.replaceAll":
                         return Ok(WriterReplaceAll(host, p));
+                    case "writer.insertStyledText":
+                        return Ok(WriterInsertStyledText(host, p));
+                    case "writer.formatSelection":
+                        return Ok(WriterFormatSelection(host, p));
+                    case "writer.setParagraphAlignment":
+                        return Ok(WriterSetParagraphAlignment(host, p));
+                    case "writer.insertTable":
+                        return Ok(WriterInsertTable(host, p));
+                    case "writer.insertPageBreak":
+                        return Ok(WriterInsertPageBreak(host));
+                    case "writer.insertImage":
+                        return Ok(WriterInsertImage(host, p));
+                    case "writer.insertHyperlink":
+                        return Ok(WriterInsertHyperlink(host, p));
+                    case "writer.heading":
+                        return Ok(WriterHeading(host, p));
+                    case "writer.undo":
+                        return Ok(WriterUndo(host, p));
+                    case "writer.exportPdf":
+                        return Ok(WriterExportPdf(host, p));
                     case "writer.save":
                         return Ok(SaveDocument(host, "wps", null));
                     case "writer.saveAs":
@@ -124,6 +144,14 @@ namespace WpsAiBridge.Bridge
                         return Ok(EtReadRange(host, p));
                     case "et.writeRange":
                         return Ok(EtWriteRange(host, p));
+                    case "et.formatRange":
+                        return Ok(EtFormatRange(host, p));
+                    case "et.activateSheet":
+                        return Ok(EtActivateSheet(host, p));
+                    case "et.exportPdf":
+                        return Ok(EtExportPdf(host, p));
+                    case "et.undo":
+                        return Ok(EtUndo(host, p));
                     case "et.save":
                         return Ok(SaveDocument(host, "et", null));
                     case "et.saveAs":
@@ -136,9 +164,21 @@ namespace WpsAiBridge.Bridge
                     case "wpp.open":
                         return Ok(WppOpen(host, p));
                     case "wpp.addSlide":
-                        return Ok(WppAddSlide(host));
+                        return Ok(WppAddSlide(host, p));
                     case "wpp.addTextBox":
                         return Ok(WppAddTextBox(host, p));
+                    case "wpp.addText":
+                        return Ok(WppAddText(host, p));
+                    case "wpp.addImage":
+                        return Ok(WppAddImage(host, p));
+                    case "wpp.addTable":
+                        return Ok(WppAddTable(host, p));
+                    case "wpp.setNotes":
+                        return Ok(WppSetNotes(host, p));
+                    case "wpp.deleteSlide":
+                        return Ok(WppDeleteSlide(host, p));
+                    case "wpp.exportPdf":
+                        return Ok(WppExportPdf(host, p));
                     case "wpp.save":
                         return Ok(SaveDocument(host, "wpp", null));
                     case "wpp.saveAs":
@@ -427,7 +467,10 @@ namespace WpsAiBridge.Bridge
                 return new Dictionary<string, object> { { "typed", 0 } };
             }
             dynamic app = host.Application;
-            app.Selection.TypeText(text);
+            using (new UndoRecordScope(host.Application, "AI: type text"))
+            {
+                app.Selection.TypeText(text);
+            }
             return new Dictionary<string, object> { { "typed", text.Length } };
         }
 
@@ -441,7 +484,10 @@ namespace WpsAiBridge.Bridge
             }
             dynamic app = host.Application;
             dynamic doc = app.ActiveDocument;
-            doc.Content.InsertAfter(text);
+            using (new UndoRecordScope(host.Application, "AI: append text"))
+            {
+                doc.Content.InsertAfter(text);
+            }
             return new Dictionary<string, object> { { "appended", text.Length } };
         }
 
@@ -456,7 +502,11 @@ namespace WpsAiBridge.Bridge
             }
             dynamic app = host.Application;
             dynamic doc = app.ActiveDocument;
-            dynamic result = doc.Content.Find.Execute(find, false, false, false, false, false, true, 1, false, replace, 2);
+            dynamic result;
+            using (new UndoRecordScope(host.Application, "AI: replace all"))
+            {
+                result = doc.Content.Find.Execute(find, false, false, false, false, false, true, 1, false, replace, 2);
+            }
             return new Dictionary<string, object> { { "replaced", Convert.ToBoolean(result) } };
         }
 
@@ -660,14 +710,680 @@ namespace WpsAiBridge.Bridge
             };
         }
 
-        private static Dictionary<string, object> WppAddSlide(IAppHost host)
+        private sealed class UndoRecordScope : IDisposable
+        {
+            private readonly object _undoRecord;
+
+            public UndoRecordScope(object app, string label)
+            {
+                try
+                {
+                    dynamic dynamicApp = app;
+                    object record = dynamicApp.UndoRecord;
+                    if (record != null)
+                    {
+                        dynamic dynamicRecord = record;
+                        dynamicRecord.StartCustomRecord(label);
+                        _undoRecord = record;
+                    }
+                }
+                catch
+                {
+                    _undoRecord = null;
+                }
+            }
+
+            public void Dispose()
+            {
+                if (_undoRecord != null)
+                {
+                    try
+                    {
+                        dynamic dynamicRecord = _undoRecord;
+                        dynamicRecord.EndCustomRecord();
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+        }
+
+        private static bool HasParam(Dictionary<string, object> p, string name)
+        {
+            object v;
+            return p != null && p.TryGetValue(name, out v) && v != null;
+        }
+
+        private static int? ParseBgrColor(string hex)
+        {
+            if (string.IsNullOrEmpty(hex))
+            {
+                return null;
+            }
+            string text = hex.Trim().TrimStart('#');
+            if (text.Length != 6)
+            {
+                return null;
+            }
+            try
+            {
+                int r = Convert.ToInt32(text.Substring(0, 2), 16);
+                int g = Convert.ToInt32(text.Substring(2, 2), 16);
+                int b = Convert.ToInt32(text.Substring(4, 2), 16);
+                return r + (g << 8) + (b << 16);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static int ParseAlignment(string alignment)
+        {
+            switch ((alignment ?? "left").ToLowerInvariant())
+            {
+                case "center":
+                    return 1;
+                case "right":
+                    return 2;
+                case "justify":
+                    return 3;
+                default:
+                    return 0;
+            }
+        }
+
+        private static void ApplyWriterFont(dynamic font, Dictionary<string, object> p)
+        {
+            if (HasParam(p, "bold"))
+            {
+                font.Bold = ParamBool(p, "bold", false) ? -1 : 0;
+            }
+            if (HasParam(p, "italic"))
+            {
+                font.Italic = ParamBool(p, "italic", false) ? -1 : 0;
+            }
+            if (HasParam(p, "underline"))
+            {
+                font.Underline = ParamBool(p, "underline", false) ? 1 : 0;
+            }
+            if (HasParam(p, "size"))
+            {
+                font.Size = ParamInt(p, "size", 12);
+            }
+            if (HasParam(p, "font"))
+            {
+                font.Name = ParamString(p, "font", null);
+            }
+            int? color = ParseBgrColor(ParamString(p, "color", null));
+            if (color.HasValue)
+            {
+                font.Color = color.Value;
+            }
+        }
+
+        private static Dictionary<string, object> WriterInsertStyledText(IAppHost host, Dictionary<string, object> p)
+        {
+            RequireKind(host, "wps");
+            string text = ParamString(p, "text", null);
+            if (string.IsNullOrEmpty(text))
+            {
+                return new Dictionary<string, object> { { "inserted", 0 } };
+            }
+            dynamic app = host.Application;
+            using (new UndoRecordScope(host.Application, "AI: insert styled text"))
+            {
+                ApplyWriterFont(app.Selection.Font, p);
+                app.Selection.TypeText(text);
+            }
+            return new Dictionary<string, object> { { "inserted", text.Length } };
+        }
+
+        private static Dictionary<string, object> WriterFormatSelection(IAppHost host, Dictionary<string, object> p)
+        {
+            RequireKind(host, "wps");
+            dynamic app = host.Application;
+            using (new UndoRecordScope(host.Application, "AI: format selection"))
+            {
+                ApplyWriterFont(app.Selection.Font, p);
+                if (HasParam(p, "alignment"))
+                {
+                    app.Selection.ParagraphFormat.Alignment = ParseAlignment(ParamString(p, "alignment", "left"));
+                }
+            }
+            return new Dictionary<string, object> { { "formatted", true } };
+        }
+
+        private static Dictionary<string, object> WriterSetParagraphAlignment(IAppHost host, Dictionary<string, object> p)
+        {
+            RequireKind(host, "wps");
+            string alignment = ParamString(p, "alignment", "left");
+            dynamic app = host.Application;
+            using (new UndoRecordScope(host.Application, "AI: paragraph alignment"))
+            {
+                app.Selection.ParagraphFormat.Alignment = ParseAlignment(alignment);
+            }
+            return new Dictionary<string, object> { { "alignment", alignment } };
+        }
+
+        private static Dictionary<string, object> WriterInsertTable(IAppHost host, Dictionary<string, object> p)
+        {
+            RequireKind(host, "wps");
+            int rows = ParamInt(p, "rows", 0);
+            int cols = ParamInt(p, "cols", 0);
+            if (rows <= 0 || cols <= 0)
+            {
+                throw new InvalidOperationException("'rows' and 'cols' are required");
+            }
+            dynamic app = host.Application;
+            int filled = 0;
+            using (new UndoRecordScope(host.Application, "AI: insert table"))
+            {
+                dynamic table = app.ActiveDocument.Tables.Add(app.Selection.Range, rows, cols);
+                IList valueRows = null;
+                object rawValues;
+                if (p != null && p.TryGetValue("values", out rawValues))
+                {
+                    valueRows = rawValues as IList;
+                }
+                if (valueRows != null)
+                {
+                    for (int r = 0; r < valueRows.Count && r < rows; r++)
+                    {
+                        IList row = valueRows[r] as IList;
+                        if (row == null)
+                        {
+                            continue;
+                        }
+                        for (int c = 0; c < row.Count && c < cols; c++)
+                        {
+                            table.Cell(r + 1, c + 1).Range.Text = Convert.ToString(row[c]);
+                            filled++;
+                        }
+                    }
+                }
+                if (HasParam(p, "style"))
+                {
+                    try
+                    {
+                        table.set_Style(ParamString(p, "style", "Table Grid"));
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+            return new Dictionary<string, object>
+            {
+                { "rows", rows },
+                { "cols", cols },
+                { "filled", filled }
+            };
+        }
+
+        private static Dictionary<string, object> WriterInsertPageBreak(IAppHost host)
+        {
+            RequireKind(host, "wps");
+            dynamic app = host.Application;
+            using (new UndoRecordScope(host.Application, "AI: page break"))
+            {
+                app.Selection.InsertBreak(7);
+            }
+            return new Dictionary<string, object> { { "inserted", true } };
+        }
+
+        private static Dictionary<string, object> WriterInsertImage(IAppHost host, Dictionary<string, object> p)
+        {
+            RequireKind(host, "wps");
+            string path = ParamString(p, "path", null);
+            if (string.IsNullOrEmpty(path))
+            {
+                throw new InvalidOperationException("'path' is required");
+            }
+            dynamic app = host.Application;
+            using (new UndoRecordScope(host.Application, "AI: insert image"))
+            {
+                dynamic shape = app.Selection.InlineShapes.AddPicture(path, false, true);
+                if (HasParam(p, "width"))
+                {
+                    shape.Width = ParamInt(p, "width", 0);
+                }
+                if (HasParam(p, "height"))
+                {
+                    shape.Height = ParamInt(p, "height", 0);
+                }
+                return new Dictionary<string, object>
+                {
+                    { "width", Convert.ToDouble(shape.Width) },
+                    { "height", Convert.ToDouble(shape.Height) }
+                };
+            }
+        }
+
+        private static Dictionary<string, object> WriterInsertHyperlink(IAppHost host, Dictionary<string, object> p)
+        {
+            RequireKind(host, "wps");
+            string url = ParamString(p, "url", null);
+            if (string.IsNullOrEmpty(url))
+            {
+                throw new InvalidOperationException("'url' is required");
+            }
+            string text = ParamString(p, "text", null);
+            if (string.IsNullOrEmpty(text))
+            {
+                text = url;
+            }
+            dynamic app = host.Application;
+            using (new UndoRecordScope(host.Application, "AI: insert hyperlink"))
+            {
+                int start = Convert.ToInt32(app.Selection.Start);
+                app.Selection.TypeText(text);
+                int end = Convert.ToInt32(app.Selection.Start);
+                dynamic range = app.ActiveDocument.Range(start, end);
+                app.ActiveDocument.Hyperlinks.Add(range, url);
+            }
+            return new Dictionary<string, object> { { "text", text }, { "url", url } };
+        }
+
+        private static Dictionary<string, object> WriterHeading(IAppHost host, Dictionary<string, object> p)
+        {
+            RequireKind(host, "wps");
+            int level = Math.Max(1, Math.Min(9, ParamInt(p, "level", 1)));
+            string text = ParamString(p, "text", null);
+            dynamic app = host.Application;
+            using (new UndoRecordScope(host.Application, "AI: heading"))
+            {
+                if (!string.IsNullOrEmpty(text))
+                {
+                    app.Selection.TypeText(text);
+                }
+                string styleName = "Heading " + level;
+                try
+                {
+                    app.Selection.set_Style(styleName);
+                }
+                catch
+                {
+                    app.Selection.Style = styleName;
+                }
+                if (!string.IsNullOrEmpty(text) && ParamBool(p, "break", true))
+                {
+                    try
+                    {
+                        app.Selection.TypeParagraph();
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+            return new Dictionary<string, object> { { "level", level } };
+        }
+
+        private static Dictionary<string, object> WriterUndo(IAppHost host, Dictionary<string, object> p)
+        {
+            RequireKind(host, "wps");
+            int count = Math.Max(1, ParamInt(p, "count", 1));
+            dynamic app = host.Application;
+            int undone = 0;
+            for (int i = 0; i < count; i++)
+            {
+                try
+                {
+                    app.Undo();
+                    undone++;
+                }
+                catch
+                {
+                    break;
+                }
+            }
+            return new Dictionary<string, object> { { "undone", undone } };
+        }
+
+        private static Dictionary<string, object> WriterExportPdf(IAppHost host, Dictionary<string, object> p)
+        {
+            RequireKind(host, "wps");
+            string path = ParamString(p, "path", null);
+            if (string.IsNullOrEmpty(path))
+            {
+                throw new InvalidOperationException("'path' is required");
+            }
+            dynamic app = host.Application;
+            dynamic doc = app.ActiveDocument;
+            doc.ExportAsFixedFormat(path, 17);
+            return new Dictionary<string, object> { { "exported", path } };
+        }
+
+        private static Dictionary<string, object> EtFormatRange(IAppHost host, Dictionary<string, object> p)
+        {
+            RequireKind(host, "et");
+            string address = ParamString(p, "range", null);
+            if (string.IsNullOrEmpty(address))
+            {
+                throw new InvalidOperationException("'range' is required");
+            }
+            string sheetName = ParamString(p, "sheet", null);
+            dynamic app = host.Application;
+            dynamic wb = app.ActiveWorkbook;
+            dynamic sheet = string.IsNullOrEmpty(sheetName) ? wb.ActiveSheet : wb.Worksheets[sheetName];
+            dynamic range = sheet.Range[address];
+            dynamic font = range.Font;
+            if (HasParam(p, "bold"))
+            {
+                font.Bold = ParamBool(p, "bold", false);
+            }
+            if (HasParam(p, "italic"))
+            {
+                font.Italic = ParamBool(p, "italic", false);
+            }
+            if (HasParam(p, "fontSize"))
+            {
+                font.Size = ParamInt(p, "fontSize", 11);
+            }
+            int? fontColor = ParseBgrColor(ParamString(p, "fontColor", null));
+            if (fontColor.HasValue)
+            {
+                font.Color = fontColor.Value;
+            }
+            int? fillColor = ParseBgrColor(ParamString(p, "fillColor", null));
+            if (fillColor.HasValue)
+            {
+                range.Interior.Color = fillColor.Value;
+            }
+            if (HasParam(p, "numFmt"))
+            {
+                range.NumberFormat = ParamString(p, "numFmt", "General");
+            }
+            if (HasParam(p, "horizontal"))
+            {
+                string horizontal = ParamString(p, "horizontal", "left").ToLowerInvariant();
+                range.HorizontalAlignment = horizontal == "center" ? -4108 : (horizontal == "right" ? -4152 : -4131);
+            }
+            if (HasParam(p, "wrap"))
+            {
+                range.WrapText = ParamBool(p, "wrap", false);
+            }
+            return new Dictionary<string, object>
+            {
+                { "sheet", Convert.ToString(sheet.Name) },
+                { "range", address }
+            };
+        }
+
+        private static Dictionary<string, object> EtActivateSheet(IAppHost host, Dictionary<string, object> p)
+        {
+            RequireKind(host, "et");
+            string sheetName = ParamString(p, "sheet", null);
+            if (string.IsNullOrEmpty(sheetName))
+            {
+                throw new InvalidOperationException("'sheet' is required");
+            }
+            dynamic app = host.Application;
+            dynamic wb = app.ActiveWorkbook;
+            wb.Worksheets[sheetName].Activate();
+            return new Dictionary<string, object> { { "active", sheetName } };
+        }
+
+        private static Dictionary<string, object> EtExportPdf(IAppHost host, Dictionary<string, object> p)
+        {
+            RequireKind(host, "et");
+            string path = ParamString(p, "path", null);
+            if (string.IsNullOrEmpty(path))
+            {
+                throw new InvalidOperationException("'path' is required");
+            }
+            dynamic app = host.Application;
+            dynamic wb = app.ActiveWorkbook;
+            wb.ExportAsFixedFormat(0, path);
+            return new Dictionary<string, object> { { "exported", path } };
+        }
+
+        private static Dictionary<string, object> EtUndo(IAppHost host, Dictionary<string, object> p)
+        {
+            RequireKind(host, "et");
+            int count = Math.Max(1, ParamInt(p, "count", 1));
+            dynamic app = host.Application;
+            int undone = 0;
+            for (int i = 0; i < count; i++)
+            {
+                try
+                {
+                    app.Undo();
+                    undone++;
+                }
+                catch
+                {
+                    break;
+                }
+            }
+            return new Dictionary<string, object> { { "undone", undone } };
+        }
+
+        private static dynamic WppGetSlide(dynamic pres, int slideIndex)
+        {
+            int count = Convert.ToInt32(pres.Slides.Count);
+            if (count == 0)
+            {
+                throw new InvalidOperationException("presentation has no slides; call wpp.addSlide first");
+            }
+            if (slideIndex < 1 || slideIndex > count)
+            {
+                slideIndex = count;
+            }
+            return pres.Slides[slideIndex];
+        }
+
+        private static Dictionary<string, object> WppAddSlide(IAppHost host, Dictionary<string, object> p)
+        {
+            RequireKind(host, "wpp");
+            int layout = ParamInt(p, "layout", 12);
+            dynamic app = host.Application;
+            dynamic pres = app.ActivePresentation;
+            int index = Convert.ToInt32(pres.Slides.Count) + 1;
+            pres.Slides.Add(index, layout);
+            return new Dictionary<string, object> { { "slide", index }, { "layout", layout } };
+        }
+
+        private static Dictionary<string, object> WppAddText(IAppHost host, Dictionary<string, object> p)
+        {
+            RequireKind(host, "wpp");
+            string text = ParamString(p, "text", "");
+            int left = ParamInt(p, "left", 60);
+            int top = ParamInt(p, "top", 60);
+            int width = ParamInt(p, "width", 540);
+            int height = ParamInt(p, "height", 120);
+            dynamic app = host.Application;
+            dynamic pres = app.ActivePresentation;
+            dynamic slide = WppGetSlide(pres, ParamInt(p, "slide", 0));
+            dynamic shape = slide.Shapes.AddTextbox(1, left, top, width, height);
+            dynamic textRange = shape.TextFrame.TextRange;
+            textRange.Text = text;
+            dynamic font = textRange.Font;
+            if (HasParam(p, "fontSize"))
+            {
+                font.Size = ParamInt(p, "fontSize", 18);
+            }
+            if (HasParam(p, "bold"))
+            {
+                font.Bold = ParamBool(p, "bold", false) ? -1 : 0;
+            }
+            int? color = ParseBgrColor(ParamString(p, "color", null));
+            if (color.HasValue)
+            {
+                font.Color = color.Value;
+            }
+            if (HasParam(p, "align"))
+            {
+                string align = ParamString(p, "align", "left").ToLowerInvariant();
+                textRange.ParagraphFormat.Alignment = align == "center" ? 2 : (align == "right" ? 3 : 1);
+            }
+            return new Dictionary<string, object>
+            {
+                { "slide", Convert.ToInt32(slide.SlideIndex) },
+                { "shape", Convert.ToString(shape.Name) }
+            };
+        }
+
+        private static Dictionary<string, object> WppAddImage(IAppHost host, Dictionary<string, object> p)
+        {
+            RequireKind(host, "wpp");
+            string path = ParamString(p, "path", null);
+            if (string.IsNullOrEmpty(path))
+            {
+                throw new InvalidOperationException("'path' is required");
+            }
+            int left = ParamInt(p, "left", 60);
+            int top = ParamInt(p, "top", 60);
+            int width = ParamInt(p, "width", -1);
+            int height = ParamInt(p, "height", -1);
+            dynamic app = host.Application;
+            dynamic pres = app.ActivePresentation;
+            dynamic slide = WppGetSlide(pres, ParamInt(p, "slide", 0));
+            dynamic shape = slide.Shapes.AddPicture(path, 0, -1, left, top, width, height);
+            return new Dictionary<string, object>
+            {
+                { "slide", Convert.ToInt32(slide.SlideIndex) },
+                { "shape", Convert.ToString(shape.Name) }
+            };
+        }
+
+        private static Dictionary<string, object> WppAddTable(IAppHost host, Dictionary<string, object> p)
+        {
+            RequireKind(host, "wpp");
+            int rows = ParamInt(p, "rows", 0);
+            int cols = ParamInt(p, "cols", 0);
+            if (rows <= 0 || cols <= 0)
+            {
+                throw new InvalidOperationException("'rows' and 'cols' are required");
+            }
+            int left = ParamInt(p, "left", 60);
+            int top = ParamInt(p, "top", 120);
+            int width = ParamInt(p, "width", 600);
+            int height = ParamInt(p, "height", 200);
+            dynamic app = host.Application;
+            dynamic pres = app.ActivePresentation;
+            dynamic slide = WppGetSlide(pres, ParamInt(p, "slide", 0));
+            dynamic tableShape = slide.Shapes.AddTable(rows, cols, left, top, width, height);
+            dynamic table = tableShape.Table;
+            int filled = 0;
+            IList valueRows = null;
+            object rawValues;
+            if (p != null && p.TryGetValue("values", out rawValues))
+            {
+                valueRows = rawValues as IList;
+            }
+            if (valueRows != null)
+            {
+                for (int r = 0; r < valueRows.Count && r < rows; r++)
+                {
+                    IList row = valueRows[r] as IList;
+                    if (row == null)
+                    {
+                        continue;
+                    }
+                    for (int c = 0; c < row.Count && c < cols; c++)
+                    {
+                        table.Cell(r + 1, c + 1).Shape.TextFrame.TextRange.Text = Convert.ToString(row[c]);
+                        filled++;
+                    }
+                }
+            }
+            return new Dictionary<string, object>
+            {
+                { "slide", Convert.ToInt32(slide.SlideIndex) },
+                { "rows", rows },
+                { "cols", cols },
+                { "filled", filled }
+            };
+        }
+
+        private static Dictionary<string, object> WppSetNotes(IAppHost host, Dictionary<string, object> p)
+        {
+            RequireKind(host, "wpp");
+            string text = ParamString(p, "text", "");
+            dynamic app = host.Application;
+            dynamic pres = app.ActivePresentation;
+            dynamic slide = WppGetSlide(pres, ParamInt(p, "slide", 0));
+            dynamic notesPage = slide.NotesPage;
+            dynamic target = null;
+            int shapeCount = Convert.ToInt32(notesPage.Shapes.Count);
+            for (int i = 1; i <= shapeCount; i++)
+            {
+                dynamic shape = notesPage.Shapes[i];
+                try
+                {
+                    if (Convert.ToInt32(shape.HasTextFrame) == -1 && Convert.ToInt32(shape.PlaceholderFormat.Type) == 2)
+                    {
+                        target = shape;
+                        break;
+                    }
+                }
+                catch
+                {
+                }
+            }
+            if (target == null)
+            {
+                for (int i = 1; i <= shapeCount; i++)
+                {
+                    dynamic shape = notesPage.Shapes[i];
+                    try
+                    {
+                        if (Convert.ToInt32(shape.HasTextFrame) == -1)
+                        {
+                            target = shape;
+                            break;
+                        }
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+            if (target == null)
+            {
+                throw new InvalidOperationException("notes text placeholder not found");
+            }
+            target.TextFrame.TextRange.Text = text;
+            return new Dictionary<string, object> { { "slide", Convert.ToInt32(slide.SlideIndex) }, { "notes", text.Length } };
+        }
+
+        private static Dictionary<string, object> WppDeleteSlide(IAppHost host, Dictionary<string, object> p)
         {
             RequireKind(host, "wpp");
             dynamic app = host.Application;
             dynamic pres = app.ActivePresentation;
-            int index = Convert.ToInt32(pres.Slides.Count) + 1;
-            pres.Slides.Add(index, 12);
-            return new Dictionary<string, object> { { "slide", index } };
+            dynamic slide = WppGetSlide(pres, ParamInt(p, "slide", 0));
+            int index = Convert.ToInt32(slide.SlideIndex);
+            slide.Delete();
+            return new Dictionary<string, object>
+            {
+                { "deleted", index },
+                { "slideCount", Convert.ToInt32(pres.Slides.Count) }
+            };
+        }
+
+        private static Dictionary<string, object> WppExportPdf(IAppHost host, Dictionary<string, object> p)
+        {
+            RequireKind(host, "wpp");
+            string path = ParamString(p, "path", null);
+            if (string.IsNullOrEmpty(path))
+            {
+                throw new InvalidOperationException("'path' is required");
+            }
+            dynamic app = host.Application;
+            dynamic pres = app.ActivePresentation;
+            try
+            {
+                pres.ExportAsFixedFormat(path, 2);
+            }
+            catch
+            {
+                pres.SaveAs(path, 32);
+            }
+            return new Dictionary<string, object> { { "exported", path } };
         }
 
         private static Dictionary<string, object> WppAddTextBox(IAppHost host, Dictionary<string, object> p)
