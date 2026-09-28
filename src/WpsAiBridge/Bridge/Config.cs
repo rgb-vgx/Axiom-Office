@@ -86,7 +86,7 @@ namespace WpsAiBridge.Bridge
             get { return ReadString("LlmModel", ""); }
         }
 
-        public static void WriteString(string name, string value)
+        public static bool WriteString(string name, string value)
         {
             try
             {
@@ -95,26 +95,28 @@ namespace WpsAiBridge.Bridge
                     if (key != null)
                     {
                         key.SetValue(name, value ?? "", RegistryValueKind.String);
+                        return true;
                     }
                 }
             }
             catch
             {
             }
+            return false;
         }
 
-        public static void WriteSecret(string name, string value)
+        public static bool WriteSecret(string name, string value)
         {
             try
             {
                 byte[] plain = System.Text.Encoding.UTF8.GetBytes(value ?? "");
                 byte[] encrypted = System.Security.Cryptography.ProtectedData.Protect(
                     plain, null, System.Security.Cryptography.DataProtectionScope.CurrentUser);
-                WriteString(name, "dpapi:" + Convert.ToBase64String(encrypted));
+                return WriteString(name, "dpapi:" + Convert.ToBase64String(encrypted));
             }
             catch
             {
-                WriteString(name, value);
+                return WriteString(name, value);
             }
         }
 

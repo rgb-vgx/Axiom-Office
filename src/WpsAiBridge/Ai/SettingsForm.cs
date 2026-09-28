@@ -107,10 +107,16 @@ namespace WpsAiBridge.Ai
                 _status.Text = "Model is required";
                 return;
             }
-            Config.WriteString("LlmProvider", SelectedProvider());
-            Config.WriteString("LlmEndpoint", _endpoint.Text.Trim());
-            Config.WriteSecret("LlmApiKey", _apiKey.Text);
-            Config.WriteString("LlmModel", _model.Text.Trim());
+            bool saved = Config.WriteString("LlmProvider", SelectedProvider());
+            saved &= Config.WriteString("LlmEndpoint", _endpoint.Text.Trim());
+            saved &= Config.WriteSecret("LlmApiKey", _apiKey.Text);
+            saved &= Config.WriteString("LlmModel", _model.Text.Trim());
+            if (!saved)
+            {
+                _status.Text = "Failed to save settings to the registry";
+                Logger.Error("AI settings save failed (registry write)", null);
+                return;
+            }
             Logger.Info("AI settings saved: provider=" + SelectedProvider() + " endpoint=" + _endpoint.Text.Trim() + " model=" + _model.Text.Trim());
             DialogResult = DialogResult.OK;
             Close();
