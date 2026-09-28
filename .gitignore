@@ -1,0 +1,8 @@
+bin/
+obj/
+*.reg
+*.reg.hkcu
+*.tlb
+*.user
+*.suo
+*.log
