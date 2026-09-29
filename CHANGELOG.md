@@ -5,6 +5,15 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Docs — `ARCHITECTURE.MD`: tài liệu thiết kế
+- Phần I, High Level Design: mục tiêu và phạm vi, bối cảnh hệ thống, container, khối chức năng,
+  kịch bản chính, triển khai, yêu cầu phi chức năng, quyết định kiến trúc (AD-1..AD-10), rủi ro
+- Phần II, Low Level Design: tổ chức mã nguồn, vòng đời add-in, mô hình thread và `ComGate`, HTTP
+  bridge (pipeline, mô hình lỗi), hệ lệnh (registry, luồng thực thi, đọc tham số), AI agent (giao
+  thức LLM, state machine), schema session và SSE, MCP server (50 tool, làn live/file), cấu hình và
+  đăng ký COM, build/cài đặt, thiết kế kiểm thử; 18 sơ đồ mermaid
+- README trỏ sang tài liệu này; bảng thành phần thêm chế độ `commands` của Host.exe
+
 ### Fixed — `values` bọc `{"item": ...}` bị ghi sai hướng; lỗi tham số khó hiểu
 - Log (Excel, "ghi Tổng vào A5 và công thức tổng vào B5"): model gửi
   `{"item":{"item":["Tổng","=SUM(B2:B3)"]}}` (một dòng). Bridge gỡ mọi lớp bọc cùng lúc thành mảng

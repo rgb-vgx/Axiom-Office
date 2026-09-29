@@ -33,6 +33,9 @@ Không cần quyền admin, không cần Python. Gói cài ~250 KB.
 
 ## Kiến trúc
 
+> Tài liệu thiết kế đầy đủ, gồm High Level Design và Low Level Design, có sơ đồ mermaid: xem
+> [ARCHITECTURE.MD](ARCHITECTURE.MD).
+
 ```
  Người dùng ── Ask AI (task pane) ──┐
                                     ▼
@@ -48,7 +51,7 @@ Không cần quyền admin, không cần Python. Gói cài ~250 KB.
 | Thành phần | Vai trò |
 |---|---|
 | `AxiomOffice.dll` | COM add-in (`IDTExtensibility2`) nạp vào Word/Excel/PowerPoint và WPS: mở HTTP bridge trong process của app, thêm tab ribbon **Axiom Office**, task pane Ask AI và AI agent |
-| `AxiomOffice.Host.exe` | `mcp [all\|word\|excel\|ppt]`: MCP server stdio · `wps\|et\|wpp\|word\|excel\|ppt`: companion tự tạo app qua COM automation và mở bridge (khi add-in không nạp được) · `llm-test`: thử cấu hình AI |
+| `AxiomOffice.Host.exe` | `mcp [all\|word\|excel\|ppt]`: MCP server stdio · `wps\|et\|wpp\|word\|excel\|ppt`: companion tự tạo app qua COM automation và mở bridge (khi add-in không nạp được) · `commands`: danh sách lệnh bridge · `llm-test`: thử cấu hình AI |
 
 Mỗi app có port riêng; WPS và Microsoft Office dùng hai dải khác nhau nên chạy song song
 được (đổi qua registry, xem [Cấu hình](#cấu-hình)):
