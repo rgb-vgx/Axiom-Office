@@ -5,6 +5,15 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Docs — README viết lại cho Axiom Office
+- Giới thiệu 3 cách dùng (Ask AI, MCP server, HTTP API), sơ đồ kiến trúc Office + WPS, cài đặt
+  cho người dùng (gói zip + install.cmd) tách khỏi phần phát triển, bảng tool MCP theo nhóm
+- API: bảng endpoint, bảng lệnh đầy đủ (thêm `ui.askpane`, `writer.closeAll`, quy ước `values`
+  mảng 2 chiều, `slide` trống = slide cuối), ví dụ PowerShell/Python có token và gửi UTF-8
+- Bỏ phần lỗi thời: `build-native.ps1` (chỉ có ở branch `cpp-native-addin`), `docs/office-integration.md`
+  (không tồn tại), CLSID cũ; MCP Python gọn lại thành mục legacy; troubleshooting dạng bảng
+
+
 ### Changed — Đổi tên dự án: WPS AI Bridge → **Axiom Office**
 - Tên hiển thị (ribbon, task pane, hộp thoại, hướng dẫn cài) và toàn bộ định danh kỹ thuật:
   namespace `AxiomOffice.*`, `AxiomOffice.dll` / `AxiomOffice.Host.exe`, ProgID

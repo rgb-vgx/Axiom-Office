@@ -1,166 +1,119 @@
 # Axiom Office
 
 AI agent làm việc ngay trong tài liệu đang mở của **Microsoft Office và WPS Office**
-(Word/Writer, Excel/Spreadsheets, PowerPoint/Presentation): task pane Ask AI trong app,
-HTTP bridge JSON trên localhost cho agent bên ngoài, và MCP server
-(`AxiomOffice.Host.exe mcp`). Không cần admin, không cần Python.
+(Word/Writer, Excel/Spreadsheets, PowerPoint/Presentation). Nội dung AI soạn xuất hiện
+trực tiếp trên trang trước mắt người dùng; mỗi thao tác của AI trong Word là một bước Ctrl+Z.
 
-> Trước đây dự án tên **WPS AI Bridge** (`WpsAiBridge`). Cài bản mới (`install.cmd` /
-> `scripts\install.ps1`) sẽ tự gỡ đăng ký của bản cũ và chuyển cấu hình (port, token, cài
-> đặt AI) từ `HKCU\Software\WpsAiBridge` sang `HKCU\Software\AxiomOffice`. Log mới nằm ở
-> `%LOCALAPPDATA%\AxiomOffice`; thư mục `%LOCALAPPDATA%\WpsAiBridge` cũ có thể xoá.
+Có ba cách dùng, chung một lõi:
 
-```
-AI agent ──HTTP/JSON──► Axiom Office ──COM──► WPS Office
-                          (in-proc hoặc companion)
-```
+| Cách dùng | Dành cho | Thành phần |
+|---|---|---|
+| **Ask AI** — task pane trong Word/Excel/PowerPoint/WPS | Người dùng cuối | `AxiomOffice.dll` (COM add-in) |
+| **MCP server** — Claude Desktop, Claude Code, agent khác | AI agent bên ngoài | `AxiomOffice.Host.exe mcp` |
+| **HTTP API** trên localhost (`/cmd`, `/events`, ...) | Script, tích hợp riêng | bridge trong add-in |
+
+Không cần quyền admin, không cần Python. Gói cài ~250 KB.
+
+> Trước đây dự án tên **WPS AI Bridge** (`WpsAiBridge`). Cài bản mới sẽ tự gỡ đăng ký của bản
+> cũ và chuyển cấu hình (port, token, cài đặt AI) từ `HKCU\Software\WpsAiBridge` sang
+> `HKCU\Software\AxiomOffice`. Thư mục log cũ `%LOCALAPPDATA%\WpsAiBridge` có thể xoá.
+
+## Mục lục
+
+- [Kiến trúc](#kiến-trúc)
+- [Cài đặt cho người dùng](#cài-đặt-cho-người-dùng)
+- [Ask AI (agent trong app)](#ask-ai-agent-trong-app)
+- [MCP server](#mcp-server)
+- [HTTP API](#http-api)
+- [Cấu hình](#cấu-hình)
+- [Phát triển](#phát-triển)
+- [Microsoft Office và WPS: lưu ý riêng](#microsoft-office-và-wps-lưu-ý-riêng)
+- [Troubleshooting](#troubleshooting)
+- [Cấu trúc project](#cấu-trúc-project)
 
 ## Kiến trúc
 
-Hai chế độ chạy cùng một protocol, cùng command set:
+```
+ Người dùng ── Ask AI (task pane) ──┐
+                                    ▼
+                   ┌─────────────────────────────────────┐        COM
+ Script ── HTTP ──►│ AxiomOffice.dll (COM add-in in-proc) │ ─────────────► tài liệu đang mở
+   (localhost)     │  bridge · ribbon · task pane · agent │     Word / Excel / PowerPoint
+                   └─────────────────────────────────────┘     hoặc WPS Writer / ET / WPP
+                                    ▲ HTTP (làn live)
+ MCP client ── stdio ──► AxiomOffice.Host.exe mcp
+                                    └── làn file: đọc/ghi .docx .xlsx .pptx .csv trực tiếp (không cần app)
+```
 
-| Chế độ | Cơ chế | Dùng khi |
-|---|---|---|
-| **In-proc add-in** (`AxiomOffice.dll`) | COM add-in `IDTExtensibility2` nạp thẳng vào WPS, mở HTTP server trong process WPS + thêm tab **"Axiom Office"** trên ribbon | WPS đang mở (điều khiển document đang mở của người dùng) |
-| **Companion** (`AxiomOffice.Host.exe`) | Process riêng dùng COM automation (`KWPS/KET/KWPP.Application`) | App chưa mở, hoặc add-in không nạp được |
+| Thành phần | Vai trò |
+|---|---|
+| `AxiomOffice.dll` | COM add-in (`IDTExtensibility2`) nạp vào Word/Excel/PowerPoint và WPS: mở HTTP bridge trong process của app, thêm tab ribbon **Axiom Office**, task pane Ask AI và AI agent |
+| `AxiomOffice.Host.exe` | `mcp [all\|word\|excel\|ppt]`: MCP server stdio · `wps\|et\|wpp\|word\|excel\|ppt`: companion tự tạo app qua COM automation và mở bridge (khi add-in không nạp được) · `llm-test`: thử cấu hình AI |
 
-Port mặc định (đổi qua registry, xem [Cấu hình](#cấu-hình)) — WPS và Microsoft
-Office dùng 2 dải port riêng nên chạy song song không đụng nhau:
+Mỗi app có port riêng; WPS và Microsoft Office dùng hai dải khác nhau nên chạy song song
+được (đổi qua registry, xem [Cấu hình](#cấu-hình)):
 
-| App | WPS (`Port`, 47821) | Microsoft Office (`PortOffice`, 47831) |
+| App | WPS (`Port`) | Microsoft Office (`PortOffice`) |
 |---|---|---|
 | Writer / Word | 47821 | 47831 |
 | Spreadsheets / Excel | 47822 | 47832 |
 | Presentation / PowerPoint | 47823 | 47833 |
 
-## Yêu cầu
+## Cài đặt cho người dùng
 
-- WPS Office 2019+ x64 (dev/test trên WPS 12.1.0.28485, bản quốc tế)
-- (Tuỳ chọn) Microsoft Office x64 — cùng một đăng ký phục vụ cả hai bộ app,
-  xem mục [Microsoft Office](#microsoft-office)
-- .NET Framework 4.8 (cho add-in C# + companion)
-- Build: Visual Studio 2022 Build Tools (không cần full VS)
+**Yêu cầu:** Windows 10/11 x64 (có sẵn .NET Framework 4.8), Microsoft Office **x64** và/hoặc
+WPS Office **x64**. Không cần admin, Python hay Visual Studio.
 
-## Build
+1. Giải nén `AxiomOffice-<version>-....zip` (tạo bằng `scripts\package.ps1`) vào một chỗ cố
+   định, ví dụ `C:\Tools\AxiomOffice`. Add-in chạy thẳng từ thư mục này; chuyển chỗ thì cài lại.
+2. Đóng Word, Excel, PowerPoint, WPS.
+3. Nhấp đúp **`install.cmd`**: tự gỡ nhãn "tải từ Internet" của file, đăng ký add-in (HKCU),
+   whitelist cho WPS và in sẵn cấu hình MCP với đúng đường dẫn.
+4. Mở Word/Excel/PowerPoint hoặc WPS: có tab **Axiom Office** trên ribbon.
+5. **Ask AI → Cài đặt**: nhập provider, endpoint, model, API key.
 
-```powershell
-# Build add-in DLL + companion EXE (C#)
-scripts\build.ps1
+Gỡ: nhấp đúp **`uninstall.cmd`** (giữ cấu hình AI và token); `uninstall.cmd -Purge` xoá cả cấu
+hình, token và log. Hướng dẫn chi tiết cho người nhận gói: `scripts/dist/HUONG-DAN-CAI-DAT.txt`.
 
-# Hoặc build bản native C++ (branch cpp-native-addin, xem mục Branches)
-scripts\build-native.ps1
-```
+Kiểm tra nhanh: `http://127.0.0.1:47831/health` (Word) hoặc `47821` (WPS Writer); log ở
+`%LOCALAPPDATA%\AxiomOffice\bridge.log`.
 
-> `build.ps1` hỏi Windows Restart Manager xem tiến trình nào đang giữ
-> `AxiomOffice.dll` / `AxiomOffice.Host.exe` (Word/Excel/PowerPoint/WPS/companion).
-> Có thì dừng và in tên + pid; `scripts\build.ps1 -Kill` để tự tắt đúng các tiến
-> trình đó (lưu tài liệu trước). Biên dịch ra `bin\Release\.stage` rồi mới chép
-> đè, nên lỗi biên dịch hay file bị lock đều giữ nguyên DLL cũ.
+## Ask AI (agent trong app)
 
-## Cài đặt / Gỡ
+Tab **Axiom Office** → **Ask AI...** mở task pane dock bên phải (`ICustomTaskPaneConsumer`,
+cùng API cho Office và WPS; host không hỗ trợ thì mở cửa sổ nổi).
 
-```powershell
-scripts\install.ps1            # đăng ký COM (HKCU, không cần admin) + whitelist WPS, in sẵn cấu hình MCP
-scripts\uninstall.ps1          # gỡ đăng ký (add-in + Ask AI pane), giữ cấu hình AI/token
-scripts\uninstall.ps1 -Purge   # gỡ và xoá luôn HKCU\Software\AxiomOffice + %LOCALAPPDATA%\AxiomOffice
-```
+1. Gõ yêu cầu (*"Soạn đơn xin việc vị trí kế toán"*, *"Tạo bảng điểm 5 học sinh, có cột trung
+   bình"*, *"Tạo 5 slide giới thiệu công ty"*) hoặc bấm một gợi ý → **Ask**. Enter gửi,
+   Shift+Enter xuống dòng.
+2. Agent gọi LLM với **tool-calling** và tự thực thi lệnh `writer.*` / `et.*` / `wpp.*` lên tài
+   liệu đang mở. Mỗi thao tác hiện thành một dòng: dấu tick xanh / x đỏ, nhãn tiếng Việt và mã
+   action.
+3. Xong thì AI trả lời ngắn. Với Word: mỗi thao tác của AI = **1 bước Ctrl+Z**; link **Chèn trả
+   lời** chèn câu trả lời vào tài liệu.
 
-`install.ps1` tự gỡ nhãn "tải từ Internet" (Zone.Identifier) của DLL/EXE: file giải nén từ zip
-tải về mang nhãn này và .NET sẽ từ chối nạp add-in.
+Hành vi:
 
-### Đóng gói cho người khác
+- **Không giới hạn số vòng** gọi model/tool. Lượt chạy dừng khi AI trả lời xong, khi bấm
+  **Dừng** (hủy ngay request đang chờ) hoặc khi chạm trần **5 phút** (`LlmClient.AgentTimeoutMs`);
+  mỗi request LLM tối đa 60s.
+- **Mỗi lần Ask là một phiên mới**, agent không nhớ lượt trước. Muốn "làm tiếp" thì mô tả phần
+  còn lại; agent tự đọc tài liệu để biết đã có gì.
+- Lỗi hiện thành thẻ có **Thử lại** / **Mở Cài đặt**. Chưa cấu hình endpoint/model thì ô nhập bị
+  khoá kèm hướng dẫn.
+- Provider: OpenAI-compatible và Anthropic. Provider không hỗ trợ tools thì tự chuyển sang chat
+  thường.
+- Transcript mỗi lượt nằm trong `bridge.log` (`AskAiPane: prompt=` / `AskAiPane progress:` /
+  `AskAiPane: ok ... N tool calls, M rounds` / `AskAiPane failed`), ghi ngay cả khi pane đã đóng.
+- Agent bên ngoài gọi cùng logic qua lệnh bridge `ai.ask`.
 
-```powershell
-scripts\package.ps1            # build + tạo dist\AxiomOffice-<version>-<ngày>-<commit>.zip
-scripts\package.ps1 -NoBuild   # dùng bản đã build trong bin\Release
-scripts\package.ps1 -Kill      # build.ps1 -Kill (tắt app đang giữ DLL)
-```
+Giao diện vẽ bằng GDI+ theo design tokens trong `PaneTheme` (`src/AxiomOffice/Ai/PaneControls.cs`):
+tương phản chữ ≥ 4.5:1, focus ring khi dùng bàn phím, scale theo DPI. Bubble nhận Tab/Ctrl+C
+và có menu chuột phải **Sao chép**.
 
-Zip (~245 KB) chỉ gồm DLL add-in, `AxiomOffice.Host.exe` (companion + MCP server), script cài/gỡ,
-`install.cmd` / `uninstall.cmd` (nhấp đúp; tự Unblock rồi chạy PowerShell với `-ExecutionPolicy
-Bypass`), `HUONG-DAN-CAI-DAT.txt` và `THIRD-PARTY-NOTICES.md`. Người nhận **không cần Python,
-Visual Studio hay quyền admin**: giải nén vào chỗ cố định → đóng Office/WPS → nhấp đúp
-`install.cmd`. Tên zip có `-dirty` khi đóng gói từ code chưa commit.
+## MCP server
 
-Sau khi cài, mở WPS lên là add-in tự nạp (kiểm tra `http://127.0.0.1:47821/health`).
-
-Nếu add-in không nạp: trong WPS vào **Công cụ → COM加载项 / COM Add-ins** để kiểm
-tra danh sách, và xem log tại `%LOCALAPPDATA%\AxiomOffice\bridge.log`.
-
-### Companion
-
-```powershell
-# WPS Office
-& "src\AxiomOffice\bin\Release\AxiomOffice.Host.exe" wps   # hoặc: et, wpp
-# Microsoft Office
-& "src\AxiomOffice\bin\Release\AxiomOffice.Host.exe" word  # hoặc: excel, ppt
-
-# Hiện cửa sổ app (để quan sát)
-& "...\AxiomOffice.Host.exe" excel --visible
-```
-
-Companion log rõ app nó tạo được (`Companion resolved application: Microsoft Excel 16.0`).
-Lưu ý: một số máy (như máy dev này) WPS đăng ký đè các ProgID
-`Word/Excel/PowerPoint.Application` ở HKCU → companion `word|excel|ppt` sẽ tạo
-WPS compat component (version 12.0) thay vì Office thật; lệnh vẫn chạy đúng
-(object model tương thích). Muốn dùng **Microsoft Office thật**: mở app trực tiếp
-— add-in tự nạp và serve ở dải port Office (47831-47833).
-
-Nếu port đã được add-in in-proc phục vụ, companion tự chuyển sang chế độ idle
-(model bền process) và log lại — cả hai đường đều trả cùng kết quả.
-
-## Ribbon UI
-
-Add-in in-proc thêm tab **"Axiom Office"** trên ribbon (WPS gọi
-`IRibbonExtensibility.GetCustomUI` khi load — xem log) với 2 nhóm:
-
-| Nút | Chức năng |
-|---|---|
-| **Status** | Hộp thoại hiển thị app, port, API base, health URL, đường dẫn log |
-| **Copy API URL** | Copy `http://127.0.0.1:<port>/` vào clipboard |
-| **Open Log** | Mở `%LOCALAPPDATA%\AxiomOffice\bridge.log` bằng ứng dụng mặc định |
-| **Ask AI...** | Mở **task pane dock trong app** (bên phải, cạnh thanh scroll) — xem mục Ask AI |
-| **Settings** | Cấu hình LLM (provider/endpoint/key/model) |
-
-Callback của nút đi qua `IDispatch` (class dùng `ClassInterfaceType.AutoDispatch`),
-tag từng nút được log tại `OnButtonAction` trong bridge.log.
-
-## Ask AI (agent mode)
-
-Ask AI mở dạng **task pane gắn trong ứng dụng** (`ICustomTaskPaneConsumer` —
-cùng API cho cả Microsoft Office và WPS; nếu host không hỗ trợ sẽ fallback
-sang cửa sổ nổi). Trong pane:
-
-1. Gõ yêu cầu (ví dụ *"Soạn cho tôi một mẫu đơn xin việc"*, *"Tạo 5 slide giới
-   thiệu công ty"*, *"Bảng điểm cho 5 học sinh"*) hoặc bấm một gợi ý → **Ask**
-   (Enter gửi, Shift+Enter xuống dòng; Ask chỉ bật khi ô nhập có chữ)
-2. AI chạy **agent mode**: gọi LLM với **tool-calling**, tự thực thi các hành
-   động đọc/ghi (`writer.*` / `et.*` / `wpp.*`) **trực tiếp lên tài liệu đang
-   mở** — user thấy nội dung xuất hiện real-time; mỗi thao tác hiện thành một
-   dòng (dấu tick xanh / dấu x đỏ + nhãn tiếng Việt + mã action)
-3. Với Word, mỗi action của AI là **1 bước Ctrl+Z** (UndoRecord); link
-   **Chèn trả lời** chèn câu trả lời cuối, **Cài đặt** mở cấu hình LLM
-4. Link **Dừng** ở footer hủy lượt đang chạy ngay (abort request LLM đang chờ).
-   **Không giới hạn số vòng** gọi model/tool: lượt chạy kết thúc khi AI trả lời xong, khi
-   bấm Dừng hoặc khi chạm trần **5 phút** (`LlmClient.AgentTimeoutMs`); mỗi request LLM 60s.
-   Lỗi hiện thành thẻ có **Thử lại** / **Mở Cài đặt**; chưa cấu hình endpoint/model
-   thì ô nhập bị khoá kèm hướng dẫn
-
-UI vẽ bằng GDI+ theo design tokens trong `PaneTheme` (`Ai/PaneControls.cs`;
-chữ/nền đạt tương phản ≥ 4.5:1, focus ring cho bàn phím, scale theo DPI). Bubble
-nhận Tab/Ctrl+C và có menu chuột phải **Sao chép**. Transcript của mỗi lượt
-luôn có trong `bridge.log` (`AskAiPane: prompt=` / `AskAiPane progress:` /
-`AskAiPane: ok|cancelled` / `AskAiPane failed`) — ghi từ worker nên vẫn còn dấu
-vết kể cả khi pane đã đóng.
-
-Hoạt động với provider OpenAI-compatible và Anthropic (tools); nếu provider
-không hỗ trợ tools, tự fallback về chat thường. Từ bên ngoài, agent có thể gọi
-cùng logic qua bridge command **`ai.ask {prompt}`**.
-
-## MCP server (C#) — `AxiomOffice.Host.exe mcp`
-
-MCP server chạy ngay trong companion EXE: **không cần Python, venv hay pip**. Người dùng chỉ
-cần `AxiomOffice.Host.exe` (build cùng add-in, template docx/pptx nhúng sẵn trong exe).
+MCP server chạy trong `AxiomOffice.Host.exe` (đi kèm gói cài, template docx/pptx nhúng sẵn):
 
 ```json
 {
@@ -173,241 +126,144 @@ cần `AxiomOffice.Host.exe` (build cùng add-in, template docx/pptx nhúng sẵ
 }
 ```
 
-- `mcp` = cả 50 tool (Word + Excel + PowerPoint + `office_sessions`); muốn ít tool hơn thì
-  `mcp word` (20), `mcp excel` (16), `mcp ppt` (16) — cùng tên/tham số với 3 server Python.
-- `AxiomOffice.Host.exe mcp --list` in danh sách tool. Log ở `bridge.log` (`MCP tool ... ok in Nms`).
-- Giao thức: MCP stdio (JSON-RPC 2.0, mỗi message một dòng), `initialize` / `tools/list` /
-  `tools/call` / `ping`; protocol 2024-11-05 → 2025-11-25.
+- `mcp` = 50 tool; muốn gọn thì `mcp word` (20), `mcp excel` (16), `mcp ppt` (16).
+  `AxiomOffice.Host.exe mcp --list` in danh sách tool.
+- Giao thức MCP stdio (JSON-RPC 2.0, mỗi message một dòng): `initialize`, `tools/list`,
+  `tools/call`, `ping`; protocol 2024-11-05 → 2025-11-25. Log: `MCP tool ... ok in Nms`.
 
-Làn file đọc/ghi thẳng OOXML (ZipArchive + XML, không thư viện ngoài). Khi sửa file chỉ các
-phần XML liên quan được ghi lại, nên **chart, ảnh, pivot, macro của file gốc được giữ nguyên**
-(openpyxl của bản Python làm mất). Khác bản Python:
-
-| | Bản C# |
+| Nhóm | Tool |
 |---|---|
-| `excel_query` (DuckDB SQL) | **bỏ** — đọc bằng `excel_read` rồi để agent tự tổng hợp |
-| `excel_convert` | chỉ `to="csv"` (không còn parquet) |
-| đọc `.xls` (BIFF) | qua Excel hoặc WPS Spreadsheets cài trên máy (COM), không cần xlrd; ô lỗi trả `#DIV/0!`... thay vì mã số |
-| `excel_copy_sheet` | chép cả định dạng có điều kiện, data validation, ô gộp; bỏ chart/ảnh/bảng như openpyxl |
-| `excel_rename_sheet` | cập nhật cả defined names trỏ tới sheet |
+| Word — file | `doc_profile`, `doc_get_text`, `doc_find_text`, `doc_extract_table`, `doc_create` |
+| Word — live | `word_health`, `word_command`, `word_read_text`, `word_type_text`, `word_insert_styled_text`, `word_format_selection`, `word_heading`, `word_insert_table`, `word_insert_image`, `word_insert_hyperlink`, `word_replace_all`, `word_export_pdf`, `word_undo`, `word_save` |
+| Excel — file | `excel_profile`, `excel_read`, `excel_write`, `excel_create`, `excel_convert` (csv), `excel_create_sheet`, `excel_copy_sheet`, `excel_rename_sheet`, `excel_delete_sheet`, `excel_format_range`, `excel_create_table` |
+| Excel — live | `wps_health`, `wps_live_command`, `wps_live_read_range`, `wps_live_write_range` |
+| PowerPoint — file | `ppt_profile`, `ppt_get_text`, `ppt_create`, `ppt_add_slide_file` |
+| PowerPoint — live | `ppt_health`, `ppt_command`, `ppt_list_slides`, `ppt_add_slide`, `ppt_add_text`, `ppt_add_image`, `ppt_add_table`, `ppt_set_notes`, `ppt_delete_slide`, `ppt_export_pdf`, `ppt_save` |
+| Chung | `office_sessions` — mọi bridge đang sống (Office + WPS): `app`, `family`, `port`, `host`, `document`, `healthy` |
 
-Kiểm tra: `tests/mcp-host/test_mcp_host.py` dùng MCP client Python chính thức, so kết quả
-từng tool file với `tools/*-mcp/*/file_tools.py` trên cùng file (file do C# tạo, do
-python-docx/openpyxl/python-pptx tạo, file Word/Excel/PowerPoint thật) và đọc lại file C# ghi
-ra bằng python-docx/openpyxl/python-pptx (152/152). `tests/mcp-host/office_roundtrip.ps1
--Verify` mở các file đó bằng Microsoft Office thật.
+**Làn live** gửi lệnh tới bridge trong app đang mở (tham số `app`: `word`/`excel`/`ppt` cho
+Office, `wps`/`et`/`wpp` cho WPS, hoặc `port` lấy từ `office_sessions`).
 
-```powershell
-tools\excel-mcp\.venv\Scripts\python.exe tests\mcp-host\test_mcp_host.py <thư_mục_output>
-powershell -ExecutionPolicy Bypass -File tests\mcp-host\office_roundtrip.ps1 -Dir <thư_mục_output> -Make   # tạo mẫu từ Office thật
-powershell -ExecutionPolicy Bypass -File tests\mcp-host\office_roundtrip.ps1 -Dir <thư_mục_output> -Verify
-```
+**Làn file** đọc/ghi thẳng OOXML (ZipArchive + XML, không thư viện ngoài), không cần app mở.
+Khi sửa file chỉ phần XML liên quan được ghi lại, nên **chart, ảnh, pivot, macro của file gốc
+được giữ nguyên**; mọi lần ghi dùng file tạm rồi thay thế (atomic). `.xls` (BIFF) chỉ đọc, qua
+Excel hoặc WPS Spreadsheets cài trên máy. Không có truy vấn SQL (`excel_query` của bản Python cũ).
 
-## MCP servers Python (`tools/`, legacy)
+## HTTP API
 
-Ba MCP server Python cùng pattern (làn file + làn live qua bridge). Vẫn giữ để đối chiếu và
-cho `excel_query` (DuckDB); cài đặt mới nên dùng bản C# ở trên.
+Mọi endpoint nghe trên `127.0.0.1`. Bridge **từ chối request có header `Origin`** (chặn gọi từ
+trình duyệt); mọi endpoint trừ `/health` cần header `X-Auth-Token` (token tự sinh khi cài, lưu ở
+`HKCU\Software\AxiomOffice\Token`); `POST /cmd` bắt buộc `Content-Type: application/json`.
 
-| Server | Thư mục | Tools | Làn file | Làn live |
-|---|---|---|---|---|
-| Excel | `tools/excel-mcp` | 17 | openpyxl/DuckDB (xlsx/xlsm/xls/csv/tsv) | `wps_live_*` → Excel/WPS ET |
-| Word | `tools/word-mcp` | 20 | python-docx | `word_*` → Word/WPS Writer |
-| PowerPoint | `tools/ppt-mcp` | 16 | python-pptx | `ppt_*` → PowerPoint/WPS WPP |
+| Endpoint | Mô tả |
+|---|---|
+| `GET /health` | Không cần token: `{"ok":true,"result":{"app":"wps","pid":1234,"port":47831,"version":"1.0.0","log":"..."}}` |
+| `GET /config` | Provider, endpoint, model (API key đã che) |
+| `GET /session` | Thông tin bridge + tài liệu đang mở (đọc ngay lúc gọi) |
+| `GET /events` | Server-Sent Events: vùng chọn, tài liệu đổi, ping |
+| `POST /cmd` | `{"action": "...", "params": {...}}` → `{"ok":true,"result":{...}}` hoặc `{"ok":false,"error":"..."}` |
 
-Cả 3 server có tool **`office_sessions()`** — liệt kê mọi bridge đang sống (Office +
-WPS, nhiều app cùng lúc) từ session registry: `app`, `family`, `port`, `host`,
-`document`, `healthy`. Truyền `port` lấy từ đây vào `wps_live_command` /
-`word_command` / `ppt_command` để nhắm đúng instance thay vì đoán port. Trong
-code Python: `bridge.sessions()` và `bridge.es_hint()` (URL + ví dụ curl cho `/events`).
+`app` trong kết quả là loại logic: `wps` = Writer/Word, `et` = Spreadsheets/Excel, `wpp` =
+Presentation/PowerPoint; `family` = `office` | `wps`.
 
-### excel-mcp
-
-MCP server Python cho AI agent thao tác Excel qua 2 làn (17 tools):
-
-- **Làn file** (không cần app mở): `excel_profile`, `excel_read` (paging,
-  `show_formula`), `excel_query` (DuckDB SQL, bảng `data`), `excel_write`,
-  `excel_create`, `excel_convert` (parquet/csv), `excel_create_sheet`,
-  `excel_copy_sheet`, `excel_rename_sheet`, `excel_delete_sheet`,
-  `excel_format_range` (font/fill/border/alignment/numFmt/decimalPlaces —
-  schema tham khảo [negokaz/excel-mcp-server](https://github.com/negokaz/excel-mcp-server)),
-  `excel_create_table`
-- **Làn live** (file đang mở trong WPS/Office): `wps_live_command` (passthrough
-  mọi command bridge), `wps_live_read_range`, `wps_live_write_range`, `wps_health`
-
-Hỗ trợ `.xlsx/.xlsm/.xls/.csv/.tsv`. File lớn: `excel_convert` sang parquet rồi
-query — nhanh hơn ~250x (đo trên file 41k dòng).
-
-An toàn dữ liệu: mọi thao tác ghi dùng file tạm cùng thư mục + `os.replace`
-(atomic — lỗi giữa chừng không làm hỏng file gốc); openpyxl có thể mất
-chart/image/pivot khi resave → file đang mở nên ghi qua làn live. `excel_query`
-bị khóa `enable_external_access=false` — SQL không đọc/ghi được file ngoài
-(chống prompt injection).
+### Ví dụ
 
 ```powershell
-cd tools\excel-mcp
-python -m venv .venv
-.venv\Scripts\python.exe -m pip install -r requirements.txt
-.venv\Scripts\python.exe -m unittest discover -s tests   # chạy test suite
-.venv\Scripts\python.exe -m excel_mcp.server   # hoặc run.cmd
+$headers = @{ "X-Auth-Token" = (Get-ItemProperty "HKCU:\Software\AxiomOffice").Token }
+$base = "http://127.0.0.1:47831"   # Word; WPS Writer: 47821
+# Gửi body dạng byte UTF-8: PowerShell 5.1 mã hoá chuỗi -Body bằng ISO-8859-1 làm hỏng tiếng Việt.
+function Cmd($body) { Invoke-RestMethod -Method Post -Uri "$base/cmd" -Headers $headers -ContentType "application/json; charset=utf-8" -Body ([Text.Encoding]::UTF8.GetBytes($body)) }
+
+Cmd '{"action":"writer.newDocument"}'
+Cmd '{"action":"writer.heading","params":{"level":1,"text":"Báo cáo tháng 9"}}'
+Cmd '{"action":"writer.insertTable","params":{"values":[["Tên","Điểm"],["An",9.5]],"style":"Table Grid"}}'
+Cmd '{"action":"writer.saveAs","params":{"path":"C:\\temp\\bao-cao.docx"}}'
 ```
 
-Đăng ký với MCP client (Claude Code / Claude Desktop / ...):
+```python
+import json, urllib.request, winreg
 
-```json
-{
-  "mcpServers": {
-    "excel-tools": {
-      "command": "<repo>\\tools\\excel-mcp\\.venv\\Scripts\\python.exe",
-      "args": ["-m", "excel_mcp.server"],
-      "env": { "PYTHONPATH": "<repo>\\tools\\excel-mcp" }
-    }
-  }
-}
+with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\AxiomOffice") as key:
+    token = winreg.QueryValueEx(key, "Token")[0]
+body = json.dumps({"action": "et.writeRange",
+                   "params": {"range": "A1", "values": [["Tên", "Điểm"], ["An", 9.5]]}}).encode()
+request = urllib.request.Request("http://127.0.0.1:47832/cmd", data=body, method="POST",
+                                 headers={"Content-Type": "application/json", "X-Auth-Token": token})
+print(json.load(urllib.request.urlopen(request)))
 ```
 
-### word-mcp
+### Danh sách lệnh (`POST /cmd`)
 
-```powershell
-cd tools\word-mcp
-python -m venv .venv
-.venv\Scripts\python.exe -m pip install -r requirements.txt
-.venv\Scripts\python.exe -m unittest discover -s tests
-.venv\Scripts\python.exe -m word_mcp.server   # hoặc run.cmd
-```
+`values` (bảng, vùng ô) luôn là **mảng 2 chiều theo dòng**, ví dụ `[["Tên","Điểm"],["An",9.5]]`.
+Sai dạng hoặc thiếu thì lệnh trả lỗi kèm ví dụ (không âm thầm bỏ qua). Tham số `slide` của
+lệnh `wpp.*` bỏ trống = slide cuối.
 
-Live tools mặc định gọi Microsoft Word (47831); truyền `app="wps"` để dùng WPS
-Writer (47821). Tools: `word_read_text`, `word_type_text`, `word_insert_styled_text`,
-`word_format_selection`, `word_heading`, `word_insert_table`, `word_insert_image`,
-`word_insert_hyperlink`, `word_replace_all`, `word_export_pdf`, `word_undo`,
-`word_save`, `word_health`, `word_command` (passthrough). Mọi thao tác ghi của AI
-= **1 bước Ctrl+Z** (Word UndoRecord).
+| Action | Params | Mô tả |
+|---|---|---|
+| `app.info` | — | Tên/version app, tài liệu đang mở, `state` (tài liệu, cửa sổ, visible) |
+| `ai.ask` | `prompt` | Chạy AI agent trên tài liệu đang mở; trả `reply`, `transcript`, `seconds`, `rounds` |
+| `ui.askpane` | — | Mở task pane Ask AI |
+| `writer.newDocument` | — | Tạo tài liệu mới |
+| `writer.open` | `path` | Mở .docx/.doc |
+| `writer.getText` | `maxChars?` | Đọc toàn bộ text |
+| `writer.selection` | — | Text + vị trí đang chọn |
+| `writer.typeText` | `text` | Gõ tại con trỏ |
+| `writer.appendText` | `text` | Nối vào cuối tài liệu |
+| `writer.insertStyledText` | `text`, `bold?`, `italic?`, `underline?`, `size?`, `color?`, `font?` | Chèn text có định dạng |
+| `writer.heading` | `level` (1-9), `text?`, `break?` | Heading + tự xuống dòng |
+| `writer.formatSelection` | `bold?`, `italic?`, `underline?`, `size?`, `color?`, `font?`, `alignment?` | Định dạng vùng chọn |
+| `writer.setParagraphAlignment` | `alignment` (left/center/right/justify) | Căn đoạn |
+| `writer.insertTable` | `rows?`, `cols?`, `values?`, `style?` | Chèn bảng; `rows`/`cols` tự suy ra/nới theo `values` |
+| `writer.insertPageBreak` | — | Ngắt trang |
+| `writer.insertImage` | `path`, `width?`, `height?` | Chèn ảnh |
+| `writer.insertHyperlink` | `url`, `text?` | Chèn liên kết |
+| `writer.replaceAll` | `find`, `replace` | Tìm và thay toàn bộ |
+| `writer.undo` | `count?` | Hoàn tác (mỗi thao tác AI = 1 bước) |
+| `writer.exportPdf` | `path` | Xuất PDF |
+| `writer.save` / `writer.saveAs` | `path?` | Lưu / lưu thành file mới |
+| `writer.closeAll` | — | **Đóng mọi tài liệu, không lưu** |
+| `et.newWorkbook` | — | Tạo workbook mới |
+| `et.open` | `path` | Mở .xlsx/.xls/.csv |
+| `et.listSheets` | — | Danh sách sheet + sheet đang active |
+| `et.activateSheet` | `sheet` | Chuyển sheet |
+| `et.readRange` | `range`, `sheet?` | Đọc vùng, ví dụ `A1:C10` |
+| `et.writeRange` | `range` (ô trên-trái), `values`, `sheet?` | Ghi vùng |
+| `et.formatRange` | `range`, `bold?`, `italic?`, `fontSize?`, `fontColor?`, `fillColor?`, `numFmt?`, `horizontal?`, `wrap?`, `sheet?` | Định dạng vùng |
+| `et.undo` | `count?` | Hoàn tác |
+| `et.exportPdf` | `path` | Xuất PDF |
+| `et.save` / `et.saveAs` | `path?` | Lưu / lưu thành file mới |
+| `wpp.newPresentation` | — | Tạo bản trình chiếu mới |
+| `wpp.open` | `path` | Mở .pptx |
+| `wpp.listSlides` | — | Số slide + text từng slide |
+| `wpp.addSlide` | `layout?` (mặc định 12 = trống) | Thêm slide |
+| `wpp.addText` | `text`, `slide?`, `left?`, `top?`, `width?`, `height?`, `fontSize?`, `bold?`, `color?`, `align?` | Textbox có định dạng |
+| `wpp.addTextBox` | `text`, `slide?`, `left?`, `top?`, `width?`, `height?` | Textbox |
+| `wpp.addImage` | `path`, `slide?`, `left?`, `top?`, `width?`, `height?` | Chèn ảnh |
+| `wpp.addTable` | `rows?`, `cols?`, `values?`, `slide?`, vị trí/kích thước? | Bảng; `rows`/`cols` tự suy ra/nới theo `values` |
+| `wpp.setNotes` | `text`, `slide?` | Ghi chú thuyết trình |
+| `wpp.deleteSlide` | `slide?` (mặc định slide cuối) | Xoá slide |
+| `wpp.exportPdf` | `path` | Xuất PDF |
+| `wpp.save` / `wpp.saveAs` | `path?` | Lưu / lưu thành file mới |
 
-```json
-{
-  "mcpServers": {
-    "word-tools": {
-      "command": "<repo>\\tools\\word-mcp\\.venv\\Scripts\\python.exe",
-      "args": ["-m", "word_mcp.server"],
-      "env": { "PYTHONPATH": "<repo>\\tools\\word-mcp" }
-    }
-  }
-}
-```
+Lệnh `writer.*` tự kích hoạt tài liệu có cửa sổ hiển thị nếu `ActiveDocument` là tài liệu ẩn.
+App đang bận (dialog mở, đang gõ trong ô Excel) thì bridge tự thử lại lỗi COM "busy" tối đa 10 lần
+(~5s) trước khi trả lỗi.
 
-### ppt-mcp
-
-```powershell
-cd tools\ppt-mcp
-python -m venv .venv
-.venv\Scripts\python.exe -m pip install -r requirements.txt
-.venv\Scripts\python.exe -m unittest discover -s tests
-.venv\Scripts\python.exe -m ppt_mcp.server   # hoặc run.cmd
-```
-
-Live mặc định Microsoft PowerPoint (47833); `app="wpp"` cho WPS Presentation
-(47823). Tools: `ppt_list_slides`, `ppt_add_slide`, `ppt_add_text`, `ppt_add_image`,
-`ppt_add_table`, `ppt_set_notes`, `ppt_delete_slide`, `ppt_export_pdf`, `ppt_save`,
-`ppt_health`, `ppt_command` (passthrough).
-
-```json
-{
-  "mcpServers": {
-    "ppt-tools": {
-      "command": "<repo>\\tools\\ppt-mcp\\.venv\\Scripts\\python.exe",
-      "args": ["-m", "ppt_mcp.server"],
-      "env": { "PYTHONPATH": "<repo>\\tools\\ppt-mcp" }
-    }
-  }
-}
-```
-
-## Microsoft Office
-
-Add-in được thiết kế để chạy trên **cả Microsoft Office lẫn WPS Office** —
-cùng một DLL, cùng một đăng ký (không cần cài thêm gì):
-
-- MS Office đọc đúng vị trí `HKCU\Software\Microsoft\Office\{Word,Excel,PowerPoint}\Addins\<ProgID>`
-  mà `install.ps1` đã ghi (`LoadBehavior=3`) — MS Office **không** cần whitelist
-  `AddinsWL` (đó là cơ chế riêng của WPS, MS Office bỏ qua).
-- COM class (`IDTExtensibility2` + `IRibbonExtensibility`) và Ribbon XML
-  (schema 2006/01) là chuẩn Office — tab "Axiom Office" xuất hiện tương tự.
-- App kind nhận diện qua COM probe (`Documents` / `Workbooks` / `Presentations`);
-  host là Microsoft Office sẽ dùng dải port **47831-47833** (registry `PortOffice`).
-
-Yêu cầu: Office **x64** (kiểm tra `Platform` tại
-`HKLM\SOFTWARE\Microsoft\Office\ClickToRun\Configuration`).
-
-Kiểm tra nhanh (đã kiểm chứng trên Office 2024 ProPlus x64 — Word/Excel/PowerPoint:
-lifecycle + ribbon + E2E qua bridge):
-
-1. Mở Word/Excel/PowerPoint
-2. `%LOCALAPPDATA%\AxiomOffice\bridge.log` phải có `OnConnection` + `GetCustomUI`
-3. `http://127.0.0.1:47831/health` (Word) / `47832` (Excel) / `47833` (PowerPoint)
-
-Port tách biệt theo host: WPS dùng `Port` (47821-47823), Microsoft Office dùng
-`PortOffice` (47831-47833) — mở song song cả hai hệ không đụng nhau.
-
-Troubleshooting riêng cho Office:
-
-- Add-in bị disable sau crash (cơ chế Resiliency của Office): xoá entry trong
-  `HKCU\Software\Microsoft\Office\16.0\{Word,Excel,PowerPoint}\Resiliency\DisabledItems`
-  rồi chạy lại `install.ps1` để khôi phục `LoadBehavior=3`.
-- Sau khi Word crash, lần mở kế tiếp có thể dừng ở hộp thoại *"start in safe
-  mode?"* — add-in chưa nạp nên `/health` không trả lời cho tới khi đóng hộp thoại.
-- Word luôn có một cửa sổ `OpusApp` **ẩn, không title** ngay từ lúc khởi động
-  (có trước cả khi tạo task pane) — đó là cửa sổ của Word, không phải của add-in.
-  `app.info` trả `state` (số tài liệu, tài liệu active, các cửa sổ + visible); log
-  ghi trạng thái này ở `OnConnection`, `OnStartupComplete` và lệnh bridge đầu tiên.
-  Lệnh `writer.*` tự kích hoạt tài liệu có cửa sổ hiển thị nếu `ActiveDocument`
-  là tài liệu ẩn.
-- Companion hiện nhận `KWPS/KET/KWPP.Application` (WPS); hỗ trợ
-  `Word/Excel/PowerPoint.Application` cho MS Office đang phát triển —
-  xem `docs/office-integration.md` khi có.
-
-## API
-
-### `GET /health`
-
-```json
-{"ok":true,"result":{"app":"wps","pid":1234,"port":47821,"version":"0.1.0","log":"..."}}
-```
-
-### `POST /cmd`
-
-Body: `{"action": "<tên>", "params": {...}}`
-Response: `{"ok": true, "result": {...}}` hoặc `{"ok": false, "error": "..."}`
-
-> **Bảo mật**: bridge từ chối mọi request có header `Origin` (chặn CSRF từ trình
-> duyệt); `POST /cmd` bắt buộc `Content-Type: application/json` (chặn "simple
-> request" của browser); token ngẫu nhiên tự sinh khi chạy `install.ps1` và bắt
-> buộc cho `/cmd`, `/config`, `/session`, `/events`. `GET /health` không cần token (chỉ đọc).
-
-### `GET /session` (cần token)
-
-Thông tin của chính bridge này, đọc tài liệu đang mở **ngay lúc gọi**:
+### `GET /session` và session registry
 
 ```json
 {"ok":true,"result":{"pid":5128,"app":"wps","family":"office","port":47831,"host":"WINWORD.EXE",
  "version":"1.0.0","started":"2026-09-28T21:25:42.965Z","lastSeen":"...","lastSeenEpoch":1790630759.1,
- "document":"phase1_doc.docx","documentPath":"C:\\...\\phase1_doc.docx","sessionFile":"..."}}
+ "document":"bao-cao.docx","documentPath":"C:\\...\\bao-cao.docx","sessionFile":"..."}}
 ```
 
-`app` là loại logic (`wps` = Writer/Word, `et` = Spreadsheets/Excel, `wpp` =
-Presentation/PowerPoint); `family` = `office` | `wps`. `document` = `null` khi
-host không có tài liệu nào mở (host bận quá 2s thì trả giá trị đã cache).
+Mỗi bridge (add-in lẫn companion) ghi `%LOCALAPPDATA%\AxiomOffice\sessions\{pid}.json` (cùng nội
+dung `/session`), heartbeat **25s** và xoá file khi app đóng. Tên tài liệu cho heartbeat đọc nền,
+chờ tối đa 2s, bỏ qua lượt khi app đang bận nên heartbeat không bao giờ trễ. `office_sessions`
+(MCP) bỏ các file có process đã chết, hoặc heartbeat quá 90s mà `/health` cũng không trả lời;
+bridge đang chạy lệnh dài (heartbeat còn mới) vẫn được giữ với `healthy: false`.
 
-### Session registry
-
-Mỗi bridge (add-in in-proc lẫn companion) khi start ghi
-`%LOCALAPPDATA%\AxiomOffice\sessions\{pid}.json` (cùng nội dung `/session`),
-heartbeat mỗi **25s** (cập nhật `lastSeen` + tên tài liệu) và xoá file khi
-`OnDisconnection` / `Stop()`. Việc đọc tài liệu cho heartbeat chạy nền, chờ tối
-đa 2s và bỏ qua lượt khi bridge đang chạy lệnh trong host — Word bận không làm
-trễ heartbeat. `bridge.sessions()` (Python) prune file khi process đã chết, hoặc
-heartbeat quá 90s mà `/health` cũng không trả lời; bridge đang bận một lệnh dài
-(heartbeat còn mới) vẫn được giữ với `healthy: false`.
-
-### `GET /events` (cần token) — Server-Sent Events
+### `GET /events` — Server-Sent Events
 
 ```powershell
 curl.exe -N -H "X-Auth-Token: <token>" http://127.0.0.1:47831/events
@@ -418,10 +274,10 @@ event: hello
 data: {"app":"wps","family":"office","port":47831,"pid":5128,"subscribers":1}
 
 event: document
-data: {"app":"wps","name":"phase2_other.docx","fullName":"C:\\...\\phase2_other.docx"}
+data: {"app":"wps","name":"bao-cao.docx","fullName":"C:\\...\\bao-cao.docx"}
 
 event: selection
-data: {"app":"wps","text":"m tra hoi q","start":4,"end":15}
+data: {"app":"wps","text":"Báo cáo","start":0,"end":7}
 
 event: ping
 data: {"time":"2026-09-28T21:26:27.055Z","subscribers":1}
@@ -431,95 +287,19 @@ data: {"time":"2026-09-28T21:26:27.055Z","subscribers":1}
 |---|---|---|
 | `hello` | ngay khi kết nối | `app`, `family`, `port`, `pid`, `subscribers` |
 | `document` | tài liệu active đổi (gửi lại cho subscriber mới) | `app`, `name`, `fullName` (`null` khi không có tài liệu) |
-| `selection` | vùng chọn đổi | Writer/Word: `text` (≤ 200 ký tự), `start`, `end`; ET/Excel: `sheet`, `address`, `text` = giá trị ô trên-trái; WPP/PowerPoint: `slide`, `type` (text/shapes/slides/none), `shape`, `text`, `start`, `end` |
+| `selection` | vùng chọn đổi | Word/Writer: `text` (≤ 200 ký tự), `start`, `end` · Excel/ET: `sheet`, `address`, `text` = giá trị ô trên-trái · PowerPoint/WPP: `slide`, `type`, `shape`, `text`, `start`, `end` |
 | `ping` | mỗi 15s | `time`, `subscribers` |
 
-V1 dùng **poll-diff 500ms** (không COM event sink — chạy giống nhau trên Office
-và WPS); poller chỉ chạy khi có subscriber, tối đa **5 subscriber** mỗi bridge
-(cái thứ 6 nhận `503`). Mỗi kết nối có thread ghi riêng nên `/cmd` và các endpoint
-khác không bị chặn. Host bận (hoặc bridge đang chạy lệnh) thì bỏ qua vòng poll
-đó; lỗi COM được log tối đa 1 lần/phút mỗi loại.
+Cơ chế poll-diff 500ms (không dùng COM event sink, nên chạy giống nhau trên Office và WPS);
+poller chỉ chạy khi có subscriber, tối đa **5 subscriber** mỗi bridge (thứ 6 nhận `503`). Mỗi kết
+nối có thread riêng nên `/cmd` không bị chặn.
 
 ### Truy cập COM tuần tự (`ComGate`)
 
-Pump HTTP, agent của pane, heartbeat session và poller SSE đều gọi object model
-của host qua `Bridge/ComGate.cs`: tại một thời điểm chỉ một thread của bridge ở
-trong host. Lệnh `/cmd` và tool của agent chờ tới lượt; heartbeat/poller chỉ chạy
-khi cổng rảnh. Object model Office không an toàn đa luồng — thiếu cổng này Word
-đã crash (AV trong `wwlib.dll`) khi heartbeat đọc `ActiveDocument` đúng lúc
-`ai.ask` đang ghi.
-
-### Danh sách command
-
-| Action | Params | Mô tả |
-|---|---|---|
-| `app.info` | — | Tên/version app, thông tin document đang mở |
-| `ai.ask` | `prompt` | Chạy AI agent (tool-calling → thao tác live document), trả `reply` + `transcript` |
-| `writer.newDocument` | — | Tạo document mới |
-| `writer.open` | `path` | Mở file .docx/.doc |
-| `writer.getText` | `maxChars?` | Đọc toàn bộ text |
-| `writer.typeText` | `text` | Gõ text tại vị trí con trỏ |
-| `writer.appendText` | `text` | Nối text vào cuối document |
-| `writer.replaceAll` | `find`, `replace` | Tìm & thay thế toàn bộ |
-| `writer.selection` | — | Text + vị trí đang chọn |
-| `writer.save` / `writer.saveAs` | `path?` | Lưu / lưu thành file mới |
-| `writer.insertStyledText` | `text`, `bold?`, `italic?`, `underline?`, `size?`, `color?`, `font?` | Chèn text kèm định dạng |
-| `writer.formatSelection` | font (`bold?`... `color?`), `alignment?` | Định dạng vùng đang chọn |
-| `writer.setParagraphAlignment` | `alignment` (left/center/right/justify) | Căn đoạn |
-| `writer.insertTable` | `rows`, `cols`, `values?`, `style?` | Chèn bảng kèm dữ liệu (`rows`/`cols` tự suy ra/nới theo `values`) |
-| `writer.insertPageBreak` | — | Ngắt trang |
-| `writer.insertImage` | `path`, `width?`, `height?` | Chèn ảnh tại con trỏ |
-| `writer.insertHyperlink` | `url`, `text?` | Chèn hyperlink |
-| `writer.heading` | `level` (1-9), `text?`, `break?` | Heading style + tự xuống dòng |
-| `writer.undo` | `count?` | Undo (mỗi action AI = 1 bước Ctrl+Z) |
-| `writer.exportPdf` | `path` | Xuất PDF |
-| `et.newWorkbook` | — | Tạo workbook mới |
-| `et.open` | `path` | Mở file .xlsx/.xls/.csv |
-| `et.listSheets` | — | Liệt kê sheet + sheet đang active |
-| `et.readRange` | `range`, `sheet?` | Đọc vùng, ví dụ `A1:C10` |
-| `et.writeRange` | `range`, `values` (ma trận 2D), `sheet?` | Ghi vùng (thiếu/sai `values` → lỗi kèm ví dụ) |
-| `et.save` / `et.saveAs` | `path?` | Lưu / lưu thành file mới |
-| `et.formatRange` | `range`, `bold?`, `italic?`, `fontSize?`, `fontColor?`, `fillColor?`, `numFmt?`, `horizontal?`, `wrap?`, `sheet?` | Định dạng vùng |
-| `et.activateSheet` | `sheet` | Chuyển sang sheet khác |
-| `et.exportPdf` | `path` | Xuất PDF |
-| `et.undo` | `count?` | Undo |
-| `wpp.newPresentation` | — | Tạo presentation mới |
-| `wpp.open` | `path` | Mở file .pptx |
-| `wpp.listSlides` | — | Số slide + text trên từng slide |
-| `wpp.addSlide` | `layout?` (mặc định 12 = blank) | Thêm slide với layout |
-| `wpp.addTextBox` | `slide?`, `text`, `left?`, `top?`, `width?`, `height?` | Thêm textbox |
-| `wpp.addText` | `text`, `slide?`, vị trí/kích thước?, `fontSize?`, `bold?`, `color?`, `align?` | Textbox có định dạng |
-| `wpp.addImage` | `path`, `slide?`, `left?`, `top?`, `width?`, `height?` | Chèn ảnh |
-| `wpp.addTable` | `rows`, `cols`, `values?`, `slide?`, vị trí/kích thước? | Bảng kèm dữ liệu |
-| `wpp.setNotes` | `text`, `slide?` | Speaker notes |
-| `wpp.deleteSlide` | `slide` | Xóa slide |
-| `wpp.exportPdf` | `path` | Xuất PDF |
-| `wpp.save` / `wpp.saveAs` | `path?` | Lưu / lưu thành file mới |
-
-### Ví dụ
-
-```powershell
-# Tạo document, gõ text, lưu file
-$base = "http://127.0.0.1:47821"
-Invoke-RestMethod -Method Post -Uri "$base/cmd" -ContentType "application/json" `
-  -Body '{"action":"writer.newDocument"}'
-Invoke-RestMethod -Method Post -Uri "$base/cmd" -ContentType "application/json" `
-  -Body '{"action":"writer.typeText","params":{"text":"Xin chao!"}}'
-Invoke-RestMethod -Method Post -Uri "$base/cmd" -ContentType "application/json" `
-  -Body '{"action":"writer.saveAs","params":{"path":"C:\\temp\\hello.docx"}}'
-
-# Ghi bảng tính
-Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:47822/cmd" -ContentType "application/json" `
-  -Body '{"action":"et.writeRange","params":{"range":"A1:B2","values":[["Ten","Diem"],["AI",9.5]]}}'
-```
-
-```python
-import requests
-
-r = requests.post("http://127.0.0.1:47822/cmd",
-                  json={"action": "et.readRange", "params": {"range": "A1:B2"}})
-print(r.json())
-```
+Bridge HTTP, agent của pane, heartbeat và poller SSE đều gọi object model của app qua
+`src/AxiomOffice/Bridge/ComGate.cs`: tại một thời điểm chỉ một thread của Axiom Office ở trong
+app. Lệnh và tool của agent chờ tới lượt; heartbeat/poller chỉ chạy khi cổng rảnh. Object model
+Office không an toàn đa luồng — thiếu cổng này Word từng crash (AV trong `wwlib.dll`).
 
 ## Cấu hình
 
@@ -527,64 +307,138 @@ print(r.json())
 
 | Value | Kiểu | Mặc định | Ý nghĩa |
 |---|---|---|---|
-| `Port` | DWORD | 47821 | Port base cho WPS (Spreadsheets +1, Presentation +2) |
-| `PortOffice` | DWORD | 47831 | Port base cho Microsoft Office (Excel +1, PowerPoint +2) |
+| `Port` | DWORD | 47821 | Port gốc cho WPS (Spreadsheets +1, Presentation +2) |
+| `PortOffice` | DWORD | 47831 | Port gốc cho Microsoft Office (Excel +1, PowerPoint +2) |
 | `Enabled` | DWORD | 1 | 0 = tắt HTTP bridge |
-| `Token` | String | tự sinh khi install (32 hex) | Bắt buộc cho `/cmd` và `/config` (header `X-Auth-Token`); `tools/excel-mcp` tự đọc từ registry |
-| `LlmProvider` / `LlmEndpoint` / `LlmApiKey` / `LlmModel` | String | — | Cấu hình AI cho Ask AI (đặt qua dialog Settings trên ribbon; API key được mã hóa DPAPI — key plaintext cũ vẫn đọc được) |
+| `Token` | String | tự sinh khi cài (32 hex) | Header `X-Auth-Token` cho mọi endpoint trừ `/health`; MCP server tự đọc |
+| `LlmProvider` / `LlmEndpoint` / `LlmModel` | String | — | Cấu hình AI (đặt qua **Cài đặt** trong pane hoặc ribbon) |
+| `LlmApiKey` | String | — | Mã hoá DPAPI theo tài khoản Windows; key plaintext cũ vẫn đọc được |
+
+## Phát triển
+
+**Yêu cầu:** .NET Framework 4.8, Visual Studio 2022 Build Tools (`csc` Roslyn, C# 7.3). Python
+chỉ cần cho bộ test.
+
+```powershell
+scripts\build.ps1              # build AxiomOffice.dll + AxiomOffice.Host.exe vào src\AxiomOffice\bin\Release
+scripts\build.ps1 -Kill        # tự tắt app đang giữ DLL (lưu tài liệu trước!)
+scripts\install.ps1            # đăng ký từ repo (HKCU), in cấu hình MCP
+scripts\uninstall.ps1 [-Purge] # gỡ đăng ký; -Purge xoá cả cấu hình và log
+scripts\package.ps1 [-NoBuild] # tạo dist\AxiomOffice-<version>-<ngày>-<commit>.zip
+```
+
+- `build.ps1` hỏi Windows Restart Manager xem tiến trình nào đang giữ DLL/EXE; có thì dừng và
+  in tên + pid. Biên dịch vào `bin\Release\.stage` rồi mới chép đè, nên lỗi build hay file bị
+  lock đều giữ nguyên DLL cũ.
+- `install.ps1` gỡ nhãn Zone.Identifier của DLL/EXE, gỡ đăng ký của bản `WpsAiBridge` cũ nếu có
+  (`scripts/legacy.ps1`), đọc version từ DLL.
+- `package.ps1` đóng gói DLL, EXE, script cài/gỡ, `install.cmd`/`uninstall.cmd`,
+  `HUONG-DAN-CAI-DAT.txt` và `THIRD-PARTY-NOTICES.md`; tên zip có `-dirty` khi code chưa commit.
+
+### Companion (không dùng add-in)
+
+```powershell
+& "src\AxiomOffice\bin\Release\AxiomOffice.Host.exe" word           # hoặc excel, ppt, wps, et, wpp
+& "src\AxiomOffice\bin\Release\AxiomOffice.Host.exe" excel --visible # hiện cửa sổ app
+& "src\AxiomOffice\bin\Release\AxiomOffice.Host.exe" llm-test        # thử cấu hình AI
+```
+
+Companion tự tạo app qua COM và mở bridge ở cùng port; nếu add-in đã giữ port thì companion
+chuyển sang idle. Lưu ý: trên máy có WPS, WPS có thể đăng ký đè ProgID
+`Word/Excel/PowerPoint.Application`, khi đó companion `word|excel|ppt` tạo ra WPS thay vì Office
+thật — muốn Office thật thì mở app trực tiếp (add-in tự nạp).
+
+### Kiểm thử
+
+```powershell
+# MCP server: MCP client chính thức + so kết quả với bản Python trên cùng file (152 kiểm tra)
+tools\excel-mcp\.venv\Scripts\python.exe tests\mcp-host\test_mcp_host.py <thư_mục_output>
+# Tạo file mẫu bằng Office thật / mở file C# ghi ra bằng Office thật
+powershell -ExecutionPolicy Bypass -File tests\mcp-host\office_roundtrip.ps1 -Dir <thư_mục_output> -Make
+powershell -ExecutionPolicy Bypass -File tests\mcp-host\office_roundtrip.ps1 -Dir <thư_mục_output> -Verify
+# Unit test của các MCP Python (legacy)
+cd tools\word-mcp; .venv\Scripts\python.exe -m unittest discover -s tests
+```
+
+Test MCP cần venv của `tools/word-mcp`, `tools/excel-mcp`, `tools/ppt-mcp` (python-docx, openpyxl,
+python-pptx, mcp) để đối chiếu.
+
+### MCP servers Python (`tools/`, legacy)
+
+Ba server Python cũ (`tools/excel-mcp` 17 tool, `tools/word-mcp` 20, `tools/ppt-mcp` 16) được giữ
+để đối chiếu trong test và cho `excel_query` (DuckDB SQL). Không phát triển thêm; cài đặt mới dùng
+[MCP server C#](#mcp-server).
+
+```powershell
+cd tools\excel-mcp
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+.venv\Scripts\python.exe -m excel_mcp.server   # hoặc run.cmd
+```
+
+## Microsoft Office và WPS: lưu ý riêng
+
+Cùng một DLL, một lần cài phục vụ cả hai bộ app:
+
+- **Microsoft Office** đọc `HKCU\Software\Microsoft\Office\{Word,Excel,PowerPoint}\Addins\AxiomOffice.Connect`
+  (`LoadBehavior=3`), không cần whitelist. Yêu cầu Office **x64** (xem `Platform` ở
+  `HKLM\SOFTWARE\Microsoft\Office\ClickToRun\Configuration`). Đã kiểm chứng trên Office 2024 x64.
+- **WPS** cần whitelist `HKCU\Software\Kingsoft\Office\{WPS,ET,WPP}\AddinsWL` (install.ps1 ghi).
+  WPS 12 chạy mọi thành phần trong cùng `wps.exe` nên loại app nhận diện qua COM probe
+  (`Documents` / `Workbooks` / `Presentations`), không qua tên process. Đã kiểm chứng trên WPS
+  12.1.0.28485.
+- Word luôn có một cửa sổ `OpusApp` **ẩn, không title** ngay từ khi khởi động — đó là cửa sổ của
+  Word, không phải của add-in. Log ghi trạng thái tài liệu/cửa sổ ở `OnConnection`,
+  `OnStartupComplete` và lệnh bridge đầu tiên; `app.info` trả `state` tương tự.
+- Task pane của WPS 12 mở ra hẹp (~250px) và áp độ rộng trễ; pane tự đo lại và nới về 360px
+  (log `Task pane width: ctp=... control=...px`).
+
+## Troubleshooting
+
+| Hiện tượng | Cách xử lý |
+|---|---|
+| Không thấy tab **Axiom Office** | Đóng hẳn app, chạy lại `install.cmd` / `scripts\install.ps1`, mở lại; xem `%LOCALAPPDATA%\AxiomOffice\bridge.log` (có dòng `Connect constructor ... from <đường dẫn DLL>` khi nạp được) |
+| Office tự tắt add-in sau crash | Xoá mục trong `HKCU\Software\Microsoft\Office\16.0\{Word,Excel,PowerPoint}\Resiliency\DisabledItems`, chạy lại `install.ps1` |
+| WPS tự tắt add-in sau crash | WPS hạ `LoadBehavior` 3→2 và ghi `AddinsCL\AxiomOffice.Connect`; chạy lại `install.ps1` |
+| Word dừng ở hộp thoại *"start in safe mode?"* sau crash | Add-in chưa nạp nên `/health` không trả lời cho tới khi đóng hộp thoại |
+| Lệnh báo `no active document` | Chưa có tài liệu mở: gọi `*.newDocument` / `*.newWorkbook` / `*.newPresentation` |
+| `401 unauthorized` | Thiếu/sai header `X-Auth-Token` (xem `HKCU\Software\AxiomOffice\Token`) |
+| `403` khi gọi từ trình duyệt | Chủ ý: bridge chặn request có header `Origin` |
+| Port bận | Một process khác giữ port: `netstat -ano \| findstr :478` |
+| Tìm bridge đang sống | `office_sessions` (MCP) hoặc `%LOCALAPPDATA%\AxiomOffice\sessions\*.json` |
+| Ô `#N/A` trong Excel đọc ra `null` | Giới hạn của COM (`Value2` trả cùng mã với ô trống); các lỗi khác (`#DIV/0!`, `#REF!`...) trả đúng tên |
+| Máy công ty không nạp add-in | Chính sách chỉ cho add-in có chữ ký số; DLL hiện chưa ký |
 
 ## Cấu trúc project
 
 ```
-src/AxiomOffice/            add-in C# + code dùng chung (HttpBridge, Dispatcher, Connect)
-src/AxiomOffice.Host/       entry point companion EXE
-src/AxiomOffice.Host/Mcp/   MCP server C# (stdio) + template docx/pptx nhúng
-tests/mcp-host/             test parity MCP C# vs Python + round-trip Office thật
-scripts/build.ps1           build C# (add-in DLL + companion EXE)
-scripts/package.ps1         đóng gói zip cài đặt cho người khác (dùng scripts/dist/*)
-scripts/install.ps1         đăng ký HKCU (branch cpp-native-addin: ưu tiên native DLL)
-scripts/uninstall.ps1       gỡ đăng ký
+src/AxiomOffice/              COM add-in (net48)
+  Connect.cs                  IDTExtensibility2 / ribbon / task pane, tạo bridge
+  Ai/                         Ask AI pane (AskAiPane, PaneControls), agent (AiAgent, LlmClient, OfficeActionTool), Settings
+  Bridge/                     HttpBridge, CommandDispatcher, ComGate, SessionRegistry, EventStream, HostProbe, Config, Logger
+  Interop/                    khai báo COM của Office (IDTExtensibility2, IRibbonExtensibility, ICustomTaskPaneConsumer)
+  Ribbon/                     Ribbon XML + xử lý nút
+src/AxiomOffice.Host/         AxiomOffice.Host.exe: companion + MCP server
+  Mcp/                        giao thức MCP, tool file (OOXML) + live, template docx/pptx nhúng
+scripts/                      build, install, uninstall, legacy (gỡ bản WpsAiBridge), package
+scripts/dist/                 install.cmd, uninstall.cmd, HUONG-DAN-CAI-DAT.txt (vào gói cài)
+tests/mcp-host/               test parity MCP + round-trip với Office thật
+tools/*-mcp/                  MCP servers Python (legacy)
 ```
 
-Đăng ký được ghi toàn bộ vào HKCU — không cần quyền admin:
+Đăng ký ghi hoàn toàn vào HKCU (không cần admin):
 
-- `Software\Classes\CLSID\{F4524DFD-...}` — COM class (mscoree + CodeBase,
-  hoặc trỏ thẳng DLL native)
-- `Software\Microsoft\Office\{Word,Excel,PowerPoint}\Addins` — metadata
-  (`LoadBehavior=3`)
-- `Software\Kingsoft\Office\{WPS,ET,WPP}\AddinsWL` — whitelist add-in của WPS
+- `Software\Classes\AxiomOffice.Connect` → CLSID `{BDB3732A-A479-4A24-AD64-D35952035BBA}` (add-in)
+- `Software\Classes\AxiomOffice.AskAiPane` → CLSID `{8001B0D7-F189-443A-B3CB-6EB98038C72E}` (task pane)
+- CLSID → `mscoree.dll` + `CodeBase` trỏ tới `AxiomOffice.dll`
+- `Software\Microsoft\Office\{Word,Excel,PowerPoint}\Addins\AxiomOffice.Connect` (`LoadBehavior=3`)
+- `Software\Kingsoft\Office\{WPS,ET,WPP}\AddinsWL` → `AxiomOffice.Connect`
 
-## Troubleshooting
-
-- **Add-in không load**: đóng WPS hoàn toàn, chạy lại `scripts\install.ps1`,
-  mở WPS. Xem `%LOCALAPPDATA%\AxiomOffice\bridge.log`.
-- **WPS tự tắt add-in sau crash**: WPS (giống MS Office) tự hạ `LoadBehavior`
-  3→2 và ghi `AddinsCL\AxiomOffice.Connect` khi add-in lỗi. Chạy lại
-  `install.ps1` để khôi phục `LoadBehavior=3` và xoá AddinsCL.
-- **Health OK nhưng command lỗi `no active document`**: chưa có document mở —
-  gọi `*.newDocument` / `*.newWorkbook` / `*.newPresentation` trước.
-- **App đang bận** (đang gõ trong ô Excel, đang mở dialog...): bridge tự retry
-  các lỗi COM busy (`RPC_E_CALL_REJECTED` / `SERVERCALL_RETRYLATER` /
-  `VBA_E_IGNORE`) tối đa 10 lần (~5s) trước khi trả lỗi — xem log nếu cần.
-- **Ô lỗi trong Excel**: `#DIV/0!` `#VALUE!` `#NAME?` `#REF!` `#NUM!` `#NULL!`
-  trả về đúng tên chuỗi; riêng `#N/A` trùng mã với ô trống qua `Value2` nên
-  vẫn về `null` (giới hạn đã biết của COM).
-- **Port bận**: một app khác đang giữ port — kiểm tra `netstat -ano | findstr 4782`.
-- **Tìm bridge đang sống**: xem `%LOCALAPPDATA%\AxiomOffice\sessions\*.json` hoặc
-  gọi `office_sessions()` từ MCP server.
-- **Task pane hẹp trên WPS 12**: CTP của WPS mở ra ~250px và áp `Width` trễ; pane
-  tự đo lại sau khi host layout (tối đa 3 lần, mỗi 500ms) và nới về 360px — log
-  `Task pane width: ctp=... control=...px`. Đã kiểm chứng trên WPS 12.1.0.28485
-  (250 → 360px).
-- Kiến trúc WPS 12: mọi component (Writer/ET/WPP) chạy chung binary `wps.exe`
-  với flag `/wps`, `/et`, `/wpp` — đừng tin tưởng tên process để phân biệt app,
-  bridge dùng COM probe.
-
-## Branches
+### Branches
 
 | Branch | Nội dung |
 |---|---|
-| `main` | C# add-in + companion — đường chạy chính thức |
-| `cpp-native-addin` | WIP port add-in sang C++ native (raw COM, không CLR). Hiện WPS tạo được instance + QI `IDTExtensibility2` nhưng chưa invoke `OnConnection` — xem commit `f2f0f00` để biết chi tiết trạng thái |
+| `main` | Add-in C# + companion/MCP — đường chạy chính thức |
+| `cpp-native-addin` | Thử nghiệm add-in C++ native (raw COM, không CLR), dừng ở bước WPS chưa gọi `OnConnection` (commit `f2f0f00`); còn dùng tên cũ `WpsAiBridge` |
 
-Lịch sử thay đổi và root-cause của các bug đã fix: xem [CHANGELOG.md](CHANGELOG.md).
+Lịch sử thay đổi và nguyên nhân các lỗi đã sửa: [CHANGELOG.md](CHANGELOG.md).
