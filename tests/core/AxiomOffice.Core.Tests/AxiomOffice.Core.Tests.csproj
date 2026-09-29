@@ -6,6 +6,8 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <RootNamespace>AxiomOffice.Core.Tests</RootNamespace>
+    <!-- Giong Core (khong ICU): bat loi phu thuoc globalization nhu string.Normalize ngay trong test. -->
+    <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>

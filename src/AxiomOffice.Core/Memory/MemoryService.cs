@@ -159,9 +159,23 @@ public sealed class MemoryService : IDisposable
                 .Where(m => m.Role is "user" or "assistant")
                 .Select(m => (m.Role, m.Content))
                 .ToList();
-            IReadOnlyList<MemoryItem> related = _retriever.Search(job.Prompt, job.DocumentKey, Today(), null, null, MemoryExtractor.MaxRelatedMemories)
+            // Lien quan theo tu khoa, lap them bang memory gan nhat cung pham vi: "toi da len pho giam doc" khong
+            // trung tu nao voi "truong phong Ke toan" nhung extractor can thay ban cu de ghi su chuyen doi + link.
+            var related = _retriever.Search(job.Prompt, job.DocumentKey, Today(), null, null, MemoryExtractor.MaxRelatedMemories)
                 .Select(h => h.Item)
                 .ToList();
+            foreach (MemoryItem recentItem in _store.Active(job.DocumentKey, Today()).OrderByDescending(m => m.CreatedAt, StringComparer.Ordinal))
+            {
+                if (related.Count >= MemoryExtractor.MaxRelatedMemories)
+                {
+                    break;
+                }
+
+                if (related.All(r => r.Id != recentItem.Id))
+                {
+                    related.Add(recentItem);
+                }
+            }
             var input = new ExtractionInput(job.Prompt, job.Reply, recent, related, Today(), job.DocumentKey);
 
             ModelClient model = _models(config);

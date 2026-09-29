@@ -432,7 +432,7 @@ def test_skills(work: str, token: str, bridge: FakeBridge, document_path: str, s
     ])
     data_dir = os.path.join(work, "core-skills")
     os.makedirs(data_dir, exist_ok=True)
-    core = Core(data_dir, session_dir, llm, token, {"AXIOM_SKILL_DIRS": org})
+    core = Core(data_dir, session_dir, llm, token, {"AXIOM_SKILL_DIRS": org, "AXIOM_MEMORY_AUTO_EXTRACT": "0"})
     try:
         status, listing = http_json(core.base + "/v1/skills?app=et", token=core.token)
         names = [s["name"] for s in listing["result"]["skills"]]
@@ -476,6 +476,153 @@ def test_skills(work: str, token: str, bridge: FakeBridge, document_path: str, s
         write_skill(org, "skill-moi", "name: skill-moi\ndescription: Them sau khi Core chay. Dung khi thu reload.", "moi")
         status, reloaded = http_json(core.base + "/v1/skills/reload", method="POST", token=core.token)
         check("skill-moi" in [s["name"] for s in reloaded["result"]["skills"]], "POST /v1/skills/reload thay skill moi", "")
+    finally:
+        core.stop()
+        llm.stop()
+
+
+def wait_for(predicate, timeout=30.0, interval=0.3):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        value = predicate()
+        if value:
+            return value
+        time.sleep(interval)
+    return predicate()
+
+
+def test_memory(work: str, token: str, bridge: FakeBridge, document_path: str, session_dir: str) -> None:
+    """Giai doan 3 (New_arch.md 8.5, 12): memory ghi o phien nay duoc dung o phien sau (ke ca sau khi Core khoi dong
+    lai); thong tin moi mau thuan -> memory MOI ghi ro chuyen doi + lien ket ban cu (ban cu khong bi sua); trung hash
+    khong tao ban moi; id bia bi bo; lenh thao tac thuan khong ton lenh goi trich xuat; tat MemoryEnabled thi khong
+    doc/ghi; xoa la mat khoi ngu canh."""
+    extract_first = json.dumps({"facts": [
+        {"text": "Người dùng là Trưởng phòng Kế toán", "scope": "user", "category": "identity", "confidence": 0.9,
+         "entities": ["Kế toán"], "linkedIds": []},
+        {"text": "Người ký công văn: Nguyễn Văn A", "scope": "user", "category": "contact", "confidence": 0.9,
+         "entities": ["Nguyễn Văn A"], "linkedIds": []},
+    ]}, ensure_ascii=False)
+    extract_duplicate = json.dumps({"facts": [
+        {"text": "người ký công văn: nguyễn văn a.", "scope": "user", "category": "contact", "confidence": 0.9, "linkedIds": []},
+    ]}, ensure_ascii=False)
+    extract_change = json.dumps({"facts": [
+        {"text": "Chức vụ người dùng đổi từ Trưởng phòng Kế toán sang Phó giám đốc từ 10/2026", "scope": "user",
+         "category": "identity", "confidence": 0.9, "entities": [], "linkedIds": ["0", "1", "9"]},
+    ]}, ensure_ascii=False)
+    llm = FakeLlm(work, [
+        {"when": "memory extractor", "texts": [extract_first, extract_duplicate, extract_change, '{"facts": []}']},
+        {"text": "Đã ghi nhận."},                                   # phien 1
+        {"text": "Đã soạn công văn."},                              # phien 2
+        {"text": "Chúc mừng anh."},                                 # phien 3
+        {"tool": "remember", "arguments": {"scope": "user", "text": "Thích font Times New Roman 13", "category": "format"}},
+        {"text": "Đã nhớ."},                                        # phien 4 (tool remember)
+        {"text": "Đã in đậm."},                                     # phien 5 (lenh thao tac thuan)
+        {"text": "Xong."},
+    ])
+    data_dir = os.path.join(work, "core-memory")
+    os.makedirs(data_dir, exist_ok=True)
+    office = {"port": bridge.port, "pid": bridge.pid, "app": "et", "family": "office"}
+    document = {"name": "bao-cao.xlsx", "fullName": document_path}
+
+    def memories(core_: Core) -> list[dict]:
+        return http_json(core_.base + "/v1/memory", token=core_.token)[1]["result"]["memories"]
+
+    def extract_calls() -> int:
+        return sum(1 for item in llm.requests()
+                   if "memory extractor" in json.dumps(item["body"].get("messages", [{}])[0], ensure_ascii=False))
+
+    def run(core_: Core, prompt: str):
+        status, created = core_.run(prompt, office, document=document)
+        events = core_.events(created["result"]["runId"])
+        return created["result"]["runId"], events
+
+    def system_prompt(index_from_end: int = -1) -> str:
+        agent = [item["body"] for item in llm.requests() if "memory extractor" not in json.dumps(item["body"].get("messages", [{}])[0], ensure_ascii=False)]
+        return agent[index_from_end]["messages"][0]["content"]
+
+    core = Core(data_dir, session_dir, llm, token)
+    try:
+        # Phien 1: nguoi dung noi ve ban than -> trich xuat nen ghi 2 fact.
+        run(core, "Tôi là trưởng phòng Kế toán, công văn ký tên Nguyễn Văn A")
+        first = wait_for(lambda: len(memories(core)) >= 2 and memories(core))
+        check(first and {m["text"] for m in first} >= {"Người dùng là Trưởng phòng Kế toán", "Người ký công văn: Nguyễn Văn A"}
+              and all(m["source"] == "extract" for m in first), "phien 1: trich xuat nen ghi 2 fact (source=extract)", first)
+    finally:
+        core.stop()
+
+    # Khoi dong lai Core: memory van con va vao ngu canh.
+    core = Core(data_dir, session_dir, llm, token)
+    try:
+        status, health = http_json(core.base + "/health")
+        check(health["result"]["memory"] == "on", "Core khoi dong lai: /health memory on", health["result"])
+        run(core, "Soạn công văn gửi Sở Tài chính đề nghị cấp kinh phí")
+        prompt2 = system_prompt()
+        check("Nguyễn Văn A" in prompt2 and "Things you remember" in prompt2, "phien 2 (sau khi khoi dong lai): prompt co nguoi ky Nguyen Van A", prompt2[-400:])
+        wait_for(lambda: extract_calls() >= 2)
+        time.sleep(1.0)
+        check(len(memories(core)) == 2, "fact trung hash khong tao ban moi", [m["text"] for m in memories(core)])
+
+        # Phien 3: thong tin moi mau thuan -> memory MOI ghi ro chuyen doi + link ban cu; ban cu giu nguyen.
+        old = next(m for m in memories(core) if m["text"] == "Người dùng là Trưởng phòng Kế toán")
+        run(core, "Tôi đã lên phó giám đốc từ tháng 10/2026 rồi nhé")
+        changed = wait_for(lambda: next((m for m in memories(core) if "đổi từ" in m["text"]), None))
+        check(changed is not None and old["id"] in changed["linked"] and len(changed["linked"]) <= 2,
+              "phien 3: memory moi ghi chuyen doi, lien ket ban cu, id bia bi bo", changed)
+        still = next((m for m in memories(core) if m["id"] == old["id"]), None)
+        check(still is not None and still["text"] == old["text"] and still["deletedAt"] is None, "ban cu khong bi model sua/xoa", still)
+
+        # Phien 4: tool remember -> SSE memory.written (source=agent).
+        _, events = run(core, "Từ nay luôn dùng font Times New Roman 13 cho văn bản của tôi")
+        written = [payload.get("data", {}) for event_type, payload in events if event_type == "memory.written"]
+        check(written and written[0].get("text") == "Thích font Times New Roman 13", "tool remember phat memory.written", written)
+        run(core, "Chức vụ trưởng phòng của tôi hiện nay còn đúng không?")
+        prompt4 = system_prompt()
+        position_change = prompt4.find("đổi từ Trưởng phòng")
+        position_old = prompt4.find("Người dùng là Trưởng phòng Kế toán")
+        check(position_change >= 0 and (position_old == -1 or position_change < position_old),
+              "ngu canh co ban chuyen doi va dua no truoc ban cu", prompt4[-500:])
+
+        # Phien 5: lenh thao tac thuan -> khong ton lenh goi trich xuat.
+        wait_for(lambda: extract_calls() >= 4, timeout=15)
+        before = extract_calls()
+        run_id, _ = run(core, "In đậm dòng đầu tiên")
+        time.sleep(1.5)
+        check(extract_calls() == before, "lenh thao tac thuan khong goi trich xuat", extract_calls() - before)
+        run_row = http_json(f"{core.base}/v1/runs/{run_id}", token=core.token)[1]["result"]
+        check(run_row.get("status") == "completed", "luot thao tac thuan van hoan thanh", run_row.get("status"))
+
+        # Xoa trong API -> mat khoi ngu canh.
+        signer = next(m for m in memories(core) if m["text"] == "Người ký công văn: Nguyễn Văn A")
+        status, deleted = http_json(f"{core.base}/v1/memory/{signer['id']}", method="DELETE", token=core.token)
+        check(status == 200 and deleted["ok"], "DELETE /v1/memory/{id} xoa mem", deleted)
+        run(core, "Soạn công văn khác gửi Sở Tài chính")
+        check("Nguyễn Văn A" not in system_prompt(), "memory da xoa khong con trong ngu canh", "")
+        status, history = http_json(f"{core.base}/v1/memory/{signer['id']}/history", token=core.token)
+        check([h["event"] for h in history["result"]["history"]] == ["ADD", "DELETE"], "lich su ADD -> DELETE", history["result"])
+        status, restored = http_json(f"{core.base}/v1/memory/{signer['id']}/restore", method="POST", token=core.token)
+        check(restored["ok"] and any(m["id"] == signer["id"] for m in memories(core)), "khoi phuc memory da xoa", restored)
+
+        # Nguoi dung tu them + tim.
+        status, added = http_json(core.base + "/v1/memory", method="POST", token=core.token,
+                                  body={"scope": "user", "text": "Cơ quan: Sở Giáo dục và Đào tạo Hà Nội"})
+        check(added["ok"] and added["result"]["memory"]["source"] == "user", "POST /v1/memory (source=user)", added)
+        status, found = http_json(core.base + "/v1/memory?q=so%20giao%20duc", token=core.token)
+        check(found["result"]["memories"] and "Sở Giáo dục" in found["result"]["memories"][0]["text"], "GET /v1/memory?q= tim khong dau", found["result"])
+    finally:
+        core.stop()
+
+    # Tat MemoryEnabled: khong doc, khong ghi.
+    core = Core(data_dir, session_dir, llm, token, {"AXIOM_MEMORY_ENABLED": "0"})
+    try:
+        status, health = http_json(core.base + "/health")
+        check(health["result"]["memory"] == "off", "MemoryEnabled=0: /health memory off", health["result"])
+        before = extract_calls()
+        run(core, "Tôi là kế toán trưởng của công ty ABC")
+        time.sleep(1.5)
+        body = [item["body"] for item in llm.requests()][-1]
+        tools = [t["function"]["name"] for t in body.get("tools", [])]
+        check("Things you remember" not in body["messages"][0]["content"] and "remember" not in tools and extract_calls() == before,
+              "MemoryEnabled=0: khong dua memory vao prompt, khong tool remember, khong trich xuat", tools)
     finally:
         core.stop()
         llm.stop()
@@ -643,7 +790,7 @@ def main() -> int:
             {"text": "Lenh do khong duoc phep"},
         ])
         # Che do --office dung session registry that cua add-in (khong tro vao thu muc tam).
-        core = Core(data_dir, None if args.office else session_dir, llm, token)
+        core = Core(data_dir, None if args.office else session_dir, llm, token, {"AXIOM_MEMORY_AUTO_EXTRACT": "0"})
 
         status, health = http_json(core.base + "/health")
         check(status == 200 and health["result"]["memory"] == "on", "GET /health bao memory on", health["result"])
@@ -656,6 +803,7 @@ def main() -> int:
             test_fake_bridge(core, bridge, llm, document_path)
             test_guards(core, bridge, document_path)
             test_skills(work, token, bridge, document_path, session_dir)
+            test_memory(work, token, bridge, document_path, session_dir)
     finally:
         if core is not None:
             core.stop()

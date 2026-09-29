@@ -184,6 +184,7 @@ public sealed class MemoryTests : IDisposable
 
     [Theory]
     [InlineData("In đậm dòng này", true)]
+    [InlineData("In đậm dòng đầu tiên", true)]
     [InlineData("Căn giữa tiêu đề và đổi màu chữ sang xanh", true)]
     [InlineData("Tạo bảng điểm 5 học sinh có cột trung bình", true)]
     [InlineData("Tôi là trưởng phòng Kế toán, công văn ký tên Nguyễn Văn A", false)]

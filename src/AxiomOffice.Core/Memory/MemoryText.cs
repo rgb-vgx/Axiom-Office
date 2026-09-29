@@ -12,7 +12,36 @@ public static partial class MemoryText
     public const int MaxFactLength = 300;
     public const int MaxQueryTerms = 12;
 
-    // Chu thuong, bo dau (NFD bo dau ket hop; 'đ' khong tach duoc nen doi tay), bo dau cau, gop khoang trang.
+    // Bang bo dau tieng Viet tuong minh: Core chay InvariantGlobalization (khong ICU) nen string.Normalize(FormD)
+    // khong tach duoc dau -> "in đậm" khong thanh "in dam" (loc lenh thao tac thuan, hash, truy van deu sai).
+    private static readonly Dictionary<char, char> VietnameseBase = BuildVietnameseMap();
+
+    private static Dictionary<char, char> BuildVietnameseMap()
+    {
+        var groups = new (char Base, string Accented)[]
+        {
+            ('a', "àáảãạăằắẳẵặâầấẩẫậ"),
+            ('e', "èéẻẽẹêềếểễệ"),
+            ('i', "ìíỉĩị"),
+            ('o', "òóỏõọôồốổỗộơờớởỡợ"),
+            ('u', "ùúủũụưừứửữự"),
+            ('y', "ỳýỷỹỵ"),
+            ('d', "đ"),
+        };
+        var map = new Dictionary<char, char>();
+        foreach ((char baseChar, string accented) in groups)
+        {
+            foreach (char c in accented)
+            {
+                map[c] = baseChar;
+                map[char.ToUpperInvariant(c)] = baseChar;
+            }
+        }
+
+        return map;
+    }
+
+    // Chu thuong, bo dau (bang tieng Viet + NFD cho chu Latin khac neu co), bo dau cau, gop khoang trang.
     public static string Normalize(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))
@@ -20,7 +49,21 @@ public static partial class MemoryText
             return "";
         }
 
-        string decomposed = text.ToLowerInvariant().Replace('đ', 'd').Replace('Đ', 'd').Normalize(NormalizationForm.FormD);
+        var mapped = new StringBuilder(text.Length);
+        foreach (char c in text)
+        {
+            mapped.Append(VietnameseBase.TryGetValue(c, out char plain) ? plain : char.ToLowerInvariant(c));
+        }
+
+        string decomposed;
+        try
+        {
+            decomposed = mapped.ToString().Normalize(NormalizationForm.FormD);
+        }
+        catch (PlatformNotSupportedException)
+        {
+            decomposed = mapped.ToString();
+        }
         var builder = new StringBuilder(decomposed.Length);
         bool space = false;
         foreach (char c in decomposed)
@@ -43,7 +86,7 @@ public static partial class MemoryText
             }
         }
 
-        return builder.ToString().Trim().Normalize(NormalizationForm.FormC);
+        return builder.ToString().Trim();
     }
 
     public static string Hash(string text)

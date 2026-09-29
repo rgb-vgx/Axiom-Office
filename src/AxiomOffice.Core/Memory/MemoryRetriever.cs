@@ -124,12 +124,12 @@ public sealed class MemoryRetriever(SqliteMemoryStore store)
             .ToList();
     }
 
-    public const double RawPerMatchedTerm = 2.5;
+    public const double RawPerMatchedTerm = 4.0;
 
     // Diem keyword tho = -bm25 (FTS5) + 2.5 x so tu truy van khop, roi sigmoid theo do dai truy van.
     // Ly do cong so tu khop: IDF cua bm25 trong FTS5 bi kep ~1e-6 khi kho it memory (may moi dung) nen mot
-    // memory khop hoan toan cung chi duoc ~0 diem va khong bao gio qua nguong 0.1; thang 2.5/tu gan voi
-    // diem rank_bm25 ma mem0 dua vao sigmoid.
+    // memory khop hoan toan cung chi duoc ~0 diem va khong bao gio qua nguong 0.1; thang 4/tu (mot tu hiem
+    // trong rank_bm25 cua mem0 duoc ~3-5 diem) de 2 tu khop cua truy van dai 12 tu van qua nguong.
     public static double KeywordScore(MemoryItem item, IReadOnlySet<string> terms, IReadOnlyDictionary<long, double> bm25, int termCount)
     {
         if (terms.Count == 0)

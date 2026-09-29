@@ -8,6 +8,12 @@ Kich ban la JSON: danh sach cac buoc, tra lan luot; het thi lap lai buoc cuoi.
      {"text": "Xong roi"},
      {"delay": 5, "text": "Cham"}]
 
+Buoc co "when" (chuoi con cua system prompt) KHONG theo thu tu: request nao co system prompt chua chuoi do
+thi tra buoc do (vd bo trich xuat memory chay nen xen giua cac luot agent). "texts" = danh sach cau tra loi
+tra lan luot, het thi lap lai cau cuoi:
+
+    {"when": "memory extractor", "texts": ["{\"facts\": []}"]}
+
 Moi request duoc ghi them mot dong JSON vao --requests de test kiem tra prompt (ngu canh hoi thoai cu).
 Khong can thu vien ngoai.
 """
@@ -26,10 +32,36 @@ _INDEX = 0
 _CALLS = 0
 
 
+_ROUTED_INDEX: dict[int, int] = {}
+
+
+def sequential() -> list[dict]:
+    return [step for step in SCRIPT if "when" not in step]
+
+
+def routed_step(body: dict) -> dict | None:
+    """Buoc "when" khop system prompt cua request (khong tieu thu thu tu kich ban chinh)."""
+    global _CALLS
+    system = body.get("system") if isinstance(body.get("system"), str) else ""
+    for message in body.get("messages", []):
+        if message.get("role") == "system" and isinstance(message.get("content"), str):
+            system += message["content"]
+    for position, step in enumerate(SCRIPT):
+        if "when" in step and step["when"] in system:
+            with _LOCK:
+                index = _ROUTED_INDEX.get(position, 0)
+                _ROUTED_INDEX[position] = index + 1
+                _CALLS += 1
+            texts = step.get("texts") or [step.get("text", "")]
+            return {"text": texts[min(index, len(texts) - 1)]}
+    return None
+
+
 def next_step() -> dict:
     global _INDEX, _CALLS
+    steps = sequential()
     with _LOCK:
-        step = SCRIPT[min(_INDEX, len(SCRIPT) - 1)] if SCRIPT else {"text": "ok"}
+        step = steps[min(_INDEX, len(steps) - 1)] if steps else {"text": "ok"}
         _INDEX += 1
         _CALLS += 1
     return step
@@ -98,7 +130,7 @@ class Handler(BaseHTTPRequestHandler):
             with open(REQUESTS_PATH, "a", encoding="utf-8") as handle:
                 handle.write(json.dumps({"path": self.path, "body": json.loads(raw)}, ensure_ascii=False) + "\n")
 
-        step = next_step()
+        step = routed_step(json.loads(raw)) or next_step()
         delay = float(step.get("delay", 0))
         if delay > 0:
             time.sleep(delay)
