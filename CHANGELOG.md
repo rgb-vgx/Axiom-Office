@@ -5,6 +5,27 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — MCP server C# trong `WpsAiBridge.Host.exe mcp` (thay 3 server Python)
+- Người dùng không còn phải cài Python/venv/pip: `WpsAiBridge.Host.exe mcp` là MCP server stdio
+  (JSON-RPC 2.0, protocol 2024-11-05 → 2025-11-25) với cả 50 tool của word/excel/ppt-mcp, cùng
+  tên và tham số; `mcp word|excel|ppt` để nạp từng nhóm, `mcp --list` in danh sách
+- Làn file đọc/ghi OOXML trực tiếp (ZipArchive + XLinq, không thư viện ngoài): docx (paragraph,
+  bảng có ô gộp, section, style, core props), pptx (clone placeholder từ layout như python-pptx,
+  ghi chú), xlsx/xlsm (đọc streaming, shared strings, ngày tháng theo numFmt, dịch shared formula
+  cho `show_formula`, ghi shared strings, styles font/fill/border/alignment/numFmt, table,
+  thêm/chép/đổi tên/xoá sheet), csv/tsv; `.xls` đọc qua Excel/WPS (COM)
+- Sửa file chỉ ghi lại phần XML liên quan: chart/ảnh/pivot/macro của file gốc được giữ (openpyxl
+  làm mất); ghi công thức thì bỏ calcChain + `fullCalcOnLoad` để Excel tính lại khi mở
+- Làn live + `office_sessions()` gọi bridge như bản Python; lỗi kết nối trả `{"ok":false}`
+- Template `default.docx`/`default.pptx` của python-docx/python-pptx (MIT) nhúng trong exe
+  (`src/WpsAiBridge.Host/Mcp/Templates/NOTICE.md`)
+- Bỏ: `excel_query` (DuckDB SQL) và xuất parquet của `excel_convert` (chỉ còn csv)
+- `tests/mcp-host/test_mcp_host.py`: MCP client Python chính thức + so parity từng tool file
+  với `file_tools.py` bản Python trên file do C#, python-docx/openpyxl/python-pptx và Office thật
+  tạo (152/152); `office_roundtrip.ps1` mở file C# ghi ra bằng Word/Excel/PowerPoint 16 thật.
+  Làn live đã chạy qua Word thật (styled text, heading, undo)
+
+
 ### Added — Event stream SSE `GET /events` (Phase 2)
 - Mỗi bridge phát Server-Sent Events: `hello`, `document` (tài liệu active đổi),
   `selection` (Writer: text ≤ 200 ký tự + start/end; ET: sheet + address + giá trị

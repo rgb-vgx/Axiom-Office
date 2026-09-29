@@ -132,9 +132,56 @@ Hoạt động với provider OpenAI-compatible và Anthropic (tools); nếu pro
 không hỗ trợ tools, tự fallback về chat thường. Từ bên ngoài, agent có thể gọi
 cùng logic qua bridge command **`ai.ask {prompt}`**.
 
-## MCP servers (`tools/`)
+## MCP server (C#) — `WpsAiBridge.Host.exe mcp`
 
-Ba MCP server Python cùng pattern (làn file + làn live qua bridge):
+MCP server chạy ngay trong companion EXE: **không cần Python, venv hay pip**. Người dùng chỉ
+cần `WpsAiBridge.Host.exe` (build cùng add-in, template docx/pptx nhúng sẵn trong exe).
+
+```json
+{
+  "mcpServers": {
+    "office": {
+      "command": "C:\\Tools\\WpsAiBridge\\src\\WpsAiBridge\\bin\\Release\\WpsAiBridge.Host.exe",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+- `mcp` = cả 50 tool (Word + Excel + PowerPoint + `office_sessions`); muốn ít tool hơn thì
+  `mcp word` (20), `mcp excel` (16), `mcp ppt` (16) — cùng tên/tham số với 3 server Python.
+- `WpsAiBridge.Host.exe mcp --list` in danh sách tool. Log ở `bridge.log` (`MCP tool ... ok in Nms`).
+- Giao thức: MCP stdio (JSON-RPC 2.0, mỗi message một dòng), `initialize` / `tools/list` /
+  `tools/call` / `ping`; protocol 2024-11-05 → 2025-11-25.
+
+Làn file đọc/ghi thẳng OOXML (ZipArchive + XML, không thư viện ngoài). Khi sửa file chỉ các
+phần XML liên quan được ghi lại, nên **chart, ảnh, pivot, macro của file gốc được giữ nguyên**
+(openpyxl của bản Python làm mất). Khác bản Python:
+
+| | Bản C# |
+|---|---|
+| `excel_query` (DuckDB SQL) | **bỏ** — đọc bằng `excel_read` rồi để agent tự tổng hợp |
+| `excel_convert` | chỉ `to="csv"` (không còn parquet) |
+| đọc `.xls` (BIFF) | qua Excel hoặc WPS Spreadsheets cài trên máy (COM), không cần xlrd; ô lỗi trả `#DIV/0!`... thay vì mã số |
+| `excel_copy_sheet` | chép cả định dạng có điều kiện, data validation, ô gộp; bỏ chart/ảnh/bảng như openpyxl |
+| `excel_rename_sheet` | cập nhật cả defined names trỏ tới sheet |
+
+Kiểm tra: `tests/mcp-host/test_mcp_host.py` dùng MCP client Python chính thức, so kết quả
+từng tool file với `tools/*-mcp/*/file_tools.py` trên cùng file (file do C# tạo, do
+python-docx/openpyxl/python-pptx tạo, file Word/Excel/PowerPoint thật) và đọc lại file C# ghi
+ra bằng python-docx/openpyxl/python-pptx (152/152). `tests/mcp-host/office_roundtrip.ps1
+-Verify` mở các file đó bằng Microsoft Office thật.
+
+```powershell
+tools\excel-mcp\.venv\Scripts\python.exe tests\mcp-host\test_mcp_host.py <thư_mục_output>
+powershell -ExecutionPolicy Bypass -File tests\mcp-host\office_roundtrip.ps1 -Dir <thư_mục_output> -Make   # tạo mẫu từ Office thật
+powershell -ExecutionPolicy Bypass -File tests\mcp-host\office_roundtrip.ps1 -Dir <thư_mục_output> -Verify
+```
+
+## MCP servers Python (`tools/`, legacy)
+
+Ba MCP server Python cùng pattern (làn file + làn live qua bridge). Vẫn giữ để đối chiếu và
+cho `excel_query` (DuckDB); cài đặt mới nên dùng bản C# ở trên.
 
 | Server | Thư mục | Tools | Làn file | Làn live |
 |---|---|---|---|---|
@@ -466,6 +513,8 @@ print(r.json())
 ```
 src/WpsAiBridge/            add-in C# + code dùng chung (HttpBridge, Dispatcher, Connect)
 src/WpsAiBridge.Host/       entry point companion EXE
+src/WpsAiBridge.Host/Mcp/   MCP server C# (stdio) + template docx/pptx nhúng
+tests/mcp-host/             test parity MCP C# vs Python + round-trip Office thật
 scripts/build.ps1           build C# (add-in DLL + companion EXE)
 scripts/install.ps1         đăng ký HKCU (branch cpp-native-addin: ưu tiên native DLL)
 scripts/uninstall.ps1       gỡ đăng ký
