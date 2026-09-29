@@ -16,6 +16,14 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
   lọc nhạy cảm, ghi rõ sự chuyển đổi kèm liên kết memory cũ), chống trùng bằng hash, tìm kiếm FTS5
   bỏ dấu + vector tuỳ chọn với scoring cộng dồn và sigmoid theo độ dài truy vấn, hạn dùng memory,
   `IMemoryStore` để chỗ cho backend mem0 sau này
+- Skills theo **chuẩn Agent Skills của Anthropic** (nghiên cứu tài liệu chính thức + repo mở):
+  thư mục `SKILL.md` + frontmatter `name` (≤ 64 ký tự, `a-z0-9-`, cấm "anthropic"/"claude") +
+  `description` (≤ 1024 ký tự, ngôi ba, nêu cái gì + khi nào dùng); nạp 3 tầng — metadata vào
+  prompt (~100 token/skill), `load_skill` khi kích hoạt, `read_skill_file` khi cần tài nguyên;
+  `references/`/`examples/`/`templates/`, liên kết 1 cấp, đường dẫn kiểu `/`, file > 100 dòng có
+  mục lục, thân `SKILL.md` < 500 dòng; viết eval trước khi viết hướng dẫn, checklist workflow,
+  vòng đọc-lại. Lệch chuẩn có chủ đích: **không chạy script** trong skill (an toàn dữ liệu văn
+  phòng); field mở rộng `apps` luôn tuỳ chọn nên skill tương thích 2 chiều
 
 ### Docs — `ARCHITECTURE.MD`: tài liệu thiết kế
 - Phần I, High Level Design: mục tiêu và phạm vi, bối cảnh hệ thống, container, khối chức năng,

@@ -459,44 +459,96 @@ Tool mà model thấy trong một run:
 `ITool { Name; Description; JsonSchema; Task<ToolResult> InvokeAsync(JsonElement args, RunContext ctx, CancellationToken ct); }`.
 Kết quả tool trả về model dạng JSON `{"ok":...}` như hiện tại; lỗi tool **không** làm hỏng run.
 
-### 8.4 Skills
+### 8.4 Skills (theo chuẩn Agent Skills)
 
-**Định dạng** (tương thích định dạng Agent Skills: thư mục + `SKILL.md` có YAML frontmatter):
+**Chuẩn áp dụng: định dạng Agent Skills của Anthropic** (mỗi skill = một thư mục chứa `SKILL.md`
+với YAML frontmatter `name` + `description`, nạp theo 3 tầng). Lý do chọn chuẩn này thay vì tự chế
+định dạng: nó là chuẩn **filesystem-based không cần đăng ký**, có sẵn hệ sinh thái (skill viết cho
+Claude Code drop vào Axiom vẫn nạp được; field mở rộng của Axiom là tuỳ chọn nên không cản mang
+skill Axiom sang nơi khác), và prompt trích xuất/quy tắc viết đã được kiểm chứng với model.
+Nguồn chuẩn: tài liệu *Agent Skills overview* + *Skill authoring best practices* của Anthropic
+(platform.claude.com/docs → agents-and-tools → agent-skills) và repo mở `github.com/anthropics/skills`.
+
+#### 8.4.1 Cấu trúc thư mục (mọi phần tuỳ chọn trừ `SKILL.md`)
 
 ```
 skills/van-ban-hanh-chinh/
-  SKILL.md
-  templates/cong-van.docx      (tuỳ chọn)
-  examples/mau-1.md            (tuỳ chọn)
+  SKILL.md                    # tầng 2: hướng dẫn chính (thân < 500 dòng, < 5k token khi nạp)
+  references/                 # tầng 3: đọc khi cần qua read_skill_file
+    the-thuc.md               # thể thức chi tiết; file > 100 dòng có mục lục ở đầu file
+  examples/
+    mau-1.md                  # cặp input/output mẫu
+  templates/
+    cong-van.docx             # tầng 3: tài nguyên nhị phân (đường dẫn tuyệt đối → writer.open)
 ```
 
-```markdown
+- Trong `SKILL.md` luôn dùng **đường dẫn kiểu `/`** (`references/the-thuc.md`) dù chạy trên Windows
+  — chuẩn yêu cầu, và `read_skill_file` chuẩn hoá cả hai kiểu.
+- Liên kết file tham chiếu **sâu một cấp kể từ `SKILL.md`** (file tham chiếu không được dẫn tới
+  file tham chiếu khác): model có thể đọc từng phần bằng offset nên dẫn sâu làm nó đọc thiếu.
+- File hướng dẫn dùng mục lục khi > 100 dòng; thân `SKILL.md` gọn — model đã biết Office, chỉ
+  thêm phần nó chưa biết (quy tắc riêng của tổ chức, thể thức mẫu, danh sách lệnh Axiom).
+
+#### 8.4.2 Frontmatter (chỉ bắt buộc `name` + `description`)
+
+```yaml
 ---
 name: van-ban-hanh-chinh
-description: Soạn công văn, quyết định, tờ trình đúng thể thức văn bản hành chính (quốc hiệu, số ký hiệu, nơi nhận...). Dùng khi người dùng muốn soạn văn bản hành chính.
-apps: [wps]              # wps | et | wpp; bỏ trống = mọi app
-version: 1
+description: >-
+  Soạn công văn, quyết định, tờ trình đúng thể thức văn bản hành chính
+  (quốc hiệu, số ký hiệu, nơi nhận, thẩm quyền). Dùng khi người dùng muốn
+  soạn công văn hoặc văn bản hành chính.
+apps: [wps]
 ---
-# Hướng dẫn
-1. Đọc tài liệu hiện có bằng writer.getText...
-...
 ```
 
-**Quy tắc**
+Quy tắc validate theo chuẩn (lỗi → bỏ qua skill đó, ghi lỗi hiện ở `GET /v1/skills`, không làm hỏng Core):
+
+- `name`: ≤ 64 ký tự, chỉ `a-z`, `0-9`, `-`; không thẻ XML; **không chứa từ cấm** `anthropic`, `claude`.
+- `description`: không rỗng, ≤ 1024 ký tự, không thẻ XML; **ngôi thứ ba**; nêu **cái gì + khi nào
+  dùng**, kèm từ khoá tiếng Việt để model chọn đúng skill khi người dùng nói "công văn", "bảng điểm",
+  "slide báo cáo".
+- Field lạ **bỏ qua** (tương thích xuôi): phần mở rộng riêng của Axiom luôn tuỳ chọn — hiện chỉ có
+  `apps` (`wps` | `et` | `wpp`, bỏ trống hoặc thiếu = mọi app). Không thêm field bắt buộc mới.
+
+#### 8.4.3 Ba tầng nạp (progressive disclosure, bằng tool của Axiom)
+
+| Tầng | Chuẩn Agent Skills | Cách Axiom làm |
+|---|---|---|
+| 1. Metadata (~100 token/skill) | nạp sẵn vào system prompt lúc khởi động | `PromptBuilder` chèn chỉ mục `name: description` (cắt 300 ký tự) của các skill hợp `apps` — mục 8.8 |
+| 2. Hướng dẫn (< 5k token) | đọc `SKILL.md` khi skill được kích hoạt | tool `load_skill` trả nội dung `SKILL.md` |
+| 3. Tài nguyên | đọc file chỉ khi được nhắc đến | tool `read_skill_file` trả text (≤ 64KB) hoặc đường dẫn tuyệt đối cho file nhị phân (template `.docx` → dùng với `writer.open`) |
+
+#### 8.4.4 Quy tắc chạy
 
 - Nguồn (thứ tự ưu tiên khi trùng tên, nguồn sau ghi đè nguồn trước): skill dựng sẵn (`skills\`
   cạnh exe) → `SkillDirs` của tổ chức → `%LOCALAPPDATA%\AxiomOffice\skills` của người dùng.
-- **Nạp tiến dần**: system prompt chỉ có danh sách `name: description` của các skill hợp với app
-  đang mở (tối đa 50 skill, mô tả cắt 300 ký tự). Model gọi `load_skill` để lấy nội dung đầy đủ.
-- `name` chỉ gồm `a-z0-9-`, ≤ 64 ký tự; `description` bắt buộc; lỗi frontmatter → bỏ qua skill đó,
-  ghi lỗi (hiện ở `GET /v1/skills`), không làm hỏng Core.
-- `read_skill_file` chỉ đọc file **bên trong** thư mục skill (chặn `..`, symlink ra ngoài).
-- **Không chạy script** trong skill ở đợt này.
+- **Không chạy script** trong skill ở đợt này — **lệch chuẩn có chủ đích**: chuẩn cho phép chạy
+  `scripts/` qua bash, nhưng Axiom thao tác trên tài liệu thật của người dùng nên chỉ đọc hướng
+  dẫn/tài nguyên. Skill có thư mục `scripts/` vẫn nạp được; hướng dẫn trong SKILL.md không được
+  bảo model chạy script. Cửa để mở sau: chạy script qua policy xác nhận (giai đoạn sau).
+- `read_skill_file` chỉ đọc file **bên trong** thư mục skill (chặn `..`, symlink ra ngoài), và
+  chỉ cho phép các phần mở rộng đã biết (`.md`, `.txt`, `.json`, `.csv`, `.docx`, `.xlsx`, `.pptx`,
+  `.png`, `.jpg`).
+- Skill của bên thứ ba phân phối dạng **zip** chứa các thư mục skill → giải nén vào một trong ba
+  nguồn trên. Tài liệu hướng dẫn ghi rõ: chỉ dùng skill từ nguồn tin cậy — coi như cài phần mềm
+  (chuẩn cũng cảnh báo y vậy).
 - Quét lại khi gọi `/v1/skills/reload` hoặc khi thư mục đổi (FileSystemWatcher, debounce 2s).
 
+#### 8.4.5 Quy tắc viết hay nhất (rút từ best practices của chuẩn)
+
+- **Viết eval trước, viết hướng dẫn sau**: mỗi skill có ≥ 3 kịch bản test (mục 11) dựng từ chỗ
+  model làm sai khi *chưa* có skill; hướng dẫn chỉ đủ dài để vượt các eval đó.
+- Workflow nhiều bước kèm **checklist** để model tự đánh dấu tiến độ (vd: đọc tài liệu → dựng khung
+  → điền nội dung → đọc lại để kiểm).
+- **Vòng phản hồi**: bước cuối của skill luôn bảo model đọc lại tài liệu (qua lệnh bridge) để tự
+  kiểm tra trước khi trả lời.
+- Nhất quán thuật ngữ trong một skill (chọn một từ cho một khái niệm); ví dụ cụ thể, không chung
+  chung; nêu một cách mặc định thay vì liệt kê nhiều lựa chọn.
+
 **Skill mẫu cần làm (giai đoạn 2)**: `van-ban-hanh-chinh` (Word), `bang-diem` (Excel: bảng điểm có
-cột trung bình, xếp loại, định dạng), `bao-cao-thang` (PowerPoint: dàn 5–7 slide). Mỗi skill có
-ca test e2e (mục 11).
+cột trung bình, xếp loại, định dạng), `bao-cao-thang` (PowerPoint: dàn 5–7 slide). Mỗi skill theo
+đúng chuẩn (mô tả ngôi ba + từ khoá, `references/` nếu cần, thân gọn) và có ca test e2e (mục 11).
 
 ### 8.5 Memory (học từ mem0 2.2.1, tự làm bằng C#)
 
@@ -852,7 +904,7 @@ Vẫn **.NET 4.8, C# 7.3, không NuGet**.
 
 | Lớp | Công cụ | Nội dung |
 |---|---|---|
-| Unit | xUnit `tests/core/AxiomOffice.Core.Tests` | SkillLoader (frontmatter hợp lệ/lỗi, ưu tiên nguồn, chặn `..`), PromptBuilder (thứ tự ổn định), ContextAssembler (ngân sách token), Memory (migration; FTS5 bỏ dấu tiếng Việt; chống trùng hash trong lô và với memory cũ; áp ADD + link + history trong transaction; linked id không nằm trong danh sách bị bỏ; lọc nhạy cảm; bỏ qua trích xuất với lệnh thao tác thuần; sigmoid theo độ dài truy vấn; cộng dồn + ngưỡng chặn tín hiệu chính, có/không embedding; entity boost giảm theo số memory gắn; hết hạn ẩn; xoá mềm/khôi phục), PolicyEngine, parse SSE, provider (qua `HttpMessageHandler` giả): OpenAI/Anthropic tool calls, fallback không tools, timeout, hủy |
+| Unit | xUnit `tests/core/AxiomOffice.Core.Tests` | SkillLoader (frontmatter theo chuẩn Agent Skills: tên/độ dài/từ cấm, mô tả ≤ 1024, field lạ bỏ qua, `apps` tuỳ chọn; ưu tiên nguồn; chặn `..`; chỉ phần mở rộng đã biết), PromptBuilder (thứ tự ổn định), ContextAssembler (ngân sách token), Memory (migration; FTS5 bỏ dấu tiếng Việt; chống trùng hash trong lô và với memory cũ; áp ADD + link + history trong transaction; linked id không nằm trong danh sách bị bỏ; lọc nhạy cảm; bỏ qua trích xuất với lệnh thao tác thuần; sigmoid theo độ dài truy vấn; cộng dồn + ngưỡng chặn tín hiệu chính, có/không embedding; entity boost giảm theo số memory gắn; hết hạn ẩn; xoá mềm/khôi phục), PolicyEngine, parse SSE, provider (qua `HttpMessageHandler` giả): OpenAI/Anthropic tool calls, fallback không tools, timeout, hủy |
 | E2E không Office | `tests/core/test_core_e2e.py` + `tests/core/fake_llm.py` | Chạy Core với `AXIOM_*` override (thư mục dữ liệu tạm, port tạm, token tạm, endpoint = fake LLM). Fake LLM trả lời theo **kịch bản** (JSON: chuỗi tool call + câu trả lời) theo chuẩn OpenAI-compatible. Bridge giả (Python HTTP server) ghi lại `/cmd` nhận được. Kiểm tra: SSE đủ event đúng thứ tự, allowlist, confirm, cancel, timeout, hội thoại nhiều lượt, `load_skill`, `remember`/`recall`, audit |
 | E2E với Office thật | `test_core_e2e.py --office` | Như `test_live_commands.py`: tự mở Word/Excel/PowerPoint riêng, dừng nếu port đã có app người dùng; pane không cần mở: gọi thẳng Core API với `office.port` thật và fake LLM có kịch bản dùng lệnh thật; kiểm tra tài liệu đổi đúng |
 | Hồi quy | Test hiện có | `tests/live/test_live_commands.py` (+ `--compare` golden), `tests/mcp-host/test_mcp_host.py` (157 kiểm tra), unit test `tools/*-mcp` |
@@ -892,8 +944,10 @@ README + CHANGELOG + `ARCHITECTURE.MD` khi cần, chạy test, báo cáo kết q
 
 ### Giai đoạn 2: Skills
 
-- [ ] SkillLoader, SkillIndex, `load_skill`, `read_skill_file`, `/v1/skills`, reload + watcher.
-- [ ] 3 skill mẫu (8.4) + template nếu cần; `skills\` vào build và gói.
+- [ ] SkillLoader (validate theo chuẩn 8.4.2, field lạ bỏ qua), SkillIndex, `load_skill`,
+      `read_skill_file` (chặn `..`, lọc phần mở rộng), `/v1/skills`, reload + watcher.
+- [ ] 3 skill mẫu theo chuẩn (8.4.5: mô tả ngôi ba + từ khoá, references/ nếu cần, thân gọn,
+      checklist + vòng đọc-lại) + template nếu cần; `skills\` vào build và gói.
 - [ ] Pane hiện `skill.loaded`.
 - **Xong khi**: e2e với fake LLM chứng minh luồng `load_skill`; với LLM thật (thủ công, có báo cáo)
   model tự chọn đúng skill cho 3 yêu cầu mẫu; skill lỗi frontmatter không làm hỏng Core.
