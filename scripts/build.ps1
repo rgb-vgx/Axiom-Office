@@ -108,8 +108,18 @@ $stagedDll = Join-Path $stage "WpsAiBridge.dll"
 & $csc @commonArgs /target:library "/out:$stagedDll" $addinSources
 if ($LASTEXITCODE -ne 0) { throw "Add-in build failed with exit code $LASTEXITCODE" }
 
+# Companion + MCP server: them thu vien zip/XLinq (doc/ghi OOXML) va template docx/pptx nhung trong exe.
+$templates = Join-Path $hostDir "Mcp\Templates"
+$hostArgs = @(
+    "/r:$fw\System.IO.Compression.dll",
+    "/r:$fw\System.IO.Compression.FileSystem.dll",
+    "/r:$fw\System.Xml.dll",
+    "/r:$fw\System.Xml.Linq.dll",
+    "/resource:$(Join-Path $templates 'default.docx'),WpsAiBridge.Mcp.default.docx",
+    "/resource:$(Join-Path $templates 'default.pptx'),WpsAiBridge.Mcp.default.pptx"
+)
 $stagedExe = Join-Path $stage "WpsAiBridge.Host.exe"
-& $csc @commonArgs /target:exe "/out:$stagedExe" $hostSources
+& $csc @commonArgs @hostArgs /target:exe "/out:$stagedExe" $hostSources
 if ($LASTEXITCODE -ne 0) { throw "Host build failed with exit code $LASTEXITCODE" }
 
 foreach ($file in @($stagedDll, $stagedExe)) {

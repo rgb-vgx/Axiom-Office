@@ -45,6 +45,11 @@ namespace WpsAiBridge.Host
                 return RunLlmTest();
             }
 
+            if (kind == "mcp")
+            {
+                return Mcp.McpHost.Run(args);
+            }
+
             string progId;
             string logicalKind;
             bool office;
@@ -85,6 +90,7 @@ namespace WpsAiBridge.Host
                     Console.Error.WriteLine("usage: WpsAiBridge.Host.exe wps|et|wpp|word|excel|ppt [--visible]");
                     Console.Error.WriteLine("  wps|et|wpp : WPS Office components (KWPS/KET/KWPP.Application)");
                     Console.Error.WriteLine("  word|excel|ppt : Microsoft Office (Word/Excel/PowerPoint.Application)");
+                    Console.Error.WriteLine("usage: WpsAiBridge.Host.exe mcp [all|word|excel|ppt] [--list]  (MCP server over stdio)");
                     return 2;
             }
 
