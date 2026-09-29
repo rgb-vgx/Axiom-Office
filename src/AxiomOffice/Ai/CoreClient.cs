@@ -133,7 +133,8 @@ namespace AxiomOffice.Ai
             }
 
             string appKind = host != null ? host.AppKind : "wps";
-            int port = ResolvePort(host);
+            int bridgePid;
+            int port = ResolvePort(host, out bridgePid);
             if (port <= 0)
             {
                 LastError = "khong tim thay port cua bridge trong session registry";
@@ -151,7 +152,7 @@ namespace AxiomOffice.Ai
             request["office"] = new Dictionary<string, object>
             {
                 { "port", port },
-                { "pid", Process.GetCurrentProcess().Id },
+                { "pid", bridgePid },
                 { "app", appKind },
                 { "family", host != null && host.IsOfficeHost ? "office" : "wps" }
             };
@@ -647,12 +648,14 @@ namespace AxiomOffice.Ai
             }
         }
 
-        // Port cua bridge trong TIEN TRINH NAY: doc tu session registry (dung khi port bi doi).
-        private static int ResolvePort(Connect host)
+        // Port + pid cua bridge trong TIEN TRINH NAY: doc tu session registry (dung khi port bi doi).
+        // Core doi chieu pid voi bridge dang giu port nen gui pid ghi trong session file.
+        private static int ResolvePort(Connect host, out int bridgePid)
         {
+            bridgePid = Process.GetCurrentProcess().Id;
             try
             {
-                string path = Path.Combine(SessionRegistry.Directory, Process.GetCurrentProcess().Id + ".json");
+                string path = Path.Combine(SessionRegistry.Directory, bridgePid + ".json");
                 if (File.Exists(path))
                 {
                     var info = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(File.ReadAllText(path, Encoding.UTF8));
@@ -661,6 +664,10 @@ namespace AxiomOffice.Ai
                         int port = Convert.ToInt32(info["port"]);
                         if (port > 0)
                         {
+                            if (info.ContainsKey("pid") && Convert.ToInt32(info["pid"]) > 0)
+                            {
+                                bridgePid = Convert.ToInt32(info["pid"]);
+                            }
                             return port;
                         }
                     }
