@@ -23,6 +23,7 @@ namespace AxiomOffice.Ai
         private readonly CheckBox _core;
         private readonly CheckBox _memory;
         private readonly CheckBox _autoExtract;
+        private readonly CheckBox _visual;
 
         public SettingsForm()
         {
@@ -65,6 +66,8 @@ namespace AxiomOffice.Ai
             _memory = new CheckBox { Text = "Ghi nhớ dài hạn", Left = 110, Top = 210, Width = 150 };
             _autoExtract = new CheckBox { Text = "Tự ghi nhớ sau mỗi lượt", Left = 270, Top = 210, Width = 210 };
             var manage = new Button { Text = "Quản lý ghi nhớ…", Left = 110, Top = 236, Width = 150 };
+            // QA thị giác (New_arch.md 8.4.6): tắt mặc định vì mỗi ảnh tốn nhiều token; cần model đọc được ảnh.
+            _visual = new CheckBox { Text = "Cho AI xem ảnh chụp cửa sổ (tốn token)", Left = 270, Top = 239, Width = 210 };
 
             _status = new Label { Left = 14, Top = 270, Width = 466, Height = 18, AutoEllipsis = true, ForeColor = SystemColors.GrayText };
 
@@ -73,7 +76,7 @@ namespace AxiomOffice.Ai
             var cancel = new Button { Text = "Cancel", Left = 400, Top = 294, Width = 80 };
 
             Controls.AddRange(new Control[] { lblProvider, _provider, lblEndpoint, _endpoint, lblKey, _apiKey, lblModel, _model, hint,
-                lblAgent, _core, _memory, _autoExtract, manage, _status, _test, save, cancel });
+                lblAgent, _core, _memory, _autoExtract, manage, _visual, _status, _test, save, cancel });
             _memory.CheckedChanged += delegate { _autoExtract.Enabled = _memory.Checked; };
             manage.Click += delegate
             {
@@ -120,6 +123,7 @@ namespace AxiomOffice.Ai
             _memory.Checked = Config.MemoryEnabled;
             _autoExtract.Checked = Config.MemoryAutoExtract;
             _autoExtract.Enabled = _memory.Checked;
+            _visual.Checked = Config.VisualQaEnabled;
             if (string.IsNullOrEmpty(_endpoint.Text))
             {
                 _endpoint.Text = DefaultEndpoint();
@@ -158,6 +162,7 @@ namespace AxiomOffice.Ai
             saved &= Config.WriteDword("CoreEnabled", _core.Checked ? 1 : 0);
             saved &= Config.WriteDword("MemoryEnabled", _memory.Checked ? 1 : 0);
             saved &= Config.WriteDword("MemoryAutoExtract", _autoExtract.Checked ? 1 : 0);
+            saved &= Config.WriteDword("VisualQaEnabled", _visual.Checked ? 1 : 0);
             if (!saved)
             {
                 _status.Text = "Failed to save settings to the registry";

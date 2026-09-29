@@ -239,8 +239,100 @@ namespace AxiomOffice.Bridge
                 Command("ai.ask", null, AiAsk, "Chạy AI agent trên tài liệu đang mở; trả `reply`, `transcript`, `seconds`, `rounds`",
                     Req("prompt")).Ungated(),
                 // ui.askpane chuyển sang UI thread; giữ cổng ở đây có thể deadlock với UI thread đang chờ cổng.
-                Command("ui.askpane", null, UiAskPane, "Mở task pane Ask AI").Ungated()
+                Command("ui.askpane", null, UiAskPane, "Mở task pane Ask AI").Ungated(),
+                // QA thị giác (New_arch.md 8.4.6): Core gửi ảnh cho model qua tool look_at_document; agent không
+                // gọi thẳng (base64 lớn sẽ đổ vào ngữ cảnh) nên không ForAgent.
+                Command("app.screenshot", null, AppScreenshot, "Ảnh chụp cửa sổ app (PNG base64, thu nhỏ theo `maxWidth`, mặc định 1280)",
+                    Opt("maxWidth"))
             };
+        }
+
+        [DllImport("user32.dll")]
+        private static extern bool PrintWindow(IntPtr hwnd, IntPtr hdc, uint flags);
+
+        [DllImport("user32.dll")]
+        private static extern bool GetWindowRect(IntPtr hwnd, out WindowRect rect);
+
+        [DllImport("user32.dll")]
+        private static extern bool IsWindow(IntPtr hwnd);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct WindowRect
+        {
+            public int Left;
+            public int Top;
+            public int Right;
+            public int Bottom;
+        }
+
+        private static IntPtr AppWindow(IAppHost host)
+        {
+            dynamic app = host.Application;
+            // Excel: Application.Hwnd; PowerPoint: Application.HWND; Word 2013+: ActiveWindow.Hwnd.
+            foreach (Func<object> read in new Func<object>[] { () => app.Hwnd, () => app.HWND, () => app.ActiveWindow.Hwnd })
+            {
+                try
+                {
+                    var handle = new IntPtr(Convert.ToInt64(read()));
+                    if (handle != IntPtr.Zero && IsWindow(handle))
+                    {
+                        return handle;
+                    }
+                }
+                catch (Exception)
+                {
+                }
+            }
+            return System.Diagnostics.Process.GetCurrentProcess().MainWindowHandle;
+        }
+
+        private static Dictionary<string, object> AppScreenshot(IAppHost host, Dictionary<string, object> p)
+        {
+            int maxWidth = Math.Max(320, Math.Min(ParamInt(p, "maxWidth", 1280), 2560));
+            IntPtr hwnd = AppWindow(host);
+            WindowRect rect;
+            if (hwnd == IntPtr.Zero || !GetWindowRect(hwnd, out rect) || rect.Right - rect.Left <= 0 || rect.Bottom - rect.Top <= 0)
+            {
+                throw new InvalidOperationException("no visible application window to capture");
+            }
+            int width = rect.Right - rect.Left;
+            int height = rect.Bottom - rect.Top;
+            using (var full = new System.Drawing.Bitmap(width, height))
+            {
+                using (var graphics = System.Drawing.Graphics.FromImage(full))
+                {
+                    IntPtr hdc = graphics.GetHdc();
+                    bool printed;
+                    try
+                    {
+                        // PW_RENDERFULLCONTENT = 2: chụp được cả khi cửa sổ bị che (DirectComposition).
+                        printed = PrintWindow(hwnd, hdc, 2);
+                    }
+                    finally
+                    {
+                        graphics.ReleaseHdc(hdc);
+                    }
+                    if (!printed)
+                    {
+                        graphics.CopyFromScreen(rect.Left, rect.Top, 0, 0, new System.Drawing.Size(width, height));
+                    }
+                }
+                double scale = width > maxWidth ? (double)maxWidth / width : 1.0;
+                int outWidth = Math.Max(1, (int)Math.Round(width * scale));
+                int outHeight = Math.Max(1, (int)Math.Round(height * scale));
+                using (var scaled = new System.Drawing.Bitmap(full, outWidth, outHeight))
+                using (var stream = new System.IO.MemoryStream())
+                {
+                    scaled.Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+                    return new Dictionary<string, object>
+                    {
+                        { "width", outWidth },
+                        { "height", outHeight },
+                        { "mime", "image/png" },
+                        { "base64", Convert.ToBase64String(stream.ToArray()) }
+                    };
+                }
+            }
         }
 
         private static Dictionary<string, object> AiAsk(IAppHost host, Dictionary<string, object> p)

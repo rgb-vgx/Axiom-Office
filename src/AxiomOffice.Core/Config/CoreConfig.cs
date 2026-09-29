@@ -43,6 +43,9 @@ public sealed class CoreConfig
     // Cho nguoi dung xac nhan toi da (giay); het gio = tu choi (muc 8.6). Test dat ngan qua AXIOM_CONFIRM_TIMEOUT.
     public int ConfirmTimeoutSeconds { get; init; } = 120;
 
+    // QA thi giac (muc 8.4.6): cho model xem anh chup cua so app; tat mac dinh vi ton token (nguoi dung tu bat).
+    public bool VisualQaEnabled { get; init; }
+
     public string LlmApiKey { get; init; } = "";
 
     public string MemoryModel { get; init; } = "";
@@ -89,6 +92,7 @@ public sealed class CoreConfig
             LlmModel = Text(config, "AXIOM_LLM_MODEL", registry, "LlmModel") ?? "",
             LlmRequestTimeoutSeconds = Math.Clamp(Int(config, "AXIOM_LLM_REQUEST_TIMEOUT", registry, "LlmRequestTimeoutSeconds", 0), 0, 600),
             ConfirmTimeoutSeconds = Math.Clamp(Int(config, "AXIOM_CONFIRM_TIMEOUT", registry, "ConfirmTimeoutSeconds", 120), 1, 3600),
+            VisualQaEnabled = Flag(config, "AXIOM_VISUAL_QA", registry, "VisualQaEnabled", false),
             LlmApiKey = Secrets.Unprotect(Text(config, "AXIOM_LLM_API_KEY", registry, "LlmApiKey")),
             MemoryModel = Text(config, "AXIOM_MEMORY_MODEL", registry, "MemoryModel") ?? "",
             EmbeddingModel = Text(config, "AXIOM_EMBEDDING_MODEL", registry, "EmbeddingModel") ?? "",

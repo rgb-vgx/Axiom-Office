@@ -41,3 +41,5 @@ Dùng `wpp.addSlide {layout: 12}` (trống) rồi `wpp.addText` với các toạ
 - [ ] Tạo slide theo lưới ở trên.
 - [ ] **Soát**: `wpp.checkLayout` → sửa mọi `overflow` (rút gọn chữ, giảm `fontSize` nhưng ≥ 12, hoặc tăng
       `height`), `offslide`, `overlap`, `small-font`, `dense`. Lặp lại đến khi `issueCount` = 0.
+- [ ] Nếu có tool `look_at_document` (người dùng bật QA thị giác): gọi **một lần** sau bước soát trên để nhìn
+      slide (tràn chữ, lệch lưới, tương phản) rồi sửa điểm còn lỗi.

@@ -36,3 +36,4 @@ lệnh (màu `#RRGGBB`, cỡ chữ, number format). Không tự chế màu mới
       `bao-cao-du-lieu` (Excel), `trinh-bay-chuyen-nghiep` (PowerPoint).
 - [ ] Làm xong thì **đọc lại để tự kiểm** bằng lệnh kiểm tra của app (`writer.checkTables`,
       `et.checkRange`, `wpp.checkLayout`) và sửa mọi `issues` trước khi trả lời.
+- [ ] Có tool `look_at_document` thì nhìn ảnh chụp một lần sau cùng; không gọi lại nhiều lần (tốn token).

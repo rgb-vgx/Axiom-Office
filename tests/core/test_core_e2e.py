@@ -119,6 +119,7 @@ def canned_result(action: str, params: dict) -> dict:
         "et.checkRange": {"sheet": "Sheet1", "rows": 7, "cols": 6, "issueCount": 0, "issues": []},
         "wpp.listSlides": {"presentation": "bao-cao.pptx", "slideCount": 0, "slides": []},
         "wpp.checkLayout": {"slideWidth": 960, "slideHeight": 540, "issueCount": 0, "slides": []},
+        "app.screenshot": {"width": 4, "height": 3, "mime": "image/png", "base64": "iVBORw0KGgoAAAANSUhEUg=="},
     }
     return canned.get(action, {"action": action, "written": 2})
 
@@ -779,6 +780,41 @@ def test_mcp(work: str, token: str, bridge: FakeBridge, document_path: str, sess
         llm.stop()
 
 
+def test_visual(work: str, token: str, bridge: FakeBridge, document_path: str, session_dir: str) -> None:
+    """Giai doan 4 (New_arch.md 8.4.6): QA thi giac chi khi bat VisualQaEnabled; anh toi model dang image_url."""
+    office = {"port": bridge.port, "pid": bridge.pid, "app": "et", "family": "office"}
+    for enabled in (False, True):
+        # Moi Core mot LLM gia rieng: kich ban tuan tu, Core truoc khong duoc tieu buoc cua Core sau.
+        llm = FakeLlm(work, [
+            {"tool": "look_at_document", "arguments": {"reason": "soat bo cuc"}},
+            {"text": "Bo cuc on"},
+        ])
+        data_dir = os.path.join(work, "core-visual-" + ("on" if enabled else "off"))
+        os.makedirs(data_dir, exist_ok=True)
+        extra = {"AXIOM_MEMORY_AUTO_EXTRACT": "0", "AXIOM_VISUAL_QA": "1" if enabled else "0"}
+        core = Core(data_dir, session_dir, llm, token, extra)
+        try:
+            before = len(llm.requests())
+            bridge.commands.clear()
+            status, created = core.run("Lam dep bang", office, document={"name": "bao-cao.xlsx", "fullName": document_path})
+            events = core.events(created["result"]["runId"])
+            bodies = [item["body"] for item in llm.requests()[before:]]
+            tools = [t["function"]["name"] for t in bodies[0].get("tools", [])]
+            if not enabled:
+                check("look_at_document" not in tools and "app.screenshot" not in bridge.actions(),
+                      "QA thi giac tat mac dinh: khong co tool look_at_document", tools)
+                continue
+            check("look_at_document" in tools and bridge.actions() == ["app.screenshot"], "VisualQaEnabled=1: tool look_at_document goi app.screenshot", bridge.actions())
+            last = bodies[1]["messages"][-1]
+            image = last["content"][1]["image_url"]["url"] if isinstance(last.get("content"), list) else ""
+            check(last["role"] == "user" and image.startswith("data:image/png;base64,iVBOR"), "anh chup toi model dang image_url", str(last)[:200])
+            status, audit = http_json(f"{core.base}/v1/audit?runId={created['result']['runId']}", token=core.token)
+            check(all("iVBOR" not in (c["params"] or "") for c in audit["result"]["calls"]), "audit khong luu base64 anh", "")
+        finally:
+            core.stop()
+            llm.stop()
+
+
 REAL_LLM_CASES = [
     # (app, prompt, skill phai nap, skill thiet ke KHONG duoc nap)
     ("wpp", "Làm bộ slide báo cáo tháng 9/2026 của phòng Kinh doanh: doanh thu 12 tỷ, tăng 8% so với tháng 8.", "bao-cao-thang", None),
@@ -957,6 +993,7 @@ def main() -> int:
             test_memory(work, token, bridge, document_path, session_dir)
             test_confirm(work, token, bridge, document_path, session_dir)
             test_mcp(work, token, bridge, document_path, session_dir)
+            test_visual(work, token, bridge, document_path, session_dir)
     finally:
         if core is not None:
             core.stop()

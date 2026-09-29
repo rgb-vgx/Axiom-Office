@@ -122,6 +122,12 @@ namespace AxiomOffice.Bridge
             get { return ReadInt("MemoryAutoExtract", 1) != 0; }
         }
 
+        // QA thị giác: Agent Core cho model xem ảnh chụp cửa sổ (tắt mặc định, tốn token).
+        public static bool VisualQaEnabled
+        {
+            get { return ReadInt("VisualQaEnabled", 0) != 0; }
+        }
+
         public static bool WriteDword(string name, int value)
         {
             try

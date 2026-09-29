@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using AxiomOffice.Core.Tools;
 
 namespace AxiomOffice.Core.Models;
 
@@ -114,11 +115,21 @@ public sealed class AnthropicCodec : IProviderCodec
         var blocks = new JsonArray();
         foreach (ToolCallResult result in results)
         {
+            // Anh (QA thi giac, muc 8.4.6): tool_result cua Anthropic nhan duoc khoi image base64.
+            JsonNode content = result.ImageDataUrl is { } dataUrl && ImageData.TrySplit(dataUrl, out string mediaType, out string base64)
+                ? new JsonArray(
+                    new JsonObject { ["type"] = "text", ["text"] = result.ResultJson },
+                    new JsonObject
+                    {
+                        ["type"] = "image",
+                        ["source"] = new JsonObject { ["type"] = "base64", ["media_type"] = mediaType, ["data"] = base64 },
+                    })
+                : JsonValue.Create(result.ResultJson)!;
             blocks.Add(new JsonObject
             {
                 ["type"] = "tool_result",
                 ["tool_use_id"] = result.CallId,
-                ["content"] = result.ResultJson,
+                ["content"] = content,
             });
         }
 

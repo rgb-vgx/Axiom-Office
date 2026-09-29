@@ -117,6 +117,12 @@ public sealed class Orchestrator(
                 tools.Add(new RecallTool(memory, memoryDocumentKey));
             }
 
+            // QA thi giac (muc 8.4.6): chi khi nguoi dung bat VisualQaEnabled (doc lai moi luot qua memory.Config).
+            if ((memory?.Config ?? config).VisualQaEnabled)
+            {
+                tools.Add(new VisualTool());
+            }
+
             // MCP (giai doan 4, muc 8.7): lan file office + server nguoi dung cau hinh; loi server khong hong run.
             if (mcp != null)
             {
@@ -311,7 +317,7 @@ public sealed class Orchestrator(
         }
 
         ToolResult result = await tool.InvokeAsync(arguments, context, cancel).ConfigureAwait(false);
-        return new ToolCallResult(call.Id, call.Name, result.Json, result.Ok, 0);
+        return new ToolCallResult(call.Id, call.Name, result.Json, result.Ok, 0, result.ImageDataUrl);
     }
 
     // Luu tom tat khi hoi thoai vuot ngan sach ngu canh (muc 8.5.9) - mot lan goi model cuoi luot.

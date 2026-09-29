@@ -5,7 +5,7 @@ using AxiomOffice.Core.Office;
 namespace AxiomOffice.Core.Tools;
 
 // Ket qua mot lan chay tool. Json = nguyen van de gui cho model; Action = ten lenh office (neu co) de ghi audit.
-public sealed record ToolResult(string Json, bool Ok, string? Action = null);
+public sealed record ToolResult(string Json, bool Ok, string? Action = null, string? ImageDataUrl = null);
 
 // Trang thai cua mot luot chay ma tool can (muc 8.3).
 public sealed class RunContext

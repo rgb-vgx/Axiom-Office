@@ -9,7 +9,8 @@ public sealed record ModelTool(string Name, string Description, JsonNode Paramet
 public sealed record ToolCall(string Id, string Name, string ArgumentsJson);
 
 // Ket qua tra ve model sau khi chay tool. Ok = false khi tool loi (khong lam hong luot chay).
-public sealed record ToolCallResult(string CallId, string Name, string ResultJson, bool Ok, long Ms);
+// ImageDataUrl: anh (data:image/png;base64,...) tool tra kem - codec gui cho model duoi dang anh that, khong vao audit.
+public sealed record ToolCallResult(string CallId, string Name, string ResultJson, bool Ok, long Ms, string? ImageDataUrl = null);
 
 // Mot luot tra loi cua model: hoac co tool call, hoac co cau tra loi cuoi.
 // RawAssistantContent giu nguyen phan assistant de lan sau gui lai y nguyen (moi giao thuc mot dang).

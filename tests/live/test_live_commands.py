@@ -15,6 +15,7 @@ Chỉ dùng thư viện chuẩn.
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import os
 import re
@@ -293,6 +294,11 @@ def test_spreadsheet(b, out, run_ai):
     b.cmd("et.writeRange", {"range": "M1", "values": [["Mã", "Giá"], ["x", "'12"], ["y", "'15"]]}, key="et.writeRange numbers as text")
     text_qa = b.cmd("et.checkRange", {"range": "M1:N3"}, key="et.checkRange numbers as text") or {}
     check("numbers-as-text" in {i.get("type") for i in text_qa.get("issues", [])}, "Excel checkRange bắt số lưu dạng chữ", text_qa)
+    # QA thị giác (New_arch.md 8.4.6): ảnh chụp cửa sổ app, thu nhỏ theo maxWidth.
+    shot = b.cmd("app.screenshot", {"maxWidth": 640}, key="app.screenshot", record=False) or {}
+    png = base64.b64decode(shot.get("base64", "") or "")
+    check(png[:8] == b"\x89PNG\r\n\x1a\n" and 0 < shot.get("width", 0) <= 640 and shot.get("height", 0) > 0,
+          "app.screenshot trả PNG thật, rộng <= maxWidth", {k: shot.get(k) for k in ("width", "height", "mime")})
     b.cmd("et.activateSheet", {"sheet": "Sheet1"})
     b.cmd("et.writeRange", {"range": "A5", "values": [["hoàn tác tôi"]]}, key="et.writeRange before undo")
     b.cmd("et.undo", {"count": 1})

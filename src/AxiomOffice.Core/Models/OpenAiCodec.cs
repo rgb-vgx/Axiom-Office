@@ -119,6 +119,19 @@ public sealed class OpenAiCodec : IProviderCodec
                 ["content"] = result.ResultJson,
             });
         }
+
+        // Tin "tool" cua OpenAI-compatible chi nhan text: anh (QA thi giac) gui kem bang mot tin user co image_url
+        // NGAY SAU cac ket qua tool (sau khi da tra loi du moi tool_call_id).
+        foreach (ToolCallResult result in results.Where(r => r.ImageDataUrl != null))
+        {
+            turns.Add(new JsonObject
+            {
+                ["role"] = "user",
+                ["content"] = new JsonArray(
+                    new JsonObject { ["type"] = "text", ["text"] = "Screenshot returned by " + result.Name + " (inspect the layout):" },
+                    new JsonObject { ["type"] = "image_url", ["image_url"] = new JsonObject { ["url"] = result.ImageDataUrl } }),
+            });
+        }
     }
 
     private static int Usage(JsonNode? root, string name)
