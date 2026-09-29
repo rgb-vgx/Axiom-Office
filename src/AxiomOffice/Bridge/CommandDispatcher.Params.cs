@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Runtime.InteropServices;
 
@@ -30,28 +31,61 @@ namespace AxiomOffice.Bridge
             return fallback;
         }
 
+        // Sai kiểu thì báo tên tham số + giá trị nhận được (thay cho "FormatException: Input string was
+        // not in a correct format.") để model tự sửa ở vòng sau.
         private static int ParamInt(Dictionary<string, object> p, string name, int fallback)
         {
             object v;
-            if (p != null && p.TryGetValue(name, out v) && v != null)
+            if (p == null || !p.TryGetValue(name, out v) || v == null)
             {
+                return fallback;
+            }
+            try
+            {
+                // Model hay gửi số dạng chuỗi ("44", "12.0").
+                var text = v as string;
+                double number;
+                if (text != null && double.TryParse(text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out number))
+                {
+                    return Convert.ToInt32(number);
+                }
                 return Convert.ToInt32(v);
             }
-            return fallback;
+            catch (Exception ex) when (ex is FormatException || ex is InvalidCastException || ex is OverflowException)
+            {
+                throw new ArgumentException("'" + name + "' must be a whole number, got " + DescribeValue(v));
+            }
         }
 
         private static bool ParamBool(Dictionary<string, object> p, string name, bool fallback)
         {
             object v;
-            if (p != null && p.TryGetValue(name, out v) && v != null)
+            if (p == null || !p.TryGetValue(name, out v) || v == null)
             {
-                if (v is bool)
-                {
-                    return (bool)v;
-                }
+                return fallback;
+            }
+            if (v is bool)
+            {
+                return (bool)v;
+            }
+            try
+            {
                 return Convert.ToBoolean(v);
             }
-            return fallback;
+            catch (Exception ex) when (ex is FormatException || ex is InvalidCastException)
+            {
+                throw new ArgumentException("'" + name + "' must be true or false, got " + DescribeValue(v));
+            }
+        }
+
+        private static string DescribeValue(object value)
+        {
+            var text = value as string;
+            if (text != null)
+            {
+                return "'" + (text.Length > 40 ? text.Substring(0, 40) + "..." : text) + "'";
+            }
+            return value is IList ? "an array" : DescribeShape(value);
         }
 
         private static void RequireKind(IAppHost host, string kind)
@@ -158,7 +192,8 @@ namespace AxiomOffice.Bridge
                 return null;
             }
             var text = raw as string;
-            if (text != null && text.TrimStart().StartsWith("[", StringComparison.Ordinal))
+            string trimmed = text == null ? null : text.TrimStart();
+            if (trimmed != null && (trimmed.StartsWith("[", StringComparison.Ordinal) || trimmed.StartsWith("{", StringComparison.Ordinal)))
             {
                 try
                 {
@@ -168,10 +203,21 @@ namespace AxiomOffice.Bridge
                 {
                 }
             }
-            var list = UnwrapArray(raw) as IList;
+            object decoded = DecodeArrays(raw);
+            var list = decoded as IList;
             if (list == null)
             {
-                throw new ArgumentException(MatrixHelp(name, DescribeShape(UnwrapArray(raw))));
+                throw new ArgumentException(MatrixHelp(name, DescribeShape(decoded)));
+            }
+            // Lớp bọc thừa ngoài cùng: [[["a","b"],["c","d"]]] → [["a","b"],["c","d"]].
+            while (list.Count == 1)
+            {
+                var only = list[0] as IList;
+                if (only == null || only.Count == 0 || !only.Cast<object>().All(i => i is IList))
+                {
+                    break;
+                }
+                list = only;
             }
             if (list.Count == 0)
             {
@@ -181,7 +227,7 @@ namespace AxiomOffice.Bridge
                 }
                 return new List<IList>();
             }
-            var items = list.Cast<object>().Select(UnwrapArray).ToList();
+            var items = list.Cast<object>().ToList();
             bool allRows = items.All(i => i is IList);
             bool allScalars = items.All(i => !(i is IList) && !(i is IDictionary));
             if (!allRows && !allScalars)
@@ -196,7 +242,13 @@ namespace AxiomOffice.Bridge
                 var row = new List<object>();
                 for (int c = 0; c < source.Count; c++)
                 {
-                    object cell = UnwrapArray(source[c]);
+                    // Ô bị bọc thành mảng 1 phần tử ({"item":"a"} → ["a"]): lấy giá trị bên trong.
+                    object cell = source[c];
+                    IList wrapped;
+                    while ((wrapped = cell as IList) != null && wrapped.Count == 1)
+                    {
+                        cell = wrapped[0];
+                    }
                     if (cell is IList || cell is IDictionary)
                     {
                         throw new ArgumentException(MatrixHelp(name, "a nested array/object at row " + (r + 1) + ", column " + (c + 1)));
@@ -208,20 +260,27 @@ namespace AxiomOffice.Bridge
             return rows;
         }
 
-        private static object UnwrapArray(object value)
+        // Model đôi khi mã hoá mảng kiểu XML: mỗi lớp {"item": x} là MỘT cấp mảng - x là danh sách phần tử,
+        // hoặc là phần tử duy nhất khi x không phải mảng. Vd {"item":{"item":["Tổng","=SUM(B2:B3)"]}} =
+        // [["Tổng","=SUM(B2:B3)"]] (một dòng); trước đây gỡ hết các lớp một lúc thành mảng 1 chiều nên bị
+        // ghi thành cột. Kết quả chỉ còn List và giá trị đơn; object khác giữ nguyên để báo lỗi.
+        private static object DecodeArrays(object value)
         {
             var dict = value as IDictionary<string, object>;
-            while (dict != null && dict.Count == 1)
+            if (dict != null && dict.Count == 1)
             {
                 string key = dict.Keys.First();
-                if (key != "item" && key != "items" && key != "row" && key != "rows" && key != "values")
+                if (key == "item" || key == "items" || key == "row" || key == "rows" || key == "values")
                 {
-                    break;
+                    object inner = dict[key];
+                    var innerList = inner as IList;
+                    return innerList != null
+                        ? innerList.Cast<object>().Select(DecodeArrays).ToList()
+                        : new List<object> { DecodeArrays(inner) };
                 }
-                value = dict[key];
-                dict = value as IDictionary<string, object>;
             }
-            return value;
+            var list = value as IList;
+            return list != null ? list.Cast<object>().Select(DecodeArrays).ToList() : value;
         }
 
         private static string DescribeShape(object value)

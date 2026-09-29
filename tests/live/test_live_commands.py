@@ -175,7 +175,11 @@ def test_writer(b, out, png, run_ai):
     text = b.cmd("writer.getText")
     check(text and "Xin chào Axiom" in text["text"] and "Dòng nối cuối" in text["text"], "Word getText thấy nội dung vừa ghi", text)
     b.cmd("writer.selection")
+    short = b.cmd("writer.getText", {"maxChars": "12.0"}, key="writer.getText string number")
+    check(short and len(short["text"]) == 12 and short["truncated"], "Word maxChars nhận số dạng chuỗi '12.0'", short)
     b.cmd("writer.insertStyledText", {"text": " Chữ đỏ đậm", "bold": True, "color": "#C00000", "size": 14})
+    error = b.cmd("writer.insertStyledText", {"text": "x", "bold": "có"}, expect_ok=False, key="writer.insertStyledText bool text")
+    check("'bold' must be true or false, got 'có'" in (error or ""), "Word lỗi bool nêu tên tham số", error)
     b.cmd("writer.heading", {"level": 1, "text": "Tiêu đề một"})
     b.cmd("writer.formatSelection", {"italic": True, "alignment": "center"})
     b.cmd("writer.setParagraphAlignment", {"alignment": "justify"})
@@ -224,6 +228,15 @@ def test_spreadsheet(b, out, run_ai):
     b.cmd("et.writeRange", {"range": "A10", "values": {"foo": 1}}, expect_ok=False, key="et.writeRange invalid")
     b.cmd("et.writeRange", {"range": "A10"}, expect_ok=False, key="et.writeRange missing values")
     b.cmd("et.writeRange", {"values": [[1]]}, expect_ok=False, key="et.writeRange missing range")
+    # Mỗi lớp {"item": x} là một cấp mảng (x không phải mảng = phần tử duy nhất).
+    b.cmd("et.writeRange", {"range": "A20", "values": {"item": {"item": ["Tổng", "=SUM(B2:B3)"]}}}, key="et.writeRange item row")
+    b.cmd("et.writeRange", {"range": "A22", "values": {"item": {"item": "đơn"}}}, key="et.writeRange item single")
+    b.cmd("et.writeRange", {"range": "A24", "values": {"item": {"item": [{"item": ["p", "q"]}, {"item": ["r", "s"]}]}}}, key="et.writeRange item overwrapped")
+    b.cmd("et.writeRange", {"range": "A27", "values": [[{"item": "c1"}, "c2"]]}, key="et.writeRange item cell")
+    b.cmd("et.writeRange", {"range": "A29", "values": '{"item": [["j", 1]]}'}, key="et.writeRange json object string")
+    decoded = b.cmd("et.readRange", {"range": "A20:B29"}, key="et.readRange item shapes")
+    expected = [["Tổng", 17.5], [None, None], ["đơn", None], [None, None], ["p", "q"], ["r", "s"], [None, None], ["c1", "c2"], [None, None], ["j", 1]]
+    check(decoded and decoded["values"] == expected, "Excel giải mã values bọc {item} đúng dòng/cột", decoded)
     values = b.cmd("et.readRange", {"range": "A1:C3"})
     check(values and values["values"][1][2] == 19, "Excel công thức =B2*2 tính ra 19", values)
     b.cmd("et.readRange", {"range": "E1:K3"}, key="et.readRange others")
@@ -253,6 +266,8 @@ def test_presentation(b, out, png, run_ai):
     b.cmd("app.info", key="app.info (trước khi có tài liệu)")
     b.cmd("wpp.newPresentation")
     b.cmd("wpp.addSlide", {"layout": 1})
+    error = b.cmd("wpp.addSlide", {"layout": "Title Only"}, expect_ok=False, key="wpp.addSlide layout text")
+    check("'layout' must be a whole number, got 'Title Only'" in (error or ""), "PowerPoint lỗi layout nêu tên tham số", error)
     b.cmd("wpp.addText", {"text": "Giới thiệu", "fontSize": 32, "bold": True, "color": "#1F4E79", "align": "center", "left": 40, "top": 40, "width": 600, "height": 60})
     b.cmd("wpp.addTextBox", {"text": "Hộp văn bản", "left": 60, "top": 150, "width": 400, "height": 50})
     b.cmd("wpp.addSlide", {})
@@ -383,7 +398,10 @@ def main():
     if args.compare:
         with open(args.compare, encoding="utf-8") as handle:
             golden = json.load(handle)
-        for key in sorted(set(golden) | set(RECORD)):
+        new_keys = sorted(set(RECORD) - set(golden))
+        if new_keys:
+            print("ca mới chưa có trong golden (ghi lại bằng --record):", ", ".join(new_keys))
+        for key in sorted(golden):
             check(golden.get(key) == RECORD.get(key), "golden " + key,
                   "trước: %s\n     sau:  %s" % (json.dumps(golden.get(key), ensure_ascii=False)[:280], json.dumps(RECORD.get(key), ensure_ascii=False)[:280]))
 

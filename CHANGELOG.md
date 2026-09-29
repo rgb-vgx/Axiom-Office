@@ -5,6 +5,19 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — `values` bọc `{"item": ...}` bị ghi sai hướng; lỗi tham số khó hiểu
+- Log (Excel, "ghi Tổng vào A5 và công thức tổng vào B5"): model gửi
+  `{"item":{"item":["Tổng","=SUM(B2:B3)"]}}` (một dòng). Bridge gỡ mọi lớp bọc cùng lúc thành mảng
+  1 chiều nên ghi thành **cột** (A5, A6); model loay hoay 19 vòng, ghi rác vào A6:C7. Giờ mỗi lớp
+  `{"item": x}` là một cấp mảng (x không phải mảng = phần tử duy nhất), bỏ lớp bọc thừa ngoài cùng
+  và ô bị bọc `{"item":"a"}`; nhận cả chuỗi JSON dạng object. Cùng yêu cầu giờ xong trong 3 vòng.
+  Các dạng vốn chạy đúng (`{"item":[{"item":[...]}]}`, mảng 1 chiều = cột...) giữ nguyên kết quả
+- Tham số số / true-false sai kiểu báo tên tham số và giá trị (`'layout' must be a whole number,
+  got 'Title Only'`) thay cho `FormatException: Input string was not in a correct format.`; số
+  dạng chuỗi có phần thập phân (`"12.0"`) được nhận
+- `wpp.addSlide`: mô tả tool ghi rõ `layout` là số (1 tiêu đề, 2 tiêu đề + nội dung, 11 chỉ tiêu
+  đề, 12 trống) — trước đó model gửi `"Title Only"`
+
 ### Changed — Ask AI: giới hạn lệnh của agent, không tự lưu file
 - Tool `office_action` từ chối lệnh không có trong mô tả tool (không gắn `ForAgent()`), vd
   `writer.closeAll` (đóng mọi tài liệu, không lưu) hay `ai.ask` lồng nhau; model nhận lỗi bảo dùng

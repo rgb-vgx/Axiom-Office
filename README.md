@@ -198,7 +198,9 @@ print(json.load(urllib.request.urlopen(request)))
 ### Danh sách lệnh (`POST /cmd`)
 
 `values` (bảng, vùng ô) luôn là **mảng 2 chiều theo dòng**, ví dụ `[["Tên","Điểm"],["An",9.5]]`.
-Sai dạng hoặc thiếu thì lệnh trả lỗi kèm ví dụ (không âm thầm bỏ qua). Tham số `slide` của
+Cũng nhận chuỗi JSON và dạng bọc `{"item": ...}` mà một số model sinh ra (mỗi lớp bọc = một cấp
+mảng: `{"item":{"item":["Tổng",17.5]}}` là một dòng). Sai dạng hoặc thiếu thì lệnh trả lỗi kèm ví
+dụ (không âm thầm bỏ qua); tham số số/true-false sai kiểu cũng báo rõ tên tham số. Tham số `slide` của
 lệnh `wpp.*` bỏ trống = slide cuối. `?` = tham số tuỳ chọn. Cột **Ask AI**: ✓ = agent trong
 task pane (và `ai.ask`) được dùng lệnh này; HTTP API và MCP gọi được mọi lệnh.
 
@@ -244,7 +246,7 @@ công cụ); lệnh khai báo cạnh handler trong `src/AxiomOffice/Bridge/Comma
 | `wpp.newPresentation` | — | Tạo bản trình chiếu mới |  |
 | `wpp.open` | `path` | Mở .pptx |  |
 | `wpp.listSlides` | — | Số slide + text từng slide | ✓ |
-| `wpp.addSlide` | `layout?` | Thêm slide cuối; `layout` mặc định 12 = trống (1 = tiêu đề, 2 = tiêu đề + nội dung) | ✓ |
+| `wpp.addSlide` | `layout?` | Thêm slide cuối; `layout` mặc định 12 = trống (1 = tiêu đề, 2 = tiêu đề + nội dung, 11 = chỉ tiêu đề) | ✓ |
 | `wpp.addText` | `text`, `slide?`, `left?`, `top?`, `width?`, `height?`, `fontSize?`, `bold?`, `color?`, `align?` | Textbox có định dạng (`color` dạng `#RRGGBB`, `align` left/center/right) | ✓ |
 | `wpp.addTextBox` | `text`, `slide?`, `left?`, `top?`, `width?`, `height?` | Textbox |  |
 | `wpp.addImage` | `path`, `slide?`, `left?`, `top?`, `width?`, `height?` | Chèn ảnh (kích thước gốc nếu bỏ trống `width`/`height`) | ✓ |
