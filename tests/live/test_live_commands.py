@@ -186,8 +186,20 @@ def test_writer(b, out, png, run_ai):
     table = b.cmd("writer.insertTable", {"values": [["Tên", "Điểm"], ["An", 9.5], ["Bình", 8]], "style": "Table Grid"}, key="writer.insertTable values")
     check(table and table.get("rows") == 3 and table.get("cols") == 2, "Word insertTable suy ra 3x2 từ values", table)
     b.cmd("writer.insertTable", {"rows": 2, "cols": 2, "values": {"item": [{"item": ["x", "y"]}]}}, key="writer.insertTable wrapped")
+    # Dạng model big-pickle gửi thật (log 30/09): mỗi dòng bọc thêm một lớp, số bọc {"item": n}, dữ liệu đặt nhầm vào rows.
+    double = b.cmd("writer.insertTable", {"cols": "2", "values": {"item": [{"item": {"item": ["STT", "Tên"]}}, {"item": {"item": ["1", "An"]}}]}},
+                   key="writer.insertTable double-wrapped rows")
+    check(double and double.get("rows") == 2 and double.get("cols") == 2 and double.get("filled") == 4, "Word insertTable gỡ dòng bọc 2 lớp", double)
+    wrapped_int = b.cmd("writer.insertTable", {"rows": {"item": 2}, "cols": [3]}, key="writer.insertTable wrapped ints")
+    check(wrapped_int and wrapped_int.get("rows") == 2 and wrapped_int.get("cols") == 3, "Word insertTable nhận rows {item:2}, cols [3]", wrapped_int)
+    rows_data = b.cmd("writer.insertTable", {"cols": "2", "rows": {"item": [{"item": ["a", "b"]}, {"item": ["c", "d"]}]}}, key="writer.insertTable data in rows")
+    check(rows_data and rows_data.get("filled") == 4, "Word insertTable dùng dữ liệu đặt nhầm vào rows", rows_data)
     b.cmd("writer.insertTable", {"rows": 2, "cols": 2, "values": {"a": 1}}, expect_ok=False, key="writer.insertTable invalid")
     b.cmd("writer.insertTable", {}, expect_ok=False, key="writer.insertTable missing")
+    b.cmd("writer.appendText", {"text": "\rTrân trọng,\rKính mong phản hồi."})
+    multi = b.cmd("writer.replaceAll", {"find": "Trân trọng,\nKính mong", "replace": "Kính mong"}, key="writer.replaceAll newline")
+    joined = b.cmd("writer.getText", record=False) or {}
+    check(multi and multi.get("replaced") and "Trân trọng" not in joined.get("text", ""), "Word replaceAll khớp \\n với ngắt đoạn", multi)
     b.cmd("writer.insertPageBreak")
     b.cmd("writer.insertImage", {"path": png, "width": 40, "height": 40})
     b.cmd("writer.insertHyperlink", {"url": "https://example.com", "text": "ví dụ"})
