@@ -24,7 +24,7 @@ namespace WpsAiBridge
 
         public Connect()
         {
-            Logger.Info("Connect constructor: instance created");
+            Logger.Info("Connect constructor: instance created from " + typeof(Connect).Assembly.Location);
         }
 
         public string GetCustomUI(string RibbonID)

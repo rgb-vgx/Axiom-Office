@@ -1,0 +1,41 @@
+﻿WPS AI Bridge - Hướng dẫn cài đặt
+==================================
+
+Yêu cầu
+- Windows 10/11 64-bit (đã có sẵn .NET Framework 4.8)
+- Microsoft Office 64-bit và/hoặc WPS Office 64-bit
+- Không cần quyền admin, không cần cài Python
+
+Cài đặt
+1. Giải nén thư mục này vào một chỗ cố định, ví dụ C:\Tools\WpsAiBridge.
+   Add-in chạy thẳng từ thư mục này: đừng xoá hay di chuyển nó sau khi cài
+   (nếu đã di chuyển thì chạy lại install.cmd ở chỗ mới).
+2. Đóng Word, Excel, PowerPoint và WPS.
+3. Nhấp đúp install.cmd. Nếu Windows cảnh báo file tải từ Internet, chọn "Run" / "Chạy".
+4. Mở Word, Excel, PowerPoint hoặc WPS: trên ribbon có tab "WPS AI Bridge".
+5. Bấm Ask AI > Cài đặt, nhập provider, endpoint, model và API key của bạn.
+   Mỗi máy dùng cấu hình AI riêng; API key được mã hoá theo tài khoản Windows.
+
+Dùng với AI agent (MCP: Claude Desktop, Claude Code, ...)
+Thêm vào cấu hình MCP của client (install.cmd in sẵn đúng đường dẫn):
+
+  "mcpServers": {
+    "office": {
+      "command": "C:\\Tools\\WpsAiBridge\\src\\WpsAiBridge\\bin\\Release\\WpsAiBridge.Host.exe",
+      "args": ["mcp"]
+    }
+  }
+
+"mcp" nạp cả 50 tool; dùng "mcp word", "mcp excel" hoặc "mcp ppt" để nạp từng nhóm.
+
+Gỡ cài đặt
+- Nhấp đúp uninstall.cmd (giữ lại cấu hình AI và token).
+- Xoá sạch cả cấu hình, token và log: mở Command Prompt tại thư mục này, chạy
+      uninstall.cmd -Purge
+- Sau đó có thể xoá thư mục cài.
+
+Sự cố thường gặp
+- Không thấy tab "WPS AI Bridge": đóng hẳn app, chạy lại install.cmd, mở lại app.
+  Log nằm ở %LOCALAPPDATA%\WpsAiBridge\bridge.log
+- Office báo add-in bị vô hiệu hoá sau khi app bị lỗi: chạy lại install.cmd.
+- Máy công ty chặn add-in chưa có chữ ký số: liên hệ bộ phận IT.

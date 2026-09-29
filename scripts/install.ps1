@@ -11,6 +11,11 @@ if (-not (Test-Path -LiteralPath $dllPath)) {
     throw "DLL not found: $dllPath - run scripts\build.ps1 first"
 }
 
+# File giai nen tu zip tai qua mang mang Zone.Identifier: .NET tu choi nap DLL do. Go danh dau truoc.
+$binDir = Split-Path -Parent $dllPath
+Get-ChildItem -LiteralPath $binDir -File | Unblock-File -ErrorAction SilentlyContinue
+$hostExe = Join-Path $binDir "WpsAiBridge.Host.exe"
+
 $codeBase = "file:///" + ($dllPath -replace '\\', '/')
 $currentUser = [Microsoft.Win32.Registry]::CurrentUser
 
@@ -96,11 +101,16 @@ Write-Output "  Office:   Word $portOffice / Excel $($portOffice + 1) / PowerPoi
 Write-Output "  Config:   HKCU\Software\WpsAiBridge (Port, PortOffice, Token, Enabled)"
 if ($tokenGenerated) {
     Write-Output "  Token:    auto-generated (32 hex) - requests to /cmd and /config must send X-Auth-Token"
-    Write-Output "            (python tools/excel-mcp reads it from the registry automatically)"
+    Write-Output "            (WpsAiBridge.Host.exe mcp and tools/*-mcp read it from the registry automatically)"
 } else {
     Write-Output "  Token:    existing value kept"
 }
 Write-Output ""
 Write-Output "Next: open WPS or Microsoft Office (Word/Excel/PowerPoint)."
 Write-Output "Companion: WpsAiBridge.Host.exe wps|et|wpp for WPS, word|excel|ppt for Microsoft Office."
+if (Test-Path -LiteralPath $hostExe) {
+    $mcpJson = @{ command = $hostExe; args = @("mcp") } | ConvertTo-Json -Compress
+    Write-Output "MCP server (AI agent): add to your MCP client config, e.g."
+    Write-Output "  ""office"": $mcpJson"
+}
 Write-Output "If the add-in does not load, open Tools tab -> COM Add-ins and enable 'WPS AI Bridge'."
