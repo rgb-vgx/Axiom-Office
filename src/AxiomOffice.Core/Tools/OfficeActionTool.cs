@@ -78,12 +78,40 @@ public sealed class OfficeActionTool : ITool
             return new ToolResult(Error($"'{action}' is not an available action; use one of the actions listed in the office_action tool description"), false, action);
         }
 
-        JsonNode? parameters = arguments?["params"];
+        JsonNode? parameters = NormalizeParams(arguments?["params"]);
         BridgeResult result = await context.Bridge
             .CommandAsync(context.Office.Port, action, parameters, cancel)
             .ConfigureAwait(false);
 
         return new ToolResult(result.RawJson, result.Ok, action);
+    }
+
+    // Model doi khi gui params la chuoi JSON ("{\"rows\":3}") thay vi object: parse ra. Gia tri bi boc
+    // kieu mang XML ({"item": ...}) de bridge go (CommandDispatcher.Params) - dung chung cho MCP/in-process.
+    public static JsonNode? NormalizeParams(JsonNode? parameters)
+    {
+        if (parameters is JsonValue value && value.TryGetValue(out string? text))
+        {
+            string trimmed = text.Trim();
+            if (trimmed.Length == 0)
+            {
+                return null;
+            }
+
+            if (trimmed.StartsWith('{'))
+            {
+                try
+                {
+                    return JsonNode.Parse(trimmed) as JsonObject ?? parameters;
+                }
+                catch (System.Text.Json.JsonException)
+                {
+                    return parameters;
+                }
+            }
+        }
+
+        return parameters?.DeepClone();
     }
 
     private static string Signature(OfficeCommand command)

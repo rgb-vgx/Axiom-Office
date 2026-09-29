@@ -40,6 +40,7 @@ namespace AxiomOffice.Bridge
             {
                 return fallback;
             }
+            v = UnwrapScalar(v);
             try
             {
                 // Model hay gửi số dạng chuỗi ("44", "12.0").
@@ -55,6 +56,32 @@ namespace AxiomOffice.Bridge
             {
                 throw new ArgumentException("'" + name + "' must be a whole number, got " + DescribeValue(v));
             }
+        }
+
+        // Số bị bọc kiểu mảng XML ({"item": 6}) hoặc mảng 1 phần tử ([6]): lấy giá trị bên trong.
+        private static object UnwrapScalar(object v)
+        {
+            for (int depth = 0; depth < 8; depth++)
+            {
+                var dict = v as IDictionary<string, object>;
+                if (dict != null && dict.Count == 1)
+                {
+                    string key = dict.Keys.First();
+                    if (key != "item" && key != "items" && key != "value")
+                    {
+                        return v;
+                    }
+                    v = dict[key];
+                    continue;
+                }
+                var list = v as IList;
+                if (list == null || list.Count != 1)
+                {
+                    return v;
+                }
+                v = list[0];
+            }
+            return v;
         }
 
         private static bool ParamBool(Dictionary<string, object> p, string name, bool fallback)
@@ -239,6 +266,12 @@ namespace AxiomOffice.Bridge
             {
                 // Mảng 1 chiều: mỗi phần tử là một dòng 1 ô (giữ hành vi cũ của et.writeRange).
                 IList source = allRows ? (IList)items[r] : new object[] { items[r] };
+                // Dòng bị bọc thêm một lớp ({"item":{"item":[...]}} → [[...]]): lấy dòng bên trong.
+                IList inner;
+                while (source.Count == 1 && (inner = source[0] as IList) != null)
+                {
+                    source = inner;
+                }
                 var row = new List<object>();
                 for (int c = 0; c < source.Count; c++)
                 {

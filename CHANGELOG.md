@@ -5,6 +5,23 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — lỗi Ask AI thấy khi test Word qua Agent Core
+- **Pane chạy một yêu cầu hai lần**: Core đã nhận lượt chạy (có `runId`) nhưng đọc SSE lỗi thì
+  `CoreClient.Run` trả null và pane chạy lại in-process — tài liệu bị sửa hai lần, dòng trạng thái
+  hiện cả "Xong" lẫn "chế độ cơ bản". Nay chỉ quay về in-process khi Core chưa nhận lượt chạy; mọi lý
+  do quay về đều ghi `bridge.log` (`CoreClient: fallback to in-process - ...`)
+- `writer.insertTable`/`et.writeRange`/... báo "nested array/object at row 1, column 1" khi model bọc
+  mỗi dòng thêm một lớp (`{"item":[{"item":{"item":[...]}}]}`): gỡ lớp thừa của từng dòng
+- "`rows` must be a whole number, got an object with keys [item]": tham số số nhận `{"item": 6}` và
+  `[6]`; `writer.insertTable` lỡ nhận dữ liệu bảng trong `rows` thì dùng như `values`
+- `writer.insertTable` lỗi COM "The range cannot be deleted": chèn ở cuối vùng chọn (trong bảng thì
+  sau bảng) thay vì thay nội dung đang chọn
+- `writer.replaceAll` không bao giờ khớp văn bản nhiều dòng (model gửi `\n`, Word dùng `\r`/`\v`) nên
+  agent lặp tới hết ngân sách 200k token: đổi `\n` → `^p`, `\v` → `^l`, `\t` → `^t`, thoát `^`
+- Core: `params` gửi dạng chuỗi JSON được parse thành object; tóm tắt hội thoại chỉ khi vượt mốc mới
+  mỗi 20 tin nhắn (trước đây tóm tắt lại sau **mọi** lượt khi hội thoại > 20 tin, tốn thêm một lần
+  gọi model mỗi lượt)
+
 ### Added — Agent Core giai đoạn 1 (phần 2): pane chạy qua Core
 - Add-in: `Ai/CoreClient.cs` — tìm Core qua `core.json`, khởi động `AxiomOffice.Core.exe` khi cần,
   `POST /v1/runs` rồi đọc SSE; hủy lượt chạy cả hai phía (abort request + `POST .../cancel`)

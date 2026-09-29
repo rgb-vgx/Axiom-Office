@@ -94,8 +94,9 @@ cùng API cho Office và WPS; host không hỗ trợ thì mở cửa sổ nổi)
    liệu đang mở — chỉ các lệnh có dấu ✓ ở cột **Ask AI** trong [bảng lệnh](#danh-sách-lệnh-post-cmd);
    lệnh khác (vd `writer.closeAll`, `ai.ask`) bị từ chối. Mỗi thao tác hiện thành một dòng: dấu tick
    xanh / x đỏ, nhãn tiếng Việt và mã action. Lượt chạy đi qua **Agent Core** (`AxiomOffice.Core.exe`)
-   khi có; Core không chạy được thì pane tự chạy agent trong add-in và ghi chú "chế độ cơ bản" ở
-   dòng trạng thái.
+   khi có; Core không chạy được (không khởi động/không nhận lượt chạy) thì pane tự chạy agent trong
+   add-in và ghi chú "chế độ cơ bản" ở dòng trạng thái. Core đã nhận lượt chạy thì **không bao giờ**
+   chạy lại in-process (tránh sửa tài liệu hai lần) — lỗi của Core hiện thẳng cho người dùng.
 3. Xong thì AI trả lời ngắn. Với Word: mỗi thao tác của AI = **1 bước Ctrl+Z**; link **Chèn trả
    lời** chèn câu trả lời vào tài liệu.
 
@@ -208,7 +209,11 @@ print(json.load(urllib.request.urlopen(request)))
 
 `values` (bảng, vùng ô) luôn là **mảng 2 chiều theo dòng**, ví dụ `[["Tên","Điểm"],["An",9.5]]`.
 Cũng nhận chuỗi JSON và dạng bọc `{"item": ...}` mà một số model sinh ra (mỗi lớp bọc = một cấp
-mảng: `{"item":{"item":["Tổng",17.5]}}` là một dòng). Sai dạng hoặc thiếu thì lệnh trả lỗi kèm ví
+mảng: `{"item":{"item":["Tổng",17.5]}}` là một dòng; dòng bị bọc thừa một lớp cũng được gỡ). Tham
+số số nhận cả `{"item": 6}`/`[6]`/`"6"`. `writer.insertTable`: dữ liệu bảng lỡ đặt vào `rows` được
+dùng như `values`; bảng chèn ở cuối vùng chọn (trong bảng thì chèn sau bảng), không thay nội dung
+đang chọn. `writer.replaceAll`: `\n` trong `find`/`replace` = ngắt đoạn (`^p`), `\v` = xuống dòng
+thủ công. Sai dạng hoặc thiếu thì lệnh trả lỗi kèm ví
 dụ (không âm thầm bỏ qua); tham số số/true-false sai kiểu cũng báo rõ tên tham số. Tham số `slide` của
 lệnh `wpp.*` bỏ trống = slide cuối. `?` = tham số tuỳ chọn. Cột **Ask AI**: ✓ = agent trong
 task pane (và `ai.ask`) được dùng lệnh này; HTTP API và MCP gọi được mọi lệnh.

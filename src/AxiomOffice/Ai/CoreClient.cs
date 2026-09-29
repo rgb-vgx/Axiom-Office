@@ -137,6 +137,7 @@ namespace AxiomOffice.Ai
             if (port <= 0)
             {
                 LastError = "khong tim thay port cua bridge trong session registry";
+                Logger.Info("CoreClient: fallback to in-process - " + LastError);
                 return null;
             }
 
@@ -162,6 +163,7 @@ namespace AxiomOffice.Ai
             if (responseText == null)
             {
                 LastError = error;
+                Logger.Info("CoreClient: fallback to in-process - POST /v1/runs failed: " + error);
                 return null;
             }
 
@@ -170,6 +172,7 @@ namespace AxiomOffice.Ai
             if (string.IsNullOrEmpty(runId))
             {
                 LastError = "Core khong tra runId: " + Truncate(responseText, 200);
+                Logger.Info("CoreClient: fallback to in-process - " + LastError);
                 return null;
             }
 
@@ -189,11 +192,15 @@ namespace AxiomOffice.Ai
                 result.Seconds = watch.Elapsed.TotalSeconds;
             }
 
-            if (result.ConversationId == null && result.Transcript.Count == 0 && !result.Ok && !result.Cancelled && !result.TimedOut)
+            if (!result.Ok && !result.Cancelled && !result.TimedOut && !result.Stopped)
             {
-                // Khong doc duoc su kien nao: coi nhu Core khong dung duoc -> pane thu in-process.
-                LastError = result.Error ?? "khong doc duoc su kien tu Agent Core";
-                return null;
+                // Da co runId thi Core co the da sua tai lieu: KHONG tra null (pane chay lai in-process se
+                // lam hai lan). Bao loi cua Core cho nguoi dung.
+                if (string.IsNullOrEmpty(result.Error))
+                {
+                    result.Error = "khong doc duoc ket qua tu Agent Core (run " + runId + ")";
+                }
+                Logger.Error("CoreClient: run " + runId + " failed: " + result.Error, null);
             }
 
             return result;

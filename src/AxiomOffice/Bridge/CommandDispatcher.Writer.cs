@@ -145,7 +145,7 @@ namespace AxiomOffice.Bridge
             dynamic result;
             using (new UndoRecordScope(host.Application, "AI: replace all"))
             {
-                result = doc.Content.Find.Execute(find, false, false, false, false, false, true, 1, false, replace, 2);
+                result = doc.Content.Find.Execute(ToWordFindText(find), false, false, false, false, false, true, 1, false, ToWordFindText(replace), 2);
             }
             return new Dictionary<string, object> { { "replaced", Convert.ToBoolean(result) } };
         }
@@ -223,7 +223,15 @@ namespace AxiomOffice.Bridge
         private static Dictionary<string, object> WriterInsertTable(IAppHost host, Dictionary<string, object> p)
         {
             List<IList> valueRows = ParamMatrix(p, "values", false);
-            int rows = ParamInt(p, "rows", 0);
+            object rawRows;
+            bool rowsHoldData = valueRows == null && p != null && p.TryGetValue("rows", out rawRows)
+                && UnwrapScalar(rawRows) is IList;
+            if (rowsHoldData)
+            {
+                // Model nhầm: đặt dữ liệu bảng vào 'rows' thay vì 'values'.
+                valueRows = ParamMatrix(p, "rows", false);
+            }
+            int rows = rowsHoldData ? 0 : ParamInt(p, "rows", 0);
             int cols = ParamInt(p, "cols", 0);
             if (valueRows != null && valueRows.Count > 0)
             {
@@ -239,7 +247,7 @@ namespace AxiomOffice.Bridge
             int filled = 0;
             using (new UndoRecordScope(host.Application, "AI: insert table"))
             {
-                dynamic table = app.ActiveDocument.Tables.Add(app.Selection.Range, rows, cols);
+                dynamic table = app.ActiveDocument.Tables.Add(TableAnchor(app), rows, cols);
                 if (valueRows != null)
                 {
                     for (int r = 0; r < valueRows.Count && r < rows; r++)
@@ -273,6 +281,42 @@ namespace AxiomOffice.Bridge
                 { "cols", cols },
                 { "filled", filled }
             };
+        }
+
+        // Chỗ chèn bảng: điểm cuối vùng chọn (Tables.Add trên vùng chọn có nội dung sẽ thay nó, gặp nội
+        // dung không xoá được thì lỗi "The range cannot be deleted"); đang ở trong bảng thì chèn sau bảng.
+        private static dynamic TableAnchor(dynamic app)
+        {
+            dynamic range = app.Selection.Range;
+            range.Collapse(0);
+            try
+            {
+                if (Convert.ToBoolean(range.Information(12)))
+                {
+                    range = range.Tables[1].Range;
+                    range.Collapse(0);
+                }
+            }
+            catch (Exception)
+            {
+            }
+            return range;
+        }
+
+        // Văn bản Word: đoạn = \r, xuống dòng thủ công = \v. Model gửi \n nên Find không bao giờ khớp;
+        // đổi sang mã đặc biệt của Find (^p, ^l, ^t) - dấu ^ có sẵn phải thoát thành ^^.
+        internal static string ToWordFindText(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return text;
+            }
+            return text.Replace("^", "^^")
+                .Replace("\r\n", "^p")
+                .Replace("\n", "^p")
+                .Replace("\r", "^p")
+                .Replace("\v", "^l")
+                .Replace("\t", "^t");
         }
 
         private static Dictionary<string, object> WriterInsertPageBreak(IAppHost host, Dictionary<string, object> p)

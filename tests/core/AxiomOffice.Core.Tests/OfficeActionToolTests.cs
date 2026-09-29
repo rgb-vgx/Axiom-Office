@@ -96,6 +96,50 @@ public class OfficeActionToolTests
     }
 
     [Fact]
+    public void Params_dang_chuoi_json_duoc_parse_thanh_object()
+    {
+        JsonNode? parsed = OfficeActionTool.NormalizeParams(JsonValue.Create("""{"rows":3,"cols":"2"}"""));
+
+        Assert.IsType<JsonObject>(parsed);
+        Assert.Equal(3, parsed!["rows"]!.GetValue<int>());
+        Assert.Null(OfficeActionTool.NormalizeParams(JsonValue.Create("  ")));
+        Assert.Equal("khong phai json", OfficeActionTool.NormalizeParams(JsonValue.Create("khong phai json"))!.GetValue<string>());
+        Assert.Null(OfficeActionTool.NormalizeParams(null));
+    }
+
+    [Fact]
+    public async Task Params_chuoi_json_gui_sang_bridge_la_object()
+    {
+        string? sent = null;
+        var handler = new ScriptedHandler((_, body) =>
+        {
+            sent = body;
+            return ScriptedHandler.Json("""{"ok":true,"result":{}}""");
+        });
+        var config = new CoreConfig { Token = "t" };
+        var context = Context(bridge: new BridgeClient(config, new HttpClient(handler)));
+        var tool = new OfficeActionTool(Catalog(), "wps");
+
+        await tool.InvokeAsync(
+            new JsonObject { ["action"] = "writer.getText", ["params"] = """{"maxChars":50}""" },
+            context, CancellationToken.None);
+
+        Assert.Contains("\"params\":{\"maxChars\":50}", sent);
+    }
+
+    [Theory]
+    [InlineData(1, 20, false)]
+    [InlineData(1, 21, true)]
+    [InlineData(18, 23, true)]
+    [InlineData(22, 30, false)]
+    [InlineData(35, 41, true)]
+    [InlineData(41, 45, false)]
+    public void Tom_tat_chi_khi_vuot_moc_moi(int firstSeq, int lastSeq, bool expected)
+    {
+        Assert.Equal(expected, AxiomOffice.Core.Agent.Orchestrator.ShouldSummarize(firstSeq, lastSeq));
+    }
+
+    [Fact]
     public void Registry_tim_tool_theo_ten()
     {
         var registry = new ToolRegistry([new OfficeActionTool(Catalog(), "wps")]);

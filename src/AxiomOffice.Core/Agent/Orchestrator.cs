@@ -209,7 +209,7 @@ public sealed class Orchestrator(
             }
 
             runs.Finish(run.Id, run.Status, run.Rounds, run.InputTokens, run.OutputTokens, run.Error);
-            await MaybeSummarizeAsync(conversation, cancel).ConfigureAwait(false);
+            await MaybeSummarizeAsync(conversation, userSeq, cancel).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -249,10 +249,24 @@ public sealed class Orchestrator(
     }
 
     // Luu tom tat khi hoi thoai vuot ngan sach ngu canh (muc 8.5.9) - mot lan goi model cuoi luot.
-    private async Task MaybeSummarizeAsync(ConversationRow conversation, CancellationToken cancel)
+    // Chi tom tat khi hoi thoai vuot qua moc moi (moi SummaryEvery tin nhan), khong phai sau MOI luot:
+    // truoc day hoi thoai >20 tin nhan bi tom tat lai o tat ca cac luot sau, ton them mot lan goi model.
+    public static bool ShouldSummarize(int firstSeqOfRun, int lastSeq)
+    {
+        if (lastSeq <= SummaryEvery)
+        {
+            return false;
+        }
+
+        return lastSeq / SummaryEvery > (firstSeqOfRun - 1) / SummaryEvery;
+    }
+
+    private const int SummaryEvery = 20;
+
+    private async Task MaybeSummarizeAsync(ConversationRow conversation, int userSeq, CancellationToken cancel)
     {
         IReadOnlyList<MessageRow> history = conversations.Messages(conversation.Id, limit: 60);
-        if (history.Count <= 20)
+        if (history.Count == 0 || !ShouldSummarize(userSeq, history[^1].Seq))
         {
             return;
         }
