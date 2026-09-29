@@ -12,7 +12,8 @@ public sealed record RunRow(
     int Rounds,
     int InputTokens,
     int OutputTokens,
-    string? Error);
+    string? Error,
+    string? MemoryStatus = null);
 
 public sealed record ToolCallRow(long Id, int Seq, string Tool, string? Action, int Ok, string? Error, long Ms, string CreatedAt);
 
@@ -31,6 +32,17 @@ public sealed class RunStore(CoreDb db)
         command.Parameters.AddWithValue("$cid", (object?)conversationId ?? DBNull.Value);
         command.Parameters.AddWithValue("$now", ConversationStore.Now());
         command.Parameters.AddWithValue("$model", model);
+        command.ExecuteNonQuery();
+    }
+
+    // null | queued | done | skipped | failed (New_arch.md muc 8.5.2) - doi sau khi run da xong (hang doi nen).
+    public void SetMemoryStatus(string runId, string memoryStatus)
+    {
+        using SqliteConnection connection = db.Open();
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = "UPDATE runs SET memory_status = $memory WHERE id = $id";
+        command.Parameters.AddWithValue("$id", runId);
+        command.Parameters.AddWithValue("$memory", memoryStatus);
         command.ExecuteNonQuery();
     }
 
@@ -80,7 +92,7 @@ public sealed class RunStore(CoreDb db)
     {
         using SqliteConnection connection = db.Open();
         using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = "SELECT id, conversation_id, status, started_at, finished_at, model, rounds, input_tokens, output_tokens, error FROM runs WHERE id = $id";
+        command.CommandText = "SELECT id, conversation_id, status, started_at, finished_at, model, rounds, input_tokens, output_tokens, error, memory_status FROM runs WHERE id = $id";
         command.Parameters.AddWithValue("$id", runId);
         using SqliteDataReader reader = command.ExecuteReader();
         if (!reader.Read())
@@ -98,7 +110,8 @@ public sealed class RunStore(CoreDb db)
             reader.GetInt32(6),
             reader.GetInt32(7),
             reader.GetInt32(8),
-            reader.IsDBNull(9) ? null : reader.GetString(9));
+            reader.IsDBNull(9) ? null : reader.GetString(9),
+            reader.IsDBNull(10) ? null : reader.GetString(10));
     }
 
     public IReadOnlyList<ToolCallRow> ToolCalls(string runId)

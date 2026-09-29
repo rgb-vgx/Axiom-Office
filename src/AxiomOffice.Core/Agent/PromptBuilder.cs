@@ -69,7 +69,10 @@ public static class PromptBuilder
             return "";
         }
 
-        return "Things you remember about this user and document:\n" + string.Join("\n", memories.Select(m => "- " + m));
+        // Mau thuan xu ly luc doc (New_arch.md 8.5.7): ban moi ghi ro su chuyen doi, liet ke truoc ban cu.
+        return "Things you remember about this user and document (use them without asking again; when two facts "
+            + "conflict, the one describing a change is the current one; call remember when the user tells you a new lasting fact):\n"
+            + string.Join("\n", memories.Select(m => "- " + m));
     }
 
     public static string ConversationSection(string? summary, IReadOnlyList<string> recentLines)

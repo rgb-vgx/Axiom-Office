@@ -3,6 +3,7 @@ using AxiomOffice.Core.Agent;
 using AxiomOffice.Core.Api;
 using AxiomOffice.Core.Config;
 using AxiomOffice.Core.Logging;
+using AxiomOffice.Core.Memory;
 using AxiomOffice.Core.Models;
 using AxiomOffice.Core.Office;
 using AxiomOffice.Core.Skills;
@@ -76,11 +77,38 @@ var manager = new RunManager();
 var skills = new SkillIndex(SkillIndex.DefaultSources(
     Path.Combine(AppContext.BaseDirectory, "skills"), config.SkillDirs, paths.SkillsDirectory));
 skills.Watch();
-var orchestrator = new Orchestrator(config, bridge, sessions, stores.Conversations, stores.Runs, models.Current, new ContextAssembler(), skills);
+// Memory dai han (muc 8.5): MemoryModel (neu co) cho trich xuat, mac dinh = model chinh.
+var memory = new MemoryService(
+    new SqliteMemoryStore(stores.Db),
+    stores.Conversations,
+    stores.Runs,
+    () => CoreConfig.Load(builder.Configuration),
+    current => string.IsNullOrWhiteSpace(current.MemoryModel)
+        ? models.Current()
+        : new ModelClient(http, current.LlmProvider, current.LlmEndpoint, current.LlmApiKey, current.MemoryModel.Trim()),
+    http,
+    stores.Available);
+if (stores.Available)
+{
+    memory.Enqueue(_ =>
+    {
+        int purged = memory.Store.PurgeSoftDeleted(DateTime.UtcNow);
+        if (purged > 0)
+        {
+            CoreLog.Info($"memory: purged {purged} soft-deleted memories older than {SqliteMemoryStore.SoftDeleteRetentionDays} days");
+        }
+
+        return Task.CompletedTask;
+    });
+    memory.QueueEmbeddingBackfill();
+}
+
+var orchestrator = new Orchestrator(config, bridge, sessions, stores.Conversations, stores.Runs, models.Current, new ContextAssembler(), skills, memory);
 
 CoreApi.Map(app, config, paths, runtime, stores);
 RunEndpoints.Map(app, manager, orchestrator, stores);
 SkillEndpoints.Map(app, skills);
+MemoryEndpoints.Map(app, memory);
 
 app.Lifetime.ApplicationStarted.Register(() =>
 {
@@ -107,6 +135,7 @@ app.Lifetime.ApplicationStopped.Register(() =>
         }
     }
 
+    memory.Dispose();
     CoreFile.Delete(paths.CoreJson);
     CoreLog.Info("Agent Core stopped");
 });

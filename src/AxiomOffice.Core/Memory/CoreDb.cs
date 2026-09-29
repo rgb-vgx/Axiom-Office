@@ -7,7 +7,7 @@ namespace AxiomOffice.Core.Memory;
 // (giai doan 3). Migration danh so bang PRAGMA user_version (New_arch.md muc 8.5.1, 8.5.2).
 public sealed class CoreDb(string path)
 {
-    public const int SchemaVersion = 1;
+    public const int SchemaVersion = 2;
 
     public string Path { get; } = path;
 
@@ -62,6 +62,49 @@ public sealed class CoreDb(string path)
                   id INTEGER PRIMARY KEY, run_id TEXT, seq INTEGER, tool TEXT, action TEXT,
                   params_json TEXT, ok INTEGER, error TEXT, ms INTEGER, created_at TEXT);
                 CREATE INDEX ix_tool_calls_run ON tool_calls(run_id, seq);
+                """);
+        }
+
+        if (version < 2)
+        {
+            // Memory dai han (giai doan 3, muc 8.5.2). memories_fts la bang FTS5 doc lap, rowid = memories.rowid,
+            // luu text DA CHUAN HOA (bo dau, d -> d) va dong bo trong C# cung transaction: unicode61
+            // remove_diacritics khong bo duoc 'đ' nen "dong" se khong khop "đồng" neu de FTS tu tach.
+            Execute(connection, transaction, """
+                CREATE TABLE memories (
+                  id TEXT PRIMARY KEY,
+                  scope TEXT NOT NULL,
+                  scope_key TEXT,
+                  text TEXT NOT NULL,
+                  hash TEXT NOT NULL,
+                  category TEXT,
+                  entities_json TEXT,
+                  expires_at TEXT,
+                  source TEXT NOT NULL,
+                  confidence REAL,
+                  pinned INTEGER DEFAULT 0,
+                  hits INTEGER DEFAULT 0, last_used_at TEXT,
+                  created_at TEXT, updated_at TEXT, deleted_at TEXT,
+                  created_run_id TEXT);
+                CREATE INDEX ix_memories_scope ON memories(scope, scope_key) WHERE deleted_at IS NULL;
+                CREATE INDEX ix_memories_hash ON memories(scope, scope_key, hash) WHERE deleted_at IS NULL;
+                CREATE VIRTUAL TABLE memories_fts USING fts5(text, tokenize = 'unicode61 remove_diacritics 2');
+
+                CREATE TABLE memory_links (
+                  memory_id TEXT NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
+                  linked_memory_id TEXT NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
+                  created_at TEXT, PRIMARY KEY (memory_id, linked_memory_id));
+
+                CREATE TABLE memory_history (
+                  id INTEGER PRIMARY KEY, memory_id TEXT, event TEXT,
+                  old_text TEXT, new_text TEXT, actor TEXT,
+                  run_id TEXT, reason TEXT, created_at TEXT);
+                CREATE INDEX ix_memory_history_memory ON memory_history(memory_id, id);
+
+                CREATE TABLE memory_embeddings (
+                  memory_id TEXT PRIMARY KEY REFERENCES memories(id) ON DELETE CASCADE,
+                  model TEXT, dim INTEGER, vector BLOB,
+                  text_hash TEXT, created_at TEXT);
                 """);
         }
 

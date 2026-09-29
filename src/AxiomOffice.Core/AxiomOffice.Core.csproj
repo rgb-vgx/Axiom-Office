@@ -16,5 +16,9 @@
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.12" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Prompt cua memory extractor nhung trong exe (New_arch.md muc 8.5.5). -->
+    <EmbeddedResource Include="Memory\Prompts\*.txt" LogicalName="AxiomOffice.Core.Memory.Prompts.%(Filename)%(Extension)" />
+  </ItemGroup>
 
 </Project>

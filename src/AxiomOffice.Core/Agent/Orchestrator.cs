@@ -20,7 +20,8 @@ public sealed class Orchestrator(
     RunStore runs,
     Func<ModelClient> models,
     ContextAssembler assembler,
-    SkillIndex? skills = null)
+    SkillIndex? skills = null,
+    MemoryService? memory = null)
 {
     public async Task ExecuteAsync(RunState run, Api.RunRequest request, CancellationToken cancel)
     {
@@ -104,6 +105,16 @@ public sealed class Orchestrator(
                 tools.Add(new ReadSkillFileTool(skills, appKind));
             }
 
+            // Memory dai han (giai doan 3, muc 8.5): tai lieu chua luu (khong co duong dan) -> khong co memory tai lieu.
+            string? memoryDocumentKey = documentKey != null && documentKey.Contains('\\') ? documentKey : null;
+            MemoryContext memoryContext = MemoryContext.Empty;
+            if (memory is { Enabled: true })
+            {
+                memoryContext = await memory.ContextAsync(request.Prompt, memoryDocumentKey, cancel).ConfigureAwait(false);
+                tools.Add(new RememberTool(memory, memoryDocumentKey));
+                tools.Add(new RecallTool(memory, memoryDocumentKey));
+            }
+
             var registry = new ToolRegistry(tools);
             var modelTools = registry.All
                 .Select(t => new ModelTool(t.Name, t.Description, t.ParametersSchema))
@@ -112,7 +123,7 @@ public sealed class Orchestrator(
             string systemPrompt = PromptBuilder.Build(
                 appKind, session, request.Document,
                 skills: appSkills.Select(s => new SkillSummary(s.Name, s.Description)).ToList(),
-                memories: [], context.Summary, context.RecentActionLines);
+                memories: memoryContext.Lines, context.Summary, context.RecentActionLines);
 
             var runContext = new RunContext
             {
@@ -225,7 +236,26 @@ public sealed class Orchestrator(
             }
 
             runs.Finish(run.Id, run.Status, run.Rounds, run.InputTokens, run.OutputTokens, run.Error);
-            await MaybeSummarizeAsync(model, conversation, userSeq, cancel).ConfigureAwait(false);
+            if (memory != null)
+            {
+                memory.TouchHits(memoryContext.Ids);
+                if (result.Ok)
+                {
+                    memory.QueueExtraction(new ExtractionJob(run.Id, conversation.Id, request.Prompt, result.Text ?? "", memoryDocumentKey));
+                }
+                else
+                {
+                    runs.SetMemoryStatus(run.Id, "skipped");
+                }
+
+                // Tom tat hoi thoai o hang doi nen (muc 8.5.9): khong bat pane cho sau khi run xong.
+                ConversationRow summarizeTarget = conversation;
+                memory.Enqueue(ct => MaybeSummarizeAsync(model, summarizeTarget, userSeq, ct));
+            }
+            else
+            {
+                await MaybeSummarizeAsync(model, conversation, userSeq, cancel).ConfigureAwait(false);
+            }
         }
         catch (Exception ex)
         {
