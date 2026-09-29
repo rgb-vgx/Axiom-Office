@@ -7,13 +7,17 @@ Chỉ chạy trên app do chính script mở: nếu port đã có bridge của a
                                             [--record golden.json | --compare golden.json]
 
 --record/--compare: ghi / so kết quả từng lệnh (đã bỏ phần thay đổi giữa các lần chạy như
-đường dẫn thư mục tạm) để chứng minh refactor không đổi hành vi. Chỉ dùng thư viện chuẩn.
+đường dẫn thư mục tạm) để chứng minh refactor không đổi hành vi.
+--ai: chạy ai.ask (gọi LLM thật) trên từng app: xong việc, không tự lưu/xuất file.
+Luôn kiểm tra (không cần Office): tool office_action của agent từ chối lệnh ngoài danh sách.
+Chỉ dùng thư viện chuẩn.
 """
 from __future__ import annotations
 
 import argparse
 import json
 import os
+import re
 import shutil
 import struct
 import subprocess
@@ -27,6 +31,7 @@ import zlib
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 HOST_EXE = os.path.join(ROOT, "src", "AxiomOffice", "bin", "Release", "AxiomOffice.Host.exe")
+ADDIN_DLL = os.path.join(ROOT, "src", "AxiomOffice", "bin", "Release", "AxiomOffice.dll")
 OFFICE = {"word": (47831, "winword.exe", ["/q", "/w"]), "excel": (47832, "excel.exe", ["/x"]), "ppt": (47833, "powerpnt.exe", [])}
 WPS_EXE = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Kingsoft", "WPS Office")
 WPS = {"word": (47821, "wps", ["/wps"]), "excel": (47822, "wps", ["/et"]), "ppt": (47823, "wps", ["/wpp"])}
@@ -63,14 +68,31 @@ class Bridge:
         self.label = label
         self.headers = {"X-Auth-Token": token(), "Content-Type": "application/json; charset=utf-8"}
 
-    def cmd(self, action, params=None, expect_ok=True, key=None, timeout=90):
+    def cmd(self, action, params=None, expect_ok=True, key=None, timeout=90, record=True):
         TESTED.add(action)
         status, reply = http(self.port, "POST", "/cmd", {"action": action, "params": params or {}}, self.headers, timeout)
         ok = status == 200 and isinstance(reply, dict) and reply.get("ok") is expect_ok
         name = "%s %s%s" % (self.label, action, "" if expect_ok else " (lỗi mong đợi)")
         check(ok, name, json.dumps(reply, ensure_ascii=False))
-        RECORD["%s|%s" % (self.label, key or action)] = normalize(reply, self.out)
+        if record:
+            RECORD["%s|%s" % (self.label, key or action)] = normalize(reply, self.out)
         return (reply or {}).get("result") if expect_ok else (reply or {}).get("error")
+
+    def ask(self, prompt, document_key):
+        """ai.ask thật (không ghi golden): xong việc, không tự lưu/xuất file, tài liệu còn ở trạng thái chưa lưu."""
+        result = self.cmd("ai.ask", {"prompt": prompt}, timeout=330, record=False) or {}
+        transcript = result.get("transcript") or []
+        actions = [a for line in transcript for a in re.findall(r'"action"\s*:\s*"([\w.]+)"', line)]
+        print("     ai.ask (%s rounds): %s" % (result.get("rounds"), ", ".join(actions)))
+        check(result.get("ok") is True, self.label + " ai.ask trả lời xong", result.get("error"))
+        saved = [a for a in actions if a.endswith((".save", ".saveAs", ".exportPdf"))]
+        check(not saved, self.label + " ai.ask không tự lưu/xuất file khi không được yêu cầu", saved)
+        refused = [line for line in transcript if "is not an available action" in line]
+        if refused:
+            print("     office_action từ chối:", refused)
+        info = self.cmd("app.info", record=False) or {}
+        check((info.get(document_key) or {}).get("saved") is False, self.label + " tài liệu vẫn chưa lưu sau ai.ask", info.get(document_key))
+        return actions
 
 
 def normalize(value, out):
@@ -183,12 +205,15 @@ def test_writer(b, out, png, run_ai):
     check(reopened and reopened["name"] == "writer.docx", "Word mở lại file đã lưu", reopened)
     b.cmd("nosuch.action", expect_ok=False, key="unknown action")
     if run_ai:
-        b.cmd("ai.ask", {"prompt": "Thêm một dòng 'Kiểm tra ai.ask' vào cuối tài liệu"}, timeout=330)
+        b.ask("Thêm một dòng 'Kiểm tra ai.ask' vào cuối tài liệu", "activeDocument")
+        text = b.cmd("writer.getText", record=False) or {}
+        check("Kiểm tra ai.ask" in text.get("text", ""), "Word ai.ask thêm được dòng mới", text.get("text", "")[-200:])
+        b.cmd("writer.save", record=False)
 
 
 # ---------------------------------------------------------------- Excel / ET
 
-def test_spreadsheet(b, out):
+def test_spreadsheet(b, out, run_ai):
     b.cmd("app.info", key="app.info (trước khi có tài liệu)")
     b.cmd("et.newWorkbook")
     b.cmd("et.listSheets")
@@ -214,11 +239,17 @@ def test_spreadsheet(b, out):
     b.cmd("et.save")
     b.cmd("et.open", {"path": xlsx})
     b.cmd("et.readRange", {"range": "A1:B2"}, key="et.readRange reopened")
+    if run_ai:
+        b.ask("Ghi chữ 'Tổng' vào ô A5 và công thức tính tổng cột Điểm (B2:B3) vào ô B5", "activeWorkbook")
+        total = b.cmd("et.readRange", {"range": "A5:B5"}, record=False) or {}
+        row = (total.get("values") or [[None, None]])[0]
+        check("tổng" in str(row[0]).lower() and row[1] == 17.5, "Excel ai.ask ghi Tổng = 17.5 vào A5:B5", row)
+        b.cmd("et.save", record=False)
 
 
 # ---------------------------------------------------------------- PowerPoint / WPP
 
-def test_presentation(b, out, png):
+def test_presentation(b, out, png, run_ai):
     b.cmd("app.info", key="app.info (trước khi có tài liệu)")
     b.cmd("wpp.newPresentation")
     b.cmd("wpp.addSlide", {"layout": 1})
@@ -242,6 +273,12 @@ def test_presentation(b, out, png):
     b.cmd("wpp.save")
     b.cmd("wpp.open", {"path": pptx})
     b.cmd("wpp.listSlides", key="wpp.listSlides reopened")
+    if run_ai:
+        b.ask("Thêm một slide mới ở cuối với tiêu đề 'Kết luận'", "activePresentation")
+        slides = b.cmd("wpp.listSlides", record=False) or {}
+        last = (slides.get("slides") or [{}])[-1].get("shapeTexts", [])
+        check(slides.get("slideCount") == 3 and any("Kết luận" in t for t in last), "PowerPoint ai.ask thêm slide 'Kết luận'", slides)
+        b.cmd("wpp.save", record=False)
 
 
 def test_http(port, label):
@@ -257,6 +294,36 @@ def test_http(port, label):
     check(status == 200 and reply["result"]["port"] == port, label + " /session", reply)
     status, reply = http(port, "GET", "/config", headers={"X-Auth-Token": token()})
     check(status == 200 and "apiKey" in reply["result"], label + " /config (key đã che)", reply)
+
+
+AGENT_TOOL_PS = r"""
+[Console]::OutputEncoding = [Text.Encoding]::UTF8
+$tool = [Reflection.Assembly]::LoadFrom('%s').GetType('AxiomOffice.Ai.OfficeActionTool', $true)
+$flags = [Reflection.BindingFlags]'Static,Public,NonPublic'
+$out = @{}
+foreach ($action in 'writer.closeAll', 'ai.ask', 'nosuch.action') {
+    $out[$action] = $tool.GetMethod('Execute', $flags).Invoke($null, @($null, 'office_action', ('{"action":"' + $action + '"}')))
+}
+foreach ($kind in 'wps', 'et', 'wpp') {
+    $def = $tool.GetMethod('Definition', $flags).Invoke($null, @($kind))
+    $out['definition:' + $kind] = $def.GetType().GetField('Description').GetValue($def)
+}
+$out | ConvertTo-Json -Compress
+"""
+
+
+def test_agent_tool():
+    """Tool office_action của agent (không cần Office): chỉ nhận lệnh có trong mô tả tool."""
+    output = subprocess.run(["powershell", "-NoProfile", "-Command", AGENT_TOOL_PS % ADDIN_DLL],
+                            capture_output=True, text=True, encoding="utf-8", timeout=60).stdout
+    data = json.loads(output)
+    for action in ("writer.closeAll", "ai.ask", "nosuch.action"):
+        reply = json.loads(data[action])
+        check(reply["ok"] is False and "not an available action" in reply["error"], "office_action từ chối " + action, reply)
+    writer = data["definition:wps"]
+    check("writer.typeText {text}" in writer and "writer.appendText {text}" in writer, "office_action (Writer) có typeText/appendText", writer)
+    listed = " ".join(data["definition:" + kind] for kind in ("wps", "et", "wpp"))
+    check("writer.closeAll" not in listed and "ai.ask {" not in listed, "office_action không liệt kê writer.closeAll / ai.ask", listed)
 
 
 def registered_actions():
@@ -282,6 +349,7 @@ def main():
     shutil.rmtree(out, ignore_errors=True)
     os.makedirs(out)
     png = tiny_png(os.path.join(out, "logo.png"))
+    test_agent_tool()
     family = "wps" if args.wps else "office"
     started = []
     try:
@@ -295,9 +363,9 @@ def main():
             if app == "word":
                 test_writer(bridge, out, png, args.ai)
             elif app == "excel":
-                test_spreadsheet(bridge, out)
+                test_spreadsheet(bridge, out, args.ai)
             else:
-                test_presentation(bridge, out, png)
+                test_presentation(bridge, out, png, args.ai)
     finally:
         if not args.keep:
             for pid in started:

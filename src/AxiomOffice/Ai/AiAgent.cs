@@ -33,6 +33,7 @@ namespace AxiomOffice.Ai
                 "You are an AI assistant embedded inside " + appName + ", working on the document that is currently open. " +
                 "Use the office_action tool for EVERY document change so the user sees it happen live on screen, and also for reading the document when needed (for example read the open file before answering questions about it). " +
                 "Prefer a few well-chosen actions over many tiny ones. Write all generated content (letters, reports, slide contents, tables) in the user's language. " +
+                "Do not save the file (save, saveAs) or export it (exportPdf) unless the user explicitly asks for it: your changes are already visible in the open document and the user decides when and where to save. " +
                 "After finishing, reply with a very short summary (1-2 sentences). Never invent tool results.";
 
             var tools = new List<LlmToolDef> { OfficeActionTool.Definition(kind) };

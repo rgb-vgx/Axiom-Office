@@ -87,8 +87,9 @@ cùng API cho Office và WPS; host không hỗ trợ thì mở cửa sổ nổi)
    bình"*, *"Tạo 5 slide giới thiệu công ty"*) hoặc bấm một gợi ý → **Ask**. Enter gửi,
    Shift+Enter xuống dòng.
 2. Agent gọi LLM với **tool-calling** và tự thực thi lệnh `writer.*` / `et.*` / `wpp.*` lên tài
-   liệu đang mở. Mỗi thao tác hiện thành một dòng: dấu tick xanh / x đỏ, nhãn tiếng Việt và mã
-   action.
+   liệu đang mở — chỉ các lệnh có dấu ✓ ở cột **Ask AI** trong [bảng lệnh](#danh-sách-lệnh-post-cmd);
+   lệnh khác (vd `writer.closeAll`, `ai.ask`) bị từ chối. Mỗi thao tác hiện thành một dòng: dấu tick
+   xanh / x đỏ, nhãn tiếng Việt và mã action.
 3. Xong thì AI trả lời ngắn. Với Word: mỗi thao tác của AI = **1 bước Ctrl+Z**; link **Chèn trả
    lời** chèn câu trả lời vào tài liệu.
 
@@ -97,6 +98,8 @@ Hành vi:
 - **Không giới hạn số vòng** gọi model/tool. Lượt chạy dừng khi AI trả lời xong, khi bấm
   **Dừng** (hủy ngay request đang chờ) hoặc khi chạm trần **5 phút** (`LlmClient.AgentTimeoutMs`);
   mỗi request LLM tối đa 60s.
+- Agent **không tự lưu / lưu thành / xuất PDF** nếu người dùng không yêu cầu: thay đổi đã hiện
+  trong tài liệu đang mở, người dùng tự quyết khi nào lưu và lưu ở đâu.
 - **Mỗi lần Ask là một phiên mới**, agent không nhớ lượt trước. Muốn "làm tiếp" thì mô tả phần
   còn lại; agent tự đọc tài liệu để biết đã có gì.
 - Lỗi hiện thành thẻ có **Thử lại** / **Mở Cài đặt**. Chưa cấu hình endpoint/model thì ô nhập bị
@@ -196,60 +199,61 @@ print(json.load(urllib.request.urlopen(request)))
 
 `values` (bảng, vùng ô) luôn là **mảng 2 chiều theo dòng**, ví dụ `[["Tên","Điểm"],["An",9.5]]`.
 Sai dạng hoặc thiếu thì lệnh trả lỗi kèm ví dụ (không âm thầm bỏ qua). Tham số `slide` của
-lệnh `wpp.*` bỏ trống = slide cuối. `?` = tham số tuỳ chọn.
+lệnh `wpp.*` bỏ trống = slide cuối. `?` = tham số tuỳ chọn. Cột **Ask AI**: ✓ = agent trong
+task pane (và `ai.ask`) được dùng lệnh này; HTTP API và MCP gọi được mọi lệnh.
 
 Bảng dưới sinh từ registry lệnh bằng `AxiomOffice.Host.exe commands --markdown` (`--json` cho
 công cụ); lệnh khai báo cạnh handler trong `src/AxiomOffice/Bridge/CommandDispatcher.*.cs`.
 
-| Action | Params | Mô tả |
-|---|---|---|
-| `app.info` | — | Tên/version app, tài liệu đang mở, `state` (tài liệu, cửa sổ, visible) |
-| `ai.ask` | `prompt` | Chạy AI agent trên tài liệu đang mở; trả `reply`, `transcript`, `seconds`, `rounds` |
-| `ui.askpane` | — | Mở task pane Ask AI |
-| `writer.newDocument` | — | Tạo tài liệu mới |
-| `writer.open` | `path` | Mở .docx/.doc |
-| `writer.getText` | `maxChars?` | Đọc toàn bộ text |
-| `writer.selection` | — | Text + vị trí đang chọn |
-| `writer.typeText` | `text` | Gõ tại con trỏ |
-| `writer.appendText` | `text` | Nối vào cuối tài liệu |
-| `writer.insertStyledText` | `text`, `bold?`, `italic?`, `underline?`, `size?`, `color?`, `font?` | Chèn text có định dạng tại con trỏ (`color` dạng `#RRGGBB`) |
-| `writer.heading` | `text?`, `level?`, `break?` | Heading 1-9 (`level`, mặc định 1) + tự xuống dòng (`break`, mặc định true) |
-| `writer.formatSelection` | `bold?`, `italic?`, `underline?`, `size?`, `color?`, `font?`, `alignment?` | Định dạng vùng chọn |
-| `writer.setParagraphAlignment` | `alignment` | Căn đoạn: left/center/right/justify |
-| `writer.insertTable` | `rows?`, `cols?`, `values?`, `style?` | Chèn bảng; `rows`/`cols` tự suy ra/nới theo `values` |
-| `writer.insertPageBreak` | — | Ngắt trang |
-| `writer.insertImage` | `path`, `width?`, `height?` | Chèn ảnh tại con trỏ (kích thước theo point) |
-| `writer.insertHyperlink` | `url`, `text?` | Chèn liên kết |
-| `writer.replaceAll` | `find`, `replace?` | Tìm và thay toàn bộ |
-| `writer.undo` | `count?` | Hoàn tác (mỗi thao tác AI = 1 bước) |
-| `writer.exportPdf` | `path` | Xuất PDF |
-| `writer.save` | — | Lưu |
-| `writer.saveAs` | `path` | Lưu thành file mới |
-| `writer.closeAll` | — | **Đóng mọi tài liệu, không lưu** |
-| `et.newWorkbook` | — | Tạo workbook mới |
-| `et.open` | `path` | Mở .xlsx/.xls/.csv |
-| `et.listSheets` | — | Danh sách sheet + sheet đang active |
-| `et.activateSheet` | `sheet` | Chuyển sheet |
-| `et.readRange` | `range`, `sheet?` | Đọc vùng, ví dụ `A1:C10` |
-| `et.writeRange` | `range`, `values`, `sheet?` | Ghi vùng bắt đầu từ ô trên-trái `range` |
-| `et.formatRange` | `range`, `bold?`, `italic?`, `fontSize?`, `fontColor?`, `fillColor?`, `numFmt?`, `horizontal?`, `wrap?`, `sheet?` | Định dạng vùng (màu dạng `#RRGGBB`, `horizontal` left/center/right) |
-| `et.undo` | `count?` | Hoàn tác |
-| `et.exportPdf` | `path` | Xuất PDF |
-| `et.save` | — | Lưu |
-| `et.saveAs` | `path` | Lưu thành file mới |
-| `wpp.newPresentation` | — | Tạo bản trình chiếu mới |
-| `wpp.open` | `path` | Mở .pptx |
-| `wpp.listSlides` | — | Số slide + text từng slide |
-| `wpp.addSlide` | `layout?` | Thêm slide cuối; `layout` mặc định 12 = trống (1 = tiêu đề, 2 = tiêu đề + nội dung) |
-| `wpp.addText` | `text`, `slide?`, `left?`, `top?`, `width?`, `height?`, `fontSize?`, `bold?`, `color?`, `align?` | Textbox có định dạng (`color` dạng `#RRGGBB`, `align` left/center/right) |
-| `wpp.addTextBox` | `text`, `slide?`, `left?`, `top?`, `width?`, `height?` | Textbox |
-| `wpp.addImage` | `path`, `slide?`, `left?`, `top?`, `width?`, `height?` | Chèn ảnh (kích thước gốc nếu bỏ trống `width`/`height`) |
-| `wpp.addTable` | `rows?`, `cols?`, `values?`, `slide?`, `left?`, `top?`, `width?`, `height?` | Bảng; `rows`/`cols` tự suy ra/nới theo `values` |
-| `wpp.setNotes` | `text`, `slide?` | Ghi chú thuyết trình |
-| `wpp.deleteSlide` | `slide?` | Xoá slide (mặc định slide cuối) |
-| `wpp.exportPdf` | `path` | Xuất PDF |
-| `wpp.save` | — | Lưu |
-| `wpp.saveAs` | `path` | Lưu thành file mới |
+| Action | Params | Mô tả | Ask AI |
+|---|---|---|:-:|
+| `app.info` | — | Tên/version app, tài liệu đang mở, `state` (tài liệu, cửa sổ, visible) |  |
+| `ai.ask` | `prompt` | Chạy AI agent trên tài liệu đang mở; trả `reply`, `transcript`, `seconds`, `rounds` |  |
+| `ui.askpane` | — | Mở task pane Ask AI |  |
+| `writer.newDocument` | — | Tạo tài liệu mới |  |
+| `writer.open` | `path` | Mở .docx/.doc |  |
+| `writer.getText` | `maxChars?` | Đọc toàn bộ text | ✓ |
+| `writer.selection` | — | Text + vị trí đang chọn | ✓ |
+| `writer.typeText` | `text` | Gõ tại con trỏ | ✓ |
+| `writer.appendText` | `text` | Nối vào cuối tài liệu | ✓ |
+| `writer.insertStyledText` | `text`, `bold?`, `italic?`, `underline?`, `size?`, `color?`, `font?` | Chèn text có định dạng tại con trỏ (`color` dạng `#RRGGBB`) | ✓ |
+| `writer.heading` | `text?`, `level?`, `break?` | Heading 1-9 (`level`, mặc định 1) + tự xuống dòng (`break`, mặc định true) | ✓ |
+| `writer.formatSelection` | `bold?`, `italic?`, `underline?`, `size?`, `color?`, `font?`, `alignment?` | Định dạng vùng chọn | ✓ |
+| `writer.setParagraphAlignment` | `alignment` | Căn đoạn: left/center/right/justify | ✓ |
+| `writer.insertTable` | `rows?`, `cols?`, `values?`, `style?` | Chèn bảng; `rows`/`cols` tự suy ra/nới theo `values` | ✓ |
+| `writer.insertPageBreak` | — | Ngắt trang | ✓ |
+| `writer.insertImage` | `path`, `width?`, `height?` | Chèn ảnh tại con trỏ (kích thước theo point) | ✓ |
+| `writer.insertHyperlink` | `url`, `text?` | Chèn liên kết | ✓ |
+| `writer.replaceAll` | `find`, `replace?` | Tìm và thay toàn bộ | ✓ |
+| `writer.undo` | `count?` | Hoàn tác (mỗi thao tác AI = 1 bước) | ✓ |
+| `writer.exportPdf` | `path` | Xuất PDF | ✓ |
+| `writer.save` | — | Lưu | ✓ |
+| `writer.saveAs` | `path` | Lưu thành file mới | ✓ |
+| `writer.closeAll` | — | **Đóng mọi tài liệu, không lưu** |  |
+| `et.newWorkbook` | — | Tạo workbook mới | ✓ |
+| `et.open` | `path` | Mở .xlsx/.xls/.csv |  |
+| `et.listSheets` | — | Danh sách sheet + sheet đang active | ✓ |
+| `et.activateSheet` | `sheet` | Chuyển sheet | ✓ |
+| `et.readRange` | `range`, `sheet?` | Đọc vùng, ví dụ `A1:C10` | ✓ |
+| `et.writeRange` | `range`, `values`, `sheet?` | Ghi vùng bắt đầu từ ô trên-trái `range` | ✓ |
+| `et.formatRange` | `range`, `bold?`, `italic?`, `fontSize?`, `fontColor?`, `fillColor?`, `numFmt?`, `horizontal?`, `wrap?`, `sheet?` | Định dạng vùng (màu dạng `#RRGGBB`, `horizontal` left/center/right) | ✓ |
+| `et.undo` | `count?` | Hoàn tác | ✓ |
+| `et.exportPdf` | `path` | Xuất PDF | ✓ |
+| `et.save` | — | Lưu | ✓ |
+| `et.saveAs` | `path` | Lưu thành file mới | ✓ |
+| `wpp.newPresentation` | — | Tạo bản trình chiếu mới |  |
+| `wpp.open` | `path` | Mở .pptx |  |
+| `wpp.listSlides` | — | Số slide + text từng slide | ✓ |
+| `wpp.addSlide` | `layout?` | Thêm slide cuối; `layout` mặc định 12 = trống (1 = tiêu đề, 2 = tiêu đề + nội dung) | ✓ |
+| `wpp.addText` | `text`, `slide?`, `left?`, `top?`, `width?`, `height?`, `fontSize?`, `bold?`, `color?`, `align?` | Textbox có định dạng (`color` dạng `#RRGGBB`, `align` left/center/right) | ✓ |
+| `wpp.addTextBox` | `text`, `slide?`, `left?`, `top?`, `width?`, `height?` | Textbox |  |
+| `wpp.addImage` | `path`, `slide?`, `left?`, `top?`, `width?`, `height?` | Chèn ảnh (kích thước gốc nếu bỏ trống `width`/`height`) | ✓ |
+| `wpp.addTable` | `rows?`, `cols?`, `values?`, `slide?`, `left?`, `top?`, `width?`, `height?` | Bảng; `rows`/`cols` tự suy ra/nới theo `values` | ✓ |
+| `wpp.setNotes` | `text`, `slide?` | Ghi chú thuyết trình | ✓ |
+| `wpp.deleteSlide` | `slide?` | Xoá slide (mặc định slide cuối) | ✓ |
+| `wpp.exportPdf` | `path` | Xuất PDF | ✓ |
+| `wpp.save` | — | Lưu | ✓ |
+| `wpp.saveAs` | `path` | Lưu thành file mới | ✓ |
 
 Lệnh `writer.*` tự kích hoạt tài liệu có cửa sổ hiển thị nếu `ActiveDocument` là tài liệu ẩn.
 App đang bận (dialog mở, đang gõ trong ô Excel) thì bridge tự thử lại lỗi COM "busy" tối đa 10 lần

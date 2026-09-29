@@ -103,14 +103,15 @@ namespace AxiomOffice.Bridge
         public static string ToMarkdown()
         {
             var text = new StringBuilder();
-            text.Append("| Action | Params | Mô tả |\n");
-            text.Append("|---|---|---|\n");
+            text.Append("| Action | Params | Mô tả | Ask AI |\n");
+            text.Append("|---|---|---|:-:|\n");
             foreach (CommandInfo command in All)
             {
                 string parameters = command.Params.Length == 0
                     ? "—"
                     : string.Join(", ", command.Params.Select(p => "`" + p.Name + (p.Required ? "" : "?") + "`").ToArray());
-                text.Append("| `").Append(command.Name).Append("` | ").Append(parameters).Append(" | ").Append(command.Summary).Append(" |\n");
+                text.Append("| `").Append(command.Name).Append("` | ").Append(parameters).Append(" | ").Append(command.Summary)
+                    .Append(" | ").Append(command.Agent ? "✓" : "").Append(" |\n");
             }
             return text.ToString();
         }

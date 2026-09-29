@@ -60,6 +60,18 @@ namespace AxiomOffice.Ai
                     });
                 }
                 string action = Convert.ToString(actionValue);
+                // Model chỉ được gọi lệnh có trong mô tả tool (ForAgent): chặn lệnh ngoài danh sách như
+                // writer.closeAll (đóng mọi tài liệu, không lưu) hay ai.ask lồng nhau. HTTP/MCP vẫn gọi được mọi lệnh.
+                CommandInfo command = CommandDispatcher.FindCommand(action);
+                if (command == null || !command.Agent)
+                {
+                    Logger.Info("office_action refused: " + action);
+                    return serializer.Serialize(new Dictionary<string, object>
+                    {
+                        { "ok", false },
+                        { "error", "'" + action + "' is not an available action; use one of the actions listed in the office_action tool description" }
+                    });
+                }
                 Dictionary<string, object> parameters = null;
                 object paramsValue;
                 if (arguments.TryGetValue("params", out paramsValue))

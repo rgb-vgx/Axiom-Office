@@ -5,6 +5,18 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed — Ask AI: giới hạn lệnh của agent, không tự lưu file
+- Tool `office_action` từ chối lệnh không có trong mô tả tool (không gắn `ForAgent()`), vd
+  `writer.closeAll` (đóng mọi tài liệu, không lưu) hay `ai.ask` lồng nhau; model nhận lỗi bảo dùng
+  lệnh trong danh sách, log `office_action refused: <action>`. HTTP API / MCP vẫn gọi được mọi lệnh
+- Agent có thêm `writer.typeText` và `writer.appendText` (trước đó phải "nối dòng" bằng
+  `writer.replaceAll` chèn `\n`)
+- System prompt: không `save` / `saveAs` / `exportPdf` nếu người dùng không yêu cầu (trước đó model
+  tự lưu, vd tạo `Documents\Presentation1.pptx`)
+- Bảng lệnh README thêm cột **Ask AI**; `test_live_commands.py --ai` chạy `ai.ask` trên cả 3 app,
+  kiểm tra không tự lưu/xuất và tài liệu còn ở trạng thái chưa lưu; kiểm tra offline (reflection
+  vào DLL) rằng `office_action` từ chối lệnh ngoài danh sách
+
 ### Changed — Dọn nợ kỹ thuật: registry lệnh bridge
 - Mỗi lệnh `POST /cmd` khai báo một lần (`Command(...)`: tên, loại app, handler, mô tả, tham số)
   thay cho 3 nơi phải sửa tay: `switch` của dispatcher, chuỗi lệnh của tool `office_action`, mô tả
