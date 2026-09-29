@@ -42,7 +42,11 @@ public sealed record AgentLoopResult(
 // timeout 60s moi request, tran ca luot, huy cat request dang cho ngay.
 public sealed class ModelClient
 {
-    public const int RequestTimeoutMs = 60_000;
+    // Mac dinh 120s moi request (truoc 60s): model free cham (oc/muse-spark) co luc can hon 60s cho mot luot
+    // tra loi dai; chinh bang LlmRequestTimeoutSeconds / AXIOM_LLM_REQUEST_TIMEOUT. Tran ca luot van la 300s.
+    public const int DefaultRequestTimeoutMs = 120_000;
+
+    public int RequestTimeoutMs { get; init; } = DefaultRequestTimeoutMs;
     public static readonly TimeSpan DefaultDeadline = TimeSpan.FromSeconds(300);
 
     private readonly HttpClient _http;
@@ -125,6 +129,7 @@ public sealed class ModelClient
         turns.Add(new JsonObject { ["role"] = "user", ["content"] = userPrompt });
 
         bool toolsEnabled = tools.Count > 0;
+        bool nudged = false;
         int rounds = 0;
         int inputTokens = 0;
         int outputTokens = 0;
@@ -173,6 +178,16 @@ public sealed class ModelClient
             if (turn.ToolCalls.Count == 0)
             {
                 string? reply = ModelText.StripThoughts(turn.Text);
+                if (string.IsNullOrWhiteSpace(reply) && !nudged)
+                {
+                    // Model free doi khi tra loi rong giua chung (log 30/09, oc/mimo-v2.6-flash-free sau khi nap
+                    // skill): nhac mot lan de no lam tiep hoac tom tat, thay vi hong ca luot da lam duoc mot nua.
+                    nudged = true;
+                    AddTranscript(transcript, callbacks, "(model tra loi rong - nhac lam tiep)");
+                    turns.Add(new JsonObject { ["role"] = "user", ["content"] = EmptyReplyNudge });
+                    continue;
+                }
+
                 if (string.IsNullOrWhiteSpace(reply))
                 {
                     return Done(false, null, "provider returned an empty reply", "provider", rounds, inputTokens, outputTokens, toolsDisabled: !toolsEnabled);
@@ -260,6 +275,9 @@ public sealed class ModelClient
         [TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(4)];
 
     public static readonly TimeSpan MaxRetryAfter = TimeSpan.FromSeconds(10);
+
+    public const string EmptyReplyNudge =
+        "Your last reply was empty. Continue the task with the tools, or if it is already done, reply with a short summary.";
 
     public static bool IsTransient(int status, string? error)
     {

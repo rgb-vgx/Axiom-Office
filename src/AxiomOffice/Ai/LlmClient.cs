@@ -29,7 +29,8 @@ namespace AxiomOffice.Ai
 
     internal static class LlmClient
     {
-        private const int TimeoutMs = 60000;
+        // 120s mỗi request (khớp Core ModelClient.DefaultRequestTimeoutMs): model free chậm có lúc cần hơn 60s.
+        private const int TimeoutMs = 120000;
 
         // Trần thời gian cho cả một lượt agent (mọi vòng LLM + tool). Mỗi request HTTP vẫn có TimeoutMs riêng.
         public const int AgentTimeoutMs = 300000;

@@ -147,5 +147,26 @@ public class ModelRetryTests
         AgentLoopResult none = await Run(Client(empty));
         Assert.False(none.Ok);
         Assert.Contains("empty reply", none.Error);
+        // Nhac dung mot lan roi moi bao loi.
+        Assert.Equal(2, empty.Count);
+    }
+
+    [Fact]
+    public async Task Tra_loi_rong_giua_chung_duoc_nhac_mot_lan_roi_lam_tiep()
+    {
+        int calls = 0;
+        var handler = new ScriptedHandler((_, _) => ++calls switch
+        {
+            1 => ScriptedHandler.Json(ScriptedHandler.OpenAiToolCall("office_action", """{"action":"writer.getText"}""")),
+            2 => ScriptedHandler.Json(ScriptedHandler.OpenAiText("")),
+            _ => ScriptedHandler.Json(ScriptedHandler.OpenAiText("Da soan xong cong van")),
+        });
+
+        AgentLoopResult result = await Run(Client(handler));
+
+        Assert.True(result.Ok, result.Error);
+        Assert.Equal("Da soan xong cong van", result.Text);
+        Assert.Equal(3, handler.Count);
+        Assert.Contains(ModelClient.EmptyReplyNudge, handler.LastBody);
     }
 }

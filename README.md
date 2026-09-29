@@ -52,7 +52,7 @@ Không cần quyền admin, không cần Python. Gói cài ~250 KB.
 |---|---|
 | `AxiomOffice.dll` | COM add-in (`IDTExtensibility2`) nạp vào Word/Excel/PowerPoint và WPS: mở HTTP bridge trong process của app, thêm tab ribbon **Axiom Office**, task pane Ask AI và AI agent |
 | `AxiomOffice.Host.exe` | `mcp [all\|word\|excel\|ppt]`: MCP server stdio · `wps\|et\|wpp\|word\|excel\|ppt`: companion tự tạo app qua COM automation và mở bridge (khi add-in không nạp được) · `commands`: danh sách lệnh bridge · `llm-test`: thử cấu hình AI |
-| `AxiomOffice.Core.exe` | **Agent Core** (theo [New_arch.md](New_arch.md)): process riêng chạy agent cho mọi app, một bản cho mỗi người dùng, chỉ nghe `127.0.0.1:47840`; add-in khởi động khi cần và tìm qua `%LOCALAPPDATA%\AxiomOffice\core.json`. Hiện có: vòng lặp agent (OpenAI-compatible + Anthropic), hội thoại liên tục theo tài liệu, audit tool call, SSE `/v1/runs/{id}/events`, hủy, trần thời gian/token; skill + memory + xác nhận + MCP client ở các giai đoạn sau |
+| `AxiomOffice.Core.exe` | **Agent Core** (theo [New_arch.md](New_arch.md)): process riêng chạy agent cho mọi app, một bản cho mỗi người dùng, chỉ nghe `127.0.0.1:47840`; add-in khởi động khi cần và tìm qua `%LOCALAPPDATA%\AxiomOffice\core.json`. Hiện có: vòng lặp agent (OpenAI-compatible + Anthropic), hội thoại liên tục theo tài liệu, audit tool call, SSE `/v1/runs/{id}/events`, hủy, trần thời gian/token, **skills** (`load_skill`, `read_skill_file`, `/v1/skills`); memory + xác nhận + MCP client ở các giai đoạn sau |
 
 Mỗi app có port riêng; WPS và Microsoft Office dùng hai dải khác nhau nên chạy song song
 được (đổi qua registry, xem [Cấu hình](#cấu-hình)):
@@ -122,6 +122,33 @@ Hành vi:
 - Transcript mỗi lượt nằm trong `bridge.log` (`AskAiPane: prompt=` / `AskAiPane progress:` /
   `AskAiPane: ok ... N tool calls, M rounds` / `AskAiPane failed`), ghi ngay cả khi pane đã đóng.
 - Agent bên ngoài gọi cùng logic qua lệnh bridge `ai.ask`.
+
+### Kỹ năng (skills)
+
+Agent Core nạp **skill theo chuẩn Agent Skills** (thư mục chứa `SKILL.md` có frontmatter `name` +
+`description`; mở rộng tuỳ chọn `apps: [wps|et|wpp]`). Chỉ mục `name: description` của skill hợp app nằm
+sẵn trong prompt; model tự gọi `load_skill` khi yêu cầu khớp (pane hiện dòng **Dùng kỹ năng: …**) và
+`read_skill_file` để đọc `references/`, `tokens.json`… Sửa nhỏ ("in đậm dòng này") không nạp skill.
+
+| Skill dựng sẵn | App | Dùng khi |
+|---|---|---|
+| `thiet-ke-van-phong` | mọi app | tạo mới / làm đẹp tài liệu, bảng, slide |
+| `trinh-bay-chuyen-nghiep` | PowerPoint | thiết kế slide: lưới, cỡ chữ, mật độ |
+| `the-thuc-van-ban` | Word | trình bày báo cáo, tờ trình: heading, bảng, căn lề |
+| `bao-cao-du-lieu` | Excel | bảng số liệu: number format, công thức, hàng tổng |
+| `bao-cao-thang` | PowerPoint | slide báo cáo tháng/quý |
+| `bang-diem` | Excel | bảng điểm, điểm trung bình, xếp loại |
+| `van-ban-hanh-chinh` | Word | công văn, quyết định, tờ trình theo NĐ 30/2020 |
+
+`skills/_design/tokens.json` là **token thiết kế dùng chung** (màu theo ngữ nghĩa, thang chữ, number
+format); skill dùng đúng giá trị trong đó. Sau khi tạo, agent tự **soát cấu trúc** bằng
+`wpp.checkLayout` / `et.checkRange` / `writer.checkTables` (tràn chữ, shape chồng, dữ liệu lạc ô…).
+
+Nguồn skill (trùng tên thì nguồn sau thắng): `skills\` cạnh `AxiomOffice.Core.exe` → thư mục trong
+`SkillDirs` (HKCU, phân cách `;`) → `%LOCALAPPDATA%\AxiomOffice\skills`. Thêm/sửa skill có hiệu lực sau
+~2 giây (theo dõi thư mục) hoặc `POST /v1/skills/reload`; `GET /v1/skills?app=et` liệt kê skill và lỗi
+nạp (skill sai frontmatter bị bỏ qua, không làm hỏng Core). Skill **không chạy script**; chỉ dùng skill từ
+nguồn tin cậy.
 
 Giao diện vẽ bằng GDI+ theo design tokens trong `PaneTheme` (`src/AxiomOffice/Ai/PaneControls.cs`):
 tương phản chữ ≥ 4.5:1, focus ring khi dùng bàn phím, scale theo DPI. Bubble nhận Tab/Ctrl+C
@@ -350,6 +377,8 @@ Office không an toàn đa luồng — thiếu cổng này Word từng crash (AV
 | `CorePort` | DWORD | 47840 | Port của Agent Core (bận thì tự thử 47840–47849) |
 | `CoreEnabled` | DWORD | 1 | 0 = pane luôn chạy agent trong add-in, không khởi động Core |
 | `MemoryEnabled` | DWORD | 1 | 0 = không đọc/ghi memory dài hạn (giai đoạn 3 dùng) |
+| `LlmRequestTimeoutSeconds` | DWORD | 120 | Hết giờ mỗi request tới model (Core); tăng nếu model chậm |
+| `SkillDirs` | String | — | Thư mục skill của tổ chức, phân cách `;` (xem [Kỹ năng](#kỹ-năng-skills)) |
 
 Agent Core đọc cùng khoá trên. Biến môi trường `AXIOM_*` (`AXIOM_CORE_DATA_DIR`, `AXIOM_CORE_PORT`,
 `AXIOM_SESSION_DIR`, `AXIOM_TOKEN`, `AXIOM_LLM_*`) ghi đè — dùng cho test, không cần cho người dùng.
@@ -425,6 +454,9 @@ dotnet test tests\core\AxiomOffice.Core.Tests
 tools\excel-mcp\.venv\Scripts\python.exe tests\core\test_core_e2e.py
 # ... hoặc trên Office thật: tự mở Excel, agent sửa tài liệu thật (cần add-in đã cài)
 tools\excel-mcp\.venv\Scripts\python.exe tests\core\test_core_e2e.py --office
+# ... hoặc với LLM thật trong HKCU (tốn token, không chạy mặc định): model có tự chọn đúng skill không
+#     AXIOM_REAL_LLM_APPS=wps,et,wpp lọc app; AXIOM_REAL_LLM_MODEL=<model> thử model khác cùng endpoint
+tools\excel-mcp\.venv\Scripts\python.exe tests\core\test_core_e2e.py --real-llm
 ```
 
 Test MCP cần venv của `tools/word-mcp`, `tools/excel-mcp`, `tools/ppt-mcp` (python-docx, openpyxl,

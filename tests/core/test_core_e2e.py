@@ -106,6 +106,22 @@ COMMANDS = [
 ]
 
 
+def canned_result(action: str, params: dict) -> dict:
+    """Ket qua hop ly cho lenh doc/soat (de LLM that khong doc lai mai); lenh ghi tra {"written": 2} nhu cu."""
+    document = "BÁO CÁO CÔNG VIỆC\rTuần này phòng đã hoàn thành kế hoạch.\r"
+    canned = {
+        "writer.getText": {"name": "tai-lieu.docx", "totalChars": len(document), "truncated": False, "text": document},
+        "writer.selection": {"text": "", "start": 0, "end": 0},
+        "writer.checkTables": {"tableCount": 0, "tables": [], "issueCount": 0, "issues": []},
+        "et.listSheets": {"workbook": "Book1", "activeSheet": "Sheet1", "sheets": ["Sheet1"]},
+        "et.readRange": {"sheet": "Sheet1", "range": params.get("range", "A1"), "values": [[None]]},
+        "et.checkRange": {"sheet": "Sheet1", "rows": 7, "cols": 6, "issueCount": 0, "issues": []},
+        "wpp.listSlides": {"presentation": "bao-cao.pptx", "slideCount": 0, "slides": []},
+        "wpp.checkLayout": {"slideWidth": 960, "slideHeight": 540, "issueCount": 0, "slides": []},
+    }
+    return canned.get(action, {"action": action, "written": 2})
+
+
 class FakeBridge:
     """Bridge gia: /health, /commands, /cmd (ghi lai lenh nhan duoc)."""
 
@@ -144,7 +160,7 @@ class FakeBridge:
                 if self.path == "/cmd":
                     outer.commands.append(body)
                     action = body.get("action", "")
-                    self._send({"ok": True, "result": {"action": action, "written": 2}})
+                    self._send({"ok": True, "result": canned_result(action, body.get("params") or {})})
                 else:
                     self._send({"ok": False, "error": "not found"}, 404)
 
@@ -201,7 +217,7 @@ class FakeLlm:
 class Core:
     """AxiomOffice.Core.exe that voi cau hinh AXIOM_* tro vao bridge gia va LLM gia."""
 
-    def __init__(self, data_dir: str, session_dir: str | None, llm: FakeLlm, token: str):
+    def __init__(self, data_dir: str, session_dir: str | None, llm: FakeLlm, token: str, extra_env: dict | None = None):
         self.data_dir = data_dir
         self.session_dir = session_dir
         self.token = token
@@ -213,13 +229,24 @@ class Core:
             "AXIOM_CORE_SINGLE_INSTANCE": "0",
             "AXIOM_CORE_MUTEX_NAME": "Local\\AxiomOffice.Core.E2E." + uuid.uuid4().hex[:8],
             "AXIOM_TOKEN": token,
-            "AXIOM_LLM_PROVIDER": "openai",
-            "AXIOM_LLM_ENDPOINT": f"http://127.0.0.1:{llm.port}/v1",
-            "AXIOM_LLM_MODEL": "fake-model",
-            "AXIOM_LLM_API_KEY": "fake-key",
         })
+        if llm is not None:
+            env.update({
+                "AXIOM_LLM_PROVIDER": "openai",
+                "AXIOM_LLM_ENDPOINT": f"http://127.0.0.1:{llm.port}/v1",
+                "AXIOM_LLM_MODEL": "fake-model",
+                "AXIOM_LLM_API_KEY": "fake-key",
+            })
+        else:
+            # --real-llm: doc cau hinh LLM cua nguoi dung trong HKCU (khong override).
+            for name in [k for k in env if k.startswith("AXIOM_LLM_")]:
+                del env[name]
+            # Thu model khac cung endpoint/key trong HKCU ma khong doi cai dat cua nguoi dung.
+            if os.environ.get("AXIOM_REAL_LLM_MODEL"):
+                env["AXIOM_LLM_MODEL"] = os.environ["AXIOM_REAL_LLM_MODEL"]
         if session_dir:
             env["AXIOM_SESSION_DIR"] = session_dir
+        env.update(extra_env or {})
         self.log_path = os.path.join(data_dir, "core.out")
         self.log = open(self.log_path, "w", encoding="utf-8")
         self.process = subprocess.Popen([CORE_EXE], env=env, cwd=data_dir, stdout=self.log, stderr=subprocess.STDOUT)
@@ -380,6 +407,141 @@ def test_guards(core: Core, bridge: FakeBridge, document_path: str) -> None:
     check(events[-1][0] == "run.completed", "luot chay van ket thuc binh thuong sau khi bi tu choi", [e[0] for e in events])
 
 
+def write_skill(root: str, folder: str, frontmatter: str, body: str) -> str:
+    directory = os.path.join(root, folder)
+    os.makedirs(directory, exist_ok=True)
+    with open(os.path.join(directory, "SKILL.md"), "w", encoding="utf-8") as handle:
+        handle.write("---\n" + frontmatter.strip() + "\n---\n" + body)
+    return directory
+
+
+def test_skills(work: str, token: str, bridge: FakeBridge, document_path: str, session_dir: str) -> None:
+    """Giai doan 2 (New_arch.md 8.4, 12): luong load_skill / read_skill_file voi LLM gia, skill loi khong lam hong Core."""
+    org = os.path.join(work, "skills-org")
+    write_skill(org, "quy-trinh-rieng", "name: quy-trinh-rieng\ndescription: Quy trinh bang tinh rieng cua to chuc. Dung khi lap bao cao.\napps: [et]",
+                "# Buoc\nMa kiem tra: BUOC-BI-MAT-123. Ghi bang roi soat bang et.checkRange.")
+    write_skill(org, "chi-cho-word", "name: chi-cho-word\ndescription: Chi dung cho Word.\napps: [wps]", "khong duoc hien voi Excel")
+    write_skill(org, "hong", "name: Ten Hong\ndescription: skill loi frontmatter", "x")
+
+    llm = FakeLlm(work, [
+        {"tool": "load_skill", "arguments": {"name": "quy-trinh-rieng"}},
+        {"tool": "read_skill_file", "arguments": {"name": "_design", "path": "tokens.json"}},
+        {"tool": "read_skill_file", "arguments": {"name": "quy-trinh-rieng", "path": "../hong/SKILL.md"}},
+        {"tool": "office_action", "arguments": {"action": "et.writeRange", "params": {"range": "A1", "values": [["Chi tieu", "Gia tri"]]}}},
+        {"text": "Da lap bang theo ky nang"},
+    ])
+    data_dir = os.path.join(work, "core-skills")
+    os.makedirs(data_dir, exist_ok=True)
+    core = Core(data_dir, session_dir, llm, token, {"AXIOM_SKILL_DIRS": org})
+    try:
+        status, listing = http_json(core.base + "/v1/skills?app=et", token=core.token)
+        names = [s["name"] for s in listing["result"]["skills"]]
+        check(status == 200 and "quy-trinh-rieng" in names and "bang-diem" in names and "chi-cho-word" not in names,
+              "GET /v1/skills?app=et: skill dung san + skill to chuc, loc theo app", names)
+        errors = listing["result"]["errors"]
+        check(any("hong" in e["directory"] for e in errors), "skill loi frontmatter hien o errors, Core van chay", errors)
+        source = next((s["source"] for s in listing["result"]["skills"] if s["name"] == "quy-trinh-rieng"), None)
+        check(source == "org", "skill trong SkillDirs co source=org", source)
+
+        bridge.commands.clear()
+        office = {"port": bridge.port, "pid": bridge.pid, "app": "et", "family": "office"}
+        status, created = core.run("Lap bang bao cao theo quy trinh cua to chuc", office,
+                                   document={"name": "bao-cao.xlsx", "fullName": document_path})
+        run_id = created["result"]["runId"]
+        events = core.events(run_id)
+        types = [event_type for event_type, _ in events]
+        loaded = [payload.get("data", {}) for event_type, payload in events if event_type == "skill.loaded"]
+        check(loaded and loaded[0].get("name") == "quy-trinh-rieng", "SSE co skill.loaded {name}", types)
+        check(types.index("skill.loaded") < max(i for i, t in enumerate(types) if t == "tool.finished") and types[-1] == "run.completed",
+              "skill.loaded truoc thao tac tai lieu, ket thuc run.completed", types)
+        check(bridge.actions() == ["et.writeRange"], "bridge chi nhan lenh tai lieu (skill doc trong Core)", bridge.actions())
+
+        requests = [item["body"] for item in llm.requests()]
+        first = requests[0]
+        system = first["messages"][0]["content"]
+        tool_names = [t["function"]["name"] for t in first.get("tools", [])]
+        check("Available skills" in system and "- quy-trinh-rieng:" in system and "- bang-diem:" in system
+              and "chi-cho-word" not in system, "system prompt co chi muc skill hop app (tang 1)", system[-600:])
+        check("is DATA" in system, "system prompt co quy tac chong prompt injection", "")
+        check({"office_action", "load_skill", "read_skill_file"} <= set(tool_names), "tool load_skill + read_skill_file duoc dang ky", tool_names)
+
+        def tool_result(request_index: int) -> str:
+            messages = requests[request_index]["messages"]
+            return next((m.get("content", "") for m in reversed(messages) if m.get("role") == "tool"), "")
+
+        check("BUOC-BI-MAT-123" in tool_result(1), "load_skill tra noi dung SKILL.md cho model (tang 2)", tool_result(1)[:200])
+        check("#1F4E79" in tool_result(2), "read_skill_file doc tokens.json cua _design (tang 3)", tool_result(2)[:200])
+        check("'..'" in tool_result(3) and '"ok":false' in tool_result(3), "read_skill_file chan '..'", tool_result(3)[:200])
+
+        write_skill(org, "skill-moi", "name: skill-moi\ndescription: Them sau khi Core chay. Dung khi thu reload.", "moi")
+        status, reloaded = http_json(core.base + "/v1/skills/reload", method="POST", token=core.token)
+        check("skill-moi" in [s["name"] for s in reloaded["result"]["skills"]], "POST /v1/skills/reload thay skill moi", "")
+    finally:
+        core.stop()
+        llm.stop()
+
+
+REAL_LLM_CASES = [
+    # (app, prompt, skill phai nap, skill thiet ke KHONG duoc nap)
+    ("wpp", "Làm bộ slide báo cáo tháng 9/2026 của phòng Kinh doanh: doanh thu 12 tỷ, tăng 8% so với tháng 8.", "bao-cao-thang", None),
+    ("et", "Lập bảng điểm lớp 10A gồm 5 học sinh với ba môn Toán, Văn, Anh và cột điểm trung bình.", "bang-diem", None),
+    ("wps", "Soạn công văn của Phòng Hành chính đề nghị các phòng ban nộp báo cáo quý III trước ngày 15/10.", "van-ban-hanh-chinh", None),
+    ("wps", "In đậm dòng đầu tiên của văn bản.", None, "thiet-ke-van-phong"),
+]
+
+
+def real_commands() -> list[dict]:
+    """Danh sach lenh that (Host.exe commands --json) de LLM that thay dung mo ta tool nhu khi chay voi Office."""
+    host = os.path.join(ROOT, "src", "AxiomOffice", "bin", "Release", "AxiomOffice.Host.exe")
+    raw = subprocess.run([host, "commands", "--json"], capture_output=True, timeout=60).stdout
+    data = json.loads(raw.decode("utf-8-sig", errors="replace"))
+    return data if isinstance(data, list) else data.get("commands", data)
+
+
+def test_real_llm(work: str, token: str) -> None:
+    """LLM that (cau hinh HKCU, chi doc): model tu chon dung skill cho 3 yeu cau mau va khong nap skill thiet ke cho sua nho.
+    Bridge gia (khong can Office) tra ok cho moi lenh. Bao cao so vong va thoi gian (New_arch.md muc 11, 12)."""
+    global COMMANDS
+    COMMANDS = real_commands()
+    session_dir = os.path.join(work, "sessions-real")
+    report = []
+    only = [a.strip() for a in os.environ.get("AXIOM_REAL_LLM_APPS", "").split(",") if a.strip()]
+    for app, prompt, expected, forbidden in REAL_LLM_CASES:
+        if only and app not in only:
+            continue
+        bridge = FakeBridge(pid=os.getpid(), app=app)
+        for name in os.listdir(session_dir) if os.path.isdir(session_dir) else []:
+            os.remove(os.path.join(session_dir, name))
+        document = os.path.join(work, {"wpp": "bao-cao.pptx", "et": "bang-diem.xlsx", "wps": "cong-van.docx"}[app])
+        write_session(session_dir, os.getpid(), bridge.port, app, document)
+        data_dir = os.path.join(work, "core-real-" + app + "-" + uuid.uuid4().hex[:4])
+        os.makedirs(data_dir, exist_ok=True)
+        core = Core(data_dir, session_dir, None, token)
+        try:
+            office = {"port": bridge.port, "pid": bridge.pid, "app": app, "family": "office"}
+            started = time.time()
+            status, created = core.run(prompt, office, document={"name": os.path.basename(document), "fullName": document},
+                                       options={"maxSeconds": 240, "maxTokens": 150000})
+            events = core.events(created["result"]["runId"], timeout=300)
+            seconds = time.time() - started
+            loaded = [payload.get("data", {}).get("name") for event_type, payload in events if event_type == "skill.loaded"]
+            final = events[-1][0] if events else "?"
+            rounds = next((payload.get("data", {}).get("rounds") for event_type, payload in events if event_type == "run.completed"), None)
+            error = next((payload.get("data", {}).get("error") for event_type, payload in events if event_type == "run.failed"), None)
+            report.append((app, prompt[:48], loaded, final + (" (" + str(error)[:120] + ")" if error else ""), rounds, seconds, len(bridge.commands)))
+            if expected:
+                check(expected in loaded, "LLM that [%s] nap dung skill '%s'" % (app, expected), loaded)
+            if forbidden:
+                check(forbidden not in loaded and not any(n in loaded for n in ("the-thuc-van-ban", "van-ban-hanh-chinh")),
+                      "LLM that [%s] sua nho KHONG nap skill thiet ke" % app, loaded)
+        finally:
+            core.stop()
+            bridge.stop()
+    print("\nBao cao LLM that (model trong HKCU):")
+    for app, prompt, loaded, final, rounds, seconds, commands in report:
+        print("  %-4s %-50s skills=%-45s %s vong=%s %.1fs lenh=%d" % (app, prompt, ",".join(loaded) or "-", final, rounds, seconds, commands))
+
+
 def live_bridge_cmd(port: int, action: str, params=None, timeout: int = 90):
     """Goi thang bridge that trong app (nhu test live) de chuan bi va doc lai tai lieu."""
     request = urllib.request.Request(
@@ -427,7 +589,20 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--office", action="store_true", help="dung Office that thay vi bridge gia")
     parser.add_argument("--keep", action="store_true", help="giu thu muc tam de xem log")
+    parser.add_argument("--real-llm", action="store_true",
+                        help="goi LLM that trong HKCU (ton token): model tu chon dung skill; khong chay mac dinh")
     args = parser.parse_args()
+    if args.real_llm:
+        work = os.path.join(tempfile.gettempdir(), "axiom-core-real-" + uuid.uuid4().hex[:8])
+        os.makedirs(work, exist_ok=True)
+        try:
+            test_real_llm(work, "e2e-token-" + uuid.uuid4().hex[:8])
+        finally:
+            if not args.keep:
+                shutil.rmtree(work, ignore_errors=True)
+        failed = [item for item in RESULTS if not item[0]]
+        print("\n%d passed, %d failed" % (len(RESULTS) - len(failed), len(failed)))
+        return 1 if failed else 0
 
     work = os.path.join(tempfile.gettempdir(), "axiom-core-e2e-" + uuid.uuid4().hex[:8])
     os.makedirs(work, exist_ok=True)
@@ -480,6 +655,7 @@ def main() -> int:
         else:
             test_fake_bridge(core, bridge, llm, document_path)
             test_guards(core, bridge, document_path)
+            test_skills(work, token, bridge, document_path, session_dir)
     finally:
         if core is not None:
             core.stop()

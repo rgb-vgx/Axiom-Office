@@ -15,7 +15,7 @@ public sealed class ModelSource(HttpClient http, Func<CoreConfig> load)
     public ModelClient Current()
     {
         CoreConfig config = load();
-        string signature = string.Join("\n", config.LlmProvider, config.LlmEndpoint, config.LlmModel, config.LlmApiKey);
+        string signature = string.Join("\n", config.LlmProvider, config.LlmEndpoint, config.LlmModel, config.LlmApiKey, config.LlmRequestTimeoutSeconds);
         lock (_gate)
         {
             if (_current == null || signature != _signature)
@@ -25,7 +25,10 @@ public sealed class ModelSource(HttpClient http, Func<CoreConfig> load)
                     CoreLog.Info($"LLM config changed: provider={config.LlmProvider} model={config.LlmModel}");
                 }
 
-                _current = new ModelClient(http, config.LlmProvider, config.LlmEndpoint, config.LlmApiKey, config.LlmModel);
+                _current = new ModelClient(http, config.LlmProvider, config.LlmEndpoint, config.LlmApiKey, config.LlmModel)
+                {
+                    RequestTimeoutMs = config.LlmRequestTimeoutSeconds > 0 ? config.LlmRequestTimeoutSeconds * 1000 : ModelClient.DefaultRequestTimeoutMs,
+                };
                 _signature = signature;
             }
 

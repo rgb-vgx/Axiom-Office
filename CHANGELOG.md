@@ -5,6 +5,33 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Agent Core giai đoạn 2: Skills (New_arch.md mục 8.4)
+- **Skill theo chuẩn Agent Skills**: `Skills/SkillLoader` (frontmatter `name`/`description` + `apps` tuỳ
+  chọn; validate tên ≤ 64 ký tự `a-z0-9-`, từ cấm `anthropic`/`claude`, mô tả ≤ 1024 không thẻ XML; field
+  lạ bỏ qua), `SkillIndex` (3 nguồn: `skills\` cạnh exe → `SkillDirs` → `%LOCALAPPDATA%\AxiomOffice\skills`,
+  nguồn sau thắng; thư mục `_*` là gói tài nguyên; FileSystemWatcher debounce 2s). Skill lỗi hiện ở
+  `GET /v1/skills`, không làm hỏng Core
+- Tool `load_skill` (tầng 2, phát SSE `skill.loaded`) và `read_skill_file` (tầng 3: text ≤ 64KB, file nhị
+  phân → đường dẫn tuyệt đối; chặn `..`, đường dẫn tuyệt đối, symlink/junction ra ngoài; chỉ `.md .txt
+  .json .csv .docx .xlsx .pptx .png .jpg`). Chỉ mục skill hợp app vào system prompt (tầng 1)
+- `GET /v1/skills?app=`, `POST /v1/skills/reload`
+- **Tầng thiết kế**: `skills/_design/tokens.json` + `thiet-ke-van-phong`, `trinh-bay-chuyen-nghiep`,
+  `the-thuc-van-ban`, `bao-cao-du-lieu`; **tầng triển khai**: `bao-cao-thang` (PowerPoint), `bang-diem`
+  (Excel), `van-ban-hanh-chinh` (Word, kèm `references/the-thuc.md` theo NĐ 30/2020)
+- **QA cấu trúc** (lệnh bridge chỉ đọc, agent dùng được): `wpp.checkLayout` (chữ tràn khung, ra ngoài
+  slide, shape chồng, chữ < 12pt, slide quá nhiều chữ), `et.checkRange` (tiêu đề trống, kiểu lẫn lộn, số
+  dạng chữ, số lẻ chưa number format, ô lỗi, dữ liệu lạc ngoài bảng), `writer.checkTables` (ô trống, ô
+  tiêu đề lẫn đoạn văn). `writer.formatTable` thêm `borders: false` (bảng dàn trang)
+- Pane hiện dòng **Dùng kỹ năng: …**; thao tác `load_skill`/`read_skill_file` không hiện như thao tác tài liệu
+- Test: 19 unit test skill; e2e 13 kiểm tra luồng `load_skill` với LLM giả; `test_core_e2e.py --real-llm`
+  (LLM thật): muse-spark-1.3 chọn đúng `bao-cao-thang` / `bang-diem` / `van-ban-hanh-chinh` cho 3 yêu cầu
+  mẫu và **không nạp skill** cho "in đậm dòng đầu"; test live dựng sẵn ca tràn chữ/chồng shape/dữ liệu lạc ô
+
+### Changed
+- Hết giờ mỗi request tới model: 60s → **120s**, chỉnh được (`LlmRequestTimeoutSeconds` /
+  `AXIOM_LLM_REQUEST_TIMEOUT`): model free (oc/muse-spark) có lượt sinh công văn dài hơn 60s
+- Model trả lời rỗng giữa chừng: Core nhắc **một lần** để làm tiếp/tóm tắt thay vì hỏng cả lượt
+
 ### Fixed — Excel hỏi lưu một sổ lạ / chạy ngầm sau khi đóng
 - Agent không còn gọi được `et.newWorkbook` (giống `writer.newDocument`/`wpp.newPresentation`): log
   30/09 01:15 model tạo thêm Book2 dù Book1 đang mở, người dùng đóng Excel thì bị hỏi lưu một sổ họ

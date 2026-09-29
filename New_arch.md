@@ -984,38 +984,38 @@ README + CHANGELOG + `ARCHITECTURE.MD` khi cần, chạy test, báo cáo kết q
 
 ### Giai đoạn 0: Toolchain và khung
 
-- [ ] Hỏi người dùng rồi cài .NET 10 SDK vào `%LOCALAPPDATA%\Microsoft\dotnet` (5.2).
-- [ ] Tạo `src/AxiomOffice.Core` (Minimal API, `/health`, mutex, `core.json`, `core.log`,
+- [x] Hỏi người dùng rồi cài .NET 10 SDK vào `%LOCALAPPDATA%\Microsoft\dotnet` (5.2).
+- [x] Tạo `src/AxiomOffice.Core` (Minimal API, `/health`, mutex, `core.json`, `core.log`,
       `/v1/admin/shutdown`, cấu hình HKCU + override `AXIOM_*`, Auth + chặn Origin).
-- [ ] `Directory.Packages.props`, `tests/core/AxiomOffice.Core.Tests` (xUnit) chạy được.
-- [ ] Bridge `GET /commands` (7.5) + ca test trong `test_live_commands.py`.
-- [ ] `build.ps1` / `package.ps1` / `install.ps1` / `uninstall.ps1` theo mục 10.
+- [x] `Directory.Packages.props`, `tests/core/AxiomOffice.Core.Tests` (xUnit) chạy được.
+- [x] Bridge `GET /commands` (7.5) + ca test trong `test_live_commands.py`.
+- [x] `build.ps1` / `package.ps1` / `install.ps1` / `uninstall.ps1` theo mục 10.
 - **Xong khi**: `build.ps1` ra 3 file (DLL, Host, Core); Core chạy/thoát êm, không chạy 2 bản;
   `/health` đúng; test cũ pass (golden khớp).
 
 ### Giai đoạn 1: Agent chạy trong Core + hội thoại liên tục
 
-- [ ] Model gateway (port hành vi `LlmClient`, mục 8.2), Tool registry với `office_action` từ
+- [x] Model gateway (port hành vi `LlmClient`, mục 8.2), Tool registry với `office_action` từ
       `/commands` (allowlist), Orchestrator + RunManager + SSE (7.3, 7.4, 8.1).
-- [ ] SQLite: `conversations`, `messages`, `runs`, `tool_calls`; ContextAssembler (ngân sách, tóm tắt).
-- [ ] Add-in: `CoreClient`, pane chạy qua Core, dự phòng in-process, "Cuộc trò chuyện mới", map hội
+- [x] SQLite: `conversations`, `messages`, `runs`, `tool_calls`; ContextAssembler (ngân sách, tóm tắt).
+- [x] Add-in: `CoreClient`, pane chạy qua Core, dự phòng in-process, "Cuộc trò chuyện mới", map hội
       thoại theo tài liệu.
-- [ ] `fake_llm.py`, `test_core_e2e.py` (không Office + `--office`).
+- [x] `fake_llm.py`, `test_core_e2e.py` (không Office + `--office`).
 - **Xong khi**: trên Word/Excel/PowerPoint thật, pane chạy 3 yêu cầu mẫu qua Core (giống các prompt
   trong `test_live_commands.py --ai`); lượt 2 "làm tiếp" dùng được ngữ cảnh lượt 1; tắt Core giữa
   chừng → pane báo lỗi rõ và lần sau dùng dự phòng; Dừng hủy ngay; test cũ + test mới pass.
 
 ### Giai đoạn 2: Skills
 
-- [ ] SkillLoader (validate theo chuẩn 8.4.2, field lạ bỏ qua), SkillIndex, `load_skill`,
+- [x] SkillLoader (validate theo chuẩn 8.4.2, field lạ bỏ qua), SkillIndex, `load_skill`,
       `read_skill_file` (chặn `..`, lọc phần mở rộng), `/v1/skills`, reload + watcher.
-- [ ] Tầng thiết kế (8.4.6): `_design/tokens.json` + `thiet-ke-van-phong`, `trinh-bay-chuyen-nghiep`,
+- [x] Tầng thiết kế (8.4.6): `_design/tokens.json` + `thiet-ke-van-phong`, `trinh-bay-chuyen-nghiep`,
       `the-thuc-van-ban`, `bao-cao-du-lieu`; tầng triển khai: `bao-cao-thang` (PPT), `bang-diem`
       (Excel), `van-ban-hanh-chinh` (Word). Mô tả ngôi ba + từ khoá, `references/` khi cần, thân gọn,
       checklist + vòng đọc-lại; `skills\` vào build và gói.
-- [ ] **QA cấu trúc** (8.4.6, mức rẻ): sau khi tạo slide/bảng, đọc lại soát tràn chữ, shape chồng,
+- [x] **QA cấu trúc** (8.4.6, mức rẻ): sau khi tạo slide/bảng, đọc lại soát tràn chữ, shape chồng,
       số dòng/cột, number format.
-- [ ] Pane hiện `skill.loaded`.
+- [x] Pane hiện `skill.loaded`.
 - **Xong khi**: e2e với fake LLM chứng minh luồng `load_skill`; với LLM thật (thủ công, có báo cáo)
   model tự chọn đúng skill cho 3 yêu cầu mẫu **và không nạp skill thiết kế cho sửa nhỏ**; QA cấu
   trúc phát hiện được ca tràn chữ dựng sẵn; skill lỗi frontmatter không làm hỏng Core.
