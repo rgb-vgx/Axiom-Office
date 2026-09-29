@@ -5,6 +5,27 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Agent Core (giai đoạn 0 của New_arch.md)
+- `src/AxiomOffice.Core/` (.NET 10, `AxiomOffice.Core.exe`): process riêng của agent, một bản cho
+  mỗi người dùng Windows (mutex `Local\AxiomOffice.Core`, instance thứ hai thoát ngay), chỉ nghe
+  `127.0.0.1`. Giai đoạn 0 gồm: `GET /health` (không cần token), `POST /v1/admin/shutdown`, quy tắc
+  bảo vệ giống bridge (chặn `Origin` → 403, thiếu token → 401, body không phải JSON → 415), ghi
+  `%LOCALAPPDATA%\AxiomOffice\core.json` khi sẵn sàng và xoá khi thoát, log `core.log` (xoay 10MB × 3)
+- Cấu hình Core: `HKCU\Software\AxiomOffice` (`CorePort` 47840, `CoreEnabled`, `MemoryEnabled`,
+  `MemoryAutoExtract`, `LlmProvider/Endpoint/Model`, API key DPAPI) + override `AXIOM_*` để test
+  không đụng cấu hình thật; port bận thì tự thử 47840–47849
+- Bridge: `GET /commands` trả bộ lệnh của DLL đang chạy (tên, loại app, cờ agent, tham số, `version`)
+  — Agent Core dùng để dựng tool cho agent đúng phiên bản
+- `scripts/install-dotnet-sdk.ps1` (cài .NET 10 SDK không cần admin), `scripts/core.ps1` (tắt Core
+  êm qua API), `build.ps1` publish Core self-contained single-file với version của DLL (bật
+  `EnableCompressionInSingleFile`: 103MB → 47,8MB đo trên máy này), `package.ps1` đóng gói kèm Core
+  + thư mục `skills\`, `install.ps1` tạo khoá cấu hình mới, `uninstall.ps1` tắt Core
+- `tests/core/AxiomOffice.Core.Tests` (xUnit, 35 test): cấu hình (ưu tiên env > HKCU > mặc định,
+  DPAPI, port không hợp lệ), core.json, log (xoay file), chọn port, và test vòng đời trên **tiến
+  trình thật** (core.json ↔ tiến trình, /health, 401/403/415/404, instance thứ hai, shutdown)
+- `tests/live/test_live_commands.py`: kiểm tra `/commands` khớp registry và version Core ↔ bridge khi
+  Core đang chạy
+
 ### Docs — `New_arch.md`: yêu cầu triển khai Agent Core
 - Bản yêu cầu cho phiên làm việc mới: tách agent ra process riêng `AxiomOffice.Core.exe` (.NET 10,
   một bản mỗi người dùng) với hội thoại liên tục, skills (`SKILL.md`), memory SQLite, policy/xác

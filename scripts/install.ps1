@@ -85,6 +85,16 @@ if ($config.GetValue("PortOffice") -eq $null) {
 if ($config.GetValue("Enabled") -eq $null) {
     $config.SetValue("Enabled", 1, [Microsoft.Win32.RegistryValueKind]::DWord)
 }
+# Cau hinh cua Agent Core (New_arch.md muc 7.6).
+if ($config.GetValue("CorePort") -eq $null) {
+    $config.SetValue("CorePort", 47840, [Microsoft.Win32.RegistryValueKind]::DWord)
+}
+if ($config.GetValue("CoreEnabled") -eq $null) {
+    $config.SetValue("CoreEnabled", 1, [Microsoft.Win32.RegistryValueKind]::DWord)
+}
+if ($config.GetValue("MemoryEnabled") -eq $null) {
+    $config.SetValue("MemoryEnabled", 1, [Microsoft.Win32.RegistryValueKind]::DWord)
+}
 $token = $config.GetValue("Token")
 $tokenGenerated = $false
 if ([string]::IsNullOrEmpty($token)) {
@@ -96,6 +106,7 @@ if ([string]::IsNullOrEmpty($token)) {
 }
 $port = $config.GetValue("Port")
 $portOffice = $config.GetValue("PortOffice")
+$corePort = $config.GetValue("CorePort")
 $config.Close()
 
 Write-Output "Installed Axiom Office."
@@ -109,7 +120,8 @@ Write-Output "  DLL:      $dllPath"
 Write-Output "  ProgID:   $progId"
 Write-Output "  WPS:      Word $port / Spreadsheets $($port + 1) / Presentation $($port + 2)"
 Write-Output "  Office:   Word $portOffice / Excel $($portOffice + 1) / PowerPoint $($portOffice + 2)"
-Write-Output "  Config:   HKCU\Software\AxiomOffice (Port, PortOffice, Token, Enabled)"
+Write-Output "  Config:   HKCU\Software\AxiomOffice (Port, PortOffice, Token, Enabled, CorePort, CoreEnabled, MemoryEnabled)"
+Write-Output "  Core:     port $corePort (Agent Core starts on demand; AxiomOffice.Core.exe next to the DLL)"
 if ($tokenGenerated) {
     Write-Output "  Token:    auto-generated (32 hex) - requests to /cmd and /config must send X-Auth-Token"
     Write-Output "            (AxiomOffice.Host.exe mcp and tools/*-mcp read it from the registry automatically)"

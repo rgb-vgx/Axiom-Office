@@ -116,9 +116,11 @@ namespace AxiomOffice.Bridge
             return text.ToString();
         }
 
-        public static string ToJson()
+        // Danh sach lenh dang du lieu: dung cho `commands --json` va cho GET /commands cua bridge
+        // (Agent Core doc de dung lai dung bo lenh cua DLL dang chay).
+        public static List<Dictionary<string, object>> ToList()
         {
-            var list = All.Select(c => new Dictionary<string, object>
+            return All.Select(c => new Dictionary<string, object>
             {
                 { "name", c.Name },
                 { "kind", c.Kind },
@@ -131,7 +133,11 @@ namespace AxiomOffice.Bridge
                         { "hint", p.Hint }
                     }).ToList() }
             }).ToList();
-            return new JavaScriptSerializer().Serialize(list);
+        }
+
+        public static string ToJson()
+        {
+            return new JavaScriptSerializer().Serialize(ToList());
         }
     }
 }

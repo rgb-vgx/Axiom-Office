@@ -309,6 +309,35 @@ def test_http(port, label):
     check(status == 200 and reply["result"]["port"] == port, label + " /session", reply)
     status, reply = http(port, "GET", "/config", headers={"X-Auth-Token": token()})
     check(status == 200 and "apiKey" in reply["result"], label + " /config (key đã che)", reply)
+    test_commands(port, label)
+
+
+def test_commands(port, label):
+    """GET /commands: bo lenh cua dung DLL dang chay, de Agent Core dung tool office_action."""
+    status, _ = http(port, "GET", "/commands")
+    check(status == 401, label + " /commands thiếu token -> 401", status)
+
+    status, reply = http(port, "GET", "/commands", headers={"X-Auth-Token": token()})
+    if status != 200 or not isinstance(reply, dict) or "result" not in reply:
+        check(False, label + " /commands", reply)
+        return
+    result = reply["result"]
+    commands = result.get("commands") or []
+    names = [c.get("name") for c in commands]
+    check(result.get("version") == http(port, "GET", "/health")[1]["result"]["version"],
+          label + " /commands version khớp /health", result.get("version"))
+    check(len(commands) >= 47 and len(set(names)) == len(names), label + " /commands danh sách lệnh", len(commands))
+
+    registry = registered_actions()
+    check(registry is not None and set(names) == registry,
+          label + " /commands khớp registry (Host.exe commands --json)",
+          sorted(set(names) ^ (registry or set())))
+
+    sample = next((c for c in commands if c.get("name") == "et.readRange"), None)
+    check(sample is not None and sample.get("kind") == "et" and sample.get("agent") is True
+          and [p.get("name") for p in sample.get("params") or []] == ["range", "sheet"]
+          and all("required" in p and "hint" in p for p in sample["params"]),
+          label + " /commands đủ trường name/kind/agent/summary/params", sample)
 
 
 AGENT_TOOL_PS = r"""
@@ -339,6 +368,31 @@ def test_agent_tool():
     check("writer.typeText {text}" in writer and "writer.appendText {text}" in writer, "office_action (Writer) có typeText/appendText", writer)
     listed = " ".join(data["definition:" + kind] for kind in ("wps", "et", "wpp"))
     check("writer.closeAll" not in listed and "ai.ask {" not in listed, "office_action không liệt kê writer.closeAll / ai.ask", listed)
+
+
+def core_health():
+    """Doc core.json -> /health cua Agent Core; None neu Core khong chay."""
+    path = os.path.join(os.environ.get("LOCALAPPDATA", ""), "AxiomOffice", "core.json")
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path, encoding="utf-8") as handle:
+            port = json.load(handle)["port"]
+        status, reply = http(port, "GET", "/health", timeout=5)
+        return reply["result"] if status == 200 else None
+    except Exception:
+        return None
+
+
+def test_core_version():
+    """Core va bridge phai cung version (build.ps1 truyen version DLL cho Core)."""
+    core = core_health()
+    if core is None:
+        print("(bỏ qua: Agent Core chưa chạy nên không so version)")
+        return
+    status, reply = http(core["port"], "GET", "/health")
+    check(status == 200 and core.get("version") == reply["result"]["version"] and core.get("protocol") == 1,
+          "Agent Core /health (version khớp bridge, protocol 1)", core)
 
 
 def registered_actions():
@@ -385,6 +439,8 @@ def main():
         if not args.keep:
             for pid in started:
                 close_app(pid)
+
+    test_core_version()
 
     registry = registered_actions()
     if registry is not None and args.apps == "word,excel,ppt":

@@ -52,6 +52,7 @@ Không cần quyền admin, không cần Python. Gói cài ~250 KB.
 |---|---|
 | `AxiomOffice.dll` | COM add-in (`IDTExtensibility2`) nạp vào Word/Excel/PowerPoint và WPS: mở HTTP bridge trong process của app, thêm tab ribbon **Axiom Office**, task pane Ask AI và AI agent |
 | `AxiomOffice.Host.exe` | `mcp [all\|word\|excel\|ppt]`: MCP server stdio · `wps\|et\|wpp\|word\|excel\|ppt`: companion tự tạo app qua COM automation và mở bridge (khi add-in không nạp được) · `commands`: danh sách lệnh bridge · `llm-test`: thử cấu hình AI |
+| `AxiomOffice.Core.exe` | **Agent Core** (đang phát triển theo [New_arch.md](New_arch.md)): process riêng chạy agent cho mọi app, một bản cho mỗi người dùng, chỉ nghe `127.0.0.1:47840`; add-in khởi động khi cần và tìm qua `%LOCALAPPDATA%\AxiomOffice\core.json`. Giai đoạn hiện tại: vòng đời + `/health` + shutdown; agent/skill/memory chuyển sang đây ở các giai đoạn sau |
 
 Mỗi app có port riêng; WPS và Microsoft Office dùng hai dải khác nhau nên chạy song song
 được (đổi qua registry, xem [Cấu hình](#cấu-hình)):
@@ -165,6 +166,7 @@ trình duyệt); mọi endpoint trừ `/health` cần header `X-Auth-Token` (tok
 |---|---|
 | `GET /health` | Không cần token: `{"ok":true,"result":{"app":"wps","pid":1234,"port":47831,"version":"1.0.0","log":"..."}}` |
 | `GET /config` | Provider, endpoint, model (API key đã che) |
+| `GET /commands` | Danh sách lệnh của DLL đang chạy (tên, loại app, cờ cho agent, tham số) + `version` — Agent Core dùng để dựng tool cho agent đúng phiên bản |
 | `GET /session` | Thông tin bridge + tài liệu đang mở (đọc ngay lúc gọi) |
 | `GET /events` | Server-Sent Events: vùng chọn, tài liệu đổi, ping |
 | `POST /cmd` | `{"action": "...", "params": {...}}` → `{"ok":true,"result":{...}}` hoặc `{"ok":false,"error":"..."}` |
@@ -332,7 +334,9 @@ Office không an toàn đa luồng — thiếu cổng này Word từng crash (AV
 ## Phát triển
 
 **Yêu cầu:** .NET Framework 4.8, Visual Studio 2022 Build Tools (`csc` Roslyn, C# 7.3). Python
-chỉ cần cho bộ test.
+chỉ cần cho bộ test. Muốn build thêm **Agent Core** (`AxiomOffice.Core.exe`, .NET 10) thì cần
+.NET 10 SDK — cài không cần admin bằng `scripts\install-dotnet-sdk.ps1`; không có SDK thì
+`build.ps1` vẫn build add-in + Host và bỏ qua Core.
 
 ```powershell
 scripts\build.ps1              # build AxiomOffice.dll + AxiomOffice.Host.exe vào src\AxiomOffice\bin\Release
@@ -391,6 +395,8 @@ powershell -ExecutionPolicy Bypass -File tests\mcp-host\office_roundtrip.ps1 -Di
 powershell -ExecutionPolicy Bypass -File tests\mcp-host\office_roundtrip.ps1 -Dir <thư_mục_output> -Verify
 # Unit test của các MCP Python (legacy)
 cd tools\word-mcp; .venv\Scripts\python.exe -m unittest discover -s tests
+# Agent Core: unit test + test vòng đời trên tiến trình thật (cần .NET 10 SDK)
+dotnet test tests\core\AxiomOffice.Core.Tests
 ```
 
 Test MCP cần venv của `tools/word-mcp`, `tools/excel-mcp`, `tools/ppt-mcp` (python-docx, openpyxl,
@@ -455,7 +461,9 @@ src/AxiomOffice/              COM add-in (net48)
   Ribbon/                     Ribbon XML + xử lý nút
 src/AxiomOffice.Host/         AxiomOffice.Host.exe: companion + MCP server
   Mcp/                        giao thức MCP, tool file (OOXML) + live, template docx/pptx nhúng
-scripts/                      build, install, uninstall, legacy (gỡ bản WpsAiBridge), package
+src/AxiomOffice.Core/         Agent Core (.NET 10, theo New_arch.md): Api, Config, Logging — process riêng của agent
+tests/core/                   test Agent Core (xUnit + test vòng đời trên tiến trình thật)
+scripts/                      build, install, uninstall, legacy (gỡ bản WpsAiBridge), core (tắt Core), install-dotnet-sdk, package
 scripts/dist/                 install.cmd, uninstall.cmd, HUONG-DAN-CAI-DAT.txt (vào gói cài)
 tests/live/                   test mọi lệnh bridge trên Office/WPS thật
 tests/mcp-host/               test parity MCP + registry lệnh + round-trip với Office thật

@@ -156,6 +156,22 @@ namespace AxiomOffice.Bridge
                 return;
             }
 
+            if (path == "/commands" && context.Request.HttpMethod == "GET")
+            {
+                // Bo lenh cua dung DLL dang chay (New_arch.md muc 7.5): Agent Core dung de dung tool
+                // office_action ma khong phai doan phien ban.
+                WriteJson(context, 200, new Dictionary<string, object>
+                {
+                    { "ok", true },
+                    { "result", new Dictionary<string, object>
+                        {
+                            { "version", CommandDispatcher.BridgeVersion },
+                            { "commands", CommandCatalog.ToList() }
+                        } }
+                });
+                return;
+            }
+
             if (path == "/session" && context.Request.HttpMethod == "GET")
             {
                 SessionRegistry session = _session;

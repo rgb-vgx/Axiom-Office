@@ -29,6 +29,7 @@ if (-not $NoBuild) {
 
 $dll = Join-Path $release "AxiomOffice.dll"
 $exe = Join-Path $release "AxiomOffice.Host.exe"
+$coreExe = Join-Path $release "AxiomOffice.Core.exe"
 foreach ($file in @($dll, $exe)) {
     if (-not (Test-Path -LiteralPath $file)) {
         throw "Thieu $file - chay scripts\build.ps1 truoc (hoac bo -NoBuild)"
@@ -75,6 +76,26 @@ foreach ($entry in $layout.GetEnumerator()) {
     $target = Join-Path $stage $entry.Key
     New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force | Out-Null
     Copy-Item -LiteralPath $entry.Value -Destination $target -Force
+}
+
+# Agent Core + skill dung san (New_arch.md muc 10): them sau khi da co layout co ban.
+if (Test-Path -LiteralPath $coreExe) {
+    $layout["src\AxiomOffice\bin\Release\AxiomOffice.Core.exe"] = $coreExe
+    $coreTarget = Join-Path $stage "src\AxiomOffice\bin\Release\AxiomOffice.Core.exe"
+    Copy-Item -LiteralPath $coreExe -Destination $coreTarget -Force
+} else {
+    Write-Output "CANH BAO: khong co AxiomOffice.Core.exe - goi cai se khong kem Agent Core (chi dung agent trong add-in)."
+}
+
+$skillsDir = Join-Path $release "skills"
+if (Test-Path -LiteralPath $skillsDir) {
+    foreach ($file in Get-ChildItem -LiteralPath $skillsDir -Recurse -File) {
+        $relative = "src\AxiomOffice\bin\Release\skills\" + $file.FullName.Substring($skillsDir.Length + 1)
+        $layout[$relative] = $file.FullName
+        $target = Join-Path $stage $relative
+        New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force | Out-Null
+        Copy-Item -LiteralPath $file.FullName -Destination $target -Force
+    }
 }
 
 # Tu ghi tung entry voi "/" (CreateFromDirectory trong PowerShell 5.1 ghi "\", cong cu ngoai Windows doc sai).

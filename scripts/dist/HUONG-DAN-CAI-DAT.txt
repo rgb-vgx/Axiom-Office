@@ -4,7 +4,7 @@
 Yêu cầu
 - Windows 10/11 64-bit (đã có sẵn .NET Framework 4.8)
 - Microsoft Office 64-bit và/hoặc WPS Office 64-bit
-- Không cần quyền admin, không cần cài Python
+- Không cần quyền admin, không cần cài Python hay .NET (Agent Core đã đóng gói kèm, tự chạy khi cần)
 
 Cài đặt
 1. Giải nén thư mục này vào một chỗ cố định, ví dụ C:\Tools\AxiomOffice.
@@ -40,3 +40,6 @@ Sự cố thường gặp
   Log nằm ở %LOCALAPPDATA%\AxiomOffice\bridge.log
 - Office báo add-in bị vô hiệu hoá sau khi app bị lỗi: chạy lại install.cmd.
 - Máy công ty chặn add-in chưa có chữ ký số: liên hệ bộ phận IT.
+- Agent Core (AxiomOffice.Core.exe) chạy nền cùng thư mục cài; log riêng ở
+  %LOCALAPPDATA%\AxiomOffice\core.log. Không muốn dùng thì đặt CoreEnabled = 0
+  trong HKCU\Software\AxiomOffice rồi mở lại app.

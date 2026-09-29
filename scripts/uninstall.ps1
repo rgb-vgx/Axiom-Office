@@ -9,7 +9,11 @@ $progId = "AxiomOffice.Connect"
 $classGuid = "{BDB3732A-A479-4A24-AD64-D35952035BBA}"
 $currentUser = [Microsoft.Win32.Registry]::CurrentUser
 . (Join-Path $PSScriptRoot "legacy.ps1")
+. (Join-Path $PSScriptRoot "core.ps1")
 [void](Remove-LegacyRegistration)
+
+# Tat Agent Core dang chay truoc khi go (New_arch.md muc 10).
+[void](Stop-AgentCore)
 
 $currentUser.DeleteSubKeyTree("Software\Classes\$progId", $false)
 $currentUser.DeleteSubKeyTree("Software\Classes\CLSID\$classGuid", $false)

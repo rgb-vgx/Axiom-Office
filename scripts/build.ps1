@@ -8,10 +8,15 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $srcDir = Join-Path $root "src\AxiomOffice"
 $hostDir = Join-Path $root "src\AxiomOffice.Host"
+$coreDir = Join-Path $root "src\AxiomOffice.Core"
 $out = Join-Path $srcDir "bin\Release"
 $stage = Join-Path $out ".stage"
+$coreExe = Join-Path $out "AxiomOffice.Core.exe"
+$skillsDir = Join-Path $root "skills"
 $fw = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319"
 $csc = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin\Roslyn\csc.exe"
+
+. (Join-Path $PSScriptRoot "core.ps1")
 
 if (-not (Test-Path -LiteralPath $csc)) {
     $csc = "$fw\csc.exe"
@@ -61,7 +66,11 @@ public static class FileLockers {
 }
 "@
 }
-$outputs = @("AxiomOffice.dll", "AxiomOffice.Host.exe") | ForEach-Object { Join-Path $out $_ } | Where-Object { Test-Path -LiteralPath $_ }
+# Agent Core dang chay giu AxiomOffice.Core.exe: tat em truoc khi ghi de (New_arch.md muc 10).
+# Core la tien trinh cua chinh du an nen tat bang API shutdown, khong can -Kill (khac Word/Excel cua nguoi dung).
+[void](Stop-AgentCore)
+
+$outputs = @("AxiomOffice.dll", "AxiomOffice.Host.exe", "AxiomOffice.Core.exe") | ForEach-Object { Join-Path $out $_ } | Where-Object { Test-Path -LiteralPath $_ }
 $lockers = @()
 if ($outputs.Count -gt 0) {
     $lockers = @([FileLockers]::Find([string[]]$outputs) | Sort-Object -Unique | ForEach-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue })
@@ -122,6 +131,23 @@ $stagedExe = Join-Path $stage "AxiomOffice.Host.exe"
 & $csc @commonArgs @hostArgs /target:exe "/out:$stagedExe" $hostSources
 if ($LASTEXITCODE -ne 0) { throw "Host build failed with exit code $LASTEXITCODE" }
 
+# Agent Core (.NET 10): publish self-contained single-file de nguoi dung khong phai cai runtime.
+# Version lay tu DLL add-in vua build de /health cua Core khop version bridge (New_arch.md muc 10).
+$dotnet = Find-Dotnet
+if ($null -eq $dotnet) {
+    Write-Host "Khong tim thay dotnet: bo qua Agent Core (AxiomOffice.Core.exe). Chay scripts\install-dotnet-sdk.ps1 roi build lai." -ForegroundColor Yellow
+} else {
+    $coreVersion = [System.Reflection.AssemblyName]::GetAssemblyName($stagedDll).Version.ToString(3)
+    $coreStage = Join-Path $stage "core"
+    # EnableCompressionInSingleFile: 103MB -> ~48MB (do that tren may nay), khoi dong cham hon khong dang ke.
+    & $dotnet publish $coreDir -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:Version=$coreVersion -o $coreStage --nologo
+    if ($LASTEXITCODE -ne 0) { throw "Agent Core publish failed with exit code $LASTEXITCODE" }
+    $builtCore = Join-Path $coreStage "AxiomOffice.Core.exe"
+    if (-not (Test-Path -LiteralPath $builtCore)) { throw "Agent Core publish did not produce $builtCore" }
+    Copy-Item -LiteralPath $builtCore -Destination $coreExe -Force
+    Write-Output "Built Agent Core: $coreExe (version $coreVersion)"
+}
+
 foreach ($file in @($stagedDll, $stagedExe)) {
     $target = Join-Path $out (Split-Path -Leaf $file)
     try {
@@ -132,6 +158,12 @@ foreach ($file in @($stagedDll, $stagedExe)) {
     }
 }
 Remove-Item -LiteralPath $stage -Recurse -Force
+
+# Skill dung san (New_arch.md muc 8.4): chep canh exe de Core doc duoc luc chay.
+if (Test-Path -LiteralPath $skillsDir) {
+    Copy-Item -LiteralPath $skillsDir -Destination (Join-Path $out "skills") -Recurse -Force
+    Write-Output "Copied skills: $(Join-Path $out 'skills')"
+}
 
 Write-Output "Built add-in: $(Join-Path $out 'AxiomOffice.dll')"
 Write-Output "Built host: $(Join-Path $out 'AxiomOffice.Host.exe')"

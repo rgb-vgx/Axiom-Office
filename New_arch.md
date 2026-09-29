@@ -1007,7 +1007,7 @@ README + CHANGELOG + `ARCHITECTURE.MD` khi cần, chạy test, báo cáo kết q
 
 | Rủi ro | Cách giảm |
 |---|---|
-| Exe Core lớn (~60–80MB) làm gói cài nặng | Chấp nhận ở đợt này; ghi lại để cân nhắc framework-dependent hoặc NativeAOT sau |
+| Exe Core lớn (đo thật: 103MB self-contained, **47,8MB** khi bật `EnableCompressionInSingleFile` — đã bật trong `build.ps1`) làm gói cài nặng | Chấp nhận ở đợt này; ghi lại để cân nhắc framework-dependent hoặc NativeAOT sau |
 | Phần mềm diệt virus chặn exe single-file chưa ký | Ghi vào Troubleshooting; ký số khi có certificate (nợ đã biết) |
 | Bridge pump tuần tự: Core gọi `/cmd` trong lúc có `ai.ask` in-process chạy | Pane khóa gửi khi đang chạy; một run mỗi port; không đổi pump ở đợt này |
 | Core chết giữa run | Pane nhận lỗi SSE → ErrorCard "Agent Core dừng đột ngột" + Thử lại; tài liệu vẫn nguyên (mỗi lệnh độc lập, Undo được) |
