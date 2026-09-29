@@ -167,7 +167,10 @@ namespace AxiomOffice.Ai
                 return null;
             }
 
-            Dictionary<string, object> reply = Deserialize(responseText) as Dictionary<string, object>;
+            // Core boc ket qua trong {"ok":true,"result":{runId, conversationId}} (giong bridge). Truoc day doc
+            // runId o cap ngoai nen luon "khong tra runId" -> pane chay lai in-process trong khi Core van chay:
+            // moi yeu cau bi lam HAI lan.
+            Dictionary<string, object> reply = RunReply(responseText);
             string runId = reply != null ? Convert.ToString(reply.ContainsKey("runId") ? reply["runId"] : null) : null;
             if (string.IsNullOrEmpty(runId))
             {
@@ -795,6 +798,17 @@ namespace AxiomOffice.Ai
         private static string Serialize(object value)
         {
             return new JavaScriptSerializer().Serialize(value);
+        }
+
+        internal static Dictionary<string, object> RunReply(string responseText)
+        {
+            var reply = Deserialize(responseText) as Dictionary<string, object>;
+            object inner;
+            if (reply != null && !reply.ContainsKey("runId") && reply.TryGetValue("result", out inner) && inner is Dictionary<string, object>)
+            {
+                return (Dictionary<string, object>)inner;
+            }
+            return reply;
         }
 
         private static object Deserialize(string json)

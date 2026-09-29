@@ -6,6 +6,11 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Fixed — lỗi Ask AI thấy khi test Word qua Agent Core
+- **Mọi yêu cầu bị làm HAI lần** (Core và in-process chạy song song): `CoreClient` đọc `runId` ở cấp
+  ngoài trong khi Core trả `{"ok":true,"result":{"runId":...}}`, nên luôn coi là "Core không trả
+  runId" và chạy thêm in-process. Hệ quả: dữ liệu bị ghi hai lần (vd thừa một hàng "Trung bình"),
+  lỗi COM `0x800A01A8` do hai agent sửa cùng lúc, luôn hiện "chế độ cơ bản", không có link "Cuộc trò
+  chuyện mới"
 - **Pane chạy một yêu cầu hai lần**: Core đã nhận lượt chạy (có `runId`) nhưng đọc SSE lỗi thì
   `CoreClient.Run` trả null và pane chạy lại in-process — tài liệu bị sửa hai lần, dòng trạng thái
   hiện cả "Xong" lẫn "chế độ cơ bản". Nay chỉ quay về in-process khi Core chưa nhận lượt chạy; mọi lý
