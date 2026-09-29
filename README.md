@@ -121,7 +121,8 @@ Hành vi:
   trong Cài đặt có hiệu lực từ lượt chạy tiếp theo, không cần khởi động lại.
 - Transcript mỗi lượt nằm trong `bridge.log` (`AskAiPane: prompt=` / `AskAiPane progress:` /
   `AskAiPane: ok ... N tool calls, M rounds` / `AskAiPane failed`), ghi ngay cả khi pane đã đóng.
-- Agent bên ngoài gọi cùng logic qua lệnh bridge `ai.ask`.
+- Agent bên ngoài gọi cùng logic qua lệnh bridge `ai.ask` (chạy qua Agent Core khi có, response thêm
+  `viaCore`; không có người bấm xác nhận nên lệnh cần xác nhận bị từ chối ngay).
 
 ### Kỹ năng (skills)
 
@@ -168,6 +169,28 @@ Agent Core **nhớ qua các phiên** (học từ mem0 2.2.1, tự làm bằng C#
 - Tắt trong Cài đặt: **Ghi nhớ dài hạn** (không đọc/ghi) hoặc **Tự ghi nhớ sau mỗi lượt** (chỉ ghi khi bạn
   hoặc AI chủ động). API: `GET/POST /v1/memory`, `PATCH/DELETE /v1/memory/{id}`,
   `POST /v1/memory/{id}/restore`, `GET /v1/memory/{id}/history`.
+
+### Xác nhận, công cụ MCP và QA thị giác
+
+- **Hỏi trước thao tác rủi ro**: khi AI định lưu/xuất file dù bạn không yêu cầu, ghi đè file đã có, xoá
+  slide, thay thế toàn bộ trong tài liệu dài (> 20.000 ký tự) hoặc dùng công cụ MCP ngoài, pane hiện thẻ
+  **Đồng ý / Từ chối**; không trả lời trong 120 giây (`ConfirmTimeoutSeconds`) = từ chối. Mọi thao tác ghi
+  vào nhật ký (`GET /v1/audit`).
+- **Công cụ MCP** cho agent: server dựng sẵn `office` (làn file của `AxiomOffice.Host.exe`: đọc/ghi
+  docx/xlsx/pptx trên đĩa không cần mở app; sửa file đã có thì hỏi trước) và server bạn thêm trong
+  `%LOCALAPPDATA%\AxiomOffice\mcp.json`:
+
+  ```json
+  {"mcpServers": {"tim-kiem": {"command": "python", "args": ["server.py"]},
+                  "noi-bo": {"url": "http://127.0.0.1:9000/mcp", "trusted": true},
+                  "office": {"disabled": true}}}
+  ```
+
+  Tool có tên `mcp__<server>__<tool>`; server không `"trusted": true` thì mỗi lần gọi đều hỏi. Xem
+  trạng thái: `GET /v1/mcp`.
+- **QA thị giác** (tắt mặc định): bật **Cho AI xem ảnh chụp cửa sổ** trong Cài đặt để agent chụp cửa sổ
+  app (`app.screenshot`) và tự soát bố cục bằng mắt sau khi làm slide/bảng — tốn thêm token, cần model
+  đọc được ảnh.
 
 Giao diện vẽ bằng GDI+ theo design tokens trong `PaneTheme` (`src/AxiomOffice/Ai/PaneControls.cs`):
 tương phản chữ ≥ 4.5:1, focus ring khi dùng bàn phím, scale theo DPI. Bubble nhận Tab/Ctrl+C
@@ -276,6 +299,7 @@ công cụ); lệnh khai báo cạnh handler trong `src/AxiomOffice/Bridge/Comma
 | `app.info` | — | Tên/version app, tài liệu đang mở, `state` (tài liệu, cửa sổ, visible) |  |
 | `ai.ask` | `prompt` | Chạy AI agent trên tài liệu đang mở; trả `reply`, `transcript`, `seconds`, `rounds` |  |
 | `ui.askpane` | — | Mở task pane Ask AI |  |
+| `app.screenshot` | `maxWidth?` | Ảnh chụp cửa sổ app (PNG base64, thu nhỏ theo `maxWidth`, mặc định 1280) |  |
 | `writer.newDocument` | — | Tạo tài liệu mới |  |
 | `writer.open` | `path` | Mở .docx/.doc |  |
 | `writer.getText` | `maxChars?` | Đọc toàn bộ text | ✓ |
@@ -401,6 +425,8 @@ Office không an toàn đa luồng — thiếu cổng này Word từng crash (AV
 | `EmbeddingModel` / `EmbeddingEndpoint` | String | — | Tuỳ chọn: tìm memory theo ngữ nghĩa qua `{endpoint}/embeddings`; bỏ trống = chỉ từ khoá |
 | `LlmRequestTimeoutSeconds` | DWORD | 120 | Hết giờ mỗi request tới model (Core); tăng nếu model chậm |
 | `SkillDirs` | String | — | Thư mục skill của tổ chức, phân cách `;` (xem [Kỹ năng](#kỹ-năng-skills)) |
+| `ConfirmTimeoutSeconds` | DWORD | 120 | Chờ bạn xác nhận thao tác rủi ro; hết giờ = từ chối |
+| `VisualQaEnabled` | DWORD | 0 | 1 = cho AI xem ảnh chụp cửa sổ để soát bố cục (tốn token) |
 
 Agent Core đọc cùng khoá trên. Biến môi trường `AXIOM_*` (`AXIOM_CORE_DATA_DIR`, `AXIOM_CORE_PORT`,
 `AXIOM_SESSION_DIR`, `AXIOM_TOKEN`, `AXIOM_LLM_*`) ghi đè — dùng cho test, không cần cho người dùng.

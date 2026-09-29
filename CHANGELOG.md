@@ -5,6 +5,25 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Agent Core giai đoạn 4: Mở rộng và an toàn (New_arch.md mục 7.7, 8.6, 8.7, 8.4.6)
+- **Policy xác nhận** (`PolicyEngine` + `ConfirmationBroker`): hỏi trước khi model lưu/xuất file mà yêu cầu
+  không nhắc tới lưu/xuất, `saveAs`/`exportPdf` ghi đè file đã có, `wpp.deleteSlide`, `writer.replaceAll` trên
+  tài liệu > 20.000 ký tự, tool MCP ngoài; SSE `confirm.required` / `confirm.resolved`, `POST
+  /v1/runs/{id}/confirm`, chờ tối đa `ConfirmTimeoutSeconds` (120s), hết giờ/hủy = từ chối, model nhận
+  `user declined`. Pane: thẻ **Đồng ý / Từ chối**
+- `GET /v1/audit?runId=&limit=`: nhật ký tool call (params ≤ 2KB; tool không phải `office_action` ghi đủ đối số)
+- **MCP client**: stdio + Streamable HTTP, `mcp.json` (`command/args/env` hoặc `url/headers`, `trusted`,
+  `disabled`), khởi động lười, lỗi server → ẩn tool; server built-in `office` = `Host.exe mcp` **chỉ mở tool
+  làn file** (tool live đi vòng allowlist/policy bị lọc), ghi vào file đã có thì hỏi; `GET /v1/mcp`
+- **`ai.ask` chạy qua Agent Core** (giữ hình dạng response, thêm `viaCore`; chế độ không tương tác từ chối
+  xác nhận ngay); bridge xử lý `ai.ask` trên thread riêng để Core gọi ngược `/cmd` không bị kẹt
+- **QA thị giác tuỳ chọn** (`VisualQaEnabled`, tắt mặc định): lệnh bridge `app.screenshot` (PrintWindow, thu
+  nhỏ), tool `look_at_document` gửi ảnh cho model (OpenAI `image_url` / Anthropic khối `image`); Cài đặt có ô bật
+- `ARCHITECTURE.MD`: HLD cập nhật cho Agent Core (container, khối chức năng, kịch bản K1/K6/K7, triển khai,
+  NFR, AD-11…AD-17, rủi ro) + LLD mục 22 Agent Core
+- Test: 194 unit test Core; e2e 76 kiểm tra (xác nhận đồng ý/từ chối/hết giờ, MCP server mẫu Python stdlib,
+  làn file office, QA thị giác, audit); `ai.ask` qua Core trên Excel thật; `app.screenshot` trên Excel thật
+
 ### Added — Agent Core giai đoạn 3: Memory dài hạn (New_arch.md mục 8.5, học từ mem0 2.2.1)
 - Schema 2: `memories`, `memories_fts` (FTS5, text chuẩn hoá bỏ dấu kể cả `đ`), `memory_links`,
   `memory_history`, `memory_embeddings`; `runs.memory_status`

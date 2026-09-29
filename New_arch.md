@@ -1043,12 +1043,12 @@ README + CHANGELOG + `ARCHITECTURE.MD` khi cần, chạy test, báo cáo kết q
 
 ### Giai đoạn 4: Mở rộng và an toàn
 
-- [ ] PolicyEngine + ConfirmationBroker + thẻ xác nhận trong pane (8.6).
-- [ ] MCP client (8.7), `mcp.json`, tool `mcp__*` cần xác nhận mặc định.
-- [ ] (Hỏi người dùng) `ai.ask` chuyển sang Core khi sẵn sàng (7.7).
-- [ ] (Hỏi người dùng) `app.screenshot` + QA thị giác: chụp cửa sổ app, model đọc ảnh soát bố cục
+- [x] PolicyEngine + ConfirmationBroker + thẻ xác nhận trong pane (8.6).
+- [x] MCP client (8.7), `mcp.json`, tool `mcp__*` cần xác nhận mặc định.
+- [x] (Hỏi người dùng) `ai.ask` chuyển sang Core khi sẵn sàng (7.7).
+- [x] (Hỏi người dùng) `app.screenshot` + QA thị giác: chụp cửa sổ app, model đọc ảnh soát bố cục
       (8.4.6) — chỉ bật khi người dùng đồng ý vì tốn token hơn QA cấu trúc.
-- [ ] Cập nhật `ARCHITECTURE.MD` (HLD + LLD) cho kiến trúc mới.
+- [x] Cập nhật `ARCHITECTURE.MD` (HLD + LLD) cho kiến trúc mới.
 - **Xong khi**: e2e cho confirm (đồng ý / từ chối / hết giờ), MCP server mẫu (một server Python
   stdlib nhỏ trong `tests/core/`) được gọi qua agent; audit đầy đủ.
 
