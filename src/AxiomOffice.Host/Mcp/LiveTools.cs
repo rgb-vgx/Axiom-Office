@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using AxiomOffice.Bridge;
 
 namespace AxiomOffice.Host.Mcp
 {
@@ -24,7 +26,7 @@ namespace AxiomOffice.Host.Mcp
                 new[] { AppParam("word"), PortParam() },
                 a => Safe(() => BridgeClient.Health(a.Str("app", "word"), a.IntOpt("port"))));
             yield return new McpTool("word_command",
-                "Send any bridge command to the live Word/WPS Writer session. Examples: writer.getText; writer.undo; writer.replaceAll params={'find':'a','replace':'b'}; writer.exportPdf params={'path':'C:/tmp/out.pdf'}." + PortTip,
+                "Send any bridge command to the live Word/WPS Writer session. Examples: writer.getText; writer.undo; writer.replaceAll params={'find':'a','replace':'b'}; writer.exportPdf params={'path':'C:/tmp/out.pdf'}." + CommandList("wps") + PortTip,
                 new[] { Param.Str("action", null, true), Param.Obj("params"), AppParam("word"), PortParam() },
                 a => Live(a, "word", a.Req("action"), a.Obj("params"), a.IntOpt("port")));
             yield return new McpTool("word_read_text",
@@ -88,7 +90,7 @@ namespace AxiomOffice.Host.Mcp
                 new[] { AppParam("ppt"), PortParam() },
                 a => Safe(() => BridgeClient.Health(a.Str("app", "ppt"), a.IntOpt("port"))));
             yield return new McpTool("ppt_command",
-                "Send any bridge command to the live PowerPoint/WPS session. Examples: wpp.listSlides; wpp.exportPdf params={'path':'C:/tmp/out.pdf'}; wpp.saveAs params={'path':'C:/tmp/out.pptx'}." + PortTip,
+                "Send any bridge command to the live PowerPoint/WPS session. Examples: wpp.listSlides; wpp.exportPdf params={'path':'C:/tmp/out.pdf'}; wpp.saveAs params={'path':'C:/tmp/out.pptx'}." + CommandList("wpp") + PortTip,
                 new[] { Param.Str("action", null, true), Param.Obj("params"), AppParam("ppt"), PortParam() },
                 a => Live(a, "ppt", a.Req("action"), a.Obj("params"), a.IntOpt("port")));
             yield return new McpTool("ppt_list_slides",
@@ -150,7 +152,7 @@ namespace AxiomOffice.Host.Mcp
                 "action='et.formatRange' params={'range':'A1:B1','bold':true,'fillColor':'#FFFF00'}; action='et.readRange' params={'range':'A1:C10'}; " +
                 "action='et.writeRange' params={'range':'A1','values':[[1,2],[3,4]]}; action='wpp.addSlide' params={'layout':1}; " +
                 "action='wpp.addText' params={'text':'Hi','fontSize':28,'color':'#FF0000'}; action='wpp.addTable' params={'rows':2,'cols':3}; " +
-                "action='wpp.setNotes' params={'text':'notes'}; action='writer.undo' OR action='et.undo'." + PortTip,
+                "action='wpp.setNotes' params={'text':'notes'}; action='writer.undo' OR action='et.undo'." + CommandList("wps", "et", "wpp") + PortTip,
                 new[] { Param.Str("app", "wps/et/wpp or word/excel/ppt", true), Param.Str("action", null, true), Param.Obj("params"), PortParam() },
                 a => Live(a, a.Req("app"), a.Req("action"), a.Obj("params"), a.IntOpt("port")));
             yield return new McpTool("wps_live_read_range",
@@ -161,6 +163,13 @@ namespace AxiomOffice.Host.Mcp
                 "Write a 2D block into the spreadsheet currently open in WPS (live). cell_range is the top-left anchor like 'A1'.",
                 new[] { Param.Str("cell_range", null, true), Param.Matrix("values", null, true), AppParam("et"), Param.Str("sheet") },
                 a => Live(a, "et", "et.writeRange", Clean("range", a.Req("cell_range"), "values", a.Raw("values"), "sheet", a.Str("sheet"))));
+        }
+
+        // " Commands: app.info {}; writer.getText {maxChars}; ..." - sinh từ registry lệnh của bridge
+        // (CommandDispatcher.Commands) nên luôn khớp với lệnh bridge thực có.
+        private static string CommandList(params string[] kinds)
+        {
+            return " Commands {params}: " + CommandCatalog.Signatures(CommandCatalog.All.Where(c => c.Kind == null || kinds.Contains(c.Kind))) + ".";
         }
 
         private static Param AppParam(string def)

@@ -5,6 +5,29 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed — Dọn nợ kỹ thuật: registry lệnh bridge
+- Mỗi lệnh `POST /cmd` khai báo một lần (`Command(...)`: tên, loại app, handler, mô tả, tham số)
+  thay cho 3 nơi phải sửa tay: `switch` của dispatcher, chuỗi lệnh của tool `office_action`, mô tả
+  tool MCP. Tool `office_action` (lệnh gắn `ForAgent()`), danh sách lệnh trong mô tả MCP
+  `word_command` / `ppt_command` / `wps_live_command` và bảng lệnh README đều sinh từ registry.
+  Tên + tham số của 50 tool MCP không đổi; model thấy cùng bộ lệnh như trước (`writer.heading` hiện
+  thêm tham số `break` vốn đã có)
+- `CommandDispatcher.cs` (1721 dòng) tách theo app: `CommandDispatcher.Writer/Spreadsheet/Presentation.cs`
+  + `Params.cs` (đọc tham số, chuyển giá trị COM); kiểm tra loại app (`RequireKind`) làm một lần ở
+  dispatcher thay vì đầu mỗi handler. Thân handler giữ nguyên
+- `AxiomOffice.Host.exe commands [--json|--markdown]`: in danh sách lệnh bridge
+- `AxiomOffice.csproj` gom `**\*.cs` như `build.ps1` thay vì liệt kê từng file
+- Bỏ code chết: `Probe.cs` (class COM chẩn đoán không còn đăng ký), `Ai/DocumentContext.cs` (không
+  còn được gọi)
+
+### Added — Test tích hợp lệnh bridge
+- `tests/live/test_live_commands.py`: gọi mọi lệnh (và các lỗi tham số `values`, thiếu token, sai
+  Content-Type, có Origin) trên Word/Excel/PowerPoint thật (`--wps`: WPS); tự mở app riêng, dừng nếu
+  port đã có app của người dùng, xong tự đóng. `--record`/`--compare` so kết quả từng lệnh trước-sau
+  refactor: bản registry cho kết quả trùng khớp cả 67 lần gọi với bản cũ trên Office 2024
+- `tests/mcp-host/test_mcp_host.py` kiểm tra README khớp `commands --markdown` và mô tả tool MCP
+  `*_command` liệt kê đủ lệnh
+
 ### Docs — README viết lại cho Axiom Office
 - Giới thiệu 3 cách dùng (Ask AI, MCP server, HTTP API), sơ đồ kiến trúc Office + WPS, cài đặt
   cho người dùng (gói zip + install.cmd) tách khỏi phần phát triển, bảng tool MCP theo nhóm

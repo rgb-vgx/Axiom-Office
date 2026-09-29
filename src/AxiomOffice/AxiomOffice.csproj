@@ -28,29 +28,8 @@
     <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Connect.cs" />
-    <Compile Include="Probe.cs" />
-    <Compile Include="Interop\IDTExtensibility2.cs" />
-    <Compile Include="Interop\IRibbonExtensibility.cs" />
-    <Compile Include="Interop\ICustomTaskPaneConsumer.cs" />
-    <Compile Include="Ribbon\RibbonUi.cs" />
-    <Compile Include="Ai\LlmClient.cs" />
-    <Compile Include="Ai\DocumentContext.cs" />
-    <Compile Include="Ai\SettingsForm.cs" />
-    <Compile Include="Ai\AskAiPane.cs" />
-    <Compile Include="Ai\PaneControls.cs" />
-    <Compile Include="Ai\OfficeActionTool.cs" />
-    <Compile Include="Ai\AiAgent.cs" />
-    <Compile Include="Bridge\Logger.cs" />
-    <Compile Include="Bridge\IAppHost.cs" />
-    <Compile Include="Bridge\Config.cs" />
-    <Compile Include="Bridge\HttpBridge.cs" />
-    <Compile Include="Bridge\CommandDispatcher.cs" />
-    <Compile Include="Bridge\ComGate.cs" />
-    <Compile Include="Bridge\HostProbe.cs" />
-    <Compile Include="Bridge\SessionRegistry.cs" />
-    <Compile Include="Bridge\EventStream.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
+    <!-- Giong scripts/build.ps1: moi *.cs trong thu muc (tru bin/obj), khong phai liet ke tung file. -->
+    <Compile Include="**\*.cs" Exclude="bin\**;obj\**" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

@@ -15,6 +15,7 @@ import glob
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import zipfile
@@ -109,6 +110,21 @@ async def test_protocol(session: ClientSession) -> None:
     check(not missing, "every Python tool exists in C# (except excel_query)", str(sorted(missing)))
     schema = attr(next(t for t in tools if t.name == "excel_format_range"), "input_schema", "inputSchema")
     check(schema.get("required") == ["path", "sheet", "cell_range", "styles"], "excel_format_range schema required", json.dumps(schema))
+    test_catalog({t.name: t.description for t in tools})
+
+
+def test_catalog(descriptions: dict[str, str]) -> None:
+    """Registry lệnh bridge (AxiomOffice.Host.exe commands): README và mô tả tool MCP *_command sinh từ đó."""
+    def host(*args):
+        return subprocess.run([EXE, *args], capture_output=True, text=True, encoding="utf-8").stdout
+    names = [c["name"] for c in json.loads(host("commands", "--json"))]
+    check(len(names) == len(set(names)) and len(names) >= 47, "commands --json: tên lệnh duy nhất", str(names))
+    with open(os.path.join(ROOT, "README.md"), encoding="utf-8") as handle:
+        readme = handle.read().replace("\r\n", "\n")
+    check(host("commands", "--markdown") in readme, "README chứa đúng bảng `commands --markdown` (chạy lại lệnh đó khi thêm/sửa lệnh)")
+    for tool, prefixes in (("word_command", ("writer.",)), ("ppt_command", ("wpp.",)), ("wps_live_command", ("writer.", "et.", "wpp."))):
+        missing = [n for n in names if n.startswith(prefixes) and n + " {" not in descriptions[tool]]
+        check(not missing, tool + " liệt kê mọi lệnh của registry", str(missing))
 
 
 async def test_word(c: Client, out: str) -> None:

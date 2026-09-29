@@ -196,7 +196,10 @@ print(json.load(urllib.request.urlopen(request)))
 
 `values` (bảng, vùng ô) luôn là **mảng 2 chiều theo dòng**, ví dụ `[["Tên","Điểm"],["An",9.5]]`.
 Sai dạng hoặc thiếu thì lệnh trả lỗi kèm ví dụ (không âm thầm bỏ qua). Tham số `slide` của
-lệnh `wpp.*` bỏ trống = slide cuối.
+lệnh `wpp.*` bỏ trống = slide cuối. `?` = tham số tuỳ chọn.
+
+Bảng dưới sinh từ registry lệnh bằng `AxiomOffice.Host.exe commands --markdown` (`--json` cho
+công cụ); lệnh khai báo cạnh handler trong `src/AxiomOffice/Bridge/CommandDispatcher.*.cs`.
 
 | Action | Params | Mô tả |
 |---|---|---|
@@ -209,41 +212,44 @@ lệnh `wpp.*` bỏ trống = slide cuối.
 | `writer.selection` | — | Text + vị trí đang chọn |
 | `writer.typeText` | `text` | Gõ tại con trỏ |
 | `writer.appendText` | `text` | Nối vào cuối tài liệu |
-| `writer.insertStyledText` | `text`, `bold?`, `italic?`, `underline?`, `size?`, `color?`, `font?` | Chèn text có định dạng |
-| `writer.heading` | `level` (1-9), `text?`, `break?` | Heading + tự xuống dòng |
+| `writer.insertStyledText` | `text`, `bold?`, `italic?`, `underline?`, `size?`, `color?`, `font?` | Chèn text có định dạng tại con trỏ (`color` dạng `#RRGGBB`) |
+| `writer.heading` | `text?`, `level?`, `break?` | Heading 1-9 (`level`, mặc định 1) + tự xuống dòng (`break`, mặc định true) |
 | `writer.formatSelection` | `bold?`, `italic?`, `underline?`, `size?`, `color?`, `font?`, `alignment?` | Định dạng vùng chọn |
-| `writer.setParagraphAlignment` | `alignment` (left/center/right/justify) | Căn đoạn |
+| `writer.setParagraphAlignment` | `alignment` | Căn đoạn: left/center/right/justify |
 | `writer.insertTable` | `rows?`, `cols?`, `values?`, `style?` | Chèn bảng; `rows`/`cols` tự suy ra/nới theo `values` |
 | `writer.insertPageBreak` | — | Ngắt trang |
-| `writer.insertImage` | `path`, `width?`, `height?` | Chèn ảnh |
+| `writer.insertImage` | `path`, `width?`, `height?` | Chèn ảnh tại con trỏ (kích thước theo point) |
 | `writer.insertHyperlink` | `url`, `text?` | Chèn liên kết |
-| `writer.replaceAll` | `find`, `replace` | Tìm và thay toàn bộ |
+| `writer.replaceAll` | `find`, `replace?` | Tìm và thay toàn bộ |
 | `writer.undo` | `count?` | Hoàn tác (mỗi thao tác AI = 1 bước) |
 | `writer.exportPdf` | `path` | Xuất PDF |
-| `writer.save` / `writer.saveAs` | `path?` | Lưu / lưu thành file mới |
+| `writer.save` | — | Lưu |
+| `writer.saveAs` | `path` | Lưu thành file mới |
 | `writer.closeAll` | — | **Đóng mọi tài liệu, không lưu** |
 | `et.newWorkbook` | — | Tạo workbook mới |
 | `et.open` | `path` | Mở .xlsx/.xls/.csv |
 | `et.listSheets` | — | Danh sách sheet + sheet đang active |
 | `et.activateSheet` | `sheet` | Chuyển sheet |
 | `et.readRange` | `range`, `sheet?` | Đọc vùng, ví dụ `A1:C10` |
-| `et.writeRange` | `range` (ô trên-trái), `values`, `sheet?` | Ghi vùng |
-| `et.formatRange` | `range`, `bold?`, `italic?`, `fontSize?`, `fontColor?`, `fillColor?`, `numFmt?`, `horizontal?`, `wrap?`, `sheet?` | Định dạng vùng |
+| `et.writeRange` | `range`, `values`, `sheet?` | Ghi vùng bắt đầu từ ô trên-trái `range` |
+| `et.formatRange` | `range`, `bold?`, `italic?`, `fontSize?`, `fontColor?`, `fillColor?`, `numFmt?`, `horizontal?`, `wrap?`, `sheet?` | Định dạng vùng (màu dạng `#RRGGBB`, `horizontal` left/center/right) |
 | `et.undo` | `count?` | Hoàn tác |
 | `et.exportPdf` | `path` | Xuất PDF |
-| `et.save` / `et.saveAs` | `path?` | Lưu / lưu thành file mới |
+| `et.save` | — | Lưu |
+| `et.saveAs` | `path` | Lưu thành file mới |
 | `wpp.newPresentation` | — | Tạo bản trình chiếu mới |
 | `wpp.open` | `path` | Mở .pptx |
 | `wpp.listSlides` | — | Số slide + text từng slide |
-| `wpp.addSlide` | `layout?` (mặc định 12 = trống) | Thêm slide |
-| `wpp.addText` | `text`, `slide?`, `left?`, `top?`, `width?`, `height?`, `fontSize?`, `bold?`, `color?`, `align?` | Textbox có định dạng |
+| `wpp.addSlide` | `layout?` | Thêm slide cuối; `layout` mặc định 12 = trống (1 = tiêu đề, 2 = tiêu đề + nội dung) |
+| `wpp.addText` | `text`, `slide?`, `left?`, `top?`, `width?`, `height?`, `fontSize?`, `bold?`, `color?`, `align?` | Textbox có định dạng (`color` dạng `#RRGGBB`, `align` left/center/right) |
 | `wpp.addTextBox` | `text`, `slide?`, `left?`, `top?`, `width?`, `height?` | Textbox |
-| `wpp.addImage` | `path`, `slide?`, `left?`, `top?`, `width?`, `height?` | Chèn ảnh |
-| `wpp.addTable` | `rows?`, `cols?`, `values?`, `slide?`, vị trí/kích thước? | Bảng; `rows`/`cols` tự suy ra/nới theo `values` |
+| `wpp.addImage` | `path`, `slide?`, `left?`, `top?`, `width?`, `height?` | Chèn ảnh (kích thước gốc nếu bỏ trống `width`/`height`) |
+| `wpp.addTable` | `rows?`, `cols?`, `values?`, `slide?`, `left?`, `top?`, `width?`, `height?` | Bảng; `rows`/`cols` tự suy ra/nới theo `values` |
 | `wpp.setNotes` | `text`, `slide?` | Ghi chú thuyết trình |
-| `wpp.deleteSlide` | `slide?` (mặc định slide cuối) | Xoá slide |
+| `wpp.deleteSlide` | `slide?` | Xoá slide (mặc định slide cuối) |
 | `wpp.exportPdf` | `path` | Xuất PDF |
-| `wpp.save` / `wpp.saveAs` | `path?` | Lưu / lưu thành file mới |
+| `wpp.save` | — | Lưu |
+| `wpp.saveAs` | `path` | Lưu thành file mới |
 
 Lệnh `writer.*` tự kích hoạt tài liệu có cửa sổ hiển thị nếu `ActiveDocument` là tài liệu ẩn.
 App đang bận (dialog mở, đang gõ trong ô Excel) thì bridge tự thử lại lỗi COM "busy" tối đa 10 lần
@@ -341,6 +347,7 @@ scripts\package.ps1 [-NoBuild] # tạo dist\AxiomOffice-<version>-<ngày>-<commi
 & "src\AxiomOffice\bin\Release\AxiomOffice.Host.exe" word           # hoặc excel, ppt, wps, et, wpp
 & "src\AxiomOffice\bin\Release\AxiomOffice.Host.exe" excel --visible # hiện cửa sổ app
 & "src\AxiomOffice\bin\Release\AxiomOffice.Host.exe" llm-test        # thử cấu hình AI
+& "src\AxiomOffice\bin\Release\AxiomOffice.Host.exe" commands        # danh sách lệnh bridge (--json | --markdown)
 ```
 
 Companion tự tạo app qua COM và mở bridge ở cùng port; nếu add-in đã giữ port thì companion
@@ -348,10 +355,27 @@ chuyển sang idle. Lưu ý: trên máy có WPS, WPS có thể đăng ký đè P
 `Word/Excel/PowerPoint.Application`, khi đó companion `word|excel|ppt` tạo ra WPS thay vì Office
 thật — muốn Office thật thì mở app trực tiếp (add-in tự nạp).
 
+### Thêm lệnh bridge
+
+Mỗi lệnh `POST /cmd` khai báo **một lần** bằng một dòng `Command(...)` cạnh handler trong
+`src/AxiomOffice/Bridge/CommandDispatcher.{Writer,Spreadsheet,Presentation}.cs` (lệnh chung trong
+`CommandDispatcher.cs`): tên, loại app, handler, mô tả, tham số (`Req`/`Opt`, kèm gợi ý cho model).
+Từ đó tự có: dispatch + kiểm tra loại app, tool `office_action` của Ask AI (nếu gắn `.ForAgent()`),
+danh sách lệnh trong mô tả tool MCP `word_command` / `ppt_command` / `wps_live_command`. Sau khi
+thêm/sửa lệnh:
+
+1. `AxiomOffice.Host.exe commands --markdown` → chép đè bảng [Danh sách lệnh](#danh-sách-lệnh-post-cmd)
+   (test MCP báo lỗi nếu README lệch).
+2. Thêm lệnh vào `tests/live/test_live_commands.py` (test báo lỗi nếu có lệnh chưa được gọi).
+
 ### Kiểm thử
 
 ```powershell
-# MCP server: MCP client chính thức + so kết quả với bản Python trên cùng file (152 kiểm tra)
+# Mọi lệnh bridge trên Word/Excel/PowerPoint thật (test tự mở app riêng, xong tự đóng; dừng nếu
+# port đã có app của bạn). --wps: chạy trên WPS; --ai: thêm ai.ask (gọi LLM thật);
+# --record/--compare golden.json: ghi / so kết quả từng lệnh trước-sau khi refactor.
+tools\excel-mcp\.venv\Scripts\python.exe tests\live\test_live_commands.py [--wps] [--ai] [--compare golden.json]
+# MCP server: MCP client chính thức + so kết quả với bản Python trên cùng file, registry lệnh
 tools\excel-mcp\.venv\Scripts\python.exe tests\mcp-host\test_mcp_host.py <thư_mục_output>
 # Tạo file mẫu bằng Office thật / mở file C# ghi ra bằng Office thật
 powershell -ExecutionPolicy Bypass -File tests\mcp-host\office_roundtrip.ps1 -Dir <thư_mục_output> -Make
@@ -415,14 +439,17 @@ Cùng một DLL, một lần cài phục vụ cả hai bộ app:
 src/AxiomOffice/              COM add-in (net48)
   Connect.cs                  IDTExtensibility2 / ribbon / task pane, tạo bridge
   Ai/                         Ask AI pane (AskAiPane, PaneControls), agent (AiAgent, LlmClient, OfficeActionTool), Settings
-  Bridge/                     HttpBridge, CommandDispatcher, ComGate, SessionRegistry, EventStream, HostProbe, Config, Logger
+  Bridge/                     HttpBridge, ComGate, SessionRegistry, EventStream, HostProbe, Config, Logger
+    CommandDispatcher*.cs     lệnh POST /cmd: khai báo + handler theo app (Writer/Spreadsheet/Presentation), Params
+    CommandCatalog.cs         kiểu khai báo lệnh + sinh mô tả (office_action, MCP, README)
   Interop/                    khai báo COM của Office (IDTExtensibility2, IRibbonExtensibility, ICustomTaskPaneConsumer)
   Ribbon/                     Ribbon XML + xử lý nút
 src/AxiomOffice.Host/         AxiomOffice.Host.exe: companion + MCP server
   Mcp/                        giao thức MCP, tool file (OOXML) + live, template docx/pptx nhúng
 scripts/                      build, install, uninstall, legacy (gỡ bản WpsAiBridge), package
 scripts/dist/                 install.cmd, uninstall.cmd, HUONG-DAN-CAI-DAT.txt (vào gói cài)
-tests/mcp-host/               test parity MCP + round-trip với Office thật
+tests/live/                   test mọi lệnh bridge trên Office/WPS thật
+tests/mcp-host/               test parity MCP + registry lệnh + round-trip với Office thật
 tools/*-mcp/                  MCP servers Python (legacy)
 ```
 

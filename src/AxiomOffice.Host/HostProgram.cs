@@ -50,6 +50,11 @@ namespace AxiomOffice.Host
                 return Mcp.McpHost.Run(args);
             }
 
+            if (kind == "commands")
+            {
+                return PrintCommands(args);
+            }
+
             string progId;
             string logicalKind;
             bool office;
@@ -91,6 +96,7 @@ namespace AxiomOffice.Host
                     Console.Error.WriteLine("  wps|et|wpp : WPS Office components (KWPS/KET/KWPP.Application)");
                     Console.Error.WriteLine("  word|excel|ppt : Microsoft Office (Word/Excel/PowerPoint.Application)");
                     Console.Error.WriteLine("usage: AxiomOffice.Host.exe mcp [all|word|excel|ppt] [--list]  (MCP server over stdio)");
+                    Console.Error.WriteLine("usage: AxiomOffice.Host.exe commands [--json|--markdown]  (bridge command list)");
                     return 2;
             }
 
@@ -165,6 +171,28 @@ namespace AxiomOffice.Host
             }
             catch
             {
+            }
+            return 0;
+        }
+
+        // Danh sách lệnh POST /cmd từ registry: bảng README (--markdown), JSON cho test (--json).
+        private static int PrintCommands(string[] args)
+        {
+            Console.OutputEncoding = new System.Text.UTF8Encoding(false);
+            if (Array.IndexOf(args, "--json") >= 0)
+            {
+                Console.WriteLine(CommandCatalog.ToJson());
+            }
+            else if (Array.IndexOf(args, "--markdown") >= 0)
+            {
+                Console.Write(CommandCatalog.ToMarkdown());
+            }
+            else
+            {
+                foreach (CommandInfo command in CommandCatalog.All)
+                {
+                    Console.WriteLine(command.Signature);
+                }
             }
             return 0;
         }
