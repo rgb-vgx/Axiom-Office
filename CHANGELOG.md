@@ -5,6 +5,13 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Docs — `New_arch.md`: yêu cầu triển khai Agent Core
+- Bản yêu cầu cho phiên làm việc mới: tách agent ra process riêng `AxiomOffice.Core.exe` (.NET 10,
+  một bản mỗi người dùng) với hội thoại liên tục, skills (`SKILL.md`), memory SQLite, policy/xác
+  nhận, MCP client; add-in mỏng lại, giữ agent in-process làm dự phòng
+- Hợp đồng Core API v1 + SSE, `GET /commands` trên bridge, schema DB, build/đóng gói, chiến lược
+  test (fake LLM theo kịch bản), 4 giai đoạn có tiêu chí hoàn thành, quy tắc bắt buộc của dự án
+
 ### Docs — `ARCHITECTURE.MD`: tài liệu thiết kế
 - Phần I, High Level Design: mục tiêu và phạm vi, bối cảnh hệ thống, container, khối chức năng,
   kịch bản chính, triển khai, yêu cầu phi chức năng, quyết định kiến trúc (AD-1..AD-10), rủi ro
