@@ -113,8 +113,10 @@ Hành vi:
   đầu; agent vẫn tự đọc tài liệu khi cần.
 - Lỗi hiện thành thẻ có **Thử lại** / **Mở Cài đặt**. Chưa cấu hình endpoint/model thì ô nhập bị
   khoá kèm hướng dẫn.
-- Provider: OpenAI-compatible và Anthropic. Provider không hỗ trợ tools thì tự chuyển sang chat
-  thường.
+- Provider: OpenAI-compatible, Anthropic và **Google Gemini** (chọn trong Cài đặt: endpoint
+  `https://generativelanguage.googleapis.com/v1beta/openai`, API key lấy ở aistudio.google.com, model
+  vd `gemini-2.5-flash`). Provider không hỗ trợ tools thì tự chuyển sang chat thường. Đổi provider/model
+  trong Cài đặt có hiệu lực từ lượt chạy tiếp theo, không cần khởi động lại.
 - Transcript mỗi lượt nằm trong `bridge.log` (`AskAiPane: prompt=` / `AskAiPane progress:` /
   `AskAiPane: ok ... N tool calls, M rounds` / `AskAiPane failed`), ghi ngay cả khi pane đã đóng.
 - Agent bên ngoài gọi cùng logic qua lệnh bridge `ai.ask`.

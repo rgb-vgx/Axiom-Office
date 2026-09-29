@@ -9,6 +9,10 @@ namespace AxiomOffice.Ai
     {
         private const string DefaultOpenAiEndpoint = "https://api.openai.com/v1";
         private const string DefaultAnthropicEndpoint = "https://api.anthropic.com/v1";
+        // Gemini dung endpoint OpenAI-compatible cua Google: luu provider "openai" nen Core, agent in-process
+        // va ban cai cu deu chay duoc, khong can SDK rieng.
+        private const string DefaultGeminiEndpoint = "https://generativelanguage.googleapis.com/v1beta/openai";
+        private const string DefaultGeminiModel = "gemini-2.5-flash";
 
         private readonly ComboBox _provider;
         private readonly TextBox _endpoint;
@@ -31,6 +35,7 @@ namespace AxiomOffice.Ai
             _provider = new ComboBox { Left = 110, Top = 15, Width = 370, DropDownStyle = ComboBoxStyle.DropDownList };
             _provider.Items.Add("OpenAI-compatible");
             _provider.Items.Add("Anthropic");
+            _provider.Items.Add("Google Gemini");
 
             var lblEndpoint = new Label { Text = "Endpoint:", Left = 14, Top = 55, Width = 90 };
             _endpoint = new TextBox { Left = 110, Top = 51, Width = 370 };
@@ -43,7 +48,7 @@ namespace AxiomOffice.Ai
 
             var hint = new Label
             {
-                Text = "OpenAI-compatible: base URL (e.g. https://api.openai.com/v1, http://localhost:11434/v1). Model name is free text.",
+                Text = "OpenAI-compatible: base URL (e.g. https://api.openai.com/v1, http://localhost:11434/v1). Gemini: key from aistudio.google.com.",
                 Left = 110,
                 Top = 151,
                 Width = 370,
@@ -74,24 +79,40 @@ namespace AxiomOffice.Ai
             return _provider.SelectedIndex == 1 ? "anthropic" : "openai";
         }
 
+        private string DefaultEndpoint()
+        {
+            return _provider.SelectedIndex == 1 ? DefaultAnthropicEndpoint
+                : _provider.SelectedIndex == 2 ? DefaultGeminiEndpoint
+                : DefaultOpenAiEndpoint;
+        }
+
+        internal static bool IsGeminiEndpoint(string endpoint)
+        {
+            return (endpoint ?? "").IndexOf("generativelanguage.googleapis.com", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
         private void LoadConfig()
         {
-            _provider.SelectedIndex = Config.LlmProvider == "anthropic" ? 1 : 0;
+            _provider.SelectedIndex = Config.LlmProvider == "anthropic" ? 1 : IsGeminiEndpoint(Config.LlmEndpoint) ? 2 : 0;
             _endpoint.Text = Config.LlmEndpoint;
             _apiKey.Text = Config.LlmApiKey;
             _model.Text = Config.LlmModel;
             if (string.IsNullOrEmpty(_endpoint.Text))
             {
-                _endpoint.Text = SelectedProvider() == "anthropic" ? DefaultAnthropicEndpoint : DefaultOpenAiEndpoint;
+                _endpoint.Text = DefaultEndpoint();
             }
         }
 
         private void OnProviderChanged(object sender, EventArgs e)
         {
             string current = (_endpoint.Text ?? "").Trim();
-            if (current.Length == 0 || current == DefaultOpenAiEndpoint || current == DefaultAnthropicEndpoint)
+            if (current.Length == 0 || current == DefaultOpenAiEndpoint || current == DefaultAnthropicEndpoint || current == DefaultGeminiEndpoint)
             {
-                _endpoint.Text = SelectedProvider() == "anthropic" ? DefaultAnthropicEndpoint : DefaultOpenAiEndpoint;
+                _endpoint.Text = DefaultEndpoint();
+            }
+            if (_provider.SelectedIndex == 2 && (_model.Text ?? "").Trim().Length == 0)
+            {
+                _model.Text = DefaultGeminiModel;
             }
         }
 

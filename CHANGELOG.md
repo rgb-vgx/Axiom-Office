@@ -6,6 +6,12 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- **Google Gemini** trong Cài đặt: chọn "Google Gemini" điền sẵn endpoint OpenAI-compatible của Google
+  (`https://generativelanguage.googleapis.com/v1beta/openai`) và model `gemini-2.5-flash`; lưu dạng
+  provider `openai` nên Core, agent in-process và bản cài cũ đều dùng được (không cần SDK
+  `Google.GenAI` — SDK chỉ chạy được trong Core .NET 10, còn add-in là .NET Framework 4.8)
+- Core đọc lại cấu hình LLM (provider/endpoint/key/model) **mỗi lượt chạy** (`Models/ModelSource.cs`):
+  trước đây chỉ đọc lúc khởi động nên đổi model trong Cài đặt không có tác dụng tới khi Core khởi động lại
 - `writer.formatTable` (agent dùng được): định dạng bảng **có sẵn** — kiểu, font, cỡ, màu chữ, màu
   hàng tiêu đề, màu sọc, viền, căn lề, co giãn. Trước đây không có lệnh này nên với "tô màu bảng cho
   đẹp" agent phải `undo` (xoá cả bảng và ghi chú) rồi dựng lại, mất 20 vòng/112s

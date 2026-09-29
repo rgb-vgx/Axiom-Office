@@ -69,9 +69,9 @@ var stores = new CoreStores(paths);
 var http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
 var bridge = new BridgeClient(config, http, CoreLog.Info);
 var sessions = new SessionDirectory(config.SessionDirectoryOverride ?? SessionDirectory.DefaultDirectory);
-var model = new ModelClient(http, config.LlmProvider, config.LlmEndpoint, config.LlmApiKey, config.LlmModel);
+var models = new ModelSource(http, () => CoreConfig.Load(builder.Configuration));
 var manager = new RunManager();
-var orchestrator = new Orchestrator(config, bridge, sessions, stores.Conversations, stores.Runs, model, new ContextAssembler());
+var orchestrator = new Orchestrator(config, bridge, sessions, stores.Conversations, stores.Runs, models.Current, new ContextAssembler());
 
 CoreApi.Map(app, config, paths, runtime, stores);
 RunEndpoints.Map(app, manager, orchestrator, stores);
@@ -107,7 +107,7 @@ app.Lifetime.ApplicationStopped.Register(() =>
 
 CoreLog.Info($"Agent Core starting: port={port} pid={Environment.ProcessId} version={CoreVersion.Value} "
     + $"singleInstance={config.SingleInstance} dataDir={paths.Root} sessionDir={sessions.Directory} "
-    + $"provider={model.Codec.Name} model={model.Model}");
+    + $"provider={models.Current().Codec.Name} model={models.Current().Model}");
 
 try
 {

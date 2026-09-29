@@ -120,7 +120,7 @@ public class OrchestratorTests : IDisposable
         var http = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
         var bridge = new BridgeClient(config, http);
         var model = new ModelClient(http, "openai", config.LlmEndpoint, config.LlmApiKey, config.LlmModel);
-        return new Orchestrator(config, bridge, WriteSessionFile(), _stores.Conversations, _stores.Runs, model, new ContextAssembler());
+        return new Orchestrator(config, bridge, WriteSessionFile(), _stores.Conversations, _stores.Runs, () => model, new ContextAssembler());
     }
 
     private (Orchestrator Orchestrator, ScriptedHandler Handler) CreateOrchestrator(

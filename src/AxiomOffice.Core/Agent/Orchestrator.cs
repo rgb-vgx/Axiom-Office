@@ -17,11 +17,13 @@ public sealed class Orchestrator(
     SessionDirectory sessions,
     ConversationStore conversations,
     RunStore runs,
-    ModelClient model,
+    Func<ModelClient> models,
     ContextAssembler assembler)
 {
     public async Task ExecuteAsync(RunState run, Api.RunRequest request, CancellationToken cancel)
     {
+        // Moi luot lay client theo cau hinh hien tai (doi model trong Cai dat khong can khoi dong lai Core).
+        ModelClient model = models();
         var actions = new ConcurrentDictionary<string, (string? Action, string? Params)>(StringComparer.Ordinal);
         try
         {
@@ -210,7 +212,7 @@ public sealed class Orchestrator(
             }
 
             runs.Finish(run.Id, run.Status, run.Rounds, run.InputTokens, run.OutputTokens, run.Error);
-            await MaybeSummarizeAsync(conversation, userSeq, cancel).ConfigureAwait(false);
+            await MaybeSummarizeAsync(model, conversation, userSeq, cancel).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -264,7 +266,7 @@ public sealed class Orchestrator(
 
     private const int SummaryEvery = 20;
 
-    private async Task MaybeSummarizeAsync(ConversationRow conversation, int userSeq, CancellationToken cancel)
+    private async Task MaybeSummarizeAsync(ModelClient model, ConversationRow conversation, int userSeq, CancellationToken cancel)
     {
         IReadOnlyList<MessageRow> history = conversations.Messages(conversation.Id, limit: 60);
         if (history.Count == 0 || !ShouldSummarize(userSeq, history[^1].Seq))
