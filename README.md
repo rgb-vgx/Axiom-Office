@@ -109,8 +109,10 @@ Hành vi:
   trong tài liệu đang mở, người dùng tự quyết khi nào lưu và lưu ở đâu.
 - **Nhớ theo tài liệu**: các lượt trong cùng một tài liệu nối thành một cuộc trò chuyện (lưu ở
   Core, `%LOCALAPPDATA%\AxiomOffice\core\core.db`), nên "làm tiếp" hiểu ngữ cảnh lượt trước và mở
-  lại tài liệu sau vẫn tiếp tục đúng mạch. Link **Cuộc trò chuyện mới** ở footer để bắt đầu lại từ
-  đầu; agent vẫn tự đọc tài liệu khi cần.
+  lại tài liệu sau vẫn tiếp tục đúng mạch. Link **Trò chuyện mới** ở header (cạnh Cài đặt) để bắt đầu
+  lại từ đầu; agent vẫn tự đọc tài liệu khi cần.
+- **Hoàn tác lượt này** (Word): sau mỗi lượt có sửa tài liệu, link ở footer hoàn tác toàn bộ thao tác
+  của lượt đó (mỗi thao tác AI = 1 bước Ctrl+Z). Excel/PowerPoint không hoàn tác được thay đổi qua COM.
 - Lỗi hiện thành thẻ có **Thử lại** / **Mở Cài đặt**. Chưa cấu hình endpoint/model thì ô nhập bị
   khoá kèm hướng dẫn.
 - Provider: OpenAI-compatible, Anthropic và **Google Gemini** (chọn trong Cài đặt: endpoint

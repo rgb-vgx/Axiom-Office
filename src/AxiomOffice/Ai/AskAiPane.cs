@@ -32,6 +32,9 @@ namespace AxiomOffice.Ai
         private readonly LinkLabel _insertLink;
         private readonly LinkLabel _stopLink;
         private readonly LinkLabel _newChatLink;
+        private readonly LinkLabel _undoLink;
+        private int _runEdits;                       // so thao tac writer.* sua tai lieu thanh cong trong luot (Word)
+        private int _lastRunEdits;
         private EmptyState _empty;
         private string _conversationId;              // hoi thoai ben Agent Core, theo tai lieu dang mo
         private bool _freshConversation;             // nguoi dung vua bam "Cuoc tro chuyen moi"
@@ -100,12 +103,13 @@ namespace AxiomOffice.Ai
             _busyDot = new AccentDot(PaneTheme.Px(6)) { Dock = DockStyle.Left, Width = PaneTheme.Px(12), Visible = false };
             _insertLink = MakeFooterLink("Chèn trả lời");
             _stopLink = MakeFooterLink("Dừng");
-            _newChatLink = MakeFooterLink("Cuộc trò chuyện mới");
+            _undoLink = MakeFooterLink("Hoàn tác lượt này");
+            _undoLink.AccessibleName = "Hoàn tác toàn bộ thay đổi của lượt AI vừa rồi";
             footer.Controls.Add(_status);
             footer.Controls.Add(_busyDot);
             footer.Controls.Add(_insertLink);
             footer.Controls.Add(_stopLink);
-            footer.Controls.Add(_newChatLink);
+            footer.Controls.Add(_undoLink);
 
             var header = new DividerPanel { Dock = DockStyle.Top, Height = PaneTheme.Px(PaneTheme.HeaderH) };
             var dot = new AccentDot(PaneTheme.Px(8));
@@ -116,10 +120,14 @@ namespace AxiomOffice.Ai
             _headerSubtitle = PaneTheme.MakeLabel("", PaneTheme.Caption, PaneTheme.TextMuted);
             _headerSubtitle.AutoEllipsis = true;
             _settingsLink = PaneTheme.MakeLink("Cài đặt", PaneTheme.Caption);
+            // New_arch.md mục 9.2: link ở header (trước đây ở footer, người dùng không thấy trong Word).
+            _newChatLink = PaneTheme.MakeLink("Trò chuyện mới", PaneTheme.Caption);
+            _newChatLink.AccessibleName = "Bắt đầu cuộc trò chuyện mới cho tài liệu này";
             header.Controls.Add(dot);
             header.Controls.Add(title);
             header.Controls.Add(_headerSubtitle);
             header.Controls.Add(_settingsLink);
+            header.Controls.Add(_newChatLink);
             header.Resize += delegate { LayoutHeader(header); };
 
             Controls.Add(_chat);
@@ -137,6 +145,7 @@ namespace AxiomOffice.Ai
             _insertLink.LinkClicked += OnInsert;
             _stopLink.LinkClicked += delegate { OnStop(); };
             _newChatLink.LinkClicked += delegate { StartNewConversation(); };
+            _undoLink.LinkClicked += delegate { UndoLastRun(); };
             _settingsLink.LinkClicked += delegate { OpenSettings(); };
             _composer.Resize += delegate { LayoutComposer(); };
             Load += delegate
@@ -175,8 +184,10 @@ namespace AxiomOffice.Ai
         {
             int padX = PaneTheme.Px(PaneTheme.PadX);
             _settingsLink.Location = new Point(header.ClientSize.Width - padX - _settingsLink.Width, (header.ClientSize.Height - _settingsLink.Height) / 2);
+            _newChatLink.Location = new Point(_settingsLink.Left - PaneTheme.Px(12) - _newChatLink.Width, _settingsLink.Top);
+            int right = _newChatLink.Visible ? _newChatLink.Left : _settingsLink.Left;
             int left = PaneTheme.Px(28);
-            _headerSubtitle.SetBounds(left, PaneTheme.Px(26), Math.Max(PaneTheme.Px(40), _settingsLink.Left - PaneTheme.Px(8) - left), PaneTheme.Px(16));
+            _headerSubtitle.SetBounds(left, PaneTheme.Px(26), Math.Max(PaneTheme.Px(40), right - PaneTheme.Px(8) - left), PaneTheme.Px(16));
         }
 
         private void LayoutComposer()
@@ -251,6 +262,11 @@ namespace AxiomOffice.Ai
             string model = (Config.LlmModel ?? "").Trim();
             string endpoint = (Config.LlmEndpoint ?? "").Trim();
             _headerSubtitle.Text = HostLabel() + " · " + (model.Length > 0 ? model : "Chưa chọn model");
+            _newChatLink.Visible = CoreClient.Instance.Enabled;
+            if (_newChatLink.Parent != null)
+            {
+                LayoutHeader(_newChatLink.Parent);
+            }
 
             string reason = null;
             if (CurrentHost == null)
@@ -367,6 +383,8 @@ namespace AxiomOffice.Ai
             _run = run;
             _busy = true;
             _toolCount = 0;
+            _runEdits = 0;
+            _undoLink.Visible = false;
             _lastPrompt = promptText;
             _insertLink.Visible = false;
             _stopLink.Visible = true;
@@ -572,7 +590,6 @@ namespace AxiomOffice.Ai
 
             _conversationId = null;
             _freshConversation = true;
-            _newChatLink.Visible = false;
             _chat.AddInfo("Bắt đầu cuộc trò chuyện mới cho tài liệu này.");
             Logger.Info("AskAiPane: new conversation requested");
             _prompt.Focus();
@@ -709,6 +726,65 @@ namespace AxiomOffice.Ai
                 _toolCount++;
                 SetStatus("Đang xử lý… · bước " + (_toolCount + 1), false);
             }
+            if (item.Succeeded && IsWordEdit(item.ActionId))
+            {
+                _runEdits++;
+            }
+        }
+
+        // Lệnh writer.* có sửa tài liệu (mỗi lệnh = 1 bước Undo nhờ UndoRecordScope); lệnh đọc/soát/lưu không tính.
+        internal static bool IsWordEdit(string action)
+        {
+            if (string.IsNullOrEmpty(action) || !action.StartsWith("writer.", StringComparison.Ordinal))
+            {
+                return false;
+            }
+            switch (action)
+            {
+                case "writer.getText":
+                case "writer.selection":
+                case "writer.checkTables":
+                case "writer.save":
+                case "writer.saveAs":
+                case "writer.exportPdf":
+                case "writer.undo":
+                    return false;
+                default:
+                    return true;
+            }
+        }
+
+        // "Hoàn tác lượt này" (New_arch.md mục 9.2, chỉ Word): writer.undo {count: số thao tác sửa của lượt}.
+        // Excel/PowerPoint không hoàn tác được thay đổi qua COM nên không có nút.
+        private void UndoLastRun()
+        {
+            Connect host = CurrentHost;
+            if (host == null || _busy || _lastRunEdits <= 0)
+            {
+                return;
+            }
+            try
+            {
+                var serializer = new System.Web.Script.Serialization.JavaScriptSerializer();
+                var arguments = new Dictionary<string, object>
+                {
+                    { "action", "writer.undo" },
+                    { "params", new Dictionary<string, object> { { "count", _lastRunEdits } } }
+                };
+                string reply = OfficeActionTool.Execute(host, OfficeActionTool.ToolName, serializer.Serialize(arguments));
+                Logger.Info("AskAiPane: undo last run (" + _lastRunEdits + " edits) -> " + Truncate(reply, 200));
+                bool ok = reply.IndexOf("\"ok\":true", StringComparison.Ordinal) >= 0;
+                _chat.AddInfo(ok ? "Đã hoàn tác " + _lastRunEdits + " thao tác của lượt vừa rồi." : "Không hoàn tác được: " + Truncate(reply, 120));
+                _undoLink.Visible = !ok;
+                if (ok)
+                {
+                    _lastRunEdits = 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                SetStatus("Hoàn tác thất bại: " + Truncate(ex.Message, 100), true);
+            }
         }
 
         private void FinishRun(CancellationTokenSource run, Connect host, LlmResult result)
@@ -724,11 +800,13 @@ namespace AxiomOffice.Ai
             _busyDot.Visible = false;
             _chat.RemoveTyping();
             _lastRunViaCore = result.ViaCore;
+            _lastRunEdits = _runEdits;
+            _undoLink.Visible = host.AppKind == "wps" && _runEdits > 0;
             if (result.ViaCore && result.Ok)
             {
                 PollExtractedMemories(result.RunId);
             }
-            _newChatLink.Visible = _conversationId != null;
+            _newChatLink.Visible = CoreClient.Instance.Enabled;
             string seconds = result.Seconds.ToString("0.0");
 
             if (result.Ok)

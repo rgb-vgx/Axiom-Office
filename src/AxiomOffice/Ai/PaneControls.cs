@@ -440,6 +440,16 @@ namespace AxiomOffice.Ai
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
         }
 
+        public string ActionId
+        {
+            get { return _actionId; }
+        }
+
+        public bool Succeeded
+        {
+            get { return _state == ToolState.Ok; }
+        }
+
         public bool IsToolCall
         {
             get { return _state != ToolState.Info; }

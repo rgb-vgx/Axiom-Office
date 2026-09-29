@@ -19,6 +19,9 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
   xác nhận ngay); bridge xử lý `ai.ask` trên thread riêng để Core gọi ngược `/cmd` không bị kẹt
 - **QA thị giác tuỳ chọn** (`VisualQaEnabled`, tắt mặc định): lệnh bridge `app.screenshot` (PrintWindow, thu
   nhỏ), tool `look_at_document` gửi ảnh cho model (OpenAI `image_url` / Anthropic khối `image`); Cài đặt có ô bật
+- Pane (New_arch.md mục 9.2): nút **Hoàn tác lượt này** trong Word (đếm thao tác `writer.*` có sửa tài liệu
+  của lượt, gọi `writer.undo {count: N}`; hiện cả sau khi bấm Dừng); link **Trò chuyện mới** chuyển lên header
+  cạnh Cài đặt và luôn hiện khi dùng Agent Core (trước ở footer, khó thấy trong Word)
 - `ARCHITECTURE.MD`: HLD cập nhật cho Agent Core (container, khối chức năng, kịch bản K1/K6/K7, triển khai,
   NFR, AD-11…AD-17, rủi ro) + LLD mục 22 Agent Core
 - Test: 194 unit test Core; e2e 76 kiểm tra (xác nhận đồng ý/từ chối/hết giờ, MCP server mẫu Python stdlib,
