@@ -241,7 +241,8 @@ công cụ); lệnh khai báo cạnh handler trong `src/AxiomOffice/Bridge/Comma
 | `writer.formatSelection` | `bold?`, `italic?`, `underline?`, `size?`, `color?`, `font?`, `alignment?` | Định dạng vùng chọn | ✓ |
 | `writer.setParagraphAlignment` | `alignment` | Căn đoạn: left/center/right/justify | ✓ |
 | `writer.insertTable` | `rows?`, `cols?`, `values?`, `style?` | Chèn bảng; `rows`/`cols` tự suy ra/nới theo `values` | ✓ |
-| `writer.formatTable` | `table?`, `style?`, `font?`, `size?`, `color?`, `headerFill?`, `headerColor?`, `headerBold?`, `bandFill?`, `borderColor?`, `alignment?`, `autoFit?` | Định dạng bảng có sẵn (mặc định: bảng tại con trỏ, không có thì bảng cuối); phần host không hỗ trợ trả về trong `skipped` | ✓ |
+| `writer.formatTable` | `table?`, `style?`, `font?`, `size?`, `color?`, `headerFill?`, `headerColor?`, `headerBold?`, `bandFill?`, `borderColor?`, `borders?`, `alignment?`, `autoFit?` | Định dạng bảng có sẵn (mặc định: bảng tại con trỏ, không có thì bảng cuối); phần host không hỗ trợ trả về trong `skipped` | ✓ |
+| `writer.checkTables` | — | QA cấu trúc (chỉ đọc): số dòng/cột, ô trống, ô tiêu đề lẫn đoạn văn | ✓ |
 | `writer.insertPageBreak` | — | Ngắt trang | ✓ |
 | `writer.insertImage` | `path`, `width?`, `height?` | Chèn ảnh tại con trỏ (kích thước theo point) | ✓ |
 | `writer.insertHyperlink` | `url`, `text?` | Chèn liên kết | ✓ |
@@ -258,6 +259,7 @@ công cụ); lệnh khai báo cạnh handler trong `src/AxiomOffice/Bridge/Comma
 | `et.readRange` | `range`, `sheet?` | Đọc vùng, ví dụ `A1:C10` | ✓ |
 | `et.writeRange` | `range`, `values`, `sheet?` | Ghi vùng bắt đầu từ ô trên-trái `range` | ✓ |
 | `et.formatRange` | `range`, `bold?`, `italic?`, `fontSize?`, `fontColor?`, `fillColor?`, `numFmt?`, `horizontal?`, `wrap?`, `sheet?` | Định dạng vùng (màu dạng `#RRGGBB`, `horizontal` left/center/right) | ✓ |
+| `et.checkRange` | `range?`, `sheet?` | QA cấu trúc (chỉ đọc): tiêu đề trống, kiểu lẫn lộn, số dạng chữ, số lẻ chưa có number format, ô lỗi, dữ liệu lạc ngoài bảng | ✓ |
 | `et.undo` | `count?` | Hoàn tác | ✓ |
 | `et.exportPdf` | `path` | Xuất PDF | ✓ |
 | `et.save` | — | Lưu | ✓ |
@@ -272,6 +274,7 @@ công cụ); lệnh khai báo cạnh handler trong `src/AxiomOffice/Bridge/Comma
 | `wpp.addTable` | `rows?`, `cols?`, `values?`, `slide?`, `left?`, `top?`, `width?`, `height?` | Bảng; `rows`/`cols` tự suy ra/nới theo `values` | ✓ |
 | `wpp.setNotes` | `text`, `slide?` | Ghi chú thuyết trình | ✓ |
 | `wpp.deleteSlide` | `slide?` | Xoá slide (mặc định slide cuối) | ✓ |
+| `wpp.checkLayout` | `slide?` | QA cấu trúc (chỉ đọc): chữ tràn khung, shape ra ngoài slide, shape chồng nhau, chữ < 12pt, slide quá nhiều chữ | ✓ |
 | `wpp.exportPdf` | `path` | Xuất PDF | ✓ |
 | `wpp.save` | — | Lưu | ✓ |
 | `wpp.saveAs` | `path` | Lưu thành file mới | ✓ |

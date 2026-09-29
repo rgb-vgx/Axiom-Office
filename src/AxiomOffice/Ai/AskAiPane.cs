@@ -465,6 +465,18 @@ namespace AxiomOffice.Ai
                 return null;
             }
 
+            if (item.Type == "skill.loaded")
+            {
+                // Dòng thông tin (không có " -> ") - New_arch.md mục 7.4.
+                return "(Dùng kỹ năng: " + (item.Name ?? "?") + ")";
+            }
+
+            // load_skill / read_skill_file: đã có dòng "Dùng kỹ năng", không hiện như thao tác trên tài liệu.
+            if (item.Type == "tool.finished" && !string.IsNullOrEmpty(item.Tool) && item.Tool != "office_action")
+            {
+                return null;
+            }
+
             if (item.Type == "tool.finished")
             {
                 string outcome = !string.IsNullOrEmpty(item.ResultPreview)

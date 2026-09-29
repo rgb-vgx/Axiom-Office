@@ -23,6 +23,7 @@ namespace AxiomOffice.Bridge
             .Concat(WriterCommands())
             .Concat(SpreadsheetCommands())
             .Concat(PresentationCommands())
+            .Concat(CheckCommands())
             .ToArray();
 
         private static readonly Dictionary<string, CommandInfo> CommandsByName =

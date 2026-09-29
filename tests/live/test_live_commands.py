@@ -207,6 +207,14 @@ def test_writer(b, out, png, run_ai):
     b.cmd("writer.typeText", {"text": "SAU_BANG"}, record=False)
     whole = (b.cmd("writer.getText", record=False) or {}).get("text", "")
     check("SAU_BANG" in whole and whole.index("SAU_BANG") > whole.index("ONE_C2"), "Word chữ gõ sau insertTable nằm SAU bảng", whole[-120:])
+    # QA cấu trúc: đoạn ghi chú lọt vào ô tiêu đề (log 30/09) + ô trống.
+    b.cmd("writer.insertTable", {"values": [["Lịch họp áp dụng cho toàn bộ phòng ban - thời gian có thể điều chỉnh.Thứ", "Giờ", "Nội dung"],
+                                            ["Hai", "8h", ""]]}, key="writer.insertTable qa")
+    tables_qa = b.cmd("writer.checkTables", key="writer.checkTables") or {}
+    table_kinds = {i.get("type") for i in tables_qa.get("issues", [])}
+    check({"long-header-cell", "empty-cells"} <= table_kinds, "Word checkTables bắt ô tiêu đề lẫn đoạn văn + ô trống", tables_qa)
+    borderless = b.cmd("writer.formatTable", {"borders": False}, key="writer.formatTable borders false")
+    check(borderless and "borders" in borderless.get("applied", []), "Word formatTable bỏ viền bảng", borderless)
     styled = b.cmd("writer.formatTable", {"font": "Calibri", "size": "12", "headerFill": "1F4E79", "headerColor": "#FFFFFF",
                                           "bandFill": "#DEEAF6", "borderColor": "#8EAADB", "alignment": "center", "autoFit": "window"},
                    key="writer.formatTable last table")
@@ -275,6 +283,16 @@ def test_spreadsheet(b, out, run_ai):
     check(values and values["values"][1][2] == 19, "Excel công thức =B2*2 tính ra 19", values)
     b.cmd("et.readRange", {"range": "E1:K3"}, key="et.readRange others")
     b.cmd("et.formatRange", {"range": "A1:C1", "bold": True, "fillColor": "#FFFF00", "fontColor": "#0000FF", "numFmt": "0.00", "horizontal": "center", "wrap": True})
+    # QA cấu trúc: B2 = 9.5 để General -> no-number-format; cả sheet có dữ liệu ngoài bảng A1:C3 -> outside-table.
+    table_qa = b.cmd("et.checkRange", {"range": "A1:C3"}, key="et.checkRange table") or {}
+    table_kinds = {i.get("type") for i in table_qa.get("issues", [])}
+    check(table_qa.get("rows") == 3 and table_qa.get("cols") == 3 and "no-number-format" in table_kinds and "outside-table" not in table_kinds,
+          "Excel checkRange: 3x3, số lẻ chưa có number format", table_qa)
+    sheet_qa = b.cmd("et.checkRange", {}, key="et.checkRange sheet") or {}
+    check("outside-table" in {i.get("type") for i in sheet_qa.get("issues", [])}, "Excel checkRange bắt dữ liệu lạc ngoài bảng", sheet_qa)
+    b.cmd("et.writeRange", {"range": "M1", "values": [["Mã", "Giá"], ["x", "'12"], ["y", "'15"]]}, key="et.writeRange numbers as text")
+    text_qa = b.cmd("et.checkRange", {"range": "M1:N3"}, key="et.checkRange numbers as text") or {}
+    check("numbers-as-text" in {i.get("type") for i in text_qa.get("issues", [])}, "Excel checkRange bắt số lưu dạng chữ", text_qa)
     b.cmd("et.activateSheet", {"sheet": "Sheet1"})
     b.cmd("et.writeRange", {"range": "A5", "values": [["hoàn tác tôi"]]}, key="et.writeRange before undo")
     b.cmd("et.undo", {"count": 1})
@@ -314,6 +332,21 @@ def test_presentation(b, out, png, run_ai):
     check(listing and listing.get("slideCount") == 2, "PowerPoint listSlides có 2 slide", listing)
     b.cmd("wpp.addSlide", {"layout": 12}, key="wpp.addSlide third")
     b.cmd("wpp.deleteSlide", {})
+    # QA cấu trúc (New_arch.md 8.4.6): ca dựng sẵn - hai hộp chồng nhau + chữ dài tràn quá đáy slide.
+    clean = b.cmd("wpp.checkLayout", {"slide": 1}, key="wpp.checkLayout clean slide")
+    check(clean and clean.get("issueCount") == 0, "PowerPoint checkLayout slide gọn không báo lỗi", clean)
+    b.cmd("wpp.addSlide", {"layout": 12}, key="wpp.addSlide qa")
+    b.cmd("wpp.addText", {"text": "Hộp A", "left": 40, "top": 100, "width": 400, "height": 100, "fontSize": 20}, key="wpp.addText qa A")
+    b.cmd("wpp.addText", {"text": "Hộp B", "left": 80, "top": 105, "width": 400, "height": 100, "fontSize": 20}, key="wpp.addText qa B")
+    long_text = "\r".join("Dòng nội dung dài số %d để tràn quá đáy slide" % i for i in range(1, 9))
+    b.cmd("wpp.addText", {"text": long_text, "left": 40, "top": 380, "width": 600, "height": 60, "fontSize": 20}, key="wpp.addText qa overflow")
+    b.cmd("wpp.addText", {"text": "chú thích nhỏ", "left": 500, "top": 20, "width": 200, "height": 30, "fontSize": 9}, key="wpp.addText qa small")
+    qa = b.cmd("wpp.checkLayout", {"slide": 3}, key="wpp.checkLayout seeded issues") or {}
+    kinds = {i.get("type") for s in qa.get("slides", []) for i in s.get("issues", [])}
+    check({"overlap", "offslide", "small-font"} <= kinds or ({"overlap", "overflow", "small-font"} <= kinds),
+          "PowerPoint checkLayout bắt được chồng + tràn + chữ nhỏ", qa)
+    b.cmd("wpp.checkLayout", {"slide": 99}, expect_ok=False, key="wpp.checkLayout bad slide")
+    b.cmd("wpp.deleteSlide", {}, key="wpp.deleteSlide qa")
     pdf = os.path.join(out, "wpp.pdf")
     b.cmd("wpp.exportPdf", {"path": pdf})
     check(os.path.getsize(pdf) > 1000, "PowerPoint exportPdf tạo file", pdf)

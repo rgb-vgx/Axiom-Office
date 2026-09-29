@@ -249,6 +249,43 @@ public sealed class SkillTests : IDisposable
         Assert.Equal(SkillFiles.MaxTextBytes, json["content"]!.GetValue<string>().Length);
     }
 
+    private static string RepoSkills()
+    {
+        for (DirectoryInfo? dir = new(AppContext.BaseDirectory); dir != null; dir = dir.Parent)
+        {
+            if (File.Exists(Path.Combine(dir.FullName, "New_arch.md")))
+            {
+                return Path.Combine(dir.FullName, "skills");
+            }
+        }
+
+        throw new InvalidOperationException("repo root not found");
+    }
+
+    [Fact]
+    public void Skill_dung_san_trong_repo_hop_le_va_dung_app()
+    {
+        using var index = new SkillIndex([new SkillSource("builtin", RepoSkills())]);
+
+        Assert.Empty(index.Errors);
+        string[] expected = ["bang-diem", "bao-cao-du-lieu", "bao-cao-thang", "the-thuc-van-ban", "thiet-ke-van-phong", "trinh-bay-chuyen-nghiep", "van-ban-hanh-chinh"];
+        Assert.Equal(expected, index.All.Select(s => s.Name));
+        Assert.Equal(["the-thuc-van-ban", "thiet-ke-van-phong", "van-ban-hanh-chinh"], index.ForApp("wps").Select(s => s.Name));
+        Assert.Equal(["bang-diem", "bao-cao-du-lieu", "thiet-ke-van-phong"], index.ForApp("et").Select(s => s.Name));
+        Assert.Equal(["bao-cao-thang", "thiet-ke-van-phong", "trinh-bay-chuyen-nghiep"], index.ForApp("wpp").Select(s => s.Name));
+        foreach (SkillDefinition skill in index.All)
+        {
+            // Chuan: mo ta ngoi ba co "Dung khi" (khi nao dung); than gon (< 500 dong).
+            Assert.Contains("Dùng khi", skill.Description);
+            Assert.True(skill.Body.Split('\n').Length < 500, skill.Name);
+            Assert.Equal(skill.Name, Path.GetFileName(skill.Directory));
+        }
+
+        string tokens = Path.Combine(index.ResourceDirectory("_design")!, "tokens.json");
+        JsonNode parsed = JsonNode.Parse(File.ReadAllText(tokens))!;
+        Assert.Equal("#1F4E79", parsed["colors"]!["primary"]!.GetValue<string>());
+    }
+
     [Fact]
     public void Prompt_liet_ke_skill_cat_300_ky_tu()
     {

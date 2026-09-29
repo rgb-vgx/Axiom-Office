@@ -17,6 +17,8 @@ namespace AxiomOffice.Ai
         public long Seq;
         public string RunId;
         public string ConversationId;
+        public string Tool;
+        public string Name;
         public string Action;
         public string ParamsPreview;
         public string ResultPreview;
@@ -559,6 +561,8 @@ namespace AxiomOffice.Ai
 
                 item.RunId = Read(data, "runId");
                 item.ConversationId = Read(data, "conversationId");
+                item.Tool = Read(data, "tool");
+                item.Name = Read(data, "name");
                 item.Action = Read(data, "action");
                 item.ParamsPreview = Read(data, "paramsPreview");
                 item.ResultPreview = Read(data, "resultPreview");

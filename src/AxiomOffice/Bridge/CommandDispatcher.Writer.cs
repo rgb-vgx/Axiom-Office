@@ -33,7 +33,7 @@ namespace AxiomOffice.Bridge
                     Opt("table", "1-based index; default: table at cursor, else last table"), Opt("style", "e.g. 'Grid Table 4 - Accent 1'"),
                     Opt("font"), Opt("size"), Opt("color", "#RRGGBB text color"),
                     Opt("headerFill", "#RRGGBB"), Opt("headerColor", "#RRGGBB header text"), Opt("headerBold"),
-                    Opt("bandFill", "#RRGGBB every other data row"), Opt("borderColor", "#RRGGBB"),
+                    Opt("bandFill", "#RRGGBB every other data row"), Opt("borderColor", "#RRGGBB"), Opt("borders", "false = no borders (layout tables)"),
                     Opt("alignment", "left/center/right"), Opt("autoFit", "content/window")).ForAgent(),
                 Command("writer.insertPageBreak", "wps", WriterInsertPageBreak, "Ngắt trang").ForAgent(),
                 Command("writer.insertImage", "wps", WriterInsertImage, "Chèn ảnh tại con trỏ (kích thước theo point)", Req("path"), Opt("width"), Opt("height")).ForAgent(),
@@ -400,6 +400,12 @@ namespace AxiomOffice.Bridge
                 if (HasParam(p, "alignment"))
                 {
                     step("alignment", delegate { table.Range.ParagraphFormat.Alignment = ParseAlignment(ParamString(p, "alignment", "left")); });
+                }
+                if (HasParam(p, "borders"))
+                {
+                    // Bảng dàn trang (vd phần đầu công văn: cơ quan | quốc hiệu) không có viền.
+                    bool borders = ParamBool(p, "borders", true);
+                    step("borders", delegate { table.Borders.Enable = borders ? 1 : 0; });
                 }
                 int? borderColor = ParseBgrColor(ParamString(p, "borderColor", null));
                 if (borderColor.HasValue)

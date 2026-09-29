@@ -411,6 +411,10 @@ namespace AxiomOffice.Ai
             { "wpp.addTable", "Thêm bảng vào slide" },
             { "wpp.setNotes", "Ghi chú thuyết trình" },
             { "wpp.deleteSlide", "Xoá slide" },
+            { "writer.formatTable", "Định dạng bảng" },
+            { "writer.checkTables", "Kiểm tra bảng" },
+            { "et.checkRange", "Kiểm tra bảng dữ liệu" },
+            { "wpp.checkLayout", "Kiểm tra bố cục slide" },
         };
 
         private static readonly Dictionary<string, string> SuffixLabels = new Dictionary<string, string>
