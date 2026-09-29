@@ -115,7 +115,9 @@ Hành vi:
   khoá kèm hướng dẫn.
 - Provider: OpenAI-compatible, Anthropic và **Google Gemini** (chọn trong Cài đặt: endpoint
   `https://generativelanguage.googleapis.com/v1beta/openai`, API key lấy ở aistudio.google.com, model
-  vd `gemini-2.5-flash`). Provider không hỗ trợ tools thì tự chuyển sang chat thường. Đổi provider/model
+  vd `gemini-2.5-flash`). Provider không hỗ trợ tools thì tự chuyển sang chat thường. Provider quá tải
+  hoặc lỗi tạm thời (429/5xx) thì tự thử lại tối đa 3 lần (1s → 2s → 4s). Phần suy nghĩ
+  `<thought>…</thought>` của model không hiện trong câu trả lời. Đổi provider/model
   trong Cài đặt có hiệu lực từ lượt chạy tiếp theo, không cần khởi động lại.
 - Transcript mỗi lượt nằm trong `bridge.log` (`AskAiPane: prompt=` / `AskAiPane progress:` /
   `AskAiPane: ok ... N tool calls, M rounds` / `AskAiPane failed`), ghi ngay cả khi pane đã đóng.

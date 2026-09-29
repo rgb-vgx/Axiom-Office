@@ -5,6 +5,14 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — độ bền khi gọi model
+- **Tự thử lại khi nhà cung cấp lỗi tạm thời** (HTTP 429/500/502/503/504, rớt mạng) ở cả Agent Core
+  (`ModelClient`) và agent in-process (`LlmClient`): tối đa 3 lần, chờ 1s → 2s → 4s, theo `Retry-After`
+  nếu có (tối đa 10s); không thử lại khi hết giờ một request hay người dùng bấm Dừng. Trước đây một lỗi
+  503 "high demand" (gemini-3.8-flash) hay 500 ngẫu nhiên (Gemma 4) làm hỏng cả lượt chạy
+- Lọc `<thought>…</thought>` / `<think>…</think>` khỏi câu trả lời hiện cho người dùng (Gemma 4 qua
+  endpoint của Google, DeepSeek/Qwen trả kèm phần suy nghĩ); tin nhắn gửi lại model vẫn giữ nguyên
+
 ### Added
 - **Google Gemini** trong Cài đặt: chọn "Google Gemini" điền sẵn endpoint OpenAI-compatible của Google
   (`https://generativelanguage.googleapis.com/v1beta/openai`) và model `gemini-2.5-flash`; lưu dạng

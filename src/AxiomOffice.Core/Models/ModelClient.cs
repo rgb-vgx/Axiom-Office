@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using AxiomOffice.Core.Logging;
 
 namespace AxiomOffice.Core.Models;
 
@@ -171,12 +172,13 @@ public sealed class ModelClient
 
             if (turn.ToolCalls.Count == 0)
             {
-                if (string.IsNullOrWhiteSpace(turn.Text))
+                string? reply = ModelText.StripThoughts(turn.Text);
+                if (string.IsNullOrWhiteSpace(reply))
                 {
                     return Done(false, null, "provider returned an empty reply", "provider", rounds, inputTokens, outputTokens, toolsDisabled: !toolsEnabled);
                 }
 
-                return Done(true, turn.Text, null, "", rounds, inputTokens, outputTokens, toolsDisabled: !toolsEnabled);
+                return Done(true, reply, null, "", rounds, inputTokens, outputTokens, toolsDisabled: !toolsEnabled);
             }
 
             Codec.AppendAssistant(turns, turn);
@@ -238,7 +240,7 @@ public sealed class ModelClient
         }
 
         ModelTurn? turn = Codec.Parse(responseText, out string? parseError);
-        return turn == null ? (null, parseError) : (turn.Text, null);
+        return turn == null ? (null, parseError) : (ModelText.StripThoughts(turn.Text), null);
     }
 
     private static string StopMessage(CancellationToken userCancel, TimeSpan deadline)
@@ -251,7 +253,50 @@ public sealed class ModelClient
         return userCancel.IsCancellationRequested ? "cancelled" : "timeout";
     }
 
+    // Loi tam thoi cua nha cung cap (qua tai 503, gioi han 429, 500/502/504, rot mang): thu lai co cho tang dan.
+    // Log 30/09: gemini-3.8-flash 503 "high demand", gemma-4 500 ngau nhien - truoc day hong ca luot chay.
+    // Khong thu lai khi het gio mot request (se an het thoi gian cua luot) hay khi nguoi dung huy.
+    public IReadOnlyList<TimeSpan> RetryDelays { get; init; } =
+        [TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(4)];
+
+    public static readonly TimeSpan MaxRetryAfter = TimeSpan.FromSeconds(10);
+
+    public static bool IsTransient(int status, string? error)
+    {
+        if (status is 429 or 500 or 502 or 503 or 504)
+        {
+            return true;
+        }
+
+        return status == 0 && error != null && error.StartsWith(nameof(HttpRequestException), StringComparison.Ordinal);
+    }
+
     private async Task<(string? Text, string? Error, int Status)> PostAsync(JsonObject body, CancellationToken cancel)
+    {
+        for (int attempt = 0; ; attempt++)
+        {
+            (string? text, string? error, int status, TimeSpan? retryAfter) = await PostOnceAsync(body, cancel).ConfigureAwait(false);
+            if (text != null || cancel.IsCancellationRequested || attempt >= RetryDelays.Count || !IsTransient(status, error))
+            {
+                return (text, error, status);
+            }
+
+            TimeSpan delay = retryAfter is { } hint && hint > TimeSpan.Zero
+                ? (hint < MaxRetryAfter ? hint : MaxRetryAfter)
+                : RetryDelays[attempt];
+            CoreLog.Info($"model {_model}: {(status > 0 ? "HTTP " + status : error)} - retry {attempt + 1}/{RetryDelays.Count} in {delay.TotalSeconds:0.#}s");
+            try
+            {
+                await Task.Delay(delay, cancel).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                return (null, "cancelled", 0);
+            }
+        }
+    }
+
+    private async Task<(string? Text, string? Error, int Status, TimeSpan? RetryAfter)> PostOnceAsync(JsonObject body, CancellationToken cancel)
     {
         using var requestCts = CancellationTokenSource.CreateLinkedTokenSource(cancel);
         requestCts.CancelAfter(RequestTimeoutMs);
@@ -276,19 +321,26 @@ public sealed class ModelClient
 
             using HttpResponseMessage response = await _http.SendAsync(request, requestCts.Token).ConfigureAwait(false);
             string text = await response.Content.ReadAsStringAsync(CancellationToken.None).ConfigureAwait(false);
-            return response.IsSuccessStatusCode ? (text, null, (int)response.StatusCode) : (null, Truncate(text, 300), (int)response.StatusCode);
+            if (response.IsSuccessStatusCode)
+            {
+                return (text, null, (int)response.StatusCode, null);
+            }
+
+            RetryConditionHeaderValue? retry = response.Headers.RetryAfter;
+            TimeSpan? retryAfter = retry?.Delta ?? (retry?.Date is { } date ? date - DateTimeOffset.UtcNow : null);
+            return (null, Truncate(text, 300), (int)response.StatusCode, retryAfter);
         }
         catch (OperationCanceledException) when (!cancel.IsCancellationRequested)
         {
-            return (null, $"request timed out after {RequestTimeoutMs / 1000}s", 0);
+            return (null, $"request timed out after {RequestTimeoutMs / 1000}s", 0, null);
         }
         catch (OperationCanceledException)
         {
-            return (null, "cancelled", 0);
+            return (null, "cancelled", 0, null);
         }
         catch (Exception ex)
         {
-            return (null, ex.GetType().Name + ": " + ex.Message, 0);
+            return (null, ex.GetType().Name + ": " + ex.Message, 0, null);
         }
     }
 

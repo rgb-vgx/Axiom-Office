@@ -119,7 +119,8 @@ public class OrchestratorTests : IDisposable
         var config = new CoreConfig { Token = "t", LlmEndpoint = "http://llm.test/v1", LlmModel = "model-test", LlmApiKey = "k" };
         var http = new HttpClient(handler) { Timeout = Timeout.InfiniteTimeSpan };
         var bridge = new BridgeClient(config, http);
-        var model = new ModelClient(http, "openai", config.LlmEndpoint, config.LlmApiKey, config.LlmModel);
+        // Khong cho thu lai o test orchestrator (thu lai co test rieng trong ModelClientTests).
+        var model = new ModelClient(http, "openai", config.LlmEndpoint, config.LlmApiKey, config.LlmModel) { RetryDelays = [] };
         return new Orchestrator(config, bridge, WriteSessionFile(), _stores.Conversations, _stores.Runs, () => model, new ContextAssembler());
     }
 

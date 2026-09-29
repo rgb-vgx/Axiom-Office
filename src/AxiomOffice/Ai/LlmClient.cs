@@ -91,6 +91,7 @@ namespace AxiomOffice.Ai
                     result.Error = "Could not find text in provider response";
                     return result;
                 }
+                result.Text = StripThoughts(result.Text);
                 result.Ok = true;
                 return result;
             }
@@ -163,9 +164,54 @@ namespace AxiomOffice.Ai
             return PostJson(url, json, configure, CancellationToken.None, out error);
         }
 
+        // Lỗi tạm thời của nhà cung cấp (429/500/502/503/504, rớt mạng): thử lại có chờ tăng dần, giống Core
+        // (ModelClient.PostAsync). Không thử lại khi hết giờ một request hay khi người dùng hủy.
+        internal static readonly int[] RetryDelaysMs = { 1000, 2000, 4000 };
+        private const int MaxRetryAfterMs = 10000;
+
+        internal static bool IsTransient(int status, WebExceptionStatus network)
+        {
+            if (status == 429 || status == 500 || status == 502 || status == 503 || status == 504)
+            {
+                return true;
+            }
+            return status == 0 && (network == WebExceptionStatus.ConnectFailure
+                || network == WebExceptionStatus.ConnectionClosed
+                || network == WebExceptionStatus.ReceiveFailure
+                || network == WebExceptionStatus.SendFailure
+                || network == WebExceptionStatus.KeepAliveFailure
+                || network == WebExceptionStatus.NameResolutionFailure);
+        }
+
         private static string PostJson(string url, string json, Action<HttpWebRequest> configure, CancellationToken cancel, out string error)
         {
+            for (int attempt = 0; ; attempt++)
+            {
+                int status;
+                WebExceptionStatus network;
+                int retryAfterMs;
+                string text = PostJsonOnce(url, json, configure, cancel, out error, out status, out network, out retryAfterMs);
+                if (text != null || cancel.IsCancellationRequested || attempt >= RetryDelaysMs.Length || !IsTransient(status, network))
+                {
+                    return text;
+                }
+                int delay = retryAfterMs > 0 ? Math.Min(retryAfterMs, MaxRetryAfterMs) : RetryDelaysMs[attempt];
+                Logger.Info("LlmClient: " + (status > 0 ? "HTTP " + status : network.ToString()) + " - retry " + (attempt + 1) + "/" + RetryDelaysMs.Length + " in " + delay + "ms");
+                if (cancel.WaitHandle.WaitOne(delay))
+                {
+                    error = "cancelled";
+                    return null;
+                }
+            }
+        }
+
+        private static string PostJsonOnce(string url, string json, Action<HttpWebRequest> configure, CancellationToken cancel,
+            out string error, out int status, out WebExceptionStatus network, out int retryAfterMs)
+        {
             error = null;
+            status = 0;
+            network = WebExceptionStatus.Success;
+            retryAfterMs = 0;
             if (cancel.IsCancellationRequested)
             {
                 error = "cancelled";
@@ -205,6 +251,17 @@ namespace AxiomOffice.Ai
                 {
                     error = "cancelled";
                     return null;
+                }
+                network = wex.Status;
+                var http = wex.Response as HttpWebResponse;
+                if (http != null)
+                {
+                    status = (int)http.StatusCode;
+                    int seconds;
+                    if (int.TryParse(http.Headers["Retry-After"], out seconds) && seconds > 0)
+                    {
+                        retryAfterMs = seconds * 1000;
+                    }
                 }
                 string body = "";
                 try
@@ -588,8 +645,18 @@ namespace AxiomOffice.Ai
                 result.Error = "agent stopped after " + maxIterations + " rounds without a final answer";
                 return;
             }
-            result.Text = finalText;
+            result.Text = StripThoughts(finalText);
             result.Ok = true;
+        }
+
+        // Một số model (Gemma 4 qua endpoint OpenAI-compatible của Google, DeepSeek/Qwen...) trả kèm phần suy
+        // nghĩ <thought>...</thought> / <think>...</think> trong content: bỏ khỏi câu trả lời hiện cho người dùng.
+        private static readonly System.Text.RegularExpressions.Regex ThoughtBlock = new System.Text.RegularExpressions.Regex(
+            @"<(thought|think|thinking)>[\s\S]*?</\1>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        internal static string StripThoughts(string text)
+        {
+            return string.IsNullOrEmpty(text) ? text : ThoughtBlock.Replace(text, "").Trim();
         }
 
         private static void AddTranscript(LlmResult result, Action<string> progress, string line)
