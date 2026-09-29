@@ -5,6 +5,7 @@ using AxiomOffice.Core.Logging;
 using AxiomOffice.Core.Memory;
 using AxiomOffice.Core.Models;
 using AxiomOffice.Core.Office;
+using AxiomOffice.Core.Skills;
 using AxiomOffice.Core.Tools;
 
 namespace AxiomOffice.Core.Agent;
@@ -18,7 +19,8 @@ public sealed class Orchestrator(
     ConversationStore conversations,
     RunStore runs,
     Func<ModelClient> models,
-    ContextAssembler assembler)
+    ContextAssembler assembler,
+    SkillIndex? skills = null)
 {
     public async Task ExecuteAsync(RunState run, Api.RunRequest request, CancellationToken cancel)
     {
@@ -93,13 +95,24 @@ public sealed class Orchestrator(
             }
 
             var officeTool = new OfficeActionTool(catalog, appKind);
-            var registry = new ToolRegistry([officeTool]);
+            // Skill hop app nay: chi muc vao prompt (tang 1), load_skill/read_skill_file nap khi can (tang 2, 3).
+            IReadOnlyList<SkillDefinition> appSkills = skills?.ForApp(appKind) ?? [];
+            var tools = new List<ITool> { officeTool };
+            if (appSkills.Count > 0 && skills != null)
+            {
+                tools.Add(new LoadSkillTool(skills, appKind));
+                tools.Add(new ReadSkillFileTool(skills, appKind));
+            }
+
+            var registry = new ToolRegistry(tools);
             var modelTools = registry.All
                 .Select(t => new ModelTool(t.Name, t.Description, t.ParametersSchema))
                 .ToList();
 
             string systemPrompt = PromptBuilder.Build(
-                appKind, session, request.Document, skills: [], memories: [], context.Summary, context.RecentActionLines);
+                appKind, session, request.Document,
+                skills: appSkills.Select(s => new SkillSummary(s.Name, s.Description)).ToList(),
+                memories: [], context.Summary, context.RecentActionLines);
 
             var runContext = new RunContext
             {

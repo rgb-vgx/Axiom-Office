@@ -5,6 +5,7 @@ using AxiomOffice.Core.Config;
 using AxiomOffice.Core.Logging;
 using AxiomOffice.Core.Models;
 using AxiomOffice.Core.Office;
+using AxiomOffice.Core.Skills;
 
 // AxiomOffice.Core.exe - Agent Core (New_arch.md): process rieng cua agent, mot ban cho moi nguoi
 // dung Windows, chi nghe 127.0.0.1. Add-in khoi dong Core khi can va tim no qua core.json.
@@ -71,10 +72,15 @@ var bridge = new BridgeClient(config, http, CoreLog.Info);
 var sessions = new SessionDirectory(config.SessionDirectoryOverride ?? SessionDirectory.DefaultDirectory);
 var models = new ModelSource(http, () => CoreConfig.Load(builder.Configuration));
 var manager = new RunManager();
-var orchestrator = new Orchestrator(config, bridge, sessions, stores.Conversations, stores.Runs, models.Current, new ContextAssembler());
+// Skill: skills\ canh exe -> SkillDirs cua to chuc -> %LOCALAPPDATA%\AxiomOffice\skills (muc 8.4.4).
+var skills = new SkillIndex(SkillIndex.DefaultSources(
+    Path.Combine(AppContext.BaseDirectory, "skills"), config.SkillDirs, paths.SkillsDirectory));
+skills.Watch();
+var orchestrator = new Orchestrator(config, bridge, sessions, stores.Conversations, stores.Runs, models.Current, new ContextAssembler(), skills);
 
 CoreApi.Map(app, config, paths, runtime, stores);
 RunEndpoints.Map(app, manager, orchestrator, stores);
+SkillEndpoints.Map(app, skills);
 
 app.Lifetime.ApplicationStarted.Register(() =>
 {
