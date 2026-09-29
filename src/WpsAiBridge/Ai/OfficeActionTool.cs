@@ -22,13 +22,13 @@ namespace WpsAiBridge.Ai
             switch (kind)
             {
                 case "et":
-                    actions = "et.listSheets {}; et.readRange {range,sheet}; et.writeRange {range,values,sheet}; et.newWorkbook {}; et.formatRange {range,bold,italic,fontSize,fontColor,fillColor,numFmt,horizontal,wrap,sheet}; et.activateSheet {sheet}; et.undo {count}; et.save {}; et.saveAs {path}; et.exportPdf {path}";
+                    actions = "et.listSheets {}; et.readRange {range,sheet}; et.writeRange {range (top-left cell e.g. 'A1'), values (2D array of rows e.g. [[\"Tên\",\"Điểm\"],[\"An\",9.5]]), sheet}; et.newWorkbook {}; et.formatRange {range,bold,italic,fontSize,fontColor,fillColor,numFmt,horizontal,wrap,sheet}; et.activateSheet {sheet}; et.undo {count}; et.save {}; et.saveAs {path}; et.exportPdf {path}";
                     break;
                 case "wpp":
-                    actions = "wpp.listSlides {}; wpp.addSlide {layout}; wpp.addText {text,slide,left,top,width,height,fontSize,bold,color,align}; wpp.addImage {path,slide,left,top,width,height}; wpp.addTable {rows,cols,values,slide,left,top,width,height}; wpp.setNotes {text,slide}; wpp.deleteSlide {slide}; wpp.save {}; wpp.saveAs {path}; wpp.exportPdf {path}";
+                    actions = "wpp.listSlides {}; wpp.addSlide {layout}; wpp.addText {text,slide,left,top,width,height,fontSize,bold,color,align}; wpp.addImage {path,slide,left,top,width,height}; wpp.addTable {rows,cols,values (2D array of rows),slide,left,top,width,height}; wpp.setNotes {text,slide}; wpp.deleteSlide {slide}; wpp.save {}; wpp.saveAs {path}; wpp.exportPdf {path}";
                     break;
                 default:
-                    actions = "writer.getText {maxChars}; writer.selection {}; writer.insertStyledText {text,bold,italic,underline,size,color,font}; writer.formatSelection {bold,italic,underline,size,color,font,alignment}; writer.setParagraphAlignment {alignment}; writer.heading {text,level}; writer.insertTable {rows,cols,values,style}; writer.insertPageBreak {}; writer.insertImage {path,width,height}; writer.insertHyperlink {url,text}; writer.replaceAll {find,replace}; writer.undo {count}; writer.save {}; writer.saveAs {path}; writer.exportPdf {path}";
+                    actions = "writer.getText {maxChars}; writer.selection {}; writer.insertStyledText {text,bold,italic,underline,size,color,font}; writer.formatSelection {bold,italic,underline,size,color,font,alignment}; writer.setParagraphAlignment {alignment}; writer.heading {text,level}; writer.insertTable {rows,cols,values (2D array of rows),style}; writer.insertPageBreak {}; writer.insertImage {path,width,height}; writer.insertHyperlink {url,text}; writer.replaceAll {find,replace}; writer.undo {count}; writer.save {}; writer.saveAs {path}; writer.exportPdf {path}";
                     break;
             }
             return new LlmToolDef
@@ -37,6 +37,7 @@ namespace WpsAiBridge.Ai
                 Description =
                     "Read and modify the LIVE document that is currently open in the office application. " +
                     "Call this for every document change the user asks for so it happens immediately on screen. " +
+                    "Array params such as values must be real JSON arrays of rows, not objects. " +
                     "Available actions (with params): " + actions,
                 ParametersJson =
                     "{\"type\":\"object\",\"properties\":{" +

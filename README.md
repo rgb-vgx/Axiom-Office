@@ -134,8 +134,9 @@ sang cửa sổ nổi). Trong pane:
    dòng (dấu tick xanh / dấu x đỏ + nhãn tiếng Việt + mã action)
 3. Với Word, mỗi action của AI là **1 bước Ctrl+Z** (UndoRecord); link
    **Chèn trả lời** chèn câu trả lời cuối, **Cài đặt** mở cấu hình LLM
-4. Link **Dừng** ở footer hủy lượt đang chạy ngay (abort request LLM đang chờ);
-   mỗi lượt có trần **5 phút** (`LlmClient.AgentTimeoutMs`), mỗi request LLM 60s.
+4. Link **Dừng** ở footer hủy lượt đang chạy ngay (abort request LLM đang chờ).
+   **Không giới hạn số vòng** gọi model/tool: lượt chạy kết thúc khi AI trả lời xong, khi
+   bấm Dừng hoặc khi chạm trần **5 phút** (`LlmClient.AgentTimeoutMs`); mỗi request LLM 60s.
    Lỗi hiện thành thẻ có **Thử lại** / **Mở Cài đặt**; chưa cấu hình endpoint/model
    thì ô nhập bị khoá kèm hướng dẫn
 
@@ -459,7 +460,7 @@ khi cổng rảnh. Object model Office không an toàn đa luồng — thiếu c
 | `writer.insertStyledText` | `text`, `bold?`, `italic?`, `underline?`, `size?`, `color?`, `font?` | Chèn text kèm định dạng |
 | `writer.formatSelection` | font (`bold?`... `color?`), `alignment?` | Định dạng vùng đang chọn |
 | `writer.setParagraphAlignment` | `alignment` (left/center/right/justify) | Căn đoạn |
-| `writer.insertTable` | `rows`, `cols`, `values?`, `style?` | Chèn bảng kèm dữ liệu |
+| `writer.insertTable` | `rows`, `cols`, `values?`, `style?` | Chèn bảng kèm dữ liệu (`rows`/`cols` tự suy ra/nới theo `values`) |
 | `writer.insertPageBreak` | — | Ngắt trang |
 | `writer.insertImage` | `path`, `width?`, `height?` | Chèn ảnh tại con trỏ |
 | `writer.insertHyperlink` | `url`, `text?` | Chèn hyperlink |
@@ -470,7 +471,7 @@ khi cổng rảnh. Object model Office không an toàn đa luồng — thiếu c
 | `et.open` | `path` | Mở file .xlsx/.xls/.csv |
 | `et.listSheets` | — | Liệt kê sheet + sheet đang active |
 | `et.readRange` | `range`, `sheet?` | Đọc vùng, ví dụ `A1:C10` |
-| `et.writeRange` | `range`, `values` (ma trận 2D), `sheet?` | Ghi vùng |
+| `et.writeRange` | `range`, `values` (ma trận 2D), `sheet?` | Ghi vùng (thiếu/sai `values` → lỗi kèm ví dụ) |
 | `et.save` / `et.saveAs` | `path?` | Lưu / lưu thành file mới |
 | `et.formatRange` | `range`, `bold?`, `italic?`, `fontSize?`, `fontColor?`, `fillColor?`, `numFmt?`, `horizontal?`, `wrap?`, `sheet?` | Định dạng vùng |
 | `et.activateSheet` | `sheet` | Chuyển sang sheet khác |

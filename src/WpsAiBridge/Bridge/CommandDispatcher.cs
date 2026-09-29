@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 
@@ -196,6 +197,7 @@ namespace WpsAiBridge.Bridge
                         }
                         reply["transcript"] = agentResult.Transcript;
                         reply["seconds"] = agentResult.Seconds;
+                        reply["rounds"] = agentResult.Rounds;
                         return Ok(reply);
                     }
 
@@ -437,6 +439,102 @@ namespace WpsAiBridge.Bridge
                 return ToMatrix(value);
             }
             return Convert.ToString(value);
+        }
+
+        // Đọc tham số mảng 2 chiều (values của writeRange/insertTable/addTable). Model đôi khi gửi mảng
+        // bọc trong {"item": ...} hoặc dạng chuỗi JSON: gỡ ra được thì dùng, sai dạng thì báo lỗi kèm ví dụ
+        // để model tự sửa ở vòng sau (trước đây bị bỏ qua âm thầm mà vẫn trả ok).
+        private static List<IList> ParamMatrix(Dictionary<string, object> p, string name, bool required)
+        {
+            object raw;
+            if (p == null || !p.TryGetValue(name, out raw) || raw == null)
+            {
+                if (required)
+                {
+                    throw new ArgumentException(MatrixHelp(name, "missing"));
+                }
+                return null;
+            }
+            var text = raw as string;
+            if (text != null && text.TrimStart().StartsWith("[", StringComparison.Ordinal))
+            {
+                try
+                {
+                    raw = new System.Web.Script.Serialization.JavaScriptSerializer().DeserializeObject(text);
+                }
+                catch (Exception)
+                {
+                }
+            }
+            var list = UnwrapArray(raw) as IList;
+            if (list == null)
+            {
+                throw new ArgumentException(MatrixHelp(name, DescribeShape(UnwrapArray(raw))));
+            }
+            if (list.Count == 0)
+            {
+                if (required)
+                {
+                    throw new ArgumentException(MatrixHelp(name, "an empty array"));
+                }
+                return new List<IList>();
+            }
+            var items = list.Cast<object>().Select(UnwrapArray).ToList();
+            bool allRows = items.All(i => i is IList);
+            bool allScalars = items.All(i => !(i is IList) && !(i is IDictionary));
+            if (!allRows && !allScalars)
+            {
+                throw new ArgumentException(MatrixHelp(name, "a mix of rows and single values"));
+            }
+            var rows = new List<IList>();
+            for (int r = 0; r < items.Count; r++)
+            {
+                // Mảng 1 chiều: mỗi phần tử là một dòng 1 ô (giữ hành vi cũ của et.writeRange).
+                IList source = allRows ? (IList)items[r] : new object[] { items[r] };
+                var row = new List<object>();
+                for (int c = 0; c < source.Count; c++)
+                {
+                    object cell = UnwrapArray(source[c]);
+                    if (cell is IList || cell is IDictionary)
+                    {
+                        throw new ArgumentException(MatrixHelp(name, "a nested array/object at row " + (r + 1) + ", column " + (c + 1)));
+                    }
+                    row.Add(cell);
+                }
+                rows.Add(row);
+            }
+            return rows;
+        }
+
+        private static object UnwrapArray(object value)
+        {
+            var dict = value as IDictionary<string, object>;
+            while (dict != null && dict.Count == 1)
+            {
+                string key = dict.Keys.First();
+                if (key != "item" && key != "items" && key != "row" && key != "rows" && key != "values")
+                {
+                    break;
+                }
+                value = dict[key];
+                dict = value as IDictionary<string, object>;
+            }
+            return value;
+        }
+
+        private static string DescribeShape(object value)
+        {
+            var dict = value as IDictionary<string, object>;
+            if (dict != null)
+            {
+                return "an object with keys [" + string.Join(", ", dict.Keys.Take(5).ToArray()) + "]";
+            }
+            return value == null ? "null" : "a " + value.GetType().Name + " value";
+        }
+
+        private static string MatrixHelp(string name, string got)
+        {
+            return "'" + name + "' must be a JSON 2D array (a list of rows), e.g. [[\"Họ tên\",\"Điểm\"],[\"An\",9.5],[\"Bình\",8]] - got " + got;
         }
 
         private static List<List<object>> ToMatrix(object value)
@@ -699,41 +797,17 @@ namespace WpsAiBridge.Bridge
             string address = ParamString(p, "range", null);
             if (string.IsNullOrEmpty(address))
             {
-                return new Dictionary<string, object> { { "written", 0 } };
+                throw new ArgumentException("'range' is required: the top-left cell to write at, e.g. 'A1'");
             }
             string sheetName = ParamString(p, "sheet", null);
-            object rawValues;
-            if (p == null || !p.TryGetValue("values", out rawValues) || rawValues == null)
-            {
-                return new Dictionary<string, object> { { "written", 0 } };
-            }
-
-            IList rowList = rawValues as IList;
-            if (rowList == null || rowList.Count == 0)
-            {
-                return new Dictionary<string, object> { { "written", 0 } };
-            }
+            List<IList> rowList = ParamMatrix(p, "values", true);
 
             int rowCount = rowList.Count;
-            int colCount = 1;
-            for (int i = 0; i < rowCount; i++)
-            {
-                IList probeRow = rowList[i] as IList;
-                if (probeRow != null && probeRow.Count > colCount)
-                {
-                    colCount = probeRow.Count;
-                }
-            }
-
+            int colCount = Math.Max(1, rowList.Max(row => row.Count));
             object[,] matrix = new object[rowCount, colCount];
             for (int r = 0; r < rowCount; r++)
             {
-                IList row = rowList[r] as IList;
-                if (row == null)
-                {
-                    IList single = new object[] { rowList[r] };
-                    row = single;
-                }
+                IList row = rowList[r];
                 for (int c = 0; c < colCount; c++)
                 {
                     matrix[r, c] = c < row.Count ? row[c] : null;
@@ -988,23 +1062,24 @@ namespace WpsAiBridge.Bridge
         private static Dictionary<string, object> WriterInsertTable(IAppHost host, Dictionary<string, object> p)
         {
             RequireKind(host, "wps");
+            List<IList> valueRows = ParamMatrix(p, "values", false);
             int rows = ParamInt(p, "rows", 0);
             int cols = ParamInt(p, "cols", 0);
+            if (valueRows != null && valueRows.Count > 0)
+            {
+                // Bảng phải chứa đủ dữ liệu: suy ra/nới rows, cols theo values thay vì cắt bớt.
+                rows = Math.Max(rows, valueRows.Count);
+                cols = Math.Max(cols, valueRows.Max(row => row.Count));
+            }
             if (rows <= 0 || cols <= 0)
             {
-                throw new InvalidOperationException("'rows' and 'cols' are required");
+                throw new ArgumentException("'rows' and 'cols' are required (or pass 'values' as a 2D array to size the table)");
             }
             dynamic app = host.Application;
             int filled = 0;
             using (new UndoRecordScope(host.Application, "AI: insert table"))
             {
                 dynamic table = app.ActiveDocument.Tables.Add(app.Selection.Range, rows, cols);
-                IList valueRows = null;
-                object rawValues;
-                if (p != null && p.TryGetValue("values", out rawValues))
-                {
-                    valueRows = rawValues as IList;
-                }
                 if (valueRows != null)
                 {
                     for (int r = 0; r < valueRows.Count && r < rows; r++)
@@ -1432,11 +1507,18 @@ namespace WpsAiBridge.Bridge
         private static Dictionary<string, object> WppAddTable(IAppHost host, Dictionary<string, object> p)
         {
             RequireKind(host, "wpp");
+            List<IList> valueRows = ParamMatrix(p, "values", false);
             int rows = ParamInt(p, "rows", 0);
             int cols = ParamInt(p, "cols", 0);
+            if (valueRows != null && valueRows.Count > 0)
+            {
+                // Bảng phải chứa đủ dữ liệu: suy ra/nới rows, cols theo values thay vì cắt bớt.
+                rows = Math.Max(rows, valueRows.Count);
+                cols = Math.Max(cols, valueRows.Max(row => row.Count));
+            }
             if (rows <= 0 || cols <= 0)
             {
-                throw new InvalidOperationException("'rows' and 'cols' are required");
+                throw new ArgumentException("'rows' and 'cols' are required (or pass 'values' as a 2D array to size the table)");
             }
             int left = ParamInt(p, "left", 60);
             int top = ParamInt(p, "top", 120);
@@ -1448,12 +1530,6 @@ namespace WpsAiBridge.Bridge
             dynamic tableShape = slide.Shapes.AddTable(rows, cols, left, top, width, height);
             dynamic table = tableShape.Table;
             int filled = 0;
-            IList valueRows = null;
-            object rawValues;
-            if (p != null && p.TryGetValue("values", out rawValues))
-            {
-                valueRows = rawValues as IList;
-            }
             if (valueRows != null)
             {
                 for (int r = 0; r < valueRows.Count && r < rows; r++)

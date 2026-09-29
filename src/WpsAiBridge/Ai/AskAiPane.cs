@@ -391,7 +391,7 @@ namespace WpsAiBridge.Ai
                 // Ghi log kết quả ngay trên worker: vẫn có dấu vết kể cả khi không trả được về UI.
                 if (result.Ok)
                 {
-                    Logger.Info("AskAiPane: ok in " + result.Seconds.ToString("0.0") + "s, " + result.Transcript.Count + " tool calls");
+                    Logger.Info("AskAiPane: ok in " + result.Seconds.ToString("0.0") + "s, " + result.Transcript.Count + " tool calls, " + result.Rounds + " rounds");
                 }
                 else if (result.Cancelled)
                 {
@@ -511,6 +511,10 @@ namespace WpsAiBridge.Ai
             if (result.TimedOut)
             {
                 message = "AI chưa xong sau " + (LlmClient.AgentTimeoutMs / 60000) + " phút nên đã dừng.";
+            }
+            else if (result.StepLimitReached)
+            {
+                message = "AI chưa xong sau " + result.Rounds + " vòng nên đã dừng.";
             }
             else if (lower.Contains("timed out"))
             {

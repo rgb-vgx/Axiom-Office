@@ -5,6 +5,20 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — Agent lặp tới "(da dat gioi han 8 buoc)" mà không làm được gì
+- Nguyên nhân (log 20:13, "Tạo bảng điểm 5 học sinh"): model gửi `values` dạng
+  `{"item":[{"item":[...]}]}`; `et.writeRange` không ghi gì nhưng vẫn trả `ok:true`, model đọc lại
+  thấy ô trống nên ghi lại mãi tới khi hết 8 vòng
+- `values` của `et.writeRange` / `writer.insertTable` / `wpp.addTable` đọc qua `ParamMatrix`: gỡ lớp
+  bọc `{"item": ...}`, nhận cả mảng dạng chuỗi JSON; sai dạng, thiếu `values`/`range` thì trả lỗi kèm
+  ví dụ `[["Họ tên","Điểm"],["An",9.5]]` để model tự sửa. Bảng tự suy ra/nới `rows`/`cols` theo
+  `values` thay vì cắt bớt dữ liệu. Mô tả tool ghi rõ định dạng mảng 2 chiều
+- Bỏ giới hạn số vòng của agent (trước là 8): lượt chạy dừng khi AI trả lời xong, khi bấm Dừng
+  hoặc chạm trần 5 phút. Nếu bên gọi tự đặt giới hạn thì kết quả báo "chưa xong" (không còn chuỗi
+  `(da dat gioi han n buoc)` giả làm câu trả lời). Log/`ai.ask` trả thêm số vòng (`rounds`)
+- Đã chạy lại đúng prompt trên Excel thật: 5 vòng, 16s, bảng 5 học sinh + cột Trung bình
+
+
 ### Added — Đóng gói cài đặt cho người khác
 - `scripts/package.ps1`: build (hoặc `-NoBuild`) rồi tạo `dist/WpsAiBridge-<version>-<ngày>-<commit>.zip`
   (~245 KB; tên có `-dirty` khi code chưa commit): DLL, `WpsAiBridge.Host.exe`, `install.ps1`/

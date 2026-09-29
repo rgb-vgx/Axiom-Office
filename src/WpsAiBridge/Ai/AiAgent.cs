@@ -40,7 +40,9 @@ namespace WpsAiBridge.Ai
             {
                 return OfficeActionTool.Execute(host, name, args);
             };
-            return LlmClient.RunAgent(system, prompt, tools, executor, 8, progress, cancel);
+            // Không giới hạn số vòng: lượt chạy dừng khi AI trả lời xong, hết trần LlmClient.AgentTimeoutMs
+            // hoặc người dùng bấm Dừng.
+            return LlmClient.RunAgent(system, prompt, tools, executor, 0, progress, cancel);
         }
     }
 }

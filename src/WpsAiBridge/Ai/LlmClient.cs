@@ -19,6 +19,8 @@ namespace WpsAiBridge.Ai
         public double Seconds;
         public bool Cancelled;
         public bool TimedOut;
+        public bool StepLimitReached;
+        public int Rounds;
         public List<string> Transcript = new List<string>();
     }
 
@@ -376,12 +378,14 @@ namespace WpsAiBridge.Ai
             bool toolsEnabled = true;
             string finalText = null;
 
-            for (int iteration = 0; iteration < maxIterations && finalText == null; iteration++)
+            // maxIterations <= 0: không giới hạn số vòng (vẫn có trần AgentTimeoutMs và hủy từ người dùng).
+            for (int iteration = 0; (maxIterations <= 0 || iteration < maxIterations) && finalText == null; iteration++)
             {
                 if (cancel.IsCancellationRequested)
                 {
                     return;
                 }
+                result.Rounds = iteration + 1;
                 var body = new Dictionary<string, object>();
                 body["model"] = model;
                 body["messages"] = messages.ToArray();
@@ -471,12 +475,14 @@ namespace WpsAiBridge.Ai
             bool toolsEnabled = true;
             string finalText = null;
 
-            for (int iteration = 0; iteration < maxIterations && finalText == null; iteration++)
+            // maxIterations <= 0: không giới hạn số vòng (vẫn có trần AgentTimeoutMs và hủy từ người dùng).
+            for (int iteration = 0; (maxIterations <= 0 || iteration < maxIterations) && finalText == null; iteration++)
             {
                 if (cancel.IsCancellationRequested)
                 {
                     return;
                 }
+                result.Rounds = iteration + 1;
                 var body = new Dictionary<string, object>();
                 body["model"] = model;
                 body["max_tokens"] = 4096;
@@ -573,7 +579,11 @@ namespace WpsAiBridge.Ai
         {
             if (finalText == null)
             {
-                finalText = "(da dat gioi han " + maxIterations + " buoc)";
+                // Chỉ xảy ra khi bên gọi tự đặt giới hạn vòng: báo là chưa xong, không giả làm câu trả lời.
+                result.Ok = false;
+                result.StepLimitReached = true;
+                result.Error = "agent stopped after " + maxIterations + " rounds without a final answer";
+                return;
             }
             result.Text = finalText;
             result.Ok = true;
