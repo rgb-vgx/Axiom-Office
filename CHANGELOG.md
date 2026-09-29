@@ -5,6 +5,22 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Agent Core giai đoạn 1 (phần 2): pane chạy qua Core
+- Add-in: `Ai/CoreClient.cs` — tìm Core qua `core.json`, khởi động `AxiomOffice.Core.exe` khi cần,
+  `POST /v1/runs` rồi đọc SSE; hủy lượt chạy cả hai phía (abort request + `POST .../cancel`)
+- `Ai/AskAiPane.cs`: lượt chạy đi qua Agent Core khi có, **tự chạy agent in-process khi Core không
+  dùng được** và ghi chú "chế độ cơ bản" ở dòng trạng thái; hội thoại **nhớ theo tài liệu** (mở lại
+  tài liệu vẫn tiếp tục mạch cũ, hỏi Core qua `/v1/conversations?documentKey=`); link **Cuộc trò
+  chuyện mới** ở footer; dòng tiến trình lấy từ sự kiện `tool.finished`; thông báo riêng khi dừng vì
+  hết ngân sách token; đọc tên tài liệu qua `ComGate` (không gọi COM song song với thread bridge)
+- `Bridge/Config.cs`: `CoreEnabled`; `LlmResult` thêm `ViaCore`, `Stopped`, `ConversationId`
+- Sự kiện `tool.finished` của Core kèm `resultPreview` để pane hiện dòng giống chế độ in-process
+- `build.ps1`: thêm `IncludeNativeLibrariesForSelfExtract` — **sửa lỗi đóng gói**: bản single-file
+  trước đó thiếu `e_sqlite3.dll` nên Core báo "SqliteConnection type initializer threw" (49,2MB)
+- Test e2e mới (`tests/core/fake_llm.py` + `tests/core/test_core_e2e.py`, 22 kiểm tra không cần
+  Office + 6 kiểm tra `--office` trên Excel thật): thứ tự sự kiện SSE, hội thoại, audit, allowlist
+  (lệnh bị chặn không xuống bridge), hủy, trần token, lỗi office, và tài liệu thật sự đổi
+
 ### Docs — `New_arch.md`: tầng thiết kế cho skills (design intelligence)
 - Tách design intelligence khỏi skill triển khai theo app: **token thiết kế là dữ liệu**
   (`skills/_design/tokens.json`), skill thiết kế nạp khi cần (`thiet-ke-van-phong`,

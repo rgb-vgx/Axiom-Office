@@ -30,7 +30,11 @@ namespace AxiomOffice.Ai
         private readonly AccentDot _busyDot;
         private readonly LinkLabel _insertLink;
         private readonly LinkLabel _stopLink;
+        private readonly LinkLabel _newChatLink;
         private EmptyState _empty;
+        private string _conversationId;              // hoi thoai ben Agent Core, theo tai lieu dang mo
+        private bool _freshConversation;             // nguoi dung vua bam "Cuoc tro chuyen moi"
+        private bool _lastRunViaCore;                // luot vua roi chay qua Core hay in-process
         private string _lastReply = "";
         private string _lastPrompt = "";
         private string _blockedReason;
@@ -95,10 +99,12 @@ namespace AxiomOffice.Ai
             _busyDot = new AccentDot(PaneTheme.Px(6)) { Dock = DockStyle.Left, Width = PaneTheme.Px(12), Visible = false };
             _insertLink = MakeFooterLink("Chèn trả lời");
             _stopLink = MakeFooterLink("Dừng");
+            _newChatLink = MakeFooterLink("Cuộc trò chuyện mới");
             footer.Controls.Add(_status);
             footer.Controls.Add(_busyDot);
             footer.Controls.Add(_insertLink);
             footer.Controls.Add(_stopLink);
+            footer.Controls.Add(_newChatLink);
 
             var header = new DividerPanel { Dock = DockStyle.Top, Height = PaneTheme.Px(PaneTheme.HeaderH) };
             var dot = new AccentDot(PaneTheme.Px(8));
@@ -129,6 +135,7 @@ namespace AxiomOffice.Ai
             _composer.Click += delegate { OnComposerClick(); };
             _insertLink.LinkClicked += OnInsert;
             _stopLink.LinkClicked += delegate { OnStop(); };
+            _newChatLink.LinkClicked += delegate { StartNewConversation(); };
             _settingsLink.LinkClicked += delegate { OpenSettings(); };
             _composer.Resize += delegate { LayoutComposer(); };
             Load += delegate
@@ -380,7 +387,13 @@ namespace AxiomOffice.Ai
                 LlmResult result;
                 try
                 {
-                    result = AiAgent.Run(host, promptText, progress, run.Token);
+                    // Uu tien Agent Core (New_arch.md muc 9); Core khong dung duoc thi chay trong add-in
+                    // nhu cu de pane khong bao gio bi khoa vi Core.
+                    result = RunViaCore(host, promptText, run, progress);
+                    if (result == null)
+                    {
+                        result = AiAgent.Run(host, promptText, progress, run.Token);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -406,6 +419,126 @@ namespace AxiomOffice.Ai
                     Logger.Error("AskAiPane: result not delivered to UI (pane closed or handle gone)", null);
                 }
             });
+        }
+
+        // Chay mot luot qua Agent Core. Tra null khi Core khong dung duoc (pane se chay in-process).
+        private LlmResult RunViaCore(Connect host, string promptText, CancellationTokenSource run, Action<string> progress)
+        {
+            CoreClient core = CoreClient.Instance;
+            if (!core.Enabled)
+            {
+                return null;
+            }
+
+            string documentKey = DocumentKey(host);
+            string conversationId = _conversationId;
+            if (conversationId == null && !_freshConversation)
+            {
+                // Mo lai tai lieu sau: tiep tuc hoi thoai gan nhat cua tai lieu do (muc 9).
+                conversationId = core.FindConversationForDocument(documentKey);
+            }
+            _freshConversation = false;
+
+            LlmResult result = core.Run(host, promptText, conversationId, delegate(CoreEvent item)
+            {
+                string line = ProgressLine(item);
+                if (line != null)
+                {
+                    progress(line);
+                }
+            }, run.Token);
+
+            if (result != null && !string.IsNullOrEmpty(result.ConversationId))
+            {
+                // Moi luot chay mot lan mot luc (_busy) nen gan truc tiep la an toan.
+                _conversationId = result.ConversationId;
+            }
+
+            return result;
+        }
+
+        // Doi su kien Core thanh dong tien trinh dung dinh dang ToolLine da co cua pane.
+        private static string ProgressLine(CoreEvent item)
+        {
+            if (item == null)
+            {
+                return null;
+            }
+
+            if (item.Type == "tool.finished")
+            {
+                string outcome = !string.IsNullOrEmpty(item.ResultPreview)
+                    ? item.ResultPreview
+                    : (item.Ok
+                        ? "{\"ok\":true}"
+                        : "{\"ok\":false,\"error\":\"" + (item.Error ?? "loi") + "\"}");
+                return "office_action " + (item.ParamsPreview ?? "{}") + " -> " + outcome;
+            }
+
+            if (item.Type == "run.failed")
+            {
+                return "(" + (item.Error ?? "loi") + ")";
+            }
+
+            return null;
+        }
+
+        // Duong dan tai lieu chuan hoa (giong Orchestrator.DocumentKey ben Core) de tra hoi thoai cu.
+        // Doc COM tu worker thread nen phai qua ComGate nhu moi noi khac trong add-in.
+        private static string DocumentKey(Connect host)
+        {
+            string key = null;
+            try
+            {
+                ComGate.TryRun(2000, delegate
+                {
+                    try
+                    {
+                        System.Collections.Generic.Dictionary<string, object> info = HostProbe.ActiveDocument(host);
+                        if (info == null)
+                        {
+                            return;
+                        }
+
+                        object value;
+                        if (!info.TryGetValue("fullName", out value))
+                        {
+                            return;
+                        }
+
+                        string text = Convert.ToString(value);
+                        if (!string.IsNullOrEmpty(text))
+                        {
+                            key = text.Trim().Replace('/', '\\').ToLowerInvariant();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Info("AskAiPane: doc ten tai lieu that bai: " + ex.Message);
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Logger.Info("AskAiPane: ComGate loi khi doc ten tai lieu: " + ex.Message);
+            }
+
+            return key;
+        }
+
+        private void StartNewConversation()
+        {
+            if (_busy)
+            {
+                return;
+            }
+
+            _conversationId = null;
+            _freshConversation = true;
+            _newChatLink.Visible = false;
+            _chat.AddInfo("Bắt đầu cuộc trò chuyện mới cho tài liệu này.");
+            Logger.Info("AskAiPane: new conversation requested");
+            _prompt.Focus();
         }
 
         private bool PostToUi(Action action)
@@ -462,6 +595,8 @@ namespace AxiomOffice.Ai
             _stopLink.Visible = false;
             _busyDot.Visible = false;
             _chat.RemoveTyping();
+            _lastRunViaCore = result.ViaCore;
+            _newChatLink.Visible = _conversationId != null;
             string seconds = result.Seconds.ToString("0.0");
 
             if (result.Ok)
@@ -472,7 +607,7 @@ namespace AxiomOffice.Ai
                     _lastReply = result.Text;
                     _insertLink.Visible = host.AppKind == "wps";
                 }
-                SetStatus("Xong trong " + seconds + "s · " + _toolCount + " thao tác", false);
+                SetStatus("Xong trong " + seconds + "s · " + _toolCount + " thao tác" + BackendNote(), false);
                 Announce("Xong. " + (result.Text ?? ""));
             }
             else if (result.Cancelled)
@@ -497,10 +632,21 @@ namespace AxiomOffice.Ai
                 };
                 card.SettingsClicked += delegate { OpenSettings(); };
                 _chat.AddBlock(card);
-                SetStatus("Không hoàn thành · " + seconds + "s", true);
+                SetStatus("Không hoàn thành · " + seconds + "s" + BackendNote(), true);
                 Announce("Lỗi: không hoàn thành yêu cầu");
             }
             UpdateSendEnabled();
+        }
+
+        // Khi Core khong chay duoc thi noi ro de nguoi dung biet dang o che do du phong (muc 9).
+        private string BackendNote()
+        {
+            if (_lastRunViaCore || !CoreClient.Instance.Enabled)
+            {
+                return "";
+            }
+
+            return " · chế độ cơ bản";
         }
 
         private string DescribeError(LlmResult result)
@@ -511,6 +657,10 @@ namespace AxiomOffice.Ai
             if (result.TimedOut)
             {
                 message = "AI chưa xong sau " + (LlmClient.AgentTimeoutMs / 60000) + " phút nên đã dừng.";
+            }
+            else if (result.Stopped)
+            {
+                message = "AI đã dùng hết ngân sách token cho lượt này nên dừng lại.";
             }
             else if (result.StepLimitReached)
             {

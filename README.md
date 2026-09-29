@@ -52,7 +52,7 @@ Không cần quyền admin, không cần Python. Gói cài ~250 KB.
 |---|---|
 | `AxiomOffice.dll` | COM add-in (`IDTExtensibility2`) nạp vào Word/Excel/PowerPoint và WPS: mở HTTP bridge trong process của app, thêm tab ribbon **Axiom Office**, task pane Ask AI và AI agent |
 | `AxiomOffice.Host.exe` | `mcp [all\|word\|excel\|ppt]`: MCP server stdio · `wps\|et\|wpp\|word\|excel\|ppt`: companion tự tạo app qua COM automation và mở bridge (khi add-in không nạp được) · `commands`: danh sách lệnh bridge · `llm-test`: thử cấu hình AI |
-| `AxiomOffice.Core.exe` | **Agent Core** (đang phát triển theo [New_arch.md](New_arch.md)): process riêng chạy agent cho mọi app, một bản cho mỗi người dùng, chỉ nghe `127.0.0.1:47840`; add-in khởi động khi cần và tìm qua `%LOCALAPPDATA%\AxiomOffice\core.json`. Giai đoạn hiện tại: vòng đời + `/health` + shutdown; agent/skill/memory chuyển sang đây ở các giai đoạn sau |
+| `AxiomOffice.Core.exe` | **Agent Core** (theo [New_arch.md](New_arch.md)): process riêng chạy agent cho mọi app, một bản cho mỗi người dùng, chỉ nghe `127.0.0.1:47840`; add-in khởi động khi cần và tìm qua `%LOCALAPPDATA%\AxiomOffice\core.json`. Hiện có: vòng lặp agent (OpenAI-compatible + Anthropic), hội thoại liên tục theo tài liệu, audit tool call, SSE `/v1/runs/{id}/events`, hủy, trần thời gian/token; skill + memory + xác nhận + MCP client ở các giai đoạn sau |
 
 Mỗi app có port riêng; WPS và Microsoft Office dùng hai dải khác nhau nên chạy song song
 được (đổi qua registry, xem [Cấu hình](#cấu-hình)):
@@ -93,7 +93,9 @@ cùng API cho Office và WPS; host không hỗ trợ thì mở cửa sổ nổi)
 2. Agent gọi LLM với **tool-calling** và tự thực thi lệnh `writer.*` / `et.*` / `wpp.*` lên tài
    liệu đang mở — chỉ các lệnh có dấu ✓ ở cột **Ask AI** trong [bảng lệnh](#danh-sách-lệnh-post-cmd);
    lệnh khác (vd `writer.closeAll`, `ai.ask`) bị từ chối. Mỗi thao tác hiện thành một dòng: dấu tick
-   xanh / x đỏ, nhãn tiếng Việt và mã action.
+   xanh / x đỏ, nhãn tiếng Việt và mã action. Lượt chạy đi qua **Agent Core** (`AxiomOffice.Core.exe`)
+   khi có; Core không chạy được thì pane tự chạy agent trong add-in và ghi chú "chế độ cơ bản" ở
+   dòng trạng thái.
 3. Xong thì AI trả lời ngắn. Với Word: mỗi thao tác của AI = **1 bước Ctrl+Z**; link **Chèn trả
    lời** chèn câu trả lời vào tài liệu.
 
@@ -104,8 +106,10 @@ Hành vi:
   mỗi request LLM tối đa 60s.
 - Agent **không tự lưu / lưu thành / xuất PDF** nếu người dùng không yêu cầu: thay đổi đã hiện
   trong tài liệu đang mở, người dùng tự quyết khi nào lưu và lưu ở đâu.
-- **Mỗi lần Ask là một phiên mới**, agent không nhớ lượt trước. Muốn "làm tiếp" thì mô tả phần
-  còn lại; agent tự đọc tài liệu để biết đã có gì.
+- **Nhớ theo tài liệu**: các lượt trong cùng một tài liệu nối thành một cuộc trò chuyện (lưu ở
+  Core, `%LOCALAPPDATA%\AxiomOffice\core\core.db`), nên "làm tiếp" hiểu ngữ cảnh lượt trước và mở
+  lại tài liệu sau vẫn tiếp tục đúng mạch. Link **Cuộc trò chuyện mới** ở footer để bắt đầu lại từ
+  đầu; agent vẫn tự đọc tài liệu khi cần.
 - Lỗi hiện thành thẻ có **Thử lại** / **Mở Cài đặt**. Chưa cấu hình endpoint/model thì ô nhập bị
   khoá kèm hướng dẫn.
 - Provider: OpenAI-compatible và Anthropic. Provider không hỗ trợ tools thì tự chuyển sang chat
@@ -330,6 +334,12 @@ Office không an toàn đa luồng — thiếu cổng này Word từng crash (AV
 | `Token` | String | tự sinh khi cài (32 hex) | Header `X-Auth-Token` cho mọi endpoint trừ `/health`; MCP server tự đọc |
 | `LlmProvider` / `LlmEndpoint` / `LlmModel` | String | — | Cấu hình AI (đặt qua **Cài đặt** trong pane hoặc ribbon) |
 | `LlmApiKey` | String | — | Mã hoá DPAPI theo tài khoản Windows; key plaintext cũ vẫn đọc được |
+| `CorePort` | DWORD | 47840 | Port của Agent Core (bận thì tự thử 47840–47849) |
+| `CoreEnabled` | DWORD | 1 | 0 = pane luôn chạy agent trong add-in, không khởi động Core |
+| `MemoryEnabled` | DWORD | 1 | 0 = không đọc/ghi memory dài hạn (giai đoạn 3 dùng) |
+
+Agent Core đọc cùng khoá trên. Biến môi trường `AXIOM_*` (`AXIOM_CORE_DATA_DIR`, `AXIOM_CORE_PORT`,
+`AXIOM_SESSION_DIR`, `AXIOM_TOKEN`, `AXIOM_LLM_*`) ghi đè — dùng cho test, không cần cho người dùng.
 
 ## Phát triển
 
@@ -361,6 +371,7 @@ scripts\package.ps1 [-NoBuild] # tạo dist\AxiomOffice-<version>-<ngày>-<commi
 & "src\AxiomOffice\bin\Release\AxiomOffice.Host.exe" excel --visible # hiện cửa sổ app
 & "src\AxiomOffice\bin\Release\AxiomOffice.Host.exe" llm-test        # thử cấu hình AI
 & "src\AxiomOffice\bin\Release\AxiomOffice.Host.exe" commands        # danh sách lệnh bridge (--json | --markdown)
+& "src\AxiomOffice\bin\Release\AxiomOffice.Core.exe"                 # Agent Core (log ra terminal + %LOCALAPPDATA%\AxiomOffice\core.log)
 ```
 
 Companion tự tạo app qua COM và mở bridge ở cùng port; nếu add-in đã giữ port thì companion
@@ -397,6 +408,10 @@ powershell -ExecutionPolicy Bypass -File tests\mcp-host\office_roundtrip.ps1 -Di
 cd tools\word-mcp; .venv\Scripts\python.exe -m unittest discover -s tests
 # Agent Core: unit test + test vòng đời trên tiến trình thật (cần .NET 10 SDK)
 dotnet test tests\core\AxiomOffice.Core.Tests
+# Agent Core e2e: Core thật + LLM giả + bridge giả (không cần Office)
+tools\excel-mcp\.venv\Scripts\python.exe tests\core\test_core_e2e.py
+# ... hoặc trên Office thật: tự mở Excel, agent sửa tài liệu thật (cần add-in đã cài)
+tools\excel-mcp\.venv\Scripts\python.exe tests\core\test_core_e2e.py --office
 ```
 
 Test MCP cần venv của `tools/word-mcp`, `tools/excel-mcp`, `tools/ppt-mcp` (python-docx, openpyxl,
@@ -461,8 +476,14 @@ src/AxiomOffice/              COM add-in (net48)
   Ribbon/                     Ribbon XML + xử lý nút
 src/AxiomOffice.Host/         AxiomOffice.Host.exe: companion + MCP server
   Mcp/                        giao thức MCP, tool file (OOXML) + live, template docx/pptx nhúng
-src/AxiomOffice.Core/         Agent Core (.NET 10, theo New_arch.md): Api, Config, Logging — process riêng của agent
-tests/core/                   test Agent Core (xUnit + test vòng đời trên tiến trình thật)
+src/AxiomOffice.Core/         Agent Core (.NET 10, theo New_arch.md)
+  Agent/                      Orchestrator, RunManager, RunEventStream (SSE), PromptBuilder, ContextAssembler
+  Models/                     codec OpenAI/Anthropic + vòng lặp agent (ModelClient)
+  Office/                     đọc session registry, gọi bridge (/health, /cmd, /commands)
+  Tools/                      tool registry + office_action (allowlist theo ForAgent)
+  Memory/                     SQLite: conversations, messages, runs, tool_calls
+  Api/, Config/, Logging/     endpoint v1, cấu hình HKCU + AXIOM_*, log core.log
+tests/core/                   test Agent Core: xUnit + e2e (fake_llm.py, test_core_e2e.py)
 scripts/                      build, install, uninstall, legacy (gỡ bản WpsAiBridge), core (tắt Core), install-dotnet-sdk, package
 scripts/dist/                 install.cmd, uninstall.cmd, HUONG-DAN-CAI-DAT.txt (vào gói cài)
 tests/live/                   test mọi lệnh bridge trên Office/WPS thật

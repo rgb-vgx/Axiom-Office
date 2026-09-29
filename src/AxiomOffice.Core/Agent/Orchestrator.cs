@@ -136,6 +136,8 @@ public sealed class Orchestrator(
                         ["ok"] = result.Ok,
                         ["error"] = error,
                         ["ms"] = result.Ms,
+                        // Ban rut gon cua ket qua de pane hien thi giong che do in-process.
+                        ["resultPreview"] = ModelClient.Truncate(result.ResultJson, 150),
                     });
                     runs.AddToolCall(run.Id, run.Transcript.Count, result.Name, info.Action, info.Params, result.Ok, error, result.Ms);
                     conversations.AppendMessage(conversation.Id, "tool_summary",

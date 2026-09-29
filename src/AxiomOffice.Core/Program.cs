@@ -106,7 +106,8 @@ app.Lifetime.ApplicationStopped.Register(() =>
 });
 
 CoreLog.Info($"Agent Core starting: port={port} pid={Environment.ProcessId} version={CoreVersion.Value} "
-    + $"singleInstance={config.SingleInstance} dataDir={paths.Root} provider={model.Codec.Name} model={model.Model}");
+    + $"singleInstance={config.SingleInstance} dataDir={paths.Root} sessionDir={sessions.Directory} "
+    + $"provider={model.Codec.Name} model={model.Model}");
 
 try
 {

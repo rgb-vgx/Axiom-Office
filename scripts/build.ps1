@@ -139,8 +139,10 @@ if ($null -eq $dotnet) {
 } else {
     $coreVersion = [System.Reflection.AssemblyName]::GetAssemblyName($stagedDll).Version.ToString(3)
     $coreStage = Join-Path $stage "core"
-    # EnableCompressionInSingleFile: 103MB -> ~48MB (do that tren may nay), khoi dong cham hon khong dang ke.
-    & $dotnet publish $coreDir -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:Version=$coreVersion -o $coreStage --nologo
+    # EnableCompressionInSingleFile: 103MB -> ~48MB (do that tren may nay).
+    # IncludeNativeLibrariesForSelfExtract: SQLite can e_sqlite3.dll native - phai nhung vao exe, neu
+    # khong thi ban publish chi co AxiomOffice.Core.exe se loi "SqliteConnection type initializer".
+    & $dotnet publish $coreDir -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:Version=$coreVersion -o $coreStage --nologo
     if ($LASTEXITCODE -ne 0) { throw "Agent Core publish failed with exit code $LASTEXITCODE" }
     $builtCore = Join-Path $coreStage "AxiomOffice.Core.exe"
     if (-not (Test-Path -LiteralPath $builtCore)) { throw "Agent Core publish did not produce $builtCore" }

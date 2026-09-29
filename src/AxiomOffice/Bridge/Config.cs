@@ -48,6 +48,12 @@ namespace AxiomOffice.Bridge
             get { return ReadInt("Enabled", 1) != 0; }
         }
 
+        // 0 = pane luon dung agent in-process, khong khoi dong Agent Core (New_arch.md muc 7.6).
+        public static bool CoreEnabled
+        {
+            get { return ReadInt("CoreEnabled", 1) != 0; }
+        }
+
         public static string LlmProvider
         {
             get { return ReadString("LlmProvider", "openai"); }
