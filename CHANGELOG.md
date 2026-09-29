@@ -5,6 +5,16 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Docs — `New_arch.md`: tầng thiết kế cho skills (design intelligence)
+- Tách design intelligence khỏi skill triển khai theo app: **token thiết kế là dữ liệu**
+  (`skills/_design/tokens.json`), skill thiết kế nạp khi cần (`thiet-ke-van-phong`,
+  `trinh-bay-chuyen-nghiep`, `the-thuc-van-ban`, `bao-cao-du-lieu`), skill theo app dùng giá trị cụ
+  thể trong lệnh. Không xây router riêng (model chọn theo `description`), không nhét design system
+  vào `ppt/SKILL.md`, không nạp skill thiết kế cho sửa nhỏ
+- **QA hai mức** cho điểm yếu "agent mù": giai đoạn 2 kiểm tra cấu trúc bằng số (tràn chữ, shape
+  chồng, số dòng/cột, number format — không cần thị giác); giai đoạn 4 mới thêm `app.screenshot` +
+  model thị giác, kèm xác nhận của người dùng vì tốn token
+
 ### Added — Agent Core (giai đoạn 0 của New_arch.md)
 - `src/AxiomOffice.Core/` (.NET 10, `AxiomOffice.Core.exe`): process riêng của agent, một bản cho
   mỗi người dùng Windows (mutex `Local\AxiomOffice.Core`, instance thứ hai thoát ngay), chỉ nghe

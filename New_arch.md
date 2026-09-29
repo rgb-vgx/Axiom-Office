@@ -360,6 +360,8 @@ bằng `BeginInvoke` (như `PostToUi` hiện có). **Không** chặn UI thread.
   `AxiomOffice.Host.exe commands --json`: `name`, `kind`, `agent`, `summary`, `params[{name,required,hint}]`)
   kèm `version` DLL. Core dùng để dựng tool `office_action` **đúng với phiên bản DLL đang chạy**
   (cache theo `version`).
+- Giai đoạn 4 (chưa làm): `app.screenshot` — chụp cửa sổ app trả về PNG (base64) để agent có thị
+  giác tự soát bố cục (mục 8.4.6). Là lệnh mới, không đổi lệnh cũ.
 - Không đổi `/cmd`, `/session`, `/events`.
 
 ### 7.6 Cấu hình của Core
@@ -552,9 +554,49 @@ Quy tắc validate theo chuẩn (lỗi → bỏ qua skill đó, ghi lỗi hiện
 - Nhất quán thuật ngữ trong một skill (chọn một từ cho một khái niệm); ví dụ cụ thể, không chung
   chung; nêu một cách mặc định thay vì liệt kê nhiều lựa chọn.
 
-**Skill mẫu cần làm (giai đoạn 2)**: `van-ban-hanh-chinh` (Word), `bang-diem` (Excel: bảng điểm có
-cột trung bình, xếp loại, định dạng), `bao-cao-thang` (PowerPoint: dàn 5–7 slide). Mỗi skill theo
-đúng chuẩn (mô tả ngôi ba + từ khoá, `references/` nếu cần, thân gọn) và có ca test e2e (mục 11).
+#### 8.4.6 Tầng thiết kế: design intelligence tách khỏi skill triển khai
+
+Chuẩn Agent Skills **không có cơ chế skill gọi skill** — skill là context được nạp, model là bên
+phối hợp. Nên "tầng thiết kế" ở Axiom làm theo cách: **token thiết kế là dữ liệu**, các skill thiết
+kế là hướng dẫn nạp khi cần, skill triển khai theo app dùng giá trị cụ thể trong lệnh. Không xây
+router riêng (model chọn skill theo `description`) và không nhét design system vào `ppt/SKILL.md`.
+
+```text
+design-tokens.json   (dữ liệu: thang chữ, màu ngữ nghĩa, spacing, lưới, number format)
+        │  dùng chung cho cả Word / Excel / PowerPoint
+        ├── thiet-ke-van-phong        design intelligence chung (typography, màu, phân cấp, a11y)
+        ├── trinh-bay-chuyen-nghiep   riêng slide: mật độ, một thông điệp/slide, chọn chart, notes vs on-slide
+        ├── the-thuc-van-ban          riêng Word: phân cấp heading, lề, caption, TOC, nhịp trang
+        └── bao-cao-du-lieu           riêng Excel: number format, KPI, conditional formatting, mật độ bảng
+                        │
+        └── skill triển khai theo app: bao-cao-thang (PPT) · bang-diem, bao-cao-tai-chinh (Excel)
+            · van-ban-hanh-chinh (Word)
+```
+
+Quy tắc:
+
+- **Chỉ nạp khi cần**: skill thiết kế nạp khi việc là *tạo mới / thiết kế lại* artifact có yếu tố
+  trình bày; không nạp cho sửa nhỏ ("in đậm dòng này") — tránh over-engineering và tiết kiệm token.
+- **Token là dữ liệu, không phải prose**: `skills/_design/tokens.json` (đổi được theo tổ chức qua
+  `SkillDirs`) chứa thang chữ, màu theo ngữ nghĩa (`primary`/`accent`/`success`/`warning`), spacing
+  base, lưới, và number format mặc định. Skill thiết kế chọn token rồi truyền **giá trị cụ thể** vào
+  lệnh (`wpp.addText {fontSize}`, `et.formatRange {numFmt, fillColor}`, `writer.insertStyledText`).
+- **Bàn giao bằng spec cụ thể** (mẫu plan → validate → execute của chuẩn, mục 8.4.5): khi việc lớn,
+  model ghi ra spec ngắn (theme + thang chữ + lưới) rồi bám theo; spec có thể ghi vào memory
+  (`scope=user`) để dùng lại cho tài liệu sau.
+- **QA hai mức** (điểm yếu của agent hiện tại: nó *mù*, chỉ đọc được text):
+  - **Giai đoạn 2 — kiểm tra cấu trúc bằng số, không cần thị giác**: sau khi tạo slide/bảng, đọc lại
+    để soát số ký tự mỗi shape (nguy cơ tràn), shape chồng nhau (toạ độ `left/top/width/height` đã
+    có trong `wpp.*`), số dòng/cột khớp dữ liệu, number format đã áp chưa. Bắt được đúng loại lỗi đã
+    gặp (ca Excel ghi rác sang C7).
+  - **Giai đoạn 4 — kiểm tra thị giác**: lệnh bridge `app.screenshot` (chụp cửa sổ app) + model có
+    thị giác đọc ảnh để soát bố cục thật (tràn chữ, lệch lưới, tương phản). Cần thêm sau, kèm xác
+    nhận của người dùng vì tốn token hơn.
+
+**Skill mẫu cần làm (giai đoạn 2)**: `_design/tokens.json` + `thiet-ke-van-phong`,
+`trinh-bay-chuyen-nghiep`, `the-thuc-van-ban`, `bao-cao-du-lieu` (tầng thiết kế) và
+`bao-cao-thang` (PPT), `bang-diem` (Excel), `van-ban-hanh-chinh` (Word) (tầng triển khai). Mỗi skill
+theo đúng chuẩn (mô tả ngôi ba + từ khoá, `references/` nếu cần, thân gọn) và có ca test e2e (mục 11).
 
 ### 8.5 Memory (học từ mem0 2.2.1, tự làm bằng C#)
 
@@ -967,11 +1009,16 @@ README + CHANGELOG + `ARCHITECTURE.MD` khi cần, chạy test, báo cáo kết q
 
 - [ ] SkillLoader (validate theo chuẩn 8.4.2, field lạ bỏ qua), SkillIndex, `load_skill`,
       `read_skill_file` (chặn `..`, lọc phần mở rộng), `/v1/skills`, reload + watcher.
-- [ ] 3 skill mẫu theo chuẩn (8.4.5: mô tả ngôi ba + từ khoá, references/ nếu cần, thân gọn,
-      checklist + vòng đọc-lại) + template nếu cần; `skills\` vào build và gói.
+- [ ] Tầng thiết kế (8.4.6): `_design/tokens.json` + `thiet-ke-van-phong`, `trinh-bay-chuyen-nghiep`,
+      `the-thuc-van-ban`, `bao-cao-du-lieu`; tầng triển khai: `bao-cao-thang` (PPT), `bang-diem`
+      (Excel), `van-ban-hanh-chinh` (Word). Mô tả ngôi ba + từ khoá, `references/` khi cần, thân gọn,
+      checklist + vòng đọc-lại; `skills\` vào build và gói.
+- [ ] **QA cấu trúc** (8.4.6, mức rẻ): sau khi tạo slide/bảng, đọc lại soát tràn chữ, shape chồng,
+      số dòng/cột, number format.
 - [ ] Pane hiện `skill.loaded`.
 - **Xong khi**: e2e với fake LLM chứng minh luồng `load_skill`; với LLM thật (thủ công, có báo cáo)
-  model tự chọn đúng skill cho 3 yêu cầu mẫu; skill lỗi frontmatter không làm hỏng Core.
+  model tự chọn đúng skill cho 3 yêu cầu mẫu **và không nạp skill thiết kế cho sửa nhỏ**; QA cấu
+  trúc phát hiện được ca tràn chữ dựng sẵn; skill lỗi frontmatter không làm hỏng Core.
 
 ### Giai đoạn 3: Memory dài hạn
 
@@ -999,6 +1046,8 @@ README + CHANGELOG + `ARCHITECTURE.MD` khi cần, chạy test, báo cáo kết q
 - [ ] PolicyEngine + ConfirmationBroker + thẻ xác nhận trong pane (8.6).
 - [ ] MCP client (8.7), `mcp.json`, tool `mcp__*` cần xác nhận mặc định.
 - [ ] (Hỏi người dùng) `ai.ask` chuyển sang Core khi sẵn sàng (7.7).
+- [ ] (Hỏi người dùng) `app.screenshot` + QA thị giác: chụp cửa sổ app, model đọc ảnh soát bố cục
+      (8.4.6) — chỉ bật khi người dùng đồng ý vì tốn token hơn QA cấu trúc.
 - [ ] Cập nhật `ARCHITECTURE.MD` (HLD + LLD) cho kiến trúc mới.
 - **Xong khi**: e2e cho confirm (đồng ý / từ chối / hết giờ), MCP server mẫu (một server Python
   stdlib nhỏ trong `tests/core/`) được gọi qua agent; audit đầy đủ.
