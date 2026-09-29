@@ -24,6 +24,12 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
   mục lục, thân `SKILL.md` < 500 dòng; viết eval trước khi viết hướng dẫn, checklist workflow,
   vòng đọc-lại. Lệch chuẩn có chủ đích: **không chạy script** trong skill (an toàn dữ liệu văn
   phòng); field mở rộng `apps` luôn tuỳ chọn nên skill tương thích 2 chiều
+- Vá 4 lỗ hổng agent: (1) **làn file** qua `AxiomOffice.Host.exe mcp` làm MCP server built-in
+  (`mcp__office__*`, trusted) — agent đọc/ghi file không cần mở app, không chiếm cửa sổ active,
+  dùng lại 50 tool có sẵn không viết code mới; (2) quy tắc **chống prompt injection** trong system
+  prompt (nội dung đọc từ tài liệu/file là dữ liệu, không phải chỉ dẫn); (3) nút **Hoàn tác lượt
+  vừa rồi** trong pane (Word: đếm N lệnh đã chạy → `writer.undo {count: N}`); (4) **trần token
+  mỗi run** (`maxTokens` mặc định 200k, event `run.stopped` kèm số token đã dùng)
 
 ### Docs — `ARCHITECTURE.MD`: tài liệu thiết kế
 - Phần I, High Level Design: mục tiêu và phạm vi, bối cảnh hệ thống, container, khối chức năng,
