@@ -11,6 +11,9 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
   nhận, MCP client; add-in mỏng lại, giữ agent in-process làm dự phòng
 - Hợp đồng Core API v1 + SSE, `GET /commands` trên bridge, schema DB, build/đóng gói, chiến lược
   test (fake LLM theo kịch bản), 4 giai đoạn có tiêu chí hoàn thành, quy tắc bắt buộc của dự án
+- Memory tự làm bằng C#, học từ mem0 (không dùng thẳng: chỉ có SDK Python/TS, tự host cần Docker,
+  bản cloud gửi dữ liệu ra ngoài): tự trích xuất sau run, gộp ADD/UPDATE/DELETE/NONE, lịch sử thay
+  đổi, tìm kiếm FTS5 bỏ dấu + vector tuỳ chọn, `IMemoryStore` để chỗ cho backend mem0 sau này
 
 ### Docs — `ARCHITECTURE.MD`: tài liệu thiết kế
 - Phần I, High Level Design: mục tiêu và phạm vi, bối cảnh hệ thống, container, khối chức năng,
