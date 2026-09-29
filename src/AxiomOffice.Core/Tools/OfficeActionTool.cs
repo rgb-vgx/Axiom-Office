@@ -10,6 +10,11 @@ public sealed class OfficeActionTool : ITool
 {
     public const string ToolName = "office_action";
 
+    // Log 30/09 01:47: khong co lenh dinh dang bang, model undo 2 lan (xoa bang + ghi chu) roi dung lai tu dau.
+    public const string UndoRule =
+        "Change existing content in place (e.g. writer.formatTable to restyle a table); " +
+        "never use undo to start over - only undo when the user asks.";
+
     private readonly Dictionary<string, OfficeCommand> _allowed;
     private readonly string _signatures;
 
@@ -41,6 +46,7 @@ public sealed class OfficeActionTool : ITool
         "Read and modify the LIVE document that is currently open in the office application. " +
         "Call this for every document change the user asks for so it happens immediately on screen. " +
         "Array params such as values must be real JSON arrays of rows, not objects. " +
+        UndoRule + " " +
         "Available actions (with params): " + _signatures;
 
     public JsonNode ParametersSchema => new JsonObject

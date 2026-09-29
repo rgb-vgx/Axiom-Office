@@ -492,6 +492,10 @@ namespace AxiomOffice.Ai
 
                         onEvent(item);
                         ApplyEvent(result, item);
+                        if (item.Type == "tool.finished")
+                        {
+                            result.Transcript.Add((item.Action ?? "?") + (item.Ok ? " ok" : " loi"));
+                        }
 
                         if (IsTerminal(item.Type))
                         {

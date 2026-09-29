@@ -133,6 +133,7 @@ public sealed class Orchestrator(
                         ["callId"] = result.CallId,
                         ["tool"] = result.Name,
                         ["action"] = info.Action,
+                        ["paramsPreview"] = ModelClient.Truncate(info.Params, 200),
                         ["ok"] = result.Ok,
                         ["error"] = error,
                         ["ms"] = result.Ms,

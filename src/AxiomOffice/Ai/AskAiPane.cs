@@ -472,7 +472,12 @@ namespace AxiomOffice.Ai
                     : (item.Ok
                         ? "{\"ok\":true}"
                         : "{\"ok\":false,\"error\":\"" + (item.Error ?? "loi") + "\"}");
-                return "office_action " + (item.ParamsPreview ?? "{}") + " -> " + outcome;
+                // Cung dinh dang dong tien trinh cua che do in-process ({"action": ..., "params": ...}) de
+                // PaneControls hien nhan tieng Viet theo action (truoc day chi co "{}").
+                string call = "{\"action\": \"" + (item.Action ?? "") + "\""
+                    + (string.IsNullOrEmpty(item.ParamsPreview) ? "" : ", \"params\": " + item.ParamsPreview)
+                    + "}";
+                return "office_action " + call + " -> " + outcome;
             }
 
             if (item.Type == "run.failed")

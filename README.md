@@ -237,6 +237,7 @@ công cụ); lệnh khai báo cạnh handler trong `src/AxiomOffice/Bridge/Comma
 | `writer.formatSelection` | `bold?`, `italic?`, `underline?`, `size?`, `color?`, `font?`, `alignment?` | Định dạng vùng chọn | ✓ |
 | `writer.setParagraphAlignment` | `alignment` | Căn đoạn: left/center/right/justify | ✓ |
 | `writer.insertTable` | `rows?`, `cols?`, `values?`, `style?` | Chèn bảng; `rows`/`cols` tự suy ra/nới theo `values` | ✓ |
+| `writer.formatTable` | `table?`, `style?`, `font?`, `size?`, `color?`, `headerFill?`, `headerColor?`, `headerBold?`, `bandFill?`, `borderColor?`, `alignment?`, `autoFit?` | Định dạng bảng có sẵn (mặc định: bảng tại con trỏ, không có thì bảng cuối); phần host không hỗ trợ trả về trong `skipped` | ✓ |
 | `writer.insertPageBreak` | — | Ngắt trang | ✓ |
 | `writer.insertImage` | `path`, `width?`, `height?` | Chèn ảnh tại con trỏ (kích thước theo point) | ✓ |
 | `writer.insertHyperlink` | `url`, `text?` | Chèn liên kết | ✓ |

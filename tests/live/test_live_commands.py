@@ -194,6 +194,28 @@ def test_writer(b, out, png, run_ai):
     check(wrapped_int and wrapped_int.get("rows") == 2 and wrapped_int.get("cols") == 3, "Word insertTable nhận rows {item:2}, cols [3]", wrapped_int)
     rows_data = b.cmd("writer.insertTable", {"cols": "2", "rows": {"item": [{"item": ["a", "b"]}, {"item": ["c", "d"]}]}}, key="writer.insertTable data in rows")
     check(rows_data and rows_data.get("filled") == 4, "Word insertTable dùng dữ liệu đặt nhầm vào rows", rows_data)
+    # Log 30/09 01:40: bảng 4 cột chèn ngay sau bảng 3 cột bị Word gộp vào bảng cũ -> Cell(1,4) lỗi COM.
+    b.cmd("writer.insertTable", {"values": [["a", "b", "c"], ["1", "2", "3"]]}, key="writer.insertTable narrow before wide")
+    wide = b.cmd("writer.insertTable", {"values": [["w", "x", "y", "z"], ["1", "2", "3", "4"]]}, key="writer.insertTable wide after narrow")
+    check(wide and wide.get("filled") == 8, "Word insertTable bảng rộng hơn ngay sau bảng hẹp (không bị gộp)", wide)
+    b.cmd("writer.appendText", {"text": "\r"}, record=False)
+    wider = b.cmd("writer.insertTable", {"values": [["1", "2", "3", "4", "5"]]}, key="writer.insertTable after appendText")
+    check(wider and wider.get("filled") == 5, "Word insertTable sau appendText vẫn không gộp bảng", wider)
+    # Log 30/09 01:48: sau insertTable con trỏ nằm ở ô (1,1) nên chữ gõ tiếp lọt vào ô tiêu đề.
+    placed = b.cmd("writer.insertTable", {"values": [["ONE_C1", "ONE_C2"]], "style": "Grid Table 4 - Accent 1"}, key="writer.insertTable then type")
+    check(placed and "styleError" not in placed, "Word insertTable đặt được style 'Grid Table 4 - Accent 1'", placed)
+    b.cmd("writer.typeText", {"text": "SAU_BANG"}, record=False)
+    whole = (b.cmd("writer.getText", record=False) or {}).get("text", "")
+    check("SAU_BANG" in whole and whole.index("SAU_BANG") > whole.index("ONE_C2"), "Word chữ gõ sau insertTable nằm SAU bảng", whole[-120:])
+    styled = b.cmd("writer.formatTable", {"font": "Calibri", "size": "12", "headerFill": "1F4E79", "headerColor": "#FFFFFF",
+                                          "bandFill": "#DEEAF6", "borderColor": "#8EAADB", "alignment": "center", "autoFit": "window"},
+                   key="writer.formatTable last table")
+    check(styled and not styled.get("skipped") and "headerFill" in styled.get("applied", []) and "bandFill" in styled.get("applied", []),
+          "Word formatTable định dạng bảng có sẵn (không bỏ qua phần nào)", styled)
+    first = b.cmd("writer.formatTable", {"table": 1, "style": "Grid Table 4 - Accent 1"}, key="writer.formatTable by index")
+    check(first and first.get("table") == 1 and first.get("applied") == ["style"], "Word formatTable theo chỉ số bảng", first)
+    bad = b.cmd("writer.formatTable", {"table": 99}, expect_ok=False, key="writer.formatTable bad index")
+    check("'table' must be between 1 and" in (bad or ""), "Word formatTable báo chỉ số bảng sai", bad)
     b.cmd("writer.insertTable", {"rows": 2, "cols": 2, "values": {"a": 1}}, expect_ok=False, key="writer.insertTable invalid")
     b.cmd("writer.insertTable", {}, expect_ok=False, key="writer.insertTable missing")
     b.cmd("writer.appendText", {"text": "\rTrân trọng,\rKính mong phản hồi."})

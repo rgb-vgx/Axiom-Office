@@ -5,7 +5,23 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+- `writer.formatTable` (agent dùng được): định dạng bảng **có sẵn** — kiểu, font, cỡ, màu chữ, màu
+  hàng tiêu đề, màu sọc, viền, căn lề, co giãn. Trước đây không có lệnh này nên với "tô màu bảng cho
+  đẹp" agent phải `undo` (xoá cả bảng và ghi chú) rồi dựng lại, mất 20 vòng/112s
+- Mô tả tool `office_action`: sửa tại chỗ, không dùng `undo` để làm lại trừ khi người dùng yêu cầu
+
 ### Fixed — lỗi Ask AI thấy khi test Word qua Agent Core
+- **Style bảng Word chưa bao giờ được áp**: `table.set_Style(...)` không tồn tại khi gọi late binding
+  (`dynamic`) và lỗi bị nuốt, nên `style` của `writer.insertTable` luôn bị bỏ qua mà vẫn trả ok. Nay
+  gán `Style` trực tiếp; lỗi (nếu có) trả về trong `styleError`
+- Sau `writer.insertTable` con trỏ nằm ở ô (1,1) nên chữ chèn tiếp lọt vào ô tiêu đề (file thật:
+  dòng ghi chú nằm trong ô "Thứ"). Nay con trỏ ra ngay sau bảng
+- `writer.insertTable` lỗi COM "The requested member of the collection does not exist" khi chèn bảng
+  rộng hơn ngay sau/trước một bảng khác: Word gộp hai bảng liền nhau. Nay tự chèn đoạn ngăn cách
+- Dòng tiến trình của pane khi chạy qua Core chỉ hiện `office_action {}`: sự kiện `tool.finished`
+  kèm `paramsPreview`, pane dựng lại `{"action": ..., "params": ...}` để hiện nhãn tiếng Việt; log
+  "AskAiPane: ok ... N tool calls" đếm đúng số thao tác của Core
 - **Mọi yêu cầu bị làm HAI lần** (Core và in-process chạy song song): `CoreClient` đọc `runId` ở cấp
   ngoài trong khi Core trả `{"ok":true,"result":{"runId":...}}`, nên luôn coi là "Core không trả
   runId" và chạy thêm in-process. Hệ quả: dữ liệu bị ghi hai lần (vd thừa một hàng "Trung bình"),

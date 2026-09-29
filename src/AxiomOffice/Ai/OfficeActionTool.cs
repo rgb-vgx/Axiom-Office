@@ -27,6 +27,8 @@ namespace AxiomOffice.Ai
                     "Read and modify the LIVE document that is currently open in the office application. " +
                     "Call this for every document change the user asks for so it happens immediately on screen. " +
                     "Array params such as values must be real JSON arrays of rows, not objects. " +
+                    "Change existing content in place (e.g. writer.formatTable to restyle a table); " +
+                    "never use undo to start over - only undo when the user asks. " +
                     "Available actions (with params): " + actions,
                 ParametersJson =
                     "{\"type\":\"object\",\"properties\":{" +
