@@ -452,7 +452,7 @@ Tool mà model thấy trong một run:
 | `office_action` | Bridge `/commands` | Như hiện tại: mô tả liệt kê chữ ký các lệnh `agent=true` của `kind` đang mở; **chỉ** cho gọi các lệnh đó (allowlist, cùng thông báo lỗi như `OfficeActionTool` hiện tại) |
 | `load_skill` | Skills | `{name}` → nội dung `SKILL.md` + danh sách file đính kèm |
 | `read_skill_file` | Skills | `{name, path}` → nội dung text (≤ 64KB) hoặc đường dẫn tuyệt đối cho file nhị phân (template .docx) để dùng với `writer.open` |
-| `remember` | Memory (giai đoạn 3) | `{scope: "user"|"document", text, category?}` → qua `MemoryConsolidator` (không tạo bản trùng) |
+| `remember` | Memory (giai đoạn 3) | `{scope: "user"|"document", text, category?}` → ADD qua bộ chống trùng + liên kết (8.5.6; không tạo bản trùng) |
 | `recall` | Memory (giai đoạn 3) | `{query, scope?, limit?}` → memory liên quan (FTS5 + vector nếu có) |
 | `mcp__<server>__<tool>` | MCP client (giai đoạn 4) | Tool của MCP server ngoài được bật trong cấu hình |
 
@@ -498,21 +498,30 @@ version: 1
 cột trung bình, xếp loại, định dạng), `bao-cao-thang` (PowerPoint: dàn 5–7 slide). Mỗi skill có
 ca test e2e (mục 11).
 
-### 8.5 Memory (học từ mem0, tự làm bằng C#)
+### 8.5 Memory (học từ mem0 2.2.1, tự làm bằng C#)
 
-**Vì sao không dùng thẳng mem0** (`github.com/mem0ai/mem0`, Apache 2.0): chỉ có SDK Python/TypeScript,
-bản tự host chạy bằng Docker, bản cloud gửi dữ liệu ra ngoài, mặc định cần thêm model embedding.
-Đều trái với ràng buộc của dự án (không Python, chạy trên máy văn phòng, dữ liệu ở lại máy, LLM do
-người dùng chọn). Ta **lấy các ý tưởng tốt nhất của mem0** và tự làm trong Core:
+**Vì sao không dùng thẳng mem0** (`github.com/mem0ai/mem0`, Apache 2.0; đã đọc repo bản 2.2.1 —
+pipeline "V3"): chỉ có SDK Python/TypeScript, bản tự host chạy bằng Docker, bản cloud gửi dữ liệu
+ra ngoài, mặc định cần thêm model embedding — đều trái ràng buộc của dự án (không Python, chạy trên
+máy văn phòng, dữ liệu ở lại máy, LLM do người dùng chọn). Ta lấy các ý tưởng của mem0 2.2.1 và tự
+làm trong Core:
 
-| Ý tưởng của mem0 | Cách làm trong Axiom Office |
+| Ý tưởng của mem0 2.2.1 | Cách làm trong Axiom Office |
 |---|---|
-| Tự trích xuất "sự thật đáng nhớ" từ hội thoại bằng LLM | `MemoryExtractor` chạy **sau mỗi run** (nền, không chặn pane) |
-| Gộp memory: so với memory cũ liên quan rồi quyết định ADD / UPDATE / DELETE / NONE | `MemoryConsolidator` + một lệnh gọi LLM trả JSON có schema; C# áp quyết định trong một transaction |
-| Lịch sử thay đổi từng memory | Bảng `memory_history` (ai đổi, đổi gì, lúc nào, từ run nào) |
-| Phạm vi memory (user / agent / run) | `user` (người dùng), `document` (theo file), `skill` (theo skill, giai đoạn sau) |
-| Tìm kiếm kết hợp | FTS5 (luôn có) + vector (khi có model embedding), trộn điểm |
-| Nhiều backend | Interface `IMemoryStore`; mặc định `SqliteMemoryStore`; để chỗ cho `Mem0MemoryStore` |
+| Trích xuất **chỉ-ADD**: một lệnh gọi LLM, chỉ thêm memory mới, không bao giờ để LLM sửa/xoá memory cũ | `MemoryExtractor` ADD-only; mọi thay đổi ghi thành memory mới |
+| Thay đổi được ghi thành **sự chuyển đổi** ("chuyển từ A sang B vì…") kèm **liên kết** memory cũ (`linked_memory_ids`) | Cột `linked` + quy tắc prompt |
+| Model **không thấy id thật** (map sang "0","1"…) — chống bịa id | Id tạm; C# bỏ mọi liên kết không nằm trong danh sách đã đưa |
+| Chống trùng bằng **hash nội dung** (trong lô và với memory đã có) | SHA-256 trên text chuẩn hoá, kiểm tra trong lô + theo (scope, scope_key) |
+| **Lưu tin nhắn gốc** kể cả khi không trích xuất được gì; tin gần nhất giúp giải nghĩa đại từ | Bảng `messages` (đã có từ giai đoạn 1) + đưa ≤10 tin gần nhất vào prompt trích xuất |
+| Điểm tìm kiếm **cộng dồn**: (ngữ nghĩa + BM25 + boost thực thể) / tổng trọng số; ngưỡng chặn **trước** khi cộng; BM25 chuẩn hoá sigmoid theo độ dài truy vấn | Công thức ở 8.5.7 |
+| Boost **thực thể** tối đa 0,5, giảm dần khi thực thể gắn nhiều memory | Giữ nguyên; thực thể do LLM trả lúc trích xuất (không cần spaCy như mem0) |
+| **Hạn dùng** từng memory (`expiration_date`) | `expires_at`; hết hạn thì ẩn khỏi ngữ cảnh/tìm kiếm |
+| Trích xuất **bằng đúng ngôn ngữ** của hội thoại | Prompt trích xuất yêu cầu trả bằng tiếng Việt |
+| **Lịch sử** thay đổi từng memory (SQLite) | `memory_history` — giờ chỉ người dùng sửa/xoá qua UI/API |
+
+Khác mem0 một điểm có chủ đích: UPDATE/DELETE memory chỉ do **người dùng** (UI/API); model không bao
+giờ tự sửa/xoá — an toàn hơn nữa cho dữ liệu văn phòng. Mâu thuẫn giữa các memory xử lý **lúc đọc**:
+bản mới ghi rõ sự chuyển đổi và liên kết bản cũ; khi cắt ngân sách ngữ cảnh ưu tiên bản mới.
 
 #### 8.5.1 Vị trí và phạm vi
 
@@ -522,7 +531,7 @@ người dùng chọn). Ta **lấy các ý tưởng tốt nhất của mem0** v�
 - Phạm vi:
   - **Hội thoại** (giai đoạn 1): tin nhắn của từng cuộc trò chuyện, dùng cho "làm tiếp".
   - **`user`**: sự thật về người dùng/tổ chức, dùng cho mọi tài liệu (vd "Cơ quan: Sở GD&ĐT Hà Nội",
-    "Thích font Times New Roman 13", "Ký tên: Nguyễn Văn A, Trưởng phòng").
+    "Thích font Times New Roman 13", "Người ký công văn: Nguyễn Văn A, Trưởng phòng").
   - **`document`**: ghi chú gắn với một file (vd "Đã xong mục 1–3, còn thiếu phần kinh phí").
   - **`skill`** (để chỗ, chưa làm): kinh nghiệm theo từng skill.
 - `document_key`: đường dẫn đầy đủ, chuẩn hoá chữ thường, dùng `\`. Tài liệu chưa lưu → không có
@@ -542,7 +551,7 @@ CREATE TABLE messages (
 CREATE TABLE runs (
   id TEXT PRIMARY KEY, conversation_id TEXT, status TEXT, started_at TEXT, finished_at TEXT,
   model TEXT, rounds INTEGER, input_tokens INTEGER, output_tokens INTEGER, error TEXT,
-  memory_status TEXT);                 -- null | queued | done | skipped | failed (trích xuất sau run)
+  memory_status TEXT);                 -- null | queued | done | skipped | failed
 CREATE TABLE tool_calls (             -- audit
   id INTEGER PRIMARY KEY, run_id TEXT, seq INTEGER, tool TEXT, action TEXT,
   params_json TEXT, ok INTEGER, error TEXT, ms INTEGER, created_at TEXT);
@@ -552,178 +561,212 @@ CREATE TABLE memories (
   id TEXT PRIMARY KEY,                 -- "m_" + ULID
   scope TEXT NOT NULL,                 -- user | document | skill
   scope_key TEXT,                      -- document_key hoặc tên skill; null cho user
-  text TEXT NOT NULL,                  -- một sự thật ngắn, tự đứng được, <= 300 ký tự
+  text TEXT NOT NULL,                  -- một sự thật tự đứng được, <= 300 ký tự
+  hash TEXT NOT NULL,                  -- SHA-256 của text chuẩn hoá (chống trùng)
   category TEXT,                       -- identity | preference | format | contact | project | progress | other
-  source TEXT NOT NULL,                -- user (người dùng tự thêm) | agent (tool remember) | extract (tự trích xuất)
-  confidence REAL,                     -- 0..1 do extractor trả, user = 1
-  pinned INTEGER DEFAULT 0,            -- người dùng ghim: luôn vào ngữ cảnh, extractor không được sửa/xoá
+  entities_json TEXT,                  -- ["Nguyễn Văn A", "Sở GD&Đt Hà Nội"] (do extractor trả)
+  expires_at TEXT,                     -- YYYY-MM-DD; null = không hết hạn
+  source TEXT NOT NULL,                -- user | agent (tool remember) | extract (tự trích xuất)
+  confidence REAL,                     -- 0..1 do extractor; user = 1
+  pinned INTEGER DEFAULT 0,            -- ghim: luôn vào ngữ cảnh
   hits INTEGER DEFAULT 0, last_used_at TEXT,
   created_at TEXT, updated_at TEXT, deleted_at TEXT,
-  created_run_id TEXT, updated_run_id TEXT);
+  created_run_id TEXT);
 CREATE INDEX ix_memories_scope ON memories(scope, scope_key) WHERE deleted_at IS NULL;
+CREATE INDEX ix_memories_hash ON memories(scope, scope_key, hash) WHERE deleted_at IS NULL;
 CREATE VIRTUAL TABLE memories_fts USING fts5(
   text, content='memories', content_rowid='rowid',
   tokenize = 'unicode61 remove_diacritics 2');   -- "luu" khớp "lưu", "hop dong" khớp "hợp đồng"
 -- trigger AFTER INSERT/UPDATE/DELETE giữ memories_fts đồng bộ
 
-CREATE TABLE memory_history (
+CREATE TABLE memory_links (            -- memory mới liên kết memory cũ liên quan (học mem0)
+  memory_id TEXT NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
+  linked_memory_id TEXT NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
+  created_at TEXT, PRIMARY KEY (memory_id, linked_memory_id));
+
+CREATE TABLE memory_history (         -- như bảng history của mem0, nhưng actor luôn là người dùng
   id INTEGER PRIMARY KEY, memory_id TEXT, event TEXT,   -- ADD | UPDATE | DELETE | RESTORE | PIN | UNPIN
-  old_text TEXT, new_text TEXT, actor TEXT,              -- user | agent | extract
+  old_text TEXT, new_text TEXT, actor TEXT,              -- user
   run_id TEXT, reason TEXT, created_at TEXT);
 
 CREATE TABLE memory_embeddings (
   memory_id TEXT PRIMARY KEY REFERENCES memories(id) ON DELETE CASCADE,
-  model TEXT, dim INTEGER, vector BLOB,                  -- float32 little-endian, đã chuẩn hoá L2
+  model TEXT, dim INTEGER, vector BLOB,                  -- float32 little-endian, chuẩn hoá L2
   text_hash TEXT, created_at TEXT);                     -- text đổi → tính lại
 ```
 
-Không dùng extension native (sqlite-vec) ở đợt này: tính cosine trong C# trên vector đã nạp vào bộ
-nhớ theo phạm vi (đủ nhanh tới vài chục nghìn memory). `IVectorIndex` để chỗ thay bằng sqlite-vec sau.
+Không dùng extension native (sqlite-vec) ở đợt này: tính cosine trong C# trên vector đã nạp theo
+phạm vi (đủ nhanh tới vài chục nghìn memory). `IVectorIndex` để chỗ thay bằng sqlite-vec sau.
 
 #### 8.5.3 Interface
 
 ```csharp
+public record NewMemory(string Scope, string? ScopeKey, string Text, string? Category,
+    string[] Entities, string[] LinkedIds, string? ExpiresAt);
 public interface IMemoryStore
 {
-    Task<MemoryItem> AddAsync(NewMemory item, MemoryActor actor, string? runId, CancellationToken ct);
-    Task<MemoryItem?> UpdateAsync(string id, string newText, MemoryActor actor, string? runId, string? reason, CancellationToken ct);
-    Task<bool> DeleteAsync(string id, MemoryActor actor, string? runId, string? reason, CancellationToken ct);   // xoá mềm
-    Task<IReadOnlyList<MemoryHit>> SearchAsync(MemoryQuery query, CancellationToken ct);                          // kết hợp FTS + vector
+    Task<IReadOnlyList<MemoryOpResult>> AddBatchAsync(IEnumerable<NewMemory> items, MemoryActor actor, string? runId, CancellationToken ct);
+    Task<MemoryItem?> UpdateAsync(string id, string newText, MemoryActor actor, string? reason, CancellationToken ct);   // actor = user
+    Task<bool> DeleteAsync(string id, MemoryActor actor, string? reason, CancellationToken ct);                           // xoá mềm, actor = user
+    Task<IReadOnlyList<MemoryHit>> SearchAsync(MemoryQuery query, CancellationToken ct);                                  // scoring ở 8.5.7
     Task<IReadOnlyList<MemoryItem>> ListAsync(MemoryScope scope, string? scopeKey, bool includeDeleted, CancellationToken ct);
     Task<IReadOnlyList<MemoryHistoryEntry>> HistoryAsync(string id, CancellationToken ct);
     Task SetPinnedAsync(string id, bool pinned, CancellationToken ct);
-    Task<int> PurgeAsync(MemoryScope? scope, CancellationToken ct);                                               // xoá cứng
+    Task<int> PurgeAsync(MemoryScope? scope, CancellationToken ct);                                                      // xoá cứng
 }
 ```
 
-- `SqliteMemoryStore`: bản mặc định.
-- `Mem0MemoryStore` (không làm ở đợt này, chỉ để chỗ): gọi REST API của một server mem0 do tổ chức tự
-  vận hành. Chỉ bật khi cấu hình `MemoryBackend=mem0` + URL; UI ghi rõ dữ liệu memory rời khỏi máy.
-- Orchestrator, tool `remember`/`recall`, API `/v1/memory` chỉ phụ thuộc `IMemoryStore`,
-  `MemoryExtractor`, `MemoryConsolidator`, `MemoryRetriever`.
+- `SqliteMemoryStore`: bản mặc định. `AddBatchAsync` trả kết quả từng fact (ADD / DUPLICATE) để
+  phát event đúng.
+- `Mem0MemoryStore` (không làm ở đợt này, chỉ để chỗ): gọi REST API của server mem0 do tổ chức tự
+  vận hành, bật khi `MemoryBackend=mem0` + URL; UI ghi rõ dữ liệu memory rời khỏi máy.
 
 #### 8.5.4 Ghi memory: ba đường vào
 
 ```mermaid
 flowchart LR
-    u["Người dùng<br/>(form Quản lý ghi nhớ, API)"] -->|"source=user, không qua gộp"| store[("memories")]
-    a["Model gọi tool remember<br/>trong run"] --> cons["MemoryConsolidator"]
-    r["Run kết thúc"] --> q["Hàng đợi trích xuất<br/>(nền, 1 worker)"] --> ext["MemoryExtractor<br/>(LLM)"] --> cons
-    cons -->|"ADD / UPDATE / DELETE / NONE"| store
-    cons --> hist[("memory_history")]
+    u["Người dùng<br/>(form Quản lý ghi nhớ, API)"] -->|"source=user, ghi thẳng"| store[("memories")]
+    a["Model gọi tool remember<br/>trong run"] --> dedup["Chống trùng + áp dụng<br/>(8.5.6)"]
+    r["Run kết thúc"] --> q["Hàng đợi trích xuất<br/>(nền, 1 worker)"] --> ext["MemoryExtractor<br/>(LLM, chỉ-ADD)"] --> dedup
+    dedup -->|"transaction: ADD + link + history"| store
+    store --> hist[("memory_history")]
     store --> ev["SSE memory.written /<br/>thông báo trong pane"]
 ```
 
-1. **Người dùng** thêm/sửa/xoá/ghim trong form hoặc API: ghi thẳng, `source=user`, không qua LLM.
-2. **Tool `remember`** trong run: model đưa `{scope, text, category?}` → qua `MemoryConsolidator`
-   (để không tạo bản trùng) → phát `memory.written`.
-3. **Tự trích xuất sau run** (`MemoryAutoExtract=1`): khi run `completed`, đưa vào hàng đợi nền
-   (một worker, không chặn pane, không giữ run). Pane không phải chờ; kết quả hiện ở lần mở pane
-   sau hoặc qua event nếu SSE còn mở.
+1. **Người dùng** thêm/sửa/xoá/ghim/đặt hạn dùng trong form hoặc API: ghi thẳng (`source=user`),
+   không qua LLM; sửa/xoá ghi `memory_history`.
+2. **Tool `remember`** trong run: model đưa `{scope, text, category?}` → đi qua bộ chống trùng
+   (8.5.6) rồi ADD (`source=agent`), phát `memory.written`.
+3. **Tự trích xuất sau run** (`MemoryAutoExtract=1`): run `completed` → đưa vào hàng đợi nền
+   (một worker, không chặn pane, không giữ run). Kết quả hiện ở lần mở pane sau hoặc qua event
+   nếu SSE còn mở.
 
-#### 8.5.5 MemoryExtractor
+#### 8.5.5 MemoryExtractor (chỉ-ADD)
 
-Đầu vào: tin nhắn user của run + câu trả lời cuối + danh sách tool summary (action, ok) + tên tài
-liệu + app. **Không** gửi nội dung tài liệu, kết quả `getText`/`readRange`, hay dữ liệu bảng.
+Đầu vào cho lệnh gọi LLM (học `generate_additive_extraction_prompt` của mem0): tin nhắn user của
+run + câu trả lời cuối + **≤10 tin nhắn gần nhất** trong hội thoại (giải nghĩa đại từ) + **≤10
+memory liên quan** của cùng scope (đã map sang id tạm `"0"`, `"1"`…, kèm text) + ngày quan sát.
+**Không** gửi nội dung tài liệu, kết quả `getText`/`readRange`, dữ liệu bảng.
 
-Bỏ qua (ghi `runs.memory_status = skipped`) khi: `MemoryEnabled=0`, `MemoryAutoExtract=0`, run
-không `completed`, prompt < 15 ký tự, hoặc bộ lọc rẻ (regex) thấy prompt chỉ là lệnh thao tác
-thuần (vd "in đậm dòng này") không chứa thông tin về người dùng/tổ chức/tiến độ. Mục tiêu: phần lớn
-run **không** tốn thêm lệnh gọi LLM.
+Bỏ qua (`runs.memory_status = skipped`, không tốn lệnh gọi LLM) khi: `MemoryEnabled=0`,
+`MemoryAutoExtract=0`, run không `completed`, prompt < 15 ký tự, hoặc bộ lọc rẻ (regex) thấy prompt
+chỉ là lệnh thao tác thuần (vd "in đậm dòng này") không chứa thông tin về người dùng/tổ chức/tiến độ.
 
-Lệnh gọi LLM (model `MemoryModel`, mặc định = `LlmModel`; temperature 0; timeout 30s) với system
-prompt cố định (lưu trong `Memory/Prompts/extract.txt`, nhúng vào exe) yêu cầu trả **đúng JSON**:
+Lệnh gọi LLM (model `MemoryModel`, mặc định = `LlmModel`; temperature 0; timeout 30s; system prompt
+nhúng trong exe: `Memory/Prompts/extract.txt`) trả **đúng JSON**:
 
 ```json
 {"facts": [
-  {"scope": "user", "category": "identity", "text": "Người dùng làm việc tại Sở GD&ĐT Hà Nội", "confidence": 0.9},
-  {"scope": "document", "category": "progress", "text": "Đã soạn xong mục 1-3; còn thiếu phần kinh phí", "confidence": 0.8}
+  {"text": "Người ký công văn: Nguyễn Văn A, Trưởng phòng", "category": "contact",
+   "confidence": 0.9, "entities": ["Nguyễn Văn A"], "linkedIds": ["0"], "expiresAt": null},
+  {"text": "Đã soạn xong mục 1-3 của báo cáo; còn thiếu phần kinh phí", "category": "progress",
+   "confidence": 0.8, "entities": [], "linkedIds": []}
 ]}
 ```
 
-Quy tắc trong prompt: chỉ ghi điều **bền vững và hữu ích cho lần sau** (danh tính, đơn vị, chức vụ,
-người ký, định dạng ưa thích, quy ước đặt tên, tiến độ tài liệu); không ghi nội dung tạm thời, không
-ghi dữ liệu nhạy cảm (số CCCD, số tài khoản, mật khẩu, thông tin sức khoẻ); mỗi fact một câu tự
-đứng được, viết bằng ngôn ngữ người dùng; tối đa 5 fact; không có gì thì `{"facts": []}`.
+Quy tắc trong prompt (học `ADDITIVE_EXTRACTION_PROMPT` của mem0, viết bằng tiếng Việt):
 
-C# kiểm tra kết quả: parse JSON (lỗi → thử lại 1 lần với lời nhắc "chỉ trả JSON", vẫn lỗi →
-`failed`), bỏ fact có `confidence < 0.6`, text rỗng hoặc > 300 ký tự, và **bộ lọc nhạy cảm bằng
-regex** (dãy 9–12 chữ số liền, số thẻ, email + mật khẩu...) chạy lại trên từng fact bất kể LLM nói gì.
+- Mỗi fact **tự đứng được** (không dùng đại từ "anh/chị/ông/bà"); ≤ 300 ký tự, 1–2 câu.
+- **Giữ nguyên tên riêng, số lượng, đơn vị** ("Times New Roman 13", không "font chữ Tây").
+- **Đổi thời gian tương đối thành ngày cụ thể** theo ngày quan sát ("tuần trước" → ngày thật);
+  không đổi ngày tuyệt đối thành mơ hồ.
+- **Ghi rõ sự chuyển đổi** khi thông tin thay đổi: cái gì mới, thay cho cái gì, vì sao (vd "Chức vụ
+  ký công văn đổi từ Trưởng phòng sang Phó giám đốc từ 10/2026") thay vì chỉ ghi trạng thái mới.
+- Lấy cả thông tin nói kèm trong câu yêu cầu; không chép lại điều người dùng nói xuất hiện trong
+  câu trả lời của assistant; bỏ câu chào/xe kẽ; tối đa 5 fact; không có gì thì `{"facts": []}`.
+- Trả bằng **ngôn ngữ của hội thoại** (tiếng Việt).
 
-#### 8.5.6 MemoryConsolidator (ADD / UPDATE / DELETE / NONE)
+C# kiểm tra: parse JSON (lỗi → thử lại 1 lần với "chỉ trả JSON", vẫn lỗi → `failed`); bỏ fact có
+`confidence < 0.6`, text rỗng hoặc > 300 ký tự; **bỏ mọi `linkedIds` không nằm trong danh sách id tạm
+đã đưa** (chống bịa id, vẫn giữ fact); `expiresAt` phải là ngày `YYYY-MM-DD` hợp lệ; **lọc nhạy cảm
+bằng regex** (dãy 9–12 chữ số liền, số thẻ, email + mật khẩu…) chạy lại trên từng fact bất kể LLM
+nói gì.
 
-Với mỗi fact mới:
+#### 8.5.6 Chống trùng và áp dụng (thay `MemoryConsolidator` kiểu cũ)
 
-1. Lấy tối đa 10 memory **cùng scope/scope_key** liên quan nhất (`MemoryRetriever`, 8.5.7).
-2. Không có memory liên quan (điểm < ngưỡng) → **ADD** trực tiếp, không gọi LLM.
-3. Trùng gần như nguyên văn (so khớp sau khi chuẩn hoá: bỏ dấu, chữ thường, bỏ dấu câu) → **NONE**,
-   tăng `hits`.
-4. Còn lại → một lệnh gọi LLM (`Memory/Prompts/consolidate.txt`) cho **cả lô** fact của run, đưa
-   memory cũ kèm id tạm (`"0"`, `"1"`... để model không bịa id thật), yêu cầu JSON:
+- **Chuẩn hoá text**: chữ thường, bỏ dấu tiếng Việt, bỏ dấu câu, xoá khoảng trắng thừa → **SHA-256**
+  làm `hash` (giống `hashlib.md5` của mem0, dùng SHA-256).
+- Bỏ fact trùng `hash` **trong cùng lô**; trùng `hash` với memory cùng `(scope, scope_key)` đã có
+  → DUPLICATE (tăng `hits` của bản cũ, không thêm mới).
+- Gần-trùng không cần LLM: có embedding thì cosine ≥ 0,96 với memory cùng scope → coi là trùng;
+  không có embedding thì chỉ so `hash`.
+- Áp **trong một transaction**: INSERT `memories` (+ hash, entities, expires_at) + INSERT
+  `memory_links` (nếu linked id hợp lệ) + INSERT `memory_history` (event ADD, actor = extract/agent);
+  mỗi ADD phát `memory.written` (`{id, event: "ADD", scope, text}`) để người dùng thấy và xoá được.
+- Tool `remember` dùng cùng đường này với một fact duy nhất (`source=agent`).
 
-```json
-{"operations": [
-  {"event": "ADD", "text": "Người ký: Nguyễn Văn A, Trưởng phòng"},
-  {"event": "UPDATE", "id": "1", "text": "Font ưa thích: Times New Roman 14", "reason": "người dùng đổi cỡ chữ"},
-  {"event": "DELETE", "id": "2", "reason": "người dùng nói đã chuyển công tác"},
-  {"event": "NONE", "id": "0"}
-]}
+#### 8.5.7 MemoryRetriever: scoring và đưa vào ngữ cảnh
+
+Ứng viên: chưa xoá, **chưa hết hạn** (`expires_at IS NULL OR expires_at > hôm qua`), thuộc `user` +
+`document` của tài liệu hiện tại; `pinned` luôn vào bất kể điểm.
+
+Tín hiệu (mọi trọng số là hằng số có tên, dễ chỉnh):
+
+- **keyword**: FTS5 `bm25()` (điểm càng thấp càng khớp → đổi dấu), chuẩn hoá về 0..1 bằng **sigmoid
+  với tham số theo độ dài truy vấn như mem0** (`get_bm25_params`): ≤3 từ (midpoint 5, steepness
+  0,7); ≤6 (7; 0,6); ≤9 (9; 0,5); ≤15 (10; 0,5); còn lại (12; 0,5). Truy vấn dựng từ prompt: bỏ từ
+  dừng tiếng Việt/Anh, tối đa 12 từ, nối `OR`.
+- **semantic** (chỉ khi có embedding, 8.5.8): cosine.
+- **entity**: thực thể khớp giữa truy vấn và `entities` của memory (so text đã chuẩn hoá) →
+  boost = 0,5 × 1/(1 + 0,001 × (n−1)²), n = số memory gắn thực thể đó (giảm khi thực thể quá
+  phổ biến — đúng `ENTITY_BOOST_WEIGHT` và `memory_count_weight` của mem0).
+
+**Cộng dồn như `score_and_rank` của mem0**:
+
+```
+combined = (semantic + keyword + entity) / maxPossible
+maxPossible = 1 (semantic) + 1 (keyword) + 0,5 (entity)   -- chỉ cộng thành phần đang có tín hiệu
 ```
 
-C# áp các thao tác **trong một transaction**, kiểm tra từng thao tác: id tạm phải có trong danh
-sách đã đưa; **không được UPDATE/DELETE memory `pinned` hoặc `source=user`** (chuyển thành ADD nếu
-là UPDATE, bỏ nếu là DELETE); mỗi thay đổi ghi `memory_history` (actor, run, reason); DELETE là xoá
-mềm. Mỗi ADD/UPDATE/DELETE phát `memory.written` (`{id, event, scope, text}`) để người dùng thấy và
-hoàn tác được.
+**Ngưỡng chặn tín hiệu chính TRƯỚC khi cộng** (mem0 threshold=0.1): có embedding → loại ứng viên
+cosine < 0,1; không có embedding → keyword là tín hiệu chính, áp ngưỡng lên điểm keyword chuẩn hoá.
+Không có embedding thì mẫu số bỏ trọng số semantic (chỉ keyword + entity).
 
-#### 8.5.7 MemoryRetriever: đọc memory vào ngữ cảnh
+Đưa vào prompt (mục 8.8, phần 3): toàn bộ `pinned`; tối đa 20 memory `document` (ưu tiên mới nhất
+khi bằng điểm — để bản ghi chuyển đổi thắng bản cũ); tối đa 8 memory `user` trên ngưỡng. Tổng
+≤ 1.500 token, mỗi dòng `- [id ngắn] text` để model trích dẫn được. Memory được đưa vào thì tăng
+`hits`, cập nhật `last_used_at` (sau run, gộp một lệnh ghi). Tool `recall {query, scope?, limit?}`
+dùng cùng retriever cho khi model cần tìm thêm.
 
-- **Ứng viên**: memory chưa xoá thuộc `user` + `document` của tài liệu hiện tại.
-- **Điểm từ khoá**: FTS5 `bm25()` với truy vấn dựng từ prompt (bỏ từ dừng tiếng Việt/Anh, tối đa 12
-  từ, nối `OR`), chuẩn hoá về 0..1.
-- **Điểm ngữ nghĩa** (chỉ khi có embedding, 8.5.8): cosine giữa embedding của prompt và của memory.
-- **Điểm cuối** = `0.5·ngữ nghĩa + 0.35·từ khoá + 0.15·mới dùng gần đây` (không có embedding:
-  `0.8·từ khoá + 0.2·gần đây`). Trọng số là hằng số có tên, dễ chỉnh.
-- **Đưa vào prompt** (mục 8.8, phần 3): toàn bộ memory `pinned`; tối đa 20 memory `document` của tài
-  liệu hiện tại (mới nhất trước); tối đa 8 memory `user` điểm cao nhất vượt ngưỡng. Tổng ≤ 1.500
-  token. Mỗi dòng dạng `- [id ngắn] text` để model trích dẫn được khi cần.
-- Memory được đưa vào prompt thì tăng `hits`, cập nhật `last_used_at` (sau run, gộp một lệnh ghi).
-- Tool `recall {query, scope?, limit?}` dùng cùng retriever cho khi model cần tìm thêm.
+**Mâu thuẫn**: không xoá bản cũ; bản mới đã ghi rõ chuyển đổi và liên kết; nếu cả hai cùng vào
+ngữ cảnh thì model đọc được sự thay đổi — đây là cách mem0 2.2.1 xử lý (không còn UPDATE tự động).
 
 #### 8.5.8 Embedding (tuỳ chọn)
 
 - Cấu hình `EmbeddingModel` (+ `EmbeddingEndpoint`, mặc định = `LlmEndpoint`), gọi
-  `{endpoint}/embeddings` kiểu OpenAI-compatible (hoạt động với OpenAI, Ollama, LM Studio...).
-  Anthropic không có API embedding: provider `anthropic` thì phải cấu hình endpoint embedding riêng
-  hoặc chạy chỉ FTS5.
-- Không cấu hình hoặc gọi lỗi → **tự chạy chỉ FTS5**, không báo lỗi cho người dùng (log một lần).
-- Tính embedding khi ADD/UPDATE (nền); đổi `EmbeddingModel` → tính lại dần ở nền (`model` khác trong
+  `{endpoint}/embeddings` kiểu OpenAI-compatible (OpenAI, Ollama, LM Studio...). Anthropic không có
+  API embedding: provider `anthropic` thì phải cấu hình endpoint embedding riêng hoặc chạy chỉ
+  keyword (FTS5).
+- Không cấu hình hoặc gọi lỗi → **tự chạy chỉ keyword**, không báo lỗi cho người dùng (log một lần).
+- Tính embedding khi ADD (nền); đổi `EmbeddingModel` → tính lại dần ở nền (`model` khác trong
   `memory_embeddings`).
 
 #### 8.5.9 Hội thoại (giai đoạn 1)
 
 Lưu tin nhắn user và câu trả lời cuối; kết quả tool lưu dạng **tóm tắt ngắn** (`tool_summary`:
-action + ok/lỗi), không lưu JSON kết quả. Khi dựng ngữ cảnh: các tin gần nhất trong ngân sách
-~8.000 token (ước lượng ký tự/4); vượt thì dùng `conversations.summary` (LLM tóm tắt khi hội thoại
-vượt ngân sách, cập nhật cuối run, cùng hàng đợi nền với trích xuất).
+action + ok/lỗi), không lưu JSON kết quả — cũng là nguồn "≤10 tin gần nhất" cho extractor (8.5.5).
+Khi dựng ngữ cảnh: các tin gần nhất trong ngân sách ~8.000 token (ước lượng ký tự/4); vượt thì dùng
+`conversations.summary` (LLM tóm tắt khi hội thoại vượt ngân sách, cập nhật cuối run, cùng hàng
+đợi nền với trích xuất).
 
 #### 8.5.10 Quyền riêng tư và kiểm soát
 
-- Mọi dữ liệu memory nằm trong `core.db` trên máy. Trích xuất và gộp dùng **cùng LLM provider** người
+- Mọi dữ liệu memory nằm trong `core.db` trên máy. Trích xuất dùng **cùng LLM provider** người
   dùng đã cấu hình (không gửi đi đâu khác).
-- `MemoryEnabled=0`: không đọc, không ghi memory dài hạn (hội thoại vẫn lưu cho "làm tiếp").
-  `MemoryAutoExtract=0`: chỉ ghi khi người dùng hoặc model (`remember`) chủ động.
-- Người dùng xem, sửa, ghim, xoá, xem lịch sử từng memory; "Xoá toàn bộ ghi nhớ" (hỏi lại) xoá cứng.
-- Xoá mềm được dọn cứng sau 30 ngày. `uninstall.ps1 -Purge` xoá cả `core\`.
+- `MemoryEnabled=0`: không đọc, không ghi memory dài hạn. `MemoryAutoExtract=0`: chỉ ghi khi người
+  dùng hoặc model (`remember`) chủ động.
+- Người dùng xem, sửa, ghim, xoá, **đặt hạn dùng**, xem lịch sử từng memory; "Xoá toàn bộ ghi nhớ"
+  (hỏi lại) xoá cứng. Model chỉ ADD; sửa/xoá chỉ xảy ra khi người dùng thao tác.
+- Xoá mềm được dọn cứng sau 30 ngày; hết hạn không xoá, chỉ ẩn. `uninstall.ps1 -Purge` xoá cả `core\`.
 - **Không bao giờ** lưu API key, token; không lưu nội dung file vào memory.
 
-#### 8.5.11 API bổ sung
+#### 8.5.11 API
 
 | Method | Path | Mô tả |
 |---|---|---|
 | `GET` | `/v1/memory?scope=&scopeKey=&q=&includeDeleted=` | Liệt kê / tìm (có `q` thì trả điểm) |
-| `POST` | `/v1/memory` | Thêm `{scope, scopeKey?, text, category?}` (`source=user`) |
-| `PATCH` | `/v1/memory/{id}` | Sửa `text`, `category`, `pinned` |
+| `POST` | `/v1/memory` | Thêm `{scope, scopeKey?, text, category?, expiresAt?}` (`source=user`) |
+| `PATCH` | `/v1/memory/{id}` | Sửa `text`, `category`, `pinned`, `expiresAt` (actor = user) |
 | `DELETE` | `/v1/memory/{id}` | Xoá mềm; `POST /v1/memory/{id}/restore` khôi phục |
 | `GET` | `/v1/memory/{id}/history` | Lịch sử thay đổi |
 | `DELETE` | `/v1/memory?scope=all&confirm=true` | Xoá cứng toàn bộ |
@@ -809,7 +852,7 @@ Vẫn **.NET 4.8, C# 7.3, không NuGet**.
 
 | Lớp | Công cụ | Nội dung |
 |---|---|---|
-| Unit | xUnit `tests/core/AxiomOffice.Core.Tests` | SkillLoader (frontmatter hợp lệ/lỗi, ưu tiên nguồn, chặn `..`), PromptBuilder (thứ tự ổn định), ContextAssembler (ngân sách token), Memory (migration; FTS5 bỏ dấu tiếng Việt; áp ADD/UPDATE/DELETE/NONE trong transaction; không sửa memory `pinned`/`source=user`; id tạm không hợp lệ bị bỏ; lọc nhạy cảm; bỏ qua trích xuất với lệnh thao tác thuần; điểm retriever có/không embedding; lịch sử; xoá mềm/khôi phục), PolicyEngine, parse SSE, provider (qua `HttpMessageHandler` giả): OpenAI/Anthropic tool calls, fallback không tools, timeout, hủy |
+| Unit | xUnit `tests/core/AxiomOffice.Core.Tests` | SkillLoader (frontmatter hợp lệ/lỗi, ưu tiên nguồn, chặn `..`), PromptBuilder (thứ tự ổn định), ContextAssembler (ngân sách token), Memory (migration; FTS5 bỏ dấu tiếng Việt; chống trùng hash trong lô và với memory cũ; áp ADD + link + history trong transaction; linked id không nằm trong danh sách bị bỏ; lọc nhạy cảm; bỏ qua trích xuất với lệnh thao tác thuần; sigmoid theo độ dài truy vấn; cộng dồn + ngưỡng chặn tín hiệu chính, có/không embedding; entity boost giảm theo số memory gắn; hết hạn ẩn; xoá mềm/khôi phục), PolicyEngine, parse SSE, provider (qua `HttpMessageHandler` giả): OpenAI/Anthropic tool calls, fallback không tools, timeout, hủy |
 | E2E không Office | `tests/core/test_core_e2e.py` + `tests/core/fake_llm.py` | Chạy Core với `AXIOM_*` override (thư mục dữ liệu tạm, port tạm, token tạm, endpoint = fake LLM). Fake LLM trả lời theo **kịch bản** (JSON: chuỗi tool call + câu trả lời) theo chuẩn OpenAI-compatible. Bridge giả (Python HTTP server) ghi lại `/cmd` nhận được. Kiểm tra: SSE đủ event đúng thứ tự, allowlist, confirm, cancel, timeout, hội thoại nhiều lượt, `load_skill`, `remember`/`recall`, audit |
 | E2E với Office thật | `test_core_e2e.py --office` | Như `test_live_commands.py`: tự mở Word/Excel/PowerPoint riêng, dừng nếu port đã có app người dùng; pane không cần mở: gọi thẳng Core API với `office.port` thật và fake LLM có kịch bản dùng lệnh thật; kiểm tra tài liệu đổi đúng |
 | Hồi quy | Test hiện có | `tests/live/test_live_commands.py` (+ `--compare` golden), `tests/mcp-host/test_mcp_host.py` (157 kiểm tra), unit test `tools/*-mcp` |
@@ -857,21 +900,24 @@ README + CHANGELOG + `ARCHITECTURE.MD` khi cần, chạy test, báo cáo kết q
 
 ### Giai đoạn 3: Memory dài hạn
 
-- [ ] `IMemoryStore` + `SqliteMemoryStore`, bảng `memories`, `memories_fts` (bỏ dấu), `memory_history`,
-      `memory_embeddings` (8.5.2, 8.5.3).
-- [ ] `MemoryRetriever` (FTS5, + vector khi có embedding) và đưa memory vào prompt (8.5.7).
-- [ ] Tool `remember`/`recall`; `MemoryConsolidator` (ADD/UPDATE/DELETE/NONE, 8.5.6).
-- [ ] Hàng đợi nền + `MemoryExtractor` sau run (8.5.5), prompt nhúng `Memory/Prompts/*.txt`.
+- [ ] `IMemoryStore` + `SqliteMemoryStore`: bảng `memories` (hash, entities, expires_at),
+      `memories_fts` (bỏ dấu), `memory_links`, `memory_history`, `memory_embeddings` (8.5.2, 8.5.3).
+- [ ] `MemoryRetriever`: scoring cộng dồn + sigmoid theo độ dài truy vấn + entity boost (8.5.7),
+      đưa memory vào prompt.
+- [ ] Tool `remember`/`recall`; chống trùng hash + áp dụng trong transaction (8.5.6).
+- [ ] Hàng đợi nền + `MemoryExtractor` chỉ-ADD sau run (8.5.5), prompt nhúng `Memory/Prompts/*.txt`.
 - [ ] Embedding tuỳ chọn (8.5.8); API memory (8.5.11).
-- [ ] Pane: event `memory.written` (hoàn tác được ngay), form "Quản lý ghi nhớ…" (xem, sửa, ghim,
-      xoá, lịch sử), cài đặt `MemoryEnabled` / `MemoryAutoExtract`.
-- [ ] Fake LLM có kịch bản cho extract/consolidate; e2e: phiên 1 nói "Tôi là trưởng phòng Kế toán,
-      công văn ký tên Nguyễn Văn A" → phiên 2 (Core khởi động lại) soạn công văn tự điền người ký;
-      phiên 3 "tôi đã lên phó giám đốc" → memory cũ được UPDATE chứ không thêm bản mâu thuẫn.
+- [ ] Pane: event `memory.written` (xoá được ngay), form "Quản lý ghi nhớ…" (xem, sửa, ghim, hạn
+      dùng, xoá, lịch sử), cài đặt `MemoryEnabled` / `MemoryAutoExtract`.
+- [ ] Fake LLM có kịch bản cho extractor; e2e: phiên 1 nói "Tôi là trưởng phòng Kế toán, công văn
+      ký tên Nguyễn Văn A" → phiên 2 (Core khởi động lại) soạn công văn tự điền người ký; phiên 3
+      "tôi đã lên phó giám đốc" → memory MỚI ghi rõ sự chuyển đổi và liên kết bản cũ (không sửa bản
+      cũ), ngữ cảnh ưu tiên thông tin mới.
 - **Xong khi**: memory ghi ở phiên này được dùng ở phiên sau (kể cả sau khi Core khởi động lại);
-  thông tin mới mâu thuẫn thì UPDATE chứ không tạo bản trùng; memory ghim/do người dùng ghi không bị
-  model sửa; không có embedding vẫn chạy (FTS5); lệnh thao tác thuần không tốn lệnh gọi trích xuất;
-  tắt `MemoryEnabled` thì không đọc/ghi; xoá trong UI là mất khỏi ngữ cảnh; `-Purge` xoá sạch.
+  thông tin mới mâu thuẫn thì có memory mới ghi rõ chuyển đổi + liên kết (bản cũ không bị model sửa);
+  fact trùng hash không tạo bản mới; linked id bịa bị bỏ; memory hết hạn ẩn khỏi ngữ cảnh; không có
+  embedding vẫn chạy (FTS5); lệnh thao tác thuần không tốn lệnh gọi trích xuất; tắt `MemoryEnabled`
+  thì không đọc/ghi; xoá trong UI là mất khỏi ngữ cảnh; `-Purge` xoá sạch.
 
 ### Giai đoạn 4: Mở rộng và an toàn
 
@@ -892,7 +938,7 @@ README + CHANGELOG + `ARCHITECTURE.MD` khi cần, chạy test, báo cáo kết q
 | Core chết giữa run | Pane nhận lỗi SSE → ErrorCard "Agent Core dừng đột ngột" + Thử lại; tài liệu vẫn nguyên (mỗi lệnh độc lập, Undo được) |
 | Hai phiên bản DLL/Core lệch | `protocol` trong `/health`; Core đọc lệnh qua `/commands` theo DLL đang chạy |
 | Memory ghi sai/nhạy cảm | Luôn hiện `memory.written`, hoàn tác được; lọc nhạy cảm bằng regex sau LLM; không gửi nội dung tài liệu cho extractor; `MemoryEnabled=0` / `MemoryAutoExtract=0` |
-| Tốn token do trích xuất/gộp sau mỗi run | Bộ lọc rẻ bỏ qua lệnh thao tác thuần; gộp theo lô; ADD thẳng khi không có memory liên quan; `MemoryModel` dùng model rẻ hơn |
+| Tốn token do trích xuất sau mỗi run | Bộ lọc rẻ bỏ qua lệnh thao tác thuần; một lệnh gọi LLM cho cả lượt (chỉ-ADD, không vòng gộp); `MemoryModel` dùng model rẻ hơn |
 | Chi phí token tăng do hội thoại dài | Ngân sách ngữ cảnh + tóm tắt + prompt caching |
 
 ## 14. Câu hỏi mở
