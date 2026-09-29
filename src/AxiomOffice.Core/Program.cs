@@ -1,11 +1,13 @@
 using AxiomOffice.Core;
+using AxiomOffice.Core.Agent;
 using AxiomOffice.Core.Api;
 using AxiomOffice.Core.Config;
 using AxiomOffice.Core.Logging;
+using AxiomOffice.Core.Models;
+using AxiomOffice.Core.Office;
 
 // AxiomOffice.Core.exe - Agent Core (New_arch.md): process rieng cua agent, mot ban cho moi nguoi
-// dung Windows, chi nghe 127.0.0.1. Giai doan 0: vong doi + /health + shutdown + cau hinh.
-// Add-in khoi dong Core khi can va tim no qua %LOCALAPPDATA%\AxiomOffice\core.json.
+// dung Windows, chi nghe 127.0.0.1. Add-in khoi dong Core khi can va tim no qua core.json.
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -61,10 +63,19 @@ builder.WebHost.UseUrls($"http://127.0.0.1:{port}");
 
 WebApplication app = builder.Build();
 CoreApiGuard.Use(app, config);
-CoreApi.Map(app, config, paths, runtime);
 
-// core.json chi duoc ghi khi Core da san sang; xoa khi thoat (dung ApplicationStopped de ca khi
-// host bi dung boi WebApplicationFactory trong test cung khong de lai file).
+// Phu thuoc cua Core (khong dung DI container: it thanh phan, khoi tao mot lan).
+var stores = new CoreStores(paths);
+var http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
+var bridge = new BridgeClient(config, http, CoreLog.Info);
+var sessions = new SessionDirectory(config.SessionDirectoryOverride ?? SessionDirectory.DefaultDirectory);
+var model = new ModelClient(http, config.LlmProvider, config.LlmEndpoint, config.LlmApiKey, config.LlmModel);
+var manager = new RunManager();
+var orchestrator = new Orchestrator(config, bridge, sessions, stores.Conversations, stores.Runs, model, new ContextAssembler());
+
+CoreApi.Map(app, config, paths, runtime, stores);
+RunEndpoints.Map(app, manager, orchestrator, stores);
+
 app.Lifetime.ApplicationStarted.Register(() =>
 {
     runtime.Port = CoreRuntime.ResolveBoundPort(app) ?? runtime.Port;
@@ -76,17 +87,26 @@ app.Lifetime.ApplicationStarted.Register(() =>
         CoreVersion.Protocol,
         Environment.ProcessPath ?? ""));
     CoreLog.Info($"Agent Core ready: port={runtime.Port} pid={Environment.ProcessId} version={CoreVersion.Value} "
-        + $"protocol={CoreVersion.Protocol} dataDir={paths.Root} memory={(config.MemoryEnabled ? "on" : "off")}");
+        + $"protocol={CoreVersion.Protocol} dataDir={paths.Root} memory={stores.Status(config.MemoryEnabled)}");
 });
 
 app.Lifetime.ApplicationStopped.Register(() =>
 {
+    // Huy cac luot chay dang do de pane nhan run.cancelled thay vi treo.
+    foreach (RunState run in manager.List())
+    {
+        if (run.Status == RunStatus.Running)
+        {
+            manager.Cancel(run.Id);
+        }
+    }
+
     CoreFile.Delete(paths.CoreJson);
     CoreLog.Info("Agent Core stopped");
 });
 
 CoreLog.Info($"Agent Core starting: port={port} pid={Environment.ProcessId} version={CoreVersion.Value} "
-    + $"singleInstance={config.SingleInstance} dataDir={paths.Root}");
+    + $"singleInstance={config.SingleInstance} dataDir={paths.Root} provider={model.Codec.Name} model={model.Model}");
 
 try
 {
@@ -100,6 +120,7 @@ catch (Exception ex)
 }
 finally
 {
+    http.Dispose();
     instanceLock?.Dispose();
 }
 

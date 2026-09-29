@@ -48,6 +48,9 @@ public sealed class CoreConfig
     // Thu muc du lieu (AXIOM_CORE_DATA_DIR). null = dung vi tri mac dinh trong %LOCALAPPDATA%.
     public string? DataDirOverride { get; init; }
 
+    // Thu muc session registry cua add-in (AXIOM_SESSION_DIR): test tro vao bridge gia.
+    public string? SessionDirectoryOverride { get; init; }
+
     // Thu muc skill cua to chuc (SkillDirs trong HKCU, phan cach ';').
     public IReadOnlyList<string> SkillDirs { get; init; } = [];
 
@@ -83,6 +86,7 @@ public sealed class CoreConfig
             EmbeddingModel = Text(config, "AXIOM_EMBEDDING_MODEL", registry, "EmbeddingModel") ?? "",
             EmbeddingEndpoint = Text(config, "AXIOM_EMBEDDING_ENDPOINT", registry, "EmbeddingEndpoint") ?? "",
             DataDirOverride = Text(config, "AXIOM_CORE_DATA_DIR", null, null),
+            SessionDirectoryOverride = Text(config, "AXIOM_SESSION_DIR", null, null),
             SkillDirs = List(Text(config, "AXIOM_SKILL_DIRS", registry, "SkillDirs")),
         };
     }
