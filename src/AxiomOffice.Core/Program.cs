@@ -3,6 +3,7 @@ using AxiomOffice.Core.Agent;
 using AxiomOffice.Core.Api;
 using AxiomOffice.Core.Config;
 using AxiomOffice.Core.Logging;
+using AxiomOffice.Core.Mcp;
 using AxiomOffice.Core.Memory;
 using AxiomOffice.Core.Models;
 using AxiomOffice.Core.Office;
@@ -103,12 +104,41 @@ if (stores.Available)
     memory.QueueEmbeddingBackfill();
 }
 
-var orchestrator = new Orchestrator(config, bridge, sessions, stores.Conversations, stores.Runs, models.Current, new ContextAssembler(), skills, memory);
+// MCP client (muc 8.7): server built-in "office" = AxiomOffice.Host.exe mcp canh exe (lan file) + mcp.json.
+var mcp = new McpManager(paths.McpConfigFile, Path.Combine(AppContext.BaseDirectory, "AxiomOffice.Host.exe"), http);
+var orchestrator = new Orchestrator(config, bridge, sessions, stores.Conversations, stores.Runs, models.Current, new ContextAssembler(), skills, memory, mcp);
 
 CoreApi.Map(app, config, paths, runtime, stores);
 RunEndpoints.Map(app, manager, orchestrator, stores);
 SkillEndpoints.Map(app, skills);
 MemoryEndpoints.Map(app, memory);
+
+// Trang thai MCP: server da cau hinh (khong in env/headers vi co the chua key) + loi khoi dong.
+app.MapGet("/v1/mcp", async (HttpContext context) =>
+{
+    IReadOnlyList<AxiomOffice.Core.Tools.ITool> tools = await mcp.ToolsAsync(context.RequestAborted);
+    var servers = new System.Text.Json.Nodes.JsonArray();
+    foreach (McpServerConfig server in mcp.Configs)
+    {
+        var names = new System.Text.Json.Nodes.JsonArray();
+        foreach (AxiomOffice.Core.Tools.ITool tool in tools.Where(t => t.Name.StartsWith(McpTool.ToolName(server.Name, ""), StringComparison.Ordinal)))
+        {
+            names.Add(tool.Name);
+        }
+
+        servers.Add(new System.Text.Json.Nodes.JsonObject
+        {
+            ["name"] = server.Name,
+            ["transport"] = server.Url != null ? "http" : "stdio",
+            ["trusted"] = server.Trusted,
+            ["builtIn"] = server.BuiltIn,
+            ["tools"] = names,
+            ["error"] = mcp.Errors.TryGetValue(server.Name, out string? error) ? error : null,
+        });
+    }
+
+    return ApiJson.Ok(new System.Text.Json.Nodes.JsonObject { ["servers"] = servers });
+});
 
 app.Lifetime.ApplicationStarted.Register(() =>
 {
@@ -136,6 +166,7 @@ app.Lifetime.ApplicationStopped.Register(() =>
     }
 
     memory.Dispose();
+    mcp.Dispose();
     CoreFile.Delete(paths.CoreJson);
     CoreLog.Info("Agent Core stopped");
 });

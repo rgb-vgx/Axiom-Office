@@ -584,7 +584,7 @@ def test_memory(work: str, token: str, bridge: FakeBridge, document_path: str, s
               "ngu canh co ban chuyen doi va dua no truoc ban cu", prompt4[-500:])
 
         # Phien 5: lenh thao tac thuan -> khong ton lenh goi trich xuat.
-        wait_for(lambda: extract_calls() >= 4, timeout=15)
+        wait_for(lambda: extract_calls() >= 5, timeout=15)
         before = extract_calls()
         run_id, _ = run(core, "In đậm dòng đầu tiên")
         time.sleep(1.5)
@@ -694,6 +694,86 @@ def test_confirm(work: str, token: str, bridge: FakeBridge, document_path: str, 
         status, bad = http_json(f"{core.base}/v1/runs/{run_id}/confirm", method="POST", token=core.token,
                                 body={"confirmationId": "cf_khong_co", "approved": True})
         check(status == 404, "confirm id khong ton tai -> 404", bad)
+    finally:
+        core.stop()
+        llm.stop()
+
+
+def test_mcp(work: str, token: str, bridge: FakeBridge, document_path: str, session_dir: str) -> None:
+    """Giai doan 4 (New_arch.md 8.7, 12): MCP server mau (Python stdlib) duoc goi qua agent; server ngoai can xac
+    nhan, "trusted" thi khong; lan file office (Host.exe) doc/ghi file; ghi de file da co thi hoi; server loi
+    khong hong run; audit ghi du tham so."""
+    sample = os.path.join(ROOT, "tests", "core", "mcp_sample_server.py")
+    data_dir = os.path.join(work, "core-mcp")
+    os.makedirs(data_dir, exist_ok=True)
+    with open(os.path.join(data_dir, "mcp.json"), "w", encoding="utf-8") as handle:
+        json.dump({"mcpServers": {
+            "mau": {"command": sys.executable, "args": [sample]},
+            "mau-tin": {"command": sys.executable, "args": [sample], "trusted": True},
+            "hong": {"command": os.path.join(work, "khong-ton-tai.exe")},
+            "tat": {"command": sys.executable, "args": [sample], "disabled": True},
+        }}, handle)
+    new_docx = os.path.join(work, "ghi-chu-mcp.docx")
+    llm = FakeLlm(work, [
+        {"tool": "mcp__mau__add", "arguments": {"a": 2, "b": 3}},
+        {"tool": "mcp__mau-tin__shout", "arguments": {"text": "xin chao"}},
+        {"tool": "mcp__office__doc_create", "arguments": {"path": new_docx, "paragraphs": ["Ghi chu tu lan file MCP"]}},
+        {"tool": "mcp__office__doc_get_text", "arguments": {"path": new_docx}},
+        {"tool": "mcp__office__doc_create", "arguments": {"path": new_docx, "paragraphs": ["ghi de"], "overwrite": True}},
+        {"text": "Da dung cong cu MCP"},
+    ])
+    core = Core(data_dir, session_dir, llm, token, {"AXIOM_MEMORY_AUTO_EXTRACT": "0", "AXIOM_CONFIRM_TIMEOUT": "20"})
+    office = {"port": bridge.port, "pid": bridge.pid, "app": "et", "family": "office"}
+    try:
+        status, listing = http_json(core.base + "/v1/mcp", token=core.token)
+        servers = {s["name"]: s for s in listing["result"]["servers"]}
+        check(set(servers) == {"office", "mau", "mau-tin", "hong"}, "GET /v1/mcp: office built-in + mcp.json (bo server disabled)", sorted(servers))
+        check(servers["office"]["builtIn"] and servers["office"]["trusted"] and "mcp__office__doc_get_text" in servers["office"]["tools"]
+              and not any("word_command" in t or "word_save" in t for t in servers["office"]["tools"]),
+              "lan file office: co tool file, KHONG co tool live di vong allowlist", servers["office"]["tools"])
+        check(servers["hong"]["error"] and not servers["hong"]["tools"], "server loi: bao loi, an tool", servers["hong"])
+        check(servers["mau"]["tools"] == ["mcp__mau__add", "mcp__mau__shout", "mcp__mau__fail"], "tool ten mcp__<server>__<tool>", servers["mau"]["tools"])
+
+        status, created = core.run("Dung cong cu MCP", office, document={"name": "bao-cao.xlsx", "fullName": document_path})
+        run_id = created["result"]["runId"]
+        collected: list = []
+        url = f"{core.base}/v1/runs/{run_id}/events"
+        reader = threading.Thread(target=lambda: sse_events(url, core.token, timeout=90, sink=collected), daemon=True)
+        reader.start()
+        answered: dict = {}
+        deadline = time.time() + 60
+        while reader.is_alive() and time.time() < deadline:
+            for event_type, payload in list(collected):
+                data = payload.get("data", {})
+                if event_type == "confirm.required" and data.get("confirmationId") not in answered:
+                    approve = data.get("action") == "mcp__mau__add"   # dong y tool ngoai, tu choi ghi de file
+                    answered[data["confirmationId"]] = (data.get("action"), approve)
+                    http_json(f"{core.base}/v1/runs/{run_id}/confirm", method="POST", token=core.token,
+                              body={"confirmationId": data["confirmationId"], "approved": approve})
+            time.sleep(0.1)
+        reader.join(timeout=5)
+
+        asked = sorted(action for action, _ in answered.values())
+        check(asked == ["mcp__mau__add", "mcp__office__doc_create"],
+              "xac nhan: tool ngoai + ghi de file; trusted va tao file moi thi khong hoi", asked)
+        bodies = [item["body"] for item in llm.requests()]
+        tools = [t["function"]["name"] for t in bodies[0].get("tools", [])]
+        check({"mcp__mau__add", "mcp__mau-tin__shout", "mcp__office__doc_get_text"} <= set(tools), "tool MCP duoc dang ky cho model", tools)
+
+        def result_of(index: int) -> str:
+            return next((m.get("content", "") for m in reversed(bodies[index]["messages"]) if m.get("role") == "tool"), "")
+
+        check('"result":"5"' in result_of(1), "mcp__mau__add (sau khi dong y) tra 5", result_of(1))
+        check("XIN CHAO" in result_of(2), "mcp__mau-tin__shout (trusted) chay khong can hoi", result_of(2))
+        check(os.path.exists(new_docx) and "Ghi chu tu lan file MCP" in result_of(4), "lan file office: tao docx roi doc lai", result_of(4)[:200])
+        check("user declined" in result_of(5), "ghi de file da co bi tu choi -> user declined", result_of(5)[:200])
+        check(collected and collected[-1][0] == "run.completed", "run MCP ket thuc binh thuong", collected[-1][0] if collected else None)
+
+        status, audit = http_json(f"{core.base}/v1/audit?runId={run_id}", token=core.token)
+        calls = list(reversed(audit["result"]["calls"]))
+        check([c["tool"] for c in calls] == ["mcp__mau__add", "mcp__mau-tin__shout", "mcp__office__doc_create", "mcp__office__doc_get_text", "mcp__office__doc_create"]
+              and '"a":2' in (calls[0]["params"] or "") and calls[4]["ok"] is False,
+              "audit day du cho tool MCP (ten, tham so, ok)", [(c["tool"], c["ok"]) for c in calls])
     finally:
         core.stop()
         llm.stop()
@@ -876,6 +956,7 @@ def main() -> int:
             test_skills(work, token, bridge, document_path, session_dir)
             test_memory(work, token, bridge, document_path, session_dir)
             test_confirm(work, token, bridge, document_path, session_dir)
+            test_mcp(work, token, bridge, document_path, session_dir)
     finally:
         if core is not None:
             core.stop()

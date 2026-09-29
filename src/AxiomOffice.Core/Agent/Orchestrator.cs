@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Text.Json.Nodes;
 using AxiomOffice.Core.Config;
 using AxiomOffice.Core.Logging;
+using AxiomOffice.Core.Mcp;
 using AxiomOffice.Core.Memory;
 using AxiomOffice.Core.Models;
 using AxiomOffice.Core.Office;
@@ -21,7 +22,8 @@ public sealed class Orchestrator(
     Func<ModelClient> models,
     ContextAssembler assembler,
     SkillIndex? skills = null,
-    MemoryService? memory = null)
+    MemoryService? memory = null,
+    McpManager? mcp = null)
 {
     public async Task ExecuteAsync(RunState run, Api.RunRequest request, CancellationToken cancel)
     {
@@ -113,6 +115,19 @@ public sealed class Orchestrator(
                 memoryContext = await memory.ContextAsync(request.Prompt, memoryDocumentKey, cancel).ConfigureAwait(false);
                 tools.Add(new RememberTool(memory, memoryDocumentKey));
                 tools.Add(new RecallTool(memory, memoryDocumentKey));
+            }
+
+            // MCP (giai doan 4, muc 8.7): lan file office + server nguoi dung cau hinh; loi server khong hong run.
+            if (mcp != null)
+            {
+                try
+                {
+                    tools.AddRange(await mcp.ToolsAsync(cancel).ConfigureAwait(false));
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    CoreLog.Error("mcp tools unavailable for run " + run.Id, ex);
+                }
             }
 
             var registry = new ToolRegistry(tools);
@@ -347,7 +362,8 @@ public sealed class Orchestrator(
         {
             JsonNode? arguments = JsonNode.Parse(call.ArgumentsJson);
             string? action = arguments?["action"]?.GetValue<string>();
-            string? parameters = arguments?["params"]?.ToJsonString();
+            // office_action: {action, params}; tool khac (mcp__*, load_skill, remember...): ca doi so la params (audit day du).
+            string? parameters = action != null ? arguments?["params"]?.ToJsonString() : arguments?.ToJsonString();
             return (action, parameters);
         }
         catch
