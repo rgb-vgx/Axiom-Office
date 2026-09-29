@@ -134,6 +134,12 @@ namespace AxiomOffice.Ai
         // loi nghiep vu cua luot chay van tra LlmResult voi Ok=false (khong chay lai de tranh ton token).
         public LlmResult Run(Connect host, string prompt, string conversationId, Action<CoreEvent> onEvent, CancellationToken cancel)
         {
+            return Run(host, prompt, conversationId, onEvent, cancel, true);
+        }
+
+        // interactive = false: không có người bấm xác nhận (ai.ask của agent bên ngoài) -> Core từ chối ngay lệnh cần xác nhận.
+        public LlmResult Run(Connect host, string prompt, string conversationId, Action<CoreEvent> onEvent, CancellationToken cancel, bool interactive)
+        {
             string baseUrl = EnsureBaseUrl();
             if (baseUrl == null)
             {
@@ -165,7 +171,7 @@ namespace AxiomOffice.Ai
                 { "family", host != null && host.IsOfficeHost ? "office" : "wps" }
             };
             request["document"] = document;
-            request["options"] = new Dictionary<string, object> { { "maxSeconds", 300 }, { "maxTokens", 200000 } };
+            request["options"] = new Dictionary<string, object> { { "maxSeconds", 300 }, { "maxTokens", 200000 }, { "interactive", interactive } };
 
             string error;
             string responseText = PostJson(baseUrl + "/v1/runs", Serialize(request), 30000, cancel, out error);

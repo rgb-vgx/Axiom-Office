@@ -149,8 +149,10 @@ public sealed class Orchestrator(
                 Bridge = bridge,
                 Event = (type, data) => run.Events.Publish(type, data),
                 Prompt = request.Prompt,
-                Confirm = (action, reason, preview, ct) => run.Confirmations.RequestAsync(
-                    run.Events, action, reason, preview, TimeSpan.FromSeconds(config.ConfirmTimeoutSeconds), ct),
+                Confirm = request.Interactive
+                    ? (action, reason, preview, ct) => run.Confirmations.RequestAsync(
+                        run.Events, action, reason, preview, TimeSpan.FromSeconds(config.ConfirmTimeoutSeconds), ct)
+                    : (_, _, _, _) => Task.FromResult(false),
             };
 
             var callbacks = new AgentLoopCallbacks(

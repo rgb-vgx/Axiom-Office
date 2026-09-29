@@ -231,6 +231,32 @@ namespace AxiomOffice.Bridge
                     parameters = request["params"] as Dictionary<string, object>;
                 }
 
+                if (action == "ai.ask")
+                {
+                    // ai.ask chạy qua Agent Core: Core gọi ngược /cmd vào CHÍNH bridge này. Pump xử lý tuần tự nên
+                    // chờ ai.ask ngay trên Pump sẽ kẹt cả hai (New_arch.md mục 13, "bridge pump tuần tự") ->
+                    // chạy trên luồng riêng như SSE; lệnh COM vẫn tuần tự qua ComGate.
+                    ThreadPool.QueueUserWorkItem(delegate
+                    {
+                        try
+                        {
+                            WriteJson(context, 200, CommandDispatcher.Execute(_host, action, parameters));
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Error("ai.ask failed", ex);
+                            try
+                            {
+                                WriteJson(context, 500, Error("internal error: " + ex.Message));
+                            }
+                            catch
+                            {
+                            }
+                        }
+                    });
+                    return;
+                }
+
                 object result = CommandDispatcher.Execute(_host, action, parameters);
                 WriteJson(context, 200, result);
                 return;

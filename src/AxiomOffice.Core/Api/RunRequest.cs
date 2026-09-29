@@ -13,7 +13,8 @@ public sealed record RunRequest(
     string App,
     string Family,
     DocumentContext? Document,
-    AgentLoopOptions Options);
+    AgentLoopOptions Options,
+    bool Interactive = true);
 
 public static class RunRequestParser
 {
@@ -67,7 +68,9 @@ public static class RunRequestParser
             Options: new AgentLoopOptions(
                 MaxRounds: 0,
                 MaxTokens: maxTokens,
-                Deadline: TimeSpan.FromSeconds(maxSeconds)));
+                Deadline: TimeSpan.FromSeconds(maxSeconds)),
+            // interactive=false (ai.ask cua agent ben ngoai): khong co ai bam xac nhan -> lenh can xac nhan bi tu choi ngay.
+            Interactive: options?["interactive"]?.GetValue<bool>() ?? true);
     }
 
     private static string? Nullable(string? value)

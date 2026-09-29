@@ -250,10 +250,27 @@ namespace AxiomOffice.Bridge
             {
                 throw new InvalidOperationException("'prompt' is required");
             }
-            Ai.LlmResult agentResult = Ai.AiAgent.Run(host, prompt, delegate(string line)
+            // Giai đoạn 4 (New_arch.md 7.7): chạy qua Agent Core khi có (skill, memory, policy, MCP), dịch kết quả về
+            // đúng hình dạng cũ; Core không dùng được (chưa nhận lượt chạy) thì chạy agent in-process như trước.
+            Ai.LlmResult agentResult = null;
+            var connect = host as Connect;
+            if (connect != null && Ai.CoreClient.Instance.Enabled)
             {
-                Logger.Info("ai.ask progress: " + line);
-            });
+                agentResult = Ai.CoreClient.Instance.Run(connect, prompt, null, delegate(Ai.CoreEvent item)
+                {
+                    if (item.Type == "tool.finished" || item.Type == "skill.loaded" || item.Type == "memory.written")
+                    {
+                        Logger.Info("ai.ask (core) " + item.Type + ": " + (item.Action ?? item.Name ?? item.Text ?? item.Tool));
+                    }
+                }, System.Threading.CancellationToken.None, false);
+            }
+            if (agentResult == null)
+            {
+                agentResult = Ai.AiAgent.Run(host, prompt, delegate(string line)
+                {
+                    Logger.Info("ai.ask progress: " + line);
+                });
+            }
             var reply = new Dictionary<string, object>();
             reply["ok"] = agentResult.Ok;
             if (agentResult.Ok)
@@ -267,6 +284,7 @@ namespace AxiomOffice.Bridge
             reply["transcript"] = agentResult.Transcript;
             reply["seconds"] = agentResult.Seconds;
             reply["rounds"] = agentResult.Rounds;
+            reply["viaCore"] = agentResult.ViaCore;
             return reply;
         }
 
