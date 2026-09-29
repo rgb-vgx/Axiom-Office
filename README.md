@@ -54,9 +54,27 @@ scripts\build-native.ps1
 ## Cài đặt / Gỡ
 
 ```powershell
-scripts\install.ps1     # đăng ký COM (HKCU, không cần admin) + whitelist WPS
-scripts\uninstall.ps1   # gỡ đăng ký
+scripts\install.ps1            # đăng ký COM (HKCU, không cần admin) + whitelist WPS, in sẵn cấu hình MCP
+scripts\uninstall.ps1          # gỡ đăng ký (add-in + Ask AI pane), giữ cấu hình AI/token
+scripts\uninstall.ps1 -Purge   # gỡ và xoá luôn HKCU\Software\WpsAiBridge + %LOCALAPPDATA%\WpsAiBridge
 ```
+
+`install.ps1` tự gỡ nhãn "tải từ Internet" (Zone.Identifier) của DLL/EXE: file giải nén từ zip
+tải về mang nhãn này và .NET sẽ từ chối nạp add-in.
+
+### Đóng gói cho người khác
+
+```powershell
+scripts\package.ps1            # build + tạo dist\WpsAiBridge-<version>-<ngày>-<commit>.zip
+scripts\package.ps1 -NoBuild   # dùng bản đã build trong bin\Release
+scripts\package.ps1 -Kill      # build.ps1 -Kill (tắt app đang giữ DLL)
+```
+
+Zip (~245 KB) chỉ gồm DLL add-in, `WpsAiBridge.Host.exe` (companion + MCP server), script cài/gỡ,
+`install.cmd` / `uninstall.cmd` (nhấp đúp; tự Unblock rồi chạy PowerShell với `-ExecutionPolicy
+Bypass`), `HUONG-DAN-CAI-DAT.txt` và `THIRD-PARTY-NOTICES.md`. Người nhận **không cần Python,
+Visual Studio hay quyền admin**: giải nén vào chỗ cố định → đóng Office/WPS → nhấp đúp
+`install.cmd`. Tên zip có `-dirty` khi đóng gói từ code chưa commit.
 
 Sau khi cài, mở WPS lên là add-in tự nạp (kiểm tra `http://127.0.0.1:47821/health`).
 
@@ -516,6 +534,7 @@ src/WpsAiBridge.Host/       entry point companion EXE
 src/WpsAiBridge.Host/Mcp/   MCP server C# (stdio) + template docx/pptx nhúng
 tests/mcp-host/             test parity MCP C# vs Python + round-trip Office thật
 scripts/build.ps1           build C# (add-in DLL + companion EXE)
+scripts/package.ps1         đóng gói zip cài đặt cho người khác (dùng scripts/dist/*)
 scripts/install.ps1         đăng ký HKCU (branch cpp-native-addin: ưu tiên native DLL)
 scripts/uninstall.ps1       gỡ đăng ký
 ```

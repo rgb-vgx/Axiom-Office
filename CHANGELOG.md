@@ -5,6 +5,21 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Đóng gói cài đặt cho người khác
+- `scripts/package.ps1`: build (hoặc `-NoBuild`) rồi tạo `dist/WpsAiBridge-<version>-<ngày>-<commit>.zip`
+  (~245 KB; tên có `-dirty` khi code chưa commit): DLL, `WpsAiBridge.Host.exe`, `install.ps1`/
+  `uninstall.ps1`, `install.cmd`/`uninstall.cmd` nhấp đúp, `HUONG-DAN-CAI-DAT.txt`, NOTICE template.
+  Entry zip dùng `/` (tự ghi từng entry; `CreateFromDirectory` của PowerShell 5.1 ghi `\`)
+- `install.ps1` gỡ nhãn Zone.Identifier của DLL/EXE (file từ zip tải về) và in cấu hình MCP với
+  đường dẫn exe đúng; add-in log đường dẫn DLL đang nạp (`Connect constructor ... from <path>`)
+- Đã test như người nhận: giải nén + gắn Zone.Identifier → `install.cmd` gỡ nhãn, đăng ký trỏ vào
+  thư mục gói, Word nạp add-in từ đó, MCP trong gói chạy (office_sessions, doc_create)
+
+### Fixed
+- `uninstall.ps1` sót đăng ký COM của Ask AI pane (`WpsAiBridge.AskAiPane`, CLSID `{D99F8693-...}`);
+  thêm `-Purge` xoá cả `HKCU\Software\WpsAiBridge` (token, cấu hình AI) và `%LOCALAPPDATA%\WpsAiBridge`
+
+
 ### Added — MCP server C# trong `WpsAiBridge.Host.exe mcp` (thay 3 server Python)
 - Người dùng không còn phải cài Python/venv/pip: `WpsAiBridge.Host.exe mcp` là MCP server stdio
   (JSON-RPC 2.0, protocol 2024-11-05 → 2025-11-25) với cả 50 tool của word/excel/ppt-mcp, cùng
