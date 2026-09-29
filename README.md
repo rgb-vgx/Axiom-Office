@@ -251,7 +251,7 @@ công cụ); lệnh khai báo cạnh handler trong `src/AxiomOffice/Bridge/Comma
 | `writer.save` | — | Lưu | ✓ |
 | `writer.saveAs` | `path` | Lưu thành file mới | ✓ |
 | `writer.closeAll` | — | **Đóng mọi tài liệu, không lưu** |  |
-| `et.newWorkbook` | — | Tạo workbook mới | ✓ |
+| `et.newWorkbook` | — | Tạo workbook mới (agent không dùng: làm trên sổ đang mở; Excel trống thì `listSheets`/`writeRange`/`formatRange` tự tạo sổ) | |
 | `et.open` | `path` | Mở .xlsx/.xls/.csv |  |
 | `et.listSheets` | — | Danh sách sheet + sheet đang active | ✓ |
 | `et.activateSheet` | `sheet` | Chuyển sheet | ✓ |

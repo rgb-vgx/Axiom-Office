@@ -225,7 +225,60 @@ namespace AxiomOffice
             }
             finally
             {
-                _application = null;
+                ReleaseComReferences();
+            }
+        }
+
+        // Excel (và các host khác) không thoát khi add-in .NET còn giữ RCW: trước đây chỉ gán null nên RCW chờ
+        // finalizer, EXCEL.EXE chạy ngầm mãi sau khi người dùng đóng (đo 30/09: không add-in thoát sau 2,4s,
+        // có add-in còn chạy sau 20s). Nhả hẳn các RCW đang giữ rồi ép GC dọn RCW tạm (dynamic) còn sót.
+        private void ReleaseComReferences()
+        {
+            object pane = _taskPane;
+            object factory = _ctpFactory;
+            object application = _application;
+            _taskPane = null;
+            _ctpFactory = null;
+            _application = null;
+            AskAiPane.CurrentHost = null;
+            try
+            {
+                if (pane != null)
+                {
+                    try
+                    {
+                        ((dynamic)pane).Delete();
+                    }
+                    catch (Exception)
+                    {
+                    }
+                }
+                FinalRelease(pane);
+                FinalRelease(factory);
+                FinalRelease(application);
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                Logger.Info("OnDisconnection: COM references released");
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("ReleaseComReferences failed", ex);
+            }
+        }
+
+        private static void FinalRelease(object value)
+        {
+            if (value != null && Marshal.IsComObject(value))
+            {
+                try
+                {
+                    Marshal.FinalReleaseComObject(value);
+                }
+                catch (Exception)
+                {
+                }
             }
         }
 

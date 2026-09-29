@@ -379,7 +379,7 @@ AGENT_TOOL_PS = r"""
 $tool = [Reflection.Assembly]::LoadFrom('%s').GetType('AxiomOffice.Ai.OfficeActionTool', $true)
 $flags = [Reflection.BindingFlags]'Static,Public,NonPublic'
 $out = @{}
-foreach ($action in 'writer.closeAll', 'ai.ask', 'nosuch.action') {
+foreach ($action in 'writer.closeAll', 'ai.ask', 'nosuch.action', 'et.newWorkbook') {
     $out[$action] = $tool.GetMethod('Execute', $flags).Invoke($null, @($null, 'office_action', ('{"action":"' + $action + '"}')))
 }
 foreach ($kind in 'wps', 'et', 'wpp') {
@@ -395,7 +395,7 @@ def test_agent_tool():
     output = subprocess.run(["powershell", "-NoProfile", "-Command", AGENT_TOOL_PS % ADDIN_DLL],
                             capture_output=True, text=True, encoding="utf-8", timeout=60).stdout
     data = json.loads(output)
-    for action in ("writer.closeAll", "ai.ask", "nosuch.action"):
+    for action in ("writer.closeAll", "ai.ask", "nosuch.action", "et.newWorkbook"):
         reply = json.loads(data[action])
         check(reply["ok"] is False and "not an available action" in reply["error"], "office_action từ chối " + action, reply)
     writer = data["definition:wps"]

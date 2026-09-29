@@ -5,6 +5,15 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — Excel hỏi lưu một sổ lạ / chạy ngầm sau khi đóng
+- Agent không còn gọi được `et.newWorkbook` (giống `writer.newDocument`/`wpp.newPresentation`): log
+  30/09 01:15 model tạo thêm Book2 dù Book1 đang mở, người dùng đóng Excel thì bị hỏi lưu một sổ họ
+  không biết. Excel trống (chưa có sổ) thì `et.listSheets`/`et.writeRange`/`et.formatRange` tự tạo sổ
+- Add-in nhả hẳn các tham chiếu COM (`Application`, CTP factory, task pane) và ép GC khi
+  `OnDisconnection`: trước đây chỉ gán null nên RCW chờ finalizer
+- Tên lệnh agent viết sai nhẹ (`et_writeRange`, khác hoa/thường — gặp ở `oc/mimo-v2.6-flash-free`)
+  được quy về tên đúng thay vì bị từ chối và mất một vòng (Core + in-process)
+
 ### Added — độ bền khi gọi model
 - **Tự thử lại khi nhà cung cấp lỗi tạm thời** (HTTP 429/500/502/503/504, rớt mạng) ở cả Agent Core
   (`ModelClient`) và agent in-process (`LlmClient`): tối đa 3 lần, chờ 1s → 2s → 4s, theo `Retry-After`

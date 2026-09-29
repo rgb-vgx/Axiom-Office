@@ -13,7 +13,7 @@ namespace AxiomOffice.Bridge
         {
             return new[]
             {
-                Command("et.newWorkbook", "et", EtNewWorkbook, "Tạo workbook mới").ForAgent(),
+                Command("et.newWorkbook", "et", EtNewWorkbook, "Tạo workbook mới"),
                 Command("et.open", "et", EtOpen, "Mở .xlsx/.xls/.csv", Req("path")),
                 Command("et.listSheets", "et", EtListSheets, "Danh sách sheet + sheet đang active").ForAgent(),
                 Command("et.activateSheet", "et", EtActivateSheet, "Chuyển sheet", Req("sheet")).ForAgent(),
@@ -32,7 +32,7 @@ namespace AxiomOffice.Bridge
         private static Dictionary<string, object> EtListSheets(IAppHost host, Dictionary<string, object> p)
         {
             dynamic app = host.Application;
-            dynamic wb = app.ActiveWorkbook;
+            dynamic wb = EnsureWorkbook(app);
             int count = Convert.ToInt32(wb.Worksheets.Count);
             var sheets = new List<object>();
             for (int i = 1; i <= count; i++)
@@ -45,6 +45,20 @@ namespace AxiomOffice.Bridge
                 { "activeSheet", Convert.ToString(app.ActiveSheet.Name) },
                 { "sheets", sheets }
             };
+        }
+
+        // Sổ đang mở; chưa có sổ nào (Excel trống) thì tạo một sổ. Agent không còn được gọi et.newWorkbook
+        // (log 30/09 01:15: model tạo thêm Book2 dù Book1 đang mở, người dùng đóng Excel thì bị hỏi lưu một sổ
+        // họ không biết) - giống Word/PowerPoint, agent làm việc trên tài liệu đang mở.
+        private static dynamic EnsureWorkbook(dynamic app)
+        {
+            dynamic wb = app.ActiveWorkbook;
+            if (wb == null)
+            {
+                wb = app.Workbooks.Add();
+                Logger.Info("et: no workbook open, created " + Convert.ToString(wb.Name));
+            }
+            return wb;
         }
 
         private static Dictionary<string, object> EtNewWorkbook(IAppHost host, Dictionary<string, object> p)
@@ -113,7 +127,7 @@ namespace AxiomOffice.Bridge
             }
 
             dynamic app = host.Application;
-            dynamic wb = app.ActiveWorkbook;
+            dynamic wb = EnsureWorkbook(app);
             dynamic sheet = string.IsNullOrEmpty(sheetName) ? wb.ActiveSheet : wb.Worksheets[sheetName];
             dynamic target = sheet.Range[address];
             try
@@ -141,7 +155,7 @@ namespace AxiomOffice.Bridge
             }
             string sheetName = ParamString(p, "sheet", null);
             dynamic app = host.Application;
-            dynamic wb = app.ActiveWorkbook;
+            dynamic wb = EnsureWorkbook(app);
             dynamic sheet = string.IsNullOrEmpty(sheetName) ? wb.ActiveSheet : wb.Worksheets[sheetName];
             dynamic range = sheet.Range[address];
             dynamic font = range.Font;

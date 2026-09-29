@@ -95,6 +95,17 @@ public class OfficeActionToolTests
         Assert.Contains("xin chao", result.Json);
     }
 
+    [Theory]
+    [InlineData("et_writeRange", "et.writeRange")]
+    [InlineData("ET.WRITERANGE", "et.writeRange")]
+    [InlineData(" et.writeRange ", "et.writeRange")]
+    [InlineData("writer_closeAll", "writer_closeAll")]
+    [InlineData("nosuch_action", "nosuch_action")]
+    public void Ten_lenh_viet_sai_nhe_duoc_quy_ve_ten_dung(string input, string expected)
+    {
+        Assert.Equal(expected, OfficeActionTool.CanonicalAction(input, ["et.writeRange", "et.readRange"]));
+    }
+
     [Fact]
     public void Params_dang_chuoi_json_duoc_parse_thanh_object()
     {

@@ -78,6 +78,7 @@ public sealed class OfficeActionTool : ITool
             return new ToolResult(Error("missing 'action' argument"), false);
         }
 
+        action = CanonicalAction(action, _allowed.Keys);
         if (!_allowed.ContainsKey(action))
         {
             // Model chi duoc goi lenh co trong mo ta tool (chan writer.closeAll, ai.ask long nhau...).
@@ -90,6 +91,30 @@ public sealed class OfficeActionTool : ITool
             .ConfigureAwait(false);
 
         return new ToolResult(result.RawJson, result.Ok, action);
+    }
+
+    // Ten lenh viet sai nhe (oc/mimo-v2.6-flash-free: "et_writeRange"; hoa/thuong khac) thi quy ve ten dung
+    // trong allowlist thay vi tu choi va mat mot vong. Chi khop khi ket qua la mot lenh duoc phep.
+    public static string CanonicalAction(string action, IEnumerable<string> allowed)
+    {
+        string trimmed = action.Trim();
+        string dotted = trimmed.Contains('.') ? trimmed : ReplaceFirst(trimmed, '_', '.');
+        foreach (string name in allowed)
+        {
+            if (string.Equals(name, trimmed, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(name, dotted, StringComparison.OrdinalIgnoreCase))
+            {
+                return name;
+            }
+        }
+
+        return action;
+    }
+
+    private static string ReplaceFirst(string text, char from, char to)
+    {
+        int index = text.IndexOf(from);
+        return index < 0 ? text : text[..index] + to + text[(index + 1)..];
     }
 
     // Model doi khi gui params la chuoi JSON ("{\"rows\":3}") thay vi object: parse ra. Gia tri bi boc
