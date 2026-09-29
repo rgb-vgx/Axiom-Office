@@ -1110,6 +1110,115 @@ namespace AxiomOffice.Ai
         }
     }
 
+    // Thẻ xác nhận của policy (New_arch.md mục 7.4 confirm.required, 8.6): Đồng ý / Từ chối; hết giờ = từ chối.
+    internal sealed class ConfirmCard : Panel
+    {
+        private readonly Label _title;
+        private readonly Label _message;
+        private readonly LinkLabel _approve;
+        private readonly LinkLabel _reject;
+
+        public event EventHandler<bool> Answered;
+
+        public ConfirmCard(string confirmationId, string action, string reason, string preview)
+        {
+            ConfirmationId = confirmationId;
+            BackColor = PaneTheme.ChipHover;
+            AccessibleRole = AccessibleRole.Alert;
+            AccessibleName = "Cần bạn xác nhận: " + reason;
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+            _title = PaneTheme.MakeLabel("Cần bạn xác nhận: " + ToolLine.LabelFor(action ?? ""), PaneTheme.SmallBold, PaneTheme.AccentFg);
+            string detail = reason ?? "";
+            if (!string.IsNullOrEmpty(preview) && preview != "{}")
+            {
+                detail += Environment.NewLine + preview;
+            }
+            _message = PaneTheme.MakeLabel(detail, PaneTheme.Small, PaneTheme.TextPrimary);
+            _approve = PaneTheme.MakeLink("Đồng ý", PaneTheme.SmallBold);
+            _reject = PaneTheme.MakeLink("Từ chối", PaneTheme.SmallBold);
+            foreach (Control control in new Control[] { _title, _message, _approve, _reject })
+            {
+                control.BackColor = PaneTheme.ChipHover;
+                Controls.Add(control);
+            }
+            _approve.LinkClicked += delegate { Answer(true); };
+            _reject.LinkClicked += delegate { Answer(false); };
+        }
+
+        public string ConfirmationId { get; private set; }
+
+        private void Answer(bool approved)
+        {
+            _approve.Enabled = false;
+            _reject.Enabled = false;
+            EventHandler<bool> handler = Answered;
+            if (handler != null)
+            {
+                handler(this, approved);
+            }
+        }
+
+        // confirm.resolved: by = user | timeout | cancelled.
+        public void SetResolved(bool approved, string by)
+        {
+            _approve.Visible = false;
+            _reject.Visible = false;
+            _title.Text = approved ? "Đã đồng ý" : by == "timeout" ? "Hết giờ chờ xác nhận — đã từ chối" : by == "cancelled" ? "Đã dừng — không thực hiện" : "Đã từ chối";
+            _title.ForeColor = approved ? PaneTheme.Success : PaneTheme.TextSecondary;
+            if (Parent != null)
+            {
+                Parent.PerformLayout();
+            }
+        }
+
+        public void Measure(int width)
+        {
+            int left = PaneTheme.Px(3 + 12);
+            int right = PaneTheme.Px(12);
+            int inner = Math.Max(PaneTheme.Px(60), width - left - right);
+            int y = PaneTheme.Px(8);
+            int h = PaneTheme.MeasureHeight(_title.Text, _title.Font, inner);
+            _title.SetBounds(left, y, inner, h);
+            y += h + PaneTheme.Px(2);
+            h = PaneTheme.MeasureHeight(_message.Text, _message.Font, inner);
+            _message.SetBounds(left, y, inner, h);
+            y += h + PaneTheme.Px(6);
+            if (_approve.Visible)
+            {
+                _approve.Location = new Point(left, y);
+                _reject.Location = new Point(_approve.Right + PaneTheme.Px(16), y);
+                y += Math.Max(_approve.Height, _reject.Height) + PaneTheme.Px(8);
+            }
+            Size = new Size(width, y);
+        }
+
+        protected override void OnPaintBackground(PaintEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            PaneTheme.ClearToParent(this, g);
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            var rect = new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f);
+            using (var path = PaneTheme.RoundedPath(rect, PaneTheme.PxF(PaneTheme.RadiusControl)))
+            {
+                using (var brush = new SolidBrush(PaneTheme.ChipHover))
+                {
+                    g.FillPath(brush, path);
+                }
+                GraphicsState state = g.Save();
+                g.SetClip(path);
+                using (var stripe = new SolidBrush(PaneTheme.Accent))
+                {
+                    g.FillRectangle(stripe, 0, 0, PaneTheme.PxF(3), Height);
+                }
+                g.Restore(state);
+                using (var pen = new Pen(PaneTheme.ChipBorder))
+                {
+                    g.DrawPath(pen, path);
+                }
+            }
+        }
+    }
+
     // Dòng "Đã ghi nhớ: …" + link Xoá (New_arch.md mục 7.4 memory.written, 8.5.10: người dùng thấy và xoá được ngay).
     internal sealed class MemoryNote : Panel
     {
@@ -1378,7 +1487,13 @@ namespace AxiomOffice.Ai
                 var empty = control as EmptyState;
                 var card = control as ErrorCard;
                 var note = control as MemoryNote;
-                if (note != null)
+                var confirm = control as ConfirmCard;
+                if (confirm != null)
+                {
+                    confirm.Measure(available);
+                    bottom = PaneTheme.GapMessage;
+                }
+                else if (note != null)
                 {
                     note.Measure(available);
                     bottom = nextIsTool ? PaneTheme.GapToolLine : PaneTheme.GapMessage;

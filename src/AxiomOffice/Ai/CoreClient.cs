@@ -21,6 +21,10 @@ namespace AxiomOffice.Ai
         public string Name;
         public string Id;       // memory.written: id memory
         public string Text;     // memory.written: nội dung
+        public string ConfirmationId;   // confirm.required / confirm.resolved
+        public string Reason;
+        public bool Approved;
+        public string By;               // confirm.resolved: user | timeout | cancelled
         public string Action;
         public string ParamsPreview;
         public string ResultPreview;
@@ -489,6 +493,8 @@ namespace AxiomOffice.Ai
                             continue;
                         }
 
+                        item.RunId = runId;
+
                         if (item.ConversationId != null)
                         {
                             result.ConversationId = item.ConversationId;
@@ -567,6 +573,13 @@ namespace AxiomOffice.Ai
                 item.Name = Read(data, "name");
                 item.Id = Read(data, "id");
                 item.Text = Read(data, "text");
+                item.ConfirmationId = Read(data, "confirmationId");
+                item.Reason = Read(data, "reason");
+                item.By = Read(data, "by");
+                if (data.ContainsKey("approved"))
+                {
+                    item.Approved = Convert.ToBoolean(data["approved"]);
+                }
                 item.Action = Read(data, "action");
                 item.ParamsPreview = Read(data, "paramsPreview");
                 item.ResultPreview = Read(data, "resultPreview");
@@ -711,6 +724,13 @@ namespace AxiomOffice.Ai
             }
 
             return document;
+        }
+
+        // Trả lời thẻ xác nhận của policy (New_arch.md 8.6): POST /v1/runs/{id}/confirm.
+        public bool ConfirmRun(string runId, string confirmationId, bool approved, out string error)
+        {
+            var body = new Dictionary<string, object> { { "confirmationId", confirmationId }, { "approved", approved } };
+            return MemoryCall("POST", "/v1/runs/" + Uri.EscapeDataString(runId) + "/confirm", body, out error) != null;
         }
 
         // ---- Memory dài hạn (New_arch.md mục 8.5.11): form "Quản lý ghi nhớ" và dòng "Đã ghi nhớ" trong pane ----

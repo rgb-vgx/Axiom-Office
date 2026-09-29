@@ -50,6 +50,9 @@ public sealed class RunState(string id, int port)
 
     public RunEventStream Events { get; } = new();
 
+    // Xac nhan dang cho cua run (confirm.required -> POST /v1/runs/{id}/confirm).
+    public ConfirmationBroker Confirmations { get; } = new();
+
     public CancellationTokenSource Cancel { get; } = new();
 
     public Task? Work { get; set; }

@@ -70,9 +70,9 @@ def http_json(url, method="GET", body=None, token=None, timeout=30):
         return ex.code, json.loads(ex.read().decode("utf-8") or "null")
 
 
-def sse_events(url, token, timeout=120, stop_after_terminal=True):
-    """Doc SSE den khi gap su kien ket thuc luot chay (hoac het timeout)."""
-    events = []
+def sse_events(url, token, timeout=120, stop_after_terminal=True, sink=None):
+    """Doc SSE den khi gap su kien ket thuc luot chay (hoac het timeout). sink: list nhan tung event ngay khi toi."""
+    events = sink if sink is not None else []
     request = urllib.request.Request(url)
     request.add_header("X-Auth-Token", token)
     request.add_header("Accept", "text/event-stream")
@@ -102,6 +102,7 @@ COMMANDS = [
     {"name": "et.writeRange", "kind": "et", "agent": True, "summary": "ghi vung",
      "params": [{"name": "range", "required": True, "hint": "top-left cell e.g. 'A1'"}, {"name": "values", "required": True, "hint": "2D array of rows"}]},
     {"name": "et.save", "kind": "et", "agent": False, "summary": "luu", "params": []},
+    {"name": "et.saveAs", "kind": "et", "agent": True, "summary": "luu thanh file", "params": [{"name": "path", "required": True, "hint": None}]},
     {"name": "writer.closeAll", "kind": "wps", "agent": False, "summary": "dong het", "params": []},
 ]
 
@@ -628,6 +629,76 @@ def test_memory(work: str, token: str, bridge: FakeBridge, document_path: str, s
         llm.stop()
 
 
+def test_confirm(work: str, token: str, bridge: FakeBridge, document_path: str, session_dir: str) -> None:
+    """Giai doan 4 (New_arch.md 8.6, 12): policy xac nhan - dong y / tu choi / het gio; audit day du."""
+    llm = FakeLlm(work, [
+        {"tool": "office_action", "arguments": {"action": "et.saveAs", "params": {"path": os.path.join(work, "dong-y.xlsx")}}},
+        {"text": "Da luu (dong y)"},
+        {"tool": "office_action", "arguments": {"action": "et.saveAs", "params": {"path": os.path.join(work, "tu-choi.xlsx")}}},
+        {"text": "Nguoi dung tu choi luu"},
+        {"tool": "office_action", "arguments": {"action": "et.saveAs", "params": {"path": os.path.join(work, "het-gio.xlsx")}}},
+        {"text": "Het gio xac nhan"},
+    ])
+    data_dir = os.path.join(work, "core-confirm")
+    os.makedirs(data_dir, exist_ok=True)
+    core = Core(data_dir, session_dir, llm, token, {"AXIOM_CONFIRM_TIMEOUT": "8", "AXIOM_MEMORY_AUTO_EXTRACT": "0"})
+    office = {"port": bridge.port, "pid": bridge.pid, "app": "et", "family": "office"}
+    try:
+        def run_with_answer(prompt: str, answer):
+            bridge.commands.clear()
+            status, created = core.run(prompt, office, document={"name": "bao-cao.xlsx", "fullName": document_path})
+            run_id = created["result"]["runId"]
+            collected: list = []
+            url = f"{core.base}/v1/runs/{run_id}/events"
+            reader = threading.Thread(target=lambda: sse_events(url, core.token, timeout=60, sink=collected), daemon=True)
+            reader.start()
+            confirmation = None
+            deadline = time.time() + 20
+            while answer is not None and confirmation is None and time.time() < deadline:
+                confirmation = next((p.get("data", {}).get("confirmationId") for t, p in list(collected) if t == "confirm.required"), None)
+                if confirmation is None:
+                    time.sleep(0.1)
+            if answer is not None and confirmation:
+                http_json(f"{core.base}/v1/runs/{run_id}/confirm", method="POST", token=core.token,
+                          body={"confirmationId": confirmation, "approved": answer})
+            reader.join(timeout=60)
+            return run_id, collected
+
+        run_id, events = run_with_answer("Tao bang doanh thu", True)
+        required = [p.get("data", {}) for t, p in events if t == "confirm.required"]
+        resolved = [p.get("data", {}) for t, p in events if t == "confirm.resolved"]
+        check(required and required[0].get("action") == "et.saveAs" and "lưu" in required[0].get("reason", ""),
+              "confirm.required khi model tu luu ma nguoi dung khong yeu cau", required)
+        check(resolved and resolved[0].get("approved") is True and bridge.actions() == ["et.saveAs"],
+              "dong y -> lenh xuong bridge", (resolved, bridge.actions()))
+
+        run_id, events = run_with_answer("Tao bang chi phi", False)
+        resolved = [p.get("data", {}) for t, p in events if t == "confirm.resolved"]
+        declined = [p.get("data", {}) for t, p in events if t == "tool.finished"]
+        check(resolved and resolved[0].get("approved") is False and bridge.actions() == []
+              and declined and "user declined" in (declined[0].get("error") or ""),
+              "tu choi -> bridge khong nhan lenh, model nhan 'user declined'", (resolved, declined))
+        check(events[-1][0] == "run.completed", "run van ket thuc binh thuong sau khi bi tu choi", events[-1][0])
+
+        started = time.time()
+        run_id, events = run_with_answer("Tao bang nhan su", None)
+        resolved = [p.get("data", {}) for t, p in events if t == "confirm.resolved"]
+        check(resolved and resolved[0].get("by") == "timeout" and resolved[0].get("approved") is False
+              and bridge.actions() == [] and time.time() - started < 30,
+              "het gio (AXIOM_CONFIRM_TIMEOUT=8s) = tu choi", resolved)
+
+        status, audit = http_json(f"{core.base}/v1/audit?runId={run_id}", token=core.token)
+        calls = audit["result"]["calls"]
+        check(calls and calls[0]["action"] == "et.saveAs" and calls[0]["ok"] is False and "het-gio.xlsx" in (calls[0]["params"] or ""),
+              "GET /v1/audit ghi tool call (action, params, ok, error)", calls)
+        status, bad = http_json(f"{core.base}/v1/runs/{run_id}/confirm", method="POST", token=core.token,
+                                body={"confirmationId": "cf_khong_co", "approved": True})
+        check(status == 404, "confirm id khong ton tai -> 404", bad)
+    finally:
+        core.stop()
+        llm.stop()
+
+
 REAL_LLM_CASES = [
     # (app, prompt, skill phai nap, skill thiet ke KHONG duoc nap)
     ("wpp", "Làm bộ slide báo cáo tháng 9/2026 của phòng Kinh doanh: doanh thu 12 tỷ, tăng 8% so với tháng 8.", "bao-cao-thang", None),
@@ -804,6 +875,7 @@ def main() -> int:
             test_guards(core, bridge, document_path)
             test_skills(work, token, bridge, document_path, session_dir)
             test_memory(work, token, bridge, document_path, session_dir)
+            test_confirm(work, token, bridge, document_path, session_dir)
     finally:
         if core is not None:
             core.stop()

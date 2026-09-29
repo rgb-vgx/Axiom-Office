@@ -442,6 +442,18 @@ namespace AxiomOffice.Ai
 
             LlmResult result = core.Run(host, promptText, conversationId, delegate(CoreEvent item)
             {
+                if (item.Type == "confirm.required" && !string.IsNullOrEmpty(item.ConfirmationId))
+                {
+                    CoreEvent request = item;
+                    PostToUi(delegate { ShowConfirmCard(request); });
+                    return;
+                }
+                if (item.Type == "confirm.resolved" && !string.IsNullOrEmpty(item.ConfirmationId))
+                {
+                    CoreEvent resolved = item;
+                    PostToUi(delegate { ResolveConfirmCard(resolved); });
+                    return;
+                }
                 if (item.Type == "memory.written" && !string.IsNullOrEmpty(item.Id))
                 {
                     string memoryId = item.Id;
@@ -564,6 +576,39 @@ namespace AxiomOffice.Ai
             _chat.AddInfo("Bắt đầu cuộc trò chuyện mới cho tài liệu này.");
             Logger.Info("AskAiPane: new conversation requested");
             _prompt.Focus();
+        }
+
+        private readonly Dictionary<string, ConfirmCard> _confirmCards = new Dictionary<string, ConfirmCard>(StringComparer.Ordinal);
+
+        private void ShowConfirmCard(CoreEvent request)
+        {
+            var card = new ConfirmCard(request.ConfirmationId, request.Action, request.Reason, request.ParamsPreview);
+            string runId = request.RunId;
+            card.Answered += delegate(object sender, bool approved)
+            {
+                ThreadPool.QueueUserWorkItem(delegate
+                {
+                    string error;
+                    if (!CoreClient.Instance.ConfirmRun(runId, card.ConfirmationId, approved, out error))
+                    {
+                        Logger.Info("AskAiPane: confirm failed: " + error);
+                    }
+                });
+            };
+            _confirmCards[request.ConfirmationId] = card;
+            _chat.AddBlock(card);
+            SetStatus("Đang chờ bạn xác nhận…", false);
+            Announce("Cần bạn xác nhận: " + (request.Reason ?? ""));
+        }
+
+        private void ResolveConfirmCard(CoreEvent resolved)
+        {
+            ConfirmCard card;
+            if (_confirmCards.TryGetValue(resolved.ConfirmationId, out card))
+            {
+                card.SetResolved(resolved.Approved, resolved.By);
+                _confirmCards.Remove(resolved.ConfirmationId);
+            }
         }
 
         // Memory đã hiện trong pane (không hiện lại khi hỏi lại kết quả trích xuất nền).

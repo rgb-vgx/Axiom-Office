@@ -15,6 +15,8 @@ public sealed record RunRow(
     string? Error,
     string? MemoryStatus = null);
 
+public sealed record AuditRow(long Id, string RunId, int Seq, string Tool, string? Action, string? ParamsJson, bool Ok, string? Error, long Ms, string CreatedAt);
+
 public sealed record ToolCallRow(long Id, int Seq, string Tool, string? Action, int Ok, string? Error, long Ms, string CreatedAt);
 
 // Luot chay va audit tool call (New_arch.md muc 8.5.2, 8.6).
@@ -133,6 +135,39 @@ public sealed class RunStore(CoreDb db)
                 reader.IsDBNull(5) ? null : reader.GetString(5),
                 reader.GetInt64(6),
                 reader.GetString(7)));
+        }
+
+        return rows;
+    }
+
+    // Nhat ky thao tac (GET /v1/audit, New_arch.md muc 7.3, 8.6): moi tool call, moi nhat truoc.
+    public IReadOnlyList<AuditRow> Audit(string? runId, int limit)
+    {
+        using SqliteConnection connection = db.Open();
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = "SELECT id, run_id, seq, tool, action, params_json, ok, error, ms, created_at FROM tool_calls"
+            + (runId == null ? "" : " WHERE run_id = $run") + " ORDER BY id DESC LIMIT $limit";
+        if (runId != null)
+        {
+            command.Parameters.AddWithValue("$run", runId);
+        }
+
+        command.Parameters.AddWithValue("$limit", limit);
+        var rows = new List<AuditRow>();
+        using SqliteDataReader reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            rows.Add(new AuditRow(
+                reader.GetInt64(0),
+                reader.IsDBNull(1) ? "" : reader.GetString(1),
+                reader.GetInt32(2),
+                reader.GetString(3),
+                reader.IsDBNull(4) ? null : reader.GetString(4),
+                reader.IsDBNull(5) ? null : reader.GetString(5),
+                reader.GetInt32(6) != 0,
+                reader.IsDBNull(7) ? null : reader.GetString(7),
+                reader.GetInt64(8),
+                reader.GetString(9)));
         }
 
         return rows;

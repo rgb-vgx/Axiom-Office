@@ -133,6 +133,9 @@ public sealed class Orchestrator(
                 Config = config,
                 Bridge = bridge,
                 Event = (type, data) => run.Events.Publish(type, data),
+                Prompt = request.Prompt,
+                Confirm = (action, reason, preview, ct) => run.Confirmations.RequestAsync(
+                    run.Events, action, reason, preview, TimeSpan.FromSeconds(config.ConfirmTimeoutSeconds), ct),
             };
 
             var callbacks = new AgentLoopCallbacks(

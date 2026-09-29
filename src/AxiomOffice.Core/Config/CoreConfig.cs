@@ -40,6 +40,9 @@ public sealed class CoreConfig
     // Het gio moi request toi model (giay); 0/thieu = mac dinh cua ModelClient.
     public int LlmRequestTimeoutSeconds { get; init; }
 
+    // Cho nguoi dung xac nhan toi da (giay); het gio = tu choi (muc 8.6). Test dat ngan qua AXIOM_CONFIRM_TIMEOUT.
+    public int ConfirmTimeoutSeconds { get; init; } = 120;
+
     public string LlmApiKey { get; init; } = "";
 
     public string MemoryModel { get; init; } = "";
@@ -85,6 +88,7 @@ public sealed class CoreConfig
             LlmEndpoint = Text(config, "AXIOM_LLM_ENDPOINT", registry, "LlmEndpoint") ?? "",
             LlmModel = Text(config, "AXIOM_LLM_MODEL", registry, "LlmModel") ?? "",
             LlmRequestTimeoutSeconds = Math.Clamp(Int(config, "AXIOM_LLM_REQUEST_TIMEOUT", registry, "LlmRequestTimeoutSeconds", 0), 0, 600),
+            ConfirmTimeoutSeconds = Math.Clamp(Int(config, "AXIOM_CONFIRM_TIMEOUT", registry, "ConfirmTimeoutSeconds", 120), 1, 3600),
             LlmApiKey = Secrets.Unprotect(Text(config, "AXIOM_LLM_API_KEY", registry, "LlmApiKey")),
             MemoryModel = Text(config, "AXIOM_MEMORY_MODEL", registry, "MemoryModel") ?? "",
             EmbeddingModel = Text(config, "AXIOM_EMBEDDING_MODEL", registry, "EmbeddingModel") ?? "",

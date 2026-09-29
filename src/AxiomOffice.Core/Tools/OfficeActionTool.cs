@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using AxiomOffice.Core.Agent;
 using AxiomOffice.Core.Office;
 
 namespace AxiomOffice.Core.Tools;
@@ -86,6 +87,24 @@ public sealed class OfficeActionTool : ITool
         }
 
         JsonNode? parameters = NormalizeParams(arguments?["params"]);
+
+        // Policy xac nhan (New_arch.md 8.6): hoi nguoi dung truoc lenh rui ro; tu choi / het gio -> model nhan "user declined".
+        PolicyDecision decision = await PolicyEngine.EvaluateAsync(
+            action,
+            parameters,
+            context.Prompt,
+            ct => PolicyEngine.WordLengthAsync(context.Bridge, context.Office.Port, ct),
+            cancel).ConfigureAwait(false);
+        if (decision.NeedsConfirmation)
+        {
+            string preview = Models.ModelClient.Truncate(parameters?.ToJsonString(Models.ModelClient.RelaxedJson) ?? "{}", 200);
+            bool approved = await context.ConfirmAsync(action, decision.Reason, preview, cancel).ConfigureAwait(false);
+            if (!approved)
+            {
+                return new ToolResult(Error("user declined: " + decision.Reason), false, action);
+            }
+        }
+
         BridgeResult result = await context.Bridge
             .CommandAsync(context.Office.Port, action, parameters, cancel)
             .ConfigureAwait(false);

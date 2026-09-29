@@ -74,6 +74,62 @@ public static class RunEndpoints
                 : ApiJson.Error($"run is not running (status {run.Status})", 409);
         });
 
+        // Tra loi yeu cau xac nhan cua policy (New_arch.md 7.3, 8.6): {"confirmationId", "approved": true|false}.
+        app.MapPost("/v1/runs/{runId}/confirm", async (HttpContext context, string runId) =>
+        {
+            RunState? run = manager.Get(runId);
+            if (run == null)
+            {
+                return ApiJson.Error("unknown run: " + runId, 404);
+            }
+
+            JsonObject? body;
+            try
+            {
+                body = await System.Text.Json.JsonSerializer.DeserializeAsync<JsonObject>(context.Request.Body, cancellationToken: context.RequestAborted);
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                body = null;
+            }
+
+            string? id = body?["confirmationId"] is JsonValue idValue && idValue.TryGetValue(out string? text) ? text : null;
+            bool? approved = body?["approved"] is JsonValue approvedValue && approvedValue.TryGetValue(out bool flag) ? flag : null;
+            if (id == null || approved == null)
+            {
+                return ApiJson.Error("'confirmationId' and 'approved' (true|false) are required", 400);
+            }
+
+            return run.Confirmations.Resolve(id, approved.Value)
+                ? ApiJson.Ok(new JsonObject { ["confirmationId"] = id, ["approved"] = approved.Value })
+                : ApiJson.Error("no pending confirmation: " + id, 404);
+        });
+
+        app.MapGet("/v1/audit", (HttpContext context) =>
+        {
+            string? runId = context.Request.Query["runId"].FirstOrDefault();
+            int limit = ClampLimit(context.Request.Query["limit"].FirstOrDefault(), 100);
+            var list = new JsonArray();
+            foreach (AuditRow row in stores.Runs.Audit(string.IsNullOrWhiteSpace(runId) ? null : runId, limit))
+            {
+                list.Add(new JsonObject
+                {
+                    ["id"] = row.Id,
+                    ["runId"] = row.RunId,
+                    ["seq"] = row.Seq,
+                    ["tool"] = row.Tool,
+                    ["action"] = row.Action,
+                    ["params"] = row.ParamsJson,
+                    ["ok"] = row.Ok,
+                    ["error"] = row.Error,
+                    ["ms"] = row.Ms,
+                    ["createdAt"] = row.CreatedAt,
+                });
+            }
+
+            return ApiJson.Ok(new JsonObject { ["calls"] = list });
+        });
+
         app.MapGet("/v1/runs/{runId}/events", async (HttpContext context, string runId) =>
         {
             RunState? run = manager.Get(runId);
