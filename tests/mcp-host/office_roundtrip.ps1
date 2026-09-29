@@ -47,7 +47,7 @@ function Release($obj) { if ($obj) { [void][Runtime.InteropServices.Marshal]::Fi
 
 # Lưu qua lệnh *.saveAs của bridge (chạy trong app): gọi SaveAs2 late-bound từ PowerShell có thể treo.
 function Save-ViaBridge([int]$port, [string]$action, [string]$path) {
-    $headers = @{ "X-Auth-Token" = (Get-ItemProperty "HKCU:\Software\WpsAiBridge").Token }
+    $headers = @{ "X-Auth-Token" = (Get-ItemProperty "HKCU:\Software\AxiomOffice").Token }
     $body = @{ action = $action; params = @{ path = $path } } | ConvertTo-Json -Compress
     $reply = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$port/cmd" -Headers $headers -ContentType "application/json" -Body $body -TimeoutSec 60
     if (-not $reply.ok) { throw "$action failed: $($reply.error)" }
@@ -98,7 +98,7 @@ if ($Make -and -not (Test-Path (Join-Path $Dir "real_word.docx"))) {
 if ($Make -and -not (Test-Path (Join-Path $Dir "real_excel.xlsx"))) {
     # Excel mở màn hình Start (chưa có cửa sổ EXCEL7) nếu không có workbook: mở sẵn một workbook trống.
     $seed = Join-Path $Dir "seed.xlsx"
-    $exe = Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) "src\WpsAiBridge\bin\Release\WpsAiBridge.Host.exe"
+    $exe = Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) "src\AxiomOffice\bin\Release\AxiomOffice.Host.exe"
     $request = @{ jsonrpc = "2.0"; id = 1; method = "tools/call"; params = @{ name = "excel_create"; arguments = @{ path = $seed; sheets = @(@{ name = "Sheet1"; values = @() }) } } } | ConvertTo-Json -Compress -Depth 8
     $request | & $exe mcp excel | Out-Null
     $excel = Get-Office "excel.exe" @("/x", "`"$seed`"") "EXCEL7"

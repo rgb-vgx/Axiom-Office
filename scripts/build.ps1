@@ -1,13 +1,13 @@
 param(
-    # Tu tat cac tien trinh dang lock WpsAiBridge.dll/.Host.exe (Word/Excel/PowerPoint/WPS/companion) thay vi dung build.
+    # Tu tat cac tien trinh dang lock AxiomOffice.dll/.Host.exe (Word/Excel/PowerPoint/WPS/companion) thay vi dung build.
     [switch]$Kill
 )
 
 $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSScriptRoot
-$srcDir = Join-Path $root "src\WpsAiBridge"
-$hostDir = Join-Path $root "src\WpsAiBridge.Host"
+$srcDir = Join-Path $root "src\AxiomOffice"
+$hostDir = Join-Path $root "src\AxiomOffice.Host"
 $out = Join-Path $srcDir "bin\Release"
 $stage = Join-Path $out ".stage"
 $fw = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319"
@@ -61,7 +61,7 @@ public static class FileLockers {
 }
 "@
 }
-$outputs = @("WpsAiBridge.dll", "WpsAiBridge.Host.exe") | ForEach-Object { Join-Path $out $_ } | Where-Object { Test-Path -LiteralPath $_ }
+$outputs = @("AxiomOffice.dll", "AxiomOffice.Host.exe") | ForEach-Object { Join-Path $out $_ } | Where-Object { Test-Path -LiteralPath $_ }
 $lockers = @()
 if ($outputs.Count -gt 0) {
     $lockers = @([FileLockers]::Find([string[]]$outputs) | Sort-Object -Unique | ForEach-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue })
@@ -69,7 +69,7 @@ if ($outputs.Count -gt 0) {
 if ($lockers.Count -gt 0) {
     $list = ($lockers | ForEach-Object { "$($_.ProcessName) (pid $($_.Id))" }) -join ", "
     if (-not $Kill) {
-        Write-Host "WpsAiBridge.dll dang bi nap boi: $list" -ForegroundColor Red
+        Write-Host "AxiomOffice.dll dang bi nap boi: $list" -ForegroundColor Red
         Write-Host "Dong cac app nay (luu tai lieu truoc) roi build lai, hoac chay: scripts\build.ps1 -Kill" -ForegroundColor Red
         exit 1
     }
@@ -84,8 +84,8 @@ if (Test-Path -LiteralPath $stage) {
 }
 New-Item -ItemType Directory -Path $stage -Force | Out-Null
 
-# Don ban cu ma csc da doi ten khi file dich bi lock (<guid>_WpsAiBridge.dll); file con bi giu thi bo qua.
-Get-ChildItem -LiteralPath $out -Filter "*_WpsAiBridge.dll" -ErrorAction SilentlyContinue |
+# Don ban cu ma csc da doi ten khi file dich bi lock (<guid>_AxiomOffice.dll); file con bi giu thi bo qua.
+Get-ChildItem -LiteralPath $out -Filter "*_AxiomOffice.dll" -ErrorAction SilentlyContinue |
     ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force -ErrorAction SilentlyContinue }
 
 $addinSources = @(Get-ChildItem -Path $srcDir -Recurse -Filter *.cs | Where-Object { $_.FullName -notlike "*\bin\*" -and $_.FullName -notlike "*\obj\*" } | ForEach-Object { $_.FullName })
@@ -104,7 +104,7 @@ $commonArgs = @(
 )
 
 # Build vao .stage roi moi chep de: loi bien dich hay file dich bi lock deu giu nguyen DLL cu.
-$stagedDll = Join-Path $stage "WpsAiBridge.dll"
+$stagedDll = Join-Path $stage "AxiomOffice.dll"
 & $csc @commonArgs /target:library "/out:$stagedDll" $addinSources
 if ($LASTEXITCODE -ne 0) { throw "Add-in build failed with exit code $LASTEXITCODE" }
 
@@ -115,10 +115,10 @@ $hostArgs = @(
     "/r:$fw\System.IO.Compression.FileSystem.dll",
     "/r:$fw\System.Xml.dll",
     "/r:$fw\System.Xml.Linq.dll",
-    "/resource:$(Join-Path $templates 'default.docx'),WpsAiBridge.Mcp.default.docx",
-    "/resource:$(Join-Path $templates 'default.pptx'),WpsAiBridge.Mcp.default.pptx"
+    "/resource:$(Join-Path $templates 'default.docx'),AxiomOffice.Mcp.default.docx",
+    "/resource:$(Join-Path $templates 'default.pptx'),AxiomOffice.Mcp.default.pptx"
 )
-$stagedExe = Join-Path $stage "WpsAiBridge.Host.exe"
+$stagedExe = Join-Path $stage "AxiomOffice.Host.exe"
 & $csc @commonArgs @hostArgs /target:exe "/out:$stagedExe" $hostSources
 if ($LASTEXITCODE -ne 0) { throw "Host build failed with exit code $LASTEXITCODE" }
 
@@ -133,5 +133,5 @@ foreach ($file in @($stagedDll, $stagedExe)) {
 }
 Remove-Item -LiteralPath $stage -Recurse -Force
 
-Write-Output "Built add-in: $(Join-Path $out 'WpsAiBridge.dll')"
-Write-Output "Built host: $(Join-Path $out 'WpsAiBridge.Host.exe')"
+Write-Output "Built add-in: $(Join-Path $out 'AxiomOffice.dll')"
+Write-Output "Built host: $(Join-Path $out 'AxiomOffice.Host.exe')"

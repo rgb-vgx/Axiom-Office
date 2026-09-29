@@ -1,23 +1,28 @@
 $ErrorActionPreference = "Stop"
 
-$progId = "WpsAiBridge.Connect"
-$classGuid = "{F4524DFD-C4F6-4027-8CA6-08B7F7DB4C44}"
-$dllVersion = "1.0.0.0"
+$progId = "AxiomOffice.Connect"
+$classGuid = "{BDB3732A-A479-4A24-AD64-D35952035BBA}"
 
 $root = Split-Path -Parent $PSScriptRoot
-$dllPath = Join-Path $root "src\WpsAiBridge\bin\Release\WpsAiBridge.dll"
+$dllPath = Join-Path $root "src\AxiomOffice\bin\Release\AxiomOffice.dll"
 
 if (-not (Test-Path -LiteralPath $dllPath)) {
     throw "DLL not found: $dllPath - run scripts\build.ps1 first"
 }
+$dllVersion = [System.Reflection.AssemblyName]::GetAssemblyName($dllPath).Version.ToString()
 
 # File giai nen tu zip tai qua mang mang Zone.Identifier: .NET tu choi nap DLL do. Go danh dau truoc.
 $binDir = Split-Path -Parent $dllPath
 Get-ChildItem -LiteralPath $binDir -File | Unblock-File -ErrorAction SilentlyContinue
-$hostExe = Join-Path $binDir "WpsAiBridge.Host.exe"
+$hostExe = Join-Path $binDir "AxiomOffice.Host.exe"
 
 $codeBase = "file:///" + ($dllPath -replace '\\', '/')
 $currentUser = [Microsoft.Win32.Registry]::CurrentUser
+
+# Du an truoc day ten WpsAiBridge: go dang ky cu (tranh nap add-in 2 lan) va chuyen cau hinh sang khoa moi.
+. (Join-Path $PSScriptRoot "legacy.ps1")
+$legacyRemoved = Remove-LegacyRegistration
+$legacyConfig = Move-LegacyConfig "Software\AxiomOffice"
 
 function New-Key([string]$path) {
     return $currentUser.CreateSubKey($path)
@@ -37,7 +42,7 @@ function Register-ComClass([string]$progIdToRegister, [string]$classGuidToRegist
     $inproc.SetValue("ThreadingModel", "Both", [Microsoft.Win32.RegistryValueKind]::String)
     $inproc.SetValue("CodeBase", $codeBase, [Microsoft.Win32.RegistryValueKind]::String)
     $versioned = $inproc.CreateSubKey($dllVersion)
-    $versioned.SetValue("Assembly", "WpsAiBridge, Version=$dllVersion, Culture=neutral, PublicKeyToken=null", [Microsoft.Win32.RegistryValueKind]::String)
+    $versioned.SetValue("Assembly", "AxiomOffice, Version=$dllVersion, Culture=neutral, PublicKeyToken=null", [Microsoft.Win32.RegistryValueKind]::String)
     $versioned.SetValue("Class", $className, [Microsoft.Win32.RegistryValueKind]::String)
     $versioned.SetValue("RuntimeVersion", "v4.0.30319", [Microsoft.Win32.RegistryValueKind]::String)
     $versioned.SetValue("CodeBase", $codeBase, [Microsoft.Win32.RegistryValueKind]::String)
@@ -47,12 +52,12 @@ function Register-ComClass([string]$progIdToRegister, [string]$classGuidToRegist
 }
 
 Register-ComClass $progId $classGuid $progId
-Register-ComClass "WpsAiBridge.AskAiPane" "{D99F8693-4316-45AF-8916-B70D87DEEF87}" "WpsAiBridge.Ai.AskAiPane"
+Register-ComClass "AxiomOffice.AskAiPane" "{8001B0D7-F189-443A-B3CB-6EB98038C72E}" "AxiomOffice.Ai.AskAiPane"
 
 foreach ($officeApp in @("Word", "Excel", "PowerPoint")) {
     $key = New-Key "Software\Microsoft\Office\$officeApp\Addins\$progId"
-    $key.SetValue("FriendlyName", "WPS AI Bridge", [Microsoft.Win32.RegistryValueKind]::String)
-    $key.SetValue("Description", "Local HTTP bridge that lets an AI agent inspect and edit open documents in WPS Office", [Microsoft.Win32.RegistryValueKind]::String)
+    $key.SetValue("FriendlyName", "Axiom Office", [Microsoft.Win32.RegistryValueKind]::String)
+    $key.SetValue("Description", "Axiom Office - AI agent that reads and edits the open document (Microsoft Office and WPS Office)", [Microsoft.Win32.RegistryValueKind]::String)
     $key.SetValue("LoadBehavior", 3, [Microsoft.Win32.RegistryValueKind]::DWord)
     $key.SetValue("CommandLineSafe", 1, [Microsoft.Win32.RegistryValueKind]::DWord)
     $key.Close()
@@ -70,7 +75,7 @@ foreach ($hive in @("WPS", "ET", "WPP")) {
     }
 }
 
-$config = New-Key "Software\WpsAiBridge"
+$config = New-Key "Software\AxiomOffice"
 if ($config.GetValue("Port") -eq $null) {
     $config.SetValue("Port", 47821, [Microsoft.Win32.RegistryValueKind]::DWord)
 }
@@ -93,24 +98,30 @@ $port = $config.GetValue("Port")
 $portOffice = $config.GetValue("PortOffice")
 $config.Close()
 
-Write-Output "Installed WpsAiBridge."
+Write-Output "Installed Axiom Office."
+if ($legacyRemoved -gt 0 -or $legacyConfig -ne "none") {
+    Write-Output "  Migrated: removed $legacyRemoved old WPS AI Bridge (WpsAiBridge) registration entries; config: $legacyConfig"
+    if (Test-Path -LiteralPath $LegacyDataDir) {
+        Write-Output "            old log folder $LegacyDataDir is no longer used and can be deleted"
+    }
+}
 Write-Output "  DLL:      $dllPath"
 Write-Output "  ProgID:   $progId"
 Write-Output "  WPS:      Word $port / Spreadsheets $($port + 1) / Presentation $($port + 2)"
 Write-Output "  Office:   Word $portOffice / Excel $($portOffice + 1) / PowerPoint $($portOffice + 2)"
-Write-Output "  Config:   HKCU\Software\WpsAiBridge (Port, PortOffice, Token, Enabled)"
+Write-Output "  Config:   HKCU\Software\AxiomOffice (Port, PortOffice, Token, Enabled)"
 if ($tokenGenerated) {
     Write-Output "  Token:    auto-generated (32 hex) - requests to /cmd and /config must send X-Auth-Token"
-    Write-Output "            (WpsAiBridge.Host.exe mcp and tools/*-mcp read it from the registry automatically)"
+    Write-Output "            (AxiomOffice.Host.exe mcp and tools/*-mcp read it from the registry automatically)"
 } else {
     Write-Output "  Token:    existing value kept"
 }
 Write-Output ""
 Write-Output "Next: open WPS or Microsoft Office (Word/Excel/PowerPoint)."
-Write-Output "Companion: WpsAiBridge.Host.exe wps|et|wpp for WPS, word|excel|ppt for Microsoft Office."
+Write-Output "Companion: AxiomOffice.Host.exe wps|et|wpp for WPS, word|excel|ppt for Microsoft Office."
 if (Test-Path -LiteralPath $hostExe) {
     $mcpJson = @{ command = $hostExe; args = @("mcp") } | ConvertTo-Json -Compress
     Write-Output "MCP server (AI agent): add to your MCP client config, e.g."
     Write-Output "  ""office"": $mcpJson"
 }
-Write-Output "If the add-in does not load, open Tools tab -> COM Add-ins and enable 'WPS AI Bridge'."
+Write-Output "If the add-in does not load, open Tools tab -> COM Add-ins and enable 'Axiom Office'."

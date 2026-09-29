@@ -5,6 +5,17 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed — Đổi tên dự án: WPS AI Bridge → **Axiom Office**
+- Tên hiển thị (ribbon, task pane, hộp thoại, hướng dẫn cài) và toàn bộ định danh kỹ thuật:
+  namespace `AxiomOffice.*`, `AxiomOffice.dll` / `AxiomOffice.Host.exe`, ProgID
+  `AxiomOffice.Connect` / `AxiomOffice.AskAiPane`, CLSID mới, khóa `HKCU\Software\AxiomOffice`,
+  log `%LOCALAPPDATA%\AxiomOffice`, thư mục `src/AxiomOffice*`, gói `AxiomOffice-<version>-...zip`
+- `scripts/legacy.ps1`: `install.ps1` gỡ ProgID/CLSID/Office Addins/whitelist WPS của bản
+  `WpsAiBridge` (tránh nạp add-in 2 lần tranh port) và chuyển cấu hình sang khóa mới — chỉ xoá
+  khóa cũ sau khi đọc lại thấy khớp từng giá trị (API key DPAPI không dùng entropy nên chép
+  nguyên được); `uninstall.ps1` cũng gỡ đăng ký cũ, `-Purge` xoá cả cấu hình/log cũ
+- `install.ps1` đọc version từ DLL thay vì ghi cứng
+
 ### Fixed — Agent lặp tới "(da dat gioi han 8 buoc)" mà không làm được gì
 - Nguyên nhân (log 20:13, "Tạo bảng điểm 5 học sinh"): model gửi `values` dạng
   `{"item":[{"item":[...]}]}`; `et.writeRange` không ghi gì nhưng vẫn trả `ok:true`, model đọc lại
@@ -20,8 +31,8 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 
 ### Added — Đóng gói cài đặt cho người khác
-- `scripts/package.ps1`: build (hoặc `-NoBuild`) rồi tạo `dist/WpsAiBridge-<version>-<ngày>-<commit>.zip`
-  (~245 KB; tên có `-dirty` khi code chưa commit): DLL, `WpsAiBridge.Host.exe`, `install.ps1`/
+- `scripts/package.ps1`: build (hoặc `-NoBuild`) rồi tạo `dist/AxiomOffice-<version>-<ngày>-<commit>.zip`
+  (~245 KB; tên có `-dirty` khi code chưa commit): DLL, `AxiomOffice.Host.exe`, `install.ps1`/
   `uninstall.ps1`, `install.cmd`/`uninstall.cmd` nhấp đúp, `HUONG-DAN-CAI-DAT.txt`, NOTICE template.
   Entry zip dùng `/` (tự ghi từng entry; `CreateFromDirectory` của PowerShell 5.1 ghi `\`)
 - `install.ps1` gỡ nhãn Zone.Identifier của DLL/EXE (file từ zip tải về) và in cấu hình MCP với
@@ -30,12 +41,12 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
   thư mục gói, Word nạp add-in từ đó, MCP trong gói chạy (office_sessions, doc_create)
 
 ### Fixed
-- `uninstall.ps1` sót đăng ký COM của Ask AI pane (`WpsAiBridge.AskAiPane`, CLSID `{D99F8693-...}`);
-  thêm `-Purge` xoá cả `HKCU\Software\WpsAiBridge` (token, cấu hình AI) và `%LOCALAPPDATA%\WpsAiBridge`
+- `uninstall.ps1` sót đăng ký COM của Ask AI pane (`AxiomOffice.AskAiPane`, CLSID `{D99F8693-...}`);
+  thêm `-Purge` xoá cả `HKCU\Software\AxiomOffice` (token, cấu hình AI) và `%LOCALAPPDATA%\AxiomOffice`
 
 
-### Added — MCP server C# trong `WpsAiBridge.Host.exe mcp` (thay 3 server Python)
-- Người dùng không còn phải cài Python/venv/pip: `WpsAiBridge.Host.exe mcp` là MCP server stdio
+### Added — MCP server C# trong `AxiomOffice.Host.exe mcp` (thay 3 server Python)
+- Người dùng không còn phải cài Python/venv/pip: `AxiomOffice.Host.exe mcp` là MCP server stdio
   (JSON-RPC 2.0, protocol 2024-11-05 → 2025-11-25) với cả 50 tool của word/excel/ppt-mcp, cùng
   tên và tham số; `mcp word|excel|ppt` để nạp từng nhóm, `mcp --list` in danh sách
 - Làn file đọc/ghi OOXML trực tiếp (ZipArchive + XLinq, không thư viện ngoài): docx (paragraph,
@@ -47,7 +58,7 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
   làm mất); ghi công thức thì bỏ calcChain + `fullCalcOnLoad` để Excel tính lại khi mở
 - Làn live + `office_sessions()` gọi bridge như bản Python; lỗi kết nối trả `{"ok":false}`
 - Template `default.docx`/`default.pptx` của python-docx/python-pptx (MIT) nhúng trong exe
-  (`src/WpsAiBridge.Host/Mcp/Templates/NOTICE.md`)
+  (`src/AxiomOffice.Host/Mcp/Templates/NOTICE.md`)
 - Bỏ: `excel_query` (DuckDB SQL) và xuất parquet của `excel_convert` (chỉ còn csv)
 - `tests/mcp-host/test_mcp_host.py`: MCP client Python chính thức + so parity từng tool file
   với `file_tools.py` bản Python trên file do C#, python-docx/openpyxl/python-pptx và Office thật
@@ -68,7 +79,7 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
   Excel 47832 (selection theo địa chỉ `$B$2`, `$C$3:$D$5`), WPS Writer 47821
 
 ### Added — Session registry + `GET /session` (Phase 1)
-- `Bridge/SessionRegistry.cs`: mỗi bridge ghi `%LOCALAPPDATA%\WpsAiBridge\sessions\{pid}.json`
+- `Bridge/SessionRegistry.cs`: mỗi bridge ghi `%LOCALAPPDATA%\AxiomOffice\sessions\{pid}.json`
   (`pid`, `app`, `family` office|wps, `port`, `host`, `started`, `lastSeen`, `document`),
   heartbeat 25s, xoá file khi Stop/OnDisconnection; đọc tên tài liệu chạy nền, chờ tối
   đa 2s, host bận thì giữ giá trị cũ (heartbeat không bao giờ trễ vì Word bận)
@@ -117,7 +128,7 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
   làm bubble cao thêm): `AutoScrollMargin` + giữ vị trí cuối khi đo lại
 - **Build làm mất DLL** (BUG-8): `build.ps1` hỏi Restart Manager tiến trình nào đang lock DLL/EXE
   (assembly .NET không hiện trong `Process.Modules`), dừng kèm tên + pid hoặc `-Kill`; biên dịch
-  vào `.stage` rồi mới chép đè; dọn `<guid>_WpsAiBridge.dll` còn sót
+  vào `.stage` rồi mới chép đè; dọn `<guid>_AxiomOffice.dll` còn sót
 
 ### Ideas (chưa làm)
 - Event stream là nền cho timeline/transaction sau này: thêm event `change` (hash nội dung
@@ -244,12 +255,12 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
   chạy song song hai hệ
 
 ### Added — Ribbon UI + AI in-app + MCP server (branch `main`)
-- Ribbon tab **"WPS AI Bridge"** (`IRibbonExtensibility.GetCustomUI`, XML chuẩn
+- Ribbon tab **"Axiom Office"** (`IRibbonExtensibility.GetCustomUI`, XML chuẩn
   2006/01): nhóm Local bridge (Status / Copy API URL / Open Log) + nhóm AI
   (Ask AI..., Settings); callback qua IDispatch (`ClassInterfaceType.AutoDispatch`)
 - **AI Settings**: dialog cấu hình provider (OpenAI-compatible | Anthropic),
   endpoint, API key, model; nút Test gọi thử; lưu vào
-  `HKCU\Software\WpsAiBridge` (LlmProvider/LlmEndpoint/LlmApiKey/LlmModel)
+  `HKCU\Software\AxiomOffice` (LlmProvider/LlmEndpoint/LlmApiKey/LlmModel)
 - **Ask AI**: dialog prompt + context (None / Selection / Whole document
   ≤50k chars), gọi LLM async không treo UI, chèn kết quả vào tài liệu
   (Insert at cursor); `DocumentContext` đọc toàn văn Writer, used range ET

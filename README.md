@@ -1,11 +1,17 @@
-# WPS AI Bridge
+# Axiom Office
 
-HTTP bridge cho phép AI agent (hoặc bất kỳ process nào) điều khiển WPS Office —
-Writer, Spreadsheets, Presentation — qua JSON API trên localhost. Không cần
-admin, không cần chỉnh sửa hay bật thủ công gì trong WPS.
+AI agent làm việc ngay trong tài liệu đang mở của **Microsoft Office và WPS Office**
+(Word/Writer, Excel/Spreadsheets, PowerPoint/Presentation): task pane Ask AI trong app,
+HTTP bridge JSON trên localhost cho agent bên ngoài, và MCP server
+(`AxiomOffice.Host.exe mcp`). Không cần admin, không cần Python.
+
+> Trước đây dự án tên **WPS AI Bridge** (`WpsAiBridge`). Cài bản mới (`install.cmd` /
+> `scripts\install.ps1`) sẽ tự gỡ đăng ký của bản cũ và chuyển cấu hình (port, token, cài
+> đặt AI) từ `HKCU\Software\WpsAiBridge` sang `HKCU\Software\AxiomOffice`. Log mới nằm ở
+> `%LOCALAPPDATA%\AxiomOffice`; thư mục `%LOCALAPPDATA%\WpsAiBridge` cũ có thể xoá.
 
 ```
-AI agent ──HTTP/JSON──► WPS AI Bridge ──COM──► WPS Office
+AI agent ──HTTP/JSON──► Axiom Office ──COM──► WPS Office
                           (in-proc hoặc companion)
 ```
 
@@ -15,8 +21,8 @@ Hai chế độ chạy cùng một protocol, cùng command set:
 
 | Chế độ | Cơ chế | Dùng khi |
 |---|---|---|
-| **In-proc add-in** (`WpsAiBridge.dll`) | COM add-in `IDTExtensibility2` nạp thẳng vào WPS, mở HTTP server trong process WPS + thêm tab **"WPS AI Bridge"** trên ribbon | WPS đang mở (điều khiển document đang mở của người dùng) |
-| **Companion** (`WpsAiBridge.Host.exe`) | Process riêng dùng COM automation (`KWPS/KET/KWPP.Application`) | App chưa mở, hoặc add-in không nạp được |
+| **In-proc add-in** (`AxiomOffice.dll`) | COM add-in `IDTExtensibility2` nạp thẳng vào WPS, mở HTTP server trong process WPS + thêm tab **"Axiom Office"** trên ribbon | WPS đang mở (điều khiển document đang mở của người dùng) |
+| **Companion** (`AxiomOffice.Host.exe`) | Process riêng dùng COM automation (`KWPS/KET/KWPP.Application`) | App chưa mở, hoặc add-in không nạp được |
 
 Port mặc định (đổi qua registry, xem [Cấu hình](#cấu-hình)) — WPS và Microsoft
 Office dùng 2 dải port riêng nên chạy song song không đụng nhau:
@@ -46,7 +52,7 @@ scripts\build-native.ps1
 ```
 
 > `build.ps1` hỏi Windows Restart Manager xem tiến trình nào đang giữ
-> `WpsAiBridge.dll` / `WpsAiBridge.Host.exe` (Word/Excel/PowerPoint/WPS/companion).
+> `AxiomOffice.dll` / `AxiomOffice.Host.exe` (Word/Excel/PowerPoint/WPS/companion).
 > Có thì dừng và in tên + pid; `scripts\build.ps1 -Kill` để tự tắt đúng các tiến
 > trình đó (lưu tài liệu trước). Biên dịch ra `bin\Release\.stage` rồi mới chép
 > đè, nên lỗi biên dịch hay file bị lock đều giữ nguyên DLL cũ.
@@ -56,7 +62,7 @@ scripts\build-native.ps1
 ```powershell
 scripts\install.ps1            # đăng ký COM (HKCU, không cần admin) + whitelist WPS, in sẵn cấu hình MCP
 scripts\uninstall.ps1          # gỡ đăng ký (add-in + Ask AI pane), giữ cấu hình AI/token
-scripts\uninstall.ps1 -Purge   # gỡ và xoá luôn HKCU\Software\WpsAiBridge + %LOCALAPPDATA%\WpsAiBridge
+scripts\uninstall.ps1 -Purge   # gỡ và xoá luôn HKCU\Software\AxiomOffice + %LOCALAPPDATA%\AxiomOffice
 ```
 
 `install.ps1` tự gỡ nhãn "tải từ Internet" (Zone.Identifier) của DLL/EXE: file giải nén từ zip
@@ -65,12 +71,12 @@ tải về mang nhãn này và .NET sẽ từ chối nạp add-in.
 ### Đóng gói cho người khác
 
 ```powershell
-scripts\package.ps1            # build + tạo dist\WpsAiBridge-<version>-<ngày>-<commit>.zip
+scripts\package.ps1            # build + tạo dist\AxiomOffice-<version>-<ngày>-<commit>.zip
 scripts\package.ps1 -NoBuild   # dùng bản đã build trong bin\Release
 scripts\package.ps1 -Kill      # build.ps1 -Kill (tắt app đang giữ DLL)
 ```
 
-Zip (~245 KB) chỉ gồm DLL add-in, `WpsAiBridge.Host.exe` (companion + MCP server), script cài/gỡ,
+Zip (~245 KB) chỉ gồm DLL add-in, `AxiomOffice.Host.exe` (companion + MCP server), script cài/gỡ,
 `install.cmd` / `uninstall.cmd` (nhấp đúp; tự Unblock rồi chạy PowerShell với `-ExecutionPolicy
 Bypass`), `HUONG-DAN-CAI-DAT.txt` và `THIRD-PARTY-NOTICES.md`. Người nhận **không cần Python,
 Visual Studio hay quyền admin**: giải nén vào chỗ cố định → đóng Office/WPS → nhấp đúp
@@ -79,18 +85,18 @@ Visual Studio hay quyền admin**: giải nén vào chỗ cố định → đón
 Sau khi cài, mở WPS lên là add-in tự nạp (kiểm tra `http://127.0.0.1:47821/health`).
 
 Nếu add-in không nạp: trong WPS vào **Công cụ → COM加载项 / COM Add-ins** để kiểm
-tra danh sách, và xem log tại `%LOCALAPPDATA%\WpsAiBridge\bridge.log`.
+tra danh sách, và xem log tại `%LOCALAPPDATA%\AxiomOffice\bridge.log`.
 
 ### Companion
 
 ```powershell
 # WPS Office
-& "src\WpsAiBridge\bin\Release\WpsAiBridge.Host.exe" wps   # hoặc: et, wpp
+& "src\AxiomOffice\bin\Release\AxiomOffice.Host.exe" wps   # hoặc: et, wpp
 # Microsoft Office
-& "src\WpsAiBridge\bin\Release\WpsAiBridge.Host.exe" word  # hoặc: excel, ppt
+& "src\AxiomOffice\bin\Release\AxiomOffice.Host.exe" word  # hoặc: excel, ppt
 
 # Hiện cửa sổ app (để quan sát)
-& "...\WpsAiBridge.Host.exe" excel --visible
+& "...\AxiomOffice.Host.exe" excel --visible
 ```
 
 Companion log rõ app nó tạo được (`Companion resolved application: Microsoft Excel 16.0`).
@@ -105,14 +111,14 @@ Nếu port đã được add-in in-proc phục vụ, companion tự chuyển san
 
 ## Ribbon UI
 
-Add-in in-proc thêm tab **"WPS AI Bridge"** trên ribbon (WPS gọi
+Add-in in-proc thêm tab **"Axiom Office"** trên ribbon (WPS gọi
 `IRibbonExtensibility.GetCustomUI` khi load — xem log) với 2 nhóm:
 
 | Nút | Chức năng |
 |---|---|
 | **Status** | Hộp thoại hiển thị app, port, API base, health URL, đường dẫn log |
 | **Copy API URL** | Copy `http://127.0.0.1:<port>/` vào clipboard |
-| **Open Log** | Mở `%LOCALAPPDATA%\WpsAiBridge\bridge.log` bằng ứng dụng mặc định |
+| **Open Log** | Mở `%LOCALAPPDATA%\AxiomOffice\bridge.log` bằng ứng dụng mặc định |
 | **Ask AI...** | Mở **task pane dock trong app** (bên phải, cạnh thanh scroll) — xem mục Ask AI |
 | **Settings** | Cấu hình LLM (provider/endpoint/key/model) |
 
@@ -151,16 +157,16 @@ Hoạt động với provider OpenAI-compatible và Anthropic (tools); nếu pro
 không hỗ trợ tools, tự fallback về chat thường. Từ bên ngoài, agent có thể gọi
 cùng logic qua bridge command **`ai.ask {prompt}`**.
 
-## MCP server (C#) — `WpsAiBridge.Host.exe mcp`
+## MCP server (C#) — `AxiomOffice.Host.exe mcp`
 
 MCP server chạy ngay trong companion EXE: **không cần Python, venv hay pip**. Người dùng chỉ
-cần `WpsAiBridge.Host.exe` (build cùng add-in, template docx/pptx nhúng sẵn trong exe).
+cần `AxiomOffice.Host.exe` (build cùng add-in, template docx/pptx nhúng sẵn trong exe).
 
 ```json
 {
   "mcpServers": {
     "office": {
-      "command": "C:\\Tools\\WpsAiBridge\\src\\WpsAiBridge\\bin\\Release\\WpsAiBridge.Host.exe",
+      "command": "C:\\Tools\\AxiomOffice\\src\\AxiomOffice\\bin\\Release\\AxiomOffice.Host.exe",
       "args": ["mcp"]
     }
   }
@@ -169,7 +175,7 @@ cần `WpsAiBridge.Host.exe` (build cùng add-in, template docx/pptx nhúng sẵ
 
 - `mcp` = cả 50 tool (Word + Excel + PowerPoint + `office_sessions`); muốn ít tool hơn thì
   `mcp word` (20), `mcp excel` (16), `mcp ppt` (16) — cùng tên/tham số với 3 server Python.
-- `WpsAiBridge.Host.exe mcp --list` in danh sách tool. Log ở `bridge.log` (`MCP tool ... ok in Nms`).
+- `AxiomOffice.Host.exe mcp --list` in danh sách tool. Log ở `bridge.log` (`MCP tool ... ok in Nms`).
 - Giao thức: MCP stdio (JSON-RPC 2.0, mỗi message một dòng), `initialize` / `tools/list` /
   `tools/call` / `ping`; protocol 2024-11-05 → 2025-11-25.
 
@@ -324,7 +330,7 @@ cùng một DLL, cùng một đăng ký (không cần cài thêm gì):
   mà `install.ps1` đã ghi (`LoadBehavior=3`) — MS Office **không** cần whitelist
   `AddinsWL` (đó là cơ chế riêng của WPS, MS Office bỏ qua).
 - COM class (`IDTExtensibility2` + `IRibbonExtensibility`) và Ribbon XML
-  (schema 2006/01) là chuẩn Office — tab "WPS AI Bridge" xuất hiện tương tự.
+  (schema 2006/01) là chuẩn Office — tab "Axiom Office" xuất hiện tương tự.
 - App kind nhận diện qua COM probe (`Documents` / `Workbooks` / `Presentations`);
   host là Microsoft Office sẽ dùng dải port **47831-47833** (registry `PortOffice`).
 
@@ -335,7 +341,7 @@ Kiểm tra nhanh (đã kiểm chứng trên Office 2024 ProPlus x64 — Word/Exc
 lifecycle + ribbon + E2E qua bridge):
 
 1. Mở Word/Excel/PowerPoint
-2. `%LOCALAPPDATA%\WpsAiBridge\bridge.log` phải có `OnConnection` + `GetCustomUI`
+2. `%LOCALAPPDATA%\AxiomOffice\bridge.log` phải có `OnConnection` + `GetCustomUI`
 3. `http://127.0.0.1:47831/health` (Word) / `47832` (Excel) / `47833` (PowerPoint)
 
 Port tách biệt theo host: WPS dùng `Port` (47821-47823), Microsoft Office dùng
@@ -393,7 +399,7 @@ host không có tài liệu nào mở (host bận quá 2s thì trả giá trị 
 ### Session registry
 
 Mỗi bridge (add-in in-proc lẫn companion) khi start ghi
-`%LOCALAPPDATA%\WpsAiBridge\sessions\{pid}.json` (cùng nội dung `/session`),
+`%LOCALAPPDATA%\AxiomOffice\sessions\{pid}.json` (cùng nội dung `/session`),
 heartbeat mỗi **25s** (cập nhật `lastSeen` + tên tài liệu) và xoá file khi
 `OnDisconnection` / `Stop()`. Việc đọc tài liệu cho heartbeat chạy nền, chờ tối
 đa 2s và bỏ qua lượt khi bridge đang chạy lệnh trong host — Word bận không làm
@@ -517,7 +523,7 @@ print(r.json())
 
 ## Cấu hình
 
-`HKCU\Software\WpsAiBridge`:
+`HKCU\Software\AxiomOffice`:
 
 | Value | Kiểu | Mặc định | Ý nghĩa |
 |---|---|---|---|
@@ -530,9 +536,9 @@ print(r.json())
 ## Cấu trúc project
 
 ```
-src/WpsAiBridge/            add-in C# + code dùng chung (HttpBridge, Dispatcher, Connect)
-src/WpsAiBridge.Host/       entry point companion EXE
-src/WpsAiBridge.Host/Mcp/   MCP server C# (stdio) + template docx/pptx nhúng
+src/AxiomOffice/            add-in C# + code dùng chung (HttpBridge, Dispatcher, Connect)
+src/AxiomOffice.Host/       entry point companion EXE
+src/AxiomOffice.Host/Mcp/   MCP server C# (stdio) + template docx/pptx nhúng
 tests/mcp-host/             test parity MCP C# vs Python + round-trip Office thật
 scripts/build.ps1           build C# (add-in DLL + companion EXE)
 scripts/package.ps1         đóng gói zip cài đặt cho người khác (dùng scripts/dist/*)
@@ -551,9 +557,9 @@ scripts/uninstall.ps1       gỡ đăng ký
 ## Troubleshooting
 
 - **Add-in không load**: đóng WPS hoàn toàn, chạy lại `scripts\install.ps1`,
-  mở WPS. Xem `%LOCALAPPDATA%\WpsAiBridge\bridge.log`.
+  mở WPS. Xem `%LOCALAPPDATA%\AxiomOffice\bridge.log`.
 - **WPS tự tắt add-in sau crash**: WPS (giống MS Office) tự hạ `LoadBehavior`
-  3→2 và ghi `AddinsCL\WpsAiBridge.Connect` khi add-in lỗi. Chạy lại
+  3→2 và ghi `AddinsCL\AxiomOffice.Connect` khi add-in lỗi. Chạy lại
   `install.ps1` để khôi phục `LoadBehavior=3` và xoá AddinsCL.
 - **Health OK nhưng command lỗi `no active document`**: chưa có document mở —
   gọi `*.newDocument` / `*.newWorkbook` / `*.newPresentation` trước.
@@ -564,7 +570,7 @@ scripts/uninstall.ps1       gỡ đăng ký
   trả về đúng tên chuỗi; riêng `#N/A` trùng mã với ô trống qua `Value2` nên
   vẫn về `null` (giới hạn đã biết của COM).
 - **Port bận**: một app khác đang giữ port — kiểm tra `netstat -ano | findstr 4782`.
-- **Tìm bridge đang sống**: xem `%LOCALAPPDATA%\WpsAiBridge\sessions\*.json` hoặc
+- **Tìm bridge đang sống**: xem `%LOCALAPPDATA%\AxiomOffice\sessions\*.json` hoặc
   gọi `office_sessions()` từ MCP server.
 - **Task pane hẹp trên WPS 12**: CTP của WPS mở ra ~250px và áp `Width` trễ; pane
   tự đo lại sau khi host layout (tối đa 3 lần, mỗi 500ms) và nới về 360px — log

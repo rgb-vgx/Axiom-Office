@@ -15,7 +15,7 @@ Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 $root = Split-Path -Parent $PSScriptRoot
-$release = Join-Path $root "src\WpsAiBridge\bin\Release"
+$release = Join-Path $root "src\AxiomOffice\bin\Release"
 if (-not $OutDir) {
     $OutDir = Join-Path $root "dist"
 }
@@ -27,8 +27,8 @@ if (-not $NoBuild) {
     }
 }
 
-$dll = Join-Path $release "WpsAiBridge.dll"
-$exe = Join-Path $release "WpsAiBridge.Host.exe"
+$dll = Join-Path $release "AxiomOffice.dll"
+$exe = Join-Path $release "AxiomOffice.Host.exe"
 foreach ($file in @($dll, $exe)) {
     if (-not (Test-Path -LiteralPath $file)) {
         throw "Thieu $file - chay scripts\build.ps1 truoc (hoac bo -NoBuild)"
@@ -44,7 +44,7 @@ try {
     }
 } catch {
 }
-$name = "WpsAiBridge-$version-$(Get-Date -Format yyyyMMdd)"
+$name = "AxiomOffice-$version-$(Get-Date -Format yyyyMMdd)"
 if ($commit) {
     $name += "-$commit"
 }
@@ -59,16 +59,17 @@ if (Test-Path -LiteralPath $zip) {
     Remove-Item -LiteralPath $zip -Force
 }
 
-# Giu nguyen cau truc thu muc: install.ps1 tim DLL o ..\src\WpsAiBridge\bin\Release tinh tu scripts\.
+# Giu nguyen cau truc thu muc: install.ps1 tim DLL o ..\src\AxiomOffice\bin\Release tinh tu scripts\.
 $layout = [ordered]@{
     "scripts\install.ps1"                            = Join-Path $root "scripts\install.ps1"
     "scripts\uninstall.ps1"                          = Join-Path $root "scripts\uninstall.ps1"
-    "src\WpsAiBridge\bin\Release\WpsAiBridge.dll"      = $dll
-    "src\WpsAiBridge\bin\Release\WpsAiBridge.Host.exe" = $exe
+    "scripts\legacy.ps1"                             = Join-Path $root "scripts\legacy.ps1"
+    "src\AxiomOffice\bin\Release\AxiomOffice.dll"      = $dll
+    "src\AxiomOffice\bin\Release\AxiomOffice.Host.exe" = $exe
     "install.cmd"                                    = Join-Path $PSScriptRoot "dist\install.cmd"
     "uninstall.cmd"                                  = Join-Path $PSScriptRoot "dist\uninstall.cmd"
     "HUONG-DAN-CAI-DAT.txt"                          = Join-Path $PSScriptRoot "dist\HUONG-DAN-CAI-DAT.txt"
-    "THIRD-PARTY-NOTICES.md"                         = Join-Path $root "src\WpsAiBridge.Host\Mcp\Templates\NOTICE.md"
+    "THIRD-PARTY-NOTICES.md"                         = Join-Path $root "src\AxiomOffice.Host\Mcp\Templates\NOTICE.md"
 }
 foreach ($entry in $layout.GetEnumerator()) {
     $target = Join-Path $stage $entry.Key

@@ -1,19 +1,21 @@
 param(
-    # Xoa ca cau hinh (HKCU\Software\WpsAiBridge: token, cai dat AI) va %LOCALAPPDATA%\WpsAiBridge (log, session).
+    # Xoa ca cau hinh (HKCU\Software\AxiomOffice: token, cai dat AI) va %LOCALAPPDATA%\AxiomOffice (log, session).
     [switch]$Purge
 )
 
 $ErrorActionPreference = "Stop"
 
-$progId = "WpsAiBridge.Connect"
-$classGuid = "{F4524DFD-C4F6-4027-8CA6-08B7F7DB4C44}"
+$progId = "AxiomOffice.Connect"
+$classGuid = "{BDB3732A-A479-4A24-AD64-D35952035BBA}"
 $currentUser = [Microsoft.Win32.Registry]::CurrentUser
+. (Join-Path $PSScriptRoot "legacy.ps1")
+[void](Remove-LegacyRegistration)
 
 $currentUser.DeleteSubKeyTree("Software\Classes\$progId", $false)
 $currentUser.DeleteSubKeyTree("Software\Classes\CLSID\$classGuid", $false)
 # Class cua Ask AI task pane (dang ky boi install.ps1)
-$currentUser.DeleteSubKeyTree("Software\Classes\WpsAiBridge.AskAiPane", $false)
-$currentUser.DeleteSubKeyTree("Software\Classes\CLSID\{D99F8693-4316-45AF-8916-B70D87DEEF87}", $false)
+$currentUser.DeleteSubKeyTree("Software\Classes\AxiomOffice.AskAiPane", $false)
+$currentUser.DeleteSubKeyTree("Software\Classes\CLSID\{8001B0D7-F189-443A-B3CB-6EB98038C72E}", $false)
 
 foreach ($officeApp in @("Word", "Excel", "PowerPoint")) {
     $currentUser.DeleteSubKeyTree("Software\Microsoft\Office\$officeApp\Addins\$progId", $false)
@@ -33,13 +35,17 @@ foreach ($hive in @("WPS", "ET", "WPP")) {
 }
 
 if ($Purge) {
-    $currentUser.DeleteSubKeyTree("Software\WpsAiBridge", $false)
-    $dataDir = Join-Path $env:LOCALAPPDATA "WpsAiBridge"
+    $currentUser.DeleteSubKeyTree("Software\AxiomOffice", $false)
+    $currentUser.DeleteSubKeyTree($LegacyConfigKey, $false)
+    if (Test-Path -LiteralPath $LegacyDataDir) {
+        Remove-Item -LiteralPath $LegacyDataDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    $dataDir = Join-Path $env:LOCALAPPDATA "AxiomOffice"
     if (Test-Path -LiteralPath $dataDir) {
         Remove-Item -LiteralPath $dataDir -Recurse -Force -ErrorAction SilentlyContinue
     }
-    Write-Output "Uninstalled WpsAiBridge and removed config (HKCU\Software\WpsAiBridge) and $dataDir."
+    Write-Output "Uninstalled Axiom Office and removed config (HKCU\Software\AxiomOffice) and $dataDir."
 } else {
-    Write-Output "Uninstalled WpsAiBridge (config key HKCU\Software\WpsAiBridge kept; use -Purge to remove it)."
+    Write-Output "Uninstalled Axiom Office (config key HKCU\Software\AxiomOffice kept; use -Purge to remove it)."
 }
 Write-Output "Close WPS first if it is running."

@@ -25,7 +25,7 @@ def _read_token() -> str:
     except ImportError:
         return ""
     try:
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\WpsAiBridge") as key:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\AxiomOffice") as key:
             value, _ = winreg.QueryValueEx(key, "Token")
             return str(value or "")
     except OSError:
@@ -59,11 +59,11 @@ def command(app: str, action: str, params: dict | None = None,
 
 
 # ---------------------------------------------------------------------------
-# Session registry: mỗi bridge đang sống ghi %LOCALAPPDATA%\WpsAiBridge\sessions\{pid}.json
+# Session registry: mỗi bridge đang sống ghi %LOCALAPPDATA%\AxiomOffice\sessions\{pid}.json
 # (heartbeat 25s). sessions() đọc thư mục đó để phát hiện mọi instance Office + WPS.
 # ---------------------------------------------------------------------------
 
-SESSIONS_DIR = os.path.join(os.environ.get("LOCALAPPDATA", ""), "WpsAiBridge", "sessions")
+SESSIONS_DIR = os.path.join(os.environ.get("LOCALAPPDATA", ""), "AxiomOffice", "sessions")
 STALE_SECONDS = 90
 
 
@@ -150,5 +150,5 @@ def es_hint(app: str | None = None, port: int | None = None) -> dict:
             "ping": "keepalive mỗi 15s",
         },
         "curl": 'curl.exe -N -H "X-Auth-Token: <token>" ' + url,
-        "notes": "Poll-diff 500ms, tối đa 5 subscriber mỗi bridge; token ở HKCU\Software\WpsAiBridge\Token.",
+        "notes": "Poll-diff 500ms, tối đa 5 subscriber mỗi bridge; token ở HKCU\Software\AxiomOffice\Token.",
     }

@@ -1,4 +1,4 @@
-﻿WPS AI Bridge - Hướng dẫn cài đặt
+﻿Axiom Office - Hướng dẫn cài đặt
 ==================================
 
 Yêu cầu
@@ -7,12 +7,13 @@ Yêu cầu
 - Không cần quyền admin, không cần cài Python
 
 Cài đặt
-1. Giải nén thư mục này vào một chỗ cố định, ví dụ C:\Tools\WpsAiBridge.
+1. Giải nén thư mục này vào một chỗ cố định, ví dụ C:\Tools\AxiomOffice.
    Add-in chạy thẳng từ thư mục này: đừng xoá hay di chuyển nó sau khi cài
    (nếu đã di chuyển thì chạy lại install.cmd ở chỗ mới).
 2. Đóng Word, Excel, PowerPoint và WPS.
 3. Nhấp đúp install.cmd. Nếu Windows cảnh báo file tải từ Internet, chọn "Run" / "Chạy".
-4. Mở Word, Excel, PowerPoint hoặc WPS: trên ribbon có tab "WPS AI Bridge".
+4. Mở Word, Excel, PowerPoint hoặc WPS: trên ribbon có tab "Axiom Office".
+   Máy đã cài bản cũ tên "WPS AI Bridge": install.cmd tự gỡ bản cũ và giữ nguyên cấu hình AI, token.
 5. Bấm Ask AI > Cài đặt, nhập provider, endpoint, model và API key của bạn.
    Mỗi máy dùng cấu hình AI riêng; API key được mã hoá theo tài khoản Windows.
 
@@ -21,7 +22,7 @@ Thêm vào cấu hình MCP của client (install.cmd in sẵn đúng đường d
 
   "mcpServers": {
     "office": {
-      "command": "C:\\Tools\\WpsAiBridge\\src\\WpsAiBridge\\bin\\Release\\WpsAiBridge.Host.exe",
+      "command": "C:\\Tools\\AxiomOffice\\src\\AxiomOffice\\bin\\Release\\AxiomOffice.Host.exe",
       "args": ["mcp"]
     }
   }
@@ -35,7 +36,7 @@ Gỡ cài đặt
 - Sau đó có thể xoá thư mục cài.
 
 Sự cố thường gặp
-- Không thấy tab "WPS AI Bridge": đóng hẳn app, chạy lại install.cmd, mở lại app.
-  Log nằm ở %LOCALAPPDATA%\WpsAiBridge\bridge.log
+- Không thấy tab "Axiom Office": đóng hẳn app, chạy lại install.cmd, mở lại app.
+  Log nằm ở %LOCALAPPDATA%\AxiomOffice\bridge.log
 - Office báo add-in bị vô hiệu hoá sau khi app bị lỗi: chạy lại install.cmd.
 - Máy công ty chặn add-in chưa có chữ ký số: liên hệ bộ phận IT.

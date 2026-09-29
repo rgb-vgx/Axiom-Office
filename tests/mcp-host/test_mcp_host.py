@@ -1,4 +1,4 @@
-"""Kiểm tra MCP server C# (WpsAiBridge.Host.exe mcp) qua MCP client chính thức.
+"""Kiểm tra MCP server C# (AxiomOffice.Host.exe mcp) qua MCP client chính thức.
 
 - Giao thức: initialize / tools/list / tools/call.
 - Parity: so kết quả tool file của bản C# với tools/*-mcp/*/file_tools.py (bản Python cũ)
@@ -20,7 +20,7 @@ import tempfile
 import zipfile
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-EXE = os.path.join(ROOT, "src", "WpsAiBridge", "bin", "Release", "WpsAiBridge.Host.exe")
+EXE = os.path.join(ROOT, "src", "AxiomOffice", "bin", "Release", "AxiomOffice.Host.exe")
 
 # Thư viện Python của 3 venv + package file_tools cũ để so parity.
 for name in ("word-mcp", "ppt-mcp", "excel-mcp"):
