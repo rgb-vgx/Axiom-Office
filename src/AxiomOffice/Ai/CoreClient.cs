@@ -19,6 +19,8 @@ namespace AxiomOffice.Ai
         public string ConversationId;
         public string Tool;
         public string Name;
+        public string Id;       // memory.written: id memory
+        public string Text;     // memory.written: nội dung
         public string Action;
         public string ParamsPreview;
         public string ResultPreview;
@@ -182,7 +184,7 @@ namespace AxiomOffice.Ai
                 return null;
             }
 
-            var result = new LlmResult { ViaCore = true };
+            var result = new LlmResult { ViaCore = true, RunId = runId };
             result.ConversationId = reply != null && reply.ContainsKey("conversationId")
                 ? Convert.ToString(reply["conversationId"])
                 : null;
@@ -563,6 +565,8 @@ namespace AxiomOffice.Ai
                 item.ConversationId = Read(data, "conversationId");
                 item.Tool = Read(data, "tool");
                 item.Name = Read(data, "name");
+                item.Id = Read(data, "id");
+                item.Text = Read(data, "text");
                 item.Action = Read(data, "action");
                 item.ParamsPreview = Read(data, "paramsPreview");
                 item.ResultPreview = Read(data, "resultPreview");
@@ -707,6 +711,166 @@ namespace AxiomOffice.Ai
             }
 
             return document;
+        }
+
+        // ---- Memory dài hạn (New_arch.md mục 8.5.11): form "Quản lý ghi nhớ" và dòng "Đã ghi nhớ" trong pane ----
+
+        // GET /v1/memory (query/runId/includeDeleted tuỳ chọn). Lỗi -> null + error.
+        public List<Dictionary<string, object>> ListMemories(string query, string runId, bool includeDeleted, out string error)
+        {
+            var parameters = new List<string>();
+            if (!string.IsNullOrWhiteSpace(query))
+            {
+                parameters.Add("q=" + Uri.EscapeDataString(query.Trim()));
+            }
+            if (!string.IsNullOrWhiteSpace(runId))
+            {
+                parameters.Add("runId=" + Uri.EscapeDataString(runId));
+            }
+            if (includeDeleted)
+            {
+                parameters.Add("includeDeleted=true");
+            }
+            Dictionary<string, object> result = MemoryCall("GET", "/v1/memory" + (parameters.Count > 0 ? "?" + string.Join("&", parameters.ToArray()) : ""), null, out error);
+            return result == null ? null : Items(result, "memories");
+        }
+
+        public Dictionary<string, object> AddMemory(string scope, string scopeKey, string text, out string error)
+        {
+            var body = new Dictionary<string, object> { { "scope", scope }, { "text", text } };
+            if (!string.IsNullOrEmpty(scopeKey))
+            {
+                body["scopeKey"] = scopeKey;
+            }
+            return MemoryCall("POST", "/v1/memory", body, out error);
+        }
+
+        // fields: text, category, pinned (bool), expiresAt ("YYYY-MM-DD" hoặc null để bỏ hạn dùng).
+        public bool UpdateMemory(string id, Dictionary<string, object> fields, out string error)
+        {
+            return MemoryCall("PATCH", "/v1/memory/" + Uri.EscapeDataString(id), fields, out error) != null;
+        }
+
+        public bool DeleteMemory(string id, out string error)
+        {
+            return MemoryCall("DELETE", "/v1/memory/" + Uri.EscapeDataString(id), null, out error) != null;
+        }
+
+        public bool RestoreMemory(string id, out string error)
+        {
+            return MemoryCall("POST", "/v1/memory/" + Uri.EscapeDataString(id) + "/restore", new Dictionary<string, object>(), out error) != null;
+        }
+
+        public List<Dictionary<string, object>> MemoryHistory(string id, out string error)
+        {
+            Dictionary<string, object> result = MemoryCall("GET", "/v1/memory/" + Uri.EscapeDataString(id) + "/history", null, out error);
+            return result == null ? null : Items(result, "history");
+        }
+
+        public bool PurgeMemories(out string error)
+        {
+            return MemoryCall("DELETE", "/v1/memory?scope=all&confirm=true", null, out error) != null;
+        }
+
+        private Dictionary<string, object> MemoryCall(string method, string path, Dictionary<string, object> body, out string error)
+        {
+            string baseUrl = EnsureBaseUrl();
+            if (baseUrl == null)
+            {
+                error = LastError ?? "Agent Core không chạy";
+                return null;
+            }
+            string text = SendJson(method, baseUrl + path, body == null ? null : Serialize(body), 15000, out error);
+            if (text == null)
+            {
+                return null;
+            }
+            var reply = Deserialize(text) as Dictionary<string, object>;
+            if (reply == null || !reply.ContainsKey("ok") || !Convert.ToBoolean(reply["ok"]))
+            {
+                error = reply != null && reply.ContainsKey("error") ? Convert.ToString(reply["error"]) : "phản hồi không hợp lệ từ Agent Core";
+                return null;
+            }
+            error = null;
+            return reply.ContainsKey("result") ? reply["result"] as Dictionary<string, object> ?? new Dictionary<string, object>() : new Dictionary<string, object>();
+        }
+
+        private static List<Dictionary<string, object>> Items(Dictionary<string, object> result, string key)
+        {
+            var list = new List<Dictionary<string, object>>();
+            var items = result.ContainsKey(key) ? result[key] as object[] : null;
+            if (items != null)
+            {
+                foreach (object item in items)
+                {
+                    var row = item as Dictionary<string, object>;
+                    if (row != null)
+                    {
+                        list.Add(row);
+                    }
+                }
+            }
+            return list;
+        }
+
+        // HTTP JSON bất kỳ method; lỗi HTTP vẫn đọc body {"ok":false,"error"} của Core để báo đúng lý do.
+        private static string SendJson(string method, string url, string json, int timeoutMs, out string error)
+        {
+            error = null;
+            try
+            {
+                var request = (HttpWebRequest)WebRequest.Create(url);
+                request.Method = method;
+                request.Timeout = timeoutMs;
+                request.ReadWriteTimeout = timeoutMs;
+                request.UserAgent = "AxiomOffice";
+                if (!string.IsNullOrEmpty(Config.Token))
+                {
+                    request.Headers["X-Auth-Token"] = Config.Token;
+                }
+                if (json != null)
+                {
+                    request.ContentType = "application/json";
+                    byte[] data = Encoding.UTF8.GetBytes(json);
+                    request.ContentLength = data.Length;
+                    using (Stream stream = request.GetRequestStream())
+                    {
+                        stream.Write(data, 0, data.Length);
+                    }
+                }
+                using (var response = (HttpWebResponse)request.GetResponse())
+                using (var reader = new StreamReader(response.GetResponseStream(), Encoding.UTF8))
+                {
+                    return reader.ReadToEnd();
+                }
+            }
+            catch (WebException ex)
+            {
+                if (ex.Response != null)
+                {
+                    try
+                    {
+                        using (var reader = new StreamReader(ex.Response.GetResponseStream(), Encoding.UTF8))
+                        {
+                            string body = reader.ReadToEnd();
+                            if (body.TrimStart().StartsWith("{", StringComparison.Ordinal))
+                            {
+                                return body;
+                            }
+                        }
+                    }
+                    catch (Exception)
+                    {
+                    }
+                }
+                error = DescribeError(ex);
+                return null;
+            }
+            catch (Exception ex)
+            {
+                error = ex.GetType().Name + ": " + ex.Message;
+                return null;
+            }
         }
 
         private static string PostJson(string url, string json, int timeoutMs, CancellationToken cancel, out string error)

@@ -1022,16 +1022,16 @@ README + CHANGELOG + `ARCHITECTURE.MD` khi cần, chạy test, báo cáo kết q
 
 ### Giai đoạn 3: Memory dài hạn
 
-- [ ] `IMemoryStore` + `SqliteMemoryStore`: bảng `memories` (hash, entities, expires_at),
+- [x] `IMemoryStore` + `SqliteMemoryStore`: bảng `memories` (hash, entities, expires_at),
       `memories_fts` (bỏ dấu), `memory_links`, `memory_history`, `memory_embeddings` (8.5.2, 8.5.3).
-- [ ] `MemoryRetriever`: scoring cộng dồn + sigmoid theo độ dài truy vấn + entity boost (8.5.7),
+- [x] `MemoryRetriever`: scoring cộng dồn + sigmoid theo độ dài truy vấn + entity boost (8.5.7),
       đưa memory vào prompt.
-- [ ] Tool `remember`/`recall`; chống trùng hash + áp dụng trong transaction (8.5.6).
-- [ ] Hàng đợi nền + `MemoryExtractor` chỉ-ADD sau run (8.5.5), prompt nhúng `Memory/Prompts/*.txt`.
-- [ ] Embedding tuỳ chọn (8.5.8); API memory (8.5.11).
-- [ ] Pane: event `memory.written` (xoá được ngay), form "Quản lý ghi nhớ…" (xem, sửa, ghim, hạn
+- [x] Tool `remember`/`recall`; chống trùng hash + áp dụng trong transaction (8.5.6).
+- [x] Hàng đợi nền + `MemoryExtractor` chỉ-ADD sau run (8.5.5), prompt nhúng `Memory/Prompts/*.txt`.
+- [x] Embedding tuỳ chọn (8.5.8); API memory (8.5.11).
+- [x] Pane: event `memory.written` (xoá được ngay), form "Quản lý ghi nhớ…" (xem, sửa, ghim, hạn
       dùng, xoá, lịch sử), cài đặt `MemoryEnabled` / `MemoryAutoExtract`.
-- [ ] Fake LLM có kịch bản cho extractor; e2e: phiên 1 nói "Tôi là trưởng phòng Kế toán, công văn
+- [x] Fake LLM có kịch bản cho extractor; e2e: phiên 1 nói "Tôi là trưởng phòng Kế toán, công văn
       ký tên Nguyễn Văn A" → phiên 2 (Core khởi động lại) soạn công văn tự điền người ký; phiên 3
       "tôi đã lên phó giám đốc" → memory MỚI ghi rõ sự chuyển đổi và liên kết bản cũ (không sửa bản
       cũ), ngữ cảnh ưu tiên thông tin mới.

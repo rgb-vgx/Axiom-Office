@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Threading;
 using System.Windows.Forms;
@@ -441,6 +442,13 @@ namespace AxiomOffice.Ai
 
             LlmResult result = core.Run(host, promptText, conversationId, delegate(CoreEvent item)
             {
+                if (item.Type == "memory.written" && !string.IsNullOrEmpty(item.Id))
+                {
+                    string memoryId = item.Id;
+                    string memoryText = item.Text ?? "";
+                    PostToUi(delegate { ShowMemoryNote(memoryId, memoryText); });
+                    return;
+                }
                 string line = ProgressLine(item);
                 if (line != null)
                 {
@@ -558,6 +566,64 @@ namespace AxiomOffice.Ai
             _prompt.Focus();
         }
 
+        // Memory đã hiện trong pane (không hiện lại khi hỏi lại kết quả trích xuất nền).
+        private readonly HashSet<string> _shownMemories = new HashSet<string>(StringComparer.Ordinal);
+
+        private void ShowMemoryNote(string memoryId, string text)
+        {
+            if (string.IsNullOrEmpty(memoryId) || !_shownMemories.Add(memoryId))
+            {
+                return;
+            }
+            var note = new MemoryNote(memoryId, text);
+            note.DeleteClicked += delegate
+            {
+                note.SetDeleting();
+                ThreadPool.QueueUserWorkItem(delegate
+                {
+                    string error;
+                    bool ok = CoreClient.Instance.DeleteMemory(note.MemoryId, out error);
+                    if (!ok)
+                    {
+                        Logger.Info("AskAiPane: delete memory failed: " + error);
+                    }
+                    PostToUi(delegate { note.SetDeleted(ok); });
+                });
+            };
+            _chat.AddBlock(note);
+        }
+
+        // Trích xuất memory chạy nền sau lượt (New_arch.md 8.5.4): hỏi lại sau ít giây để hiện "Đã ghi nhớ".
+        private void PollExtractedMemories(string runId)
+        {
+            if (string.IsNullOrEmpty(runId))
+            {
+                return;
+            }
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                foreach (int delayMs in new[] { 8000, 17000 })
+                {
+                    Thread.Sleep(delayMs);
+                    string error;
+                    List<Dictionary<string, object>> items = CoreClient.Instance.ListMemories(null, runId, false, out error);
+                    if (items == null)
+                    {
+                        return;
+                    }
+                    foreach (Dictionary<string, object> item in items)
+                    {
+                        string id = item.ContainsKey("id") ? Convert.ToString(item["id"]) : null;
+                        string text = item.ContainsKey("text") ? Convert.ToString(item["text"]) : "";
+                        if (!PostToUi(delegate { ShowMemoryNote(id, text); }))
+                        {
+                            return;
+                        }
+                    }
+                }
+            });
+        }
+
         private bool PostToUi(Action action)
         {
             try
@@ -613,6 +679,10 @@ namespace AxiomOffice.Ai
             _busyDot.Visible = false;
             _chat.RemoveTyping();
             _lastRunViaCore = result.ViaCore;
+            if (result.ViaCore && result.Ok)
+            {
+                PollExtractedMemories(result.RunId);
+            }
             _newChatLink.Visible = _conversationId != null;
             string seconds = result.Seconds.ToString("0.0");
 

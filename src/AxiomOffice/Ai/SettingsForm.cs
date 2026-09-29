@@ -20,6 +20,9 @@ namespace AxiomOffice.Ai
         private readonly TextBox _model;
         private readonly Label _status;
         private readonly Button _test;
+        private readonly CheckBox _core;
+        private readonly CheckBox _memory;
+        private readonly CheckBox _autoExtract;
 
         public SettingsForm()
         {
@@ -28,7 +31,7 @@ namespace AxiomOffice.Ai
             MaximizeBox = false;
             MinimizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
-            ClientSize = new Size(500, 250);
+            ClientSize = new Size(500, 334);
             Font = SystemFonts.MessageBoxFont;
 
             var lblProvider = new Label { Text = "Provider:", Left = 14, Top = 19, Width = 90 };
@@ -56,13 +59,29 @@ namespace AxiomOffice.Ai
                 ForeColor = SystemColors.GrayText
             };
 
-            _status = new Label { Left = 14, Top = 186, Width = 466, Height = 18, AutoEllipsis = true, ForeColor = SystemColors.GrayText };
+            // Agent Core + ghi nhớ dài hạn (New_arch.md mục 9.4, 8.5.10).
+            var lblAgent = new Label { Text = "Agent:", Left = 14, Top = 190, Width = 90 };
+            _core = new CheckBox { Text = "Dùng Agent Core (hội thoại liên tục, kỹ năng, ghi nhớ)", Left = 110, Top = 186, Width = 370 };
+            _memory = new CheckBox { Text = "Ghi nhớ dài hạn", Left = 110, Top = 210, Width = 150 };
+            _autoExtract = new CheckBox { Text = "Tự ghi nhớ sau mỗi lượt", Left = 270, Top = 210, Width = 210 };
+            var manage = new Button { Text = "Quản lý ghi nhớ…", Left = 110, Top = 236, Width = 150 };
 
-            _test = new Button { Text = "Test", Left = 110, Top = 210, Width = 80 };
-            var save = new Button { Text = "Save", Left = 312, Top = 210, Width = 80 };
-            var cancel = new Button { Text = "Cancel", Left = 400, Top = 210, Width = 80 };
+            _status = new Label { Left = 14, Top = 270, Width = 466, Height = 18, AutoEllipsis = true, ForeColor = SystemColors.GrayText };
 
-            Controls.AddRange(new Control[] { lblProvider, _provider, lblEndpoint, _endpoint, lblKey, _apiKey, lblModel, _model, hint, _status, _test, save, cancel });
+            _test = new Button { Text = "Test", Left = 110, Top = 294, Width = 80 };
+            var save = new Button { Text = "Save", Left = 312, Top = 294, Width = 80 };
+            var cancel = new Button { Text = "Cancel", Left = 400, Top = 294, Width = 80 };
+
+            Controls.AddRange(new Control[] { lblProvider, _provider, lblEndpoint, _endpoint, lblKey, _apiKey, lblModel, _model, hint,
+                lblAgent, _core, _memory, _autoExtract, manage, _status, _test, save, cancel });
+            _memory.CheckedChanged += delegate { _autoExtract.Enabled = _memory.Checked; };
+            manage.Click += delegate
+            {
+                using (var form = new MemoryForm())
+                {
+                    form.ShowDialog(this);
+                }
+            };
             AcceptButton = save;
             CancelButton = cancel;
 
@@ -97,6 +116,10 @@ namespace AxiomOffice.Ai
             _endpoint.Text = Config.LlmEndpoint;
             _apiKey.Text = Config.LlmApiKey;
             _model.Text = Config.LlmModel;
+            _core.Checked = Config.CoreEnabled;
+            _memory.Checked = Config.MemoryEnabled;
+            _autoExtract.Checked = Config.MemoryAutoExtract;
+            _autoExtract.Enabled = _memory.Checked;
             if (string.IsNullOrEmpty(_endpoint.Text))
             {
                 _endpoint.Text = DefaultEndpoint();
@@ -132,6 +155,9 @@ namespace AxiomOffice.Ai
             saved &= Config.WriteString("LlmEndpoint", _endpoint.Text.Trim());
             saved &= Config.WriteSecret("LlmApiKey", _apiKey.Text);
             saved &= Config.WriteString("LlmModel", _model.Text.Trim());
+            saved &= Config.WriteDword("CoreEnabled", _core.Checked ? 1 : 0);
+            saved &= Config.WriteDword("MemoryEnabled", _memory.Checked ? 1 : 0);
+            saved &= Config.WriteDword("MemoryAutoExtract", _autoExtract.Checked ? 1 : 0);
             if (!saved)
             {
                 _status.Text = "Failed to save settings to the registry";

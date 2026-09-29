@@ -111,6 +111,36 @@ namespace AxiomOffice.Bridge
             return false;
         }
 
+        // Ghi nhớ dài hạn của Agent Core (New_arch.md mục 8.5.10); Core đọc lại mỗi lượt.
+        public static bool MemoryEnabled
+        {
+            get { return ReadInt("MemoryEnabled", 1) != 0; }
+        }
+
+        public static bool MemoryAutoExtract
+        {
+            get { return ReadInt("MemoryAutoExtract", 1) != 0; }
+        }
+
+        public static bool WriteDword(string name, int value)
+        {
+            try
+            {
+                using (RegistryKey key = Registry.CurrentUser.CreateSubKey(KeyPath))
+                {
+                    if (key != null)
+                    {
+                        key.SetValue(name, value, RegistryValueKind.DWord);
+                        return true;
+                    }
+                }
+            }
+            catch
+            {
+            }
+            return false;
+        }
+
         public static bool WriteSecret(string name, string value)
         {
             try

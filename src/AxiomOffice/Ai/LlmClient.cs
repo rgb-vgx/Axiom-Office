@@ -23,6 +23,7 @@ namespace AxiomOffice.Ai
         public bool Stopped;                 // dung vi tran token cua Agent Core
         public bool ViaCore;                 // luot chay qua Agent Core (khong phai in-process)
         public string ConversationId;        // hoi thoai ben Core (de "lam tiep")
+        public string RunId;                 // luot chay ben Core (tim memory trich xuat nen cua luot)
         public int Rounds;
         public List<string> Transcript = new List<string>();
     }

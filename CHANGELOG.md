@@ -5,6 +5,30 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Agent Core giai đoạn 3: Memory dài hạn (New_arch.md mục 8.5, học từ mem0 2.2.1)
+- Schema 2: `memories`, `memories_fts` (FTS5, text chuẩn hoá bỏ dấu kể cả `đ`), `memory_links`,
+  `memory_history`, `memory_embeddings`; `runs.memory_status`
+- `SqliteMemoryStore`: ADD theo lô trong một transaction (chống trùng hash SHA-256 trong lô + với memory cũ,
+  gần-trùng cosine ≥ 0,96 nếu có embedding, link chỉ tới memory tồn tại, history); sửa/ghim/hạn dùng/xoá
+  mềm/khôi phục/xoá cứng **chỉ do người dùng**; dọn xoá mềm sau 30 ngày
+- `MemoryRetriever`: chấm điểm cộng dồn như `score_and_rank` của mem0 (keyword sigmoid theo độ dài truy
+  vấn, entity boost giảm dần, semantic nếu có embedding; ngưỡng 0,1 chặn tín hiệu chính trước khi cộng);
+  ngữ cảnh = ghim + ≤ 20 memory tài liệu + ≤ 8 memory user, ≤ ~1.500 token, bản chuyển đổi mới đứng trước
+- `MemoryExtractor` **chỉ-ADD** (prompt tiếng Việt nhúng trong exe) chạy ở **hàng đợi nền**: id tạm chống
+  bịa id, lọc confidence < 0,6 / > 300 ký tự / thông tin nhạy cảm (regex CCCD, số thẻ, mật khẩu, API key),
+  bỏ qua lệnh thao tác thuần; JSON lỗi thì thử lại 1 lần. Tóm tắt hội thoại chuyển sang cùng hàng đợi
+- Tool `remember` / `recall`; SSE `memory.written`; `/v1/memory` (list/tìm/thêm/sửa/xoá/khôi phục/lịch
+  sử/xoá toàn bộ); embedding tuỳ chọn (`EmbeddingModel`, lỗi thì tự chạy chỉ keyword)
+- Pane: dòng **Đã ghi nhớ: …** + **Xoá** (cả memory trích xuất nền của lượt vừa xong); Cài đặt thêm "Dùng
+  Agent Core", "Ghi nhớ dài hạn", "Tự ghi nhớ sau mỗi lượt", form **Quản lý ghi nhớ…**
+- Test: 33 unit test memory; e2e 18 kiểm tra (3 phiên + khởi động lại Core, chuyển đổi chức vụ có liên kết,
+  trùng hash, id bịa, lệnh thao tác thuần, xoá/khôi phục/lịch sử, `MemoryEnabled=0`); 14 kiểm tra add-in
+  `CoreClient` ↔ Core thật (thư mục dữ liệu tạm)
+
+### Fixed
+- Chuẩn hoá bỏ dấu tiếng Việt trong Core dùng bảng tường minh: Core chạy `InvariantGlobalization` nên
+  `string.Normalize(FormD)` không tách dấu ("in đậm" không thành "in dam"); project test cũng chạy invariant
+
 ### Added — Agent Core giai đoạn 2: Skills (New_arch.md mục 8.4)
 - **Skill theo chuẩn Agent Skills**: `Skills/SkillLoader` (frontmatter `name`/`description` + `apps` tuỳ
   chọn; validate tên ≤ 64 ký tự `a-z0-9-`, từ cấm `anthropic`/`claude`, mô tả ≤ 1024 không thẻ XML; field

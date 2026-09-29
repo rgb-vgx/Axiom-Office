@@ -150,6 +150,25 @@ Nguồn skill (trùng tên thì nguồn sau thắng): `skills\` cạnh `AxiomOff
 nạp (skill sai frontmatter bị bỏ qua, không làm hỏng Core). Skill **không chạy script**; chỉ dùng skill từ
 nguồn tin cậy.
 
+### Ghi nhớ dài hạn (memory)
+
+Agent Core **nhớ qua các phiên** (học từ mem0 2.2.1, tự làm bằng C#, dữ liệu nằm trong
+`%LOCALAPPDATA%\AxiomOffice\core\core.db` trên máy):
+
+- **Phạm vi**: `user` (đúng cho mọi tài liệu: bạn là ai, cơ quan, người ký, thói quen trình bày) và
+  `document` (tiến độ/ghi chú của riêng một file đã lưu).
+- **Ghi**: bạn tự thêm trong **Cài đặt → Quản lý ghi nhớ…**; AI gọi `remember` khi bạn nói điều đáng nhớ;
+  và **tự trích xuất sau mỗi lượt** (chạy nền, một lệnh gọi LLM, **chỉ thêm mới**). Lệnh thao tác thuần
+  ("in đậm dòng này") không tốn lệnh gọi trích xuất. Pane hiện dòng **Đã ghi nhớ: …** kèm link **Xoá**.
+- **Thay đổi** (vd "tôi đã lên phó giám đốc") được ghi thành memory **mới** nói rõ chuyển từ gì sang gì và
+  liên kết bản cũ; AI không bao giờ tự sửa/xoá memory — chỉ bạn sửa, ghim, đặt hạn dùng, xoá (khôi phục
+  được 30 ngày), xem lịch sử, hoặc "Xoá toàn bộ".
+- **Đọc**: memory liên quan tới yêu cầu (tìm không dấu, chấm điểm cộng dồn keyword + thực thể + embedding
+  nếu có) và memory ghim được đưa vào prompt; hết hạn thì ẩn. Không lưu mật khẩu, số thẻ/CCCD, API key.
+- Tắt trong Cài đặt: **Ghi nhớ dài hạn** (không đọc/ghi) hoặc **Tự ghi nhớ sau mỗi lượt** (chỉ ghi khi bạn
+  hoặc AI chủ động). API: `GET/POST /v1/memory`, `PATCH/DELETE /v1/memory/{id}`,
+  `POST /v1/memory/{id}/restore`, `GET /v1/memory/{id}/history`.
+
 Giao diện vẽ bằng GDI+ theo design tokens trong `PaneTheme` (`src/AxiomOffice/Ai/PaneControls.cs`):
 tương phản chữ ≥ 4.5:1, focus ring khi dùng bàn phím, scale theo DPI. Bubble nhận Tab/Ctrl+C
 và có menu chuột phải **Sao chép**.
@@ -376,7 +395,10 @@ Office không an toàn đa luồng — thiếu cổng này Word từng crash (AV
 | `LlmApiKey` | String | — | Mã hoá DPAPI theo tài khoản Windows; key plaintext cũ vẫn đọc được |
 | `CorePort` | DWORD | 47840 | Port của Agent Core (bận thì tự thử 47840–47849) |
 | `CoreEnabled` | DWORD | 1 | 0 = pane luôn chạy agent trong add-in, không khởi động Core |
-| `MemoryEnabled` | DWORD | 1 | 0 = không đọc/ghi memory dài hạn (giai đoạn 3 dùng) |
+| `MemoryEnabled` | DWORD | 1 | 0 = không đọc/ghi memory dài hạn (xem [Ghi nhớ](#ghi-nhớ-dài-hạn-memory)) |
+| `MemoryAutoExtract` | DWORD | 1 | 0 = không tự trích xuất sau lượt (chỉ ghi khi bạn/AI chủ động) |
+| `MemoryModel` | String | = `LlmModel` | Model dùng cho trích xuất memory (có thể chọn model rẻ hơn) |
+| `EmbeddingModel` / `EmbeddingEndpoint` | String | — | Tuỳ chọn: tìm memory theo ngữ nghĩa qua `{endpoint}/embeddings`; bỏ trống = chỉ từ khoá |
 | `LlmRequestTimeoutSeconds` | DWORD | 120 | Hết giờ mỗi request tới model (Core); tăng nếu model chậm |
 | `SkillDirs` | String | — | Thư mục skill của tổ chức, phân cách `;` (xem [Kỹ năng](#kỹ-năng-skills)) |
 

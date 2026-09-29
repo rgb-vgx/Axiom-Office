@@ -1110,6 +1110,84 @@ namespace AxiomOffice.Ai
         }
     }
 
+    // Dòng "Đã ghi nhớ: …" + link Xoá (New_arch.md mục 7.4 memory.written, 8.5.10: người dùng thấy và xoá được ngay).
+    internal sealed class MemoryNote : Panel
+    {
+        private readonly Label _text;
+        private readonly LinkLabel _delete;
+
+        public event EventHandler DeleteClicked;
+
+        public MemoryNote(string memoryId, string text)
+        {
+            MemoryId = memoryId;
+            BackColor = PaneTheme.ChipHover;
+            AccessibleRole = AccessibleRole.StaticText;
+            AccessibleName = "Đã ghi nhớ: " + text;
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+            _text = PaneTheme.MakeLabel("Đã ghi nhớ: " + text, PaneTheme.Small, PaneTheme.TextSecondary);
+            _delete = PaneTheme.MakeLink("Xoá", PaneTheme.SmallBold);
+            _delete.AccessibleName = "Xoá ghi nhớ này";
+            foreach (Control control in new Control[] { _text, _delete })
+            {
+                control.BackColor = PaneTheme.ChipHover;
+                Controls.Add(control);
+            }
+            _delete.LinkClicked += delegate
+            {
+                EventHandler handler = DeleteClicked;
+                if (handler != null)
+                {
+                    handler(this, EventArgs.Empty);
+                }
+            };
+        }
+
+        public string MemoryId { get; private set; }
+
+        public void SetDeleting()
+        {
+            _delete.Enabled = false;
+        }
+
+        public void SetDeleted(bool ok)
+        {
+            _text.Text = ok ? "Đã xoá ghi nhớ." : _text.Text + " (không xoá được)";
+            _delete.Visible = !ok;
+            _delete.Enabled = !ok;
+            if (Parent != null)
+            {
+                Parent.PerformLayout();
+            }
+        }
+
+        public void Measure(int width)
+        {
+            int pad = PaneTheme.Px(8);
+            int linkWidth = _delete.Visible ? _delete.PreferredSize.Width + PaneTheme.Px(10) : 0;
+            int inner = Math.Max(PaneTheme.Px(60), width - pad * 2 - linkWidth);
+            int h = PaneTheme.MeasureHeight(_text.Text, _text.Font, inner);
+            _text.SetBounds(pad, pad / 2 + PaneTheme.Px(2), inner, h);
+            _delete.Location = new Point(pad + inner + PaneTheme.Px(10), pad / 2 + PaneTheme.Px(2));
+            Size = new Size(width, h + pad + PaneTheme.Px(4));
+        }
+
+        protected override void OnPaintBackground(PaintEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            PaneTheme.ClearToParent(this, g);
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            var rect = new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f);
+            using (var path = PaneTheme.RoundedPath(rect, PaneTheme.PxF(PaneTheme.RadiusControl)))
+            using (var brush = new SolidBrush(PaneTheme.ChipHover))
+            using (var pen = new Pen(PaneTheme.ChipBorder))
+            {
+                g.FillPath(brush, path);
+                g.DrawPath(pen, path);
+            }
+        }
+    }
+
     internal sealed class ChatList : FlowLayoutPanel
     {
         private readonly ToolTip _toolTip = new ToolTip();
@@ -1299,7 +1377,13 @@ namespace AxiomOffice.Ai
                 var line = control as ToolLine;
                 var empty = control as EmptyState;
                 var card = control as ErrorCard;
-                if (bubble != null)
+                var note = control as MemoryNote;
+                if (note != null)
+                {
+                    note.Measure(available);
+                    bottom = nextIsTool ? PaneTheme.GapToolLine : PaneTheme.GapMessage;
+                }
+                else if (bubble != null)
                 {
                     bubble.Measure((int)(available * (bubble.IsUserBubble ? PaneTheme.BubbleMaxUser : PaneTheme.BubbleMaxAi)));
                     if (bubble.IsUserBubble)
