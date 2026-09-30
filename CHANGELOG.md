@@ -22,8 +22,16 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 - Phần e2e **`embeddings`** (`EmbeddingModel`): máy chủ `/embeddings` giả trả vector điều khiển được →
   kiểm tra chống trùng bằng cosine ≥ 0.96 (khác hash vẫn bị coi là trùng), vector khác thì thêm mới, và tìm
   được theo **nghĩa** dù truy vấn không chung từ khoá nào; mỗi lần ghi gửi cả lô trong một request
-- Hai phần này chạy được cho **cả hai bản** (.NET và Go) — bộ e2e giờ 119 kiểm tra, tất cả đều xanh trên
-  cả hai bản; CI (Linux) chạy thêm ba phần `shutdown`, `anthropic`, `embeddings`
+- Phần e2e **`summarize`**: 21 lượt trong cùng một hội thoại → Core tóm tắt ở hàng đợi nền, **chỉ khi vượt
+  mốc 20 tin nhắn** (không tốn một lần gọi model mỗi lượt), và bản tóm tắt được đưa vào ngữ cảnh lượt sau
+  thay cho các lượt cũ
+- Phần `confirm` thêm ca **`interactive=false`** (đường `ai.ask` của agent bên ngoài, MCP, script): lệnh rủi
+  ro bị từ chối **ngay** và không xuống bridge, thay vì chờ hết hạn xác nhận 8 giây
+- Phần `memory` thêm các ca **PATCH** (đường dialog "Quản lý ghi nhớ" trên cả hai nền tảng): sửa nội dung,
+  ghim/bỏ ghim, đặt và bỏ hạn dùng, hạn dùng sai định dạng → 400, id không tồn tại → 404, lịch sử ghi
+  UPDATE/PIN/EXPIRES
+- Bộ e2e giờ **135 kiểm tra**, tất cả đều xanh trên **cả hai bản** (.NET và Go); CI (Linux) chạy 11 phần
+  (`shutdown`, `anthropic`, `embeddings`, `summarize` là bốn phần mới thêm)
 
 ### Added — Wizard thiết lập cho người dùng không chuyên (Windows + Linux)
 - **Một nội dung, hai bộ vẽ**: câu chữ + preset nhà cung cấp nằm ở `catalog/setup.json`, sinh ra

@@ -618,6 +618,31 @@ def test_memory(work: str, token: str, bridge: FakeBridge, document_path: str, s
         status, restored = http_json(f"{core.base}/v1/memory/{signer['id']}/restore", method="POST", token=core.token)
         check(restored["ok"] and any(m["id"] == signer["id"] for m in memories(core)), "khoi phuc memory da xoa", restored)
 
+        # Sua / ghim / han dung qua PATCH (dialog Quan ly ghi nho dung nhung duong nay).
+        target = next(m for m in memories(core) if m["text"] == "Người ký công văn: Nguyễn Văn A")
+        status, edited = http_json(f"{core.base}/v1/memory/{target['id']}", method="PATCH", token=core.token,
+                                   body={"text": "Người ký công văn: Nguyễn Văn B"})
+        check(status == 200 and edited["result"]["text"] == "Người ký công văn: Nguyễn Văn B",
+              "PATCH /v1/memory/{id} sua noi dung", edited["result"])
+        status, pinned = http_json(f"{core.base}/v1/memory/{target['id']}", method="PATCH", token=core.token,
+                                   body={"pinned": True})
+        check(status == 200 and pinned["result"]["pinned"] is True, "PATCH ghim memory", pinned["result"])
+        status, dated = http_json(f"{core.base}/v1/memory/{target['id']}", method="PATCH", token=core.token,
+                                  body={"expiresAt": "2030-01-01"})
+        check(status == 200 and dated["result"]["expiresAt"] == "2030-01-01", "PATCH han dung", dated["result"])
+        status, cleared = http_json(f"{core.base}/v1/memory/{target['id']}", method="PATCH", token=core.token,
+                                    body={"expiresAt": None})
+        check(status == 200 and cleared["result"]["expiresAt"] is None, "PATCH bo han dung", cleared["result"])
+        status, bad_date = http_json(f"{core.base}/v1/memory/{target['id']}", method="PATCH", token=core.token,
+                                     body={"expiresAt": "01/01/2030"})
+        check(status == 400, "PATCH han dung sai dinh dang -> 400", bad_date)
+        status, missing = http_json(f"{core.base}/v1/memory/m_khong_co", method="PATCH", token=core.token, body={"pinned": True})
+        check(status == 404, "PATCH memory khong ton tai -> 404", missing)
+        status, history2 = http_json(f"{core.base}/v1/memory/{target['id']}/history", token=core.token)
+        events2 = [h["event"] for h in history2["result"]["history"]]
+        check("UPDATE" in events2 and "PIN" in events2 and "EXPIRES" in events2,
+              "lich su ghi UPDATE/PIN/EXPIRES", events2)
+
         # Nguoi dung tu them + tim.
         status, added = http_json(core.base + "/v1/memory", method="POST", token=core.token,
                                   body={"scope": "user", "text": "Cơ quan: Sở Giáo dục và Đào tạo Hà Nội"})
@@ -821,6 +846,63 @@ def test_embeddings(work: str, token: str, bridge: FakeBridge, document_path: st
         embed.stop()
 
 
+def test_summarize(work: str, token: str, bridge: FakeBridge, document_path: str, session_dir: str) -> None:
+    """Hoi thoai dai: Core tom tat o hang doi nen, CHI khi vuot moc (khong ton mot lan goi model moi luot),
+    va ban tom tat duoc dua vao ngu canh cua luot sau (New_arch.md muc 8.5.9).
+    """
+    llm = FakeLlm(work, [{"text": "Da lam xong."}] * 80)
+    data_dir = os.path.join(work, "core-summarize")
+    os.makedirs(data_dir, exist_ok=True)
+    core = Core(data_dir, session_dir, llm, token, {"AXIOM_MEMORY_AUTO_EXTRACT": "0"})
+    office = {"port": bridge.port, "pid": bridge.pid, "app": "et", "family": "office"}
+    document = {"name": "bao-cao.xlsx", "fullName": document_path}
+
+    def summarize_calls() -> int:
+        count = 0
+        for item in llm.requests():
+            messages = item["body"].get("messages", [])
+            head = json.dumps(messages[0] if messages else {}, ensure_ascii=False)
+            if "summarize office-document conversations" in head:
+                count += 1
+        return count
+
+    def agent_prompt(request_index: int = -1) -> str:
+        prompts = []
+        for item in llm.requests():
+            messages = item["body"].get("messages", [])
+            head = json.dumps(messages[0] if messages else {}, ensure_ascii=False)
+            if "summarize office-document conversations" not in head:
+                prompts.append(messages[0]["content"] if messages else "")
+        return prompts[request_index]
+
+    try:
+        conversation_id = None
+        for index in range(21):
+            status, created = core.run("Buoc %d: ghi mot dong vao bang" % (index + 1), office,
+                                       conversation_id=conversation_id, document=document)
+            conversation_id = created["result"]["conversationId"]
+            core.events(created["result"]["runId"])
+        check(bool(conversation_id), "hoi thoai dai: 21 luot dung lai mot hoi thoai", conversation_id)
+
+        summary = wait_for(lambda: (http_json(core.base + "/v1/conversations/" + conversation_id,
+                                             token=core.token)[1]["result"].get("summary") or None), timeout=20)
+        check(bool(summary), "hoi thoai dai duoc tom tat o hang doi nen", summary)
+
+        calls = summarize_calls()
+        check(0 < calls <= 4, "chi tom tat khi vuot moc (khong goi model moi luot)", (calls, 21))
+
+        before = len(llm.requests())
+        status, created = core.run("Buoc cuoi cung", office, conversation_id=conversation_id, document=document)
+        core.events(created["result"]["runId"])
+        check(len(llm.requests()) > before, "luot sau khi tom tat van chay", len(llm.requests()) - before)
+        prompt = agent_prompt()
+        check("Earlier in this conversation:" in prompt, "ban tom tat duoc dua vao ngu canh luot sau", prompt[-260:])
+        check("Buoc 21" not in prompt, "cac luot qua cu da duoc thay bang tom tat", prompt[-260:])
+    finally:
+        core.stop()
+        llm.stop()
+
+
 def test_confirm(work: str, token: str, bridge: FakeBridge, document_path: str, session_dir: str) -> None:
     """Giai doan 4 (New_arch.md 8.6, 12): policy xac nhan - dong y / tu choi / het gio; audit day du."""
     llm = FakeLlm(work, [
@@ -830,6 +912,8 @@ def test_confirm(work: str, token: str, bridge: FakeBridge, document_path: str, 
         {"text": "Nguoi dung tu choi luu"},
         {"tool": "office_action", "arguments": {"action": "et.saveAs", "params": {"path": os.path.join(work, "het-gio.xlsx")}}},
         {"text": "Het gio xac nhan"},
+        {"tool": "office_action", "arguments": {"action": "et.saveAs", "params": {"path": os.path.join(work, "khong-ai-bam.xlsx")}}},
+        {"text": "Khong co ai bam xac nhan"},
     ])
     data_dir = os.path.join(work, "core-confirm")
     os.makedirs(data_dir, exist_ok=True)
@@ -886,6 +970,22 @@ def test_confirm(work: str, token: str, bridge: FakeBridge, document_path: str, 
         status, bad = http_json(f"{core.base}/v1/runs/{run_id}/confirm", method="POST", token=core.token,
                                 body={"confirmationId": "cf_khong_co", "approved": True})
         check(status == 404, "confirm id khong ton tai -> 404", bad)
+
+        # interactive=false (lenh ai.ask cua agent ben ngoai, MCP, script): khong co ai bam xac nhan nen
+        # lenh rui ro phai bi tu choi NGAY thay vi cho het han (truoc day se treo 8s roi moi tu choi).
+        bridge.commands.clear()
+        started = time.time()
+        status, created = core.run("Tao bang nhan su (khong co nguoi)", office,
+                                   document={"name": "bao-cao.xlsx", "fullName": document_path},
+                                   options={"interactive": False})
+        events = core.events(created["result"]["runId"])
+        types = [item[0] for item in events]
+        declined = [item[1].get("data", {}) for item in events if item[0] == "tool.finished"]
+        check("confirm.required" not in types and types[-1] == "run.completed",
+              "interactive=false: khong hoi xac nhan, luot chay van xong", types)
+        check(declined and "user declined" in (declined[0].get("error") or "") and bridge.actions() == [],
+              "interactive=false: lenh rui ro bi tu choi ngay, khong xuong bridge", declined)
+        check(time.time() - started < 8, "interactive=false: khong cho het han xac nhan", round(time.time() - started, 1))
     finally:
         core.stop()
         llm.stop()
@@ -1191,7 +1291,7 @@ def test_office(core: Core, port: int, pid: int) -> None:
 
 # Cac phan chay duoc rieng (--only); /health luon chay truoc.
 SECTIONS = ["fake_bridge", "guards", "skills", "memory", "confirm", "mcp", "visual", "setup", "shutdown",
-            "anthropic", "embeddings"]
+            "anthropic", "embeddings", "summarize"]
 
 # Phan phu thuoc: `guards` dung chung kich ban LLM voi `fake_bridge` (kich ban tuan tu) nen chay mot minh
 # se lech buoc -> --only tu keo theo phan can truoc.
@@ -1305,6 +1405,8 @@ def main() -> int:
                 test_anthropic(work, token, bridge, document_path, session_dir)
             if wanted("embeddings"):
                 test_embeddings(work, token, bridge, document_path, session_dir)
+            if wanted("summarize"):
+                test_summarize(work, token, bridge, document_path, session_dir)
     finally:
         if core is not None:
             core.stop()
