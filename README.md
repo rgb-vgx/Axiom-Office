@@ -85,10 +85,27 @@ WPS Office **x64**. Không cần admin, Python hay Visual Studio.
 3. Nhấp đúp **`install.cmd`**: tự gỡ nhãn "tải từ Internet" của file, đăng ký add-in (HKCU),
    whitelist cho WPS và in sẵn cấu hình MCP với đúng đường dẫn.
 4. Mở Word/Excel/PowerPoint hoặc WPS: có tab **Axiom Office** trên ribbon.
-5. **Ask AI → Cài đặt**: nhập provider, endpoint, model, API key.
+5. **Thiết lập…**: wizard 5 bước tự mở khi pane chưa có cấu hình (xem mục dưới). Cài đặt nâng cao
+   nằm trong bước 4 của wizard.
 
 Gỡ: nhấp đúp **`uninstall.cmd`** (giữ cấu hình AI và token); `uninstall.cmd -Purge` xoá cả cấu
 hình, token và log. Hướng dẫn chi tiết cho người nhận gói: `scripts/dist/HUONG-DAN-CAI-DAT.txt`.
+
+### Wizard thiết lập (người dùng không chuyên)
+
+Cùng một bố cục và cùng câu chữ trên Windows (ribbon **Thiết lập…**, link **Thiết lập** ở header pane)
+và LibreOffice trên Linux (menu **Axiom Office → Thiết lập…**):
+
+| Bước | Việc người dùng làm |
+|---|---|
+| 1. Chào mừng | biết mình sắp làm gì, mất khoảng một phút |
+| 2. Kiểm tra máy | từng dòng có ✓ / ! / ✗ kèm nút **Sửa** (khởi động lại Agent Core, tạo khoá bảo vệ mới) |
+| 3. Kết nối máy chủ AI | chọn máy chủ công ty / OpenAI / Anthropic / Gemini, **tải danh sách model** để chọn, **Kiểm tra kết nối** báo lỗi bằng tiếng Việt dễ hiểu kèm gợi ý sửa |
+| 4. Tính năng | "Nhớ những điều tôi đã dặn", "Tự rút ra điều đáng nhớ", "Cho AI xem ảnh trang tài liệu" + link **Tuỳ chọn nâng cao…** (dialog Cài đặt cũ: cổng Core, hạn giờ, model ghi nhớ) |
+| 5. Hoàn tất | tóm tắt cấu hình + **Thử ngay**: chạy một lượt thật qua Agent Core trên tài liệu đang mở |
+
+Câu chữ và preset (nhà cung cấp, endpoint, nơi lấy khoá, model gợi ý) nằm ở [`catalog/setup.json`](catalog/setup.json)
+— nguồn duy nhất, sinh ra cả ba bản (C# cho add-in + Core, Python cho LibreOffice, Go cho Core bản Go).
 
 Kiểm tra nhanh: `http://127.0.0.1:47831/health` (Word) hoặc `47821` (WPS Writer); log ở
 `%LOCALAPPDATA%\AxiomOffice\bridge.log`.

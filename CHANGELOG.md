@@ -5,6 +5,29 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Wizard thiết lập cho người dùng không chuyên (Windows + Linux)
+- **Một nội dung, hai bộ vẽ**: câu chữ + preset nhà cung cấp nằm ở `catalog/setup.json`, sinh ra
+  `Setup/SetupCatalog.cs` (dùng chung add-in Windows và Agent Core) cùng `axiom/setup_catalog.py`;
+  `scripts/generate_setup_catalog.py --check` chạy trong CI nên ba bản không thể lệch
+- **Core API cho wizard**: `GET /v1/setup` (preset + bước + tính năng + việc cần làm + cấu hình đang chạy),
+  `POST /v1/llm/test` (thử kết nối với giá trị *chưa lưu*), `GET /v1/llm/models` (danh sách model của máy chủ
+  để chọn thay vì gõ tay); `Setup/LlmErrors.cs` dịch lỗi (401/403/404/429/5xx, DNS, mạng, hết giờ…) thành
+  câu tiếng Việt kèm gợi ý sửa. Khoá API không bao giờ vào log hay response
+- **Windows** (`Ai/SetupWizardForm.cs` + `Ai/CoreSetup.cs`): 5 bước Chào mừng → Kiểm tra máy (mỗi dòng có
+  nút **Sửa**: khởi động lại Core, tạo khoá mới, sang bước kết nối) → **Kết nối máy chủ AI** (chọn máy chủ
+  công ty/OpenAI/Anthropic/Gemini, tải danh sách model, *Kiểm tra kết nối* báo lỗi tiếng Việt, có nút xem
+  khoá và mở trang lấy khoá) → Tính năng (lời thường + link **Tuỳ chọn nâng cao…** mở đúng `SettingsForm`
+  cũ) → Hoàn tất (tóm tắt + **Thử ngay** chạy một lượt thật qua Core trên tài liệu đang mở). Điểm vào:
+  ribbon `Settings` → **Thiết lập…**, link header pane `Cài đặt` → **Thiết lập**, và tự mở **một lần** khi
+  pane mở mà chưa có endpoint/model (giống bản Linux, không làm phiền lần sau)
+- **Linux**: `axiom/setup.py` (máy trạng thái + câu chữ, thuần Python nên test không cần LibreOffice) và
+  `axiom/setupwizard.py` (dialog awt, cùng bố cục 5 bước); mục menu **Thiết lập…**, link header, thẻ mời tự mở
+  một lần; tự sửa: khởi động lại Core, sinh `Token`, `chmod 0600`, gợi ý khi thiếu `python3-uno`
+- Kiểm thử: `tests/lo/test_setup.py`, `SetupTests.cs` (xUnit) và `test_setup` trong e2e cho Core API;
+  `tests/live/test_setup_wizard.py` bấm thật trong phiên X ảo (12 kiểm tra); CI chạy cả ba
+- Ghi chú: wizard chỉ lo **cấu hình + tự sửa lỗi**, không thay installer — người dùng Linux vẫn chạy
+  `install.sh` một lần như trước
+
 ### Changed — Agent Core phát hành bằng bản Go (`core-go/`, giai đoạn G6)
 - `scripts/build.ps1` build Agent Core từ `core-go/` thành `AxiomOffice.Core.exe` (~11 MB, không cần .NET
   runtime trên máy người dùng; trước đây ~48 MB); `-Core dotnet` giữ đường cũ để đối chiếu

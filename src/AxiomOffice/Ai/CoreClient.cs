@@ -41,7 +41,8 @@ namespace AxiomOffice.Ai
     // Client HTTP + SSE toi AxiomOffice.Core.exe: tim Core qua core.json, khoi dong khi can (muc 7.1),
     // chay luot agent qua Core API (7.3/7.4). Moi loi ket noi -> Run tra null de pane dung agent
     // in-process nhu cu (du phong). Khong bao gio nem ra ngoai.
-    internal sealed class CoreClient
+    // partial: phan cho wizard thiet lap nam o CoreSetup.cs (SetupWizardForm dung).
+    internal sealed partial class CoreClient
     {
         public const int Protocol = 1;
 

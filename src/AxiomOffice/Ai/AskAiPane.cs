@@ -119,7 +119,8 @@ namespace AxiomOffice.Ai
             title.Location = new Point(PaneTheme.Px(28), PaneTheme.Px(7));
             _headerSubtitle = PaneTheme.MakeLabel("", PaneTheme.Caption, PaneTheme.TextMuted);
             _headerSubtitle.AutoEllipsis = true;
-            _settingsLink = PaneTheme.MakeLink("Cài đặt", PaneTheme.Caption);
+            _settingsLink = PaneTheme.MakeLink("Thiết lập", PaneTheme.Caption);
+            _settingsLink.AccessibleName = "Mở wizard thiết lập Axiom Office";
             // New_arch.md mục 9.2: link ở header (trước đây ở footer, người dùng không thấy trong Word).
             _newChatLink = PaneTheme.MakeLink("Trò chuyện mới", PaneTheme.Caption);
             _newChatLink.AccessibleName = "Bắt đầu cuộc trò chuyện mới cho tài liệu này";
@@ -146,13 +147,14 @@ namespace AxiomOffice.Ai
             _stopLink.LinkClicked += delegate { OnStop(); };
             _newChatLink.LinkClicked += delegate { StartNewConversation(); };
             _undoLink.LinkClicked += delegate { UndoLastRun(); };
-            _settingsLink.LinkClicked += delegate { OpenSettings(); };
+            _settingsLink.LinkClicked += delegate { OpenSetup(); };
             _composer.Resize += delegate { LayoutComposer(); };
             Load += delegate
             {
                 LayoutHeader(header);
                 LayoutComposer();
                 RefreshState();
+                OfferSetupOnce();
                 _prompt.Focus();
                 ScheduleWidthCheck();
             };
@@ -239,7 +241,7 @@ namespace AxiomOffice.Ai
             {
                 if (CurrentHost != null)
                 {
-                    OpenSettings();
+                    OpenSetup();
                 }
                 return;
             }
@@ -275,7 +277,7 @@ namespace AxiomOffice.Ai
             }
             else if (endpoint.Length == 0 || model.Length == 0)
             {
-                reason = "Chưa cấu hình AI. Mở Cài đặt để nhập endpoint và model.";
+                reason = "Chưa thiết lập AI — bấm Thiết lập ở trên";
             }
             _blockedReason = reason;
             bool blocked = reason != null;
@@ -840,7 +842,7 @@ namespace AxiomOffice.Ai
                         }
                     }
                 };
-                card.SettingsClicked += delegate { OpenSettings(); };
+                card.SettingsClicked += delegate { OpenSetup(); };
                 _chat.AddBlock(card);
                 SetStatus("Không hoàn thành · " + seconds + "s" + BackendNote(), true);
                 Announce("Lỗi: không hoàn thành yêu cầu");
@@ -912,13 +914,50 @@ namespace AxiomOffice.Ai
             run.Cancel();
         }
 
-        private void OpenSettings()
+        // Wizard thiet lap (cung noi dung voi ban Linux): nguoi dung khong chuyen cung lam duoc.
+        // Cau hinh nang cao (SettingsForm) van vao duoc tu buoc 4 cua wizard.
+        private void OpenSetup()
         {
-            using (var form = new SettingsForm())
+            using (var form = new SetupWizardForm(CurrentHost))
             {
                 form.ShowDialog(this);
             }
             RefreshState();
+        }
+
+        // Chua co cau hinh AI -> tu mo wizard MOT lan trong moi phien (giong panel.py cua ban Linux),
+        // khong lam phien nguoi dung da biet minh muon tu cau hinh.
+        private static bool _setupOffered;
+
+        private void OfferSetupOnce()
+        {
+            if (_setupOffered)
+            {
+                return;
+            }
+
+            if ((Config.LlmEndpoint ?? "").Trim().Length > 0 && (Config.LlmModel ?? "").Trim().Length > 0)
+            {
+                return;
+            }
+
+            _setupOffered = true;
+            var pane = this;
+            var timer = new System.Windows.Forms.Timer { Interval = 1500 };
+            timer.Tick += delegate
+            {
+                timer.Stop();
+                timer.Dispose();
+                try
+                {
+                    pane.OpenSetup();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error("AskAiPane: khong mo duoc wizard thiet lap", ex);
+                }
+            };
+            timer.Start();
         }
 
         private void SetStatus(string text, bool isError)
