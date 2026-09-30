@@ -80,7 +80,27 @@ process ghi ba file session. Thiết kế đầy đủ (Linux, sidebar, Core đa
 **Yêu cầu:** Windows 10/11 x64 (có sẵn .NET Framework 4.8), Microsoft Office **x64** và/hoặc
 WPS Office **x64**. Không cần admin, Python hay Visual Studio.
 
-1. Giải nén `AxiomOffice-<version>-....zip` (tạo bằng `scripts\package.ps1`) vào một chỗ cố
+Máy đích **không phải cài gì thêm**: Agent Core (Go), skills và add-in đều nằm trong zip. Điều kiện duy
+nhất dễ bỏ sót là **bitness của Office/WPS** — add-in đóng gói x64 nên Office 32-bit cài xong vẫn không
+thấy tab:
+
+```powershell
+(Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Office\ClickToRun\Configuration').Platform   # phải trả về x64
+```
+
+**Tạo gói** (trên máy có mã nguồn — Windows không có artifact CI như bên Linux):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\package.ps1    # -> dist\AxiomOffice-<ver>-<ngày>-<commit>.zip
+```
+
+`package.ps1` chạy `build.ps1` trước (`-NoBuild` để dùng lại `bin\Release`), cần .NET Framework có sẵn để
+gọi `csc`. Máy build **không có Go 1.26+** thì gói vẫn ra nhưng **không kèm `AxiomOffice.Core.exe`** (có
+cảnh báo) — add-in vẫn chạy, chỉ mất phần agent riêng. Đang mở Word/Excel/WPS thì build **dừng lại và
+liệt kê tiến trình đang giữ DLL** — lưu tài liệu rồi đóng app; chỉ dùng `-Kill` khi chấp nhận để script tự
+tắt các app đó (Agent Core là tiến trình của chính dự án nên luôn được tắt trước một cách an toàn).
+
+1. Giải nén `AxiomOffice-<version>-....zip` vào một chỗ cố
    định, ví dụ `C:\Tools\AxiomOffice`. Add-in chạy thẳng từ thư mục này; chuyển chỗ thì cài lại.
 2. Đóng Word, Excel, PowerPoint, WPS.
 3. Nhấp đúp **`install.cmd`**: tự gỡ nhãn "tải từ Internet" của file, đăng ký add-in (HKCU),
@@ -91,6 +111,9 @@ WPS Office **x64**. Không cần admin, Python hay Visual Studio.
 
 Gỡ: nhấp đúp **`uninstall.cmd`** (giữ cấu hình AI và token); `uninstall.cmd -Purge` xoá cả cấu
 hình, token và log. Hướng dẫn chi tiết cho người nhận gói: `scripts/dist/HUONG-DAN-CAI-DAT.txt`.
+Khoá API mã hoá bằng DPAPI theo tài khoản Windows nên **mỗi máy nhập khoá riêng**, không chép registry
+sang máy khác được. Endpoint nội bộ (vd `http://localhost:20128/v1`) thì máy mới phải có đường tới đó
+trước, nếu không bước **Kiểm tra kết nối** báo lỗi mạng chứ không phải lỗi khoá.
 
 ### Wizard thiết lập (người dùng không chuyên)
 
@@ -698,14 +721,35 @@ Khác bản Office (do UNO):
 
 ### Linux
 
-Yêu cầu: LibreOffice 7.x trở lên + Python UNO (`python3-uno`). **Không cần .NET** — bản phát hành kèm
-Agent Core self-contained (`linux-x64`).
+Yêu cầu: LibreOffice 7.x trở lên + Python UNO (`python3-uno`). **Không cần .NET, không cần Go trên máy
+đích** — bản phát hành kèm Agent Core self-contained (`linux-x64`/`linux-arm64`).
+
+**Máy Ubuntu mới tinh** — chỉ một lệnh apt, rồi cài; phần LLM để wizard lo:
 
 ```bash
-# Gói phát hành: dist/axiom-office-linux-x64-<ver>.tar.gz (Core + MCP + skills + .oxt + install.sh)
+sudo apt update
+sudo apt install -y libreoffice python3-uno
+sudo apt install -y libsecret-tools      # tuỳ chọn: lưu khoá API vào keyring thay vì file 0600
+
+# Lấy gói: tải artifact "axiom-office-linux-x64" của job `linux` trong GitHub Actions,
+# hoặc build tại máy có mã nguồn: bash scripts/linux/package.sh [--rid linux-arm64]
+#   (cần Go 1.26+ và .NET SDK 10; chạy được cả trong Git Bash/WSL)
+scp dist/axiom-office-linux-x64-<ver>.tar.gz nguoidung@may-ubuntu:~
+
 tar -xzf axiom-office-linux-x64-0.1.0.tar.gz && cd axiom-office-linux-x64-0.1.0
+./install.sh              # không cần tham số: cấu hình AI sau bằng wizard (menu Axiom Office -> Thiết lập…)
+./install.sh --systemd    # tuỳ chọn: Core chạy thường trực (systemd --user)
+```
+
+- **Phải là LibreOffice bản cài từ gói distro (`.deb`/`.rpm`)**. Bản **snap/flatpak không được hỗ trợ**:
+  sandbox chặn kết nối `127.0.0.1` tới Agent Core và quyền chạy binary ngoài. Kiểm tra bằng
+  `readlink -f "$(command -v soffice)"` — ra `/snap/bin/soffice` thì gỡ snap rồi cài bản apt.
+- Endpoint nội bộ (vd `http://localhost:20128/v1`) thì máy mới phải có đường tới đó trước (cùng mạng hoặc
+  SSH tunnel), nếu không bước **Kiểm tra kết nối** báo lỗi mạng chứ không phải lỗi khoá.
+
+```bash
+# Hoặc điền sẵn LLM ngay khi cài (bỏ qua thì wizard hỏi sau):
 ./install.sh --endpoint http://localhost:20128/v1 --model <tên-model> --api-key -   # - = đọc key từ stdin
-./install.sh --systemd          # tuỳ chọn: Core chạy thường trực (systemd --user)
 ./install.sh --uninstall [--purge]                                                  # gỡ (--purge xoá cả cấu hình/dữ liệu)
 ```
 
@@ -724,10 +768,9 @@ tar -xzf axiom-office-linux-x64-0.1.0.tar.gz && cd axiom-office-linux-x64-0.1.0
 - `CoreExe` trong cấu hình trỏ tới Core ở chỗ khác; bỏ trống thì pane tự dùng Core đã cài (kèm `install.sh`).
   Trên Windows, Core chưa chạy thì pane tự khởi động nó; trên Linux cũng vậy (tách session, không chết theo
   LibreOffice).
-- Bỏ qua các tham số LLM khi cài thì cấu hình sau trong pane **Cài đặt** (endpoint/model/API key) — dialog
-  ghi thẳng vào `config.json`.
-- Đóng gói lại từ mã nguồn: `scripts/linux/package.sh [--rid linux-arm64]` (cần .NET SDK 10);
-  đóng gói/cài/gỡ nhanh bản dev: `scripts/libreoffice.sh package|install|status|log|uninstall`.
+- Bỏ qua các tham số LLM khi cài thì cấu hình sau bằng wizard **Thiết lập…** hoặc pane **Cài đặt**
+  (endpoint/model/API key) — cả hai ghi thẳng vào `config.json`.
+- Đóng gói/cài/gỡ nhanh bản dev (không cần dựng tarball): `scripts/libreoffice.sh package|install|status|log|uninstall`.
 - **CI**: `.github/workflows/ci.yml` — job `linux` chạy unit test extension + build MCP +
   cài LibreOffice/Python UNO rồi chạy toàn bộ test lệnh bridge và test MCP có tool live, cuối cùng đóng gói
   tarball làm artifact; job `windows` chạy unit test, `go test`, build net48 (add-in + Host) và test MCP.

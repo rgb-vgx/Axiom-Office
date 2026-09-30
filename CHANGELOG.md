@@ -5,6 +5,25 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Docs — cài đặt trên máy mới tinh (Windows + Ubuntu)
+- README mục **Cài đặt cho người dùng** nay nói rõ máy đích không phải cài gì thêm, và điều kiện dễ bỏ sót
+  nhất là **bitness**: add-in đóng gói x64 nên Office/WPS 32-bit cài xong vẫn không thấy tab — kèm lệnh
+  kiểm tra `(Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Office\ClickToRun\Configuration').Platform`. Phần
+  đóng gói bổ sung: Windows không có artifact CI nên phải chạy `scripts\package.ps1`; máy build thiếu Go 1.26+
+  thì gói vẫn ra nhưng không kèm `AxiomOffice.Core.exe`; đang mở Word/Excel/WPS thì build dừng lại và liệt kê
+  tiến trình đang giữ DLL (chỉ dùng `-Kill` khi chấp nhận để script tự tắt app đó)
+- README mục **Linux** thêm đường đi cho **máy Ubuntu mới tinh**: hai lệnh `apt` (LibreOffice + `python3-uno`,
+  tuỳ chọn `libsecret-tools` cho keyring), lấy gói từ artifact CI `axiom-office-linux-x64` hoặc
+  `scripts/linux/package.sh`, rồi `./install.sh` **không cần tham số** (cấu hình AI bằng wizard). Thêm cảnh
+  báo **LibreOffice bản snap/flatpak không được hỗ trợ** (sandbox chặn `127.0.0.1` tới Agent Core và quyền
+  chạy binary ngoài) kèm cách kiểm tra `readlink -f "$(command -v soffice)"`, và ghi chú endpoint nội bộ phải
+  có đường tới trước khi bấm "Kiểm tra kết nối"
+- `scripts/dist/HUONG-DAN-CAI-DAT.txt` (phát cho người nhận gói): thêm mục "Kiểm tra Office 64-bit" và hai
+  dòng sự cố — không thấy tab vì app 32-bit, và "Kiểm tra kết nối" báo lỗi mạng khi máy chủ AI ở trong mạng
+  công ty mà máy chưa vào được
+- Bỏ phần trùng lặp trong README (cách đóng gói Linux và "bỏ qua tham số LLM" được nhắc hai lần sau khi thêm
+  mục máy mới tinh)
+
 ### Changed — Wizard thiết lập (Windows): soi lại giao diện từ ảnh render thật
 - **Có ảnh để soi**: thêm `tests/ui/shots.ps1` + `tests/ui/SetupWizardShots.cs` — biên dịch harness chung với
   mã nguồn add-in (không đụng `bin\Release`, không cần Office/WPS), mở `SetupWizardForm` thật, nhảy qua 5

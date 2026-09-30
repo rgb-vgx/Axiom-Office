@@ -6,6 +6,12 @@ Yêu cầu
 - Microsoft Office 64-bit và/hoặc WPS Office 64-bit
 - Không cần quyền admin, không cần cài Python hay .NET (Agent Core đã đóng gói kèm, tự chạy khi cần)
 
+Kiểm tra Office 64-bit trước khi cài (add-in chỉ chạy với bản 64-bit): mở PowerShell và chạy
+
+  (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Office\ClickToRun\Configuration').Platform
+
+Kết quả phải là x64. Ra x86 thì cần bản Office/WPS 64-bit, add-in sẽ không nạp được.
+
 Cài đặt
 1. Giải nén thư mục này vào một chỗ cố định, ví dụ C:\Tools\AxiomOffice.
    Add-in chạy thẳng từ thư mục này: đừng xoá hay di chuyển nó sau khi cài
@@ -41,6 +47,11 @@ Gỡ cài đặt
 Sự cố thường gặp
 - Không thấy tab "Axiom Office": đóng hẳn app, chạy lại install.cmd, mở lại app.
   Log nằm ở %LOCALAPPDATA%\AxiomOffice\bridge.log
+- Cài xong vẫn không thấy tab: kiểm tra app là bản 64-bit (xem mục "Kiểm tra Office 64-bit" ở trên).
+  Add-in không nạp được vào Office/WPS 32-bit.
+- Ở bước 3 của wizard, "Kiểm tra kết nối" báo không kết nối được: nếu máy chủ AI nằm trong mạng
+  của công ty thì máy này phải vào được mạng đó (VPN/cùng mạng LAN) trước; lỗi mạng không phải
+  lỗi khoá. Khoá đúng nhưng máy chủ đòi model khác thì chọn lại model trong danh sách.
 - Office báo add-in bị vô hiệu hoá sau khi app bị lỗi: chạy lại install.cmd.
 - Máy công ty chặn add-in chưa có chữ ký số: liên hệ bộ phận IT.
 - Agent Core (AxiomOffice.Core.exe) chạy nền cùng thư mục cài; log riêng ở
