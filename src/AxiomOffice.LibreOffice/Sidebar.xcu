@@ -44,6 +44,9 @@
         <prop oor:name="ImplementationURL">
           <value>private:resource/toolpanel/AxiomOfficePanelFactory/AskAi</value>
         </prop>
+        <prop oor:name="TitleBarIsOptional" oor:type="xs:boolean">
+          <value>true</value>
+        </prop>
         <prop oor:name="ContextList">
           <value oor:separator=";">any, any, visible ;</value>
         </prop>

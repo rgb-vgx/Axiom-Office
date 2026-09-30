@@ -5,6 +5,28 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed — pane Ask AI của LibreOffice làm lại theo thiết kế pane Office
+- Giao diện giống pane Word/Excel/PowerPoint: `axiom/theme.py` (bản LibreOffice của `PaneTheme`: cùng mã
+  màu, font Segoe UI, cỡ chữ, khoảng cách, nhãn tiếng Việt cho từng lệnh, gợi ý theo app), `axiom/widgets.py`
+  (hộp bo góc = nền + 4 ảnh góc PNG vẽ sẵn bằng zlib + viền 1px; nhãn/nút/chip bấm được có hover),
+  `axiom/chatview.py` (danh sách cuộn được: bong bóng người dùng/AI, dòng thao tác có icon ✓/✗ và mã lệnh,
+  thẻ xác nhận / ghi nhớ / lỗi, "• • •" đang chờ, màn hình đầu có chip gợi ý). `chat.py` sinh thêm danh sách
+  mục có cấu trúc (`items` + `rev`) để chỉ vẽ lại mục mới/đổi
+- Pane mở trong **sidebar thật của LibreOffice** khi sidebar đang hiện (Calc/Impress): sửa factory đọc tham số
+  `ParentWindow`/`Frame` theo tên, panel implement `XSidebarPanel`, ẩn thanh tiêu đề panel thừa; trạng thái
+  sidebar đọc qua status của `.uno:Sidebar`
+- Cửa sổ không có sidebar (Writer): pane **neo bên phải và co vùng tài liệu lại** như task pane Office (không
+  còn đè lên thanh công cụ/tài liệu); ✕ đóng và trả lại bề rộng; mở lại giữ hội thoại
+- Ô soạn: Enter gửi (sửa lỗi Edit chèn "\n" vào giữa tin nhắn khi con trỏ không ở cuối), Shift+Enter xuống
+  dòng, PageUp/PageDown cuộn hội thoại, viền đổi màu khi có focus, placeholder
+- Cài đặt/Ghi nhớ: nền trắng, viền mảnh, font như pane, đặt giữa vùng tài liệu (không đè pane)
+- Bấm trên pane kích hoạt khi **nhấn** chuột: panel trong sidebar không nhận được `mouseReleased`
+- `writer.heading`: tiêu đề luôn thành đoạn riêng khi con trỏ đang ở đoạn có chữ (trước đây nối vào đoạn cũ
+  và biến cả đoạn thành Heading)
+- Test: `tests/lo/test_chat.py` 23 test (thêm mục có cấu trúc, vòng đời thẻ xác nhận, nhãn, PNG góc/icon);
+  live 159/159 (thêm ca heading), cả headless lẫn có cửa sổ; đã chạy thật bằng chuột/bàn phím: chip → Gửi,
+  Enter giữa câu, Hoàn tác lượt này, ✕ đóng, mở lại qua menu, phóng to cửa sổ, lượt thật trong sidebar Calc
+
 ### Added — pane Ask AI trong LibreOffice (LibreOffice_arch.md mục 10, giai đoạn L2)
 - **Pane nói chuyện với Agent Core bằng Python** (`axiom/core.py`, `axiom/chat.py`): POST `/v1/runs` (kèm
   `office.port` của bridge), đọc SSE `/v1/runs/{id}/events`, `cancel`/`confirm`, `GET /v1/memory`; Core

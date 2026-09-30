@@ -463,6 +463,27 @@ Chi tiết khác: `PanelElement.Type` = `UIElementType.TOOLPANEL` (= 7 ở bản
 thẳng (`UnoGate.on_main_thread`) vì gọi lại gate sẽ tự treo; nút "Hoàn tác lượt này" dùng tiền tố lệnh theo
 kind (`wps` -> `writer.undo`), không phải `wps.undo`.
 
+### 14.3 Làm lại giao diện pane theo pane Office (30/09/2026)
+
+awt của LibreOffice không vẽ được hình bo góc, không có control tự vẽ, và `Button` dùng giao diện hệ điều
+hành (không đổi được màu). Pane mới dựng từ control có sẵn: `FixedText` (màu nền/chữ/font), `ImageControl`
+(PNG góc bo và icon trạng thái, sinh bằng zlib trong `theme.py`, cache ở `%LOCALAPPDATA%\AxiomOffice\ui-cache`)
+và container lồng nhau (tự cắt khi cuộn) + `ScrollBar`. Những điều rút ra khi thử trên 26.8:
+
+| Hiện tượng | Xử lý |
+|---|---|
+| Control thêm **trước** nằm **trên** control thêm sau | Mỗi nhóm thêm góc/chữ trước, nền sau cùng; khung chat không phủ lên cột thanh cuộn |
+| Nền vẽ lại (đổi màu hover) đè mất viền/góc chồng lên nó | Nền hình chữ thập (2 hình chữ nhật) không chồng lên góc/viền |
+| Tên thuộc tính font là `FontName/FontHeight/FontWeight` (không phải `Char*` — đặt sai bị bỏ qua lặng lẽ) | Sửa ở `awt.py`/`widgets.py` |
+| Chiều cao chữ: `XLayoutConstrains.calcAdjustedSize(Size(width, 0))` của chính `FixedText` | Đo khi dựng bong bóng/thẻ |
+| Sidebar gọi `createUIElement` với `PropertyValue` có tên, cần `XSidebarPanel` để có chiều cao | Sửa factory + panel; `TitleBarIsOptional` |
+| Panel trong sidebar không nhận `mouseReleased` | Bấm = `mousePressed` (chuột trái) |
+| Không có sự kiện con lăn chuột cho control tự vẽ; `ScrollBar` tự tạo cũng không nhận wheel | Thanh cuộn bấm/kéo + PageUp/PageDown; tự cuộn xuống cuối |
+| `XSidebarProvider` không có; trạng thái sidebar | `XDispatch.addStatusListener(listener, url)` của `.uno:Sidebar` (đồng bộ) |
+| Writer 26.8 trên máy này không bật được sidebar (`.uno:Sidebar` không đổi trạng thái) | Pane neo: co `frame.ComponentWindow`, nghe resize để co lại sau mỗi lần LibreOffice xếp lại |
+| Tạo lại container thứ hai ở cùng chỗ có lúc không vẽ | Pane neo đóng = ẩn, mở lại = hiện (không huỷ/tạo lại) |
+| Edit nhiều dòng chèn "\n" trước khi `keyPressed` tới listener | Bỏ đúng ký tự xuống dòng tại vị trí con trỏ (`getSelection().Min`) trước khi gửi |
+
 ### Giai đoạn L2: Core đa nền tảng + pane
 
 - [ ] `IConfigSource`/`ISecretStore`, publish linux-x64, khởi động Core từ extension.

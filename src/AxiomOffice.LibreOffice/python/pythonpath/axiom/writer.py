@@ -221,6 +221,16 @@ def insert_styled_text(env, params):
     return {"inserted": len(text)}
 
 
+def _paragraph_has_text_before(text_obj, cursor) -> bool:
+    """Doan chua cursor co chu dung truoc vi tri cursor khong."""
+    try:
+        probe = text_obj.createTextCursorByRange(cursor.getStart())
+        probe.gotoStartOfParagraph(True)
+        return bool(probe.getString().strip())
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def heading(env, params):
     level = max(1, min(9, values.integer(params, "level", 1)))
     text = values.string(params, "text")
@@ -229,6 +239,10 @@ def heading(env, params):
     view = _view_cursor(doc)
     text_obj = view.getText()
     cursor = text_obj.createTextCursorByRange(view.getEnd())
+    if text and _paragraph_has_text_before(text_obj, cursor):
+        # Con tro dang o cuoi/giua mot doan co chu (vd sau appendText): tieu de phai la doan RIENG, neu khong
+        # chu tieu de noi vao doan cu va ca doan bi doi thanh Heading.
+        text_obj.insertControlCharacter(cursor, PARAGRAPH_BREAK, False)
     if text:
         _insert(text_obj, cursor, text)
     cursor.ParaStyleName = style

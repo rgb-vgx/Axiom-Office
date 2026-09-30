@@ -1,14 +1,9 @@
 """Dung giao dien awt bang code (khong can file .xdl/.ui).
 
-Hai loai "host" cho cung mot bo dieu khien:
-
-* `Container` - `com.sun.star.awt.UnoControlContainer`: cua so con de nhung (panel sidebar);
-  dieu khien them bang `addControl(name, control)`.
-* `Dialog` - `com.sun.star.awt.UnoControlDialog`: cua so noi (modeless) co tieu de, keo tha duoc;
-  dieu khien them bang mo hinh (`model.insertByName`) - lop `Dialog` che di khac biet nay.
-
-Ca hai deu tra XWindow qua `window()` va cho lay dieu khien qua `control(name)` (XControlContainer),
-nen phan logic/layout trong panel.py chi can biet giao dien chung nay.
+`Container` boc `com.sun.star.awt.UnoControlContainer` (cua so con nhung vao cua so khac, dieu khien them
+bang ten); `ChildWindow` la Container nen trang vien mong dung cho dialog Cai dat/Ghi nho (dialogs.py).
+Khong dung UnoControlDialog: tren ban 26.8 dialog roi khong hien len (LibreOffice_arch.md 14.2).
+Pane Ask AI dung widgets.py (ve theo toa do, khong theo ten).
 
 Don vi toa do/kich thuoc la pixel, cung don vi voi `setPosSize`/`getPosSize` cua cua so.
 Chi chay tren main thread: pane goi chung qua `UnoGate` (xem `panel.py`).
@@ -54,7 +49,7 @@ class TextListener(unohelper.Base, XTextListener):
 
 
 class _Host:
-    """Phan chung cua Container/Dialog: quan ly mo hinh dieu khien + bang ten."""
+    """Quan ly mo hinh dieu khien + bang ten (lop con cung cap _insert/control)."""
 
     GEOMETRY = ("PositionX", "PositionY", "Width", "Height")
 
@@ -82,7 +77,7 @@ class _Host:
         self._remember_geometry(name, props)
         for key, value in props.items():
             if key in self.GEOMETRY and not self.model_geometry:
-                continue        # lop con tu ap dung (xem Dialog.apply_geometry)
+                continue        # dat len view trong apply_geometry
             self._try_set(self.models[name], key, value)
         if not self.model_geometry:
             self.apply_geometry(name)
@@ -170,83 +165,6 @@ class Container(_Host):
             pass
 
 
-class Dialog(_Host):
-    """Cua so noi (modeless) co tieu de rieng - dung khi sidebar khong kha dung.
-
-    Mo hinh dieu khien cua dialog tinh bang map unit (1/100 mm), con cua so tinh bang pixel. PaneUI tinh
-    layout theo pixel nen lop nay quy doi 4 thuoc tinh hinh hoc khi ghi xuong mo hinh (he so lay tu
-    pixelToLogic cua chinh dialog, khac nhau theo DPI man hinh).
-    """
-
-    def __init__(self, ctx, toolkit, title: str, width: int = 400, height: int = 640):
-        super().__init__(ctx)
-        self.toolkit = toolkit
-        self.dialog = ctx.ServiceManager.createInstanceWithContext("com.sun.star.awt.UnoControlDialog", ctx)
-        model = ctx.ServiceManager.createInstanceWithContext("com.sun.star.awt.UnoControlDialogModel", ctx)
-        self.dialog.setModel(model)
-        self.model = model
-        model.setPropertyValue("Title", title)
-        # DesktopAsParent=True: dialog la con cua desktop nen nam DUOI cua so tai lieu; dat False de noi tren
-        # cua so cha (pane phai luon thay duoc khi nguoi dung dang sua tai lieu).
-        self._try_set(model, "DesktopAsParent", False)
-        unit = 26.4583   # pixel -> 1/100 mm o 96 DPI; dialog khong nhan PositionX nen phai quy doi tay
-        try:
-            unit = self.dialog.pixelToLogic(1000, uno.getConstantByName("com.sun.star.util.MeasureUnit.MM_100TH")) / 1000.0
-        except Exception:  # noqa: BLE001
-            pass
-        model.setPropertyValue("Width", int(round(width * unit)))
-        model.setPropertyValue("Height", int(round(height * unit)))
-
-    def _insert(self, name: str, service: str, model) -> None:
-        self.model.insertByName(name, model)
-
-    def control(self, name: str):
-        return self.dialog.getControl(name)
-
-    def create_peer(self, parent_peer=None) -> None:
-        self.dialog.createPeer(self.toolkit, parent_peer)
-        self.peer_ready = True
-        self.apply_geometry()
-
-    def window(self):
-        return self.dialog
-
-    def resize(self, x: int, y: int, width: int, height: int) -> None:
-        self.dialog.setPosSize(x, y, width, height, 15)
-
-    def set_visible(self, visible: bool) -> None:
-        self.dialog.setVisible(visible)
-
-    def end_execute(self) -> None:
-        try:
-            self.dialog.endExecute()
-        except Exception:  # noqa: BLE001
-            self.set_visible(False)
-
-    def to_front(self) -> None:
-        try:
-            self.dialog.toFront()
-        except Exception as exc:  # noqa: BLE001
-            log_error("toFront: %s" % exc)
-        try:
-            self.dialog.setFocus()
-        except Exception:  # noqa: BLE001
-            pass
-
-    def dispose(self) -> None:
-        try:
-            self.dialog.dispose()
-        except Exception:  # noqa: BLE001
-            pass
-
-    @property
-    def disposed(self) -> bool:
-        try:
-            return self.dialog.getPeer() is None
-        except Exception:  # noqa: BLE001
-            return True
-
-
 class ChildWindow(Container):
     """Cua so con co vien trong cua so tai lieu: dung cho pane neo va cac dialog.
 
@@ -255,10 +173,30 @@ class ChildWindow(Container):
     """
 
     def __init__(self, ctx, parent_window, width: int, height: int):
+        from . import theme
+
         super().__init__(ctx, toolkit(ctx), width, height)
         self.parent = parent_window
         self.ctx = ctx
+        # Nen trang + vien mong nhu the/pane (theme.py), khong dung mau xam mac dinh cua awt.
+        self._try_set(self.model, "BackgroundColor", theme.PANE_BG)
+        self._try_set(self.model, "Border", 2)
+        self._try_set(self.model, "BorderColor", theme.INPUT_BORDER)
         self.create_peer(peer_of(parent_window))
+
+    def add(self, service: str, name: str, **props):
+        """Mac dinh font/mau cua pane cho moi dieu khien (nhan, o nhap, o danh dau, nut)."""
+        from . import theme
+
+        if service in ("FixedText", "Edit", "CheckBox", "Button", "ListBox"):
+            props.setdefault("FontName", theme.FONT)
+            props.setdefault("FontHeight", theme.SIZE_SMALL)
+        if service in ("FixedText", "CheckBox"):
+            props.setdefault("BackgroundColor", theme.PANE_BG)
+            props.setdefault("TextColor", theme.TEXT_PRIMARY)
+        if not props.get("FontName"):
+            props.pop("FontName", None)
+        return super().add(service, name, **props)
 
     def place(self, x: int, y: int, width: int, height: int) -> None:
         self.resize(x, y, width, height)

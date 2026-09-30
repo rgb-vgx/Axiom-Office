@@ -111,6 +111,8 @@ def test_writer(b, out, png, run_ai):
     b.cmd("writer.heading", {"level": 1, "text": "Tiêu đề một"})
     levels = (b.cmd("writer.getText", record=False) or {}).get("text", "")
     check("Tiêu đề một" in levels, "Writer heading thêm được tiêu đề", levels[-60:])
+    # Con tro o cuoi mot doan co chu: tieu de phai thanh doan rieng, khong noi vao doan cu.
+    check("\nTiêu đề một" in levels, "Writer heading tạo đoạn riêng khi con trỏ đang ở cuối đoạn có chữ", levels[-80:])
     b.cmd("writer.formatSelection", {"italic": True, "alignment": "center"})
     b.cmd("writer.setParagraphAlignment", {"alignment": "justify"})
     table = b.cmd("writer.insertTable", {"values": [["Tên", "Điểm"], ["An", 9.5], ["Bình", 8]], "style": "Grid Table 4 - Accent 1"})

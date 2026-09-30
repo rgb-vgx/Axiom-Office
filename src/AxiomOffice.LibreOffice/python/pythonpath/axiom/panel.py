@@ -1,16 +1,18 @@
-"""Pane Ask AI cua LibreOffice (LibreOffice_arch.md muc 10).
+"""Pane Ask AI cua LibreOffice (LibreOffice_arch.md muc 10, 14.3).
 
-Hai cho hien thi, cung mot giao dien (`PaneUI`):
+Giao dien giong pane cua MS Office/WPS (AskAiPane.cs + PaneControls.cs): header co cham accent, tieu de,
+phu de va link "Tro chuyen moi / Ghi nho / Cai dat"; vung chat voi bong bong bo goc, dong thao tac co icon,
+the xac nhan, the ghi nho, the loi va man hinh trong co goi y; o soan bo goc co placeholder + nut Gui
+indigo; footer trang thai voi link "Dung" / "Hoan tac luot nay". Mau/co chu/khoang cach lay tu theme.py.
 
-* **Sidebar deck** "Axiom Office" - `Sidebar.xcu` + `Factory.xcu` dang ky; factory trong file nay tra ve
-  `PanelElement` boc `AskAiPanel`. Sidebar goi factory khi nguoi dung mo deck.
-* **Cua so noi** (`AskAiWindow`) - dung khi sidebar khong kha dung (mot so ban LibreOffice khong tao phan
-  tu sidebar: layout khong co `private:resource/uielement/sidebar`). `ui.askpane` mo deck neu co, khong
-  thi mo cua so.
+Hai cho hien thi, cung mot `PaneUI` ve tren mot UnoControlContainer:
 
-Luong chay: nut Gui -> thread nen goi Agent Core (`core.py`) -> SSE do `chat.ChatSession` cap nhat ->
-main thread ve lai awt qua `UnoGate` (moi thao tac awt phai o main thread, va KHONG duoc goi lai gate khi
-da o main thread - se tu treo).
+* **Sidebar deck** "Axiom Office" - `Sidebar.xcu` + `Factory.xcu`; factory tra ve `PanelElement` boc
+  `AskAiPanel`.
+* **Pane neo** (`AskAiDock`) ben phai cua so tai lieu - khi ban LibreOffice khong co sidebar dung duoc.
+
+Luong chay: Gui -> thread nen goi Agent Core (`core.py`) -> SSE do `chat.ChatSession` cap nhat -> main
+thread ve lai qua `UnoGate` (awt chi chay tren main thread; da o main thread thi goi thang).
 """
 from __future__ import annotations
 
@@ -19,11 +21,15 @@ import threading
 
 import uno
 import unohelper
-from com.sun.star.awt import XKeyListener, XWindowListener
-from com.sun.star.ui import XToolPanel, XUIElement, XUIElementFactory
+from com.sun.star.awt import XWindowListener
+from com.sun.star.frame import XStatusListener
+from com.sun.star.ui import XSidebarPanel, XToolPanel, XUIElement, XUIElementFactory
 
-from . import chat, core, documents, log
-from .awt import BOLD, Container, Dialog, bind_actions, peer_of, toolkit
+from . import chat, config, core, documents, log, theme
+from .awt import peer_of, toolkit
+from .chatview import ChatView
+from .widgets import (FocusListener, KeyListener, RoundBox, Surface, TextListener, Widget, button, dot, link,
+                      make_clickable, set_prop, text_width, _valign_middle)
 
 DECK_ID = "AxiomOfficeDeck"
 DECK_TITLE = "Axiom Office"
@@ -32,35 +38,17 @@ FACTORY_NAME = "AxiomOfficePanelFactory"
 FACTORY_IMPL = "org.axiomoffice.bridge.PanelFactory"
 PANEL_URL = "private:resource/toolpanel/%s/%s" % (FACTORY_NAME, PANEL_ID)
 
-MARGIN = 6
-GAP = 4
-BUTTONS = ("newchat", "undo", "settings", "memory")
-BUTTON_LABELS = {"newchat": "Trò chuyện mới", "undo": "Hoàn tác lượt này", "settings": "Cài đặt", "memory": "Ghi nhớ",
-                 "send": "Gửi", "stop": "Dừng", "confirm_yes": "Đồng ý", "confirm_no": "Từ chối", "close": "Đóng"}
-_ALL_BUTTONS = ("send", "stop", "newchat", "undo", "settings", "memory", "confirm_yes", "confirm_no", "close")
-
 DOCK_WIDTH = 380
 # kind (ma port) -> tien to ten lenh: wps dung writer.* (giong ban Windows)
 PREFIX = {"wps": "writer", "et": "et", "wpp": "wpp"}
-DOCKS: dict = {}   # kind -> AskAiDock dang mo (moi kind mot pane, khong mo trung)
+DOCKS: dict = {}   # kind -> AskAiDock dang mo (moi kind mot pane; dong = an, mo lai = hien)
+SIDEBAR_PANES: list = []   # PaneUI dang song trong sidebar (de test/log; sidebar tu quan ly vong doi)
 
-
-class KeyListener(unohelper.Base, XKeyListener):
-    def __init__(self, handler):
-        self._handler = handler
-
-    def keyPressed(self, event):  # noqa: N802
-        self._handler(event)
-
-    def keyReleased(self, event):  # noqa: N802
-        pass
-
-    def disposing(self, event):
-        pass
+SHIFT = 1          # com.sun.star.awt.KeyModifier.SHIFT
 
 
 class WindowListener(unohelper.Base, XWindowListener):
-    """Doi kich thuoc cua so (sidebar keo rong/hep) -> ve lai layout."""
+    """Doi kich thuoc cua so (sidebar keo rong/hep, cua so tai lieu doi co) -> xep lai pane."""
 
     def __init__(self, handler):
         self._handler = handler
@@ -81,143 +69,268 @@ class WindowListener(unohelper.Base, XWindowListener):
         pass
 
 
-class PaneUI:
-    """Giao dien + luot chay cua pane, khong phu thuoc host la container hay dialog."""
+def new_container(ctx, parent_peer, background: int = theme.PANE_BG):
+    """UnoControlContainer nen trang, da co peer (ve duoc ngay)."""
+    sm = ctx.ServiceManager
+    container = sm.createInstanceWithContext("com.sun.star.awt.UnoControlContainer", ctx)
+    model = sm.createInstanceWithContext("com.sun.star.awt.UnoControlContainerModel", ctx)
+    model.setPropertyValue("BackgroundColor", background)
+    container.setModel(model)
+    container.createPeer(toolkit(ctx), parent_peer)
+    return container
 
-    def __init__(self, ctx, gate, kind: str, port: int, host, width: int = 300, height: int = 620, frame=None):
+
+class PaneUI:
+    """Giao dien + luot chay cua pane tren mot container (sidebar hoac pane neo)."""
+
+    def __init__(self, ctx, gate, kind: str, port: int, container, width: int, height: int, frame=None,
+                 on_close=None, left_border: bool = False, in_sidebar: bool = False):
         self.ctx = ctx
         self.gate = gate
         self.kind = kind
         self.port = port
         self.frame = frame
-        self.host = host
+        self.on_close = on_close
+        self.left_border = left_border
+        self.in_sidebar = in_sidebar      # deck cua sidebar da co tieu de "Axiom Office": header ghi ten app
+        self.container = container
+        self.surface = Surface(ctx, container)
         self.session = chat.ChatSession(kind, on_change=self._on_change)
         self.session.status = "Sẵn sàng"
         self._stop = threading.Event()
         self._busy = False
+        self._clear_prompt = False
+        self._focused = False
         self._width, self._height = width, height
         self._build()
-        self._layout(width, height)
+        self.resize(width, height)
 
     # ---------------------------------------------------------------- dung giao dien
 
     def _build(self) -> None:
-        host = self.host
-        host.add("FixedText", "header", PositionX=MARGIN, PositionY=MARGIN, Width=280, Height=16, CharWeight=BOLD,
-                 Label=self._header())
-        host.add("Edit", "transcript", PositionX=MARGIN, PositionY=28, Width=288, Height=300, MultiLine=True,
-                 ReadOnly=True, AutoVScroll=True, VScroll=True)
-        host.add("FixedText", "confirm", PositionX=MARGIN, PositionY=330, Width=288, Height=28, MultiLine=True,
-                 CharWeight=BOLD, Visible=False)
-        host.add("Edit", "input", PositionX=MARGIN, PositionY=380, Width=200, Height=24)
-        host.add("Button", "send", PositionX=212, PositionY=380, Width=40, Height=24, Label=BUTTON_LABELS["send"])
-        host.add("Button", "stop", PositionX=256, PositionY=380, Width=44, Height=24, Label=BUTTON_LABELS["stop"],
-                 Enabled=False)
-        host.add("Button", "confirm_yes", PositionX=MARGIN, PositionY=352, Width=70, Height=22,
-                 Label=BUTTON_LABELS["confirm_yes"], Visible=False)
-        host.add("Button", "confirm_no", PositionX=MARGIN + 76, PositionY=352, Width=70, Height=22,
-                 Label=BUTTON_LABELS["confirm_no"], Visible=False)
-        host.add("Button", "close", PositionX=330, PositionY=MARGIN, Width=44, Height=18, Label=BUTTON_LABELS["close"])
-        for name in BUTTONS:
-            host.add("Button", name, PositionX=MARGIN, PositionY=420, Width=60, Height=24, Label=BUTTON_LABELS[name])
-        host.add("FixedText", "status", PositionX=MARGIN, PositionY=450, Width=288, Height=16, Label="Sẵn sàng")
+        s = self.surface
+        # Header ------------------------------------------------------------
+        self.header_links = []
+        link_specs = [("Trò chuyện mới", self._new_chat), ("Ghi nhớ", self._open_memory), ("Cài đặt", self._open_settings)]
+        if self.on_close is not None:
+            link_specs.append(("✕", self._close))
+        for text, handler in link_specs:
+            color = theme.TEXT_MUTED if text == "✕" else theme.ACCENT_FG
+            item = link(s, text, handler, color=color, hover=theme.TEXT_PRIMARY if text == "✕" else theme.ACTION_HOVER,
+                        size=10.0 if text == "✕" else theme.SIZE_CAPTION)
+            self.header_links.append(item)
+        self.accent_dot = dot(s, "dot", 8)
+        self.title = Widget(s)
+        title = theme.APP_NAMES.get(self.kind, self.kind) if self.in_sidebar else "Axiom Office"
+        self.title_label = self.title.add("FixedText", 0, 0, 120, 20, Label=title, TextColor=theme.TEXT_PRIMARY,
+                                          BackgroundColor=theme.PANE_BG, Border=0, NoLabel=True,
+                                          font=(theme.FONT_SEMIBOLD, theme.SIZE_TITLE))
+        self.subtitle = Widget(s)
+        self.subtitle_label = self.subtitle.add("FixedText", 0, 0, 200, 16, Label=self._subtitle(),
+                                                TextColor=theme.TEXT_MUTED, BackgroundColor=theme.PANE_BG, Border=0,
+                                                NoLabel=True, font=(theme.FONT, theme.SIZE_CAPTION))
+        self.header_divider = Widget(s)
+        self.header_divider.add("FixedText", 0, 0, 10, 1, Label="", BackgroundColor=theme.DIVIDER, Border=0)
+        self.left_line = None
+        if self.left_border:
+            self.left_line = Widget(s)
+            self.left_line.add("FixedText", 0, 0, 1, 10, Label="", BackgroundColor=theme.DIVIDER, Border=0)
+
+        # Footer ------------------------------------------------------------
+        self.busy_dot = dot(s, "dot", 6)
+        self.status = Widget(s)
+        self.status_label = self.status.add("FixedText", 0, 0, 200, theme.FOOTER_H, Label="Sẵn sàng",
+                                            TextColor=theme.TEXT_MUTED, BackgroundColor=theme.PANE_BG, Border=0,
+                                            VerticalAlign=_valign_middle(), NoLabel=True,
+                                            font=(theme.FONT, theme.SIZE_CAPTION))
+        self.stop_link = link(s, "Dừng", self._stop_run)
+        self.undo_link = link(s, "Hoàn tác lượt này", self._undo_turn)
+
+        # O soan (bo goc, vien; chu + nut them TRUOC nen de nam tren) ---------
+        self.composer = Widget(s)
+        self.composer_box = RoundBox(self.composer, 300, theme.COMPOSER_H - 12, theme.RADIUS_COMPOSER, theme.PANE_BG,
+                                     theme.INPUT_BORDER)
+        self.composer_box.add_corners()
+        self.placeholder = self.composer.add("FixedText", 0, 0, 10, 20, Label=theme.PROMPT_PLACEHOLDER,
+                                             TextColor=theme.TEXT_MUTED, BackgroundColor=theme.PANE_BG, Border=0,
+                                             NoLabel=True, font=(theme.FONT, theme.SIZE_BODY))
+        self.prompt = self.composer.add("Edit", 0, 0, 10, 20, MultiLine=True, Border=0, BackgroundColor=theme.PANE_BG,
+                                        TextColor=theme.TEXT_PRIMARY, VScroll=False, HScroll=False, AutoVScroll=True,
+                                        font=(theme.FONT, theme.SIZE_BODY))
+        self.hint = self.composer.add("FixedText", 0, 0, 10, 16, Label=theme.PROMPT_HINT, TextColor=theme.TEXT_MUTED,
+                                      BackgroundColor=theme.PANE_BG, Border=0, NoLabel=True,
+                                      font=(theme.FONT, theme.SIZE_CAPTION))
+        self.send = button(s, "Gửi", theme.SEND_W, theme.SEND_H, self._send)
+        self.composer_box.add_background()
+
+        # Vung chat ------------------------------------------------------------
+        self.chat = ChatView(self.ctx, s, {"suggestion": self._use_suggestion, "confirm": self._answer_confirm,
+                                           "forget": self._forget, "settings": self._open_settings})
 
         self._return_key = uno.getConstantByName("com.sun.star.awt.Key.RETURN")
-        host.control("input").addKeyListener(KeyListener(self._on_key))
-        bind_actions(host, _ALL_BUTTONS, self._on_action)
+        self._page_up = uno.getConstantByName("com.sun.star.awt.Key.PAGEUP")
+        self._page_down = uno.getConstantByName("com.sun.star.awt.Key.PAGEDOWN")
+        self.prompt.addKeyListener(KeyListener(self._on_key, self._on_key_up))
+        self.prompt.addTextListener(TextListener(self._on_prompt_changed))
+        self.prompt.addFocusListener(FocusListener(self._on_focus))
+        make_clickable(s, [self.placeholder], lambda: self.prompt.setFocus())
+        self._refresh_send()
 
-    def _header(self) -> str:
-        return "Axiom Office · %s" % documents.NAMES.get(self.kind, self.kind)
+    def _subtitle(self) -> str:
+        model = str(config.value("LlmModel", "") or "")
+        app = theme.APP_NAMES.get(self.kind, self.kind)
+        if self.in_sidebar:
+            return model or "Agent Core"
+        return "%s · %s" % (app, model) if model else app
 
     # ---------------------------------------------------------------- layout
 
-    def _layout(self, width: int, height: int) -> None:
-        self._width, self._height = max(240, width), max(300, height)
+    def resize(self, width: int, height: int) -> None:
+        self._width, self._height = max(260, width), max(320, height)
         w, h = self._width, self._height
-        inner = w - 2 * MARGIN
-        h_status, h_buttons, h_input = 16, 24, 24
-        h_confirm = 34 if self.session.pending else 0
+        pad = theme.PAD_X
+        # header
+        self.accent_dot.place(pad, 20)
+        self.title.place(28, 7)
+        title_w = text_width(self.title_label) + 4
+        self.title.resize_part(self.title_label, w=title_w)
+        right = w - pad
+        for item in reversed(self.header_links):
+            right -= item.width
+            item.place(right, 8)
+            right -= 10
+        self.title.resize_part(self.title_label, w=min(title_w, max(40, right - 28)))
+        self.subtitle.resize_part(self.subtitle_label, w=w - 28 - pad)
+        self.subtitle.place(28, 26)
+        self.header_divider.resize_part(self.header_divider.parts[0][0], w=w)
+        self.header_divider.place(0, theme.HEADER_H - 1)
+        if self.left_line is not None:
+            self.left_line.resize_part(self.left_line.parts[0][0], h=h)
+            self.left_line.place(0, 0)
+        # footer
+        footer_y = h - theme.FOOTER_H
+        self.busy_dot.place(pad, footer_y + (theme.FOOTER_H - 6) // 2)
+        self._layout_footer()
+        # composer
+        box_h = theme.COMPOSER_H - 12
+        box_w = w - 2 * pad
+        box_y = footer_y - box_h - 4
+        self.composer_box.resize(box_w, box_h)
+        inner = 12
+        self.composer.resize_part(self.prompt, dx=inner, dy=8, w=box_w - 2 * inner, h=box_h - 8 - theme.SEND_H - 12)
+        self.composer.resize_part(self.placeholder, dx=inner + 3, dy=10, w=box_w - 2 * inner - 6, h=18)
+        self.composer.resize_part(self.hint, dx=inner, dy=box_h - 8 - theme.SEND_H + 8,
+                                  w=box_w - 2 * inner - theme.SEND_W - 8, h=16)
+        set_prop(self.hint, "Label", theme.PROMPT_HINT if box_w >= 340 else theme.PROMPT_HINT_SHORT)
+        self.composer.place(pad, box_y)
+        self.send.place(pad + box_w - 8 - theme.SEND_W, box_y + box_h - 8 - theme.SEND_H)
+        # chat
+        top = theme.HEADER_H
+        self.chat.set_rect(1 if self.left_line else 0, top, w - (1 if self.left_line else 0), box_y - 8 - top,
+                           self.session)
 
-        y_status = h - MARGIN - h_status
-        y_buttons = y_status - GAP - h_buttons
-        y_input = y_buttons - GAP - h_input
-        y_confirm = y_input - GAP - h_confirm if h_confirm else y_input
-        top = MARGIN + 16 + GAP
-        transcript_h = max(80, (y_confirm if h_confirm else y_input) - GAP - top)
+    def _layout_footer(self) -> None:
+        w, h = self._width, self._height
+        pad = theme.PAD_X
+        footer_y = h - theme.FOOTER_H
+        right = w - pad
+        for item, visible in ((self.undo_link, self._show_undo()), (self.stop_link, self.session.running)):
+            item.set_visible(visible)
+            if visible:
+                right -= item.width
+                item.place(right, footer_y + (theme.FOOTER_H - 18) // 2)
+                right -= 12
+        left = pad + (12 if self.session.running else 0)
+        self.busy_dot.set_visible(self.session.running)
+        self.status.resize_part(self.status_label, w=max(40, right - left))
+        self.status.place(left, footer_y)
 
-        ui = self.host
-        ui.set("header", PositionX=MARGIN, PositionY=MARGIN, Width=inner, Height=16)
-        ui.set("transcript", PositionX=MARGIN, PositionY=top, Width=inner, Height=transcript_h)
-        send_w, stop_w = 40, 44
-        input_w = max(60, inner - send_w - stop_w - 2 * GAP)
-        ui.set("input", PositionX=MARGIN, PositionY=y_input, Width=input_w, Height=h_input)
-        ui.set("send", PositionX=MARGIN + input_w + GAP, PositionY=y_input, Width=send_w, Height=h_input)
-        ui.set("stop", PositionX=MARGIN + input_w + GAP + send_w + GAP, PositionY=y_input, Width=stop_w, Height=h_input)
-        if h_confirm:
-            ui.set("confirm", PositionX=MARGIN, PositionY=y_confirm, Width=inner, Height=h_confirm - 24)
-            ui.set("confirm_yes", PositionX=MARGIN, PositionY=y_confirm + h_confirm - 22, Width=70, Height=22)
-            ui.set("confirm_no", PositionX=MARGIN + 76, PositionY=y_confirm + h_confirm - 22, Width=70, Height=22)
-        share = max(52, inner // len(BUTTONS))
-        for index, name in enumerate(BUTTONS):
-            ui.set(name, PositionX=MARGIN + index * share, PositionY=y_buttons, Width=share - GAP, Height=h_buttons)
-        ui.set("status", PositionX=MARGIN, PositionY=y_status, Width=inner, Height=h_status)
+    def _show_undo(self) -> bool:
+        return not self.session.running and self.session.edit_count() > 0
 
-    def close(self) -> None:
-        """Nut Dong: panel trong sidebar thi an (khong pha), pane neo thi go han."""
-        if hasattr(self.host, "dispose"):
-            try:
-                self.host.dispose()
-            except Exception:  # noqa: BLE001
-                pass
+    # ---------------------------------------------------------------- o soan
 
-    def on_resize(self, width: int, height: int) -> None:
-        if width > 0 and height > 0 and (width, height) != (self._width, self._height):
-            self._layout(width, height)
-
-    # ---------------------------------------------------------------- awt -> logic
+    def _prompt_text(self) -> str:
+        try:
+            return str(self.prompt.getText() or "")
+        except Exception:  # noqa: BLE001
+            return ""
 
     def _on_key(self, event) -> None:
-        if event.KeyCode == self._return_key:
+        if event.KeyCode == self._return_key and not (event.Modifiers & SHIFT):
+            # O Edit da chen xuong dong TRUOC khi listener nhan phim (thu tren 26.8): bo dung ky tu do tai con tro,
+            # neu khong tin nhan co "\n" o giua khi nguoi dung bam Enter luc con tro chua o cuoi.
+            self._strip_enter_newline()
+            self._clear_prompt = True
             self._send()
+        elif event.KeyCode in (self._page_up, self._page_down):
+            # Con lan chuot khong toi duoc khung chat tu ve (awt khong co su kien wheel): cuon bang PgUp/PgDn.
+            step = max(60, self.chat.rect[3] - 60)
+            self.chat.scroll_by(-step if event.KeyCode == self._page_up else step)
 
-    def _on_action(self, command: str, event) -> None:
-        if command == "send":
-            self._send()
-        elif command == "stop":
-            self._stop_run()
-        elif command == "newchat":
-            self.session.reset()
-            self._render()
-        elif command == "undo":
-            self._undo_turn()
-        elif command == "confirm_yes":
-            self._answer_confirm(True)
-        elif command == "confirm_no":
-            self._answer_confirm(False)
-        elif command == "settings":
-            from . import dialogs
+    def _strip_enter_newline(self) -> None:
+        text = self._prompt_text()
+        try:
+            position = int(self.prompt.getSelection().Min)
+        except Exception:  # noqa: BLE001
+            position = len(text)
+        for separator in ("\r\n", "\n", "\r"):
+            start = position - len(separator)
+            if start >= 0 and text[start:position] == separator:
+                self.prompt.setText(text[:start] + text[position:])
+                return
 
-            dialogs.open_settings(self)
-        elif command == "memory":
-            from . import dialogs
+    def _on_key_up(self, event) -> None:
+        if self._clear_prompt:
+            # Enter da chen xuong dong vao o soan sau khi gui: xoa not.
+            self._clear_prompt = False
+            try:
+                self.prompt.setText("")
+            except Exception:  # noqa: BLE001
+                pass
+            self._on_prompt_changed()
 
-            dialogs.open_memory(self)
-        elif command == "close":
-            self.close()
+    def _on_prompt_changed(self) -> None:
+        empty = not self._prompt_text().strip()
+        try:
+            self.placeholder.setVisible(empty)
+        except Exception:  # noqa: BLE001
+            pass
+        self._refresh_send()
+
+    def _on_focus(self, focused: bool) -> None:
+        self._focused = focused
+        self.composer_box.recolor(theme.PANE_BG, theme.FOCUS if focused else theme.INPUT_BORDER)
+
+    def _refresh_send(self) -> None:
+        self.send.set_enabled(not self.session.running and bool(self._prompt_text().strip()))
+
+    def _use_suggestion(self, text: str) -> None:
+        if self.session.running:
+            return
+        try:
+            self.prompt.setText(text)
+            self.prompt.setFocus()
+        except Exception:  # noqa: BLE001
+            pass
+        self._on_prompt_changed()
 
     # ---------------------------------------------------------------- luot chay
 
     def _send(self) -> None:
         if self._busy or self.session.running:
             return
-        prompt = str(self.host.value("input", "Text") or "").strip()
+        prompt = self._prompt_text().strip()
         if not prompt:
             return
-        self.host.set("input", Text="")
+        try:
+            self.prompt.setText("")
+        except Exception:  # noqa: BLE001
+            pass
         self._busy = True
         self._stop.clear()
         self.session.begin(prompt)
-        self._render()
+        self._on_prompt_changed()
         threading.Thread(target=self._worker, args=(prompt,), name="axiom-pane-run", daemon=True).start()
 
     def _worker(self, prompt: str) -> None:
@@ -233,25 +346,24 @@ class PaneUI:
             self.session.conversation_id = started.get("conversationId") or self.session.conversation_id
             core.stream_events(base, run_id, self._on_event, self._stop)
             final = core.get_run(base, run_id)
-            self._ui(lambda: (self.session.finish(final), self._render()))
+            self._ui(lambda: self.session.finish(final))
         except core.CoreError as exc:
-            self._ui(lambda: (self.session.fail(str(exc)), self._render()))
+            self._ui(lambda: self.session.fail(str(exc)))
         except Exception as exc:  # noqa: BLE001
             log.error("pane run failed: %s" % exc)
-            self._ui(lambda: (self.session.fail(str(exc)), self._render()))
+            self._ui(lambda: self.session.fail(str(exc)))
         finally:
             self._busy = False
+            self._ui(self._render)
 
     def _on_event(self, event: dict) -> None:
-        self.session.handle_event(event)
-        self._ui(self._render)
+        self._ui(lambda: self.session.handle_event(event))
 
     def _stop_run(self) -> None:
         if not self.session.running:
             return
         self._stop.set()
         self.session.cancel_requested()
-        self._render()
         run_id = self.session.run_id
         try:
             base, _ = core.ensure()
@@ -260,12 +372,10 @@ class PaneUI:
         if run_id:
             threading.Thread(target=lambda: core.cancel_run(base, run_id), daemon=True).start()
 
-    def _answer_confirm(self, approved: bool) -> None:
-        pending = self.session.pending or {}
-        run_id, confirmation_id = self.session.run_id, pending.get("confirmationId")
+    def _answer_confirm(self, item: dict, approved: bool) -> None:
+        run_id, confirmation_id = self.session.run_id, item.get("id")
         self.session.pending = None
-        self.session.note("• Bạn đã %s: %s" % ("đồng ý" if approved else "từ chối", pending.get("action") or ""))
-        self._render()
+        self.session.set_confirm_state(confirmation_id, "approved" if approved else "rejected")
         if run_id and confirmation_id:
             try:
                 base, _ = core.ensure()
@@ -273,11 +383,26 @@ class PaneUI:
                 return
             threading.Thread(target=lambda: core.confirm_run(base, run_id, confirmation_id, approved), daemon=True).start()
 
+    def _forget(self, item: dict) -> None:
+        memory_id = item.get("id")
+        if not memory_id:
+            return
+        self.session.touch(item, state="deleting")
+
+        def work():
+            ok = False
+            try:
+                base, _ = core.ensure()
+                ok = core.delete_memory(base, memory_id)
+            except core.CoreError:
+                ok = False
+            self._ui(lambda: self.session.touch(item, state="deleted" if ok else "failed"))
+
+        threading.Thread(target=work, daemon=True).start()
+
     def _undo_turn(self) -> None:
         count = self.session.edit_count()
-        if not count:
-            self.session.note("(lượt này chưa có thao tác nào để hoàn tác)")
-            self._render()
+        if not count or self.session.running:
             return
         from . import bridge
 
@@ -285,11 +410,29 @@ class PaneUI:
         result = bridge.run_on_main(self.ctx, self.gate, self.kind, action, {"count": count})
         if result.get("ok"):
             undone = (result.get("result") or {}).get("undone", 0)
-            self.session.note("⏪ Đã hoàn tác %d bước" % undone)
             self.session.clear_edits()
+            self.session.note("Đã hoàn tác %d thao tác của lượt vừa rồi." % undone)
         else:
             self.session.note("Không hoàn tác được: %s" % result.get("error"))
-        self._render()
+
+    def _new_chat(self) -> None:
+        if self.session.running:
+            return
+        self.session.reset()
+
+    def _open_settings(self) -> None:
+        from . import dialogs
+
+        dialogs.open_settings(self)
+
+    def _open_memory(self) -> None:
+        from . import dialogs
+
+        dialogs.open_memory(self)
+
+    def _close(self) -> None:
+        if self.on_close is not None:
+            self.on_close()
 
     # ---------------------------------------------------------------- ve lai
 
@@ -304,75 +447,120 @@ class PaneUI:
         self._ui(self._render)
 
     def _render(self) -> None:
-        host = self.host
-        host.set("transcript", Text=self.session.transcript())
-        host.set("status", Label=self.session.summary())
-        pending = self.session.pending
-        host.show("confirm", bool(pending))
-        host.show("confirm_yes", bool(pending))
-        host.show("confirm_no", bool(pending))
-        if pending:
-            host.set("confirm", Label="Cần xác nhận: %s\n%s" % (pending.get("action"), pending.get("reason") or ""))
-        host.enable("stop", bool(self.session.running))
-        host.enable("send", not self.session.running)
-        host.enable("input", not self.session.running)
-        self._layout(self._width, self._height)
+        try:
+            set_prop(self.status_label, "Label", self.session.summary())
+            self.chat.sync(self.session)
+            self._layout_footer()
+            self._refresh_send()
+        except Exception as exc:  # noqa: BLE001 - loi ve khong duoc lam sap LibreOffice
+            log.error("pane render failed: %s" % exc)
 
 
-class AskAiPanel(unohelper.Base, XToolPanel):
-    """Panel cua sidebar: boc PaneUI trong container cua so con do sidebar cap."""
+class AskAiPanel(unohelper.Base, XToolPanel, XSidebarPanel):
+    """Panel cua sidebar: PaneUI tren container con cua cua so sidebar cap.
+
+    XSidebarPanel bao cho sidebar chieu cao mong muon: Maximum = -1 (khong gioi han) de panel chiem het deck
+    - thieu interface nay sidebar coi panel cao 0 va khong hien gi.
+    """
 
     def __init__(self, ctx, gate, parent_window, frame, kind: str, port: int, parent_peer):
         self.ctx = ctx
         self.frame = frame
-        self.ui = Container(ctx, toolkit(ctx), 300, 620)
-        self.pane = PaneUI(ctx, gate, kind, port, self.ui, frame=frame)
-        self.ui.create_peer(parent_peer)
-        self.ui.set_visible(True)
-        self.ui.window().addWindowListener(WindowListener(self.pane.on_resize))
+        rect = parent_window.getPosSize()
+        width, height = max(300, int(rect.Width)), max(400, int(rect.Height))
+        log.info("sidebar panel: %s port %d, %dx%d" % (kind, port, width, height))
+        self.container = new_container(ctx, parent_peer)
+        self.container.setPosSize(0, 0, width, height, 15)
+        self.container.setVisible(True)
+        self.pane = PaneUI(ctx, gate, kind, port, self.container, width, height, frame=frame, in_sidebar=True)
+        SIDEBAR_PANES.append(self.pane)
+        self.container.addWindowListener(WindowListener(self.pane.resize))
 
     def getWindow(self):  # noqa: N802 - ten UNO
-        return self.ui.window()
+        return self.container
 
     def createAccessible(self, parent):  # noqa: N802
         return None
 
+    def getHeightForWidth(self, width):  # noqa: N802 - XSidebarPanel
+        size = uno.createUnoStruct("com.sun.star.ui.LayoutSize")
+        size.Minimum, size.Maximum, size.Preferred = 360, -1, 600
+        return size
+
+    def getMinimalWidth(self):  # noqa: N802
+        return 300
+
 
 class AskAiDock:
-    """Pane neo vao cua so tai lieu (cua so con goc phai vung soan thao).
+    """Pane neo ben phai vung tai lieu (khi khong co sidebar), nhu task pane cua Office.
 
-    Dung khi ban LibreOffice nay khong co sidebar. Cua so con luon nam TRONG cua so tai lieu nen khong bi
-    che khuat (khac dialog roi: tren ban nay dialog khong hien len duoc - xem ghi chu trong LibreOffice_arch.md).
+    Vung tai lieu (frame.ComponentWindow) duoc co hep lai de nhuong cho pane - tai lieu tu xep dong, co
+    thanh cuon rieng, khong bi pane de len. Moi lan LibreOffice xep lai cua so (doi co, hien/an thanh cong
+    cu) no dat vung tai lieu ve full rong -> listener co lai. Dong pane = an + tra lai be rong.
+    Khong huy/tao lai container: tao lai container thu hai o cung cho tren ban 26.8 co luc khong ve.
     """
 
     def __init__(self, ctx, gate, frame, kind: str, port: int):
         self.ctx = ctx
         self.frame = frame
         self.kind = kind
-        self.parent = frame.ContainerWindow
-        rect = self.parent.getPosSize()
-        height = self._height(rect)
-        self.ui = Container(ctx, toolkit(ctx), DOCK_WIDTH, height)
-        self.pane = PaneUI(ctx, gate, kind, port, self.ui, DOCK_WIDTH, height, frame=frame)
-        self.ui.create_peer(peer_of(self.parent))
-        self.parent.addWindowListener(WindowListener(self._on_parent_resize))
-        self.place()
+        self.component = frame.ComponentWindow
+        self._applied_width = None     # be rong vung tai lieu do chinh pane dat (de phan biet voi LibreOffice)
+        self._shown = False
+        rect = self.component.getPosSize()
+        self.container = new_container(ctx, peer_of(frame.ContainerWindow))
+        self.container.setPosSize(int(rect.X + rect.Width - DOCK_WIDTH), int(rect.Y), DOCK_WIDTH, int(rect.Height), 15)
+        self.pane = PaneUI(ctx, gate, kind, port, self.container, DOCK_WIDTH, int(rect.Height), frame=frame,
+                           on_close=self.hide, left_border=True)
+        self.component.addWindowListener(WindowListener(self._on_component_resize))
+        self.show()
 
-    def _height(self, rect) -> int:
-        return max(320, min(int(rect.Height) - 60, 900))
+    def show(self) -> None:
+        self._shown = True
+        rect = self.component.getPosSize()
+        full = int(rect.Width) if self._applied_width is None else int(rect.Width) + (
+            DOCK_WIDTH if int(rect.Width) == self._applied_width else 0)
+        self._dock(int(rect.X), int(rect.Y), full, int(rect.Height))
+        self.container.setVisible(True)
+        try:
+            self.pane.prompt.setFocus()
+        except Exception:  # noqa: BLE001
+            pass
 
-    def place(self) -> None:
-        rect = self.parent.getPosSize()
-        height = self._height(rect)
-        self.ui.resize(max(DOCK_WIDTH, int(rect.Width) - DOCK_WIDTH - 34), 44, DOCK_WIDTH, height)
-        self.ui.set_visible(True)
+    def hide(self) -> None:
+        self._shown = False
+        self.container.setVisible(False)
+        rect = self.component.getPosSize()
+        if self._applied_width is not None and int(rect.Width) == self._applied_width:
+            self._applied_width = None
+            self.component.setPosSize(int(rect.X), int(rect.Y), int(rect.Width) + DOCK_WIDTH, int(rect.Height), 15)
+        self._applied_width = None
 
-    def _on_parent_resize(self, width: int, height: int) -> None:
-        self.place()
-        self.pane.on_resize(DOCK_WIDTH, self._height(self.parent.getPosSize()))
+    @property
+    def visible(self) -> bool:
+        return self._shown
 
-    def close(self) -> None:
-        self.ui.dispose()
+    def _dock(self, x: int, y: int, full_width: int, height: int) -> None:
+        doc_width = max(200, full_width - DOCK_WIDTH)
+        self._applied_width = doc_width
+        self.component.setPosSize(x, y, doc_width, height, 15)
+        self.container.setPosSize(x + doc_width, y, full_width - doc_width, height, 15)
+        self.pane.resize(full_width - doc_width, height)
+
+    def _on_component_resize(self, width: int, height: int) -> None:
+        if not self._shown:
+            return
+        if width == self._applied_width:
+            # Chi doi chieu cao (hoac la lan dat cua chinh pane): giu be rong, doi chieu cao pane.
+            rect = self.container.getPosSize()
+            if int(rect.Height) != height:
+                comp = self.component.getPosSize()
+                self.container.setPosSize(int(comp.X) + width, int(comp.Y), DOCK_WIDTH, height, 15)
+                self.pane.resize(DOCK_WIDTH, height)
+            return
+        # LibreOffice vua xep lai vung tai lieu ve full rong: co lai.
+        comp = self.component.getPosSize()
+        self._dock(int(comp.X), int(comp.Y), width, height)
 
 
 class PanelElement(unohelper.Base, XUIElement):
@@ -412,8 +600,16 @@ class PanelFactory(unohelper.Base, XUIElementFactory):
             raise _no_such_element(resource_url)
         from . import bridge
 
-        parent_window = args[0]
-        frame = args[1] if len(args) > 1 else None
+        # Sidebar truyen tham so dang PropertyValue co ten (ParentWindow, Frame, Sidebar...), khong theo vi tri.
+        named = {}
+        for arg in args or ():
+            name = getattr(arg, "Name", None)
+            if name:
+                named[name] = arg.Value
+        parent_window = named.get("ParentWindow") or (args[0] if args and not named else None)
+        frame = named.get("Frame")
+        if parent_window is None:
+            raise _no_such_element("missing ParentWindow")
         kind, port = pane_target(frame)
         panel = AskAiPanel(self.ctx, bridge.gate(), parent_window, frame, kind, port, peer_of(parent_window))
         return PanelElement(self.ctx, str(resource_url), frame, panel)
@@ -427,7 +623,7 @@ def _no_such_element(resource_url):
 
 def pane_target(frame):
     """(kind, port) cua pane: theo tai lieu dang mo trong cua so, khong thi kind dau tien."""
-    from . import bridge, config
+    from . import bridge
 
     kind = None
     try:
@@ -440,18 +636,49 @@ def pane_target(frame):
 
 # ---------------------------------------------------------------- mo pane
 
-def current_sidebar(ctx, frame):
-    """Doi tuong sidebar cua cua so (None khi ban LibreOffice nay khong tao sidebar)."""
+class _StatusListener(unohelper.Base, XStatusListener):
+    def __init__(self):
+        self.enabled = False
+        self.checked = False
+
+    def statusChanged(self, event):  # noqa: N802
+        try:
+            self.enabled = bool(event.IsEnabled)
+            self.checked = event.State is True
+        except BaseException:  # noqa: BLE001 - khong duoc nem loi ra C++
+            pass
+
+    def disposing(self, event):
+        pass
+
+
+def command_state(ctx, frame, command: str) -> tuple[bool, bool]:
+    """(enabled, checked) cua mot lenh .uno:... - vd .uno:Sidebar checked = sidebar dang hien.
+
+    XDispatch.addStatusListener(listener, url) goi statusChanged ngay (dong bo) voi trang thai hien tai.
+    """
+    listener = _StatusListener()
     try:
-        controller = frame.getController()
-        provider = controller.queryInterface(uno.getTypeByName("com.sun.star.ui.XSidebarProvider"))
-        return provider.getSidebar() if provider is not None else None
-    except Exception:  # noqa: BLE001
-        return None
+        transformer = ctx.ServiceManager.createInstanceWithContext("com.sun.star.util.URLTransformer", ctx)
+        url = uno.createUnoStruct("com.sun.star.util.URL")
+        url.Complete = command
+        parsed = transformer.parseStrict(url)
+        parsed_url = parsed[1] if isinstance(parsed, tuple) and len(parsed) > 1 else parsed
+        provider = frame.queryInterface(uno.getTypeByName("com.sun.star.frame.XDispatchProvider"))
+        item = provider.queryDispatch(parsed_url, "", 0)
+        if item is None:
+            return False, False
+        item.addStatusListener(listener, parsed_url)
+        item.removeStatusListener(listener, parsed_url)
+    except Exception as exc:  # noqa: BLE001
+        log.info("command_state %s: %s" % (command, exc))
+    return listener.enabled, listener.checked
 
 
-def sidebar_available(ctx, frame) -> bool:
-    return current_sidebar(ctx, frame) is not None
+def sidebar_visible(ctx, frame) -> bool:
+    """Sidebar cua cua so dang hien? (XSidebarProvider khong co o ban 26.8 nen doc trang thai .uno:Sidebar.)"""
+    enabled, checked = command_state(ctx, frame, ".uno:Sidebar")
+    return enabled and checked
 
 
 def dispatch(ctx, frame, command: str) -> bool:
@@ -475,18 +702,26 @@ def dispatch(ctx, frame, command: str) -> bool:
     return True
 
 
+def _same(a, b) -> bool:
+    try:
+        return a == b
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def show_pane(ctx, frame) -> dict:
-    """Lenh ui.askpane: mo deck trong sidebar neu ban LibreOffice nay co sidebar, khong thi mo cua so noi."""
+    """Lenh ui.askpane: mo deck trong sidebar neu ban LibreOffice nay co sidebar, khong thi pane neo."""
     from . import bridge
 
     kind, port = pane_target(frame)
-    if sidebar_available(ctx, frame):
+    if sidebar_visible(ctx, frame):
+        # Sidebar cua LibreOffice dang hien (Calc/Impress mac dinh): mo deck Axiom Office trong do.
         dispatch(ctx, frame, ".uno:SidebarDeck." + DECK_ID)
         return {"taskPane": True, "host": "sidebar", "kind": kind}
 
     dock = DOCKS.get(kind)
-    if dock is not None:
-        dock.place()
+    if dock is not None and _same(dock.frame, frame):
+        dock.show()
         return {"taskPane": True, "host": "dock", "kind": kind}
     DOCKS[kind] = AskAiDock(ctx, bridge.gate(), frame, kind, port)
     return {"taskPane": True, "host": "dock", "kind": kind}

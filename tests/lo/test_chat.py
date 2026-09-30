@@ -21,7 +21,132 @@ if "uno" not in sys.modules:      # axiom.core chi can stdlib; axiom.chat thuan 
     sys.modules["uno"] = types.ModuleType("uno")
 sys.path.insert(0, PYTHONPATH)
 
-from axiom import chat, core  # noqa: E402
+from axiom import chat, core, theme  # noqa: E402
+
+
+class ItemTests(unittest.TestCase):
+    """Muc co cau truc ma pane ve thanh bong bong / dong thao tac / the (chatview.py)."""
+
+    def kinds(self, session):
+        return [item["kind"] for item in session.items]
+
+    def test_turn_items(self):
+        session = chat.ChatSession("wps")
+        session.begin("Chèn bảng")
+        session.handle_event({"type": "skill.loaded", "data": {"name": "the-thuc-van-ban"}})
+        session.handle_event({"type": "tool.finished", "data": {"tool": "load_skill", "ok": True}})
+        session.handle_event({"type": "tool.finished", "data": {"action": "writer.insertTable", "ok": True}})
+        session.handle_event({"type": "tool.finished", "data": {"action": "writer.heading", "ok": False, "error": "boom"}})
+        self.assertTrue(session.thinking)
+        session.finish({"status": "completed", "reply": "Xong."})
+        # tool.finished cua load_skill khong lap lai dong "Dung ky nang".
+        self.assertEqual(self.kinds(session), ["user", "skill", "tool", "tool", "ai"])
+        self.assertEqual(session.items[3]["state"], "error")
+        self.assertEqual(session.items[3]["error"], "boom")
+        self.assertFalse(session.thinking)
+
+    def test_confirm_card_lifecycle(self):
+        session = chat.ChatSession("wpp")
+        session.begin("Xoá slide")
+        session.handle_event({"type": "confirm.required", "data": {"confirmationId": "cf_1", "action": "wpp.deleteSlide",
+                                                                   "reason": "xoá", "paramsPreview": "{\"slide\":3}"}})
+        card = session.items[-1]
+        self.assertEqual((card["kind"], card["state"], card["rev"]), ("confirm", "pending", 0))
+        self.assertFalse(session.thinking)          # dang cho nguoi dung: khong hien "..."
+        session.handle_event({"type": "confirm.resolved", "data": {"confirmationId": "cf_1", "approved": False, "by": "timeout"}})
+        self.assertEqual(card["state"], "timeout")
+        self.assertEqual(card["rev"], 1)            # rev tang -> pane ve lai dung the nay
+
+    def test_pending_confirm_closed_when_run_ends(self):
+        session = chat.ChatSession("wps")
+        session.begin("x")
+        session.handle_event({"type": "confirm.required", "data": {"confirmationId": "cf_2", "action": "writer.saveAs"}})
+        session.finish({"status": "cancelled"})
+        self.assertEqual(session.items[1]["state"], "cancelled")
+        self.assertEqual((session.items[-1]["kind"], session.items[-1]["text"]), ("info", "Đã dừng."))
+
+    def test_memory_and_error_items(self):
+        session = chat.ChatSession("wps")
+        session.begin("x")
+        session.handle_event({"type": "memory.written", "data": {"id": "m1", "text": "Người ký: A"}})
+        memory = session.items[-1]
+        session.touch(memory, state="deleted")
+        self.assertEqual((memory["state"], memory["rev"]), ("deleted", 1))
+        session.fail("khong ket noi duoc Agent Core (http://127.0.0.1:47840)")
+        error = session.items[-1]
+        self.assertEqual(error["kind"], "error")
+        self.assertEqual(error["title"], "Không kết nối được Agent Core")
+
+    def test_reset_clears_items(self):
+        session = chat.ChatSession("wps")
+        session.begin("x")
+        session.note("Đã hoàn tác 1 thao tác.")
+        session.reset()
+        self.assertEqual(session.items, [])
+
+
+class ThemeTests(unittest.TestCase):
+    def test_labels(self):
+        self.assertEqual(theme.label_for("writer.insertTable"), "Chèn bảng")
+        self.assertEqual(theme.label_for("et.saveAs"), "Lưu tệp")
+        self.assertEqual(theme.label_for("wpp.exportPdf"), "Xuất PDF")
+        self.assertEqual(theme.label_for("load_skill"), "Dùng kỹ năng")
+        self.assertEqual(theme.label_for("writer.somethingNew"), "Thao tác trên tài liệu")
+        self.assertEqual(theme.label_for(None), "Thao tác trên tài liệu")
+
+    def test_empty_state_per_app(self):
+        for kind, noun in (("wps", "văn bản"), ("et", "bảng tính"), ("wpp", "bản trình chiếu")):
+            title, description, suggestions = theme.empty_state(kind)
+            self.assertIn(noun, title)
+            self.assertEqual(len(suggestions), 3)
+
+    def test_plain_reply_strips_markdown_marks(self):
+        self.assertEqual(theme.plain_reply("**Xong** `writer.heading`"), "Xong writer.heading")
+
+    def _png_size(self, data: bytes):
+        self.assertEqual(data[:8], b"\x89PNG\r\n\x1a\n")
+        import struct
+
+        return struct.unpack(">II", data[16:24])
+
+    def _pixels(self, data: bytes, width: int):
+        import struct
+        import zlib
+
+        pos, idat = 8, b""
+        while pos < len(data):
+            length = struct.unpack(">I", data[pos:pos + 4])[0]
+            if data[pos + 4:pos + 8] == b"IDAT":
+                idat += data[pos + 8:pos + 8 + length]
+            pos += 12 + length
+        raw = zlib.decompress(idat)
+        stride = 1 + width * 3
+        rows = [raw[i * stride + 1:(i + 1) * stride] for i in range(len(raw) // stride)]
+        return [[tuple(row[x * 3:x * 3 + 3]) for x in range(width)] for row in rows]
+
+    def test_corner_png_geometry(self):
+        """Goc 'tl': diem ngoai cung tron = mau nen pane, goc trong = mau to."""
+        data = theme.corner_png(10, "tl", theme.USER_BG, theme.PANE_BG)
+        self.assertEqual(self._png_size(data), (10, 10))
+        pixels = self._pixels(data, 10)
+        self.assertEqual(pixels[0][0], theme.rgb(theme.PANE_BG))
+        self.assertEqual(pixels[9][9], theme.rgb(theme.USER_BG))
+        br = self._pixels(theme.corner_png(10, "br", theme.USER_BG, theme.PANE_BG), 10)
+        self.assertEqual(br[9][9], theme.rgb(theme.PANE_BG))
+        self.assertEqual(br[0][0], theme.rgb(theme.USER_BG))
+
+    def test_corner_png_border_ring(self):
+        pixels = self._pixels(theme.corner_png(10, "tl", theme.AI_BG, theme.PANE_BG, theme.AI_BORDER), 10)
+        # Diem nam tren cung tron (ban kinh ~9.5) mang mau vien, khong phai mau to.
+        self.assertNotEqual(pixels[9][0], theme.rgb(theme.AI_BG))
+        self.assertEqual(pixels[9][9], theme.rgb(theme.AI_BG))
+
+    def test_icons(self):
+        for kind in ("ok", "error", "running", "dot"):
+            data = theme.icon_png(kind, 12)
+            self.assertEqual(self._png_size(data), (12, 12))
+        center = self._pixels(theme.icon_png("dot", 12), 12)[6][6]
+        self.assertEqual(center, theme.rgb(theme.ACCENT))
 
 
 class EditCountTests(unittest.TestCase):

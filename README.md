@@ -509,7 +509,7 @@ powershell -ExecutionPolicy Bypass -File tests\mcp-host\office_roundtrip.ps1 -Di
 powershell -ExecutionPolicy Bypass -File tests\mcp-host\office_roundtrip.ps1 -Dir <thư_mục_output> -Verify
 # Unit test của các MCP Python (legacy)
 cd tools\word-mcp; .venv\Scripts\python.exe -m unittest discover -s tests
-# Làn LibreOffice: 30 unit test (giải mã tham số + registry lệnh khớp bản C#, logic pane + đọc SSE của
+# Làn LibreOffice: 41 unit test (giải mã tham số + registry lệnh khớp bản C#, logic pane, theme + đọc SSE của
 # Core) và test mọi lệnh trên LibreOffice thật (script tự mở LibreOffice bằng profile người dùng;
 # --ui: bản có cửa sổ; --ai: ai.ask)
 python tests\lo\test_extension.py
@@ -590,21 +590,31 @@ Bận/đổi port thì bridge thử cổng kế tiếp (+10) tối đa 5 lần.
 **Cách điều khiển:**
 
 - **Pane Ask AI trong LibreOffice**: menubar có menu **Axiom Office → Ask AI** (và *Settings…*); hoặc lệnh
-  `ui.askpane` qua bridge. Pane hiện ở mép phải cửa sổ tài liệu: transcript (dòng `✓ writer.…`, `✓ Dùng kỹ
-  năng: …`, `✓ Đã ghi nhớ: …`), ô nhập + **Gửi**/**Dừng**, thẻ **Đồng ý/Từ chối** khi policy cần xác nhận,
-  **Trò chuyện mới**, **Hoàn tác lượt này** (Writer/Calc/Impress — UNO hoàn tác được), **Cài đặt**
-  (provider/endpoint/model/key, Core, ghi nhớ, QA thị giác), **Ghi nhớ** (xem/xoá), **Đóng**.
-  Pane nói chuyện với Agent Core qua `core.json`; Core chưa chạy thì tự khởi động bằng `CoreExe`.
+  `ui.askpane` qua bridge. Giao diện giống pane bên Word/Excel/PowerPoint (cùng màu, cỡ chữ, khoảng cách —
+  `axiom/theme.py` là bản LibreOffice của `PaneTheme`): header có chấm accent + link **Trò chuyện mới /
+  Ghi nhớ / Cài đặt**; màn hình đầu có **gợi ý** dạng chip (bấm để điền); bong bóng chat bo góc (người dùng
+  bên phải nền indigo nhạt, AI bên trái nền xám có viền); mỗi thao tác một dòng "✓ Chèn bảng …
+  `writer.insertTable`" (✗ đỏ kèm lỗi nếu hỏng); thẻ **Cần bạn xác nhận** (Đồng ý/Từ chối), thẻ **Đã ghi nhớ**
+  (Xoá), thẻ lỗi (Mở Cài đặt); "• • •" khi đang chờ model; ô soạn bo góc với placeholder, nút **Gửi** indigo
+  (Enter gửi, Shift+Enter xuống dòng, PageUp/PageDown cuộn hội thoại); footer trạng thái với **Dừng** /
+  **Hoàn tác lượt này** (Writer/Calc/Impress — UNO hoàn tác được). Pane nói chuyện với Agent Core qua
+  `core.json`; Core chưa chạy thì tự khởi động bằng `CoreExe`.
 - **MCP**: `office_sessions` liệt kê cả bridge LibreOffice; gọi lệnh kèm `port`: `word_command
   {action: 'writer.appendText', params: {text: '...'}, port: 47851}`.
 - **Agent Core**: `ai.ask` trên bridge (Core đọc `core.json`, chạy agent đầy đủ skill/memory/policy rồi
   gọi ngược `/cmd`). Đây là đường đi đã kiểm chứng end-to-end: model tự nạp skill, sửa tài liệu thật.
 
-Pane được đăng ký đúng chuẩn LibreOffice: deck sidebar "Axiom Office" (`Sidebar.xcu` + `Factory.xcu`,
-panel `private:resource/toolpanel/AxiomOfficePanelFactory/AskAi`) **và** menu (`Addons.xcu` +
-`ProtocolHandler.xcu`). Bản LibreOffice nào không có sidebar dùng được (vd 26.8 trên máy này: layout không
-có `private:resource/uielement/sidebar`) thì `ui.askpane` mở pane dạng cửa sổ con neo bên phải cửa sổ tài
-liệu — xem ghi chú ở `LibreOffice_arch.md` mục 14.2.
+Pane mở ở một trong hai chỗ (cùng một giao diện):
+
+- **Deck "Axiom Office" trong sidebar của LibreOffice** khi sidebar đang hiện (Calc, Impress mặc định) — biểu
+  tượng bong bóng chat trên thanh tab sidebar; kéo mép sidebar để đổi bề rộng.
+- **Pane neo bên phải** khi cửa sổ không có sidebar (Writer trên máy này): vùng tài liệu tự co lại nhường
+  chỗ (tài liệu xếp dòng lại, có thanh cuộn riêng), phóng to/thu nhỏ cửa sổ thì xếp lại theo; nút **✕** đóng
+  pane và trả lại bề rộng, mở lại giữ nguyên hội thoại.
+
+Hạn chế: con lăn chuột không cuộn được hội thoại (awt không có sự kiện wheel cho khung tự vẽ) — dùng thanh
+cuộn hoặc PageUp/PageDown trong ô soạn; hội thoại tự cuộn xuống cuối khi có dòng mới. Chi tiết kỹ thuật:
+`LibreOffice_arch.md` mục 14.2–14.3.
 
 Khác bản Office (do UNO):
 
@@ -667,8 +677,8 @@ src/AxiomOffice.LibreOffice/  extension Python UNO cho LibreOffice (nói cùng g
   python/axiom_panel.py       component UNO: factory panel cho sidebar
   python/axiom_dispatch.py    component UNO: xu ly URL org.axiomoffice.bridge:... (menu)
   python/pythonpath/axiom/    bridge (HTTP), gate (AsyncCallback), registry lệnh, writer/calc/impress/checks,
-                              session; pane: core (client Agent Core), chat (logic hội thoại), awt, panel,
-                              dialogs, dispatch
+                              session; pane: core (client Agent Core), chat (logic hội thoại), theme (màu/cỡ
+                              chữ như PaneTheme + PNG góc bo), widgets, chatview, panel, awt, dialogs, dispatch
 tests/live/                   test mọi lệnh bridge trên Office/WPS thật
 tests/lo/                     unit test extension LibreOffice (không cần LibreOffice: uno giả)
 tests/mcp-host/               test parity MCP + registry lệnh + round-trip với Office thật
