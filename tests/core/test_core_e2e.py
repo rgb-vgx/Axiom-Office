@@ -912,7 +912,15 @@ def test_setup(core: Core, llm: FakeLlm, work: str) -> None:
     Day la duong ma SetupWizardForm (Windows) va setupwizard.py (Linux) goi; cau chu tieng Viet tra ve tu day.
     """
     token = core.token
-    endpoint = f"http://127.0.0.1:{llm.port}/v1"
+    # LLM gia rieng tra loi text: kich ban chung cua `llm` bat dau bang tool call nen --only setup se thieu text.
+    chat = FakeLlm(work, [{"text": "OK"}])
+    try:
+        _test_setup(core, token, f"http://127.0.0.1:{chat.port}/v1", work)
+    finally:
+        chat.stop()
+
+
+def _test_setup(core: Core, token: str, endpoint: str, work: str) -> None:
 
     status, payload = http_json(core.base + "/v1/setup", token=token)
     check(status == 200 and payload.get("ok") is True, "GET /v1/setup tra ok", json.dumps(payload, ensure_ascii=False)[:200])
@@ -1002,13 +1010,28 @@ def test_office(core: Core, port: int, pid: int) -> None:
     check(rows and rows[0][:2] == ["Ten", "Diem"], "tai lieu that su doi (A1:B1)", rows)
 
 
+# Cac phan chay duoc rieng (--only); /health luon chay truoc.
+SECTIONS = ["fake_bridge", "guards", "skills", "memory", "confirm", "mcp", "visual", "setup"]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--office", action="store_true", help="dung Office that thay vi bridge gia")
     parser.add_argument("--keep", action="store_true", help="giu thu muc tam de xem log")
     parser.add_argument("--real-llm", action="store_true",
                         help="goi LLM that trong HKCU (ton token): model tu chon dung skill; khong chay mac dinh")
+    parser.add_argument("--only", default="",
+                        help="chi chay cac phan (cach nhau dau phay): " + ",".join(SECTIONS)
+                        + " - dung khi port Core sang Go tung giai doan")
     args = parser.parse_args()
+    only = [name.strip() for name in args.only.split(",") if name.strip()]
+    unknown = [name for name in only if name not in SECTIONS]
+    if unknown:
+        parser.error("phan khong co: " + ", ".join(unknown))
+
+    def wanted(section: str) -> bool:
+        return not only or section in only
+
     if args.real_llm:
         work = os.path.join(tempfile.gettempdir(), "axiom-core-real-" + uuid.uuid4().hex[:8])
         os.makedirs(work, exist_ok=True)
@@ -1070,14 +1093,22 @@ def main() -> int:
         if args.office:
             test_office(core, office_port, office_pid)
         else:
-            test_fake_bridge(core, bridge, llm, document_path)
-            test_guards(core, bridge, document_path)
-            test_skills(work, token, bridge, document_path, session_dir)
-            test_memory(work, token, bridge, document_path, session_dir)
-            test_confirm(work, token, bridge, document_path, session_dir)
-            test_mcp(work, token, bridge, document_path, session_dir)
-            test_visual(work, token, bridge, document_path, session_dir)
-            test_setup(core, llm, work)
+            if wanted("fake_bridge"):
+                test_fake_bridge(core, bridge, llm, document_path)
+            if wanted("guards"):
+                test_guards(core, bridge, document_path)
+            if wanted("skills"):
+                test_skills(work, token, bridge, document_path, session_dir)
+            if wanted("memory"):
+                test_memory(work, token, bridge, document_path, session_dir)
+            if wanted("confirm"):
+                test_confirm(work, token, bridge, document_path, session_dir)
+            if wanted("mcp"):
+                test_mcp(work, token, bridge, document_path, session_dir)
+            if wanted("visual"):
+                test_visual(work, token, bridge, document_path, session_dir)
+            if wanted("setup"):
+                test_setup(core, llm, work)
     finally:
         if core is not None:
             core.stop()

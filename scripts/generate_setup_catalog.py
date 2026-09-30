@@ -1,11 +1,12 @@
 """Sinh catalog cho wizard thiet lap tu `catalog/setup.json` (nguon duy nhat ve chu + preset).
 
-Ra hai file, KHONG sua tay:
+Ra ba file, KHONG sua tay:
   - `src/AxiomOffice/Setup/SetupCatalog.cs`   - add-in net48 (build.ps1 bien dich ca thu muc src\\AxiomOffice)
                                                 va Agent Core (csproj Compile Include) dung chung.
                                                 Phai la cu phap C# 7.3 (add-in build bang /langversion:7.3).
   - `src/AxiomOffice.LibreOffice/python/pythonpath/axiom/setup_catalog.py` - extension LibreOffice
                                                 (nam trong pythonpath nen scripts/package_oxt.py dong goi luon).
+  - `core-go/internal/setup/catalog_gen.go`  - Agent Core ban Go (JSON nhung san, giai ma luc khoi dong).
 
     python scripts/generate_setup_catalog.py [--check]
 """
@@ -22,6 +23,7 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 SOURCE = os.path.join(ROOT, "catalog", "setup.json")
 CSHARP = os.path.join(ROOT, "src", "AxiomOffice", "Setup", "SetupCatalog.cs")
 PYTHON = os.path.join(ROOT, "src", "AxiomOffice.LibreOffice", "python", "pythonpath", "axiom", "setup_catalog.py")
+GO = os.path.join(ROOT, "core-go", "internal", "setup", "catalog_gen.go")
 
 
 def load() -> dict:
@@ -256,6 +258,16 @@ def render_python(data: dict) -> str:
     )
 
 
+def render_go(data: dict) -> str:
+    # Chuoi do json.dumps sinh ra cung la literal chuoi Go hop le (cac escape \" \\ \n \uXXXX giong nhau).
+    payload = json.dumps(json.dumps(data, ensure_ascii=False, separators=(",", ":")), ensure_ascii=False)
+    return (
+        "// SINH TU DONG tu catalog/setup.json bang scripts/generate_setup_catalog.py - KHONG sua tay.\n\n"
+        "package setup\n\n"
+        "const catalogJSON = " + payload + "\n"
+    )
+
+
 def write(path: str, text: str, check: bool) -> bool:
     current = ""
     if os.path.exists(path):
@@ -280,10 +292,11 @@ def main() -> int:
     data = load()
     stale = write(CSHARP, render_csharp(data), args.check)
     stale = write(PYTHON, render_python(data), args.check) or stale
+    stale = write(GO, render_go(data), args.check) or stale
     if args.check and stale:
         return 1
     if args.check:
-        print("khop: SetupCatalog.cs + setup_catalog.py")
+        print("khop: SetupCatalog.cs + setup_catalog.py + catalog_gen.go")
     return 0
 
 

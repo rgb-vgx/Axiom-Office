@@ -1,0 +1,3 @@
+# Binary build tai cho (go build -o ...)
+/axiom-core
+/axiom-core.exe

@@ -34,6 +34,23 @@ jobs:
       - name: MCP server (khong can app dang mo)
         run: python3 tests/mcp-host/test_mcp_portable.py src/AxiomOffice.Mcp/bin/Release/net10.0/axiom-office-mcp.dll
 
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: core-go/go.mod
+          cache-dependency-path: core-go/go.sum
+
+      - name: Agent Core ban Go (go test + build + e2e cac phan da port)
+        run: |
+          python3 scripts/generate_setup_catalog.py --check
+          cd core-go
+          go vet ./...
+          go test ./...
+          CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o "$RUNNER_TEMP/gocore/axiom-core" ./cmd/axiom-core
+          cp -r ../skills "$RUNNER_TEMP/gocore/"
+          cd ..
+          # G1 chua dem skill (G3) nen chi canh bao; tu G3 bo "|| echo" de chan merge khi lech.
+          AXIOM_E2E_CORE_EXE="$RUNNER_TEMP/gocore/axiom-core" python3 tests/core/test_core_e2e.py --only setup             || echo "::warning::Core Go chua qua het phan setup"
+
       - name: Cai LibreOffice + Python UNO (+ xvfb cho phan giao dien)
         run: |
           sudo apt-get update
@@ -87,6 +104,15 @@ jobs:
 
       - name: Agent Core (xUnit)
         run: dotnet test tests/core/AxiomOffice.Core.Tests -c Release
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: core-go/go.mod
+          cache-dependency-path: core-go/go.sum
+
+      - name: Agent Core ban Go (go test)
+        working-directory: core-go
+        run: go test ./...
 
       - name: Build add-in + Host (net48)
         shell: pwsh

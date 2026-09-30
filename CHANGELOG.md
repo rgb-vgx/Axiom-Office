@@ -5,6 +5,22 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Agent Core bản Go, giai đoạn G1 (`core-go/`, song song với bản .NET)
+- Viết lại Agent Core bằng Go để phát hành **một binary ~11 MB không cần runtime** (Windows + Linux, build
+  chéo không cần cgo nhờ `modernc.org/sqlite`). Bản .NET vẫn là bản phát hành cho tới khi bản Go qua toàn bộ
+  e2e; kế hoạch G1–G6 trong `core-go/README.md`
+- G1: cấu hình (`AXIOM_*` → HKCU + DPAPI / `config.json` + libsecret), `core.log` (cùng định dạng, xoay 10 MB),
+  `core.json`, một-phiên-bản (cùng mutex với bản .NET; `flock` trên Linux), chọn port 47840–47849, guard
+  (Origin 403 / token 401 / Content-Type 415), `/health`, `/v1/admin/shutdown`, migrate `core.db` schema 2
+  giống hệt, model client (OpenAI-compatible + Anthropic, thử lại lỗi tạm thời, nhắc khi trả lời rỗng, bỏ
+  `<think>`), vòng lặp agent, và API wizard `/v1/setup`, `/v1/llm/test`, `/v1/llm/models`
+- `scripts/generate_setup_catalog.py` sinh thêm `core-go/internal/setup/catalog_gen.go` (vẫn một nguồn
+  `catalog/setup.json`)
+- `tests/core/test_core_e2e.py --only <phần,...>` chạy riêng từng phần (dùng để đối chiếu bản Go theo giai
+  đoạn); `test_setup` dùng LLM giả riêng nên chạy độc lập được. Bản Go qua `/health` + 19/20 kiểm tra
+  `setup` trên cả Windows và Linux (còn thiếu đếm skill, thuộc G3); `go test ./...` cho config, model/codec,
+  dịch lỗi, guard + `/v1/setup`
+
 ### Added — Nốt phần L3 cho Linux: skill trong gói, libsecret, systemd, CI
 - **Skill dựng sẵn trong gói**: `scripts/linux/package.sh` chép `skills/` (8 skill + `_design/tokens.json`)
   vào `core/skills` — Core nạp sẵn nguồn "builtin" cạnh binary, máy mới cài không cần cấu hình `SkillDirs`
