@@ -21,8 +21,8 @@ from urllib.parse import urlencode
 import uno
 
 from . import bridge, config, core, documents, log, setup, setup_catalog, theme
-from .awt import Dialog, message_box
-from .widgets import RoundBox, Surface, Widget, button, link, set_icon, set_prop
+from .awt import Dialog, ItemListener, message_box
+from .widgets import RoundBox, Surface, TextListener, Widget, button, link, set_icon, set_prop
 
 WIDTH, HEIGHT = 640, 524
 PAD = 16
@@ -40,6 +40,7 @@ def open_setup(target) -> "Wizard | None":
     frame = getattr(target, "frame", None) or documents.desktop(ctx).getCurrentFrame()
     global CURRENT
     if CURRENT is not None and CURRENT.is_open():
+        CURRENT.window.to_front()   # co the dang nam sau cua so LibreOffice
         return CURRENT           # dang mo: giu nguyen trang thai (mo lai khong lam mat buoc dang lam)
     wizard = Wizard(ctx, frame)
     wizard.show()
@@ -95,8 +96,11 @@ class Wizard:
         self.state = setup.SetupState(self.kind)
         self.busy = False
         self._token = 0
+        self._writing = False     # dang ghi o nhap tu code -> TextListener bo qua
+        self.closed = False       # da goi close() (bam X co the bao nhieu lan)
         # Dialog that (co X window rieng): cua so con VCL trong vung tai lieu khong bam duoc (xem awt.Dialog).
         self.window = Dialog(ctx, WIDTH, HEIGHT, "Thiết lập Axiom Office")
+        self.window.on_close(self.close)      # bam X tren thanh tieu de
         self.surface = Surface(ctx, self.window.container)
         self.boxes: dict = {}
         self.check_rows: list = []
@@ -211,6 +215,8 @@ class Wizard:
         self.key_link = link(self.surface, "Lấy khoá ở đâu?", self._open_key_url, color=theme.ACCENT_FG)
         box.add(self.key_link, 150, 138)
         self.model_edit = self._field(box, 158, "Model")
+        for edit in (self.endpoint_edit, self.key_edit, self.model_edit):
+            edit.addTextListener(TextListener(self._on_field_changed))   # bat/tat nut chinh ngay khi go
         self.models_button = button(self.surface, "Tải danh sách model", 170, 26, self._load_models, primary=False)
         box.add(self.models_button, 150, 184)
         self.models_hint = box.widget(332, 184).add("FixedText", 0, 0, WIDTH - 2 * PAD - 332, 28, Label="", MultiLine=True,
@@ -219,6 +225,7 @@ class Wizard:
         list_holder = box.widget(150, 214)
         self.model_list = list_holder.add("ListBox", 0, 0, WIDTH - 2 * PAD - 150, 80, StringItemList=(), LineCount=4)
         self.model_list.setVisible(False)
+        self.model_list.addItemListener(ItemListener(self._on_model_picked))   # chon model khac -> thu lai
         test_holder = box.widget(0, 300)
         self.test_icon = test_holder.add("ImageControl", 2, 3, 12, 12, Border=0, ScaleImage=False,
                                          BackgroundColor=theme.PANE_BG, Tabstop=False)
@@ -296,15 +303,13 @@ class Wizard:
         """Wizard con song khong (nguoi dung co the da bam X cua so -> dispose)."""
         if getattr(self, "closed", False):
             return False
-        try:
-            self.window.container.getPeer()
-            return True
-        except Exception:  # noqa: BLE001 - cua so da bi huy
-            return False
+        return self.window.is_alive()
 
     def close(self) -> None:
         global CURRENT
 
+        if self.closed:
+            return               # close() -> dispose -> TopWindowListener goi lai
         self.closed = True
         if CURRENT is self:
             CURRENT = None
@@ -326,12 +331,11 @@ class Wizard:
             box.place(PAD, CONTENT_Y)
             box.set_visible(step_id == state.step_id)
         self.back_button.set_visible(not state.is_first)
-        label = {"welcome": "Bắt đầu →", "checks": "Tiếp tục →", "connect": "Kiểm tra kết nối",
-                 "features": "Tiếp tục →", "done": "Hoàn tất"}[state.step_id]
-        self._set_next(label)
+        self._set_next()
         self._refresh_step()
 
-    def _set_next(self, label: str) -> None:
+    def _set_next(self) -> None:
+        label = self.state.next_label
         if label != getattr(self.next_button, "text", None):
             self.next_button.text = label
             set_prop(self.next_button.label, "Label", label)
@@ -375,7 +379,7 @@ class Wizard:
         for control, value in ((self.endpoint_edit, self.state.endpoint), (self.model_edit, self.state.model)):
             try:
                 if str(control.getModel().getPropertyValue("Text") or "") != value:
-                    control.getModel().setPropertyValue("Text", value)
+                    self._set_text(control, value)
             except Exception:  # noqa: BLE001
                 pass
 
@@ -603,33 +607,86 @@ class Wizard:
 
     # ---------------------------------------------------------------- hanh dong buoc 3
 
-    def _read_fields(self) -> None:
+    def _read_fields(self) -> bool:
+        """Doc ba o nhap vao trang thai; tra ve True neu gia tri doi (ket qua thu cu het hieu luc).
+
+        Di qua `SetupState.update_fields` chu KHONG gan thang: do la cho duy nhat biet "gia tri vua doi thi
+        ket qua thu cu khong con dung". Danh sach model (ListBox) la nguon chinh khi no co du lieu.
+        """
         state = self.state
         endpoint = str(self.endpoint_edit.getModel().getPropertyValue("Text") or "").strip()
         model = str(self.model_edit.getModel().getPropertyValue("Text") or "").strip()
-        if state.step_id == "connect" and (endpoint != state.endpoint or model != state.model):
-            state.touched = True
-        state.endpoint, state.model = endpoint, model
-        state.api_key = str(self.key_edit.getModel().getPropertyValue("Text") or "").strip()
+        api_key = str(self.key_edit.getModel().getPropertyValue("Text") or "").strip()
         selected = self._selected_model()
         if selected:
-            state.model = selected
-            self.model_edit.getModel().setPropertyValue("Text", selected)
+            model = selected
+            self._set_text(self.model_edit, selected)
+        return state.update_fields(endpoint, model, api_key)
+
+    def _set_text(self, edit, value: str) -> None:
+        """Ghi o nhap tu code ma khong kich _on_field_changed (ghi tung o se doc lech o con lai)."""
+        self._writing = True
+        try:
+            edit.getModel().setPropertyValue("Text", value)
+        finally:
+            self._writing = False
+
+    def _on_field_changed(self) -> None:
+        """Nguoi dung go vao o dia chi/khoa/model: cap nhat trang thai nut chinh, bo ket qua thu cu."""
+        if self._writing or self.state.step_id != "connect":
+            return
+        try:
+            texts = [str(edit.getModel().getPropertyValue("Text") or "")
+                     for edit in (self.endpoint_edit, self.model_edit, self.key_edit)]
+        except Exception:  # noqa: BLE001 - control da bi huy
+            return
+        if texts[1].strip() != self._selected_model():
+            self._drop_list_selection()   # tu go ten model -> chu trong o thang the danh sach
+        self._note_change(self.state.update_fields(*texts))
+
+    def _on_model_picked(self) -> None:
+        """Chon model trong danh sach: nhu go tay - ket qua thu cu (do model cu) het hieu luc."""
+        if self._writing or self.state.step_id != "connect":
+            return
+        state = self.state
+        self._note_change(state.update_fields(state.endpoint, self._selected_model() or state.model,
+                                               state.api_key))
+
+    def _drop_list_selection(self) -> None:
+        """Bo muc dang chon trong danh sach model (neu co)."""
+        try:
+            index = int(self.model_list.getSelectedItemPos())
+            if index >= 0:
+                self.model_list.selectItemPos(index, False)
+        except Exception as exc:  # noqa: BLE001 - chua co peer / ban khac khong ho tro
+            log.info("setup: khong bo chon duoc muc model (%s)" % exc)
+
+    def _note_change(self, changed: bool) -> None:
+        if changed:
+            set_icon(self.test_icon, "dot", 12, theme.PANE_BG)
+            set_prop(self.test_line, "Label", "")
+        self._set_next()
 
     def _selected_model(self) -> str:
+        """Model dang chon trong ListBox ("" khi danh sach trong hoac chua chon muc nao).
+
+        Phai doc tu CONTROL (`XListBox.getSelectedItemPos`), KHONG phai tu model: thuoc tinh
+        `SelectedItemPos` cua model tra ve None du nguoi dung da chon (LibreOffice 26.8), nen doc model thi
+        khong bao gio thay duoc lua chon - chon model trong danh sach se vo hieu.
+        """
         if not self.state.models:
             return ""
         try:
-            index = int(self.model_list.getModel().getPropertyValue("SelectedItemPos"))
-        except Exception:  # noqa: BLE001
+            index = int(self.model_list.getSelectedItemPos())
+        except Exception:  # noqa: BLE001 - control chua co peer hoac da bi huy
             return ""
         return self.state.models[index] if 0 <= index < len(self.state.models) else ""
 
     def _choose(self, provider_id: str) -> None:
         self._read_fields()
         self.state.choose_provider(provider_id)
-        self.endpoint_edit.getModel().setPropertyValue("Text", self.state.endpoint)
-        self.model_edit.getModel().setPropertyValue("Text", self.state.model)
+        self._set_text(self.endpoint_edit, self.state.endpoint)
+        self._set_text(self.model_edit, self.state.model)
         self._refresh_step()
 
     def _open_key_url(self) -> None:
@@ -667,7 +724,7 @@ class Wizard:
                 self.state.apply_models_error(error)
             else:
                 self.state.apply_models(models)
-                self.model_edit.getModel().setPropertyValue("Text", self.state.model)
+                self._set_text(self.model_edit, self.state.model)
 
     def _test_connection(self) -> None:
         if self.busy:
@@ -704,7 +761,7 @@ class Wizard:
     def _open_advanced(self) -> None:
         from . import dialogs
 
-        dialogs.open_settings(_SettingsTarget(self.ctx, self.frame))
+        dialogs.open_settings(_SettingsTarget(self.ctx, self.frame), floating=True)   # cua so roi: noi len tren wizard
 
     def _try_now(self) -> None:
         if self.busy:
@@ -782,7 +839,7 @@ class Wizard:
                 config.set_value("LlmApiKey", config.protect_secret(state.api_key, "LlmApiKey"))
                 state.api_key = ""
                 state.has_stored_key = True
-                self.key_edit.getModel().setPropertyValue("Text", "")
+                self._set_text(self.key_edit, "")
             for key, enabled in state.features.items():
                 config.set_value(key, 1 if enabled else 0)
         except Exception as exc:  # noqa: BLE001
@@ -805,18 +862,28 @@ def drive(wizard: "Wizard", params: dict) -> dict:
         wizard._show_step()
     if params.get("provider"):
         wizard._choose(str(params["provider"]))
-    if params.get("endpoint") is not None:
-        state.endpoint = str(params["endpoint"]).strip()
-        state.touched = True
-    if params.get("model") is not None:
-        state.model = str(params["model"]).strip()
-        state.touched = True
-    if params.get("apiKey") is not None:
-        state.api_key = str(params["apiKey"])
+    if params.get("endpoint") is not None or params.get("model") is not None or params.get("apiKey") is not None:
+        # Di qua update_fields (khong gan thang): doi gia tri thi ket qua thu cu phai het hieu luc, giong
+        # duong nguoi dung go tay.
+        state.update_fields(
+            str(params["endpoint"]) if params.get("endpoint") is not None else state.endpoint,
+            str(params["model"]) if params.get("model") is not None else state.model,
+            str(params["apiKey"]) if params.get("apiKey") is not None else state.api_key)
+        if params.get("endpoint") is not None or params.get("model") is not None:
+            state.touched = True
     if params.get("step") or params.get("provider") or params.get("endpoint") is not None or params.get("model") is not None:
-        wizard._sync_fields()
+        wizard._sync_fields()      # _sync_fields chi lo o dia chi + model; o khoa API khong bao gio dien san
+    if params.get("model") is not None:
+        wizard._on_field_changed()  # nhu go tay vao o Model: bo muc dang chon trong danh sach
     if params.get("models"):
         wizard._load_models()
+    if params.get("modelIndex") is not None:
+        # Chon model trong ListBox (nhu nguoi dung bam): dat muc dang chon roi goi thang handler cua listener,
+        # vi gan muc dang chon bang code khong ban itemStateChanged.
+        uno.invoke(wizard.model_list, "selectItemPos", (int(params["modelIndex"]), True))
+        wizard._on_model_picked()
+    if params.get("advanced"):
+        wizard._open_advanced()
     if params.get("test"):
         wizard._test_connection()
     if params.get("features"):
@@ -841,11 +908,23 @@ def status(wizard: "Wizard") -> dict:
         "modelsStatus": state.models_status,
         "testKind": state.test_kind(),
         "testLine": state.test_line(),
+        "nextLabel": state.next_label,
         "endpoint": state.endpoint,
         "model": state.model,
         "coreError": state.core_error,
         "features": dict(state.features),
+        "selectedPos": _selected_pos(wizard),
     }
+
+def _selected_pos(wizard: "Wizard"):
+    """Muc dang chon trong ListBox model (-1: chua chon muc nao; "khong doc duoc": control da bi huy).
+
+    Doc tu control - cung nguon voi `Wizard._selected_model` (model khong phan anh lua chon cua nguoi dung).
+    """
+    try:
+        return wizard.model_list.getSelectedItemPos()
+    except Exception:  # noqa: BLE001 - control da bi huy
+        return "khong doc duoc"
 
 class _SettingsTarget:
     """Doi tuong gia de mo dialog Cai dat nang cao tu wizard (giong dispatch._SettingsTarget)."""

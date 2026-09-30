@@ -9,7 +9,9 @@ Chay rieng (khong nam trong test_live_libreoffice.py) vi wizard la DIALOG THAT:
     xvfb-run -a python3 tests/live/test_setup_wizard.py        # CI
 
 Kiem tra: mo wizard -> doc trang thai tu Core -> nhay buoc -> nap danh sach model tu may chu ->
-thu ket noi (thanh cong + that bai, cau tieng Viet) -> luu cau hinh -> dong.
+thu ket noi (thanh cong + that bai, cau tieng Viet) -> ket qua thu cu het hieu luc khi doi gia tri
+(go tay hoac chon trong danh sach) -> mo dialog Cai dat nang cao (cua so roi) -> luu cau hinh ->
+bam X tren thanh tieu de -> dong.
 """
 from __future__ import annotations
 
@@ -34,6 +36,8 @@ from test_live_commands import RESULTS, check  # noqa: E402  (dung chung cach in
 FAKE_LLM = os.path.join(ROOT, "tests", "core", "fake_llm.py")
 PORT = 47851
 IS_WINDOWS = sys.platform.startswith("win")
+TITLE = "Thiết lập Axiom Office"        # tieu de cua so wizard (setupwizard.open_setup)
+ADVANCED_TITLE = "Cài đặt"              # tieu de dialog mo tu "Tuy chon nang cao" (dialogs.open_settings)
 
 def config_path() -> str:
     base = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
@@ -123,6 +127,29 @@ def dismiss_first_run() -> None:
         subprocess.run(["xdotool", "key", "--window", windows[0], "Escape"], capture_output=True)
         time.sleep(1.0)
 
+def search_windows(name: str) -> list:
+    """Id cua so tren X co tieu de chua `name` (rong tren Windows hoac khi khong co xdotool)."""
+    if IS_WINDOWS or not shutil.which("xdotool"):
+        return []
+    found = subprocess.run(["xdotool", "search", "--name", name], capture_output=True, text=True)
+    return found.stdout.split()
+
+def close_window(name: str) -> bool:
+    """Bam X tren thanh tieu de (gui WM_DELETE_WINDOW). True neu tim thay cua so de dong."""
+    windows = search_windows(name)
+    if not windows:
+        return False
+    subprocess.run(["xdotool", "windowclose", windows[0]], capture_output=True)
+    return True
+
+def wait_until(ready, seconds: float = 15.0) -> bool:
+    deadline = time.time() + seconds
+    while time.time() < deadline:
+        if ready():
+            return True
+        time.sleep(0.5)
+    return ready()
+
 def launch_fresh(work: str) -> subprocess.Popen:
     """LibreOffice voi PROFILE RIENG da cai extension: khong dung app/cau hinh dang dung cua nguoi dung."""
     oxt = subprocess.run([sys.executable, os.path.join(ROOT, "scripts", "package_oxt.py"), "--print-path"],
@@ -196,8 +223,35 @@ def main() -> int:
         state = wait(lambda item: not item.get("busy") and item.get("testKind"))
         check(state.get("testKind") == "ok" and "Kết nối tốt" in (state.get("testLine") or ""),
               "wizard thu ket noi voi may chu that -> bao ket noi tot", state.get("testLine"))
+        check(state.get("nextLabel") == "Tiếp tục →",
+              "thu ket noi tot -> nut chinh doi thanh \"Tiep tuc\"", state.get("nextLabel"))
 
-        call({"endpoint": "http://127.0.0.1:59999/v1"})
+        # Chon model KHAC trong danh sach: ket qua thu cu (do model cu) phai het hieu luc - neu khong, nguoi
+        # dung bam "Tiep tuc" la luu luon model chua he duoc thu.
+        picked = call({"modelIndex": 1})
+        check(picked.get("model") == "fake-model-2" and picked.get("testKind") == ""
+              and picked.get("nextLabel") == "Kiểm tra kết nối",
+              "chon model khac trong danh sach -> ket qua thu cu het hieu luc",
+              json.dumps({key: picked.get(key) for key in ("model", "testKind", "nextLabel", "selectedPos")},
+                         ensure_ascii=False))
+        call({"modelIndex": 0})        # tra ve model dau cho cac buoc sau
+
+        # Go tay ten model khac: chu trong o thang danh sach (bo muc dang chon), nen lan sau bam "Tiep tuc"
+        # khong bi danh sach ghi de nguoc lai.
+        typed = call({"model": "model-tu-go"})
+        check(typed.get("model") == "model-tu-go" and typed.get("selectedPos") == -1
+              and typed.get("nextLabel") == "Kiểm tra kết nối",
+              "go tay ten model -> bo muc dang chon trong danh sach",
+              json.dumps({key: typed.get(key) for key in ("model", "selectedPos", "nextLabel")}, ensure_ascii=False))
+        call({"model": "fake-model"})  # tra ve model cu cho cac buoc sau
+
+        # Doi dia chi sau khi da thu tot: ket qua thu cu het hieu luc, phai thu lai truoc khi cho di tiep
+        # (neu khong, nguoi dung bam "Tiep tuc" la luu luon dia chi chua he duoc thu).
+        changed = call({"endpoint": "http://127.0.0.1:59999/v1"})
+        check(changed.get("testKind") == "" and changed.get("nextLabel") == "Kiểm tra kết nối",
+              "doi dia chi -> ket qua thu cu het hieu luc",
+              json.dumps({key: changed.get(key) for key in ("testKind", "nextLabel")}, ensure_ascii=False))
+
         call({"test": True})
         state = wait(lambda item: not item.get("busy") and item.get("testKind"))
         line = state.get("testLine") or ""
@@ -214,6 +268,25 @@ def main() -> int:
         check(saved_state.get("step") in ("connect", "features", "done"), "wizard o buoc hop le sau khi luu",
               saved_state.get("step"))
         check(call({"close": True}).get("closed") is True, "wizard dong duoc", "")
+
+        # Dialog "Cai dat nang cao" mo TU wizard phai la cua so ROI (floating): cua so con nam duoi wizard nen
+        # bi che, nen no phai hien thanh cua so rieng tren X moi bam duoc.
+        call({})                       # wizard da dong -> open_setup dung cua so moi
+        call({"advanced": True})
+        check(wait_until(lambda: bool(search_windows(ADVANCED_TITLE))),
+              "mo \"Tuy chon nang cao\" tu wizard -> dialog Cai dat hien thanh cua so rieng",
+              json.dumps(search_windows(ADVANCED_TITLE)))
+        close_window(ADVANCED_TITLE)
+
+        # Bam X tren thanh tieu de: cua so tao bang toolkit KHONG tu dong dong, phai co TopWindowListener
+        # (awt.Dialog.on_close) moi tat duoc - va phai don khoi CURRENT de lan sau mo lai ra wizard moi.
+        check(bool(search_windows(TITLE)), "wizard la cua so that tren X (tim duoc theo tieu de)", "")
+        closed = close_window(TITLE)
+        check(closed and wait_until(lambda: not search_windows(TITLE)),
+              "bam X tren thanh tieu de dong han wizard", json.dumps(search_windows(TITLE)))
+        reopened = call({})
+        check(reopened.get("step") in ("welcome", "checks"),
+              "mo lai sau khi bam X -> wizard MOI (trang thai cu da duoc don)", reopened.get("step"))
     finally:
         if fake is not None:
             fake.terminate()

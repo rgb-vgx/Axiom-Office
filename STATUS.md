@@ -14,8 +14,8 @@ hướng dẫn dùng ở [README.md](README.md); lịch sử thay đổi ở [CH
 | **Agent Core** (`core-go/`, Go) | Windows + Linux | **Đã thay bản .NET làm bản phát hành** (G1–G10), qua toàn bộ e2e của bản .NET |
 | **Agent Core cũ** (`src/AxiomOffice.Core`, .NET 10) | Windows + Linux | Vẫn nằm nguyên trong repo, dùng để đối chiếu (`build.ps1 -Core dotnet`); bộ test xUnit của nó vẫn chạy |
 | **MCP server** (`src/AxiomOffice.Mcp`, net10) | Windows + Linux | Không đổi trong đợt này; parity 61/61 |
-| **Extension LibreOffice** (Python UNO) | Linux (LibreOffice) | Chạy được; 159/159 trên LibreOffice thật + wizard 12/12 với Core Go |
-| **Wizard thiết lập** | Windows (WinForms) + Linux (awt) | Bản Linux đã chạy thật (12/12); **bản Windows mới chỉ biên dịch sạch, chưa bấm tay trong Office** |
+| **Extension LibreOffice** (Python UNO) | Linux (LibreOffice) | Chạy được; 159/159 trên LibreOffice thật + wizard 20/20 với Core Go |
+| **Wizard thiết lập** | Windows (WinForms) + Linux (awt) | Bản Linux đã chạy thật (20/20); **bản Windows mới chỉ biên dịch sạch, chưa bấm tay trong Office** |
 
 ## 2. Đã làm được
 
@@ -60,9 +60,9 @@ Kích thước: Core Go **11,9 MB** (bản .NET self-contained: 51,6 MB), không
 | e2e Core — **bản .NET** (đối chiếu) | **155/155** |
 | e2e trên **Linux** đúng lệnh CI (13 phần) | **143/143** |
 | LibreOffice thật (gói mới, Core Go) | **159/159** |
-| Wizard thiết lập (dialog thật, X ảo) | **12/12** |
+| Wizard thiết lập (dialog thật, X ảo) | **20/20** |
 | `go test ./...` (core-go) | 10/10 gói |
-| .NET xUnit · `tests/lo` · MCP parity | 228/228 · 85 · 61/61 |
+| .NET xUnit · `tests/lo` · MCP parity | 228/228 · 89 · 61/61 |
 | `--real-llm` (model thật trong HKCU) | **4/4** — nạp đúng skill (`bao-cao-thang`, `bang-diem`, `van-ban-hanh-chinh`), câu "in đậm" không nạp skill thiết kế |
 | Đối chiếu khoá API DPAPI với bản .NET | cùng plaintext (dài 35, sha256 `bec24e97c4893251`) |
 | libsecret (keyring Linux, qua `secret-tool` giả) | đọc được khoá; thiếu khoá → coi như chưa cấu hình |

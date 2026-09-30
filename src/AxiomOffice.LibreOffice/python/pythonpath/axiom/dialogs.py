@@ -1,9 +1,10 @@
 """Dialog Cai dat + Quan ly ghi nho cua pane (LibreOffice_arch.md muc 10).
 
-Moi dialog la mot cua so con (`awt.ChildWindow`) giua cua so tai lieu - dialog roi (UnoControlDialog) khong
-hien duoc tren ban 26.8 (LibreOffice_arch.md 14.2). Kieu chu/mau theo theme.py nhu pane. Cau hinh ghi bang
-`config.set_value` (HKCU tren Windows - cung cho voi add-in; config.json tren Linux) va khoa API ma hoa DPAPI
-nhu add-in.
+Mac dinh moi dialog la mot cua so con (`awt.ChildWindow`) giua cua so tai lieu. Mo TU WIZARD thi truyen
+`floating=True` de dung cua so roi (`awt.Dialog`): wizard cung la cua so roi nen cua so con nam duoi bi che,
+va tren Linux cua so con khong nhan chuot (xem awt.Dialog). Kieu chu/mau theo theme.py nhu pane. Cau hinh ghi
+bang `config.set_value` (HKCU tren Windows - cung cho voi add-in; config.json tren Linux) va khoa API ma hoa
+DPAPI nhu add-in.
 
 Cau hinh LLM (dia chi/model/khoa) CO HIEU LUC NGAY: Core doc lai moi luot chay (Models/ModelSource.cs), khong
 phai khoi dong lai. Chi `Token` va `CorePort` moi chot luc Core khoi dong - doi thi bam "Tat Core" (dung API
@@ -16,13 +17,17 @@ import uno
 import os
 
 from . import config, core, theme
-from .awt import ChildWindow, bind_actions
+from .awt import ChildWindow, Dialog, bind_actions
 
-DIALOGS: dict = {}   # ten -> cua so con dang mo (bam lai thi dong cai cu)
+DIALOGS: dict = {}   # ten -> cua so dang mo (ChildWindow hoac Dialog; bam lai thi dong cai cu)
 
 
-def _open(ctx, frame, name: str, width: int, height: int) -> ChildWindow:
-    """Mo cua so con giua cua so tai lieu (dang bam lai thi dong cua so cu truoc)."""
+def _open(ctx, frame, name: str, width: int, height: int, floating: bool = False):
+    """Mo cua so giua cua so tai lieu (dang bam lai thi dong cua so cu truoc).
+
+    floating=True: cua so roi (`awt.Dialog`) - dung khi mo tu wizard thiet lap (cung la cua so roi): cua so
+    con nam DUOI wizard nen bi che, va tren Linux cua so con khong nhan chuot (xem awt.Dialog).
+    """
     old = DIALOGS.pop(name, None)
     if old is not None:
         try:
@@ -38,7 +43,11 @@ def _open(ctx, frame, name: str, width: int, height: int) -> ChildWindow:
     rect = frame.ComponentWindow.getPosSize()
     x = max(10, int(rect.X) + (int(rect.Width) - width) // 2)
     y = max(10, int(rect.Y) + (int(rect.Height) - height) // 2)
-    window = ChildWindow(ctx, parent, width, height)
+    if floating:
+        window = Dialog(ctx, width, height, name)
+        window.on_close(lambda: _forget(name, window))   # bam X tren thanh tieu de
+    else:
+        window = ChildWindow(ctx, parent, width, height)
     window.add("FixedText", "title", PositionX=12, PositionY=8, Width=width - 24, Height=20, Label=name,
                FontName=theme.FONT_SEMIBOLD, FontHeight=theme.SIZE_EMPTY_TITLE)
     window.add("FixedText", "title_line", PositionX=0, PositionY=34, Width=width, Height=1, Label="",
@@ -46,6 +55,17 @@ def _open(ctx, frame, name: str, width: int, height: int) -> ChildWindow:
     window.place(x, y, width, height)
     DIALOGS[name] = window
     return window
+
+
+def _forget(name: str, window) -> None:
+    """Dong cua so roi va bo khoi DIALOGS (chi khi van la cua so dang ghi - cua so cu bi thay thi thoi).
+
+    Mot lan bam X bao ba lan (windowClosing, windowClosed, disposing) nen phai chiu duoc goi lai.
+    """
+    if DIALOGS.get(name) is not window:
+        return               # da bi cua so khac thay (hoac da don roi) - khong dong len cua so moi
+    DIALOGS.pop(name, None)
+    window.close()
 
 
 SETTINGS_FIELDS = (
@@ -82,9 +102,9 @@ def _button(dialog: ChildWindow, name: str, x: int, y: int, width: int, text: st
     dialog.add("Button", name, PositionX=x, PositionY=y, Width=width, Height=24, Label=text)
 
 
-def open_settings(pane) -> None:
+def open_settings(pane, floating: bool = False) -> None:
     ctx = pane.ctx
-    dialog = _open(ctx, pane.frame if hasattr(pane, "frame") else None, "Cài đặt", 470, 380)
+    dialog = _open(ctx, pane.frame if hasattr(pane, "frame") else None, "Cài đặt", 470, 380, floating)
     if dialog is None:
         return
     y = 46

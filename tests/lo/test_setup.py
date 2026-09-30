@@ -120,6 +120,50 @@ class ValidationTests(unittest.TestCase):
         state.model = "m1"
         self.assertEqual(state.can_continue(), (True, ""))
 
+    def test_nut_chinh_buoc_ket_noi_doi_thanh_tiep_tuc_khi_thu_thanh_cong(self):
+        state = setup.SetupState()
+        state.go("connect")
+        self.assertEqual(state.next_label, "Kiểm tra kết nối")
+        state.apply_test({"ok": False, "message": "Lỗi"})
+        self.assertEqual(state.next_label, "Kiểm tra kết nối")
+        state.apply_test({"ok": True, "reply": "OK"})
+        self.assertEqual(state.next_label, "Tiếp tục →")
+        state.go("features")
+        self.assertEqual(state.next_label, "Tiếp tục →")
+        state.go("done")
+        self.assertEqual(state.next_label, "Hoàn tất")
+
+    def test_go_vao_o_nhap_cap_nhat_trang_thai_va_bo_ket_qua_thu_cu(self):
+        state = setup.SetupState()
+        state.go("connect")
+        self.assertTrue(state.update_fields(" http://may-chu/v1 ", "m1", ""))
+        self.assertEqual((state.endpoint, state.model), ("http://may-chu/v1", "m1"))
+        self.assertTrue(state.touched)
+        self.assertEqual(state.can_continue(), (True, ""))
+        state.apply_test({"ok": True, "reply": "OK"})
+        self.assertFalse(state.update_fields("http://may-chu/v1", "m1", ""))   # khong doi -> giu ket qua thu
+        self.assertEqual(state.next_label, "Tiếp tục →")
+        self.assertTrue(state.update_fields("http://may-chu/v1", "m2", ""))    # doi model -> phai thu lai
+        self.assertIsNone(state.test)
+        self.assertEqual(state.next_label, "Kiểm tra kết nối")
+
+    def test_doi_khoa_api_cung_lam_het_hieu_luc_ket_qua_thu(self):
+        """Khoa la mot phan cua lan thu: doi khoa thi ket qua cu (theo khoa cu) khong con dung."""
+        state = setup.SetupState()
+        state.go("connect")
+        state.update_fields("http://may-chu/v1", "m1", "khoa-cu")
+        state.apply_test({"ok": True, "reply": "OK"})
+        self.assertTrue(state.update_fields("http://may-chu/v1", "m1", "khoa-moi"))
+        self.assertIsNone(state.test)
+        self.assertEqual(state.next_label, "Kiểm tra kết nối")
+
+    def test_go_o_nhap_ngoai_buoc_ket_noi_khong_danh_dau_touched(self):
+        """`touched` chan Core ghi de gia tri nguoi dung; chi co y nghia o buoc ket noi."""
+        state = setup.SetupState()
+        state.go("features")
+        state.update_fields("http://may-chu/v1", "m1", "")
+        self.assertFalse(state.touched)
+
     def test_gui_len_core_dung_ten_tham_so(self):
         state = setup.SetupState()
         state.choose_provider("anthropic")

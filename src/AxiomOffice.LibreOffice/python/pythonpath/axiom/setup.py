@@ -91,6 +91,27 @@ class SetupState:
         self.step -= 1
         return True
 
+    @property
+    def next_label(self) -> str:
+        """Nhan nut chinh. Buoc ket noi: "Kiem tra ket noi" cho toi khi thu thanh cong, roi "Tiep tuc"."""
+        if self.step_id == "connect":
+            return "Tiếp tục →" if self.test and self.test.get("ok") else "Kiểm tra kết nối"
+        return {"welcome": "Bắt đầu →", "done": "Hoàn tất"}.get(self.step_id, "Tiếp tục →")
+
+    def update_fields(self, endpoint: str, model: str, api_key: str) -> bool:
+        """Nhan gia tri o nhap khi nguoi dung dang go. Doi gia tri thi ket qua thu cu het hieu luc.
+
+        Tra ve True neu co thay doi.
+        """
+        endpoint, model, api_key = endpoint.strip(), model.strip(), api_key.strip()
+        if (endpoint, model, api_key) == (self.endpoint, self.model, self.api_key):
+            return False
+        if self.step_id == "connect":
+            self.touched = True
+        self.endpoint, self.model, self.api_key = endpoint, model, api_key
+        self.test = None
+        return True
+
     def can_continue(self) -> tuple:
         """(duoc phep di tiep?, ly do khi khong). Khong chan cung: buoc "Tinh nang"/"Hoan tat" luon di duoc."""
         if self.step_id == "connect":

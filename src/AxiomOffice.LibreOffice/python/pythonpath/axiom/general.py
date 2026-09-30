@@ -135,8 +135,9 @@ def ui_setup(env, params):
 
     Tham so (dung cho test live / cau hinh san, bo trong thi chi mo wizard):
       step (id buoc), provider (id nha cung cap), endpoint, model, apiKey,
-      models=true (nap danh sach model), test=true (thu ket noi), features={...} (bat/tat roi luu),
-      save=true (luu cau hinh hien tai).
+      models=true (nap danh sach model), modelIndex=N (chon model thu N trong danh sach),
+      test=true (thu ket noi), advanced=true (mo dialog Cai dat nang cao),
+      features={...} (bat/tat roi luu), save=true (luu cau hinh hien tai).
     Thao tac nang chi khoi dong roi tra ve ngay; goi lai lenh voi tham so rong de doc ket qua.
     """
     from . import setupwizard

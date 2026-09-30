@@ -5,6 +5,31 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — Wizard thiết lập (Linux): chọn model trong danh sách, bấm X, và kết quả thử cũ
+- **Chọn model trong danh sách không có tác dụng**: `Wizard._selected_model` đọc thuộc tính
+  `SelectedItemPos` của *model*, nhưng LibreOffice trả về `None` ở đó dù người dùng đã bấm chọn — lựa chọn
+  thật nằm ở control (`XListBox.getSelectedItemPos`, trả về -1 khi chưa chọn). Nay đọc từ control, nên bấm
+  một model trong danh sách thật sự đổi model đang dùng
+- **Kết quả "Kiểm tra kết nối" cũ không hết hiệu lực khi đổi giá trị**: `_read_fields` gán thẳng
+  `state.endpoint/model/api_key` thay vì đi qua `SetupState.update_fields`, và danh sách model không có
+  listener nào. Hậu quả: thử kết nối với model A thành công → chọn model B (hoặc gõ địa chỉ khác) → nút chính
+  vẫn ghi "Tiếp tục →" → bấm là **lưu luôn giá trị chưa hề được thử**. Nay mọi đường đổi giá trị (gõ tay, đổi
+  nhà cung cấp, chọn trong danh sách) đều đi qua `update_fields` và làm kết quả thử cũ hết hiệu lực; thêm
+  `awt.ItemListener` cho ListBox model
+- Gõ tay tên model thì **bỏ mục đang chọn** trong danh sách, để danh sách không ghi đè ngược lại lúc bấm
+  "Tiếp tục"
+- **Bấm X trên thanh tiêu đề không đóng được wizard**: cửa sổ tạo bằng toolkit không tự đóng khi bấm X. Thêm
+  `awt.TopWindowListener` (`Dialog.on_close`) nên X đóng thật, và wizard được dọn khỏi `CURRENT` để lần sau
+  mở ra là một wizard mới
+- `Dialog.is_alive()` / `Dialog.to_front()`: mở lại wizard đang nằm sau cửa sổ LibreOffice thì đưa lên trước
+  thay vì mở chồng
+- Dialog **Tuỳ chọn nâng cao** mở từ wizard nay là cửa sổ rời (`floating=True`): cửa sổ con nằm dưới wizard
+  nên bị che, và trên Linux cửa sổ con không nhận chuột
+- Kiểm thử: `tests/lo/test_setup.py` **89** unit test (thêm 4 ca cho `next_label`/`update_fields`);
+  `tests/live/test_setup_wizard.py` **20** kiểm tra trên LibreOffice thật (thêm 8: nhãn nút chính, kết quả thử
+  cũ hết hiệu lực khi đổi địa chỉ / chọn model trong danh sách / gõ tay, dialog nâng cao là cửa sổ rời, bấm X
+  đóng hẳn wizard)
+
 ### Fixed — Core dừng khi đang chạy lượt: agent phải dừng sửa tài liệu (`core-go/`)
 - Bản Go trước đây không hủy các lượt đang chạy lúc Core dừng (bản .NET làm trong `ApplicationStopped`),
   nên agent có thể còn gửi lệnh xuống bridge sau khi Core đã tắt → tài liệu bị sửa dở. Nay Core hủy mọi

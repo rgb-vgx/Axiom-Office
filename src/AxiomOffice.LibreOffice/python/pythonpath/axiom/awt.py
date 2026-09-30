@@ -2,7 +2,10 @@
 
 `Container` boc `com.sun.star.awt.UnoControlContainer` (cua so con nhung vao cua so khac, dieu khien them
 bang ten); `ChildWindow` la Container nen trang vien mong dung cho dialog Cai dat/Ghi nho (dialogs.py).
-Khong dung UnoControlDialog: tren ban 26.8 dialog roi khong hien len (LibreOffice_arch.md 14.2).
+
+`Dialog` boc `com.sun.star.awt.UnoControlDialog` - cua so ROI (peer rieng, co thanh tieu de). Cua so con VCL
+nhung trong vung tai lieu khong bam duoc tren LibreOffice 26.8 (LibreOffice_arch.md 14.2), nen wizard thiet
+lap va dialog mo TU wizard dung `Dialog`; dialog mo tu pane van dung `ChildWindow` cho quen mat.
 Pane Ask AI dung widgets.py (ve theo toa do, khong theo ten).
 
 Don vi toa do/kich thuoc la pixel, cung don vi voi `setPosSize`/`getPosSize` cua cua so.
@@ -12,7 +15,7 @@ from __future__ import annotations
 
 import uno
 import unohelper
-from com.sun.star.awt import XActionListener, XTextListener
+from com.sun.star.awt import XActionListener, XItemListener, XTextListener, XTopWindowListener
 
 BOLD = 150.0
 NORMAL = 100.0
@@ -46,6 +49,49 @@ class TextListener(unohelper.Base, XTextListener):
 
     def disposing(self, event):
         pass
+
+class ItemListener(unohelper.Base, XItemListener):
+    """Doi muc dang chon trong ListBox (chon model khac -> ket qua thu cu het hieu luc)."""
+
+    def __init__(self, handler):
+        self._handler = handler
+
+    def itemStateChanged(self, event):  # noqa: N802 - ten UNO
+        self._handler()
+
+    def disposing(self, event):
+        pass
+
+
+class TopWindowListener(unohelper.Base, XTopWindowListener):
+    """Bao khi nguoi dung bam X tren thanh tieu de (windowClosing) hoac cua so da dong."""
+
+    def __init__(self, on_close):
+        self._on_close = on_close
+
+    def windowClosing(self, event):  # noqa: N802
+        self._on_close()
+
+    def windowClosed(self, event):  # noqa: N802
+        self._on_close()
+
+    def windowOpened(self, event):  # noqa: N802
+        pass
+
+    def windowMinimized(self, event):  # noqa: N802
+        pass
+
+    def windowNormalized(self, event):  # noqa: N802
+        pass
+
+    def windowActivated(self, event):  # noqa: N802
+        pass
+
+    def windowDeactivated(self, event):  # noqa: N802
+        pass
+
+    def disposing(self, event):
+        self._on_close()
 
 
 class _Host:
@@ -276,6 +322,26 @@ class Dialog(_Host):
             self.container.dispose()
         except Exception:  # noqa: BLE001
             pass
+
+    def on_close(self, handler) -> None:
+        """Goi handler khi nguoi dung bam X (cua so tao bang toolkit KHONG tu dong khi bam X)."""
+        self.container.addTopWindowListener(TopWindowListener(handler))
+
+    def is_alive(self) -> bool:
+        """Con peer va dang hien. getPeer() tra None (khong nem loi) sau khi dispose."""
+        try:
+            return self.container.getPeer() is not None and bool(self.container.isVisible())
+        except Exception:  # noqa: BLE001 - da bi huy
+            return False
+
+    def to_front(self) -> None:
+        """Dua cua so len tren (bi cua so LibreOffice che khi nguoi dung bam vao tai lieu)."""
+        try:
+            self.container.setVisible(True)
+            self.container.toFront()
+            self.container.setFocus()
+        except Exception as exc:  # noqa: BLE001
+            log_error("dialog to_front failed: %s" % exc)
 
 def bind_actions(host, names, handler) -> None:
     """Gan mot ActionListener chung; moi nut tu khai ActionCommand = ten cua no."""
