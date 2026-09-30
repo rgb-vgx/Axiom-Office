@@ -124,7 +124,10 @@ namespace AxiomOffice.Bridge
             }
         }
 
-        private static string ExcelErrorName(int code)
+        // Ma loi Excel -> ten hien thi; KHONG nhan ra thi tra null de cho goi tra ve so goc.
+        // Ten khac ban trong CommandDispatcher.Checks.cs (ban do tra "#ERR<ma>" va co them #N/A) vi hai noi
+        // co hop dong khac nhau - doi ten de tranh trung thanh vien trong cung lop partial (CS0111).
+        private static string ExcelErrorNameOrNull(int code)
         {
             switch (code)
             {
@@ -170,7 +173,7 @@ namespace AxiomOffice.Bridge
                 {
                     return null;
                 }
-                string excelError = ExcelErrorName(intValue);
+                string excelError = ExcelErrorNameOrNull(intValue);
                 if (excelError != null)
                 {
                     return excelError;
