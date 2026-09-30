@@ -11,6 +11,7 @@ from .commands import command, opt, req
 
 BOLD, NORMAL = 150.0, 100.0
 ALIGN = {"left": "LEFT", "center": "CENTER", "right": "RIGHT", "justify": "BLOCK"}
+PARSE_ERROR = 508      # Err:508 "Pair missing" - cong thuc khong doc duoc (thuong la sai dau phan cach)
 
 
 def _sheets(doc):
@@ -123,6 +124,76 @@ def _active_sheet_name(env, params):
     return name if name else _active_name(doc)
 
 
+# ---------------------------------------------------------------- cong thuc
+
+def _error(cell) -> int:
+    """Ma loi cua o (0 = khong loi). Co ngay sau setFormula, khong phai tinh lai ca bang."""
+    try:
+        return int(cell.getError())
+    except Exception:  # noqa: BLE001 - ban khac khong ho tro
+        return 0
+
+
+def _with_separator(formula: str, target: str):
+    """Doi dau phan cach tham so (',' hoac ';') trong cong thuc; None neu khong co gi phai doi.
+
+    Bo qua phan trong chuoi "...": dau phay trong "Trung binh, kha" khong phai dau phan cach.
+    Ngoac kep doi ("") de thoat ky tu tu xu ly duoc vi cap do tu mo roi dong lai.
+
+    Luu y: doi MOI dau phan cach ngoai chuoi, ke ca trong mang hang {1;2} (mang cua Calc dung ';'
+    giua cac cot) - nen chi goi khi cong thuc vua ghi da loi va con duong khac de thu.
+    """
+    chars, in_string, changed = [], False, False
+    for ch in formula:
+        if ch == '"':
+            in_string = not in_string
+            chars.append(ch)
+        elif not in_string and ch in ",;":
+            chars.append(target)
+            changed = changed or ch != target
+        else:
+            chars.append(ch)
+    return "".join(chars) if changed else None
+
+
+def _write_formula(cell, formula: str, state: dict):
+    """Ghi cong thuc, tu sua dau phan cach tham so khi LibreOffice khong doc duoc. -> (loi, da ghi).
+
+    Khong phai ban LibreOffice nao cung nhan ',' lam dau phan cach tham so: ban 24.2 tren mot so may
+    doi ';' - va muc Tools > Options > Calc > Formula > Separators de doi da bi bo - nen cong thuc
+    kieu en-US do agent sinh ra bi Err:508 "pair missing". Excel qua COM thi luon dung ',' bat ke
+    locale, nen ban Windows khong dinh loi nay.
+
+    Chi thu doi dau khi gap DUNG loi cu phap 508: loi luc tinh (#DIV/0! = 532, #REF!...) thi dau phan
+    cach da dung roi, doi sang kieu kia chi lam cong thuc hong them. Do mot lan roi nho vao `state`
+    de khong phai thu lai tung o trong cung mot lan ghi.
+    """
+    known = state.get("separator")
+    if known:
+        formula = _with_separator(formula, known) or formula
+    cell.setFormula(formula)
+    error = _error(cell)
+    if error != PARSE_ERROR or known:
+        return error, formula
+    for target in (",", ";"):
+        swapped = _with_separator(formula, target)
+        if not swapped:
+            continue
+        cell.setFormula(swapped)
+        found = _error(cell)
+        if found != PARSE_ERROR:            # 0 hoac loi luc tinh: da doc duoc cong thuc
+            state["separator"] = target
+            return found, swapped
+    cell.setFormula(formula)                # doi dau khong giup gi -> tra lai dung ban agent viet
+    return error, formula
+
+
+def _cell_address(start_col: int, start_row: int, c: int, r: int) -> str:
+    from .checks import column_letter     # import muon: checks nhap calc o trong ham
+
+    return "%s%d" % (column_letter(start_col + c + 1), start_row + r + 1)
+
+
 def write_range(env, params):
     address = values.string(params, "range")
     if not address:
@@ -137,6 +208,8 @@ def write_range(env, params):
 
     # Ghi TUNG O: setDataArray voi phan tu rong (None) lam LibreOffice ghi loi #N/A vao o, con
     # setFormulaArray + setDataArray tren cung vung thi o cong thuc bi ghi de mat cong thuc.
+    state: dict = {}
+    errors = []
     for r, row in enumerate(rows):
         for c in range(width):
             value = row[c] if c < len(row) else None
@@ -147,12 +220,20 @@ def write_range(env, params):
                 cell.setFormula("TRUE()" if value else "FALSE()")
             elif isinstance(value, str):
                 if value.startswith("="):
-                    cell.setFormula(value)
+                    error, written = _write_formula(cell, value, state)
+                    if error:
+                        errors.append({"cell": _cell_address(start_col, start_row, c, r),
+                                       "formula": written, "error": error, "text": cell.getString()})
                 else:
                     cell.setString(value)
             else:
                 cell.setValue(float(value))
-    return {"written": len(rows) * width, "sheet": _active_sheet_name(env, params)}
+
+    result = {"written": len(rows) * width, "sheet": _active_sheet_name(env, params)}
+    # Cong thuc hong thi bao ra day: truoc day ghi xong tra ve {"written": n} nen agent tuong da xong.
+    if errors:
+        result["formulaErrors"] = errors
+    return result
 
 
 def format_range(env, params):
@@ -195,7 +276,9 @@ command("et.open", "et", lambda env, p: documents.open_document(env.ctx, "et", v
 command("et.listSheets", "et", list_sheets, "Danh sách sheet + sheet đang active", agent=True)
 command("et.activateSheet", "et", activate_sheet, "Chuyển sheet", req("sheet"), agent=True)
 command("et.readRange", "et", read_range, "Đọc vùng, ví dụ `A1:C10`", req("range"), opt("sheet"), agent=True)
-command("et.writeRange", "et", write_range, "Ghi vùng từ ô góc trên-trái; `values` là mảng 2 chiều",
+command("et.writeRange", "et", write_range,
+        "Ghi vùng từ ô góc trên-trái; `values` là mảng 2 chiều. Công thức viết theo cú pháp en-US "
+        "(dấu phẩy); nếu máy dùng dấu chấm phẩy thì tự đổi. Công thức còn lỗi trả về ở `formulaErrors`",
         req("range", "top-left cell e.g. 'A1'"), req("values", "2D array of rows e.g. [[\"Tên\",\"Điểm\"],[\"An\",9.5]]"), opt("sheet"),
         agent=True, undo=True)
 command("et.formatRange", "et", format_range, "Định dạng vùng", req("range"), opt("bold"), opt("italic"), opt("fontSize"),

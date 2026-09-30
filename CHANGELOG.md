@@ -5,6 +5,30 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — Calc (LibreOffice): công thức nhiều tham số bị Err:508, và lỗi công thức bị báo sai
+- **Gốc bệnh**: bản LibreOffice 24.2 trên máy này đòi `;` làm dấu phân cách tham số, còn agent viết công
+  thức theo cú pháp en-US (dấu `,`) → mọi công thức từ hai tham số trở lên (`=ROUND(AVERAGE(C2:E2),1)`,
+  `=IF(...)`) đều ra `Err:508` "pair missing". Mục `Tools ▸ Options ▸ Calc ▸ Formula ▸ Separators` để đổi
+  đã bị bỏ ở bản này, nên không sửa được từ phía cấu hình. Excel qua COM thì luôn nhận `,` bất kể locale —
+  bản Windows không dính lỗi này, nên chỉ sửa phía LibreOffice
+- `et.writeRange` nay tự kiểm tra: sau khi ghi công thức, đọc `cell.getError()`; gặp đúng lỗi cú pháp 508
+  thì thử lại với dấu phân cách còn lại (bộ đổi dấu bỏ qua phần trong chuỗi `"..."`, kể cả ngoặc kép đôi
+  `""`, để dấu phẩy trong `"Có, dữ liệu"` không bị đổi). Dấu phân cách dò được nhớ lại cho các ô sau trong
+  cùng một lần ghi. Chỉ đổi dấu khi gặp 508 — lỗi lúc tính (`#DIV/0!` = 532) nghĩa là dấu đã đúng, đổi sang
+  kiểu kia chỉ làm công thức hỏng thêm; đổi mà không cứu được thì trả lại đúng bản agent đã viết
+- **`et.writeRange` không còn im lặng**: công thức nào còn lỗi sau khi thử thì trả về ở trường
+  `formulaErrors` (`{cell, formula, error, text}`) thay vì chỉ `{"written": n}`. Trước đây agent ghi 11 ô
+  `Err:508` mà kết quả vẫn báo thành công
+- `et.checkRange` in **mã lỗi thật** của từng cột (`column E has 1 error value(s): #DIV/0!`) thay vì chuỗi
+  ví dụ cứng `(#DIV/0!, #REF!...)` — chuỗi đó khiến người đọc (và agent) đi tìm sai bệnh. Bản C# đổi tương
+  ứng: thêm `ExcelErrorName` (mã lỗi Excel → `#DIV/0!`, `#REF!`...), giữ hai bản khớp nhau
+- Skill `bao-cao-du-lieu`: nói rõ viết công thức theo cú pháp en-US và **đọc `formulaErrors`** sau khi ghi,
+  đừng coi `"written": n` là xong
+- Kiểm thử: `tests/lo/test_calc.py` mới (**12** ca: đổi dấu phân cách, dấu phẩy trong chuỗi, lỗi lúc tính
+  không bị đổi dấu, đổi dấu vô ích thì trả lại bản gốc, `formulaErrors` trong kết quả) — cả bộ `tests/lo`
+  nay **101** test; `tests/live/test_live_commands.py` thêm **3** kiểm tra trên LibreOffice thật: công thức
+  nhiều tham số ghi bằng dấu phẩy không lỗi, tính đúng giá trị, `checkRange` không báo `error-values`
+
 ### Fixed — Wizard thiết lập (Linux): chọn model trong danh sách, bấm X, và kết quả thử cũ
 - **Chọn model trong danh sách không có tác dụng**: `Wizard._selected_model` đọc thuộc tính
   `SelectedItemPos` của *model*, nhưng LibreOffice trả về `None` ở đó dù người dùng đã bấm chọn — lựa chọn

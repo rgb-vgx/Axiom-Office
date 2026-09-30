@@ -334,6 +334,22 @@ namespace AxiomOffice.Bridge
             return matrix;
         }
 
+        /// <summary>Mã lỗi Excel (Value2 trả về số nguyên âm) -> tên hiển thị trên ô. Lạ thì trả mã thô.</summary>
+        internal static string ExcelErrorName(int code)
+        {
+            switch (code)
+            {
+                case -2146826288: return "#NULL!";
+                case -2146826281: return "#DIV/0!";
+                case -2146826273: return "#VALUE!";
+                case -2146826265: return "#REF!";
+                case -2146826259: return "#NAME?";
+                case -2146826252: return "#NUM!";
+                case -2146826246: return "#N/A";
+                default: return "#ERR" + code.ToString(CultureInfo.InvariantCulture);
+            }
+        }
+
         internal static List<object> ColumnStats(object[,] values, object[,] formulas, IList<string> formats, int rows, int cols, int firstColumn,
             List<Dictionary<string, object>> issues)
         {
@@ -343,6 +359,7 @@ namespace AxiomOffice.Bridge
                 string letter = ColumnLetter(firstColumn + c);
                 object header = values[0, c];
                 int numbers = 0, texts = 0, blanks = 0, numericTexts = 0, errors = 0, formulaCount = 0, fractional = 0;
+                var errorNames = new List<string>();
                 for (int r = 1; r < rows; r++)
                 {
                     object v = values[r, c];
@@ -358,6 +375,7 @@ namespace AxiomOffice.Bridge
                     else if (v is int && (int)v < -2146820000)
                     {
                         errors++;
+                        errorNames.Add(ExcelErrorName((int)v));
                     }
                     else if (v is double || v is int || v is decimal)
                     {
@@ -395,7 +413,10 @@ namespace AxiomOffice.Bridge
                 }
                 if (errors > 0)
                 {
-                    issues.Add(Issue("error-values", "column " + letter + " has " + errors + " error value(s) (#DIV/0!, #REF!...)"));
+                    // Mã lỗi THẬT (#DIV/0! = mẫu bằng 0, #REF! = tham chiếu hỏng...), không liệt kê ví dụ nữa:
+                    // đoán mò làm người đọc đi tìm sai bệnh.
+                    issues.Add(Issue("error-values", "column " + letter + " has " + errors + " error value(s): "
+                        + string.Join(", ", new SortedSet<string>(errorNames))));
                 }
                 if (fractional > 0 && (format.Length == 0 || string.Equals(format, "General", StringComparison.OrdinalIgnoreCase)))
                 {

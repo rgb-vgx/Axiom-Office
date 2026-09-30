@@ -298,6 +298,20 @@ def test_spreadsheet(b, out, run_ai):
     check(decoded and decoded["values"] == expected, "Excel giải mã values bọc {item} đúng dòng/cột", decoded)
     values = b.cmd("et.readRange", {"range": "A1:C3"})
     check(values and values["values"][1][2] == 19, "Excel công thức =B2*2 tính ra 19", values)
+    # Dấu phân cách tham số: một số bản LibreOffice đòi ';' và không còn mục Tools > Options > Calc >
+    # Formula > Separators để đổi, nên công thức en-US (dấu phẩy) của agent bị Err:508. Excel qua COM
+    # thì luôn nhận ','. Ghi bằng ',' phải chạy được ở cả hai, và không được im lặng khi còn lỗi.
+    multi = b.cmd("et.writeRange", {"range": "O1", "values": [
+        ["Số", "Làm tròn", "Xếp loại"],
+        [8.5, "=ROUND(AVERAGE(O2:O2),1)", '=IF(O2>=8,"Giỏi","Khá")'],
+        [7.0, "=ROUND(AVERAGE(O3:O3),1)", '=IF(O3>=8,"Giỏi","Khá")']]}, key="et.writeRange công thức nhiều tham số")
+    check(not (multi or {}).get("formulaErrors"), "Excel công thức nhiều tham số (dấu phẩy) không lỗi", multi)
+    computed = b.cmd("et.readRange", {"range": "O2:Q3"}, key="et.readRange công thức nhiều tham số") or {}
+    check(computed.get("values") == [[8.5, 8.5, "Giỏi"], [7.0, 7.0, "Khá"]],
+          "Excel công thức nhiều tham số tính đúng ở mọi dấu phân cách", computed)
+    multi_qa = b.cmd("et.checkRange", {"range": "O1:Q3"}, key="et.checkRange công thức nhiều tham số") or {}
+    check("error-values" not in {i.get("type") for i in multi_qa.get("issues", [])},
+          "Excel checkRange không báo lỗi công thức sau khi tự đổi dấu phân cách", multi_qa)
     b.cmd("et.readRange", {"range": "E1:K3"}, key="et.readRange others")
     b.cmd("et.formatRange", {"range": "A1:C1", "bold": True, "fillColor": "#FFFF00", "fontColor": "#0000FF", "numFmt": "0.00", "horizontal": "center", "wrap": True})
     # QA cấu trúc: B2 = 9.5 để General -> no-number-format; cả sheet có dữ liệu ngoài bảng A1:C3 -> outside-table.

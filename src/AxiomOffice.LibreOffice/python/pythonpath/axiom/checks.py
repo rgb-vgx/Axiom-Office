@@ -88,6 +88,14 @@ def _format_string(doc, key: int) -> str:
         return ""
 
 
+def _error_name(cell, text: str) -> str:
+    """Ten loi hien tren o: 'Err:508' (loi cu phap) hoac '#DIV/0!' (loi luc tinh). Du phong ma so."""
+    if text:
+        return text
+    code = cell.getError()
+    return "Err:%d" % code if code else "error"
+
+
 def _cell_type(cell) -> str:
     """com.sun.star.table.CellContentType -> ten ('EMPTY'/'VALUE'/'TEXT'/'FORMULA'); pyuno tra ve uno.Enum."""
     content = cell.getType()
@@ -120,6 +128,7 @@ def range_report(env, params):
         header = _cell(sheet, c, bounds.StartRow)
         header_text = _cell_text(header.getString())
         numbers = texts = blanks = numeric_texts = errors = formulas = fractional = 0
+        error_names = []
         for r in range(bounds.StartRow + 1, bounds.EndRow + 1):
             cell = _cell(sheet, c, r)
             content = _cell_type(cell)
@@ -132,6 +141,7 @@ def range_report(env, params):
                 blanks += 1
             elif _is_error(cell, text):
                 errors += 1
+                error_names.append(_error_name(cell, text))
             elif content == "TEXT":
                 # So nam trong o dang chu: Excel/Calc khong tinh vao cong thuc -> canh bao.
                 texts += 1
@@ -153,7 +163,10 @@ def range_report(env, params):
         elif numbers > 0 and texts > 0:
             issues.append(issue("mixed-types", "column %s mixes %d number(s) and %d text value(s)" % (letter, numbers, texts)))
         if errors > 0:
-            issues.append(issue("error-values", "column %s has %d error value(s) (#DIV/0!, #REF!...)" % (letter, errors)))
+            # Ma loi THAT (Err:508 = sai dau phan cach tham so, #DIV/0! = mau bang 0...), khong liet ke
+            # vi du nua: doan mo ho lam nguoi doc di tim sai benh.
+            issues.append(issue("error-values", "column %s has %d error value(s): %s" % (
+                letter, errors, ", ".join(sorted(set(error_names))))))
         if fractional > 0 and (not fmt or fmt.lower() == "general"):
             issues.append(issue("no-number-format",
                 "column %s has decimals shown with the General format: apply numFmt such as \"0.0\" or \"#,##0.00\"" % letter))
