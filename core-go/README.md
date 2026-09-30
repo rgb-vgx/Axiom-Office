@@ -11,7 +11,7 @@ Nhờ vậy add-in, extension LibreOffice và MCP không phải đổi gì khi t
 
 | Giai đoạn | Nội dung | Phần e2e | Trạng thái |
 |---|---|---|---|
-| G1 | cấu hình (HKCU/DPAPI, config.json/libsecret), `core.log`, `core.json`, một-phiên-bản, chọn port, guard (Origin/token/Content-Type), `/health`, `/v1/admin/shutdown`, migrate `core.db`, model client + codec OpenAI/Anthropic + vòng lặp agent, `/v1/setup`, `/v1/llm/test`, `/v1/llm/models` | `/health`, `setup` | ✔ (trừ đếm skill, chờ G3) |
+| G1 | cấu hình (HKCU/DPAPI, config.json/libsecret), `core.log`, `core.json`, một-phiên-bản, chọn port, guard (Origin/token/Content-Type), `/health`, `/v1/admin/shutdown`, migrate `core.db`, model client + codec OpenAI/Anthropic + vòng lặp agent, `/v1/setup`, `/v1/llm/test`, `/v1/llm/models` | `/health`, `setup` | ✔ |
 | G2 | `/v1/runs` + SSE, orchestrator, bridge client, session registry, `office_action`, policy + xác nhận, audit, hội thoại | `fake_bridge`, `guards`, `confirm` | ✔ |
 | G3 | skills (`load_skill`, `read_skill_file`, `/v1/skills`, theo dõi thư mục) | `skills` | ✔ |
 | G4 | memory dài hạn (FTS5, trích xuất, embedding) | `memory` | |

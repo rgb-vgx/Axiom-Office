@@ -48,8 +48,8 @@ jobs:
           CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o "$RUNNER_TEMP/gocore/axiom-core" ./cmd/axiom-core
           cp -r ../skills "$RUNNER_TEMP/gocore/"
           cd ..
-          # G1 chua dem skill (G3) nen chi canh bao; tu G3 bo "|| echo" de chan merge khi lech.
-          AXIOM_E2E_CORE_EXE="$RUNNER_TEMP/gocore/axiom-core" python3 tests/core/test_core_e2e.py --only setup             || echo "::warning::Core Go chua qua het phan setup"
+          # Cac phan da port (G1-G3). Phan memory/mcp/visual them o cac giai doan sau.
+          AXIOM_E2E_CORE_EXE="$RUNNER_TEMP/gocore/axiom-core"             python3 tests/core/test_core_e2e.py --only fake_bridge,guards,skills,confirm,setup
 
       - name: Cai LibreOffice + Python UNO (+ xvfb cho phan giao dien)
         run: |
