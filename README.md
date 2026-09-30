@@ -483,9 +483,10 @@ Agent Core đọc cùng khoá trên. Biến môi trường `AXIOM_*` (`AXIOM_COR
 ## Phát triển
 
 **Yêu cầu:** .NET Framework 4.8, Visual Studio 2022 Build Tools (`csc` Roslyn, C# 7.3). Python
-chỉ cần cho bộ test. Muốn build thêm **Agent Core** (`AxiomOffice.Core.exe`, .NET 10) thì cần
-.NET 10 SDK — cài không cần admin bằng `scripts\install-dotnet-sdk.ps1`; không có SDK thì
-`build.ps1` vẫn build add-in + Host và bỏ qua Core.
+chỉ cần cho bộ test. **Agent Core** (`AxiomOffice.Core.exe`) là bản Go trong `core-go/`
+([thiết kế](core-go/README.md)) nên cần **Go 1.26+**; không có Go thì `build.ps1` vẫn build
+add-in + Host và bỏ qua Core. Muốn đối chiếu bản .NET cũ thì cần .NET 10 SDK (cài không cần
+admin bằng `scripts\install-dotnet-sdk.ps1`) và chạy `build.ps1 -Core dotnet`.
 
 ```powershell
 scripts\build.ps1              # build AxiomOffice.dll + AxiomOffice.Host.exe vào src\AxiomOffice\bin\Release
