@@ -5,7 +5,11 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+#if PORTABLE
+using AxiomOffice.Host.Mcp.Portable;   // ban .NET 10 (axiom-office-mcp): JavaScriptSerializer tren System.Text.Json
+#else
 using System.Web.Script.Serialization;
+#endif
 using AxiomOffice.Bridge;
 
 namespace AxiomOffice.Host.Mcp

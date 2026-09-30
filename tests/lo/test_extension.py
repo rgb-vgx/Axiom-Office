@@ -128,6 +128,22 @@ class CatalogTests(unittest.TestCase):
             for param in item["params"]:
                 self.assertEqual(set(param), {"name", "required", "hint"})
 
+    def test_mcp_live_commands_khop_registry(self):
+        """`src\\AxiomOffice.Mcp\\live-commands.json` (nhúng vào axiom-office-mcp) phải khớp registry này.
+
+        Bản Windows lấy danh sách lệnh từ CommandCatalog của add-in; bản .NET 10 không có add-in nên nhúng
+        sẵn file - lệch nghĩa là mô tả tool `*_command` nói sai việc bridge làm được.
+        """
+        path = os.path.join(ROOT, "src", "AxiomOffice.Mcp", "live-commands.json")
+        with open(path, encoding="utf-8", newline="") as handle:
+            text = handle.read().replace("\r\n", "\n")
+        expected = [{"name": item["name"], "kind": item["kind"],
+                     "params": [{"name": p["name"], "hint": p["hint"]} for p in item["params"]]}
+                    for item in commands.catalog()]
+        self.assertEqual(json.loads(text), expected, "chạy lại scripts/generate_mcp_commands.py")
+        self.assertEqual(text, json.dumps(expected, ensure_ascii=False, indent=2) + "\n",
+                         "file phải đúng định dạng của scripts/generate_mcp_commands.py")
+
     def test_every_kind_has_agent_actions(self):
         # Ten lenh mang tien to app (writer./et./wpp.), kind la ma port dung chung voi Office/WPS (wps/et/wpp).
         for kind, prefix in (("wps", "writer."), ("et", "et."), ("wpp", "wpp.")):

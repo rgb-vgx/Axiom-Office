@@ -14,6 +14,7 @@ import asyncio
 import glob
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -21,7 +22,15 @@ import tempfile
 import zipfile
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-EXE = os.path.join(ROOT, "src", "AxiomOffice", "bin", "Release", "AxiomOffice.Host.exe")
+EXE = os.environ.get("AXIOM_MCP_EXE") or os.path.join(ROOT, "src", "AxiomOffice", "bin", "Release", "AxiomOffice.Host.exe")
+# AXIOM_MCP_ARGS="mcp" (AxiomOffice.Host.exe) hoặc "all"/"word" (axiom-office-mcp).
+MCP_ARGS = os.environ.get("AXIOM_MCP_ARGS", "mcp").split()
+# axiom-office-mcp không có lệnh `commands` (danh sách lệnh nhúng sẵn) -> bỏ phần đối chiếu registry.
+HAS_COMMANDS = os.environ.get("AXIOM_MCP_NO_CATALOG", "") == ""
+# Chạy bản khác (axiom-office-mcp .NET 10): AXIOM_MCP_CMD="dotnet <duong-dan-toi.dll> all"
+if os.environ.get("AXIOM_MCP_CMD"):
+    _parts = shlex.split(os.environ["AXIOM_MCP_CMD"])
+    EXE, MCP_ARGS = _parts[0], _parts[1:]
 
 # Thư viện Python của 3 venv + package file_tools cũ để so parity.
 for name in ("word-mcp", "ppt-mcp", "excel-mcp"):
@@ -110,7 +119,10 @@ async def test_protocol(session: ClientSession) -> None:
     check(not missing, "every Python tool exists in C# (except excel_query)", str(sorted(missing)))
     schema = attr(next(t for t in tools if t.name == "excel_format_range"), "input_schema", "inputSchema")
     check(schema.get("required") == ["path", "sheet", "cell_range", "styles"], "excel_format_range schema required", json.dumps(schema))
-    test_catalog({t.name: t.description for t in tools})
+    if HAS_COMMANDS:
+        test_catalog({t.name: t.description for t in tools})
+    else:
+        check(True, "bo qua doi chieu registry (ban MCP khong co lenh `commands`)", "")
 
 
 def test_catalog(descriptions: dict[str, str]) -> None:
@@ -299,7 +311,7 @@ async def main() -> int:
     os.makedirs(out, exist_ok=True)
     print("exe:", EXE)
     print("out:", out)
-    params = StdioServerParameters(command=EXE, args=["mcp"])
+    params = StdioServerParameters(command=EXE, args=MCP_ARGS)
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             init = await session.initialize()

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Dong goi ban Linux: dist/axiom-office-linux-x64-<ver>.tar.gz gom
-#   core/ (Agent Core self-contained linux-x64 - may dich khong can .NET), AxiomOffice-LibreOffice-<ver>.oxt,
-#   install.sh, README.txt.
+#   core/ (Agent Core self-contained linux-x64 - may dich khong can .NET), mcp/ (axiom-office-mcp cho
+#   Claude Code/Desktop), AxiomOffice-LibreOffice-<ver>.oxt, install.sh, README.txt.
 # Can .NET SDK 10 (dotnet trong PATH hoac ~/.dotnet/dotnet). Chay duoc tren Linux hoac Git Bash/WSL.
 #
 #   scripts/linux/package.sh [--rid linux-x64|linux-arm64]
@@ -25,6 +25,11 @@ echo "== Agent Core ($RID, self-contained)"
 "$DOTNET" publish "$ROOT/src/AxiomOffice.Core" -c Release -r "$RID" --self-contained \
     -p:DebugType=none -o "$STAGE/core" -v q -nologo
 chmod +x "$STAGE/core/AxiomOffice.Core"
+
+echo "== MCP server ($RID, self-contained)"
+"$DOTNET" publish "$ROOT/src/AxiomOffice.Mcp" -c Release -r "$RID" --self-contained \
+    -p:DebugType=none -o "$STAGE/mcp" -v q -nologo
+chmod +x "$STAGE/mcp/axiom-office-mcp"
 
 echo "== Extension LibreOffice"
 "$PYTHON" "$ROOT/scripts/package_oxt.py" --out "$STAGE" >/dev/null

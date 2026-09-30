@@ -15,6 +15,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/axiom-office"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/axiom-office"
 CORE_DIR="$DATA_DIR/core"
+MCP_DIR="$DATA_DIR/mcp"
 EXTENSION_ID="org.axiomoffice.bridge"
 UNOPKG="${UNOPKG:-$(command -v unopkg || echo /usr/lib/libreoffice/program/unopkg)}"
 
@@ -93,7 +94,7 @@ install() {
         || die "thieu Python UNO: sudo apt install python3-uno (Debian/Ubuntu) hoac sudo dnf install libreoffice-pyuno (Fedora)."
     assert_libreoffice_closed
 
-    echo "1/3 Agent Core -> $CORE_DIR"
+    echo "1/4 Agent Core -> $CORE_DIR"
     stop_core
     mkdir -p "$DATA_DIR"
     rm -rf "$CORE_DIR.new"
@@ -101,22 +102,45 @@ install() {
     rm -rf "$CORE_DIR"
     mv "$CORE_DIR.new" "$CORE_DIR"
 
-    echo "2/3 Extension LibreOffice ($(basename "$oxt"))"
+    echo "2/4 Extension LibreOffice ($(basename "$oxt"))"
     "$UNOPKG" add --force "$oxt"
 
-    echo "3/3 Cau hinh -> $CONFIG_DIR/config.json"
+    echo "3/4 Cau hinh -> $CONFIG_DIR/config.json"
     write_config
+
+    if [ -x "$HERE/mcp/axiom-office-mcp" ]; then
+        echo "4/4 MCP server -> $MCP_DIR"
+        rm -rf "$MCP_DIR.new"
+        cp -a "$HERE/mcp" "$MCP_DIR.new"
+        rm -rf "$MCP_DIR"
+        mv "$MCP_DIR.new" "$MCP_DIR"
+    else
+        echo "4/4 MCP server: khong co trong goi, bo qua"
+    fi
 
     echo
     echo "Xong. Mo LibreOffice Writer/Calc/Impress: menu Axiom Office > Ask AI (hoac sidebar)."
+    echo
+    print_mcp_config
+}
+
+# Cau hinh MCP cho Claude Code / Claude Desktop (dung tool file + tool live tren LibreOffice dang mo).
+print_mcp_config() {
+    echo "Them MCP server (Claude Code: claude mcp add, hoac file cau hinh MCP):"
+    echo "  {"
+    echo "    \"mcpServers\": {"
+    echo "      \"office\": { \"command\": \"$MCP_DIR/axiom-office-mcp\", \"args\": [\"all\"] }"
+    echo "    }"
+    echo "  }"
+    echo "  (\"args\": [\"word\"] / [\"excel\"] / [\"ppt\"] neu chi muon mot nhom tool)"
 }
 
 uninstall() {
     assert_libreoffice_closed
     stop_core
     "$UNOPKG" remove "$EXTENSION_ID" 2>/dev/null && echo "Da go extension $EXTENSION_ID" || echo "(extension chua cai)"
-    rm -rf "$CORE_DIR"
-    echo "Da xoa $CORE_DIR"
+    rm -rf "$CORE_DIR" "$MCP_DIR"
+    echo "Da xoa $CORE_DIR va $MCP_DIR"
     if [ "$PURGE" = 1 ]; then
         rm -rf "$DATA_DIR" "$CONFIG_DIR" "${XDG_RUNTIME_DIR:-$HOME/.cache}/axiom-office"
         echo "Da xoa cau hinh va du lieu (hoi thoai, memory, log)."

@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
+#if !PORTABLE
+using System.Runtime.InteropServices;   // chi cho COM .xls cua ban Windows
+#endif
 using System.Text.RegularExpressions;
 
 namespace AxiomOffice.Host.Mcp
@@ -655,9 +657,153 @@ namespace AxiomOffice.Host.Mcp
         }
     }
 
-    // .xls (BIFF) chỉ đọc qua Excel hoặc WPS Spreadsheets (COM) — không cần thư viện ngoài.
+    // .xls (BIFF): Windows đọc qua Excel/WPS (COM); Linux nhờ LibreOffice chuyển sang .xlsx rồi đọc như
+    // file xlsx thường (LibreOffice_arch.md mục 11) — máy không có LibreOffice thì báo rõ.
     internal static class XlsAutomation
     {
+#if PORTABLE
+        public static List<SheetGrid> Read(string path, string sheet, bool allSheets)
+        {
+            using (Converted converted = ConvertToXlsx(path))
+            {
+                using (OoxmlPackage package = OoxmlPackage.OpenRead(converted.Path))
+                {
+                    var book = new XlsxBook(package);
+                    IEnumerable<string> names = allSheets || string.IsNullOrEmpty(sheet) ? book.SheetNames : new List<string> { sheet };
+                    var grids = new List<SheetGrid>();
+                    foreach (string name in names)
+                    {
+                        grids.Add(book.Read(book.FindSheet(name), false));
+                    }
+                    return grids;
+                }
+            }
+        }
+
+        private sealed class Converted : IDisposable
+        {
+            public string Path;
+            public string Dir;
+
+            public void Dispose()
+            {
+                try
+                {
+                    System.IO.Directory.Delete(Dir, true);
+                }
+                catch (Exception)
+                {
+                }
+            }
+        }
+
+        private static Converted ConvertToXlsx(string path)
+        {
+            string soffice = FindSoffice();
+            if (soffice == null)
+            {
+                throw new InvalidOperationException("reading .xls needs LibreOffice (soffice) on this machine - or save the file as .xlsx");
+            }
+            string dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "axiom-mcp-xls-" + Guid.NewGuid().ToString("N"));
+            System.IO.Directory.CreateDirectory(dir);
+            try
+            {
+                // Profile riêng: LibreOffice đang mở thì cùng profile chỉ chuyển tiếp lệnh rồi thoát mà không đổi file.
+                string profile = System.IO.Path.Combine(dir, "lo-profile");
+                System.IO.Directory.CreateDirectory(profile);
+                var info = new System.Diagnostics.ProcessStartInfo(soffice)
+                {
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true,
+                };
+                info.ArgumentList.Add("-env:UserInstallation=" + new Uri(profile).AbsoluteUri);
+                info.ArgumentList.Add("--headless");
+                info.ArgumentList.Add("--norestore");
+                info.ArgumentList.Add("--convert-to");
+                info.ArgumentList.Add("xlsx");
+                info.ArgumentList.Add("--outdir");
+                info.ArgumentList.Add(dir);
+                info.ArgumentList.Add(System.IO.Path.GetFullPath(path));
+                using (System.Diagnostics.Process process = System.Diagnostics.Process.Start(info))
+                {
+                    string errors = process.StandardError.ReadToEnd();
+                    string output = process.StandardOutput.ReadToEnd();
+                    if (!process.WaitForExit(120000))
+                    {
+                        try
+                        {
+                            process.Kill(true);
+                        }
+                        catch (Exception)
+                        {
+                        }
+                        throw new InvalidOperationException("soffice did not finish converting " + path + " within 120s");
+                    }
+                    string converted = System.IO.Path.Combine(dir, System.IO.Path.GetFileNameWithoutExtension(path) + ".xlsx");
+                    if (!System.IO.File.Exists(converted))
+                    {
+                        throw new InvalidOperationException("soffice could not convert " + path + " to xlsx: " +
+                            (errors + " " + output).Trim());
+                    }
+                    return new Converted { Path = converted, Dir = dir };
+                }
+            }
+            catch (Exception)
+            {
+                try
+                {
+                    System.IO.Directory.Delete(dir, true);
+                }
+                catch (Exception)
+                {
+                }
+                throw;
+            }
+        }
+
+        private static string FindSoffice()
+        {
+            string configured = Environment.GetEnvironmentVariable("AXIOM_SOFFICE");
+            if (!string.IsNullOrEmpty(configured) && System.IO.File.Exists(configured))
+            {
+                return configured;
+            }
+            string[] known =
+            {
+                "/usr/bin/soffice", "/usr/lib/libreoffice/program/soffice", "/snap/bin/libreoffice",
+                "/usr/lib64/libreoffice/program/soffice", "/opt/libreoffice/program/soffice",
+                @"C:\Program Files\LibreOffice\program\soffice.exe",
+                @"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+                Environment.ExpandEnvironmentVariables(@"%ProgramW6432%\LibreOffice\program\soffice.exe"),
+            };
+            foreach (string candidate in known)
+            {
+                if (System.IO.File.Exists(candidate))
+                {
+                    return candidate;
+                }
+            }
+            string path = Environment.GetEnvironmentVariable("PATH") ?? "";
+            foreach (string folder in path.Split(System.IO.Path.PathSeparator))
+            {
+                if (folder.Length == 0)
+                {
+                    continue;
+                }
+                foreach (string name in new[] { "soffice", "soffice.exe" })
+                {
+                    string candidate = System.IO.Path.Combine(folder, name);
+                    if (System.IO.File.Exists(candidate))
+                    {
+                        return candidate;
+                    }
+                }
+            }
+            return null;
+        }
+#else
         public static List<SheetGrid> Read(string path, string sheet, bool allSheets)
         {
             Type type = Type.GetTypeFromProgID("Excel.Application") ?? Type.GetTypeFromProgID("KET.Application") ?? Type.GetTypeFromProgID("ET.Application");
@@ -822,5 +968,6 @@ namespace AxiomOffice.Host.Mcp
                 default: return code;
             }
         }
+#endif
     }
 }

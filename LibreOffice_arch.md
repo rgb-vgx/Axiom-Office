@@ -332,14 +332,36 @@ Sidebar deck **"Axiom Office"** (hiện với Writer, Calc, Impress), panel dự
 
 ## 11. Làn file (MCP) trên Linux
 
-- Tách phần file của `AxiomOffice.Host` (`OoxmlPackage`, `WordFiles`, `ExcelFiles`, `PptFiles`,
-  `XlsxBook`, `Cells`, template docx/pptx) thành thư viện **`AxiomOffice.Files` (`net10.0`)**; thay
-  `JavaScriptSerializer` bằng `System.Text.Json`.
-- `axiom-office-mcp` (`net10.0`, linux-x64 + win-x64): MCP stdio gồm **20 tool file** + tool live gọi bridge
-  qua HTTP (như `LiveTools` hiện tại, chọn bridge bằng session registry).
-- `.xls` (đọc qua COM Excel ở bản Windows) trên Linux: chuyển bằng `soffice --headless --convert-to xlsx`
-  nếu có LibreOffice, không thì báo không hỗ trợ.
-- `tests/mcp-host/test_mcp_host.py` chạy cho cả hai bản (so kết quả 20 tool file với bản Python cũ).
+> **Đã làm (30/09/2026)** — làm khác kế hoạch ban đầu ở chỗ *không* tách thư viện `AxiomOffice.Files`:
+> `src/AxiomOffice.Mcp` (`net10.0`, `axiom-office-mcp`) **compile lại chính** `src/AxiomOffice.Host/Mcp/*.cs`
+> với ký hiệu `PORTABLE` — một nguồn duy nhất cho 20 tool file + tool live của cả hai bản, không có bản sao
+> nào phải giữ đồng bộ. Phần chỉ có trên Windows nằm sau `#if PORTABLE` (`ExcelFiles`: `.xls` qua COM →
+> chuyển bằng LibreOffice) hoặc trong lớp shim `Compat/` (bản .NET 10).
+
+Kế hoạch ban đầu (giữ lại để đối chiếu):
+
+- ~~Tách phần file của `AxiomOffice.Host` thành thư viện **`AxiomOffice.Files` (`net10.0`)`~~; thay
+  `JavaScriptSerializer` bằng `System.Text.Json` → **làm bằng `Compat/PortableJson.cs`**: lớp
+  `JavaScriptSerializer` cùng API (dùng trong `McpServer.cs`) nhưng chạy trên `System.Text.Json`
+  (`DeserializeObject` trả `Dictionary<string, object>`/`object[]`/`long`/`double` như bản cũ).
+- ✅ `axiom-office-mcp` (`net10.0`, linux-x64): MCP stdio gồm **20 tool file** + tool live gọi bridge qua
+  HTTP (chọn bridge bằng session registry) + `office_sessions`.
+- ✅ `.xls` trên Linux: `soffice --headless --convert-to xlsx` với **profile riêng** (LibreOffice đang mở thì
+  cùng profile chỉ chuyển tiếp lệnh rồi thoát mà không đổi file) rồi đọc như file xlsx; không có LibreOffice
+  thì báo rõ. Bản Windows vẫn dùng COM.
+- ✅ `tests/mcp-host/test_mcp_host.py` chạy cho cả hai bản (`AXIOM_MCP_CMD` + `AXIOM_MCP_NO_CATALOG`), và
+  thêm `tests/mcp-host/test_mcp_portable.py` không cần thư viện ngoài (giao thức + 50 tool + tool file +
+  `.xls` + tool live khi có app mở).
+
+Khác biệt so với bản Windows (đã chấp nhận):
+
+| Việc | Bản Windows (`AxiomOffice.Host.exe mcp`) | Bản .NET 10 (`axiom-office-mcp`) |
+|---|---|---|
+| Cấu hình, token, port | HKCU `Software\AxiomOffice` | HKCU trên Windows, `~/.config/axiom-office/config.json` trên Linux (`PortLibreOffice`, mặc định 47851) |
+| Thư mục session | `%LOCALAPPDATA%\AxiomOffice\sessions` | `$XDG_RUNTIME_DIR/axiom-office/sessions` (Linux) |
+| Danh sách lệnh trong mô tả tool `*_command` | `CommandCatalog` của add-in | `live-commands.json` nhúng sẵn, sinh từ registry extension (`scripts/generate_mcp_commands.py`, có test chống lệch) |
+| `commands --json/--markdown` (bảng README) | có | không có |
+| `.xls` | COM (Excel/WPS) | LibreOffice hoặc COM (tuỳ nền tảng) |
 
 ## 12. Cài đặt, đóng gói, gỡ
 
@@ -348,6 +370,7 @@ Gói `axiom-office-linux-x64-<version>.tar.gz` (do `scripts/linux/package.sh` si
 ```
 axiom-office-linux-x64-0.1.0/
   core/                        Agent Core self-contained linux-x64 (máy đích không cần .NET)
+  mcp/axiom-office-mcp         MCP server (Claude Code/Desktop) - cùng 50 tool với bản Windows
   AxiomOffice-LibreOffice-0.1.0.oxt
   install.sh                   cài / --uninstall [--purge] / --help
   README.txt
@@ -363,12 +386,13 @@ axiom-office-linux-x64-0.1.0/
    **không tự tắt**.
 4. Cập nhật `~/.config/axiom-office/config.json` (`0600`): chỉ ghi khoá nào được truyền
    (`--endpoint/--model/--api-key`, `--api-key -` đọc từ stdin); giữ nguyên token và cấu hình cũ khi nâng cấp.
+5. Chép `mcp/` vào `~/.local/share/axiom-office/mcp` và in đoạn cấu hình MCP cho Claude Code/Desktop.
 
 `--uninstall [--purge]`: `unopkg remove org.axiomoffice.bridge`, xoá `<data_dir>/core`; `--purge` xoá thêm
 `~/.config/axiom-office`, `~/.local/share/axiom-office` và `$XDG_RUNTIME_DIR/axiom-office`.
 
-Còn lại so với kế hoạch: `axiom-office-mcp` trong gói, thư mục `skills/` dựng sẵn, `HUONG-DAN-CAI-DAT.txt`
-riêng, và gọi `/v1/admin/shutdown` khi gỡ (hiện chỉ gửi `SIGTERM` cho tiến trình Core).
+Còn lại so với kế hoạch: thư mục `skills/` dựng sẵn, `HUONG-DAN-CAI-DAT.txt` riêng, và gọi
+`/v1/admin/shutdown` khi gỡ (hiện chỉ gửi `SIGTERM` cho tiến trình Core).
 
 Flatpak/Snap LibreOffice chạy trong sandbox: extension vẫn cài được qua `unopkg` của bản đó, nhưng
 kết nối `127.0.0.1` tới Core ngoài sandbox và quyền chạy binary có thể bị chặn → **đợt này chỉ hỗ trợ
@@ -494,12 +518,15 @@ Máy kiểm chứng: Ubuntu 24.04, LibreOffice 24.2.7.2 (`python3-uno`, VCL kf5 
 
 | Việc | Kết quả |
 |---|---|
-| Unit test extension (không cần LibreOffice) | 51/51 |
+| Unit test extension (không cần LibreOffice) | 52/52 |
 | `tests/live/test_live_libreoffice.py` headless | 159/159 |
 | `tests/live/test_live_libreoffice.py --ui` | 159/159 |
 | Agent Core (`dotnet test`) | 200/200 (trên Linux **và** trên Windows) |
 | `ai.ask` thật qua Core + LLM (Writer/Calc/Impress) | Pass: model tự nạp skill, sửa tài liệu thật (Writer 25s, Calc 53s) |
 | Pane trong sidebar (KDE) và pane neo (dock) | Pass, có ảnh chụp |
+| `tests/mcp-host/test_mcp_portable.py` (`axiom-office-mcp`, linux-x64) | 70/70 (có app LibreOffice đang mở) |
+| `tests/mcp-host/test_mcp_host.py` cho bản `axiom-office-mcp` (parity với bản Python) | 103/103 (Linux **và** Windows) |
+| Cài từ tarball (`install.sh`) | Pass: Core + `mcp/` vào `~/.local/share/axiom-office`, `--list` ra 50 tool |
 
 Khác biệt Windows → Linux phải xử lý:
 
@@ -512,8 +539,10 @@ Khác biệt Windows → Linux phải xử lý:
 | Sidebar của VCL trên Linux cấp cho panel chiều cao **lớn hơn** vùng vẽ thật (thanh tiêu đề deck cao hơn LibreOffice tính) → footer "Sẵn sàng"/"Hoàn tác lượt này" bị thanh trạng thái che | Trừ `theme.SIDEBAR_BOTTOM_INSET` (12px) khi pane nằm trong sidebar |
 | Font mono mặc định trên Linux rộng hơn Consolas → mã lệnh bị cắt ở mép phải (`writer.insertTable` → `writer.insertTabl`) | Ưu tiên đủ chỗ cho mã lệnh (nới giới hạn 45% bề rộng), chừa 2px mép, rút gọn tên kiểu lỗi ở dòng lỗi |
 | Script test giả định `tasklist`/`taskkill`/`winreg`/`winreg` token và đường dẫn `soffice.exe` | Bộ live test dò `soffice` qua PATH, `pgrep`/`SIGTERM`, token đọc từ `config.json`; `winreg` import mềm |
+| Bản Windows của MCP (`AxiomOffice.Host.exe mcp`) dùng `JavaScriptSerializer` (chỉ có trên .NET Framework), COM cho `.xls`, HKCU | Lớp `Compat/` cho bản .NET 10: `JavaScriptSerializer` trên `System.Text.Json`, `.xls` qua LibreOffice, cấu hình HKCU/config.json (mục 11) |
+| Lệnh bridge gửi từ MCP trên Linux không có tiền tố nào để biết đang nói với LibreOffice hay WPS | `Config.PortForKind` trên Linux luôn trỏ về `PortLibreOffice` (47851/47852/47853) — cùng cổng với extension |
 
-Chưa làm ở L3: `AxiomOffice.Files` + `axiom-office-mcp` cho Linux và CI Ubuntu (mục 11 và 12).
+Chưa làm ở L3: CI Ubuntu (mục 12).
 
 ### Giai đoạn L2: Core đa nền tảng + pane
 
@@ -526,7 +555,9 @@ Chưa làm ở L3: `AxiomOffice.Files` + `axiom-office-mcp` cho Linux và CI Ubu
 
 ### Giai đoạn L3: Làn file + MCP + đóng gói
 
-- [ ] `AxiomOffice.Files` (`net10.0`), `axiom-office-mcp` (linux-x64, win-x64), test so với bản Python.
+- [x] `axiom-office-mcp` (`net10.0`, linux-x64) + test so với bản Python — làm bằng cách compile lại mã nguồn
+      tool của `AxiomOffice.Host` với `PORTABLE` thay vì tách `AxiomOffice.Files` (mục 11); win-x64 vẫn dùng
+      `AxiomOffice.Host.exe mcp` (đã có sẵn, không cần bản thứ hai).
 - [x] `install.sh` / `uninstall.sh`, tarball, hướng dẫn; CI Ubuntu (CI còn lại).
 - **Xong khi**: cài từ tarball trên máy sạch Ubuntu/Fedora không cần root (trừ gói `python3-uno` nếu
   thiếu); Claude Code dùng được `axiom-office-mcp` với LibreOffice đang mở; CI xanh.

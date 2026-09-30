@@ -247,6 +247,37 @@ Khi sửa file chỉ phần XML liên quan được ghi lại, nên **chart, ả
 được giữ nguyên**; mọi lần ghi dùng file tạm rồi thay thế (atomic). `.xls` (BIFF) chỉ đọc, qua
 Excel hoặc WPS Spreadsheets cài trên máy. Không có truy vấn SQL (`excel_query` của bản Python cũ).
 
+### Trên Linux (`axiom-office-mcp`)
+
+Gói Linux có sẵn `~/.local/share/axiom-office/mcp/axiom-office-mcp` (`scripts/linux/package.sh` đóng gói,
+`install.sh` cài) — **cùng 50 tool, cùng mã nguồn tool với `AxiomOffice.Host.exe mcp`**, tự chứa nên máy
+đích không cần .NET:
+
+```json
+{
+  "mcpServers": {
+    "office": { "command": "/home/<bạn>/.local/share/axiom-office/mcp/axiom-office-mcp", "args": ["all"] }
+  }
+}
+```
+
+- Chạy từ mã nguồn: `dotnet build src/AxiomOffice.Mcp -c Release` rồi
+  `dotnet src/AxiomOffice.Mcp/bin/Release/net10.0/axiom-office-mcp.dll all` (`--list` để xem tool).
+- `office_sessions` đọc session ở `$XDG_RUNTIME_DIR/axiom-office/sessions`, còn token và port
+  (`PortLibreOffice`, mặc định 47851) lấy từ `~/.config/axiom-office/config.json` — **cùng chỗ** với
+  Agent Core và extension, nên tool live nói chuyện được với LibreOffice đang mở ngay khi cài xong.
+- `.xls` trên Linux đọc bằng cách nhờ `soffice --headless --convert-to xlsx` (**profile riêng**, không
+  đụng phiên LibreOffice đang mở) rồi đọc như file xlsx thường; máy không có LibreOffice thì báo rõ
+  (đặt `AXIOM_SOFFICE` nếu `soffice` không nằm trong PATH).
+- Khác bản Windows: không có lệnh `commands` (`AxiomOffice.Host.exe commands --json|--markdown` sinh bảng
+  README) — danh sách lệnh cho mô tả tool `*_command` nhúng sẵn trong
+  `src/AxiomOffice.Mcp/live-commands.json`, sinh bằng `scripts/generate_mcp_commands.py` và được
+  `tests/lo/test_extension.py` so lại với registry của extension.
+- Test: `python tests/mcp-host/test_mcp_portable.py <exe> [--live]` (không cần thư viện ngoài, chạy được
+  cả hai hệ điều hành: giao thức, 50 tool, các tool file trên file thật, `.xls` qua LibreOffice, và tool
+  live khi có app đang mở). Bộ parity đầy đủ `tests/mcp-host/test_mcp_host.py` chạy cho bản này bằng
+  `AXIOM_MCP_CMD="<đường dẫn tới axiom-office-mcp> all" AXIOM_MCP_NO_CATALOG=1`.
+
 ## HTTP API
 
 Mọi endpoint nghe trên `127.0.0.1`. Bridge **từ chối request có header `Origin`** (chặn gọi từ
@@ -514,7 +545,7 @@ powershell -ExecutionPolicy Bypass -File tests\mcp-host\office_roundtrip.ps1 -Di
 powershell -ExecutionPolicy Bypass -File tests\mcp-host\office_roundtrip.ps1 -Dir <thư_mục_output> -Verify
 # Unit test của các MCP Python (legacy)
 cd tools\word-mcp; .venv\Scripts\python.exe -m unittest discover -s tests
-# Làn LibreOffice: 51 unit test (giải mã tham số + registry lệnh khớp bản C#, logic pane, theme + đọc SSE của
+# Làn LibreOffice: 52 unit test (giải mã tham số + registry lệnh khớp bản C#, logic pane, theme + đọc SSE của
 # Core) và test mọi lệnh trên LibreOffice thật (script tự mở LibreOffice bằng profile người dùng;
 # --ui: bản có cửa sổ; --ai: ai.ask). Chạy được cả trên Linux (đường dẫn soffice tự dò, tắt app bằng
 # SIGTERM, token đọc từ ~/.config/axiom-office/config.json).
@@ -699,6 +730,9 @@ src/AxiomOffice/              COM add-in (net48)
   Ribbon/                     Ribbon XML + xử lý nút
 src/AxiomOffice.Host/         AxiomOffice.Host.exe: companion + MCP server
   Mcp/                        giao thức MCP, tool file (OOXML) + live, template docx/pptx nhúng
+src/AxiomOffice.Mcp/          MCP server đa nền tảng (.NET 10, `axiom-office-mcp`) - dùng chung mã nguồn
+                              tool với AxiomOffice.Host (compile lại Mcp\*.cs + lớp Compat cho Linux:
+                              config.json/HKCU, session XDG, JSON, .xls qua LibreOffice)
 src/AxiomOffice.Core/         Agent Core (.NET 10, theo New_arch.md) - net10.0, chạy cả Windows lẫn Linux
   Agent/                      Orchestrator, RunManager, RunEventStream (SSE), PromptBuilder, ContextAssembler
   Models/                     codec OpenAI/Anthropic + vòng lặp agent (ModelClient)
@@ -710,8 +744,9 @@ tests/core/                   test Agent Core: xUnit + e2e (fake_llm.py, test_co
 scripts/                      build, install, uninstall, legacy (gỡ bản WpsAiBridge), core (tắt Core), install-dotnet-sdk, package, libreoffice
   libreoffice.sh              Linux: đóng gói/cài/gỡ .oxt bằng unopkg của người dùng
   package_oxt.py              đóng gói .oxt (Windows + Linux)
-  linux/install.sh            cài cho người dùng cuối Linux: Core vào ~/.local/share, .oxt, config.json
-  linux/package.sh            tarball linux-x64/arm64: Core self-contained + .oxt + install.sh
+  generate_mcp_commands.py    sinh danh sách lệnh nhúng cho axiom-office-mcp (từ registry extension)
+  linux/install.sh            cài cho người dùng cuối Linux: Core + MCP vào ~/.local/share, .oxt, config.json
+  linux/package.sh            tarball linux-x64/arm64: Core + MCP self-contained + .oxt + install.sh
 scripts/dist/                 install.cmd, uninstall.cmd, HUONG-DAN-CAI-DAT.txt (vào gói cài)
 src/AxiomOffice.LibreOffice/  extension Python UNO cho LibreOffice (nói cùng giao thức bridge)
   python/axiom_job.py         component UNO: job OnStartApp -> axiom.bridge.start

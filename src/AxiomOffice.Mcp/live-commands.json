@@ -1,0 +1,754 @@
+[
+  {
+    "name": "app.info",
+    "kind": null,
+    "params": []
+  },
+  {
+    "name": "ai.ask",
+    "kind": null,
+    "params": [
+      {
+        "name": "prompt",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "ui.askpane",
+    "kind": null,
+    "params": []
+  },
+  {
+    "name": "app.screenshot",
+    "kind": null,
+    "params": [
+      {
+        "name": "maxWidth",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "writer.newDocument",
+    "kind": "wps",
+    "params": []
+  },
+  {
+    "name": "writer.open",
+    "kind": "wps",
+    "params": [
+      {
+        "name": "path",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "writer.getText",
+    "kind": "wps",
+    "params": [
+      {
+        "name": "maxChars",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "writer.selection",
+    "kind": "wps",
+    "params": []
+  },
+  {
+    "name": "writer.typeText",
+    "kind": "wps",
+    "params": [
+      {
+        "name": "text",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "writer.appendText",
+    "kind": "wps",
+    "params": [
+      {
+        "name": "text",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "writer.insertStyledText",
+    "kind": "wps",
+    "params": [
+      {
+        "name": "text",
+        "hint": null
+      },
+      {
+        "name": "bold",
+        "hint": null
+      },
+      {
+        "name": "italic",
+        "hint": null
+      },
+      {
+        "name": "underline",
+        "hint": null
+      },
+      {
+        "name": "size",
+        "hint": null
+      },
+      {
+        "name": "color",
+        "hint": null
+      },
+      {
+        "name": "font",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "writer.heading",
+    "kind": "wps",
+    "params": [
+      {
+        "name": "text",
+        "hint": null
+      },
+      {
+        "name": "level",
+        "hint": null
+      },
+      {
+        "name": "break",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "writer.formatSelection",
+    "kind": "wps",
+    "params": [
+      {
+        "name": "bold",
+        "hint": null
+      },
+      {
+        "name": "italic",
+        "hint": null
+      },
+      {
+        "name": "underline",
+        "hint": null
+      },
+      {
+        "name": "size",
+        "hint": null
+      },
+      {
+        "name": "color",
+        "hint": null
+      },
+      {
+        "name": "font",
+        "hint": null
+      },
+      {
+        "name": "alignment",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "writer.setParagraphAlignment",
+    "kind": "wps",
+    "params": [
+      {
+        "name": "alignment",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "writer.insertTable",
+    "kind": "wps",
+    "params": [
+      {
+        "name": "rows",
+        "hint": null
+      },
+      {
+        "name": "cols",
+        "hint": null
+      },
+      {
+        "name": "values",
+        "hint": "2D array of rows"
+      },
+      {
+        "name": "style",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "writer.formatTable",
+    "kind": "wps",
+    "params": [
+      {
+        "name": "table",
+        "hint": "1-based index; default: table at cursor, else last table"
+      },
+      {
+        "name": "style",
+        "hint": "e.g. 'Grid Table 4 - Accent 1'"
+      },
+      {
+        "name": "font",
+        "hint": null
+      },
+      {
+        "name": "size",
+        "hint": null
+      },
+      {
+        "name": "color",
+        "hint": "#RRGGBB text color"
+      },
+      {
+        "name": "headerFill",
+        "hint": "#RRGGBB"
+      },
+      {
+        "name": "headerColor",
+        "hint": "#RRGGBB header text"
+      },
+      {
+        "name": "headerBold",
+        "hint": null
+      },
+      {
+        "name": "bandFill",
+        "hint": "#RRGGBB every other data row"
+      },
+      {
+        "name": "borderColor",
+        "hint": "#RRGGBB"
+      },
+      {
+        "name": "borders",
+        "hint": "false = no borders (layout tables)"
+      },
+      {
+        "name": "alignment",
+        "hint": "left/center/right"
+      },
+      {
+        "name": "autoFit",
+        "hint": "content/window"
+      }
+    ]
+  },
+  {
+    "name": "writer.insertPageBreak",
+    "kind": "wps",
+    "params": []
+  },
+  {
+    "name": "writer.insertImage",
+    "kind": "wps",
+    "params": [
+      {
+        "name": "path",
+        "hint": null
+      },
+      {
+        "name": "width",
+        "hint": null
+      },
+      {
+        "name": "height",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "writer.insertHyperlink",
+    "kind": "wps",
+    "params": [
+      {
+        "name": "url",
+        "hint": null
+      },
+      {
+        "name": "text",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "writer.replaceAll",
+    "kind": "wps",
+    "params": [
+      {
+        "name": "find",
+        "hint": null
+      },
+      {
+        "name": "replace",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "writer.undo",
+    "kind": "wps",
+    "params": [
+      {
+        "name": "count",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "writer.exportPdf",
+    "kind": "wps",
+    "params": [
+      {
+        "name": "path",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "writer.save",
+    "kind": "wps",
+    "params": []
+  },
+  {
+    "name": "writer.saveAs",
+    "kind": "wps",
+    "params": [
+      {
+        "name": "path",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "writer.closeAll",
+    "kind": "wps",
+    "params": []
+  },
+  {
+    "name": "et.newWorkbook",
+    "kind": "et",
+    "params": []
+  },
+  {
+    "name": "et.open",
+    "kind": "et",
+    "params": [
+      {
+        "name": "path",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "et.listSheets",
+    "kind": "et",
+    "params": []
+  },
+  {
+    "name": "et.activateSheet",
+    "kind": "et",
+    "params": [
+      {
+        "name": "sheet",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "et.readRange",
+    "kind": "et",
+    "params": [
+      {
+        "name": "range",
+        "hint": null
+      },
+      {
+        "name": "sheet",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "et.writeRange",
+    "kind": "et",
+    "params": [
+      {
+        "name": "range",
+        "hint": "top-left cell e.g. 'A1'"
+      },
+      {
+        "name": "values",
+        "hint": "2D array of rows e.g. [[\"Tên\",\"Điểm\"],[\"An\",9.5]]"
+      },
+      {
+        "name": "sheet",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "et.formatRange",
+    "kind": "et",
+    "params": [
+      {
+        "name": "range",
+        "hint": null
+      },
+      {
+        "name": "bold",
+        "hint": null
+      },
+      {
+        "name": "italic",
+        "hint": null
+      },
+      {
+        "name": "fontSize",
+        "hint": null
+      },
+      {
+        "name": "fontColor",
+        "hint": null
+      },
+      {
+        "name": "fillColor",
+        "hint": null
+      },
+      {
+        "name": "numFmt",
+        "hint": null
+      },
+      {
+        "name": "horizontal",
+        "hint": null
+      },
+      {
+        "name": "wrap",
+        "hint": null
+      },
+      {
+        "name": "sheet",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "et.undo",
+    "kind": "et",
+    "params": [
+      {
+        "name": "count",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "et.exportPdf",
+    "kind": "et",
+    "params": [
+      {
+        "name": "path",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "et.save",
+    "kind": "et",
+    "params": []
+  },
+  {
+    "name": "et.saveAs",
+    "kind": "et",
+    "params": [
+      {
+        "name": "path",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "et.closeAll",
+    "kind": "et",
+    "params": []
+  },
+  {
+    "name": "et.checkRange",
+    "kind": "et",
+    "params": [
+      {
+        "name": "range",
+        "hint": "default: the used range"
+      },
+      {
+        "name": "sheet",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "wpp.newPresentation",
+    "kind": "wpp",
+    "params": []
+  },
+  {
+    "name": "wpp.open",
+    "kind": "wpp",
+    "params": [
+      {
+        "name": "path",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "wpp.listSlides",
+    "kind": "wpp",
+    "params": []
+  },
+  {
+    "name": "wpp.addSlide",
+    "kind": "wpp",
+    "params": [
+      {
+        "name": "layout",
+        "hint": "number: 1 title, 2 title+content, 11 title only, 12 blank"
+      }
+    ]
+  },
+  {
+    "name": "wpp.addText",
+    "kind": "wpp",
+    "params": [
+      {
+        "name": "text",
+        "hint": null
+      },
+      {
+        "name": "slide",
+        "hint": null
+      },
+      {
+        "name": "left",
+        "hint": null
+      },
+      {
+        "name": "top",
+        "hint": null
+      },
+      {
+        "name": "width",
+        "hint": null
+      },
+      {
+        "name": "height",
+        "hint": null
+      },
+      {
+        "name": "fontSize",
+        "hint": null
+      },
+      {
+        "name": "bold",
+        "hint": null
+      },
+      {
+        "name": "color",
+        "hint": null
+      },
+      {
+        "name": "align",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "wpp.addTextBox",
+    "kind": "wpp",
+    "params": [
+      {
+        "name": "text",
+        "hint": null
+      },
+      {
+        "name": "slide",
+        "hint": null
+      },
+      {
+        "name": "left",
+        "hint": null
+      },
+      {
+        "name": "top",
+        "hint": null
+      },
+      {
+        "name": "width",
+        "hint": null
+      },
+      {
+        "name": "height",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "wpp.addImage",
+    "kind": "wpp",
+    "params": [
+      {
+        "name": "path",
+        "hint": null
+      },
+      {
+        "name": "slide",
+        "hint": null
+      },
+      {
+        "name": "left",
+        "hint": null
+      },
+      {
+        "name": "top",
+        "hint": null
+      },
+      {
+        "name": "width",
+        "hint": null
+      },
+      {
+        "name": "height",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "wpp.addTable",
+    "kind": "wpp",
+    "params": [
+      {
+        "name": "rows",
+        "hint": null
+      },
+      {
+        "name": "cols",
+        "hint": null
+      },
+      {
+        "name": "values",
+        "hint": "2D array of rows"
+      },
+      {
+        "name": "slide",
+        "hint": null
+      },
+      {
+        "name": "left",
+        "hint": null
+      },
+      {
+        "name": "top",
+        "hint": null
+      },
+      {
+        "name": "width",
+        "hint": null
+      },
+      {
+        "name": "height",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "wpp.setNotes",
+    "kind": "wpp",
+    "params": [
+      {
+        "name": "text",
+        "hint": null
+      },
+      {
+        "name": "slide",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "wpp.deleteSlide",
+    "kind": "wpp",
+    "params": [
+      {
+        "name": "slide",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "wpp.exportPdf",
+    "kind": "wpp",
+    "params": [
+      {
+        "name": "path",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "wpp.save",
+    "kind": "wpp",
+    "params": []
+  },
+  {
+    "name": "wpp.saveAs",
+    "kind": "wpp",
+    "params": [
+      {
+        "name": "path",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "wpp.closeAll",
+    "kind": "wpp",
+    "params": []
+  },
+  {
+    "name": "wpp.checkLayout",
+    "kind": "wpp",
+    "params": [
+      {
+        "name": "slide",
+        "hint": "slide number; default: every slide"
+      }
+    ]
+  },
+  {
+    "name": "writer.checkTables",
+    "kind": "wps",
+    "params": []
+  }
+]

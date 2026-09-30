@@ -5,6 +5,31 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — MCP server đa nền tảng `axiom-office-mcp` (LibreOffice_arch.md mục 11)
+- **`src/AxiomOffice.Mcp`** (`net10.0`, `axiom-office-mcp`): MCP stdio 50 tool — 20 tool file (docx/xlsx/
+  pptx/csv: đọc, tạo, sửa, format, export) + tool live gọi bridge qua HTTP + `office_sessions`. **Dùng
+  chung mã nguồn** với `AxiomOffice.Host` (compile lại `src/AxiomOffice.Host/Mcp/*.cs` với ký hiệu
+  `PORTABLE`), nên hai bản không thể lệch nhau về hành vi tool
+- Lớp `Compat/` cho bản .NET 10: `JavaScriptSerializer` trên `System.Text.Json` (cùng API mà `McpServer.cs`
+  dùng, `DeserializeObject` trả `Dictionary<string, object>`/`object[]` như bản cũ), `Config`/`Logger`/
+  `SessionRegistry` đọc HKCU + `%LOCALAPPDATA%` trên Windows và `~/.config/axiom-office/config.json` +
+  `$XDG_RUNTIME_DIR/axiom-office` trên Linux, danh sách lệnh cho mô tả tool `*_command` nhúng sẵn
+  (`live-commands.json`, sinh từ registry extension bằng `scripts/generate_mcp_commands.py`)
+- `.xls` trên Linux: nhờ `soffice --headless --convert-to xlsx` với **profile riêng** (không đụng phiên
+  LibreOffice đang mở) rồi đọc như file xlsx; không có LibreOffice thì báo lỗi rõ. Bản Windows vẫn dùng COM.
+  `FindSoffice` dò `AXIOM_SOFFICE` → PATH → các vị trí cài quen thuộc (Linux + Windows)
+- Gói Linux: `scripts/linux/package.sh` publish thêm `mcp/` (self-contained, máy đích không cần .NET);
+  `install.sh` cài vào `~/.local/share/axiom-office/mcp`, gỡ bằng `--uninstall`, và in sẵn đoạn cấu hình
+  `mcpServers` cho Claude Code/Desktop
+- Test: `tests/mcp-host/test_mcp_portable.py` (không cần thư viện ngoài, chạy cả Windows lẫn Linux: giao
+  thức, 50 tool, các tool file trên file thật, `.xls` qua LibreOffice, tool live khi có app mở, `--live`);
+  `tests/mcp-host/test_mcp_host.py` chạy được cho bản .NET 10 qua `AXIOM_MCP_CMD` + `AXIOM_MCP_NO_CATALOG`;
+  `tests/lo/test_extension.py` thêm test chống lệch giữa `live-commands.json` và registry
+- Đã kiểm chứng: parity đầy đủ với bản Python (python-docx/openpyxl/python-pptx đọc file do bản .NET 10 ghi
+  và ngược lại) **103/103 trên cả Windows và Linux**; `test_mcp_portable.py` 61/61 (không có app) và
+  70/70 (LibreOffice Calc đang mở, có ghi/đọc ô thật qua bridge); bản net48 (`AxiomOffice.Host.exe`) vẫn
+  biên dịch và chạy nguyên như trước
+
 ### Added — LibreOffice trên Linux (LibreOffice_arch.md giai đoạn L2–L3)
 - **Agent Core chạy được trên Linux**: `TargetFramework` `net10.0` (bỏ `-windows`); cấu hình đọc từ
   `~/.config/axiom-office/config.json` (`JsonConfigSource`, cùng tên khoá với HKCU — giá trị bool ghi
