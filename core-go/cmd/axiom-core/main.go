@@ -10,17 +10,21 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"syscall"
 	"time"
 
+	"axiomoffice/core/internal/agent"
 	"axiomoffice/core/internal/api"
 	"axiomoffice/core/internal/config"
 	"axiomoffice/core/internal/corefile"
 	"axiomoffice/core/internal/corelog"
 	"axiomoffice/core/internal/instance"
 	"axiomoffice/core/internal/model"
+	"axiomoffice/core/internal/office"
+	"axiomoffice/core/internal/skills"
 	"axiomoffice/core/internal/store"
 )
 
@@ -68,6 +72,24 @@ func run() int {
 	corelog.Info("Agent Core starting: port=%d pid=%d version=%s singleInstance=%t dataDir=%s sessionDir=%s provider=%s model=%s",
 		port, os.Getpid(), version, cfg.SingleInstance, paths.Root, sessionDir(cfg), current.Codec.Name(), current.Model)
 
+	// Skill: skills/ canh binary -> SkillDirs cua to chuc -> thu muc skills cua nguoi dung (muc 8.4.4).
+	exe, _ := os.Executable()
+	watchCtx, stopWatch := context.WithCancel(context.Background())
+	defer stopWatch()
+	skillIndex := skills.New(skills.DefaultSources(
+		filepath.Join(filepath.Dir(exe), "skills"), cfg.SkillDirs, paths.SkillsDir))
+	skillIndex.Watch(watchCtx)
+
+	// Bridge + session registry: noi Core dieu khien add-in/extension dang chay.
+	bridge := office.NewBridgeClient(httpClient, cfg.Token)
+	sessions := office.NewDirectory(cfg.SessionDirectoryOverride)
+	manager := agent.NewManager()
+	orchestrator := &agent.Orchestrator{
+		Bridge: bridge, Sessions: sessions,
+		Conversations: stores.Convs, Runs: stores.Runs,
+		Models: models, Skills: skillIndex, Config: config.Load, Assembler: agent.NewContextAssembler(),
+	}
+
 	server := &http.Server{ReadHeaderTimeout: 10 * time.Second}
 	var stopOnce sync.Once
 	stop := func() {
@@ -89,7 +111,12 @@ func run() int {
 		Runtime: runtime,
 		HTTP:    httpClient,
 		Stores:  stores,
-		Stop:    stop,
+		Skills:  skillIndex,
+
+		Manager:      manager,
+		Orchestrator: orchestrator,
+
+		Stop: stop,
 	}, mux)
 
 	signals := make(chan os.Signal, 1)
@@ -100,7 +127,6 @@ func run() int {
 		stop()
 	}()
 
-	exe, _ := os.Executable()
 	corefile.Write(paths.CoreJSON, corefile.Info{
 		Pid: os.Getpid(), Port: port, Version: version, Started: runtime.StartedText(), Protocol: api.Protocol, Exe: exe,
 	})
@@ -108,6 +134,9 @@ func run() int {
 		port, os.Getpid(), version, api.Protocol, paths.Root, stores.Status(cfg.MemoryEnabled))
 
 	serveErr := server.Serve(listener)
+	// Dong ket noi dang nho (keep-alive toi bridge) truoc khi thoat: ban .NET lam viec nay bang
+	// HttpClient.Dispose(); thoat tien trinh khi con socket mo lam phia bridge nhan RST thay vi dong em.
+	httpClient.CloseIdleConnections()
 	corefile.Delete(paths.CoreJSON)
 	if stores.DB != nil {
 		_ = stores.DB.Close()

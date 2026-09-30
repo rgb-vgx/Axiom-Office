@@ -10,7 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"axiomoffice/core/internal/agent"
 	"axiomoffice/core/internal/config"
+	"axiomoffice/core/internal/skills"
 	"axiomoffice/core/internal/store"
 )
 
@@ -35,8 +37,12 @@ type Deps struct {
 	Runtime *Runtime
 	HTTP    *http.Client
 	Stores  *store.Stores
-	// Skills tra (so skill, so loi nap) cho /v1/setup; nil = chua co kho skill.
-	Skills func() (int, int)
+	Skills  *skills.Index
+
+	// Luot chay agent (giai doan 2).
+	Manager      *agent.Manager
+	Orchestrator *agent.Orchestrator
+
 	// Stop dung Core (POST /v1/admin/shutdown).
 	Stop func()
 }
@@ -45,6 +51,10 @@ type Deps struct {
 func Handler(deps *Deps, mux *http.ServeMux) http.Handler {
 	mapCore(mux, deps)
 	mapSetup(mux, deps)
+	mapRuns(mux, deps)
+	if deps.Skills != nil {
+		mapSkills(mux, deps)
+	}
 	return guard(deps.Config.Token, mux)
 }
 

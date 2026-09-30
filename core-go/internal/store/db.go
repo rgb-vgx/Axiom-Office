@@ -142,6 +142,8 @@ CREATE TABLE memory_embeddings (
 // Stores gom kho du lieu + trang thai cho /health ("on" | "off" | "unavailable").
 type Stores struct {
 	DB        *DB
+	Convs     *Conversations
+	Runs      *Runs
 	Available bool
 	Error     string
 }
@@ -161,6 +163,8 @@ func OpenStores(path string) *Stores {
 		return stores
 	}
 	stores.DB = db
+	stores.Convs = db.Conversations()
+	stores.Runs = db.Runs()
 	stores.Available = true
 	return stores
 }

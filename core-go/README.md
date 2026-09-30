@@ -12,8 +12,8 @@ Nhờ vậy add-in, extension LibreOffice và MCP không phải đổi gì khi t
 | Giai đoạn | Nội dung | Phần e2e | Trạng thái |
 |---|---|---|---|
 | G1 | cấu hình (HKCU/DPAPI, config.json/libsecret), `core.log`, `core.json`, một-phiên-bản, chọn port, guard (Origin/token/Content-Type), `/health`, `/v1/admin/shutdown`, migrate `core.db`, model client + codec OpenAI/Anthropic + vòng lặp agent, `/v1/setup`, `/v1/llm/test`, `/v1/llm/models` | `/health`, `setup` | ✔ (trừ đếm skill, chờ G3) |
-| G2 | `/v1/runs` + SSE, orchestrator, bridge client, session registry, `office_action`, policy + xác nhận, audit, hội thoại | `fake_bridge`, `guards`, `confirm` | |
-| G3 | skills (`load_skill`, `read_skill_file`, `/v1/skills`, theo dõi thư mục) | `skills` | |
+| G2 | `/v1/runs` + SSE, orchestrator, bridge client, session registry, `office_action`, policy + xác nhận, audit, hội thoại | `fake_bridge`, `guards`, `confirm` | ✔ |
+| G3 | skills (`load_skill`, `read_skill_file`, `/v1/skills`, theo dõi thư mục) | `skills` | ✔ |
 | G4 | memory dài hạn (FTS5, trích xuất, embedding) | `memory` | |
 | G5 | MCP client + QA thị giác | `mcp`, `visual` | |
 | G6 | đóng gói thay bản .NET (`build.ps1`, `scripts/linux/package.sh`, CI) | toàn bộ | |
@@ -48,7 +48,13 @@ AXIOM_E2E_CORE_EXE=/duong/dan/axiom-core python tests/core/test_core_e2e.py --on
 | `internal/store` | `Memory/CoreDb.cs`, `Api/CoreStores.cs` |
 | `internal/model` | `Models/*` |
 | `internal/setup` | `Setup/LlmErrors.cs` + catalog sinh từ `catalog/setup.json` (`scripts/generate_setup_catalog.py`) |
-| `internal/api` | `Api/CoreApi.cs`, `CoreApiGuard.cs`, `ApiJson.cs`, `SetupEndpoints.cs` |
+| `internal/office` | `Office/SessionDirectory.cs`, `Office/BridgeClient.cs` |
+| `internal/skills` | `Skills/SkillIndex.cs`, `SkillLoader.cs` (phần quy tắc file nằm trong `Tools/SkillTools.cs`) |
+| `internal/policy` | `Agent/PolicyEngine.cs` (tách riêng gói để `tools` và `agent` dùng chung, không vòng import) |
+| `internal/tools` | `Tools/ITool.cs`, `OfficeActionTool.cs`, `SkillTools.cs` |
+| `internal/agent` | `Agent/Orchestrator.cs`, `RunManager.cs`, `RunEventStream.cs`, `PolicyEngine.cs` (phần xác nhận), `PromptBuilder.cs`, `ContextAssembler.cs` |
+| `internal/api` | `Api/CoreApi.cs`, `CoreApiGuard.cs`, `ApiJson.cs`, `SetupEndpoints.cs`, `RunEndpoints.cs`, `SkillEndpoints.cs` |
+| `internal/store` | `Memory/CoreDb.cs`, `ConversationStore.cs`, `RunStore.cs`, `Api/CoreStores.cs` |
 
 Khác biệt có chủ ý: bản Go **giữ luôn listener** của port tìm được (bản .NET thả port rồi Kestrel mới bind lại,
 có khe để tiến trình khác chiếm) và dừng êm khi nhận SIGTERM (systemd `--user`).

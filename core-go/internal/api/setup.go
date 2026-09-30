@@ -189,9 +189,9 @@ func setupPayload(deps *Deps) map[string]any {
 		problems = append(problems, problem("memory", "warning", "Không mở được dữ liệu ghi nhớ", hint))
 	}
 
-	skills, skillErrors := 0, 0
+	skillCount, skillErrors := 0, 0
 	if deps.Skills != nil {
-		skills, skillErrors = deps.Skills()
+		skillCount, skillErrors = len(deps.Skills.All()), len(deps.Skills.Errors())
 	}
 	return map[string]any{
 		"version":    deps.Runtime.Version,
@@ -207,7 +207,7 @@ func setupPayload(deps *Deps) map[string]any {
 			"port":        deps.Runtime.Port,
 			"dataDir":     deps.Paths.Root,
 			"logFile":     deps.Paths.LogFile,
-			"skills":      skills,
+			"skills":      skillCount,
 			"skillErrors": skillErrors,
 		},
 	}

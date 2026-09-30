@@ -5,6 +5,26 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Agent Core bản Go, giai đoạn G2+G3: lượt chạy agent và skills (`core-go/`)
+- **G2 — lượt chạy**: `POST /v1/runs` (+ `GET /v1/runs/{id}`, `/cancel`, `/confirm`, SSE `events` với `?after=`),
+  `GET /v1/audit`, `GET/DELETE /v1/conversations…`; orchestrator đầy đủ (kiểm tra session + `/health` của
+  bridge, hội thoại theo tài liệu, ngữ cảnh 8000 token, tóm tắt khi vượt mốc 20 tin nhắn, allowlist lệnh qua
+  `GET /commands`, ghi audit + transcript, `run.started|tool.*|run.completed|failed|cancelled|timedout|stopped`),
+  `office_action` (chuẩn hoá tên lệnh viết sai nhẹ, `params` dạng chuỗi JSON), policy xác nhận
+  (tự lưu/tự xuất, ghi đè `saveAs`, `wpp.deleteSlide`, `writer.replaceAll` trên tài liệu dài;
+  `interactive:false` = từ chối ngay) và session registry (`flock`/mở handle để biết tiến trình còn sống)
+- **G3 — skills**: `GET /v1/skills?app=…`, `POST /v1/skills/reload`, `load_skill`, `read_skill_file`
+  (chặn `..`, đường dẫn tuyệt đối, symlink ra ngoài, giới hạn 64KB), frontmatter YAML (danh sách `- item`
+  và `[a, b]`, khối `>`/`|`, nháy đơn/kép), nguồn `builtin` → `org` → `user` ghi đè theo thứ tự, gói tài
+  nguyên `_design`, quét lại thư mục khi có thay đổi (Go không có FileSystemWatcher nên so dấu vết file mỗi 2s)
+- Bản Go qua **60/60** kiểm tra e2e của các phần `fake_bridge`, `guards`, `skills`, `confirm`, `setup`
+  (Windows và Linux); `go test ./...` phủ config, model/codec, dịch lỗi, guard + `/v1/setup`, skills
+  (frontmatter, ghi đè nguồn, chặn thoát thư mục), tools (allowlist, chuẩn hoá tên lệnh, tham số) và
+  agent (SSE, hàng đợi lượt chạy, xác nhận, prompt, ngân sách ngữ cảnh, mốc tóm tắt)
+- Khác bản .NET có chủ ý: `conversationId` gửi kèm khoảng trắng được cắt bỏ (bản .NET coi là hội thoại mới);
+  đóng kết nối keep-alive tới bridge khi Core dừng (bản .NET làm qua `HttpClient.Dispose()`) để bridge
+  không nhận RST
+
 ### Added — Agent Core bản Go, giai đoạn G1 (`core-go/`, song song với bản .NET)
 - Viết lại Agent Core bằng Go để phát hành **một binary ~11 MB không cần runtime** (Windows + Linux, build
   chéo không cần cgo nhờ `modernc.org/sqlite`). Bản .NET vẫn là bản phát hành cho tới khi bản Go qua toàn bộ
