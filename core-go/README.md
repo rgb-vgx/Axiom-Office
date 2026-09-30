@@ -19,7 +19,8 @@ bản .NET vẫn nằm trong repo và vẫn chạy được (`build.ps1 -Core do
 | G4 | memory dài hạn (FTS5, trích xuất, embedding) | `memory` | ✔ |
 | G5 | MCP client + QA thị giác | `mcp`, `visual` | ✔ |
 | G6 | đóng gói thay bản .NET (`build.ps1`, `scripts/linux/package.sh`, CI) | toàn bộ | ✔ |
-| G7 | vá lỗ hổng phát hiện khi soát lại: hủy lượt đang chạy lúc Core dừng (+ phần e2e `shutdown`) | `shutdown` | ✔ |
+| G7 | vá lỗ hổng phát hiện khi soát lại: hủy lượt đang chạy lúc Core dừng | `shutdown` | ✔ |
+| G8 | phủ nốt hai vùng chưa có e2e: codec Anthropic (chạy thật) và embedding (cosine + tìm theo nghĩa) | `anthropic`, `embeddings` | ✔ |
 
 ## Build
 

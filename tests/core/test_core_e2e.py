@@ -28,6 +28,8 @@ import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import fakes  # noqa: E402  (may chu gia trong tien trinh: Anthropic + embeddings)
 # Ban Core da publish (di kem AxiomOffice.Host.exe + skills canh no, cho ca lan file MCP).
 # MCP). Muon chay voi ban vua `dotnet build` thi dat AXIOM_E2E_CORE_EXE.
 CORE_EXE = os.environ.get("AXIOM_E2E_CORE_EXE") or os.path.join(ROOT, "src", "AxiomOffice", "bin", "Release", "AxiomOffice.Core.exe")
@@ -683,6 +685,142 @@ def test_shutdown(work: str, token: str, bridge: FakeBridge, document_path: str,
         llm.stop()
 
 
+def test_anthropic(work: str, token: str, bridge: FakeBridge, document_path: str, session_dir: str) -> None:
+    """Codec Anthropic (/messages) di qua mot luot that: tool_use -> tool_result, anh base64, header dung.
+
+    LLM gia cua cac phan khac noi giao thuc OpenAI; phan nay kiem tra nhanh con lai cua Models/AnthropicCodec.cs
+    (va model/anthropic.go cua ban Go) de nguoi dung dung khoa Claude khong gap loi chi o buoc chay that.
+    """
+    handler = fakes.anthropic_handler({"calls": [
+        {"name": "load_skill", "arguments": {"name": "bang-diem"}},
+        {"name": "office_action", "arguments": {"action": "et.writeRange", "params": {"range": "A1", "values": [["a", 1]]}}},
+        {"name": "look_at_document", "arguments": {"reason": "soat bo cuc"}},
+    ]}, "Da ghi bang va soat bo cuc.")
+    server = fakes.JsonServer(handler)
+    data_dir = os.path.join(work, "core-anthropic")
+    os.makedirs(data_dir, exist_ok=True)
+    core = Core(data_dir, session_dir, None, token, {
+        "AXIOM_LLM_PROVIDER": "anthropic",
+        "AXIOM_LLM_ENDPOINT": server.base + "/v1",
+        "AXIOM_LLM_MODEL": "claude-test",
+        "AXIOM_LLM_API_KEY": "anthropic-key",
+        "AXIOM_VISUAL_QA": "1",
+        "AXIOM_SKILL_DIRS": os.path.join(ROOT, "skills"),
+        "AXIOM_MEMORY_AUTO_EXTRACT": "0",
+    })
+    office = {"port": bridge.port, "pid": bridge.pid, "app": "et", "family": "office"}
+    try:
+        bridge.commands.clear()
+        status, created = core.run("Lam bang diem va soat bo cuc", office,
+                                   document={"name": "bao-cao.xlsx", "fullName": document_path})
+        events = core.events(created["result"]["runId"])
+        check(events[-1][0] == "run.completed", "Anthropic: luot chay xong", [e[0] for e in events])
+        check("Da ghi bang va soat bo cuc." in (events[-1][1]["data"].get("reply") or ""),
+              "Anthropic: tra loi cuoi duoc doc dung", events[-1][1]["data"].get("reply"))
+
+        calls = [item for item in server.requests if item["path"].endswith("/messages")]
+        check(len(calls) >= 2, "Anthropic: co it nhat 2 lan goi /v1/messages", len(calls))
+        first = calls[0]
+        check(first["headers"].get("x-api-key") == "anthropic-key"
+              and first["headers"].get("anthropic-version") == "2023-06-01",
+              "Anthropic: gui x-api-key + anthropic-version", {k: v for k, v in first["headers"].items() if "key" in k or "anthropic" in k})
+        body = first["body"]
+        check(isinstance(body.get("system"), str) and "AI assistant embedded inside" in body["system"],
+              "Anthropic: system la truong rieng (khong nam trong messages)", str(body.get("system"))[:80])
+        check(all(message.get("role") != "system" for message in body["messages"]),
+              "Anthropic: messages khong co role system")
+        tools = body.get("tools") or []
+        check(tools and "input_schema" in tools[0] and "function" not in tools[0],
+              "Anthropic: tool dung dinh dang input_schema", str(tools[:1])[:160])
+        check(body.get("max_tokens", 0) > 0, "Anthropic: co max_tokens", body.get("max_tokens"))
+
+        # Luot thu hai: ket qua tool phai la block tool_result trong message role=user, giu dung id.
+        second = calls[1]["body"]["messages"]
+        assistant = next((m for m in second if m.get("role") == "assistant" and isinstance(m.get("content"), list)), None)
+        check(assistant is not None and any(block.get("type") == "tool_use" for block in assistant["content"]),
+              "Anthropic: gui lai assistant voi block tool_use", str(assistant)[:160])
+        users = [m for m in second if m.get("role") == "user" and isinstance(m.get("content"), list)]
+        blocks = [block for message in users for block in message["content"] if block.get("type") == "tool_result"]
+        ids = [block.get("tool_use_id") for block in blocks]
+        check(sorted(ids) == ["toolu_1", "toolu_2", "toolu_3"], "Anthropic: tool_result giu dung tool_use_id", ids)
+        images = [block for block in blocks if isinstance(block.get("content"), list)
+                  and any(part.get("type") == "image" for part in block["content"])]
+        check(bool(images) and "iVBOR" in json.dumps(images[0], ensure_ascii=False),
+              "Anthropic: anh chup nam trong tool_result dang khoi image base64", str(images)[:200])
+        check(bridge.actions() == ["et.writeRange", "app.screenshot"],
+              "Anthropic: lenh xuong bridge dung (ghi bang + chup anh)", bridge.actions())
+    finally:
+        core.stop()
+        server.stop()
+
+
+def test_embeddings(work: str, token: str, bridge: FakeBridge, document_path: str, session_dir: str) -> None:
+    """Embedding tuy chon (EmbeddingModel): chong trung bang cosine va tim theo NGHIA, khong chi tu khoa.
+
+    Vector do may chu gia quyet dinh theo dau hieu trong text, nho vay kiem thu chac chan:
+      - hai cau KHAC hash nhung vector gan nhau -> DUPLICATE (khong tao ban moi)
+      - vector khac han -> ADD
+      - truy van khong chung tu khoa nao voi memory nhung cung vector -> van tim thay (semantic)
+    """
+    # TRUNG -> [1,0,0]; GAN -> [1,0.05,0] (cosine ~0.999); KHAC -> [0,0,1]; mac dinh [0,1,0].
+    embed = fakes.JsonServer(fakes.embedding_handler({
+        "TRUNG": [1.0, 0.0, 0.0],
+        "GAN": [1.0, 0.05, 0.0],
+        "KHAC": [0.0, 0.0, 1.0],
+    }))
+    llm = FakeLlm(work, [{"text": "Da ghi nhan."}] * 20)
+    data_dir = os.path.join(work, "core-embeddings")
+    os.makedirs(data_dir, exist_ok=True)
+    core = Core(data_dir, session_dir, llm, token, {
+        "AXIOM_EMBEDDING_ENDPOINT": embed.base,
+        "AXIOM_EMBEDDING_MODEL": "fake-embed",
+        "AXIOM_MEMORY_AUTO_EXTRACT": "0",
+    })
+    try:
+        def add(scope: str, text: str):
+            return http_json(core.base + "/v1/memory", method="POST", token=core.token,
+                             body={"scope": scope, "text": text})
+
+        status, first = add("user", "Quy uoc TRUNG ve cach trinh bay bang bieu")
+        check(first["result"]["event"] == "ADD", "Embedding: fact dau tien duoc them", first["result"])
+        first_id = first["result"]["memory"]["id"]
+        check(any(item["path"].endswith("/embeddings") for item in embed.requests),
+              "Embedding: Core goi /embeddings khi ghi memory", [item["path"] for item in embed.requests][:3])
+
+        # Cau khac hash nhung vector gan nhu trung -> DUPLICATE, khong tao ban moi.
+        status, near = add("user", "Quy uoc GAN nhu trung nhung viet khac han")
+        check(near["result"]["event"] == "DUPLICATE" and near["result"]["memory"]["id"] == first_id,
+              "Embedding: cosine >= 0.96 -> DUPLICATE (khong tao ban moi)", near["result"])
+
+        # Vector khac han -> ADD (khong gop bua).
+        status, other = add("user", "Ghi chu KHAC han ve tien do")
+        check(other["result"]["event"] == "ADD", "Embedding: vector khac -> ADD", other["result"])
+
+        # Tim theo nghia: truy van khong chung tu khoa nao (vector mac dinh [0,1,0]) -> khong co ket qua.
+        status, none = http_json(core.base + "/v1/memory?q=zzz%20khong%20lien%20quan", token=core.token)
+        check(not none["result"]["memories"], "Embedding: truy van khong lien quan -> khong tra ve gi",
+              [m["text"] for m in none["result"]["memories"]])
+
+        # Them mot memory mang vector mac dinh; truy van khong trung tu khoa nao van phai tim ra (semantic).
+        status, semantic = add("user", "Quy uoc rieng cua phong")
+        check(semantic["result"]["event"] == "ADD", "Embedding: them memory cho duong tim theo nghia", semantic["result"])
+        status, found = http_json(core.base + "/v1/memory?q=zzz%20khong%20lien%20quan", token=core.token)
+        hits = found["result"]["memories"]
+        check(hits and hits[0]["text"] == "Quy uoc rieng cua phong" and hits[0].get("score", 0) > 0,
+              "Embedding: tim duoc theo NGHIA du khong chung tu khoa", [(m["text"], m.get("score")) for m in hits])
+        check(all("Quy uoc TRUNG" not in m["text"] for m in hits),
+              "Embedding: memory khong lien quan khong bi keo vao", [m["text"] for m in hits])
+
+        # Bat buoc: embedding gui ca lo trong mot request (khong goi tung cau).
+        batches = [item["body"]["input"] for item in embed.requests if item["body"] and "/embeddings" in item["path"]]
+        check(any(isinstance(batch, list) and len(batch) == 1 for batch in batches),
+              "Embedding: moi lan ghi gui mot lo text trong mot request", [len(b) if isinstance(b, list) else b for b in batches])
+    finally:
+        core.stop()
+        llm.stop()
+        embed.stop()
+
+
 def test_confirm(work: str, token: str, bridge: FakeBridge, document_path: str, session_dir: str) -> None:
     """Giai doan 4 (New_arch.md 8.6, 12): policy xac nhan - dong y / tu choi / het gio; audit day du."""
     llm = FakeLlm(work, [
@@ -1052,7 +1190,8 @@ def test_office(core: Core, port: int, pid: int) -> None:
 
 
 # Cac phan chay duoc rieng (--only); /health luon chay truoc.
-SECTIONS = ["fake_bridge", "guards", "skills", "memory", "confirm", "mcp", "visual", "setup", "shutdown"]
+SECTIONS = ["fake_bridge", "guards", "skills", "memory", "confirm", "mcp", "visual", "setup", "shutdown",
+            "anthropic", "embeddings"]
 
 # Phan phu thuoc: `guards` dung chung kich ban LLM voi `fake_bridge` (kich ban tuan tu) nen chay mot minh
 # se lech buoc -> --only tu keo theo phan can truoc.
@@ -1162,6 +1301,10 @@ def main() -> int:
                 test_setup(core, llm, work)
             if wanted("shutdown"):
                 test_shutdown(work, token, bridge, document_path, session_dir)
+            if wanted("anthropic"):
+                test_anthropic(work, token, bridge, document_path, session_dir)
+            if wanted("embeddings"):
+                test_embeddings(work, token, bridge, document_path, session_dir)
     finally:
         if core is not None:
             core.stop()

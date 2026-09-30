@@ -13,6 +13,18 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 - Thêm phần e2e `shutdown` (dùng được cho cả hai bản): dừng Core giữa lúc agent đang ghi tài liệu → bridge
   không nhận thêm lệnh nào và tiến trình Core thoát
 
+### Added — Hai vùng chức năng trước đây chưa có e2e: codec Anthropic và embedding
+- Phần e2e **`anthropic`**: chạy một lượt thật qua `/messages` với máy chủ giả trong tiến trình — kiểm tra
+  `x-api-key` + `anthropic-version`, `system` là trường riêng (không có message role system), tool theo dạng
+  `input_schema`, `max_tokens`, vòng `tool_use` → `tool_result` giữ đúng `tool_use_id`, và ảnh chụp màn hình
+  đi trong `tool_result` dạng khối `image` base64. Trước đây codec Anthropic chỉ được test đơn vị, chưa
+  chạy qua lượt thật
+- Phần e2e **`embeddings`** (`EmbeddingModel`): máy chủ `/embeddings` giả trả vector điều khiển được →
+  kiểm tra chống trùng bằng cosine ≥ 0.96 (khác hash vẫn bị coi là trùng), vector khác thì thêm mới, và tìm
+  được theo **nghĩa** dù truy vấn không chung từ khoá nào; mỗi lần ghi gửi cả lô trong một request
+- Hai phần này chạy được cho **cả hai bản** (.NET và Go) — bộ e2e giờ 119 kiểm tra, tất cả đều xanh trên
+  cả hai bản; CI (Linux) chạy thêm ba phần `shutdown`, `anthropic`, `embeddings`
+
 ### Added — Wizard thiết lập cho người dùng không chuyên (Windows + Linux)
 - **Một nội dung, hai bộ vẽ**: câu chữ + preset nhà cung cấp nằm ở `catalog/setup.json`, sinh ra
   `Setup/SetupCatalog.cs` (dùng chung add-in Windows và Agent Core) cùng `axiom/setup_catalog.py`;

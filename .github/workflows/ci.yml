@@ -51,7 +51,9 @@ jobs:
           # Prompt trich xuat memory phai giong ban .NET (mot nguon, hai ban).
           diff src/AxiomOffice.Core/Memory/Prompts/extract.txt core-go/internal/memory/prompts/extract.txt
           # Phan mcp can AxiomOffice.Host.exe (chi co tren Windows) nen bo qua o day.
-          AXIOM_E2E_CORE_EXE="$RUNNER_TEMP/gocore/axiom-core"             python3 tests/core/test_core_e2e.py --only fake_bridge,guards,skills,confirm,memory,visual,setup
+          export AXIOM_E2E_CORE_EXE="$RUNNER_TEMP/gocore/axiom-core"
+          PARTS=fake_bridge,guards,skills,confirm,memory,visual,setup,shutdown,anthropic,embeddings
+          python3 tests/core/test_core_e2e.py --only "$PARTS"
 
       - name: Cai LibreOffice + Python UNO (+ xvfb cho phan giao dien)
         run: |
