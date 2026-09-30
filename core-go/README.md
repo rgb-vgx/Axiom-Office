@@ -6,8 +6,10 @@ Hai bản **dùng chung hợp đồng**: cùng Core API v1, cùng `core.json`, c
 cấu hình (`AXIOM_*` → HKCU / `~/.config/axiom-office/config.json` → mặc định), cùng tên mutex một-phiên-bản.
 Nhờ vậy add-in, extension LibreOffice và MCP không phải đổi gì khi thay bản Core.
 
-**Cách làm: song song dần.** Bản .NET vẫn là bản phát hành. Bản Go chỉ thay được khi qua **toàn bộ**
-`tests/core/test_core_e2e.py`; mỗi giai đoạn chạy các phần tương ứng bằng `--only`.
+**Cách làm: song song dần.** Bản Go đã qua **toàn bộ** `tests/core/test_core_e2e.py` (94/94 trên Windows,
+82/82 trên Linux) nên từ G6 nó là bản được đóng gói phát hành (`scripts/build.ps1`, `scripts/linux/package.sh`);
+bản .NET vẫn nằm trong repo và vẫn chạy được (`build.ps1 -Core dotnet`, `AXIOM_CORE=dotnet package.sh`) để
+đối chiếu. Hai bản dùng chung `core.json`, `core.db` và Core API v1 nên đổi qua lại không mất dữ liệu.
 
 | Giai đoạn | Nội dung | Phần e2e | Trạng thái |
 |---|---|---|---|
@@ -16,7 +18,7 @@ Nhờ vậy add-in, extension LibreOffice và MCP không phải đổi gì khi t
 | G3 | skills (`load_skill`, `read_skill_file`, `/v1/skills`, theo dõi thư mục) | `skills` | ✔ |
 | G4 | memory dài hạn (FTS5, trích xuất, embedding) | `memory` | ✔ |
 | G5 | MCP client + QA thị giác | `mcp`, `visual` | ✔ |
-| G6 | đóng gói thay bản .NET (`build.ps1`, `scripts/linux/package.sh`, CI) | toàn bộ | |
+| G6 | đóng gói thay bản .NET (`build.ps1`, `scripts/linux/package.sh`, CI) | toàn bộ | ✔ |
 
 ## Build
 

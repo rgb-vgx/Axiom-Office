@@ -58,7 +58,7 @@ trên (cùng tên lệnh `writer.*`/`et.*`/`wpp.*`, cùng session registry) — 
 |---|---|
 | `AxiomOffice.dll` | COM add-in (`IDTExtensibility2`) nạp vào Word/Excel/PowerPoint và WPS: mở HTTP bridge trong process của app, thêm tab ribbon **Axiom Office**, task pane Ask AI và AI agent |
 | `AxiomOffice.Host.exe` | `mcp [all\|word\|excel\|ppt]`: MCP server stdio · `wps\|et\|wpp\|word\|excel\|ppt`: companion tự tạo app qua COM automation và mở bridge (khi add-in không nạp được) · `commands`: danh sách lệnh bridge · `llm-test`: thử cấu hình AI |
-| `AxiomOffice.Core.exe` | **Agent Core** (theo [New_arch.md](New_arch.md)): process riêng chạy agent cho mọi app, một bản cho mỗi người dùng, chỉ nghe `127.0.0.1:47840`; add-in khởi động khi cần và tìm qua `%LOCALAPPDATA%\AxiomOffice\core.json`. Hiện có: vòng lặp agent (OpenAI-compatible + Anthropic), hội thoại liên tục theo tài liệu, audit tool call, SSE `/v1/runs/{id}/events`, hủy, trần thời gian/token, **skills** (`load_skill`, `read_skill_file`, `/v1/skills`); memory + xác nhận + MCP client ở các giai đoạn sau |
+| `AxiomOffice.Core.exe` | **Agent Core** viết bằng Go ([core-go/](core-go/README.md), theo [New_arch.md](New_arch.md)): process riêng chạy agent cho mọi app, một bản cho mỗi người dùng, chỉ nghe `127.0.0.1:47840`; add-in khởi động khi cần và tìm qua `%LOCALAPPDATA%\AxiomOffice\core.json`. Hiện có: vòng lặp agent (OpenAI-compatible + Anthropic), hội thoại liên tục theo tài liệu, audit tool call, SSE `/v1/runs/{id}/events`, hủy, trần thời gian/token, **skills** (`load_skill`, `read_skill_file`, `/v1/skills`); memory + xác nhận + MCP client ở các giai đoạn sau |
 
 Mỗi app có port riêng; WPS và Microsoft Office dùng hai dải khác nhau nên chạy song song
 được (đổi qua registry, xem [Cấu hình](#cấu-hình)):

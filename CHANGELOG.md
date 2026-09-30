@@ -5,6 +5,16 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed — Agent Core phát hành bằng bản Go (`core-go/`, giai đoạn G6)
+- `scripts/build.ps1` build Agent Core từ `core-go/` thành `AxiomOffice.Core.exe` (~11 MB, không cần .NET
+  runtime trên máy người dùng; trước đây ~48 MB); `-Core dotnet` giữ đường cũ để đối chiếu
+- `scripts/linux/package.sh` đóng gói `core/AxiomOffice.Core` từ bản Go (Go 1.26+, build chéo theo `--rid`);
+  `AXIOM_CORE=dotnet` để đóng gói bản .NET
+- Bản .NET vẫn nằm nguyên trong `src/AxiomOffice.Core` và bộ test xUnit của nó vẫn chạy: hai bản dùng chung
+  `core.json`, `core.db` (schema 2) và Core API v1 nên đổi qua lại không mất dữ liệu hay phải cấu hình lại
+- Kiểm chứng: e2e **94/94** với binary Go đặt đúng chỗ phát hành (`src\AxiomOfficein\Release\AxiomOffice.Core.exe`),
+  82/82 trên Linux (trừ phần `mcp` cần `AxiomOffice.Host.exe`), và đóng gói Linux chạy được với `install.sh`
+
 ### Added — Agent Core bản Go, giai đoạn G4+G5: memory dài hạn, MCP client, QA thị giác (`core-go/`)
 - **G4 — memory**: chuẩn hoá/bỏ dấu tiếng Việt (bảng tường minh như bản .NET), hash chống trùng, kho SQLite
   (thêm có chống trùng theo hash và theo cosine ≥ 0.96, liên kết chỉ tới memory còn sống, lịch sử ADD/UPDATE/
