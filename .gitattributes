@@ -1,2 +1,7 @@
 # Script shell phai giu LF ke ca khi checkout tren Windows (chay tren Linux).
 *.sh text eol=lf
+
+# Ma Go: gofmt/CI (Linux) dung LF, ep LF ke ca khi checkout tren Windows.
+*.go text eol=lf
+*.mod text eol=lf
+*.sum text eol=lf
