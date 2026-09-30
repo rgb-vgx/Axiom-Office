@@ -386,19 +386,49 @@ Mỗi giai đoạn: branch riêng (`feat/lo-phase-N-...`), test thật, báo cá
 
 ### Giai đoạn L0: Spike và khung (1 tuần)
 
-- [ ] Extension tối thiểu: `OnStartApp` job mở HTTP `/health` + `POST /cmd writer.getText` trên Ubuntu 24.04
-      (LibreOffice 24.2) và Fedora 40; kiểm chứng `AsyncCallback` từ thread nền, headless và có UI.
-- [ ] Kiểm chứng `XUndoManager` gom nhiều thao tác thành một bước; filter PNG xuất trang hiện tại.
+- [x] Extension tối thiểu: `OnStartApp` job mở HTTP `/health` + `POST /cmd writer.getText` — **đã chạy trên
+      Windows (LibreOffice 26.8)**; Ubuntu 24.04 / Fedora 40 còn phải làm ở L2 cùng Core `linux-x64`.
+- [x] Kiểm chứng `AsyncCallback` từ thread nền (headless **và** có cửa sổ), `XUndoManager` gom nhiều thao
+      tác thành một bước, filter PNG xuất trang hiện tại.
 - [ ] Core build `net10.0` chạy trên Linux với `JsonConfigSource`, XDG, file lock.
 - **Xong khi**: script chứng minh 4 điểm trên chạy trên cả hai distro; ghi kết quả vào mục 15 (rủi ro nào
-  được xác nhận/loại bỏ).
+  được xác nhận/loại bỏ). → **trên Windows đã xong 2/3, kết quả ghi ở mục 14.1**
 
 ### Giai đoạn L1: Bridge Writer + Calc + Impress
 
-- [ ] `commands.py` + handler đủ lệnh mục 7 (kể cả QA cấu trúc), `UnoGate`, undo context, session ×3, SSE.
-- [ ] `test_live_commands.py --libreoffice` chạy headless.
+- [x] `commands.py` + handler đủ lệnh mục 7 (kể cả QA cấu trúc), `UnoGate`, undo context, session ×3.
+- [x] `tests\live\test_live_libreoffice.py` (bản Windows của `test_live_commands.py --libreoffice`) chạy
+      headless và có cửa sổ: **158 kiểm tra pass** cả ba app.
+- [ ] SSE `/events` (mục 13) — chưa làm; Core hiện dùng SSE của chính nó, bridge chưa cần.
 - **Xong khi**: mọi lệnh `agent=true` của bản Windows có bản LibreOffice pass test live; Core e2e
-  `--libreoffice` sửa được tài liệu thật cả ba app.
+  `--libreoffice` sửa được tài liệu thật cả ba app. → **phần Windows đã xong; `--libreoffice` cho Core
+  e2e sẽ làm cùng L2 (khi Core chạy Linux, không cần `/health` khác).**
+
+### 14.1 Kết quả triển khai trên Windows (30/09/2026)
+
+Đã làm ở branch `feat/lo-l1-bridge` (LibreOffice 26.8.0.3, Windows 10 x64, profile người dùng thật):
+extension `.oxt` + `scripts\libreoffice.ps1`, đủ 52 lệnh của bản C# (thêm `et.closeAll`/`wpp.closeAll`
+cho test), `ai.ask` chạy qua Agent Core đã kiểm chứng end-to-end trên tài liệu thật.
+
+Những điểm **khác thiết kế ban đầu**, phát hiện khi chạy thật (đã sửa trong code, ghi lại để Linux
+không vấp lại):
+
+| Vấn đề | Thực tế API | Cách xử lý |
+|---|---|---|
+| `setDataArray` với ô rỗng | Phần tử `None` bị LibreOffice ghi thành **lỗi `#N/A`** vào ô | Ghi từng ô (`setFormula("")` để xoá, `setValue`/`setString`/`setFormula` theo kiểu) |
+| `queryKey`/`addNew` của number format | Cần **struct `com.sun.star.lang.Locale`**, truyền chuỗi `"en-US"` → lỗi pyuno khó đọc ("Couldn't convert … traceback object") | Tạo `Locale{Language:"en", Country:"US"}` |
+| Placeholder trống của layout | Placeholder của template **không** mang tên service `TitleTextShape`/`OutlinerShape` (chỉ có `drawing.TextShape`) → lọc theo service bị sót | Đọc `IsEmptyPresentationObject` (tương đương `Shape.Type == msoPlaceholder`) |
+| `replaceAll` xuyên đoạn | LibreOffice không tìm xuyên đoạn văn | Chỉ nhận `\n` ở **cuối** chuỗi `find` (thành `$`); `\n` giữa chuỗi trả lỗi nêu cách sửa |
+| `writer.open` file **đang mở** | `loadComponentFromURL` hiện hộp thoại "đã mở" → chặn main thread, mọi lệnh sau `Busy` (headless thì mở bản read-only) | Tìm component cùng `getURL()` trước, nếu có thì `frame.activate()` và trả `alreadyOpen: true` |
+| `wpp.addSlide` sai `layout` | Chèn slide trước rồi mới báo lỗi → để lại slide rác (test bắt được: 6 slide thay vì 5) | Kiểm tra `layout` trước, và gỡ slide nếu `page.Layout` lỗi |
+| `autoFit: content` | UNO không có API tương đương | Báo trong `skipped` của `writer.formatTable`; `window` dùng `HoriOrient = FULL` |
+| Style bảng Word | Không có style cùng tên | Bảng ánh xạ sang autoformat có sẵn (`"Grid Table 4 - Accent 1"` → `Box List Blue`), không khớp thì trả `styleError` |
+| `app.screenshot` | `PixelWidth` của filter chỉ là gợi ý, có thể rộng hơn `maxWidth` vài pixel; ảnh là **trang/slide** chứ không phải cửa sổ | Giữ nguyên (đúng tinh thần mục 15, Wayland) |
+| Layout slide | `AUTOLAYOUT_NONE=0/TITLE=1/TITLE_CONTENT=2` (`uno.getConstantByName`); Office 1/2/11/12 → 1/2/1/0 | Bảng `LAYOUTS` trong `impress.py`; LibreOffice không có layout "title + subtitle" như Office |
+| Hộp thoại đang mở | Mọi lệnh đều hết giờ chờ main thread (60s) và trả `Busy` | `/health` trả `stuck: true`; thông báo lỗi nêu rõ phải đóng hộp thoại |
+
+Việc còn lại trước L2: gọi UNO từ nhiều client đồng thời (test tải), SSE `/events` của bridge, ô
+"Đã ghi nhớ"/sidebar (L2), và các câu hỏi mở mục 16 (đặc biệt: pane `awt` hay web UI).
 
 ### Giai đoạn L2: Core đa nền tảng + pane
 

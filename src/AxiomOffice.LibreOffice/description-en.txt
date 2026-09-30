@@ -1,0 +1,1 @@
+Axiom Office bridge for LibreOffice: HTTP bridge (same protocol as the Microsoft Office / WPS add-in) so Axiom Office Agent Core, scripts and MCP clients can read and edit the open Writer, Calc and Impress documents.

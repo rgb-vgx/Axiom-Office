@@ -1,0 +1,210 @@
+"""Lenh Calc (kind "et") - cung ten/ket qua voi CommandDispatcher.Spreadsheet.cs (LibreOffice_arch.md muc 7.2).
+
+Khac Excel mot diem: LibreOffice hoan tac duoc bang undo manager nen et.undo la undo that.
+"""
+from __future__ import annotations
+
+import uno
+
+from . import documents, values
+from .commands import command, opt, req
+
+BOLD, NORMAL = 150.0, 100.0
+ALIGN = {"left": "LEFT", "center": "CENTER", "right": "RIGHT", "justify": "BLOCK"}
+
+
+def _sheets(doc):
+    return doc.getSheets()
+
+
+def _ensure_sheet(doc):
+    """Calc trong (khong co sheet nao) thi tao mot sheet - giong EnsureWorkbook cua ban Windows."""
+    sheets = _sheets(doc)
+    if not sheets.getElementNames():
+        sheets.insertNewByName("Sheet1", 0)
+    return sheets
+
+
+def _sheet(doc, params):
+    sheets = _ensure_sheet(doc)
+    name = values.string(params, "sheet")
+    if name:
+        if name not in tuple(sheets.getElementNames()):
+            raise values.ParamError("no sheet named '%s' (sheets: %s)" % (name, ", ".join(sheets.getElementNames())))
+        return sheets.getByName(name)
+    return doc.getCurrentController().getActiveSheet()
+
+
+def _active_name(doc):
+    return _ensure_sheet(doc).getByName(doc.getCurrentController().getActiveSheet().getName()).getName()
+
+
+def _range(sheet, address: str):
+    try:
+        return sheet.getCellRangeByName(address)
+    except Exception:  # noqa: BLE001
+        raise values.ParamError("'range' must be a valid address like 'A1:C10', got '%s'" % address)
+
+
+def _to_matrix(data, empty_as_none: bool = True):
+    """getDataArray -> list hang (so/chuoi; o trong -> None cho khop Value2 cua Excel)."""
+    grid = data if isinstance(data, tuple) else (data,)
+    out = []
+    for row in grid:
+        line = []
+        for cell in row:
+            if isinstance(cell, str):
+                line.append(cell or (None if empty_as_none else ""))
+            else:
+                line.append(cell)
+        out.append(line)
+    return out
+
+
+def _cell_text(value) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return "True" if value else "False"
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value)
+
+
+def _number_format(doc, code: str) -> int:
+    """Format code hieu theo locale en-US de '#,##0.00' giong Excel (queryKey/addNew nhan struct Locale)."""
+    locale = uno.createUnoStruct("com.sun.star.lang.Locale")
+    locale.Language, locale.Country = "en", "US"
+    formats = doc.getNumberFormats()
+    key = formats.queryKey(code, locale, False)
+    if key == -1:
+        key = formats.addNew(code, locale)
+    return key
+
+
+def _apply_font(target, params) -> None:
+    if values.has(params, "bold"):
+        target.CharWeight = BOLD if values.boolean(params, "bold", False) else NORMAL
+    if values.has(params, "italic"):
+        target.CharPosture = uno.Enum("com.sun.star.awt.FontSlant",
+                                      "ITALIC" if values.boolean(params, "italic", False) else "NONE")
+    if values.has(params, "fontSize"):
+        target.CharHeight = float(values.number(params, "fontSize", 11))
+
+
+def list_sheets(env, params):
+    doc = env.document
+    sheets = _ensure_sheet(doc)
+    return {"workbook": doc.getTitle(), "activeSheet": _active_name(doc), "sheets": list(sheets.getElementNames())}
+
+
+def activate_sheet(env, params):
+    name = values.string(params, "sheet")
+    if not name:
+        raise values.ParamError("'sheet' is required")
+    doc = env.document
+    sheets = _ensure_sheet(doc)
+    if name not in tuple(sheets.getElementNames()):
+        raise values.ParamError("no sheet named '%s' (sheets: %s)" % (name, ", ".join(sheets.getElementNames())))
+    doc.getCurrentController().setActiveSheet(sheets.getByName(name))
+    return {"active": name}
+
+
+def read_range(env, params):
+    address = values.string(params, "range", "A1") or "A1"
+    doc = env.document
+    range_ = _range(_sheet(doc, params), address)
+    return {"sheet": _active_sheet_name(env, params), "range": address, "values": _to_matrix(range_.getDataArray())}
+
+
+def _active_sheet_name(env, params):
+    doc = env.document
+    name = values.string(params, "sheet")
+    return name if name else _active_name(doc)
+
+
+def write_range(env, params):
+    address = values.string(params, "range")
+    if not address:
+        raise values.ParamError("'range' is required: the top-left cell to write at, e.g. 'A1'")
+    rows = values.matrix(params, "values", True)
+    width = max(1, max(len(r) for r in rows))
+    doc = env.document
+    sheet = _sheet(doc, params)
+    top_left = _range(sheet, address)
+    start_col, start_row = top_left.RangeAddress.StartColumn, top_left.RangeAddress.StartRow
+    target = sheet.getCellRangeByPosition(start_col, start_row, start_col + width - 1, start_row + len(rows) - 1)
+
+    # Ghi TUNG O: setDataArray voi phan tu rong (None) lam LibreOffice ghi loi #N/A vao o, con
+    # setFormulaArray + setDataArray tren cung vung thi o cong thuc bi ghi de mat cong thuc.
+    for r, row in enumerate(rows):
+        for c in range(width):
+            value = row[c] if c < len(row) else None
+            cell = target.getCellByPosition(c, r)
+            if value is None:
+                cell.setFormula("")            # xoa o (khong tao o chuoi rong)
+            elif isinstance(value, bool):
+                cell.setFormula("TRUE()" if value else "FALSE()")
+            elif isinstance(value, str):
+                if value.startswith("="):
+                    cell.setFormula(value)
+                else:
+                    cell.setString(value)
+            else:
+                cell.setValue(float(value))
+    return {"written": len(rows) * width, "sheet": _active_sheet_name(env, params)}
+
+
+def format_range(env, params):
+    address = values.string(params, "range")
+    if not address:
+        raise values.ParamError("'range' is required")
+    doc = env.document
+    target = _range(_sheet(doc, params), address)
+    _apply_font(target, params)
+    color = values.color(values.string(params, "fontColor"))
+    if color is not None:
+        target.CharColor = color
+    fill = values.color(values.string(params, "fillColor"))
+    if fill is not None:
+        target.CellBackColor = fill
+    if values.has(params, "numFmt"):
+        target.NumberFormat = _number_format(doc, values.string(params, "numFmt", "General") or "General")
+    if values.has(params, "horizontal"):
+        name = (values.string(params, "horizontal", "left") or "left").lower()
+        if name not in ALIGN:
+            raise values.ParamError("'horizontal' must be left/center/right, got '%s'" % name)
+        target.HoriJustify = uno.Enum("com.sun.star.table.CellHoriJustify", ALIGN[name])
+    if values.has(params, "wrap"):
+        target.IsTextWrapped = values.boolean(params, "wrap", False)
+    return {"sheet": _active_sheet_name(env, params), "range": address}
+
+
+def undo(env, params):
+    return documents.undo(env.document, values.integer(params, "count", 1))
+
+
+def check_range(env, params):
+    from . import checks
+
+    return checks.range_report(env, params)
+
+
+command("et.newWorkbook", "et", lambda env, p: documents.open_document(env.ctx, "et", None), "Tạo sổ tính mới")
+command("et.open", "et", lambda env, p: documents.open_document(env.ctx, "et", values.string(p, "path")), "Mở .xlsx/.xls/.ods/.csv", req("path"))
+command("et.listSheets", "et", list_sheets, "Danh sách sheet + sheet đang active", agent=True)
+command("et.activateSheet", "et", activate_sheet, "Chuyển sheet", req("sheet"), agent=True)
+command("et.readRange", "et", read_range, "Đọc vùng, ví dụ `A1:C10`", req("range"), opt("sheet"), agent=True)
+command("et.writeRange", "et", write_range, "Ghi vùng từ ô góc trên-trái; `values` là mảng 2 chiều",
+        req("range", "top-left cell e.g. 'A1'"), req("values", "2D array of rows e.g. [[\"Tên\",\"Điểm\"],[\"An\",9.5]]"), opt("sheet"),
+        agent=True, undo=True)
+command("et.formatRange", "et", format_range, "Định dạng vùng", req("range"), opt("bold"), opt("italic"), opt("fontSize"),
+        opt("fontColor"), opt("fillColor"), opt("numFmt"), opt("horizontal"), opt("wrap"), opt("sheet"), agent=True, undo=True)
+command("et.undo", "et", undo, "Hoàn tác", opt("count"), agent=True)
+command("et.exportPdf", "et", lambda env, p: documents.export_pdf(env.document, "et", values.string(p, "path")),
+        "Xuất PDF", req("path"), agent=True)
+command("et.save", "et", lambda env, p: documents.save(env.document, "et", None), "Lưu", agent=True)
+command("et.saveAs", "et", lambda env, p: documents.save(env.document, "et", values.string(p, "path")),
+        "Lưu thành file mới", req("path"), agent=True)
+command("et.closeAll", "et", lambda env, p: documents.close_all(env.ctx, "et"), "**Đóng mọi sổ, không lưu**")
+command("et.checkRange", "et", check_range, "Soát vùng (chỉ đọc): lỗi công thức, ô trống, vùng ngoài bảng", opt("range", "default: the used range"), opt("sheet"), agent=True)

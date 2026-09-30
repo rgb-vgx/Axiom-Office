@@ -1,6 +1,6 @@
 # Axiom Office
 
-AI agent làm việc ngay trong tài liệu đang mở của **Microsoft Office và WPS Office**
+AI agent làm việc ngay trong tài liệu đang mở của **Microsoft Office, WPS Office và LibreOffice**
 (Word/Writer, Excel/Spreadsheets, PowerPoint/Presentation). Nội dung AI soạn xuất hiện
 trực tiếp trên trang trước mắt người dùng; mỗi thao tác của AI trong Word là một bước Ctrl+Z.
 
@@ -13,6 +13,11 @@ Có ba cách dùng, chung một lõi:
 | **HTTP API** trên localhost (`/cmd`, `/events`, ...) | Script, tích hợp riêng | bridge trong add-in |
 
 Không cần quyền admin, không cần Python. Gói cài ~250 KB.
+
+LibreOffice dùng **extension Python UNO** (`src\AxiomOffice.LibreOffice`) nói đúng giao thức bridge
+trên (cùng tên lệnh `writer.*`/`et.*`/`wpp.*`, cùng session registry) — xem
+[mục LibreOffice](#libreoffice). Hiện đã chạy được trên Windows (giai đoạn L1); Linux là giai đoạn L2
+(xem `LibreOffice_arch.md`).
 
 > Trước đây dự án tên **WPS AI Bridge** (`WpsAiBridge`). Cài bản mới sẽ tự gỡ đăng ký của bản
 > cũ và chuyển cấu hình (port, token, cài đặt AI) từ `HKCU\Software\WpsAiBridge` sang
@@ -28,6 +33,7 @@ Không cần quyền admin, không cần Python. Gói cài ~250 KB.
 - [Cấu hình](#cấu-hình)
 - [Phát triển](#phát-triển)
 - [Microsoft Office và WPS: lưu ý riêng](#microsoft-office-và-wps-lưu-ý-riêng)
+- [LibreOffice](#libreoffice)
 - [Troubleshooting](#troubleshooting)
 - [Cấu trúc project](#cấu-trúc-project)
 
@@ -63,8 +69,10 @@ Mỗi app có port riêng; WPS và Microsoft Office dùng hai dải khác nhau n
 | Spreadsheets / Excel | 47822 | 47832 |
 | Presentation / PowerPoint | 47823 | 47833 |
 
-**LibreOffice trên Linux** (đang thiết kế): xem [LibreOffice_arch.md](LibreOffice_arch.md) — extension
-Python UNO làm bridge cùng giao thức (port dự kiến 47851–47853), Agent Core chạy native `linux-x64`.
+**LibreOffice** dùng dải port thứ ba, 47851–47853, do extension Python UNO mở (cùng giao thức, cùng
+session registry — xem [mục LibreOffice](#libreoffice)); ba app chung một tiến trình `soffice` nên một
+process ghi ba file session. Thiết kế đầy đủ (Linux, sidebar, Core đa nền tảng, giai đoạn L0–L4):
+[LibreOffice_arch.md](LibreOffice_arch.md).
 
 ## Cài đặt cho người dùng
 
@@ -501,6 +509,10 @@ powershell -ExecutionPolicy Bypass -File tests\mcp-host\office_roundtrip.ps1 -Di
 powershell -ExecutionPolicy Bypass -File tests\mcp-host\office_roundtrip.ps1 -Dir <thư_mục_output> -Verify
 # Unit test của các MCP Python (legacy)
 cd tools\word-mcp; .venv\Scripts\python.exe -m unittest discover -s tests
+# Làn LibreOffice: 18 unit test (giải mã tham số + registry lệnh khớp bản C#) và test mọi lệnh trên
+# LibreOffice thật (script tự mở LibreOffice bằng profile người dùng; --ui: bản có cửa sổ; --ai: ai.ask)
+python tests\lo\test_extension.py
+python tests\live\test_live_libreoffice.py [--apps writer,calc,impress] [--ui] [--ai]
 # Agent Core: unit test + test vòng đời trên tiến trình thật (cần .NET 10 SDK)
 dotnet test tests\core\AxiomOffice.Core.Tests
 # Agent Core e2e: Core thật + LLM giả + bridge giả (không cần Office)
@@ -545,6 +557,58 @@ Cùng một DLL, một lần cài phục vụ cả hai bộ app:
 - Task pane của WPS 12 mở ra hẹp (~250px) và áp độ rộng trễ; pane tự đo lại và nới về 360px
   (log `Task pane width: ctp=... control=...px`).
 
+## LibreOffice
+
+Cùng giao thức, cùng tên lệnh với add-in — nhưng bridge nằm trong **extension Python UNO**
+(`src\AxiomOffice.LibreOffice`), không phải COM add-in, nên không cần .NET và chạy được cả trên Linux
+(thiết kế: `LibreOffice_arch.md`; giai đoạn L2–L3 cho Linux/sidebar chưa làm).
+
+```powershell
+# Đóng LibreOffice trước (unopkg từ chối chạy khi soffice đang mở); script không tự tắt app của bạn.
+powershell -ExecutionPolicy Bypass -File scripts\libreoffice.ps1 -Install   # gói .oxt + unopkg add --force
+powershell -ExecutionPolicy Bypass -File scripts\libreoffice.ps1 -Status    # extension đã cài, session, /health
+powershell -ExecutionPolicy Bypass -File scripts\libreoffice.ps1 -Log       # 40 dòng cuối bridge.log
+powershell -ExecutionPolicy Bypass -File scripts\libreoffice.ps1 -Uninstall
+```
+
+Mở LibreOffice (Writer/Calc/Impress, có cửa sổ hay `--headless` đều được): job `OnStartApp` của
+extension bật bridge, cùng log `%LOCALAPPDATA%\AxiomOffice\bridge.log` và cùng registry session
+`%LOCALAPPDATA%\AxiomOffice\sessions\` với add-in — nhưng một tiến trình `soffice` ghi **ba** session
+`{pid}-{kind}.json` vì cả ba app dùng chung một process.
+
+| App | Port | kind |
+|---|---|---|
+| Writer | 47851 | `wps` |
+| Calc | 47852 | `et` |
+| Impress | 47853 | `wpp` |
+
+Port đổi được bằng `PortLibreOffice` (HKCU, mặc định 47851); token dùng chung `Token` với add-in.
+Bận/đổi port thì bridge thử cổng kế tiếp (+10) tối đa 5 lần.
+
+**Cách điều khiển** (chưa có task pane trong LibreOffice — đó là giai đoạn L3):
+
+- **MCP**: `office_sessions` liệt kê cả bridge LibreOffice; gọi lệnh kèm `port`: `word_command
+  {action: 'writer.appendText', params: {text: '...'}, port: 47851}`.
+- **Agent Core**: `ai.ask` trên bridge (Core đọc `core.json`, chạy agent đầy đủ skill/memory/policy rồi
+  gọi ngược `/cmd`). Đây là đường đi đã kiểm chứng end-to-end: model tự nạp skill, sửa tài liệu thật.
+
+Khác bản Office (do UNO):
+
+- **Undo**: Calc và Impress cũng là một bước Ctrl+Z cho mỗi lệnh AI (`XUndoManager`), không như Excel
+  qua COM. `writer.undo`/`et.undo` hoàn tác được cả bảng, định dạng, chèn ảnh.
+- **`app.screenshot`** xuất **trang/slide hiện tại** ra PNG qua filter `*_png_Export` (không chụp cửa sổ);
+  `PixelWidth` của filter chỉ là gợi ý nên ảnh có thể rộng hơn `maxWidth` vài pixel.
+- **`writer.replaceAll`**: LibreOffice không tìm xuyên đoạn, nên `\n` chỉ được ở **cuối** chuỗi `find`
+  (dịch thành `$`); `\n` ở giữa trả lỗi nêu rõ cách sửa.
+- **Style bảng Word** được ánh xạ sang autoformat của LibreOffice (`"Grid Table 4 - Accent 1"` →
+  `Box List Blue`); phần không hỗ trợ (`autoFit: content`) nằm trong `skipped` của kết quả
+  `writer.formatTable`, không làm hỏng lệnh.
+- **`writer.open`/`et.open`/`wpp.open`** trên file **đang mở** thì kích hoạt cửa sổ đó
+  (`alreadyOpen: true`) thay vì gọi `loadComponentFromURL` — tránh hộp thoại "đã mở" chặn main thread.
+- `/health` có thêm `stuck`: `true` khi main thread không trả lời (thường là một hộp thoại đang mở);
+  lệnh khi đó trả lỗi `Busy` nêu rõ phải đóng hộp thoại.
+- `ui.askpane` chưa có trong LibreOffice (giai đoạn L3) — gọi sẽ báo lỗi rõ ràng.
+
 ## Troubleshooting
 
 | Hiện tượng | Cách xử lý |
@@ -582,9 +646,13 @@ src/AxiomOffice.Core/         Agent Core (.NET 10, theo New_arch.md)
   Memory/                     SQLite: conversations, messages, runs, tool_calls
   Api/, Config/, Logging/     endpoint v1, cấu hình HKCU + AXIOM_*, log core.log
 tests/core/                   test Agent Core: xUnit + e2e (fake_llm.py, test_core_e2e.py)
-scripts/                      build, install, uninstall, legacy (gỡ bản WpsAiBridge), core (tắt Core), install-dotnet-sdk, package
+scripts/                      build, install, uninstall, legacy (gỡ bản WpsAiBridge), core (tắt Core), install-dotnet-sdk, package, libreoffice (đóng gói/cài .oxt)
 scripts/dist/                 install.cmd, uninstall.cmd, HUONG-DAN-CAI-DAT.txt (vào gói cài)
+src/AxiomOffice.LibreOffice/  extension Python UNO cho LibreOffice (nói cùng giao thức bridge)
+  python/axiom_job.py         component UNO: job OnStartApp -> axiom.bridge.start
+  python/pythonpath/axiom/    bridge (HTTP), gate (AsyncCallback), registry lệnh, writer/calc/impress/checks, session
 tests/live/                   test mọi lệnh bridge trên Office/WPS thật
+tests/lo/                     unit test extension LibreOffice (không cần LibreOffice: uno giả)
 tests/mcp-host/               test parity MCP + registry lệnh + round-trip với Office thật
 tools/*-mcp/                  MCP servers Python (legacy)
 ```

@@ -5,6 +5,33 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — làn LibreOffice: extension Python UNO (LibreOffice_arch.md, giai đoạn L1)
+- `src\AxiomOffice.LibreOffice`: extension `.oxt` (`org.axiomoffice.bridge`) chạy trong `soffice` — job
+  `OnStartApp` bật bridge HTTP trên 47851/47852/47853 (Writer/Calc/Impress, kind `wps`/`et`/`wpp`),
+  **giữ nguyên giao thức và tên lệnh** với add-in nên Agent Core, MCP (`office_sessions` + `*_command`
+  kèm `port`), skill, memory và policy dùng lại không đổi. Port đổi qua `PortLibreOffice`, token dùng
+  chung `Token`; bận cổng thì thử +10 (5 lần)
+- `UnoGate`: mọi lệnh UNO chạy trên main thread qua `com.sun.star.awt.AsyncCallback`, khoá tuần tự như
+  `ComGate`; `/health` thêm `stuck` khi main thread không trả lời (hộp thoại đang mở) và lỗi `Busy` nêu
+  rõ phải đóng hộp thoại. Mỗi lệnh AI = **một bước Undo** (`XUndoManager`) — Calc/Impress cũng hoàn tác
+  được, khác Excel qua COM
+- Đủ bộ lệnh của bản C# (test so trực tiếp với `AxiomOffice.Host.exe commands --json`: cùng tên, kind,
+  cờ `ForAgent`, tham số; chỉ thêm `et.closeAll`/`wpp.closeAll` cho test): `writer.*` (bảng, style theo
+  autoformat LibreOffice, replaceAll biết giới hạn không tìm xuyên đoạn), `et.*` (ô `null` để trống
+  thật, công thức tính đúng, `numFmt` theo locale en-US), `wpp.*` (layout Office 1/2/11/12 →
+  `AUTOLAYOUT_*`, đo tràn chữ bằng `TextAutoGrowHeight`), `writer.checkTables`/`et.checkRange`/
+  `wpp.checkLayout`, `app.info`, `app.screenshot` (xuất trang/slide ra PNG), `ai.ask` (chạy qua Agent Core)
+- Session: một tiến trình `soffice` ghi ba file `{pid}-{kind}.json` (heartbeat 25s, xoá khi thoát, dọn
+  file cũ > 10 phút); `writer.open`/`et.open`/`wpp.open` trên file **đang mở** thì kích hoạt cửa sổ đó
+  (`alreadyOpen`) thay vì load lại — tránh hộp thoại "đã mở" chặn main thread
+- `scripts\libreoffice.ps1`: `-Package` (đóng gói `.oxt` vào `dist`), `-Install`/`-Uninstall`
+  (`unopkg add --force`, từ chối chạy khi LibreOffice đang mở), `-Status`, `-Log`
+- Test: `tests\lo\test_extension.py` (18 unit test, không cần LibreOffice: uno giả — giải mã tham số
+  `{"item":…}`/chuỗi JSON/số dạng chuỗi + registry khớp bản C#); `tests\live\test_live_libreoffice.py`
+  (158 kiểm tra trên Writer/Calc/Impress thật, headless lẫn có cửa sổ, tự mở/đóng LibreOffice)
+- Đã kiểm chứng `ai.ask` end-to-end: Core chạy agent đầy đủ (nạp skill, đọc tài liệu, chèn heading +
+  bảng, tự soát bằng `writer.checkTables`) trên tài liệu LibreOffice thật
+
 ### Docs — `LibreOffice_arch.md`: thiết kế tích hợp LibreOffice trên Linux
 - Bridge là extension Python UNO (`axiom-office.oxt`) chạy trong `soffice`, **giữ nguyên giao thức bridge và tên
   lệnh** (`writer.*`/`et.*`/`wpp.*`) để Agent Core, skill, memory, test dùng lại; ba session/port như WPS
