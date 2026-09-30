@@ -18,7 +18,8 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
   công ty/OpenAI/Anthropic/Gemini, tải danh sách model, *Kiểm tra kết nối* báo lỗi tiếng Việt, có nút xem
   khoá và mở trang lấy khoá) → Tính năng (lời thường + link **Tuỳ chọn nâng cao…** mở đúng `SettingsForm`
   cũ) → Hoàn tất (tóm tắt + **Thử ngay** chạy một lượt thật qua Core trên tài liệu đang mở). Điểm vào:
-  ribbon `Settings` → **Thiết lập…**, link header pane `Cài đặt` → **Thiết lập**, và tự mở **một lần** khi
+  ribbon `Settings` → **Thiết lập…** (thêm **Cài đặt nâng cao…** cho ngang bản Linux), link header pane
+  `Cài đặt` → **Thiết lập**, và tự mở **một lần** khi
   pane mở mà chưa có endpoint/model (giống bản Linux, không làm phiền lần sau)
 - **Linux**: `axiom/setup.py` (máy trạng thái + câu chữ, thuần Python nên test không cần LibreOffice) và
   `axiom/setupwizard.py` (dialog awt, cùng bố cục 5 bước); mục menu **Thiết lập…**, link header, thẻ mời tự mở

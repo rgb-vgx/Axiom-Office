@@ -128,7 +128,7 @@ axiom-office.oxt  (zip)
   META-INF/manifest.xml          khai báo component Python + các file .xcu
   description.xml                id org.axiomoffice.bridge, version, LibreOffice tối thiểu 7.4
   Jobs.xcu                       job chạy ở sự kiện OnStartApp → khởi động bridge
-  Addons.xcu                     menu "Axiom Office" (Ask AI, Cài đặt, Quản lý ghi nhớ)
+  Addons.xcu                     menu "Axiom Office" (Hỏi AI, Thiết lập…, Cài đặt nâng cao…, Quản lý ghi nhớ)
   Sidebar.xcu + Factories.xcu    deck "Axiom Office" + panel Ask AI (XUIElementFactory)
   python/
     axiom_job.py                 XJob: start bridge (một lần mỗi process)
@@ -303,7 +303,7 @@ riêng chỗ nói "Word"/"Excel" trong prompt (`PromptBuilder.AppName`) thêm nh
 Sidebar deck **"Axiom Office"** (hiện với Writer, Calc, Impress), panel dựng bằng `awt` trong Python:
 
 ```
-┌ Axiom Office ─────────── [Trò chuyện mới] [Cài đặt] ┐
+┌ Axiom Office ───────── [Trò chuyện mới] [Thiết lập] ┐
 │ Writer · muse-spark-1.3                              │
 │ ┌──────────────────────────────────────────────────┐ │
 │ │ Bạn: Soạn công văn đề nghị nộp báo cáo quý III   │ │
@@ -324,7 +324,11 @@ Sidebar deck **"Axiom Office"** (hiện với Writer, Calc, Impress), panel dự
 - **Thẻ xác nhận**: hộp thoại `MessageBox` Có/Không (không chặn thread SSE — mở trên main thread qua
   AsyncCallback, trả lời bằng `POST /v1/runs/{id}/confirm`).
 - **Hoàn tác lượt này**: có cho cả Writer, **Calc và Impress** (UNO hoàn tác được) — `*.undo {count: N}`.
-- **Cài đặt** và **Quản lý ghi nhớ**: dialog `awt` (provider/endpoint/model/key, Core, ghi nhớ, QA thị
+- **Thiết lập…** (menu, link header pane, hoặc tự mở một lần khi chưa có cấu hình): wizard 5 bước trong
+  `axiom/setupwizard.py` + `axiom/setup.py` — kiểm tra máy (nút **Sửa**), chọn nơi cung cấp AI với danh sách
+  model tải từ `GET /v1/llm/models`, thử kết nối qua `POST /v1/llm/test` (lỗi tiếng Việt từ `Setup/LlmErrors.cs`),
+  chọn tính năng, rồi **Thử ngay** một lượt thật. Câu chữ lấy từ `catalog/setup.json`.
+- **Cài đặt nâng cao** và **Quản lý ghi nhớ**: dialog `awt` (provider/endpoint/model/key, Core, ghi nhớ, QA thị
   giác; danh sách memory gọi `/v1/memory`).
 - Logic chat nằm trong `pane.py` thuần Python (không phụ thuộc awt) để test đơn vị được.
 - **Dự phòng**: Core không chạy được → pane báo lỗi rõ + nút "Khởi động lại Agent Core" (không có agent
@@ -470,7 +474,7 @@ Việc còn lại trước L2: gọi UNO từ nhiều client đồng thời (tes
 
 Đã làm (`feat/lo-l1-bridge`): `axiom/core.py` (client Agent Core + SSE), `axiom/chat.py` (logic hội thoại,
 thuần Python nên test được), `axiom/awt.py` (host điều khiển), `axiom/panel.py` (pane + factory sidebar),
-`axiom/dialogs.py` (Cài đặt/Ghi nhớ), `axiom/dispatch.py` (URL menu), `Sidebar.xcu`/`Factory.xcu`/
+`axiom/dialogs.py` (Cài đặt nâng cao/Ghi nhớ), `axiom/setup.py` + `axiom/setupwizard.py` (wizard thiết lập), `axiom/dispatch.py` (URL menu), `Sidebar.xcu`/`Factory.xcu`/
 `Addons.xcu`/`ProtocolHandler.xcu`, component `python/axiom_panel.py` + `python/axiom_dispatch.py`.
 
 Đã chạy thật trên LibreOffice 26.8 (Writer/Impress): gửi yêu cầu -> Core chạy agent -> tài liệu được sửa ->

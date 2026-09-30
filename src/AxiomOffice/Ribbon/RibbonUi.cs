@@ -20,6 +20,7 @@ namespace AxiomOffice.Ribbon
             "<group id=\"axiomOfficeAiGroup\" label=\"AI\">" +
             "<button id=\"btnAskAi\" label=\"Ask AI...\" size=\"large\" onAction=\"OnButtonAction\" tag=\"askAi\"/>" +
             "<button id=\"btnSetup\" label=\"Thiết lập…\" size=\"large\" onAction=\"OnButtonAction\" tag=\"setup\"/>" +
+            "<button id=\"btnSettings\" label=\"Cài đặt nâng cao…\" size=\"large\" onAction=\"OnButtonAction\" tag=\"settings\"/>" +
             "</group>" +
             "</tab>" +
             "</tabs></ribbon>" +
@@ -42,9 +43,16 @@ namespace AxiomOffice.Ribbon
                     connect.ShowAskAiPane();
                     break;
                 case "setup":
-                    // Wizard thiet lap cho nguoi dung khong chuyen (New_arch.md muc 9). Cau hinh nang cao
-                    // (SettingsForm cu) nam trong buoc 4 cua wizard va o pane.
+                    // Wizard thiet lap cho nguoi dung khong chuyen (New_arch.md muc 9) - cung noi dung voi
+                    // ban Linux (menu "Thiet lap..." + "Cai dat nang cao..."). Cau hinh nang cao cung nam
+                    // trong buoc 4 cua wizard.
                     using (var form = new Ai.SetupWizardForm(connect))
+                    {
+                        form.ShowDialog();
+                    }
+                    break;
+                case "settings":
+                    using (var form = new Ai.SettingsForm())
                     {
                         form.ShowDialog();
                     }

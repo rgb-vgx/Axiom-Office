@@ -14,8 +14,11 @@ Cài đặt
 3. Nhấp đúp install.cmd. Nếu Windows cảnh báo file tải từ Internet, chọn "Run" / "Chạy".
 4. Mở Word, Excel, PowerPoint hoặc WPS: trên ribbon có tab "Axiom Office".
    Máy đã cài bản cũ tên "WPS AI Bridge": install.cmd tự gỡ bản cũ và giữ nguyên cấu hình AI, token.
-5. Bấm Ask AI > Cài đặt, nhập provider, endpoint, model và API key của bạn.
-   Mỗi máy dùng cấu hình AI riêng; API key được mã hoá theo tài khoản Windows.
+5. Bấm Thiết lập… (hoặc Ask AI - pane tự mở wizard khi chưa có cấu hình) rồi làm theo 5 bước:
+   kiểm tra máy - chọn nơi cung cấp AI - chọn model từ danh sách tải về - chọn tính năng - Thử ngay.
+   Không chắc địa chỉ máy chủ AI thì hỏi quản trị viên; dùng tài khoản cá nhân thì bấm
+   "Lấy khoá ở đâu?" để mở trang lấy khoá. Mỗi máy dùng cấu hình AI riêng; khoá được mã hoá
+   theo tài khoản Windows. Cần chỉnh cổng Core, hạn giờ... thì mở "Tuỳ chọn nâng cao…" ở bước 4.
 
 Dùng với AI agent (MCP: Claude Desktop, Claude Code, ...)
 Thêm vào cấu hình MCP của client (install.cmd in sẵn đúng đường dẫn):
