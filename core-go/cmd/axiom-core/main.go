@@ -184,7 +184,7 @@ func run() int {
 		_ = stores.DB.Close()
 	}
 	if serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
-		corelog.Error("Agent Core crashed: %v", serveErr)
+		corelog.ErrorDetail("Agent Core crashed", serveErr)
 		return 5
 	}
 	corelog.Info("Agent Core stopped")

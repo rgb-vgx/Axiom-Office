@@ -3,6 +3,9 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -103,5 +106,46 @@ func TestModelToolsShape(t *testing.T) {
 	var schema map[string]any
 	if err := json.Unmarshal(list[0].Parameters, &schema); err != nil || schema["type"] != "object" {
 		t.Fatalf("schema = %s", list[0].Parameters)
+	}
+}
+
+// Cung ky vong voi PolicyTests.cs cua ban .NET: nguoi dung tu choi thi tool tra "user declined"
+// va KHONG gui lenh nao xuong bridge.
+func TestOfficeActionDeclinedDoesNotCallBridge(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		_, _ = w.Write([]byte(`{"ok":true,"result":{}}`))
+	}))
+	defer server.Close()
+
+	port, err := strconv.Atoi(strings.TrimPrefix(server.URL, "http://127.0.0.1:"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	catalog := &office.CommandCatalog{Version: "1.0.0", Commands: []office.Command{
+		{Name: "wpp.deleteSlide", Kind: "wpp", Agent: true, Summary: "xoa slide"},
+	}}
+	tool := NewOfficeActionTool(catalog, "wpp")
+	run := &RunContext{
+		Office: &office.Session{App: "wpp", Port: port},
+		Bridge: office.NewBridgeClient(server.Client(), "t"),
+		Prompt: "xoa slide cuoi",
+		Confirm: func(action, reason, preview string) (bool, error) {
+			if action != "wpp.deleteSlide" || !strings.Contains(reason, "Xoá slide") {
+				t.Errorf("ly do hoi sai: action=%q reason=%q", action, reason)
+			}
+			return false, nil
+		},
+	}
+
+	result := tool.Invoke(context.Background(), map[string]any{"action": "wpp.deleteSlide"}, run)
+
+	if result.OK || !strings.Contains(result.JSON, "user declined") {
+		t.Fatalf("phai bi tu choi: %+v", result)
+	}
+	if calls != 0 {
+		t.Fatalf("da tu choi thi khong duoc goi bridge (goi %d lan)", calls)
 	}
 }

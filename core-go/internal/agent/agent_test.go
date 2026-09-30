@@ -164,6 +164,29 @@ func TestConfirmationsResolveAndTimeout(t *testing.T) {
 	if run.Confirmations.Request(context.Background(), run.Events, "et.saveAs", "ly do", "{}", 50*time.Millisecond) {
 		t.Fatal("het gio phai tu choi")
 	}
+
+	// Huy giua luc cho = tu choi, va ly do tra loi duoc ghi dung trong confirm.resolved.
+	cancelled, cancel := context.WithCancel(context.Background())
+	go func() { time.Sleep(30 * time.Millisecond); cancel() }()
+	if run.Confirmations.Request(cancelled, run.Events, "et.saveAs", "ly do", "{}", 5*time.Second) {
+		t.Fatal("bi huy phai tu choi")
+	}
+
+	// Thu tu "by" giong PolicyTests.cs cua ban .NET: user, user, timeout, cancelled.
+	by := []string{}
+	for _, item := range run.Events.Since(0) {
+		if item.Type != "confirm.resolved" {
+			continue
+		}
+		value, _ := item.Data["by"].(string)
+		by = append(by, value)
+	}
+	if strings.Join(by, ",") != "user,timeout,cancelled" {
+		t.Fatalf("thu tu by = %v", by)
+	}
+	if run.Confirmations.PendingCount() != 0 {
+		t.Fatalf("khong duoc con xac nhan nao cho: %d", run.Confirmations.PendingCount())
+	}
 }
 
 func TestBuildPromptSections(t *testing.T) {

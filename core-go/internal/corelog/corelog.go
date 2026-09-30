@@ -5,6 +5,7 @@ package corelog
 import (
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -43,6 +44,34 @@ func SetLimits(max int64, files int) {
 func Info(format string, args ...any) { write("INFO", fmt.Sprintf(format, args...)) }
 
 func Error(format string, args ...any) { write("ERROR", fmt.Sprintf(format, args...)) }
+
+// ErrorDetail ghi loi kem ten kieu: "<thong diep>: <TenKieu>: <loi>" - giong CoreLog.Error(message, exception)
+// cua ban .NET (Go khong tu in ten kieu khi dung %v, nen lay tu %T roi bo ten goi/duong dan).
+func ErrorDetail(message string, err error) {
+	if err == nil {
+		Error("%s", message)
+		return
+	}
+	if name := typeName(err); name != "" {
+		Error("%s: %s: %s", message, name, err.Error())
+		return
+	}
+	Error("%s: %s", message, err.Error())
+}
+
+func typeName(err error) string {
+	name := fmt.Sprintf("%T", err)
+	if index := strings.LastIndex(name, "."); index >= 0 {
+		name = name[index+1:]
+	}
+	name = strings.TrimPrefix(name, "*")
+	// errors.New(...) trong Go la kieu noi bo "errorString" (io.EOF, context.* cung vay): ten kieu chi lam
+	// nhieu log, nen bo di; cac loi that (PathError, OpError, x509...) van giu ten nhu GetType().Name cua .NET.
+	if name == "errorString" {
+		return ""
+	}
+	return name
+}
 
 func write(level, message string) {
 	line := time.Now().Format("2006-01-02 15:04:05.000") + " [" + level + "] [pid " + fmt.Sprint(os.Getpid()) + "] " + message
