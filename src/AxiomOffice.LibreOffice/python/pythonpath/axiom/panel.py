@@ -97,6 +97,7 @@ class PaneUI:
         self.surface = Surface(ctx, container)
         self.session = chat.ChatSession(kind, on_change=self._on_change)
         self.session.status = "Sẵn sàng"
+        self.setup_offered = False
         self._stop = threading.Event()
         self._busy = False
         self._clear_prompt = False
@@ -104,6 +105,28 @@ class PaneUI:
         self._width, self._height = width, height
         self._build()
         self.resize(width, height)
+        self.offer_setup()
+
+    def offer_setup(self) -> None:
+        """Chua co cau hinh AI -> nhac o footer va tu mo wizard thiet lap MOT lan (khong lam phien).
+
+        Wizard mo qua gate sau khi pane dung xong (cua so con can cua so tai lieu da san sang).
+        """
+        if self.setup_offered:
+            return
+        if config.value("LlmEndpoint", "") and config.value("LlmModel", ""):
+            return
+        self.setup_offered = True
+        self.session.status = "Chưa thiết lập AI — bấm Thiết lập ở trên"
+        self._on_change()
+
+        def later() -> None:
+            import time
+
+            time.sleep(1.5)
+            self.gate.run_quiet(self._open_setup, 20.0, None)
+
+        threading.Thread(target=later, name="axiom-setup-offer", daemon=True).start()
 
     # ---------------------------------------------------------------- dung giao dien
 
@@ -111,7 +134,8 @@ class PaneUI:
         s = self.surface
         # Header ------------------------------------------------------------
         self.header_links = []
-        link_specs = [("Trò chuyện mới", self._new_chat), ("Ghi nhớ", self._open_memory), ("Cài đặt", self._open_settings)]
+        link_specs = [("Trò chuyện mới", self._new_chat), ("Ghi nhớ", self._open_memory),
+                      ("Thiết lập", self._open_setup)]
         if self.on_close is not None:
             link_specs.append(("✕", self._close))
         for text, handler in link_specs:
@@ -420,6 +444,12 @@ class PaneUI:
         if self.session.running:
             return
         self.session.reset()
+
+    def _open_setup(self) -> None:
+        """Mo wizard thiet lap (nguoi dung khong chuyen); "Tuy chon nang cao" trong do mo dialog cu."""
+        from . import setupwizard
+
+        setupwizard.open_setup(self)
 
     def _open_settings(self) -> None:
         from . import dialogs

@@ -34,10 +34,10 @@ jobs:
       - name: MCP server (khong can app dang mo)
         run: python3 tests/mcp-host/test_mcp_portable.py src/AxiomOffice.Mcp/bin/Release/net10.0/axiom-office-mcp.dll
 
-      - name: Cai LibreOffice + Python UNO
+      - name: Cai LibreOffice + Python UNO (+ xvfb cho phan giao dien)
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libreoffice python3-uno
+          sudo apt-get install -y --no-install-recommends libreoffice python3-uno xvfb
           soffice --version
 
       - name: Cai extension + test moi lenh bridge tren LibreOffice that
@@ -45,6 +45,11 @@ jobs:
           bash scripts/libreoffice.sh install
           bash scripts/libreoffice.sh status
           python3 tests/live/test_live_libreoffice.py
+
+      - name: Wizard thiet lap (dialog that, profile rieng, LLM gia - qua Xvfb)
+        run: |
+          sudo apt-get install -y --no-install-recommends xdotool
+          xvfb-run -a python3 tests/live/test_setup_wizard.py
 
       - name: MCP + tool live (LibreOffice dang mo)
         run: |

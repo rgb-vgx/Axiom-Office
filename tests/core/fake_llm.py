@@ -15,6 +15,12 @@ tra lan luot, het thi lap lai cau cuoi:
     {"when": "memory extractor", "texts": ["{\"facts\": []}"]}
 
 Moi request duoc ghi them mot dong JSON vao --requests de test kiem tra prompt (ngu canh hoi thoai cu).
+
+Cho wizard thiet lap (GET /v1/setup, POST /v1/llm/test, GET /v1/llm/models):
+    --key <khoa>        bat buoc Authorization: Bearer <khoa>; sai/thieu -> 401 (nhanh "sai khoa API")
+    --models a,b,c      GET /v1/models tra dung danh sach nay
+    --fail-status 503   moi POST tra ma loi nay (nhanh "may chu loi")
+    model "no-such-model" -> 404 (nhanh "model khong ton tai")
 Khong can thu vien ngoai.
 """
 from __future__ import annotations
@@ -27,6 +33,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 SCRIPT: list[dict] = []
 REQUESTS_PATH: str | None = None
+REQUIRED_KEY: str = ""      # --key: bat buoc Authorization: Bearer <key> (de test nhanh sai khoa)
+MODELS: list[str] = ["fake-model", "fake-model-2"]
+FAIL_STATUS: int = 0        # --fail-status 503: moi POST tra ma loi nay (de test nhanh may chu loi)
+UNKNOWN_MODEL: str = "no-such-model"   # POST voi model nay -> 404 (de test nhanh model khong ton tai)
 _LOCK = threading.Lock()
 _INDEX = 0
 _CALLS = 0
@@ -112,16 +122,31 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args) -> None:  # tat log ra stderr
         pass
 
-    def do_GET(self) -> None:
-        if self.path == "/__state":
-            body = json.dumps({"calls": _CALLS}).encode()
-        else:
-            body = b'{"ok":false,"error":"not found"}'
-        self.send_response(200 if self.path == "/__state" else 404)
+    def _authorized(self) -> bool:
+        """Khong co --key thi khong kiem tra (mac dinh)."""
+        if not REQUIRED_KEY:
+            return True
+        return self.headers.get("Authorization", "") == "Bearer " + REQUIRED_KEY
+
+    def _json(self, payload: dict, status: int = 200) -> None:
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def do_GET(self) -> None:
+        if self.path == "/__state":
+            self._json({"calls": _CALLS})
+            return
+        if self.path.endswith("/models"):
+            if not self._authorized():
+                self._json({"error": {"message": "invalid api key"}}, 401)
+                return
+            self._json({"object": "list", "data": [{"id": name, "object": "model"} for name in MODELS]})
+            return
+        self._json({"ok": False, "error": "not found"}, 404)
 
     def do_POST(self) -> None:
         length = int(self.headers.get("Content-Length", "0"))
@@ -130,26 +155,39 @@ class Handler(BaseHTTPRequestHandler):
             with open(REQUESTS_PATH, "a", encoding="utf-8") as handle:
                 handle.write(json.dumps({"path": self.path, "body": json.loads(raw)}, ensure_ascii=False) + "\n")
 
-        step = routed_step(json.loads(raw)) or next_step()
+        if not self._authorized():
+            self._json({"error": {"message": "invalid api key"}}, 401)
+            return
+        if FAIL_STATUS:
+            self._json({"error": {"message": "server error"}}, FAIL_STATUS)
+            return
+
+        parsed = json.loads(raw)
+        if parsed.get("model") == UNKNOWN_MODEL:
+            self._json({"error": {"message": "model `%s` does not exist" % UNKNOWN_MODEL}}, 404)
+            return
+
+        step = routed_step(parsed) or next_step()
         delay = float(step.get("delay", 0))
         if delay > 0:
             time.sleep(delay)
 
-        payload = json.dumps(build_response(step), ensure_ascii=False).encode("utf-8")
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(payload)))
-        self.end_headers()
-        self.wfile.write(payload)
+        self._json(build_response(step))
 
 
 def main() -> int:
-    global SCRIPT, REQUESTS_PATH
+    global SCRIPT, REQUESTS_PATH, REQUIRED_KEY, MODELS, FAIL_STATUS
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--script", required=True)
     parser.add_argument("--requests")
+    parser.add_argument("--key", help="bat buoc Authorization: Bearer <key> (test nhanh sai khoa)")
+    parser.add_argument("--models", help="danh sach model cho GET /v1/models, phan cach dau phay")
+    parser.add_argument("--fail-status", type=int, default=0, help="moi POST tra ma loi nay (test may chu loi)")
     args = parser.parse_args()
+    REQUIRED_KEY = args.key or ""
+    MODELS = [name.strip() for name in (args.models or "fake-model,fake-model-2").split(",") if name.strip()]
+    FAIL_STATUS = args.fail_status
 
     with open(args.script, encoding="utf-8") as handle:
         SCRIPT = json.load(handle)

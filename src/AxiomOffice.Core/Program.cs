@@ -112,6 +112,8 @@ CoreApi.Map(app, config, paths, runtime, stores);
 RunEndpoints.Map(app, manager, orchestrator, stores);
 SkillEndpoints.Map(app, skills);
 MemoryEndpoints.Map(app, memory);
+// Wizard thiet lap (SetupWizardForm tren Windows, setupwizard.py tren Linux): preset + thu ket noi LLM + danh sach model.
+SetupEndpoints.Map(app, config, paths, runtime, http, skills, stores);
 
 // Trang thai MCP: server da cau hinh (khong in env/headers vi co the chua key) + loi khoi dong.
 app.MapGet("/v1/mcp", async (HttpContext context) =>

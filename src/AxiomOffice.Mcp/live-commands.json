@@ -20,6 +20,11 @@
     "params": []
   },
   {
+    "name": "ui.setup",
+    "kind": null,
+    "params": []
+  },
+  {
     "name": "app.screenshot",
     "kind": null,
     "params": [

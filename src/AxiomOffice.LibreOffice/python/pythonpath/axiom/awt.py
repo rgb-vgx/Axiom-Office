@@ -206,6 +206,77 @@ class ChildWindow(Container):
         self.dispose()
 
 
+class Dialog(_Host):
+    """Cua so noi that (UnoControlDialog) - co X window rieng, khac `ChildWindow`.
+
+    Tren LibreOffice 24.2/Linux, cua so con VCL ve TRONG vung tai lieu nhung KHONG nhan duoc su kien chuot:
+    cua so tai lieu la mot X window that nam tren cung nen moi cu bam deu roi vao no (do bang xdotool: pane
+    trong sidebar/dock bam duoc, dialog kieu cua so con thi khong). Dialog that co cua so rieng nen bam duoc -
+    day la duong dung cho dialog cua extension.
+
+    Dung giong `ChildWindow`: `.add(service, name, **props)` (tra ve model), `.container` de tao
+    `widgets.Surface`, `.place(x, y, w, h)`, `.close()`.
+    """
+
+    def __init__(self, ctx, width: int, height: int, title: str = ""):
+        from . import theme
+
+        super().__init__(ctx)
+        sm = ctx.ServiceManager
+        self.container = sm.createInstanceWithContext("com.sun.star.awt.UnoControlDialog", ctx)
+        model = sm.createInstanceWithContext("com.sun.star.awt.UnoControlDialogModel", ctx)
+        model.setPropertyValue("Width", width)
+        model.setPropertyValue("Height", height)
+        model.setPropertyValue("Title", title)
+        model.setPropertyValue("BackgroundColor", theme.PANE_BG)
+        self.container.setModel(model)
+        self.model = model
+        # None = cua so doc lap, khong bi cua so tai lieu che (do la nguyen nhan khong bam duoc cua so con).
+        self.container.createPeer(toolkit(ctx), None)
+        self.peer_ready = True
+
+    def add(self, service: str, name: str, **props):
+        """Nhu ChildWindow.add: mac dinh font/mau cua pane cho dieu khien thong thuong."""
+        from . import theme
+
+        if service in ("FixedText", "Edit", "CheckBox", "Button", "ListBox", "RadioButton"):
+            props.setdefault("FontName", theme.FONT)
+            props.setdefault("FontHeight", theme.SIZE_SMALL)
+        if service in ("FixedText", "CheckBox", "RadioButton"):
+            props.setdefault("BackgroundColor", theme.PANE_BG)
+            props.setdefault("TextColor", theme.TEXT_PRIMARY)
+        if not props.get("FontName"):
+            props.pop("FontName", None)
+        return super().add(service, name, **props)
+
+    def _insert(self, name: str, service: str, model) -> None:
+        control = self.ctx.ServiceManager.createInstanceWithContext("com.sun.star.awt.UnoControl" + service, self.ctx)
+        control.setModel(model)
+        self.container.addControl(name, control)
+
+    def control(self, name: str):
+        return self.container.getControl(name)
+
+    def window(self):
+        return self.container
+
+    def set_title(self, title: str) -> None:
+        try:
+            self.container.getPeer().setPropertyValue("Title", title)
+        except Exception:  # noqa: BLE001 - ban khac khong co thuoc tinh nay
+            pass
+
+    def place(self, x: int, y: int, width: int, height: int) -> None:
+        self.container.setPosSize(x, y, width, height, 15)
+        self.container.setVisible(True)
+
+    def close(self) -> None:
+        try:
+            self.container.setVisible(False)
+            self.container.dispose()
+        except Exception:  # noqa: BLE001
+            pass
+
 def bind_actions(host, names, handler) -> None:
     """Gan mot ActionListener chung; moi nut tu khai ActionCommand = ten cua no."""
     listener = ActionListener(handler)

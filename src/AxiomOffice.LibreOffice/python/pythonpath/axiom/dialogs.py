@@ -5,10 +5,13 @@ hien duoc tren ban 26.8 (LibreOffice_arch.md 14.2). Kieu chu/mau theo theme.py n
 `config.set_value` (HKCU tren Windows - cung cho voi add-in; config.json tren Linux) va khoa API ma hoa DPAPI
 nhu add-in.
 
-Sua xong Cau dat thi Core dang chay van doc cau hinh cu (Core doc luc khoi dong) -> dialog nhac nguoi dung
-tat Core de nap lai (hoac bam "Tat Core" - dung API /v1/admin/shutdown).
+Cau hinh LLM (dia chi/model/khoa) CO HIEU LUC NGAY: Core doc lai moi luot chay (Models/ModelSource.cs), khong
+phai khoi dong lai. Chi `Token` va `CorePort` moi chot luc Core khoi dong - doi thi bam "Tat Core" (dung API
+/v1/admin/shutdown) roi gui yeu cau moi de Core tu chay lai.
 """
 from __future__ import annotations
+
+import uno
 
 import os
 
@@ -59,10 +62,11 @@ SETTINGS_FLAGS = (
 )
 MEMORY_LIST_TIMEOUT = 10
 # Noi luu cau hinh: noi ro theo he dieu hanh de nguoi dung biet dang sua file nao.
-STORAGE_HINT = (r"Cấu hình dùng chung với add-in (HKCU\Software\AxiomOffice). Agent Core đọc lúc khởi động."
-                if config.IS_WINDOWS else
+STORAGE_HINT = (r"Cấu hình dùng chung với add-in (HKCU\Software\AxiomOffice). Địa chỉ/model/khoá dùng được ngay; "
+                "chỉ 'Tắt Core' khi vừa đổi Token." if config.IS_WINDOWS else
                 "Cấu hình dùng chung với Agent Core (~/.config/axiom-office/config.json). Khoá API lưu vào "
-                "keyring nếu máy có secret-tool, không thì trong file quyền 0600.")
+                "keyring nếu máy có secret-tool, không thì trong file quyền 0600. Địa chỉ/model/khoá dùng "
+                "được ngay, không cần khởi động lại.")
 
 
 def _label(dialog: ChildWindow, name: str, y: int, text: str, width: int = 134) -> None:
@@ -121,7 +125,8 @@ def open_settings(pane) -> None:
                 config.set_value(name, text)
             for name, _, _ in SETTINGS_FLAGS:
                 config.set_value(name, 1 if int(dialog.value(name, "State") or 0) else 0)
-            dialog.set("status", Label="Đã lưu. Cấu hình Core đọc khi khởi động - bấm \"Tắt Core\" rồi gửi yêu cầu mới để Core nạp lại.")
+            dialog.set("status", Label="Đã lưu. Địa chỉ/model/khoá mới dùng được ngay; nếu vừa đổi khoá bảo vệ "
+                                           "(Token) thì bấm \"Tắt Core\" rồi gửi yêu cầu mới.")
         elif command == "check":
             try:
                 base, port = core.ensure()
@@ -159,7 +164,8 @@ def open_memory(pane) -> None:
         return
     dialog.add("Edit", "query", PositionX=12, PositionY=46, Width=426, Height=24)
     _button(dialog, "search", 444, 46, 64, "Tìm")
-    dialog.add("ListBox", "items", PositionX=12, PositionY=78, Width=496, Height=270, StringItemList=())
+    dialog.add("ListBox", "items", PositionX=12, PositionY=78, Width=496, Height=270,
+               StringItemList=uno.Any("[]string", ()))
     dialog.add("FixedText", "status", PositionX=12, PositionY=354, Width=496, Height=32, MultiLine=True,
                TextColor=theme.TEXT_MUTED, FontHeight=theme.SIZE_CAPTION, Label="Đang tải…")
     _button(dialog, "delete", 12, 402, 90, "Xoá")
@@ -174,7 +180,7 @@ def open_memory(pane) -> None:
             base, _ = core.ensure()
             rows = core.memories(base, query=query)
         except core.CoreError as exc:
-            dialog.set("items", StringItemList=())
+            uno.invoke(dialog.models["items"], "setPropertyValue", ("StringItemList", uno.Any("[]string", ())))
             dialog.set("status", Label="Không đọc được ghi nhớ: %s" % exc)
             return
         labels = []
@@ -182,7 +188,10 @@ def open_memory(pane) -> None:
             state["items"].append(row)
             text = str(row.get("text") or "").replace("\n", " ")
             labels.append("%s · %s" % (row.get("scope") or "user", text[:90]))
-        dialog.set("items", StringItemList=tuple(labels))
+        # pyuno can kieu tuong minh cho sequence<string> va uno.Any chi dung duoc qua uno.invoke (dat tuple
+        # truc tiep thi bao "Unable to convert the given value for the property StringItemList").
+        uno.invoke(dialog.models["items"], "setPropertyValue",
+                   ("StringItemList", uno.Any("[]string", tuple(labels))))
         dialog.set("status", Label="%d ghi nhớ%s" % (len(labels), " · chọn rồi bấm Xoá" if labels else ""))
 
     def on_action(command: str, event) -> None:

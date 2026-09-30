@@ -59,10 +59,22 @@ internal sealed class ScriptedHandler : HttpMessageHandler
         lock (_requests)
         {
             _requests.Add((request.RequestUri?.ToString() ?? "", body));
+            _lastHeaders = request.Headers.ToDictionary(h => h.Key, h => string.Join(",", h.Value), StringComparer.OrdinalIgnoreCase);
         }
 
         return await _respond(request, body, cancellationToken);
     }
+
+    private Dictionary<string, string> _lastHeaders = new(StringComparer.OrdinalIgnoreCase);
+
+    // Header xac thuc cua request cuoi (kiem tra ModelCatalog/ModelClient gan dung kieu cua tung provider).
+    public string? LastAuthorizationScheme => Header("Authorization")?.Split(' ')[0];
+
+    public string? LastApiKeyHeader => Header("x-api-key");
+
+    public string? LastAnthropicVersion => Header("anthropic-version");
+
+    private string? Header(string name) => _lastHeaders.TryGetValue(name, out string? value) ? value : null;
 
     public static HttpResponseMessage Json(string json, HttpStatusCode status = HttpStatusCode.OK)
     {

@@ -28,8 +28,15 @@ import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-CORE_EXE = os.path.join(ROOT, "src", "AxiomOffice", "bin", "Release", "AxiomOffice.Core.exe")
+# Ban Core da publish (di kem AxiomOffice.Host.exe + skills canh no, cho ca lan file MCP).
+# MCP). Muon chay voi ban vua `dotnet build` thi dat AXIOM_E2E_CORE_EXE.
+CORE_EXE = os.environ.get("AXIOM_E2E_CORE_EXE") or os.path.join(ROOT, "src", "AxiomOffice", "bin", "Release", "AxiomOffice.Core.exe")
 FAKE_LLM = os.path.join(ROOT, "tests", "core", "fake_llm.py")
+
+# Console Windows mac dinh cp1252 -> khong in duoc tieng Viet trong ten/chi tiet check.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
 
 RESULTS: list[tuple[bool, str, str]] = []
 
@@ -181,17 +188,22 @@ class FakeBridge:
 class FakeLlm:
     """Chay fake_llm.py trong tien trinh rieng voi kich ban cho truoc."""
 
-    def __init__(self, work_dir: str, script: list[dict]):
+    def __init__(self, work_dir: str, script: list[dict], models: list[str] | None = None, key: str | None = None,
+                 fail_status: int = 0):
         self.port = free_port()
         self.script_path = os.path.join(work_dir, f"script-{uuid.uuid4().hex[:6]}.json")
         self.requests_path = os.path.join(work_dir, f"requests-{uuid.uuid4().hex[:6]}.jsonl")
         with open(self.script_path, "w", encoding="utf-8") as handle:
             json.dump(script, handle, ensure_ascii=False)
-        self.process = subprocess.Popen(
-            [sys.executable, FAKE_LLM, "--port", str(self.port), "--script", self.script_path, "--requests", self.requests_path],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        argv = [sys.executable, FAKE_LLM, "--port", str(self.port), "--script", self.script_path,
+                "--requests", self.requests_path]
+        if models:
+            argv += ["--models", ",".join(models)]
+        if key:
+            argv += ["--key", key]
+        if fail_status:
+            argv += ["--fail-status", str(fail_status)]
+        self.process = subprocess.Popen(argv, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         deadline = time.time() + 15
         while time.time() < deadline:
             try:
@@ -894,6 +906,77 @@ def live_bridge_cmd(port: int, action: str, params=None, timeout: int = 90):
         return json.loads(response.read().decode("utf-8"))
 
 
+def test_setup(core: Core, llm: FakeLlm, work: str) -> None:
+    """Wizard thiet lap: /v1/setup + /v1/llm/test + /v1/llm/models (Api/SetupEndpoints.cs).
+
+    Day la duong ma SetupWizardForm (Windows) va setupwizard.py (Linux) goi; cau chu tieng Viet tra ve tu day.
+    """
+    token = core.token
+    endpoint = f"http://127.0.0.1:{llm.port}/v1"
+
+    status, payload = http_json(core.base + "/v1/setup", token=token)
+    check(status == 200 and payload.get("ok") is True, "GET /v1/setup tra ok", json.dumps(payload, ensure_ascii=False)[:200])
+    if not payload.get("ok"):
+        return
+    result = payload["result"]
+    check([p["id"] for p in result["presets"]] == ["company", "openai", "anthropic", "gemini"],
+          "/v1/setup co du preset nha cung cap", str([p["id"] for p in result["presets"]]))
+    check([s["id"] for s in result["steps"]] == ["welcome", "checks", "connect", "features", "done"],
+          "/v1/setup co du buoc cua wizard", str([s["id"] for s in result["steps"]]))
+    check(all(p["label"] and p["description"] for p in result["presets"]), "moi preset co nhan + mo ta")
+    check(result["current"]["model"] == "fake-model" and result["current"]["configured"] is True,
+          "/v1/setup bao dung cau hinh dang chay", json.dumps(result["current"], ensure_ascii=False))
+    check(result["current"]["hasKey"] is True, "/v1/setup noi da co khoa API (khong tra khoa)", json.dumps(result["current"]))
+    check("fake-key" not in json.dumps(result), "/v1/setup KHONG tra khoa API")
+    check(result["core"]["skills"] >= 1 and result["core"]["port"] == core.port, "/v1/setup bao trang thai Core", json.dumps(result["core"]))
+
+    # Danh sach model: nguoi dung chon thay vi tu go ten.
+    status, models = http_json(f"{core.base}/v1/llm/models?provider=openai&endpoint={endpoint}&apiKey=fake-key", token=token)
+    check(status == 200 and models["result"].get("models") == ["fake-model", "fake-model-2"],
+          "GET /v1/llm/models tra danh sach model", json.dumps(models, ensure_ascii=False)[:200])
+
+    # Thu ket noi thanh cong (gia tri chua luu, y het luc bam nut trong wizard).
+    status, ok = http_json(core.base + "/v1/llm/test", method="POST", token=token, body={
+        "providerId": "company", "endpoint": endpoint, "model": "fake-model", "apiKey": "fake-key"})
+    check(status == 200 and ok["result"].get("reply"), "POST /v1/llm/test bao ket noi tot", json.dumps(ok, ensure_ascii=False)[:200])
+    check(ok["result"].get("seconds") is not None and ok["result"].get("model") == "fake-model",
+          "ket qua thu co so giay + ten model", json.dumps(ok["result"], ensure_ascii=False))
+
+    # Model khong ton tai -> goi y chon lai tu danh sach.
+    status, bad = http_json(core.base + "/v1/llm/test", method="POST", token=token, body={
+        "providerId": "company", "endpoint": endpoint, "model": "no-such-model", "apiKey": "fake-key"})
+    check(bad["result"].get("kind") == "model", "model sai -> kind=model", json.dumps(bad, ensure_ascii=False)[:200])
+    check("danh sách model" in bad["result"].get("hint", ""), "goi y bam Tai danh sach model", str(bad["result"].get("hint"))[:200])
+
+    # Dia chi sai -> khong ket noi duoc (khong phai loi khoa).
+    status, dead = http_json(core.base + "/v1/llm/test", method="POST", token=token, body={
+        "providerId": "company", "endpoint": f"http://127.0.0.1:{free_port()}/v1", "model": "fake-model", "apiKey": "x"})
+    check(dead["result"].get("kind") in ("network", "dns", "timeout"),
+          "dia chi sai -> kind mang/dns/timeout", json.dumps(dead, ensure_ascii=False)[:200])
+
+    # Thieu dia chi -> loi cau hinh (khong goi mang).
+    status, missing = http_json(core.base + "/v1/llm/test", method="POST", token=token, body={"model": "fake-model"})
+    check(missing["result"].get("kind") == "config", "thieu dia chi -> kind=config", json.dumps(missing, ensure_ascii=False)[:200])
+
+    # Sai khoa API: LLM gia doi khoa khac -> 401 -> cau "khoa khong dung".
+    picky = FakeLlm(work, [{"text": "OK"}], key="sk-dung", models=["fake-model"])
+    try:
+        status, wrong = http_json(core.base + "/v1/llm/test", method="POST", token=token, body={
+            "providerId": "company", "endpoint": f"http://127.0.0.1:{picky.port}/v1", "model": "fake-model",
+            "apiKey": "sk-sai"})
+        check(wrong["result"].get("kind") == "auth", "sai khoa -> kind=auth", json.dumps(wrong, ensure_ascii=False)[:200])
+        status, models = http_json(
+            f"{core.base}/v1/llm/models?provider=openai&endpoint=http://127.0.0.1:{picky.port}/v1&apiKey=sk-sai", token=token)
+        check(models["result"].get("kind") == "auth", "sai khoa khi lay danh sach model -> kind=auth",
+              json.dumps(models, ensure_ascii=False)[:200])
+    finally:
+        picky.stop()
+
+    # Khong co token -> 401 nhu moi endpoint khac cua Core (khoa API khong duoc lo ra ngoai).
+    status, _ = http_json(core.base + "/v1/llm/test", method="POST", body={"endpoint": endpoint, "model": "fake-model"})
+    check(status == 401, "POST /v1/llm/test can token", str(status))
+
+
 def test_office(core: Core, port: int, pid: int) -> None:
     """Che do --office: Core chay lenh that len Excel dang mo va tai lieu that su doi."""
     live_bridge_cmd(port, "et.newWorkbook")
@@ -994,6 +1077,7 @@ def main() -> int:
             test_confirm(work, token, bridge, document_path, session_dir)
             test_mcp(work, token, bridge, document_path, session_dir)
             test_visual(work, token, bridge, document_path, session_dir)
+            test_setup(core, llm, work)
     finally:
         if core is not None:
             core.stop()

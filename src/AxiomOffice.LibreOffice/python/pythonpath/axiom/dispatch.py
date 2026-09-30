@@ -1,7 +1,8 @@
 """Xu ly URL org.axiomoffice.bridge:... tu menu (Addons.xcu -> ProtocolHandler.xcu -> component nay).
 
-Hai URL: `:askpane` (mo pane Ask AI) va `:settings` (mo cua so Cai dat). Dispatch chay tren main thread
-(menu cua LibreOffice), nen goi thang `panel.show_pane` / `dialogs.open_settings` ma khong qua UnoGate.
+Ba URL: `:askpane` (mo pane Ask AI), `:setup` (mo wizard thiet lap cho nguoi dung khong chuyen) va `:settings`
+(cua so Cai dat nang cao). Dispatch chay tren main thread (menu cua LibreOffice), nen goi thang
+`panel.show_pane` / `setupwizard.open_setup` / `dialogs.open_settings` ma khong qua UnoGate.
 """
 from __future__ import annotations
 
@@ -11,7 +12,7 @@ from com.sun.star.lang import XInitialization
 
 from . import log
 
-ACTIONS = {"askpane", "settings"}
+ACTIONS = {"askpane", "settings", "setup"}
 
 
 class Dispatcher(unohelper.Base, XDispatchProvider, XInitialization, XDispatch):
@@ -55,6 +56,10 @@ class Dispatcher(unohelper.Base, XDispatchProvider, XInitialization, XDispatch):
                 from . import dialogs
 
                 dialogs.open_settings(_SettingsTarget(self.ctx, self._frame()))
+            elif action == "setup":
+                from . import setupwizard
+
+                setupwizard.open_setup(_SettingsTarget(self.ctx, self._frame()))
         except Exception as exc:  # noqa: BLE001 - khong duoc lam sap LibreOffice tu menu
             log.error("dispatch %s failed: %s" % (action, exc))
 

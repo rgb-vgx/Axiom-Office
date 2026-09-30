@@ -24,13 +24,22 @@
               <value xml:lang="vi">Hỏi AI</value>
             </prop>
           </node>
+          <node oor:name="setup" oor:op="replace">
+            <prop oor:name="URL">
+              <value>org.axiomoffice.bridge:setup</value>
+            </prop>
+            <prop oor:name="Title">
+              <value xml:lang="en-US">Set up…</value>
+              <value xml:lang="vi">Thiết lập…</value>
+            </prop>
+          </node>
           <node oor:name="settings" oor:op="replace">
             <prop oor:name="URL">
               <value>org.axiomoffice.bridge:settings</value>
             </prop>
             <prop oor:name="Title">
-              <value xml:lang="en-US">Settings…</value>
-              <value xml:lang="vi">Cài đặt…</value>
+              <value xml:lang="en-US">Advanced settings…</value>
+              <value xml:lang="vi">Cài đặt nâng cao…</value>
             </prop>
           </node>
         </node>

@@ -78,6 +78,26 @@ public sealed class ModelClient
         return value.Contains("://", StringComparison.Ordinal) ? value : "http://" + value;
     }
 
+    // Header xac thuc theo provider: Anthropic dung x-api-key + anthropic-version, con lai Bearer.
+    // ModelCatalog (danh sach model) dung chung de khong lech voi duong chat.
+    internal static void ApplyAuth(HttpRequestMessage request, string provider, string apiKey)
+    {
+        if (string.IsNullOrEmpty(apiKey))
+        {
+            return;
+        }
+
+        if (provider == "anthropic")
+        {
+            request.Headers.Add("x-api-key", apiKey);
+            request.Headers.Add("anthropic-version", "2023-06-01");
+        }
+        else
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        }
+    }
+
     public static string BuildUrl(string endpoint, string suffix)
     {
         string baseUrl = endpoint.TrimEnd('/');
@@ -325,18 +345,7 @@ public sealed class ModelClient
             {
                 Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json"),
             };
-            if (!string.IsNullOrEmpty(_apiKey))
-            {
-                if (Codec.Name == "anthropic")
-                {
-                    request.Headers.Add("x-api-key", _apiKey);
-                    request.Headers.Add("anthropic-version", "2023-06-01");
-                }
-                else
-                {
-                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
-                }
-            }
+            ApplyAuth(request, Codec.Name, _apiKey);
 
             using HttpResponseMessage response = await _http.SendAsync(request, requestCts.Token).ConfigureAwait(false);
             string text = await response.Content.ReadAsStringAsync(CancellationToken.None).ConfigureAwait(false);

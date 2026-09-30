@@ -167,7 +167,8 @@ class CatalogTests(unittest.TestCase):
         csharp = {item["name"]: item for item in json.loads(raw)}
         python = {item["name"]: item for item in commands.catalog()}
         only_python = set(python) - set(csharp)
-        self.assertEqual(only_python, {"et.closeAll", "wpp.closeAll"}, "lệnh chỉ có ở làn LibreOffice (đóng tài liệu, không ForAgent)")
+        self.assertEqual(only_python, {"et.closeAll", "wpp.closeAll", "ui.setup"},
+                         "lệnh chỉ có ở làn LibreOffice (đóng tài liệu + mở wizard thiết lập, không ForAgent)")
         self.assertEqual(set(csharp) - set(python), set(), "lệnh C# bị thiếu trong extension")
         for name, theirs in csharp.items():
             mine = python[name]

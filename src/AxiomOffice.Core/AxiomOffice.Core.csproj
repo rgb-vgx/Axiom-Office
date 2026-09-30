@@ -17,6 +17,13 @@
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.12" />
   </ItemGroup>
   <ItemGroup>
+    <!-- Chu + preset cua wizard thiet lap: sinh tu catalog/setup.json, dung chung voi add-in (net48). -->
+    <Compile Include="..\AxiomOffice\Setup\SetupCatalog.cs" Link="Setup\SetupCatalog.cs" />
+    <!-- Test xUnit doc truc tiep SetupCatalog (kieu internal nhu ban add-in). -->
+    <InternalsVisibleTo Include="AxiomOffice.Core.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Prompt cua memory extractor nhung trong exe (New_arch.md muc 8.5.5). -->
     <EmbeddedResource Include="Memory\Prompts\*.txt" LogicalName="AxiomOffice.Core.Memory.Prompts.%(Filename)%(Extension)" />
   </ItemGroup>

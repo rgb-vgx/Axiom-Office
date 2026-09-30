@@ -130,6 +130,34 @@ def ui_askpane(env, params):
     return result
 
 
+def ui_setup(env, params):
+    """Mo wizard thiet lap (nguoi dung khong chuyen tu dien endpoint/model) va tra trang thai cua no.
+
+    Tham so (dung cho test live / cau hinh san, bo trong thi chi mo wizard):
+      step (id buoc), provider (id nha cung cap), endpoint, model, apiKey,
+      models=true (nap danh sach model), test=true (thu ket noi), features={...} (bat/tat roi luu),
+      save=true (luu cau hinh hien tai).
+    Thao tac nang chi khoi dong roi tra ve ngay; goi lai lenh voi tham so rong de doc ket qua.
+    """
+    from . import setupwizard
+
+    frame = documents.desktop(env.ctx).getCurrentFrame()
+    if frame is None:
+        raise RuntimeError("ui.setup: no visible LibreOffice window (headless)")
+    wizard = setupwizard.open_setup(_Target(env.ctx, frame))
+    if wizard is None:
+        raise RuntimeError("ui.setup: khong mo duoc wizard")
+    result = setupwizard.drive(wizard, params or {})
+    result["taskPane"] = True
+    return result
+
+
+class _Target:
+    def __init__(self, ctx, frame):
+        self.ctx = ctx
+        self.frame = frame
+
+
 def app_screenshot(env, params):
     """Xuat trang/slide hien tai ra PNG qua filter *_png_Export (khong can chup cua so)."""
     max_width = max(320, min(values.integer(params, "maxWidth", 1280), 2560))
@@ -165,5 +193,6 @@ command("app.info", None, app_info, "Tên/version app, tài liệu đang mở, `
 command("ai.ask", None, ai_ask, "Chạy AI agent trên tài liệu đang mở; trả `reply`, `transcript`, `seconds`, `rounds`",
         req("prompt"), gated=False)
 command("ui.askpane", None, ui_askpane, "Mở panel Ask AI trong sidebar")
+command("ui.setup", None, ui_setup, "Mở wizard thiết lập (nhập máy chủ AI, model, kiểm tra kết nối)")
 command("app.screenshot", None, app_screenshot,
         "Ảnh chụp trang/slide hiện tại (PNG base64, thu nhỏ theo `maxWidth`, mặc định 1280)", opt("maxWidth"))

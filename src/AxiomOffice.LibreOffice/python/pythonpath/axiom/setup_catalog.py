@@ -1,0 +1,146 @@
+"""SINH TU DONG tu catalog/setup.json bang scripts/generate_setup_catalog.py - KHONG sua tay.
+
+Chu cua wizard thiet lap + preset nha cung cap AI, dung chung voi ban Windows (SetupCatalog.cs).
+"""
+from __future__ import annotations
+
+CATALOG = {'comment': 'Nguon duy nhat cho wizard thiet lap (chu + preset). Sinh ra src/AxiomOffice/Setup/SetupCatalog.cs '
+            '(net48, cho add-in + Core) va src/AxiomOffice.LibreOffice/python/pythonpath/axiom/setup_catalog.py '
+            '(extension) bang scripts/generate_setup_catalog.py. KHONG sua hai file sinh ra.',
+ 'version': 1,
+ 'steps': [{'id': 'welcome',
+            'title': 'Chào mừng bạn đến với Axiom Office',
+            'subtitle': 'Chỉ mất khoảng một phút. Trợ lý AI cần kết nối tới một máy chủ AI để đọc và sửa tài liệu '
+                        'đang mở.'},
+           {'id': 'checks',
+            'title': 'Kiểm tra máy',
+            'subtitle': 'Axiom Office tự kiểm tra những thứ cần thiết và sửa được thì sửa luôn.'},
+           {'id': 'connect',
+            'title': 'Kết nối máy chủ AI',
+            'subtitle': 'Chọn nơi cung cấp AI. Không chắc thì hỏi quản trị viên hoặc dùng tài khoản cá nhân.'},
+           {'id': 'features',
+            'title': 'Tính năng',
+            'subtitle': 'Bật/tắt những gì Axiom Office làm thêm cho bạn. Có thể đổi lại sau.'},
+           {'id': 'done', 'title': 'Hoàn tất', 'subtitle': 'Kiểm tra lại lần cuối rồi bắt đầu làm việc.'}],
+ 'providers': [{'id': 'company',
+                'group': 'internal',
+                'label': 'Máy chủ của công ty',
+                'description': 'Máy chủ AI nội bộ (hoặc proxy) tương thích OpenAI. Hỏi quản trị viên địa chỉ và khoá '
+                               'truy cập.',
+                'endpoint': '',
+                'needsKey': False,
+                'keyUrl': '',
+                'codec': 'openai',
+                'suggestedModels': []},
+               {'id': 'openai',
+                'group': 'public',
+                'label': 'OpenAI',
+                'description': 'Dùng tài khoản OpenAI của bạn (trả phí theo lượng dùng).',
+                'endpoint': 'https://api.openai.com/v1',
+                'needsKey': True,
+                'keyUrl': 'https://platform.openai.com/api-keys',
+                'codec': 'openai',
+                'suggestedModels': ['gpt-4o-mini', 'gpt-4o', 'gpt-4.1-mini']},
+               {'id': 'anthropic',
+                'group': 'public',
+                'label': 'Anthropic (Claude)',
+                'description': 'Dùng tài khoản Anthropic của bạn.',
+                'endpoint': 'https://api.anthropic.com/v1',
+                'needsKey': True,
+                'keyUrl': 'https://console.anthropic.com/settings/keys',
+                'codec': 'anthropic',
+                'suggestedModels': []},
+               {'id': 'gemini',
+                'group': 'public',
+                'label': 'Google Gemini',
+                'description': 'Dùng khoá lấy từ Google AI Studio.',
+                'endpoint': 'https://generativelanguage.googleapis.com/v1beta/openai',
+                'needsKey': True,
+                'keyUrl': 'https://aistudio.google.com/apikey',
+                'codec': 'openai',
+                'suggestedModels': ['gemini-2.5-flash']}],
+ 'features': [{'key': 'MemoryEnabled',
+               'label': 'Nhớ những điều tôi đã dặn',
+               'description': 'Axiom Office ghi nhớ quy ước của bạn (ví dụ: luôn dùng Times New Roman 13) để lần sau '
+                              'khỏi nhắc lại.',
+               'recommended': True},
+              {'key': 'MemoryAutoExtract',
+               'label': 'Tự rút ra điều đáng nhớ sau mỗi lượt',
+               'description': 'Tiện hơn, nhưng tốn thêm một lượt gọi model sau mỗi yêu cầu.',
+               'recommended': True},
+              {'key': 'VisualQaEnabled',
+               'label': 'Cho AI xem ảnh trang tài liệu',
+               'description': 'Giúp AI soát bố cục; tốn nhiều token và cần model đọc được ảnh.',
+               'recommended': False}],
+ 'checks': [{'id': 'app',
+             'label': 'Axiom Office đã nạp trong ứng dụng',
+             'fixable': False,
+             'fixLabel': '',
+             'help': 'Nếu dòng này đỏ, hãy cài lại gói (install.cmd trên Windows, install.sh trên Linux) rồi mở lại '
+                     'ứng dụng.'},
+            {'id': 'core',
+             'label': 'Agent Core đang chạy',
+             'fixable': True,
+             'fixLabel': 'Khởi động Core',
+             'help': 'Agent Core là bộ não chạy nền: hội thoại, kỹ năng, ghi nhớ. Pane tự khởi động khi cần.'},
+            {'id': 'bridge',
+             'label': 'Cầu nối trong ứng dụng trả lời được',
+             'fixable': True,
+             'fixLabel': 'Kiểm tra lại',
+             'help': 'Cầu nối là đường Axiom Office điều khiển tài liệu đang mở.'},
+            {'id': 'config',
+             'label': 'Đã có cấu hình AI',
+             'fixable': True,
+             'fixLabel': 'Thiết lập ngay',
+             'help': 'Cần địa chỉ máy chủ AI và tên model.'},
+            {'id': 'token',
+             'label': 'Khoá bảo vệ giữa ứng dụng và Agent Core',
+             'fixable': True,
+             'fixLabel': 'Tạo khoá mới',
+             'help': 'Khoá này chỉ đi trên máy của bạn, để ứng dụng khác không điều khiển được Agent Core.'},
+            {'id': 'configFile',
+             'label': 'Tệp cấu hình đọc/ghi được',
+             'fixable': True,
+             'fixLabel': 'Sửa tệp cấu hình',
+             'help': 'Trên Windows là HKCU\\Software\\AxiomOffice; trên Linux là ~/.config/axiom-office/config.json '
+                     '(quyền 0600).'},
+            {'id': 'mcp',
+             'label': 'MCP cho Claude Code / Claude Desktop (tuỳ chọn)',
+             'fixable': False,
+             'fixLabel': '',
+             'help': 'Chỉ cần nếu bạn muốn Claude điều khiển Word/LibreOffice qua MCP.'}]}
+
+STEPS = CATALOG["steps"]
+PROVIDERS = CATALOG["providers"]
+FEATURES = CATALOG["features"]
+CHECKS = CATALOG["checks"]
+
+
+def provider(provider_id: str):
+    """Preset theo id (None neu khong co)."""
+    for item in PROVIDERS:
+        if item["id"] == provider_id:
+            return item
+    return None
+
+
+def check(check_id: str):
+    for item in CHECKS:
+        if item["id"] == check_id:
+            return item
+    return None
+
+
+def guess_provider_id(endpoint: str, codec: str = "openai") -> str:
+    """Doan nha cung cap tu dia chi dang cau hinh (mo lai wizard thi chon dung lua chon cu)."""
+    value = (endpoint or "").strip()
+    if not value:
+        return "company"
+    lowered = value.lower()
+    if "api.openai.com" in lowered:
+        return "openai"
+    if "anthropic.com" in lowered:
+        return "anthropic"
+    if "generativelanguage.googleapis.com" in lowered:
+        return "gemini"
+    return "company"
