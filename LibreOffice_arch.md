@@ -295,6 +295,11 @@ riêng chỗ nói "Word"/"Excel" trong prompt (`PromptBuilder.AppName`) thêm nh
 
 ## 10. Pane Ask AI trong LibreOffice
 
+> **Đã làm (giai đoạn L2, 30/09/2026)** - xem kết quả và các khác biệt API ở mục 14.2. Pane dùng chung
+> một giao diện cho hai chỗ hiển thị: deck sidebar (đăng ký đúng chuẩn) và **cửa sổ con neo bên phải cửa
+> sổ tài liệu** (bản LibreOffice không có sidebar dùng được - vd 26.8 trên máy này). Mở bằng menu
+> **Axiom Office -> Ask AI** (Addons.xcu + ProtocolHandler.xcu) hoặc lệnh `ui.askpane`.
+
 Sidebar deck **"Axiom Office"** (hiện với Writer, Calc, Impress), panel dựng bằng `awt` trong Python:
 
 ```
@@ -429,6 +434,34 @@ không vấp lại):
 
 Việc còn lại trước L2: gọi UNO từ nhiều client đồng thời (test tải), SSE `/events` của bridge, ô
 "Đã ghi nhớ"/sidebar (L2), và các câu hỏi mở mục 16 (đặc biệt: pane `awt` hay web UI).
+
+### 14.2 Pane Ask AI: kết quả và khác biệt API (30/09/2026)
+
+Đã làm (`feat/lo-l1-bridge`): `axiom/core.py` (client Agent Core + SSE), `axiom/chat.py` (logic hội thoại,
+thuần Python nên test được), `axiom/awt.py` (host điều khiển), `axiom/panel.py` (pane + factory sidebar),
+`axiom/dialogs.py` (Cài đặt/Ghi nhớ), `axiom/dispatch.py` (URL menu), `Sidebar.xcu`/`Factory.xcu`/
+`Addons.xcu`/`ProtocolHandler.xcu`, component `python/axiom_panel.py` + `python/axiom_dispatch.py`.
+
+Đã chạy thật trên LibreOffice 26.8 (Writer/Impress): gửi yêu cầu -> Core chạy agent -> tài liệu được sửa ->
+phản hồi hiện trong pane; "Hoàn tác lượt này" trả tài liệu về nguyên trạng; "Dừng" hủy giữa lượt; thẻ xác
+nhận của policy (`wpp.deleteSlide`) hiện đúng và đồng ý thì Core mới thực thi; dialog Cài đặt đọc đúng
+HKCU và ghi lại bằng DPAPI; dialog Ghi nhớ liệt kê `/v1/memory`.
+
+Những điểm **khác thiết kế**, phát hiện khi làm:
+
+| Vấn đề | Thực tế API | Cách xử lý |
+|---|---|---|
+| Toạ độ điều khiển awt | Model điều khiển **không** nhận `PositionX/PositionY/Width/Height` (chỉ có thuộc tính riêng như `Text`, `Label`, `State`); `setPropertyValue` báo ok nhưng giá trị không có tác dụng, `getPropertyValue` lỗi | Đặt vị trí/kích thước lên chính *view* (`XControl.setPosSize`) sau khi tạo peer, lưu hình học theo tên trong `awt._Host` |
+| `UnoControlDialog` (cửa sổ rời) | Tạo được peer, `isVisible()` true, hình học đúng, nhưng cửa sổ **không hiện trên màn hình** (kể cả `toFront`/`setFocus`, `DesktopAsParent=False`) | Pane và dialog dùng **cửa sổ con** (`UnoControlContainer` nhúng vào cửa sổ tài liệu) - luôn hiện, không bị che |
+| Sidebar của LibreOffice 26.8 | Config Sidebar/Factories nhận deck + panel + factory của mình, nhưng `XLayoutManager.getElement("private:resource/uielement/sidebar")` = None, `XSidebarProvider` không có, `.uno:Sidebar` không tạo phần tử => không có chỗ nhúng panel | Vẫn đăng ký deck đúng chuẩn (bản LibreOffice khác sẽ dùng), `ui.askpane` kiểm tra sidebar trước rồi mới rơi về cửa sổ con |
+| `DispatchHelper.executeDispatch` | Lỗi pyuno "Type 17 is not supported!" khi truyền struct `URL` | Dùng `XDispatchProvider.queryDispatch` + `XDispatch.dispatch` |
+| Menu Addons | URL phải có protocol handler: tên node trong `ProtocolHandler/HandlerSet` là **implementation name** (không phải tên protocol), và component phải implement `com.sun.star.lang.XInitialization` (không phải `com.sun.star.frame.XInitialization`) | `ProtocolHandler.xcu` + `axiom_dispatch.py` chỉ implement `XDispatchProvider` (implement cả `XDispatchProviderInterceptor` bị lỗi MRO vì nó kế thừa `XDispatchProvider`) |
+| Một file XCU nhiều `component-data` | Chỉ khối đầu được merge (khối `Factories` trong `Sidebar.xcu` bị bỏ) | Mỗi file `.xcu` một `component-data` |
+
+Chi tiết khác: `PanelElement.Type` = `UIElementType.TOOLPANEL` (= 7 ở bản này); `createAccessible` trả None
+(không có accessibility riêng); cập nhật UI từ thread SSE qua `UnoGate`, nhưng khi đã ở main thread thì gọi
+thẳng (`UnoGate.on_main_thread`) vì gọi lại gate sẽ tự treo; nút "Hoàn tác lượt này" dùng tiền tố lệnh theo
+kind (`wps` -> `writer.undo`), không phải `wps.undo`.
 
 ### Giai đoạn L2: Core đa nền tảng + pane
 

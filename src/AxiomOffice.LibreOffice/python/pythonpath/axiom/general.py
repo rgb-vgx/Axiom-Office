@@ -143,7 +143,15 @@ def ai_ask(env, params):
 
 
 def ui_askpane(env, params):
-    raise RuntimeError("ui.askpane: the LibreOffice sidebar pane is not implemented yet (phase L3)")
+    """Mo deck Axiom Office trong sidebar (LibreOffice_arch.md muc 10). Gated: dispatcher UI phai o main thread."""
+    from . import panel
+
+    frame = documents.desktop(env.ctx).getCurrentFrame()
+    if frame is None:
+        raise RuntimeError("ui.askpane: no visible LibreOffice window (headless)")
+    result = panel.show_pane(env.ctx, frame)
+    result["taskPane"] = True
+    return result
 
 
 def app_screenshot(env, params):
@@ -180,6 +188,6 @@ def _png_size(raw: bytes):
 command("app.info", None, app_info, "Tên/version app, tài liệu đang mở, `state` (tài liệu, cửa sổ, visible)")
 command("ai.ask", None, ai_ask, "Chạy AI agent trên tài liệu đang mở; trả `reply`, `transcript`, `seconds`, `rounds`",
         req("prompt"), gated=False)
-command("ui.askpane", None, ui_askpane, "Mở task pane Ask AI", gated=False)
+command("ui.askpane", None, ui_askpane, "Mở panel Ask AI trong sidebar")
 command("app.screenshot", None, app_screenshot,
         "Ảnh chụp trang/slide hiện tại (PNG base64, thu nhỏ theo `maxWidth`, mặc định 1280)", opt("maxWidth"))

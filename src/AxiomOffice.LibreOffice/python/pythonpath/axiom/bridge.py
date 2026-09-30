@@ -145,7 +145,7 @@ def start(ctx) -> None:
             return
         commands.load_all()
         gate = UnoGate(ctx)
-        _STATE.update(started=True, token=config.token(), gate=gate, servers=[])
+        _STATE.update(started=True, token=config.token(), gate=gate, servers=[], ctx=ctx)
         base = config.base_port()
         for index, kind in enumerate(config.KINDS):
             port_ref = [0]
@@ -199,6 +199,47 @@ def _watch_termination(ctx) -> None:
         documents.desktop(ctx).addTerminateListener(Listener())
     except Exception as exc:  # noqa: BLE001
         log.error("cannot watch termination: %s" % exc)
+
+
+def gate() -> UnoGate:
+    """UnoGate dang dung (pane can de day cap nhat giao dien ve main thread)."""
+    with _START_LOCK:
+        self_gate = _STATE.get("gate")
+        if self_gate is None:
+            self_gate = UnoGate(_STATE["ctx"])
+            _STATE["gate"] = self_gate
+        return self_gate
+
+
+def pane_target(kind: str | None = None) -> tuple[str, int]:
+    """(kind, port) cho pane: theo tai lieu dang mo, khong thi kind dau tien dang co bridge."""
+    servers = _STATE.get("servers") or []
+    if kind:
+        for server_kind, port, _ in servers:
+            if server_kind == kind:
+                return kind, port
+    if servers:
+        server_kind, port, _ = servers[0]
+        return server_kind, port
+    return kind or config.KINDS[0], config.base_port()
+
+
+def run_on_main(ctx, uno_gate, kind: str, action: str, params: dict) -> dict:
+    """Chay mot lenh NGAY tren thread dang goi (pane da o main thread: qua gate se tu treo)."""
+    command = commands.REGISTRY.get(action)
+    if command is None:
+        return {"ok": False, "error": "unknown action: " + str(action)}
+    try:
+        env = Env(ctx, kind, uno_gate)
+        if command.undo:
+            with documents.undo_step(env.document, action):
+                return {"ok": True, "result": command.handler(env, params or {})}
+        return {"ok": True, "result": command.handler(env, params or {})}
+    except (values.ParamError, ValueError) as exc:
+        return {"ok": False, "error": "ArgumentException: " + str(exc)}
+    except Exception as exc:  # noqa: BLE001
+        log.error("Action failed (pane): %s => %s" % (action, exc))
+        return {"ok": False, "error": "%s: %s" % (type(exc).__name__, exc)}
 
 
 def uptime_started() -> float:

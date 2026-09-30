@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Menu "Axiom Office" trong menubar cua Writer/Calc/Impress: mo pane Ask AI (LibreOffice_arch.md muc 10).
+     URL org.axiomoffice.bridge:askpane duoc xu ly boi ProtocolHandler.xcu. -->
+<oor:component-data xmlns:oor="http://openoffice.org/2001/registry"
+                    xmlns:xs="http://www.w3.org/2001/XMLSchema"
+                    oor:name="Addons" oor:package="org.openoffice.Office">
+  <node oor:name="AddonUI">
+    <node oor:name="OfficeMenuBar">
+      <node oor:name="org.axiomoffice.bridge.menu" oor:op="replace">
+        <prop oor:name="Title">
+          <value xml:lang="en-US">Axiom Office</value>
+          <value xml:lang="vi">Axiom Office</value>
+        </prop>
+        <prop oor:name="Target">
+          <value>_self</value>
+        </prop>
+        <node oor:name="Submenu">
+          <node oor:name="askai" oor:op="replace">
+            <prop oor:name="URL">
+              <value>org.axiomoffice.bridge:askpane</value>
+            </prop>
+            <prop oor:name="Title">
+              <value xml:lang="en-US">Ask AI</value>
+              <value xml:lang="vi">Hỏi AI</value>
+            </prop>
+          </node>
+          <node oor:name="settings" oor:op="replace">
+            <prop oor:name="URL">
+              <value>org.axiomoffice.bridge:settings</value>
+            </prop>
+            <prop oor:name="Title">
+              <value xml:lang="en-US">Settings…</value>
+              <value xml:lang="vi">Cài đặt…</value>
+            </prop>
+          </node>
+        </node>
+      </node>
+    </node>
+  </node>
+</oor:component-data>

@@ -65,6 +65,55 @@ def value(name: str, default=None):
     return default if found is None else found
 
 
+def set_value(name: str, value) -> None:
+    """Ghi cau hinh: HKCU (Windows, cung cho voi add-in) hoac config.json (Linux, cung cho voi Core)."""
+    if IS_WINDOWS:
+        import winreg
+
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, r"Software\AxiomOffice") as key:
+            winreg.SetValueEx(key, name, 0, winreg.REG_SZ, str(value))
+        return
+    path = config_file()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    data = _json_config()
+    data[name] = value
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(data, handle, indent=2, ensure_ascii=False)
+    os.chmod(path, 0o600)
+
+
+def protect_secret(text: str) -> str:
+    """Ma hoa khoa API bang DPAPI (CurrentUser, khong entropy) nhu add-in: 'dpapi:<base64>'.
+
+    Core giai ma dung dinh dang nay (Secrets.Unprotect); gia tri khong ma hoa van duoc chap nhan.
+    """
+    if not text or not IS_WINDOWS:
+        return text
+    try:
+        import base64
+        import ctypes
+        from ctypes import wintypes
+
+        class DataBlob(ctypes.Structure):
+            _fields_ = [("cbData", wintypes.DWORD), ("pbData", ctypes.POINTER(ctypes.c_char))]
+
+        crypt32 = ctypes.WinDLL("crypt32", use_last_error=True)
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        raw = text.encode("utf-8")
+        source = ctypes.create_string_buffer(raw, len(raw))
+        incoming = DataBlob(len(raw), ctypes.cast(source, ctypes.POINTER(ctypes.c_char)))
+        outgoing = DataBlob()
+        if not crypt32.CryptProtectData(ctypes.byref(incoming), None, None, None, None, 1, ctypes.byref(outgoing)):
+            return text
+        try:
+            encrypted = ctypes.string_at(outgoing.pbData, outgoing.cbData)
+        finally:
+            kernel32.LocalFree(outgoing.pbData)
+        return "dpapi:" + base64.b64encode(encrypted).decode("ascii")
+    except Exception:  # noqa: BLE001 - khong ma hoa duoc thi luu thang
+        return text
+
+
 def token() -> str:
     found = value("Token")
     if found:

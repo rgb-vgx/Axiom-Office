@@ -39,6 +39,10 @@ class UnoGate:
         # /health bao "stuck" de nguoi dung biet phai dong hop thoai thay vi doan mo.
         self.stuck_since: float | None = None
 
+    def on_main_thread(self) -> bool:
+        """True khi dang chay tren main thread: goi gate.run tu day se tu treo (job khong bao gio chay)."""
+        return threading.current_thread() is self._main_thread
+
     @property
     def stuck(self) -> bool:
         return self.stuck_since is not None

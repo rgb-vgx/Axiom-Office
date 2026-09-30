@@ -509,9 +509,11 @@ powershell -ExecutionPolicy Bypass -File tests\mcp-host\office_roundtrip.ps1 -Di
 powershell -ExecutionPolicy Bypass -File tests\mcp-host\office_roundtrip.ps1 -Dir <thư_mục_output> -Verify
 # Unit test của các MCP Python (legacy)
 cd tools\word-mcp; .venv\Scripts\python.exe -m unittest discover -s tests
-# Làn LibreOffice: 18 unit test (giải mã tham số + registry lệnh khớp bản C#) và test mọi lệnh trên
-# LibreOffice thật (script tự mở LibreOffice bằng profile người dùng; --ui: bản có cửa sổ; --ai: ai.ask)
+# Làn LibreOffice: 30 unit test (giải mã tham số + registry lệnh khớp bản C#, logic pane + đọc SSE của
+# Core) và test mọi lệnh trên LibreOffice thật (script tự mở LibreOffice bằng profile người dùng;
+# --ui: bản có cửa sổ; --ai: ai.ask)
 python tests\lo\test_extension.py
+python tests\lo\test_chat.py
 python tests\live\test_live_libreoffice.py [--apps writer,calc,impress] [--ui] [--ai]
 # Agent Core: unit test + test vòng đời trên tiến trình thật (cần .NET 10 SDK)
 dotnet test tests\core\AxiomOffice.Core.Tests
@@ -585,12 +587,24 @@ extension bật bridge, cùng log `%LOCALAPPDATA%\AxiomOffice\bridge.log` và c�
 Port đổi được bằng `PortLibreOffice` (HKCU, mặc định 47851); token dùng chung `Token` với add-in.
 Bận/đổi port thì bridge thử cổng kế tiếp (+10) tối đa 5 lần.
 
-**Cách điều khiển** (chưa có task pane trong LibreOffice — đó là giai đoạn L3):
+**Cách điều khiển:**
 
+- **Pane Ask AI trong LibreOffice**: menubar có menu **Axiom Office → Ask AI** (và *Settings…*); hoặc lệnh
+  `ui.askpane` qua bridge. Pane hiện ở mép phải cửa sổ tài liệu: transcript (dòng `✓ writer.…`, `✓ Dùng kỹ
+  năng: …`, `✓ Đã ghi nhớ: …`), ô nhập + **Gửi**/**Dừng**, thẻ **Đồng ý/Từ chối** khi policy cần xác nhận,
+  **Trò chuyện mới**, **Hoàn tác lượt này** (Writer/Calc/Impress — UNO hoàn tác được), **Cài đặt**
+  (provider/endpoint/model/key, Core, ghi nhớ, QA thị giác), **Ghi nhớ** (xem/xoá), **Đóng**.
+  Pane nói chuyện với Agent Core qua `core.json`; Core chưa chạy thì tự khởi động bằng `CoreExe`.
 - **MCP**: `office_sessions` liệt kê cả bridge LibreOffice; gọi lệnh kèm `port`: `word_command
   {action: 'writer.appendText', params: {text: '...'}, port: 47851}`.
 - **Agent Core**: `ai.ask` trên bridge (Core đọc `core.json`, chạy agent đầy đủ skill/memory/policy rồi
   gọi ngược `/cmd`). Đây là đường đi đã kiểm chứng end-to-end: model tự nạp skill, sửa tài liệu thật.
+
+Pane được đăng ký đúng chuẩn LibreOffice: deck sidebar "Axiom Office" (`Sidebar.xcu` + `Factory.xcu`,
+panel `private:resource/toolpanel/AxiomOfficePanelFactory/AskAi`) **và** menu (`Addons.xcu` +
+`ProtocolHandler.xcu`). Bản LibreOffice nào không có sidebar dùng được (vd 26.8 trên máy này: layout không
+có `private:resource/uielement/sidebar`) thì `ui.askpane` mở pane dạng cửa sổ con neo bên phải cửa sổ tài
+liệu — xem ghi chú ở `LibreOffice_arch.md` mục 14.2.
 
 Khác bản Office (do UNO):
 
@@ -650,7 +664,11 @@ scripts/                      build, install, uninstall, legacy (gỡ bản WpsA
 scripts/dist/                 install.cmd, uninstall.cmd, HUONG-DAN-CAI-DAT.txt (vào gói cài)
 src/AxiomOffice.LibreOffice/  extension Python UNO cho LibreOffice (nói cùng giao thức bridge)
   python/axiom_job.py         component UNO: job OnStartApp -> axiom.bridge.start
-  python/pythonpath/axiom/    bridge (HTTP), gate (AsyncCallback), registry lệnh, writer/calc/impress/checks, session
+  python/axiom_panel.py       component UNO: factory panel cho sidebar
+  python/axiom_dispatch.py    component UNO: xu ly URL org.axiomoffice.bridge:... (menu)
+  python/pythonpath/axiom/    bridge (HTTP), gate (AsyncCallback), registry lệnh, writer/calc/impress/checks,
+                              session; pane: core (client Agent Core), chat (logic hội thoại), awt, panel,
+                              dialogs, dispatch
 tests/live/                   test mọi lệnh bridge trên Office/WPS thật
 tests/lo/                     unit test extension LibreOffice (không cần LibreOffice: uno giả)
 tests/mcp-host/               test parity MCP + registry lệnh + round-trip với Office thật

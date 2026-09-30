@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Pane "Ask AI" trong sidebar (LibreOffice_arch.md muc 10): mot deck "Axiom Office" voi mot panel, hien o
+     ca Writer/Calc/Impress (ContextList "any, any, visible"). Sidebar tao panel qua ImplementationURL ->
+     factory dang ky trong khoi Factories ben duoi. -->
+<oor:component-data xmlns:oor="http://openoffice.org/2001/registry"
+                    xmlns:xs="http://www.w3.org/2001/XMLSchema"
+                    oor:name="Sidebar" oor:package="org.openoffice.Office.UI">
+  <node oor:name="Content">
+    <node oor:name="DeckList">
+      <node oor:name="AxiomOfficeDeck" oor:op="replace">
+        <prop oor:name="Title">
+          <value xml:lang="en-US">Axiom Office</value>
+          <value xml:lang="vi">Axiom Office</value>
+        </prop>
+        <prop oor:name="Id">
+          <value>AxiomOfficeDeck</value>
+        </prop>
+        <prop oor:name="IconURL">
+          <value>vnd.sun.star.extension://org.axiomoffice.bridge/icon.png</value>
+        </prop>
+        <prop oor:name="TitleBarIconURL">
+          <value>vnd.sun.star.extension://org.axiomoffice.bridge/icon.png</value>
+        </prop>
+        <prop oor:name="ContextList">
+          <value oor:separator=";">any, any, visible ;</value>
+        </prop>
+        <prop oor:name="OrderIndex" oor:type="xs:int">
+          <value>50</value>
+        </prop>
+      </node>
+    </node>
+    <node oor:name="PanelList">
+      <node oor:name="AskAiPanel" oor:op="replace">
+        <prop oor:name="Title">
+          <value xml:lang="en-US">Ask AI</value>
+          <value xml:lang="vi">Hỏi AI</value>
+        </prop>
+        <prop oor:name="Id">
+          <value>AskAiPanel</value>
+        </prop>
+        <prop oor:name="DeckId">
+          <value>AxiomOfficeDeck</value>
+        </prop>
+        <prop oor:name="ImplementationURL">
+          <value>private:resource/toolpanel/AxiomOfficePanelFactory/AskAi</value>
+        </prop>
+        <prop oor:name="ContextList">
+          <value oor:separator=";">any, any, visible ;</value>
+        </prop>
+      </node>
+    </node>
+  </node>
+</oor:component-data>

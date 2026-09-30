@@ -5,6 +5,33 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — pane Ask AI trong LibreOffice (LibreOffice_arch.md mục 10, giai đoạn L2)
+- **Pane nói chuyện với Agent Core bằng Python** (`axiom/core.py`, `axiom/chat.py`): POST `/v1/runs` (kèm
+  `office.port` của bridge), đọc SSE `/v1/runs/{id}/events`, `cancel`/`confirm`, `GET /v1/memory`; Core
+  chưa chạy thì tự khởi động bằng `CoreExe` trong cấu hình. Logic hội thoại (`chat.py`) thuần Python:
+  transcript, số thao tác sửa để "Hoàn tác lượt này", thẻ xác nhận, ghi nhớ vừa ghi, dòng trạng thái
+- **Giao diện pane** (`axiom/awt.py` + `axiom/panel.py`): transcript (dòng `✓ writer.…`, `✓ Dùng kỹ năng`,
+  `✓ Đã ghi nhớ`), ô nhập (Enter = Gửi), **Gửi/Dừng**, thẻ **Đồng ý/Từ chối** khi policy cần xác nhận,
+  **Trò chuyện mới**, **Hoàn tác lượt này** (Writer/Calc/Impress — UNO hoàn tác được, khác Excel qua COM),
+  **Cài đặt**, **Ghi nhớ**, **Đóng**; mọi cập nhật UI đi qua `UnoGate` (awt chỉ chạy trên main thread, và
+  không gọi lại gate khi đã ở main thread để tránh tự treo)
+- **Cài đặt** (`axiom/dialogs.py`): provider/endpoint/model/API key/CoreExe + bật ghi nhớ, tự trích xuất,
+  QA thị giác; ghi vào HKCU như add-in, API key mã hoá **DPAPI** (`dpapi:<base64>`, đúng định dạng
+  `Secrets.Unprotect` của Core); có "Kiểm tra Core" và "Tắt Core". **Ghi nhớ**: liệt kê/tìm/xoá qua
+  `/v1/memory`
+- **Hai đường mở pane**: deck sidebar "Axiom Office" (`Sidebar.xcu` + `Factory.xcu` + `axiom_panel.py`:
+  `XUIElementFactory`/`XUIElement`/`XToolPanel`) và menu **Axiom Office → Ask AI / Settings…**
+  (`Addons.xcu` + `ProtocolHandler.xcu` + `axiom_dispatch.py`); lệnh `ui.askpane` mở deck nếu bản
+  LibreOffice có sidebar, không thì mở pane dạng cửa sổ con neo bên phải cửa sổ tài liệu
+- Test: `tests/lo/test_chat.py` (12 unit test: đếm thao tác, thẻ xác nhận, ghi nhớ, dòng trạng thái, đọc
+  SSE bằng server giả); đã chạy thật trên LibreOffice: gửi yêu cầu → Core sửa tài liệu → hiện phản hồi
+  (Writer 7–10s), **Hoàn tác lượt này** trả tài liệu về nguyên trạng, **Dừng** hủy giữa lượt, thẻ xác nhận
+  `wpp.deleteSlide` trên Impress (đồng ý → xoá slide thật), dialog Cài đặt/Ghi nhớ hiện đúng cấu hình
+- `LibreOffice_arch.md` mục 14.2: các khác biệt API phải xử lý khi làm pane (model điều khiển awt không
+  nhận toạ độ → đặt lên view; dialog rời không hiện được → cửa sổ con; sidebar của LO 26.8 không có phần
+  tử layout; `XInitialization` nằm ở `com.sun.star.lang`; tên node ProtocolHandler = implementation name;
+  MRO khi vừa `XDispatchProvider` vừa `XDispatchProviderInterceptor`)
+
 ### Added — làn LibreOffice: extension Python UNO (LibreOffice_arch.md, giai đoạn L1)
 - `src\AxiomOffice.LibreOffice`: extension `.oxt` (`org.axiomoffice.bridge`) chạy trong `soffice` — job
   `OnStartApp` bật bridge HTTP trên 47851/47852/47853 (Writer/Calc/Impress, kind `wps`/`et`/`wpp`),
