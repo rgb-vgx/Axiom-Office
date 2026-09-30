@@ -5,6 +5,14 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — Core dừng khi đang chạy lượt: agent phải dừng sửa tài liệu (`core-go/`)
+- Bản Go trước đây không hủy các lượt đang chạy lúc Core dừng (bản .NET làm trong `ApplicationStopped`),
+  nên agent có thể còn gửi lệnh xuống bridge sau khi Core đã tắt → tài liệu bị sửa dở. Nay Core hủy mọi
+  lượt đang chạy **trước khi** đóng HTTP server (pane còn nhận được `run.cancelled`) rồi chờ tối đa 2s cho
+  các lượt dừng hẳn
+- Thêm phần e2e `shutdown` (dùng được cho cả hai bản): dừng Core giữa lúc agent đang ghi tài liệu → bridge
+  không nhận thêm lệnh nào và tiến trình Core thoát
+
 ### Added — Wizard thiết lập cho người dùng không chuyên (Windows + Linux)
 - **Một nội dung, hai bộ vẽ**: câu chữ + preset nhà cung cấp nằm ở `catalog/setup.json`, sinh ra
   `Setup/SetupCatalog.cs` (dùng chung add-in Windows và Agent Core) cùng `axiom/setup_catalog.py`;

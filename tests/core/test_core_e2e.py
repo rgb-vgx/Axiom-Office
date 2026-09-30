@@ -642,6 +642,47 @@ def test_memory(work: str, token: str, bridge: FakeBridge, document_path: str, s
         llm.stop()
 
 
+def test_shutdown(work: str, token: str, bridge: FakeBridge, document_path: str, session_dir: str) -> None:
+    """Core dung khi dang chay luot -> agent dung sua tai lieu (khong de tai lieu bi sua do).
+
+    Ban .NET huy cac luot trong ApplicationStopped; ban Go huy truoc khi dong HTTP server nen pane con
+    nhan duoc run.cancelled. Ca hai deu phai: KHONG gui them lenh xuong bridge sau khi Core dung.
+    """
+    slow = {"tool": "office_action",
+            "arguments": {"action": "et.writeRange", "params": {"range": "A1", "values": [["a", 1]]}},
+            "delay": 0.4}
+    llm = FakeLlm(work, [slow] * 100)
+    data_dir = os.path.join(work, "core-shutdown")
+    os.makedirs(data_dir, exist_ok=True)
+    core = Core(data_dir, session_dir, llm, token, {"AXIOM_MEMORY_AUTO_EXTRACT": "0"})
+    office = {"port": bridge.port, "pid": bridge.pid, "app": "et", "family": "office"}
+    try:
+        bridge.commands.clear()
+        status, created = core.run("ghi tung o mot", office, document={"name": "bao-cao.xlsx", "fullName": document_path})
+        check(status == 200 and created["result"]["runId"], "Core dung giua luot: tao duoc luot chay", created)
+
+        # Cho agent that su dang lam viec (co lenh xuong bridge).
+        deadline = time.time() + 30
+        while not bridge.commands and time.time() < deadline:
+            time.sleep(0.1)
+        check(bool(bridge.commands), "Core dung giua luot: agent da bat dau sua tai lieu", bridge.actions()[:3])
+
+        # Dung Core ngay giua luot.
+        core.stop()
+        time.sleep(0.5)
+        stopped_at = len(bridge.commands)
+        time.sleep(2.0)
+        check(len(bridge.commands) == stopped_at,
+              "Core dung -> agent KHONG sua tai lieu nua", (stopped_at, len(bridge.commands)))
+        check(core.process.poll() is not None, "Core dung -> tien trinh thoat", core.process.poll())
+    finally:
+        try:
+            core.stop()
+        except Exception:
+            pass
+        llm.stop()
+
+
 def test_confirm(work: str, token: str, bridge: FakeBridge, document_path: str, session_dir: str) -> None:
     """Giai doan 4 (New_arch.md 8.6, 12): policy xac nhan - dong y / tu choi / het gio; audit day du."""
     llm = FakeLlm(work, [
@@ -1011,7 +1052,7 @@ def test_office(core: Core, port: int, pid: int) -> None:
 
 
 # Cac phan chay duoc rieng (--only); /health luon chay truoc.
-SECTIONS = ["fake_bridge", "guards", "skills", "memory", "confirm", "mcp", "visual", "setup"]
+SECTIONS = ["fake_bridge", "guards", "skills", "memory", "confirm", "mcp", "visual", "setup", "shutdown"]
 
 # Phan phu thuoc: `guards` dung chung kich ban LLM voi `fake_bridge` (kich ban tuan tu) nen chay mot minh
 # se lech buoc -> --only tu keo theo phan can truoc.
@@ -1119,6 +1160,8 @@ def main() -> int:
                 test_visual(work, token, bridge, document_path, session_dir)
             if wanted("setup"):
                 test_setup(core, llm, work)
+            if wanted("shutdown"):
+                test_shutdown(work, token, bridge, document_path, session_dir)
     finally:
         if core is not None:
             core.stop()

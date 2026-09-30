@@ -133,6 +133,42 @@ func (m *Manager) Cancel(id string) bool {
 	return true
 }
 
+// CancelRunning: huy moi luot dang chay (Core sap dung) va tra ve so luot vua huy.
+// Goi lan hai tra 0 vi cac luot do da co context ket thuc - dung cho shutdown idempotent.
+func (m *Manager) CancelRunning() int {
+	m.mu.Lock()
+	list := make([]*Run, 0, len(m.runs))
+	for _, run := range m.runs {
+		if run.Status == StatusRunning {
+			list = append(list, run)
+		}
+	}
+	m.mu.Unlock()
+
+	cancelled := 0
+	for _, run := range list {
+		if run.ctx.Err() != nil {
+			continue
+		}
+		run.Cancel()
+		cancelled++
+	}
+	return cancelled
+}
+
+// Running: so luot con dang chay (Core cho chung dung han truoc khi thoat).
+func (m *Manager) Running() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	count := 0
+	for _, run := range m.runs {
+		if run.Status == StatusRunning {
+			count++
+		}
+	}
+	return count
+}
+
 func (m *Manager) List() []*Run {
 	m.mu.Lock()
 	defer m.mu.Unlock()

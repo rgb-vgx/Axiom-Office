@@ -120,6 +120,11 @@ func run() int {
 	var stopOnce sync.Once
 	stop := func() {
 		stopOnce.Do(func() {
+			// Huy cac luot dang chay TRUOC khi dung HTTP server: pane nhan run.cancelled thay vi treo, va
+			// agent khong sua tiep tai lieu sau khi Core da dung (giong ApplicationStopped cua ban .NET).
+			if cancelled := manager.CancelRunning(); cancelled > 0 {
+				corelog.Info("shutdown: cancelled %d running run(s)", cancelled)
+			}
 			go func() {
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer cancel()
@@ -163,6 +168,12 @@ func run() int {
 		port, os.Getpid(), version, api.Protocol, paths.Root, stores.Status(cfg.MemoryEnabled))
 
 	serveErr := server.Serve(listener)
+	// Cho cac luot vua bi huy dung han (toi da 2s) de khong cat giua mot tool call dang sua tai lieu.
+	manager.CancelRunning()
+	deadline := time.Now().Add(2 * time.Second)
+	for manager.Running() > 0 && time.Now().Before(deadline) {
+		time.Sleep(50 * time.Millisecond)
+	}
 	memoryService.Close()
 	mcpClient.Close()
 	// Dong ket noi dang nho (keep-alive toi bridge) truoc khi thoat: ban .NET lam viec nay bang

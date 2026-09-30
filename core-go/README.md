@@ -19,6 +19,7 @@ bản .NET vẫn nằm trong repo và vẫn chạy được (`build.ps1 -Core do
 | G4 | memory dài hạn (FTS5, trích xuất, embedding) | `memory` | ✔ |
 | G5 | MCP client + QA thị giác | `mcp`, `visual` | ✔ |
 | G6 | đóng gói thay bản .NET (`build.ps1`, `scripts/linux/package.sh`, CI) | toàn bộ | ✔ |
+| G7 | vá lỗ hổng phát hiện khi soát lại: hủy lượt đang chạy lúc Core dừng (+ phần e2e `shutdown`) | `shutdown` | ✔ |
 
 ## Build
 
@@ -64,4 +65,5 @@ AXIOM_E2E_CORE_EXE=/duong/dan/axiom-core python tests/core/test_core_e2e.py --on
 file ngoài module); CI so sánh hai file nên không thể lệch.
 
 Khác biệt có chủ ý: bản Go **giữ luôn listener** của port tìm được (bản .NET thả port rồi Kestrel mới bind lại,
-có khe để tiến trình khác chiếm) và dừng êm khi nhận SIGTERM (systemd `--user`).
+có khe để tiến trình khác chiếm), dừng êm khi nhận SIGTERM (systemd `--user`), và **hủy các lượt đang chạy
+trước khi đóng HTTP server** (bản .NET hủy sau khi server đã dừng) nên pane còn nhận được `run.cancelled`.

@@ -76,6 +76,38 @@ func TestManagerBusyAndCancel(t *testing.T) {
 	}
 }
 
+func TestManagerCancelRunning(t *testing.T) {
+	manager := NewManager()
+	first, _ := manager.TryStart(47840)
+	second, _ := manager.TryStart(47841)
+	if manager.Running() != 2 {
+		t.Fatalf("Running = %d", manager.Running())
+	}
+
+	// Core sap dung: huy het luot dang chay, lan hai khong huy lai (idempotent).
+	if cancelled := manager.CancelRunning(); cancelled != 2 {
+		t.Fatalf("CancelRunning = %d", cancelled)
+	}
+	if manager.CancelRunning() != 0 {
+		t.Fatal("goi lan hai phai tra 0")
+	}
+	for _, run := range []*Run{first, second} {
+		select {
+		case <-run.Context().Done():
+		case <-time.After(time.Second):
+			t.Fatal("context cua luot chay phai ket thuc")
+		}
+	}
+
+	// Luot da xong thi khong tinh la dang chay.
+	first.Status = StatusCompleted
+	finished := time.Now().UTC()
+	first.Finished = &finished
+	if manager.Running() != 1 {
+		t.Fatalf("Running = %d", manager.Running())
+	}
+}
+
 func TestRunJSONShape(t *testing.T) {
 	run, _ := NewManager().TryStart(47840)
 	run.ConversationID = "c_1"
