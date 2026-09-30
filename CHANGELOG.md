@@ -5,6 +5,15 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Docs — `LibreOffice_arch.md`: thiết kế tích hợp LibreOffice trên Linux
+- Bridge là extension Python UNO (`axiom-office.oxt`) chạy trong `soffice`, **giữ nguyên giao thức bridge và tên
+  lệnh** (`writer.*`/`et.*`/`wpp.*`) để Agent Core, skill, memory, test dùng lại; ba session/port như WPS
+  (47851–47853); `UnoGate` đưa lệnh về main thread qua `AsyncCallback`; mỗi thao tác AI = 1 bước Undo
+  (`XUndoManager`, cả Calc/Impress); bảng ánh xạ từng lệnh sang UNO
+- Agent Core đa nền tảng (`net10.0`, cấu hình `config.json` + XDG, libsecret, file lock), sidebar Ask AI,
+  làn file `axiom-office-mcp`, cài không cần root (`unopkg` + tarball), kiểm thử headless + CI Ubuntu,
+  giai đoạn L0–L4, rủi ro và câu hỏi mở
+
 ### Added — Agent Core giai đoạn 4: Mở rộng và an toàn (New_arch.md mục 7.7, 8.6, 8.7, 8.4.6)
 - **Policy xác nhận** (`PolicyEngine` + `ConfirmationBroker`): hỏi trước khi model lưu/xuất file mà yêu cầu
   không nhắc tới lưu/xuất, `saveAs`/`exportPdf` ghi đè file đã có, `wpp.deleteSlide`, `writer.replaceAll` trên

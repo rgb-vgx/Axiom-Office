@@ -63,6 +63,9 @@ Mỗi app có port riêng; WPS và Microsoft Office dùng hai dải khác nhau n
 | Spreadsheets / Excel | 47822 | 47832 |
 | Presentation / PowerPoint | 47823 | 47833 |
 
+**LibreOffice trên Linux** (đang thiết kế): xem [LibreOffice_arch.md](LibreOffice_arch.md) — extension
+Python UNO làm bridge cùng giao thức (port dự kiến 47851–47853), Agent Core chạy native `linux-x64`.
+
 ## Cài đặt cho người dùng
 
 **Yêu cầu:** Windows 10/11 x64 (có sẵn .NET Framework 4.8), Microsoft Office **x64** và/hoặc
