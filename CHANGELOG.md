@@ -5,6 +5,25 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Agent Core bản Go, giai đoạn G4+G5: memory dài hạn, MCP client, QA thị giác (`core-go/`)
+- **G4 — memory**: chuẩn hoá/bỏ dấu tiếng Việt (bảng tường minh như bản .NET), hash chống trùng, kho SQLite
+  (thêm có chống trùng theo hash và theo cosine ≥ 0.96, liên kết chỉ tới memory còn sống, lịch sử ADD/UPDATE/
+  PIN/UNPIN/EXPIRES/DELETE/RESTORE, ghim, hạn dùng, xoá mềm + dọn sau 30 ngày), truy hồi theo bm25 (FTS5)
+  + entity boost + sigmoid như mem0 2.2.1, trích xuất sau mỗi lượt bằng LLM (bỏ qua prompt quá ngắn/lệnh thao
+  tác thuần, lọc confidence/nhạy cảm/id bịa), tool `remember`/`recall`, và toàn bộ `/v1/memory` (tìm không
+  dấu, sửa, xoá, khôi phục, lịch sử, xoá cứng có xác nhận)
+- **G5 — MCP client**: transport stdio (JSON-RPC một dòng mỗi thông điệp, tự trả lời -32601 khi server hỏi
+  ngược) + Streamable HTTP, `initialize`/`tools/list` có phân trang, tên tool `mcp__<server>__<tool>`, mcp.json
+  nạp lại khi đổi, server lỗi bị ẩn tool kèm lý do; **server built-in `office`** = `AxiomOffice.Host.exe mcp`
+  cạnh binary nhưng chỉ lấy tool đọc/ghi file (tool live trùng `office_action` bị loại); xác nhận trước khi
+  gọi server ngoài (không tin cậy) và trước khi ghi đè file đã có; `/v1/mcp` liệt kê server + tool + lỗi
+- **G5 — QA thị giác**: `look_at_document` chụp cửa sổ app qua bridge rồi gửi ảnh thật cho model (chỉ khi
+  bật `VisualQaEnabled`), ảnh không vào audit
+- Bản Go qua **94/94** kiểm tra e2e (bằng đúng con số của bản .NET, chạy trên Windows); trên Linux qua 82/82
+  phần chạy được không cần `AxiomOffice.Host.exe`; `go test ./...` phủ thêm memory, mcp, office
+- CI: job `windows` chạy trọn bộ e2e của bản Go (kèm Host.exe như gói phát hành), job `linux` chạy 7 phần và
+  so sánh `prompts/extract.txt` giữa hai bản
+
 ### Added — Agent Core bản Go, giai đoạn G2+G3: lượt chạy agent và skills (`core-go/`)
 - **G2 — lượt chạy**: `POST /v1/runs` (+ `GET /v1/runs/{id}`, `/cancel`, `/confirm`, SSE `events` với `?after=`),
   `GET /v1/audit`, `GET/DELETE /v1/conversations…`; orchestrator đầy đủ (kiểm tra session + `/health` của

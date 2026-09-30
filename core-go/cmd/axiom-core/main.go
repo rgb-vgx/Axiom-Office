@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -22,6 +23,8 @@ import (
 	"axiomoffice/core/internal/corefile"
 	"axiomoffice/core/internal/corelog"
 	"axiomoffice/core/internal/instance"
+	"axiomoffice/core/internal/mcp"
+	"axiomoffice/core/internal/memory"
 	"axiomoffice/core/internal/model"
 	"axiomoffice/core/internal/office"
 	"axiomoffice/core/internal/skills"
@@ -80,6 +83,28 @@ func run() int {
 		filepath.Join(filepath.Dir(exe), "skills"), cfg.SkillDirs, paths.SkillsDir))
 	skillIndex.Watch(watchCtx)
 
+	// Memory dai han (muc 8.5): MemoryModel (neu co) cho trich xuat, mac dinh = model chinh.
+	memoryService := memory.NewService(stores.DB, stores.Convs, stores.Runs, config.Load,
+		func(cfg config.Config) *model.Client {
+			if strings.TrimSpace(cfg.MemoryModel) != "" {
+				return model.NewClient(httpClient, cfg.LlmProvider, cfg.LlmEndpoint, cfg.LlmApiKey, strings.TrimSpace(cfg.MemoryModel))
+			}
+			return models.Current()
+		}, httpClient, stores.Available)
+	if stores.Available {
+		memoryService.Enqueue(func(context.Context) error {
+			if purged := memoryService.Store().PurgeSoftDeleted(time.Now().UTC()); purged > 0 {
+				corelog.Info("memory: purged %d soft-deleted memories older than %d days", purged, memory.SoftDeleteRetentionDays)
+			}
+			return nil
+		})
+		memoryService.QueueEmbeddingBackfill()
+	}
+
+	// MCP client (muc 8.7): server built-in "office" = AxiomOffice.Host.exe mcp canh binary (lan file) + mcp.json.
+	mcpClient := mcp.NewManager(paths.McpConfigFile, filepath.Join(filepath.Dir(exe), "AxiomOffice.Host.exe"), httpClient)
+	mcp.SetClientVersion(version)
+
 	// Bridge + session registry: noi Core dieu khien add-in/extension dang chay.
 	bridge := office.NewBridgeClient(httpClient, cfg.Token)
 	sessions := office.NewDirectory(cfg.SessionDirectoryOverride)
@@ -87,7 +112,8 @@ func run() int {
 	orchestrator := &agent.Orchestrator{
 		Bridge: bridge, Sessions: sessions,
 		Conversations: stores.Convs, Runs: stores.Runs,
-		Models: models, Skills: skillIndex, Config: config.Load, Assembler: agent.NewContextAssembler(),
+		Models: models, Skills: skillIndex, Memory: memoryService, MCP: mcpClient,
+		Config: config.Load, Assembler: agent.NewContextAssembler(),
 	}
 
 	server := &http.Server{ReadHeaderTimeout: 10 * time.Second}
@@ -116,6 +142,9 @@ func run() int {
 		Manager:      manager,
 		Orchestrator: orchestrator,
 
+		Memory: memoryService,
+		MCP:    mcpClient,
+
 		Stop: stop,
 	}, mux)
 
@@ -134,6 +163,8 @@ func run() int {
 		port, os.Getpid(), version, api.Protocol, paths.Root, stores.Status(cfg.MemoryEnabled))
 
 	serveErr := server.Serve(listener)
+	memoryService.Close()
+	mcpClient.Close()
 	// Dong ket noi dang nho (keep-alive toi bridge) truoc khi thoat: ban .NET lam viec nay bang
 	// HttpClient.Dispose(); thoat tien trinh khi con socket mo lam phia bridge nhan RST thay vi dong em.
 	httpClient.CloseIdleConnections()

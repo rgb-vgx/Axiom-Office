@@ -10,6 +10,8 @@ import (
 
 	"axiomoffice/core/internal/config"
 	"axiomoffice/core/internal/corelog"
+	"axiomoffice/core/internal/mcp"
+	"axiomoffice/core/internal/memory"
 	"axiomoffice/core/internal/model"
 	"axiomoffice/core/internal/office"
 	"axiomoffice/core/internal/skills"
@@ -98,6 +100,8 @@ type Orchestrator struct {
 	Runs          *store.Runs
 	Models        *model.Source
 	Skills        *skills.Index
+	Memory        *memory.Service
+	MCP           *mcp.Manager
 	Config        func() config.Config
 	Assembler     *ContextAssembler
 }
@@ -176,6 +180,28 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 	if len(appSkills) > 0 && o.Skills != nil {
 		list = append(list, tools.NewLoadSkillTool(o.Skills, appKind), tools.NewReadSkillFileTool(o.Skills, appKind))
 	}
+
+	// Memory dai han (giai doan 3, muc 8.5): tai lieu chua luu (khong co duong dan) -> khong co memory tai lieu.
+	memoryDocumentKey := ""
+	if strings.HasPrefix(documentKey, "/") || strings.Contains(documentKey, `\`) {
+		memoryDocumentKey = documentKey
+	}
+	memoryContext := memory.EmptyContext()
+	if o.Memory != nil && o.Memory.Enabled() {
+		memoryContext = o.Memory.Context(ctx, request.Prompt, memoryDocumentKey)
+		list = append(list, tools.NewRememberTool(o.Memory, memoryDocumentKey), tools.NewRecallTool(o.Memory, memoryDocumentKey))
+	}
+	// QA thi giac (muc 8.4.6): chi khi nguoi dung bat VisualQaEnabled (doc lai moi luot qua cau hinh).
+	if o.Config().VisualQaEnabled {
+		list = append(list, tools.NewVisualTool())
+	}
+
+	// MCP (muc 8.7): lan file office + server nguoi dung cau hinh; loi server khong hong run.
+	if o.MCP != nil {
+		if bound := o.MCP.Tools(ctx); len(bound) > 0 {
+			list = append(list, tools.WrapMCPTools(bound)...)
+		}
+	}
 	registry := tools.NewRegistry(list)
 
 	var confirm func(string, string, string) (bool, error)
@@ -198,7 +224,8 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 		Confirm: confirm,
 	}
 
-	systemPrompt := Build(appKind, session, request.Document, appSkills, nil, assembled.Summary, assembled.RecentActionLines)
+	systemPrompt := Build(appKind, session, request.Document, appSkills, memoryContext.Lines, assembled.Summary,
+		assembled.RecentActionLines)
 
 	callbacks := model.AgentCallbacks{
 		Transcript: func(line string) { run.Transcript = append(run.Transcript, line) },
@@ -289,7 +316,24 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 	}
 
 	o.Runs.Finish(run.ID, run.Status, run.Rounds, run.InputTokens, run.OutputTokens, o.errorPtr(run), nil)
-	if result.OK {
+	if o.Memory != nil {
+		o.Memory.TouchHits(memoryContext.IDs)
+		if result.OK {
+			o.Memory.QueueExtraction(memory.ExtractionJob{
+				RunID: run.ID, ConversationID: conversation.ID, Prompt: request.Prompt,
+				Reply: result.Text, DocumentKey: memoryDocumentKey,
+			})
+		} else {
+			o.Runs.SetMemoryStatus(run.ID, "skipped")
+		}
+
+		// Tom tat hoi thoai o hang doi nen (muc 8.5.9): khong bat pane cho sau khi run xong.
+		target, seq := conversation, userSeq
+		o.Memory.Enqueue(func(inner context.Context) error {
+			o.maybeSummarize(inner, o.Models.Current(), target, seq)
+			return nil
+		})
+	} else if result.OK {
 		o.maybeSummarize(ctx, client, conversation, userSeq)
 	}
 	o.finish(run)

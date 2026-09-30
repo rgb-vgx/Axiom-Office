@@ -48,8 +48,10 @@ jobs:
           CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o "$RUNNER_TEMP/gocore/axiom-core" ./cmd/axiom-core
           cp -r ../skills "$RUNNER_TEMP/gocore/"
           cd ..
-          # Cac phan da port (G1-G3). Phan memory/mcp/visual them o cac giai doan sau.
-          AXIOM_E2E_CORE_EXE="$RUNNER_TEMP/gocore/axiom-core"             python3 tests/core/test_core_e2e.py --only fake_bridge,guards,skills,confirm,setup
+          # Prompt trich xuat memory phai giong ban .NET (mot nguon, hai ban).
+          diff src/AxiomOffice.Core/Memory/Prompts/extract.txt core-go/internal/memory/prompts/extract.txt
+          # Phan mcp can AxiomOffice.Host.exe (chi co tren Windows) nen bo qua o day.
+          AXIOM_E2E_CORE_EXE="$RUNNER_TEMP/gocore/axiom-core"             python3 tests/core/test_core_e2e.py --only fake_bridge,guards,skills,confirm,memory,visual,setup
 
       - name: Cai LibreOffice + Python UNO (+ xvfb cho phan giao dien)
         run: |
@@ -141,6 +143,20 @@ jobs:
 
       - name: Build MCP server
         run: dotnet build src/AxiomOffice.Mcp -c Release
+
+      - name: Agent Core ban Go (e2e day du tren Windows)
+        shell: pwsh
+        run: |
+          $stage = Join-Path $env:RUNNER_TEMP "gocore"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          Set-Location core-go
+          go build -trimpath -ldflags "-s -w" -o "$stage\axiom-core.exe" ./cmd/axiom-core
+          Set-Location ..
+          Copy-Item -Recurse skills $stage
+          # Server MCP built-in "office" = Host.exe canh binary (nhu goi phat hanh).
+          Copy-Item (Join-Path $env:TEMP "axiom-ci\AxiomOffice.Host.exe") $stage
+          $env:AXIOM_E2E_CORE_EXE = Join-Path $stage "axiom-core.exe"
+          python tests/core/test_core_e2e.py
 
       - name: MCP server (khong can app dang mo)
         run: python tests/mcp-host/test_mcp_portable.py src/AxiomOffice.Mcp/bin/Release/net10.0/axiom-office-mcp.dll

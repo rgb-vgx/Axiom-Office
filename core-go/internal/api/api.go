@@ -12,6 +12,8 @@ import (
 
 	"axiomoffice/core/internal/agent"
 	"axiomoffice/core/internal/config"
+	"axiomoffice/core/internal/mcp"
+	"axiomoffice/core/internal/memory"
 	"axiomoffice/core/internal/skills"
 	"axiomoffice/core/internal/store"
 )
@@ -43,6 +45,12 @@ type Deps struct {
 	Manager      *agent.Manager
 	Orchestrator *agent.Orchestrator
 
+	// Memory dai han (giai doan 3, muc 8.5).
+	Memory *memory.Service
+
+	// MCP client (giai doan 4, muc 8.7).
+	MCP *mcp.Manager
+
 	// Stop dung Core (POST /v1/admin/shutdown).
 	Stop func()
 }
@@ -54,6 +62,12 @@ func Handler(deps *Deps, mux *http.ServeMux) http.Handler {
 	mapRuns(mux, deps)
 	if deps.Skills != nil {
 		mapSkills(mux, deps)
+	}
+	if deps.Memory != nil {
+		mapMemory(mux, deps)
+	}
+	if deps.MCP != nil {
+		mapMCP(mux, deps)
 	}
 	return guard(deps.Config.Token, mux)
 }

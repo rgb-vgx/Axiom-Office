@@ -14,8 +14,8 @@ Nhờ vậy add-in, extension LibreOffice và MCP không phải đổi gì khi t
 | G1 | cấu hình (HKCU/DPAPI, config.json/libsecret), `core.log`, `core.json`, một-phiên-bản, chọn port, guard (Origin/token/Content-Type), `/health`, `/v1/admin/shutdown`, migrate `core.db`, model client + codec OpenAI/Anthropic + vòng lặp agent, `/v1/setup`, `/v1/llm/test`, `/v1/llm/models` | `/health`, `setup` | ✔ |
 | G2 | `/v1/runs` + SSE, orchestrator, bridge client, session registry, `office_action`, policy + xác nhận, audit, hội thoại | `fake_bridge`, `guards`, `confirm` | ✔ |
 | G3 | skills (`load_skill`, `read_skill_file`, `/v1/skills`, theo dõi thư mục) | `skills` | ✔ |
-| G4 | memory dài hạn (FTS5, trích xuất, embedding) | `memory` | |
-| G5 | MCP client + QA thị giác | `mcp`, `visual` | |
+| G4 | memory dài hạn (FTS5, trích xuất, embedding) | `memory` | ✔ |
+| G5 | MCP client + QA thị giác | `mcp`, `visual` | ✔ |
 | G6 | đóng gói thay bản .NET (`build.ps1`, `scripts/linux/package.sh`, CI) | toàn bộ | |
 
 ## Build
@@ -55,6 +55,11 @@ AXIOM_E2E_CORE_EXE=/duong/dan/axiom-core python tests/core/test_core_e2e.py --on
 | `internal/agent` | `Agent/Orchestrator.cs`, `RunManager.cs`, `RunEventStream.cs`, `PolicyEngine.cs` (phần xác nhận), `PromptBuilder.cs`, `ContextAssembler.cs` |
 | `internal/api` | `Api/CoreApi.cs`, `CoreApiGuard.cs`, `ApiJson.cs`, `SetupEndpoints.cs`, `RunEndpoints.cs`, `SkillEndpoints.cs` |
 | `internal/store` | `Memory/CoreDb.cs`, `ConversationStore.cs`, `RunStore.cs`, `Api/CoreStores.cs` |
+| `internal/memory` | `Memory/MemoryText.cs`, `MemoryStore.cs`, `MemoryRetriever.cs`, `MemoryExtractor.cs`, `MemoryService.cs` |
+| `internal/mcp` | `Mcp/McpTransport.cs`, `McpManager.cs`, `Tools/VisualTool.cs` (phần quy tắc đã tách sang `internal/tools`) |
+
+`prompts/extract.txt` là bản sao của `src/AxiomOffice.Core/Memory/Prompts/extract.txt` (Go không nhúng được
+file ngoài module); CI so sánh hai file nên không thể lệch.
 
 Khác biệt có chủ ý: bản Go **giữ luôn listener** của port tìm được (bản .NET thả port rồi Kestrel mới bind lại,
 có khe để tiến trình khác chiếm) và dừng êm khi nhận SIGTERM (systemd `--user`).
