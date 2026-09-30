@@ -142,6 +142,30 @@ def close_window(name: str) -> bool:
     subprocess.run(["xdotool", "windowclose", windows[0]], capture_output=True)
     return True
 
+def click_in_window(name: str, x: int, y: int, model: tuple = (640, 524)) -> bool:
+    """Bam chuot THAT vao (x, y) tinh theo model cua wizard (640x524), khong qua `ui.setup`.
+
+    Can thiet cho loi "nut bam duoc nhung cu bam bi dieu khien khac nuot": chi chuot that moi lo ra.
+    Cua so co the co vien/thanh tieu de (may co trinh quan ly cua so) -> tru phan lech do.
+    Tra ve False neu khong tim thay cua so hoac khong co xdotool (Windows).
+    """
+    windows = search_windows(name)
+    if not windows or not shutil.which("xdotool"):
+        return False
+    win = windows[0]
+    geometry = subprocess.run(["xdotool", "getwindowgeometry", "--shell", win],
+                              capture_output=True, text=True).stdout
+    box = dict(line.split("=") for line in geometry.strip().splitlines() if "=" in line)
+    border = max(0, (int(box.get("WIDTH", model[0])) - model[0]) // 2)
+    offset_y = max(0, int(box.get("HEIGHT", model[1])) - model[1] - border)
+    subprocess.run(["xdotool", "windowraise", win], capture_output=True)
+    subprocess.run(["xdotool", "windowfocus", win], capture_output=True)
+    time.sleep(0.5)
+    subprocess.run(["xdotool", "mousemove", "--window", win, str(x + border), str(y + offset_y)], capture_output=True)
+    time.sleep(0.3)
+    subprocess.run(["xdotool", "click", "1"], capture_output=True)
+    return True
+
 def wait_until(ready, seconds: float = 15.0) -> bool:
     deadline = time.time() + seconds
     while time.time() < deadline:
@@ -207,6 +231,14 @@ def main() -> int:
         # May da thiet lap (co LlmEndpoint + LlmModel) thi wizard vao thang man kiem tra (sua loi).
         check(state.get("step") in ("welcome", "checks"), "wizard mo duoc", json.dumps(state, ensure_ascii=False)[:200])
         check(state.get("coreError") == "", "wizard doc duoc trang thai tu Agent Core", state.get("coreError"))
+        # Nut "Quay lai" phai bam duoc bang chuot that: nhan trang thai o hang nut tung de len no (rong hon)
+        # nen nuot het cu bam, va `ui.setup` thi khong bao gio lo ra loi nay.
+        check(call({"step": "checks"}).get("step") == "checks", "wizard ve lai buoc kiem tra may", "")
+        if click_in_window(TITLE, 71, 485):        # giua nut "Quay lai": PAD + BACK_W/2, y 470..500 (setupwizard)
+            state = wait(lambda item: item.get("step") == "welcome", 10)
+            check(state.get("step") == "welcome", "bam chuot vao nut \"Quay lai\" -> lui ve buoc chao mung",
+                  state.get("step"))
+
         check(call({"step": "connect"}).get("step") == "connect", "wizard nhay sang buoc ket noi", "")
 
         fake, port = start_fake_llm(work)

@@ -5,6 +5,22 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — Wizard thiết lập (Linux): nút "Quay lại" bấm không được
+- **Gốc bệnh**: ở hàng nút dưới cùng, nhãn trạng thái (`FixedText` nền trắng, rộng `WIDTH - 2*PAD -
+  2*BUTTON_W - 24` = 284 px, đặt tại `PAD`) trùm trọn nút "Quay lại" (rộng 110 px, cùng hàng). Điều khiển
+  đè lên điều khiển bấm được thì nuốt hết cú bấm ở vùng đó — VCL còn nâng nó lên mỗi lần đổi `Label` — nên
+  nút "Quay lại" chết hẳn. Đo trên LibreOffice thật bằng xdotool: bấm "Tiếp tục →" ăn (đổi bước), bấm "Quay
+  lại" ở 5 điểm khác nhau đều không, và `mouseEntered` của nút không hề chạy (không có hiệu ứng hover).
+  `ui.setup` không bao giờ lộ ra lỗi này vì nó đổi bước bằng API chứ không bằng chuột
+- Nay nhãn trạng thái nằm gọn trong khoảng trống **giữa** nút "Quay lại" và link "Để sau"
+  (`status_x = PAD + BACK_W + GAP`, bề rộng lấy theo vị trí thật của link), không chồng lên điều khiển bấm
+  được nào; thêm hằng số `BACK_W`/`GAP` và ghi lại cái bẫy này ngay chỗ dựng giao diện
+- **Vì sao mở wizard lại thấy bước 2/5**: máy đã có `LlmEndpoint` + `LlmModel` thì `_apply_collect` cố ý
+  nhảy `welcome → checks` để vào thẳng màn kiểm tra / sửa lỗi. Trước đây "Quay lại" không bấm được nên
+  người dùng thành ra mắc kẹt ở đó
+- Kiểm thử: `tests/live/test_setup_wizard.py` thêm `click_in_window` (bấm chuột THẬT theo toạ độ model, tự
+  trừ lề cửa sổ) và 2 kiểm tra: về lại bước kiểm tra máy, rồi bấm "Quay lại" phải lui về bước chào mừng
+
 ### Fixed — Calc (LibreOffice): công thức nhiều tham số bị Err:508, và lỗi công thức bị báo sai
 - **Gốc bệnh**: bản LibreOffice 24.2 trên máy này đòi `;` làm dấu phân cách tham số, còn agent viết công
   thức theo cú pháp en-US (dấu `,`) → mọi công thức từ hai tham số trở lên (`=ROUND(AVERAGE(C2:E2),1)`,

@@ -30,6 +30,8 @@ CONTENT_Y = 114
 CONTENT_H = 340
 ROW_H = 44
 BUTTON_W, BUTTON_H = 150, 30
+BACK_W = 110            # nut "Quay lai" hep hon nut chinh
+GAP = 12                # khe giua cac dieu khien o hang nut
 CURRENT: "Wizard | None" = None   # wizard dang mo; mo lai thi dung lai de khong mat buoc dang lam
 
 def open_setup(target) -> "Wizard | None":
@@ -130,15 +132,20 @@ class Wizard:
         self._chrome(s, PAD, 106, WIDTH - 2 * PAD, 1, BackgroundColor=theme.DIVIDER, NoLabel=True)
         self._chrome(s, PAD, 462, WIDTH - 2 * PAD, 1, BackgroundColor=theme.DIVIDER, NoLabel=True)
 
-        status_w = WIDTH - 2 * PAD - 2 * BUTTON_W - 24
-        self.status = self._chrome(s, PAD, 470, status_w, 30, MultiLine=True, TextColor=theme.TEXT_MUTED,
-                                   NoLabel=True, font=(theme.FONT, theme.SIZE_CAPTION))
-        self.back_button = button(s, "← Quay lại", 110, BUTTON_H, self._back, primary=False)
+        self.back_button = button(s, "← Quay lại", BACK_W, BUTTON_H, self._back, primary=False)
         self.next_button = button(s, "Tiếp tục →", BUTTON_W, BUTTON_H, self._next)
+        self.later_link = link(s, "Để sau", self._later, color=theme.TEXT_MUTED)
         self.back_button.place(PAD, 470)
         self.next_button.place(WIDTH - PAD - BUTTON_W, 470)
-        self.later_link = link(s, "Để sau", self._later, color=theme.TEXT_MUTED)
-        self.later_link.place(WIDTH - PAD - BUTTON_W - 24 - self.later_link.width, 478)
+        self.later_link.place(WIDTH - PAD - BUTTON_W - 2 * GAP - self.later_link.width, 478)
+        # Nhan trang thai la FixedText nen duc: de len dieu khien bam duoc nao la no nuot het cu bam o do
+        # (VCL con nang no len moi lan doi Label), va nut "Quay lai" nam trong vung no phu nen bam mai khong
+        # an. Vi vay no phai nam gon trong khoang trong giua nut "Quay lai" va link "De sau"; do dai lay theo
+        # vi tri that cua link de doi cau chu link khong lam no chong lai.
+        status_x = PAD + BACK_W + GAP
+        status_w = self.later_link.x - GAP - status_x
+        self.status = self._chrome(s, status_x, 470, status_w, 30, MultiLine=True, TextColor=theme.TEXT_MUTED,
+                                   NoLabel=True, font=(theme.FONT, theme.SIZE_CAPTION))
 
         self._build_welcome()
         self._build_checks()
