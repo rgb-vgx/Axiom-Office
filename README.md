@@ -514,7 +514,7 @@ powershell -ExecutionPolicy Bypass -File tests\mcp-host\office_roundtrip.ps1 -Di
 powershell -ExecutionPolicy Bypass -File tests\mcp-host\office_roundtrip.ps1 -Dir <thư_mục_output> -Verify
 # Unit test của các MCP Python (legacy)
 cd tools\word-mcp; .venv\Scripts\python.exe -m unittest discover -s tests
-# Làn LibreOffice: 46 unit test (giải mã tham số + registry lệnh khớp bản C#, logic pane, theme + đọc SSE của
+# Làn LibreOffice: 51 unit test (giải mã tham số + registry lệnh khớp bản C#, logic pane, theme + đọc SSE của
 # Core) và test mọi lệnh trên LibreOffice thật (script tự mở LibreOffice bằng profile người dùng;
 # --ui: bản có cửa sổ; --ai: ai.ask). Chạy được cả trên Linux (đường dẫn soffice tự dò, tắt app bằng
 # SIGTERM, token đọc từ ~/.config/axiom-office/config.json).

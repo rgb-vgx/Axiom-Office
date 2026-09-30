@@ -24,9 +24,13 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 - **Sửa lỗi chỉ thấy trên Linux**: footer pane bị thanh trạng thái che (sidebar VCL cấp chiều cao lớn hơn
   vùng vẽ thật — trừ 12px khi ở trong sidebar); mã lệnh bị cắt ở mép phải do font mono rộng hơn Consolas;
   dòng lỗi rút gọn tên kiểu lỗi (`ArgumentException: …`) để xuống dòng được trong cột nhãn hẹp
+- **Dọn session của tiến trình đã chết**: `sweep()` xoá file `{pid}-{kind}.json` ngay khi khởi động nếu
+  pid không còn sống (`kill 0` trên Linux, `OpenProcess` trên Windows), không phải chờ hết 10 phút theo
+  heartbeat — trên Linux `soffice` hay bị tắt bằng SIGTERM/đăng xuất nên file cũ tồn đọng thành session ma
+  trong `office_sessions`/Core
 - Test: bộ live test chạy được trên Linux (`soffice` theo PATH, tắt app bằng SIGTERM, token đọc từ
-  `config.json`, `winreg` import mềm); `tests/lo` 46 unit test (thêm `theme.error_summary`, khởi động Core
-  theo nền tảng)
+  `config.json`, `winreg` import mềm); `tests/lo` 51 unit test (thêm `theme.error_summary`, khởi động Core
+  theo nền tảng, dọn session cũ)
 - Đã kiểm chứng trên Ubuntu 24.04 + LibreOffice 24.2 (KDE Plasma X11): 159/159 test lệnh headless và
   159/159 có cửa sổ, Agent Core 200/200 (Linux và Windows), lượt `ai.ask` thật trên Writer/Calc/Impress,
   pane chạy ở cả deck sidebar lẫn pane neo bên phải (ảnh chụp trong phiên X ảo và phiên KDE thật)

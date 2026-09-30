@@ -13,6 +13,7 @@ import shutil
 import sys
 import tempfile
 import threading
+import time
 import types
 import unittest
 from unittest import mock
@@ -24,7 +25,7 @@ if "uno" not in sys.modules:      # axiom.core chi can stdlib; axiom.chat thuan 
     sys.modules["uno"] = types.ModuleType("uno")
 sys.path.insert(0, PYTHONPATH)
 
-from axiom import chat, core, theme  # noqa: E402
+from axiom import chat, config, core, sessions, theme  # noqa: E402
 
 
 class ItemTests(unittest.TestCase):
@@ -304,6 +305,68 @@ class CoreLaunchTests(unittest.TestCase):
         options = calls[0][1]
         self.assertIn("creationflags", options)
         self.assertNotIn("start_new_session", options)
+
+
+class SessionSweepTests(unittest.TestCase):
+    """Don file session cua lan chay truoc (axiom.sessions.sweep): pid da chet, hoac heartbeat qua cu.
+
+    File cua add-in Windows ({pid}.json, khong co "-kind") va file tam khong bi dong toi.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="axiom-sessions-")
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        mock.patch.object(config, "sessions_dir", lambda: self.tmp).start()
+        self.addCleanup(mock.patch.stopall)
+
+    def _write(self, name: str, seen: float | None = None, pid: int = 0) -> str:
+        path = os.path.join(self.tmp, name)
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump({"pid": pid or int(name.split("-")[0]), "lastSeenEpoch": time.time() if seen is None else seen},
+                      handle)
+        return path
+
+    def _left(self) -> list:
+        return sorted(os.listdir(self.tmp))
+
+    def test_xoa_file_cua_tien_trinh_da_chet(self):
+        dead = self._write("999999-wps.json")     # heartbeat vua ghi nhung pid da chet
+        alive = self._write("%d-wps.json" % os.getpid(), pid=os.getpid())
+        with mock.patch.object(sessions, "_alive", lambda pid: pid == os.getpid()):
+            sessions.sweep()
+        self.assertFalse(os.path.exists(dead))
+        self.assertTrue(os.path.exists(alive))
+
+    def test_alive_theo_tien_trinh_that(self):
+        self.assertTrue(sessions._alive(os.getpid()))
+        self.assertFalse(sessions._alive(0) or sessions._alive(-1))
+
+    def test_xoa_file_heartbeat_qua_cu(self):
+        with mock.patch.object(sessions, "_alive", lambda pid: True):
+            old = self._write("1234-et.json", seen=time.time() - sessions.STALE_SECONDS - 60)
+            fresh = self._write("1235-et.json")
+            sessions.sweep()
+        self.assertFalse(os.path.exists(old))
+        self.assertTrue(os.path.exists(fresh))
+
+    def test_bo_qua_file_khong_phai_session(self):
+        # Add-in ghi {pid}.json; them file tam .tmp dang ghi do -> khong xoa.
+        addin = self._write("4321.json", pid=999999)
+        temp = self._write("999999-wps.json.tmp", pid=999999)
+        other = self._write("999999-slides.json", pid=999999)      # kind la khong thuoc KINDS
+        sessions.sweep()
+        self.assertEqual(self._left(), sorted([os.path.basename(addin), os.path.basename(temp),
+                                               os.path.basename(other)]))
+
+    def test_ten_la_chi_xet_heartbeat(self):
+        weird = self._write("abc-wps.json", seen=time.time() - sessions.STALE_SECONDS - 60, pid=1)
+        sessions.sweep()
+        self.assertFalse(os.path.exists(weird))      # ten la + cu -> van don
+        kept = os.path.join(self.tmp, "xyz-et.json")
+        with open(kept, "w", encoding="utf-8") as handle:
+            json.dump({"lastSeenEpoch": time.time()}, handle)
+        sessions.sweep()
+        self.assertTrue(os.path.exists(kept))        # ten la nhung con moi -> giu
 
 
 class CoreSseTests(unittest.TestCase):

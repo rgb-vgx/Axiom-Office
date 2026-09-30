@@ -494,7 +494,7 @@ Máy kiểm chứng: Ubuntu 24.04, LibreOffice 24.2.7.2 (`python3-uno`, VCL kf5 
 
 | Việc | Kết quả |
 |---|---|
-| Unit test extension (không cần LibreOffice) | 46/46 |
+| Unit test extension (không cần LibreOffice) | 51/51 |
 | `tests/live/test_live_libreoffice.py` headless | 159/159 |
 | `tests/live/test_live_libreoffice.py --ui` | 159/159 |
 | Agent Core (`dotnet test`) | 200/200 (trên Linux **và** trên Windows) |
