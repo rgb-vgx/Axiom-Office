@@ -649,6 +649,14 @@ def test_memory(work: str, token: str, bridge: FakeBridge, document_path: str, s
         check(added["ok"] and added["result"]["memory"]["source"] == "user", "POST /v1/memory (source=user)", added)
         status, found = http_json(core.base + "/v1/memory?q=so%20giao%20duc", token=core.token)
         check(found["result"]["memories"] and "Sở Giáo dục" in found["result"]["memories"][0]["text"], "GET /v1/memory?q= tim khong dau", found["result"])
+
+        # Nut "Xoa toan bo ghi nho" trong dialog: thieu confirm=true thi khong xoa duoc.
+        status, bad_purge = http_json(core.base + "/v1/memory?scope=all", method="DELETE", token=core.token)
+        check(status == 400, "xoa cung thieu confirm=true -> 400", bad_purge)
+        before = len(memories(core))
+        status, purged = http_json(core.base + "/v1/memory?scope=all&confirm=true", method="DELETE", token=core.token)
+        check(status == 200 and purged["result"]["removed"] == before and not memories(core),
+              "xoa cung toan bo ghi nho (?scope=all&confirm=true)", (before, purged["result"], len(memories(core))))
     finally:
         core.stop()
 
@@ -898,6 +906,56 @@ def test_summarize(work: str, token: str, bridge: FakeBridge, document_path: str
         prompt = agent_prompt()
         check("Earlier in this conversation:" in prompt, "ban tom tat duoc dua vao ngu canh luot sau", prompt[-260:])
         check("Buoc 21" not in prompt, "cac luot qua cu da duoc thay bang tom tat", prompt[-260:])
+    finally:
+        core.stop()
+        llm.stop()
+
+
+def test_cancel(work: str, token: str, bridge: FakeBridge, document_path: str, session_dir: str) -> None:
+    """Nut Dung (POST /v1/runs/{id}/cancel): luot chay dung ngay, agent thoi sua tai lieu, Core van khoe.
+
+    Pane (Windows va Linux) goi dung duong nay khi nguoi dung bam Dung; truoc day e2e chua phu.
+    """
+    slow = {"tool": "office_action",
+            "arguments": {"action": "et.writeRange", "params": {"range": "A1", "values": [["a", 1]]}},
+            "delay": 0.4}
+    llm = FakeLlm(work, [slow] * 100)
+    data_dir = os.path.join(work, "core-cancel")
+    os.makedirs(data_dir, exist_ok=True)
+    core = Core(data_dir, session_dir, llm, token, {"AXIOM_MEMORY_AUTO_EXTRACT": "0"})
+    office = {"port": bridge.port, "pid": bridge.pid, "app": "et", "family": "office"}
+    try:
+        bridge.commands.clear()
+        status, created = core.run("ghi tung o mot", office, document={"name": "bao-cao.xlsx", "fullName": document_path})
+        check(status == 200 and created["result"]["runId"], "Dung: tao duoc luot chay", created)
+        run_id = created["result"]["runId"]
+
+        collected: list = []
+        url = f"{core.base}/v1/runs/{run_id}/events"
+        reader = threading.Thread(target=lambda: sse_events(url, token, timeout=60, sink=collected), daemon=True)
+        reader.start()
+        deadline = time.time() + 30
+        while not bridge.commands and time.time() < deadline:
+            time.sleep(0.1)
+        check(bool(bridge.commands), "Dung: agent da bat dau sua tai lieu", bridge.actions()[:2])
+
+        status, cancelled = http_json(f"{core.base}/v1/runs/{run_id}/cancel", method="POST", token=core.token)
+        check(status == 200 and cancelled["result"]["cancelled"] is True, "POST /v1/runs/{id}/cancel huy luot chay", cancelled)
+
+        reader.join(timeout=30)
+        types = [item[0] for item in collected]
+        check(types and types[-1] == "run.cancelled", "SSE ket thuc bang run.cancelled", types)
+        stopped_at = len(bridge.commands)
+        time.sleep(1.5)
+        check(len(bridge.commands) == stopped_at, "sau khi bam Dung, agent khong sua tai lieu nua",
+              (stopped_at, len(bridge.commands)))
+
+        run = core.get_run(run_id)
+        check(run.get("status") == "cancelled", "GET /v1/runs/{id} bao cancelled", run.get("status"))
+        status, again = http_json(f"{core.base}/v1/runs/{run_id}/cancel", method="POST", token=core.token)
+        check(status == 409, "huy luot da xong -> 409", again)
+        status, health = http_json(core.base + "/health")
+        check(status == 200 and health["result"]["memory"] == "on", "sau khi huy, Core van khoe", health["result"]["memory"])
     finally:
         core.stop()
         llm.stop()
@@ -1291,7 +1349,7 @@ def test_office(core: Core, port: int, pid: int) -> None:
 
 # Cac phan chay duoc rieng (--only); /health luon chay truoc.
 SECTIONS = ["fake_bridge", "guards", "skills", "memory", "confirm", "mcp", "visual", "setup", "shutdown",
-            "anthropic", "embeddings", "summarize"]
+            "anthropic", "embeddings", "summarize", "cancel"]
 
 # Phan phu thuoc: `guards` dung chung kich ban LLM voi `fake_bridge` (kich ban tuan tu) nen chay mot minh
 # se lech buoc -> --only tu keo theo phan can truoc.
@@ -1407,6 +1465,8 @@ def main() -> int:
                 test_embeddings(work, token, bridge, document_path, session_dir)
             if wanted("summarize"):
                 test_summarize(work, token, bridge, document_path, session_dir)
+            if wanted("cancel"):
+                test_cancel(work, token, bridge, document_path, session_dir)
     finally:
         if core is not None:
             core.stop()

@@ -21,6 +21,8 @@ bản .NET vẫn nằm trong repo và vẫn chạy được (`build.ps1 -Core do
 | G6 | đóng gói thay bản .NET (`build.ps1`, `scripts/linux/package.sh`, CI) | toàn bộ | ✔ |
 | G7 | vá lỗ hổng phát hiện khi soát lại: hủy lượt đang chạy lúc Core dừng | `shutdown` | ✔ |
 | G8 | phủ nốt hai vùng chưa có e2e: codec Anthropic (chạy thật) và embedding (cosine + tìm theo nghĩa) | `anthropic`, `embeddings` | ✔ |
+| G9 | phủ đường tóm tắt hội thoại dài (chỉ khi vượt mốc 20 tin nhắn) | `summarize` | ✔ |
+| G10 | phủ nút Dừng, `interactive=false` (`ai.ask`), PATCH memory và xóa cứng toàn bộ | `cancel`, `confirm`, `memory` | ✔ |
 
 ## Build
 

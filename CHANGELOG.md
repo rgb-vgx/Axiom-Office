@@ -30,8 +30,12 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 - Phần `memory` thêm các ca **PATCH** (đường dialog "Quản lý ghi nhớ" trên cả hai nền tảng): sửa nội dung,
   ghim/bỏ ghim, đặt và bỏ hạn dùng, hạn dùng sai định dạng → 400, id không tồn tại → 404, lịch sử ghi
   UPDATE/PIN/EXPIRES
-- Bộ e2e giờ **135 kiểm tra**, tất cả đều xanh trên **cả hai bản** (.NET và Go); CI (Linux) chạy 11 phần
-  (`shutdown`, `anthropic`, `embeddings`, `summarize` là bốn phần mới thêm)
+- Phần e2e **`cancel`** (nút Dừng của pane): hủy giữa lúc agent đang ghi tài liệu → SSE kết thúc bằng
+  `run.cancelled`, agent không sửa tài liệu nữa, `GET /v1/runs/{id}` báo `cancelled`, hủy lại → 409, và Core
+  vẫn khỏe để chạy lượt mới. Phần `memory` thêm ca xóa cứng toàn bộ (`?scope=all&confirm=true`, thiếu
+  `confirm` → 400) — nút "Xóa toàn bộ ghi nhớ" trong dialog
+- Bộ e2e giờ **145 kiểm tra**, tất cả đều xanh trên **cả hai bản** (.NET và Go); CI (Linux) chạy 12 phần
+  (`shutdown`, `anthropic`, `embeddings`, `summarize`, `cancel` là năm phần mới thêm)
 
 ### Added — Wizard thiết lập cho người dùng không chuyên (Windows + Linux)
 - **Một nội dung, hai bộ vẽ**: câu chữ + preset nhà cung cấp nằm ở `catalog/setup.json`, sinh ra

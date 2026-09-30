@@ -575,7 +575,8 @@ python3 tests/live/test_live_libreoffice.py [--apps writer,calc,impress] [--ui] 
 dotnet test tests\core\AxiomOffice.Core.Tests
 # Agent Core e2e: Core thật + LLM giả + bridge giả (không cần Office)
 tools\excel-mcp\.venv\Scripts\python.exe tests\core\test_core_e2e.py
-# ... chỉ vài phần (fake_bridge,guards,skills,memory,confirm,mcp,visual,setup,shutdown,anthropic,embeddings),
+# ... chỉ vài phần (fake_bridge,guards,skills,memory,confirm,mcp,visual,setup,shutdown,anthropic,
+#     embeddings,summarize,cancel),
 #     hoặc với Core bản Go (core-go/README.md)
 $env:AXIOM_E2E_CORE_EXE = "<đường dẫn axiom-core.exe>"; python tests\core\test_core_e2e.py --only setup
 # ... hoặc trên Office thật: tự mở Excel, agent sửa tài liệu thật (cần add-in đã cài)
