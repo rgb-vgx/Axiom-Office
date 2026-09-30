@@ -232,7 +232,8 @@ public sealed class ModelClient
     }
 
     // Goi mot lan, khong tool: dung cho tom tat hoi thoai va kiem tra cau hinh.
-    public async Task<(string? Text, string? Error)> ChatAsync(string systemPrompt, string userPrompt, CancellationToken cancel)
+    // maxTokens: du cho model "suy nghi ngam" (reasoning) van con cho viet noi dung - 1024 tung lam extractor nhan rong.
+    public async Task<(string? Text, string? Error)> ChatAsync(string systemPrompt, string userPrompt, CancellationToken cancel, int maxTokens = 2048)
     {
         if (_endpoint.Length == 0)
         {
@@ -247,7 +248,7 @@ public sealed class ModelClient
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancel);
         cts.CancelAfter(RequestTimeoutMs);
         JsonObject body = Codec.BuildRequest(_model, systemPrompt,
-            [new JsonObject { ["role"] = "user", ["content"] = userPrompt }], [], toolsEnabled: false, maxTokens: 1024);
+            [new JsonObject { ["role"] = "user", ["content"] = userPrompt }], [], toolsEnabled: false, maxTokens: maxTokens);
         (string? responseText, string? error, int status) = await PostAsync(body, cts.Token).ConfigureAwait(false);
         if (responseText == null)
         {

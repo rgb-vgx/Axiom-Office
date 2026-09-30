@@ -187,9 +187,10 @@ public static partial class MemoryExtractor
         for (int attempt = 0; attempt < 2; attempt++)
         {
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancel);
-            timeout.CancelAfter(TimeSpan.FromSeconds(30));
+            // Cho bang het gio request cua model (toi thieu 30s): model free cham (~60s/request) tung bi huy o moc 30s co dinh.
+            timeout.CancelAfter(TimeSpan.FromMilliseconds(Math.Max(30_000, model.RequestTimeoutMs)));
             string message = attempt == 0 ? user : user + "\n\nCHỈ trả về một đối tượng JSON hợp lệ, không có chữ nào khác.";
-            (string? text, string? error) = await model.ChatAsync(SystemPrompt, message, timeout.Token).ConfigureAwait(false);
+            (string? text, string? error) = await model.ChatAsync(SystemPrompt, message, timeout.Token, maxTokens: 4096).ConfigureAwait(false);
             if (text == null)
             {
                 return (null, error ?? "no reply");
