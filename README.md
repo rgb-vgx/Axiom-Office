@@ -25,6 +25,7 @@ trên (cùng tên lệnh `writer.*`/`et.*`/`wpp.*`, cùng session registry) — 
 
 ## Mục lục
 
+- [Tình trạng dự án](STATUS.md) — đã làm được gì, chưa làm được gì
 - [Kiến trúc](#kiến-trúc)
 - [Cài đặt cho người dùng](#cài-đặt-cho-người-dùng)
 - [Ask AI (agent trong app)](#ask-ai-agent-trong-app)
