@@ -30,8 +30,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import fakes  # noqa: E402  (may chu gia trong tien trinh: Anthropic + embeddings)
-# Ban Core da publish (di kem AxiomOffice.Host.exe + skills canh no, cho ca lan file MCP).
-# MCP). Muon chay voi ban vua `dotnet build` thi dat AXIOM_E2E_CORE_EXE.
+# Core Go da build, dat canh AxiomOffice.Host.exe + skills (cho phan MCP lan file + /v1/setup).
+# Build lai Core roi doi duong dan bang AXIOM_E2E_CORE_EXE.
 CORE_EXE = os.environ.get("AXIOM_E2E_CORE_EXE") or os.path.join(ROOT, "src", "AxiomOffice", "bin", "Release", "AxiomOffice.Core.exe")
 FAKE_LLM = os.path.join(ROOT, "tests", "core", "fake_llm.py")
 

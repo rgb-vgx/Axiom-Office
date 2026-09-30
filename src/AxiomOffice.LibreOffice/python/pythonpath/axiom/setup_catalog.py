@@ -5,8 +5,9 @@ Chu cua wizard thiet lap + preset nha cung cap AI, dung chung voi ban Windows (S
 from __future__ import annotations
 
 CATALOG = {'comment': 'Nguon duy nhat cho wizard thiet lap (chu + preset). Sinh ra src/AxiomOffice/Setup/SetupCatalog.cs '
-            '(net48, cho add-in + Core) va src/AxiomOffice.LibreOffice/python/pythonpath/axiom/setup_catalog.py '
-            '(extension) bang scripts/generate_setup_catalog.py. KHONG sua hai file sinh ra.',
+            '(add-in net48), src/AxiomOffice.LibreOffice/python/pythonpath/axiom/setup_catalog.py (extension) va '
+            'core-go/internal/setup/catalog_gen.go (Agent Core ban Go) bang scripts/generate_setup_catalog.py. KHONG '
+            'sua ba file sinh ra.',
  'version': 1,
  'steps': [{'id': 'welcome',
             'title': 'Chào mừng bạn đến với Axiom Office',

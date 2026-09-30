@@ -1,5 +1,5 @@
 // SINH TU DONG tu catalog/setup.json bang scripts/generate_setup_catalog.py - KHONG sua tay.
-// Dung chung cho add-in Windows (net48) va Agent Core (net10): chu cua wizard + preset nha cung cap.
+// Chu cua wizard + preset nha cung cap cho add-in Windows (net48).
 using System;
 using System.Collections.Generic;
 

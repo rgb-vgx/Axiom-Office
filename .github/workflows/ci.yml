@@ -25,9 +25,6 @@ jobs:
       - name: Unit test extension LibreOffice (khong can LibreOffice)
         run: python3 -m unittest discover -s tests/lo -v
 
-      - name: Agent Core (xUnit)
-        run: dotnet test tests/core/AxiomOffice.Core.Tests -c Release
-
       - name: Build MCP server
         run: dotnet build src/AxiomOffice.Mcp -c Release
 
@@ -48,8 +45,6 @@ jobs:
           CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o "$RUNNER_TEMP/gocore/axiom-core" ./cmd/axiom-core
           cp -r ../skills "$RUNNER_TEMP/gocore/"
           cd ..
-          # Prompt trich xuat memory phai giong ban .NET (mot nguon, hai ban).
-          diff src/AxiomOffice.Core/Memory/Prompts/extract.txt core-go/internal/memory/prompts/extract.txt
           # Phan mcp can AxiomOffice.Host.exe (chi co tren Windows) nen bo qua o day.
           export AXIOM_E2E_CORE_EXE="$RUNNER_TEMP/gocore/axiom-core"
           PARTS=fake_bridge,guards,skills,confirm,memory,visual,setup,shutdown,anthropic,embeddings,summarize,cancel,mcp_http
@@ -105,9 +100,6 @@ jobs:
 
       - name: Unit test extension LibreOffice
         run: python -m unittest discover -s tests/lo -v
-
-      - name: Agent Core (xUnit)
-        run: dotnet test tests/core/AxiomOffice.Core.Tests -c Release
 
       - uses: actions/setup-go@v5
         with:

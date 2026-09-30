@@ -12,7 +12,7 @@ import (
 	"axiomoffice/core/internal/model"
 )
 
-// Cung noi dung voi src/AxiomOffice.Core/Memory/Prompts/extract.txt (CI so sanh hai file).
+// Prompt cua bo trich xuat memory: nguon duy nhat trong repo, nhung vao binary bang go:embed.
 //
 //go:embed prompts/extract.txt
 var extractPrompt string

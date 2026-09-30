@@ -3,7 +3,6 @@
 #   core/ (Agent Core linux-x64 - binary Go, may dich khong can runtime + skills/ dung san),
 #   mcp/ (axiom-office-mcp cho Claude Code/Desktop), AxiomOffice-LibreOffice-<ver>.oxt, install.sh, README.txt.
 # Can Go 1.26+ (Agent Core) va .NET SDK 10 (MCP server). Chay duoc tren Linux hoac Git Bash/WSL.
-# AXIOM_CORE=dotnet: dong goi Agent Core ban .NET thay vi ban Go.
 #
 #   scripts/linux/package.sh [--rid linux-x64|linux-arm64]
 set -euo pipefail
@@ -22,23 +21,17 @@ STAGE="$ROOT/dist/$NAME"
 rm -rf "$STAGE"
 mkdir -p "$STAGE"
 
-# Agent Core: mac dinh ban Go (mot binary, may dich khong can .NET runtime); AXIOM_CORE=dotnet dung ban .NET.
-if [ "${AXIOM_CORE:-go}" = "go" ]; then
-    echo "== Agent Core (Go, $RID)"
-    GO="${GO:-$(command -v go || echo /usr/local/go/bin/go)}"
-    [ -x "$GO" ] || { echo "khong thay go (cai Go 1.26+ hoac dat GO=/duong/dan/go)" >&2; exit 1; }
-    case "$RID" in
-        *-arm64) GOARCH=arm64 ;;
-        *) GOARCH=amd64 ;;
-    esac
-    mkdir -p "$STAGE/core"
-    GOOS=linux GOARCH="$GOARCH" CGO_ENABLED=0 "$GO" build -C "$ROOT/core-go" -trimpath \
-        -ldflags "-s -w -X main.version=$VERSION" -o "$STAGE/core/AxiomOffice.Core" ./cmd/axiom-core
-else
-    echo "== Agent Core ($RID, self-contained .NET)"
-    "$DOTNET" publish "$ROOT/src/AxiomOffice.Core" -c Release -r "$RID" --self-contained \
-        -p:DebugType=none -o "$STAGE/core" -v q -nologo
-fi
+# Agent Core: mot binary Go, may dich khong can runtime (core-go/README.md).
+echo "== Agent Core (Go, $RID)"
+GO="${GO:-$(command -v go || echo /usr/local/go/bin/go)}"
+[ -x "$GO" ] || { echo "khong thay go (cai Go 1.26+ hoac dat GO=/duong/dan/go)" >&2; exit 1; }
+case "$RID" in
+    *-arm64) GOARCH=arm64 ;;
+    *) GOARCH=amd64 ;;
+esac
+mkdir -p "$STAGE/core"
+GOOS=linux GOARCH="$GOARCH" CGO_ENABLED=0 "$GO" build -C "$ROOT/core-go" -trimpath \
+    -ldflags "-s -w -X main.version=$VERSION" -o "$STAGE/core/AxiomOffice.Core" ./cmd/axiom-core
 chmod +x "$STAGE/core/AxiomOffice.Core"
 
 # Skill dung san: Core nap `skills/` canh binary truoc (nguon "builtin"), khong can cau hinh SkillDirs.

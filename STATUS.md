@@ -1,6 +1,6 @@
 # Tình trạng dự án Axiom Office
 
-Cập nhật: **30/09/2026** · nhánh `main` (98 commit) · cây làm việc sạch · **chưa push remote**
+Cập nhật: **01/10/2026** · nhánh `main` · cây làm việc sạch · **chưa push remote**
 
 Tài liệu này là ảnh chụp nhanh "đã làm được gì / chưa làm được gì". Chi tiết thiết kế nằm ở
 [New_arch.md](New_arch.md) (Core + add-in) và [LibreOffice_arch.md](LibreOffice_arch.md) (LibreOffice);
@@ -12,7 +12,6 @@ hướng dẫn dùng ở [README.md](README.md); lịch sử thay đổi ở [CH
 |---|---|---|
 | **Add-in COM** (`src/AxiomOffice`, net48) | Word/Excel/PowerPoint + WPS, Windows | Chạy được; đã kiểm chứng trên Office/WPS thật ở các đợt trước. Đợt này **chưa** chạy lại làn `--office` |
 | **Agent Core** (`core-go/`, Go) | Windows + Linux | **Đã thay bản .NET làm bản phát hành** (G1–G10), qua toàn bộ e2e của bản .NET |
-| **Agent Core cũ** (`src/AxiomOffice.Core`, .NET 10) | Windows + Linux | Vẫn nằm nguyên trong repo, dùng để đối chiếu (`build.ps1 -Core dotnet`); bộ test xUnit của nó vẫn chạy |
 | **MCP server** (`src/AxiomOffice.Mcp`, net10) | Windows + Linux | Không đổi trong đợt này; parity 61/61 |
 | **Extension LibreOffice** (Python UNO) | Linux (LibreOffice) | Chạy được; 159/159 trên LibreOffice thật + wizard 20/20 với Core Go |
 | **Wizard thiết lập** | Windows (WinForms) + Linux (awt) | Bản Linux đã chạy thật (20/20); **bản Windows mới chỉ biên dịch sạch, chưa bấm tay trong Office** |
@@ -61,8 +60,8 @@ Kích thước: Core Go **11,9 MB** (bản .NET self-contained: 51,6 MB), không
 | e2e trên **Linux** đúng lệnh CI (13 phần) | **143/143** |
 | LibreOffice thật (gói mới, Core Go) | **159/159** |
 | Wizard thiết lập (dialog thật, X ảo) | **20/20** |
-| `go test ./...` (core-go) | 10/10 gói |
-| .NET xUnit · `tests/lo` · MCP parity | 228/228 · 89 · 61/61 |
+| `go test ./...` (core-go) | 14 gói (Windows) · 15 gói (Linux, thêm `internal/instance`) |
+| `tests/lo` · MCP parity | 106 · 61/61 |
 | `--real-llm` (model thật trong HKCU) | **4/4** — nạp đúng skill (`bao-cao-thang`, `bang-diem`, `van-ban-hanh-chinh`), câu "in đậm" không nạp skill thiết kế |
 | Đối chiếu khoá API DPAPI với bản .NET | cùng plaintext (dài 35, sha256 `bec24e97c4893251`) |
 | libsecret (keyring Linux, qua `secret-tool` giả) | đọc được khoá; thiếu khoá → coi như chưa cấu hình |
@@ -71,9 +70,9 @@ Kích thước: Core Go **11,9 MB** (bản .NET self-contained: 51,6 MB), không
 
 ### 2.4 CI
 
-`.github/workflows/ci.yml`: job **linux** chạy unit test extension, xUnit, build MCP, `go vet`/`go test`, e2e 12
-phần với binary Go, so sánh `prompts/extract.txt` giữa hai bản, cài LibreOffice rồi chạy bộ live + wizard, và
-đóng gói tarball; job **windows** chạy unit test, xUnit, `go test`, build net48, và **toàn bộ e2e của bản Go**
+`.github/workflows/ci.yml`: job **linux** chạy unit test extension, build MCP, `go vet`/`go test`, e2e 13
+phần với binary Go, cài LibreOffice rồi chạy bộ live + wizard, và đóng gói tarball; job **windows** chạy
+unit test, `go vet`/`go test`, build net48, và **toàn bộ e2e của bản Go**
 (kèm `AxiomOffice.Host.exe` như gói phát hành).
 
 ## 3. Chưa làm / chưa kiểm chứng
@@ -86,11 +85,10 @@ phần với binary Go, so sánh `prompts/extract.txt` giữa hai bản, cài Li
 | Đọc/ghi **HKCU** bằng test tự động trên Windows | Một phần | Đối chiếu tay: Core Go đọc đúng endpoint/model/token/DPAPI của bạn; test tự động hiện dùng `AXIOM_*` |
 | **Push remote** | Chưa | Bạn yêu cầu chỉ commit |
 | Merge `feat/setup-wizard` + `feat/core-go` vào `main` | **Đã xong** | Fast-forward, lịch sử thẳng |
-| Bản Core .NET | Giữ lại | Không còn là bản phát hành nhưng vẫn build/test được để đối chiếu; hai bản chia sẻ `SetupCatalog.cs` và `prompts/extract.txt` nên sửa Core dùng chung phải chạy cả hai bộ |
 | Nền tảng khác | Chưa | Chỉ build được Windows (amd64) và Linux (amd64/arm64); chưa có macOS hay Windows ARM |
 | Embedding với máy chủ thật | Chưa | Chỉ kiểm bằng máy chủ giả trả vector điều khiển được |
 
-## 4. Khác biệt có chủ ý giữa Core Go và Core .NET
+## 4. Ghi chú hành vi (khác bản .NET đã bỏ ngày 01/10/2026)
 
 Ghi ở [core-go/README.md](core-go/README.md); tóm tắt:
 
@@ -107,7 +105,6 @@ Ghi ở [core-go/README.md](core-go/README.md); tóm tắt:
 
 ```powershell
 scripts\build.ps1                 # add-in + Host + Agent Core (Go) vào src\AxiomOffice\bin\Release
-scripts\build.ps1 -Core dotnet    # đóng gói Core .NET thay vì bản Go (đối chiếu)
 scripts\install.ps1               # đăng ký add-in (HKCU), in cấu hình MCP
 scripts\package.ps1               # zip phát hành
 ```
@@ -115,7 +112,7 @@ scripts\package.ps1               # zip phát hành
 ```bash
 cd core-go && go test ./... && go build -o axiom-core.exe ./cmd/axiom-core     # Core Go
 AXIOM_E2E_CORE_EXE=<binary> python tests/core/test_core_e2e.py [--only <phần,...>]
-bash scripts/linux/package.sh     # gói Linux (AXIOM_CORE=dotnet để dùng bản .NET)
+bash scripts/linux/package.sh     # gói Linux (Core Go + MCP + .oxt)
 ```
 
 Các phần e2e chạy riêng được: `fake_bridge`, `guards`, `skills`, `memory`, `confirm`, `mcp`, `visual`,
@@ -125,5 +122,4 @@ Các phần e2e chạy riêng được: `fake_bridge`, `guards`, `skills`, `memo
 
 1. **Bạn bấm thử wizard Windows** trong Word/Excel/WPS (5 bước, nhất là **Thử ngay**) rồi báo lại.
 2. Chạy `--real-llm` cho **memory** (trích xuất bằng model thật) khi muốn chắc chắn chất lượng fact.
-3. Cân nhắc **bỏ hẳn bản Core .NET** sau một thời gian chạy thật ổn định (khi đó `SetupCatalog.cs` chỉ còn
-   dùng cho add-in, và `prompts/extract.txt` chỉ còn một bản).
+3. Dọn `tools/` (các MCP server Python cũ) nếu không còn dùng.

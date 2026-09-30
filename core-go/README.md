@@ -1,15 +1,17 @@
 # Agent Core viết lại bằng Go (`core-go/`)
 
-Bản Go của `src/AxiomOffice.Core` (.NET 10), để phát hành **một file binary nhỏ, không cần runtime**
-(~11 MB sau `-s -w`, so với ~52 MB single-file .NET hoặc 19 MB Native AOT — bản AOT làm hỏng JSON reflection).
-Hai bản **dùng chung hợp đồng**: cùng Core API v1, cùng `core.json`, cùng `core.db` (schema 2), cùng nguồn
-cấu hình (`AXIOM_*` → HKCU / `~/.config/axiom-office/config.json` → mặc định), cùng tên mutex một-phiên-bản.
-Nhờ vậy add-in, extension LibreOffice và MCP không phải đổi gì khi thay bản Core.
+Agent Core của Axiom Office, phát hành dưới dạng **một file binary nhỏ, không cần runtime** (~12 MB sau
+`-s -w`, thay cho ~52 MB single-file của bản .NET cũ hoặc 19 MB Native AOT — bản AOT làm hỏng JSON reflection).
+Bản .NET (`src/AxiomOffice.Core`) đã được **bỏ khỏi repo ngày 01/10/2026**; `git log` còn giữ lịch sử.
 
-**Cách làm: song song dần.** Bản Go đã qua **toàn bộ** `tests/core/test_core_e2e.py` (94/94 trên Windows,
-82/82 trên Linux) nên từ G6 nó là bản được đóng gói phát hành (`scripts/build.ps1`, `scripts/linux/package.sh`);
-bản .NET vẫn nằm trong repo và vẫn chạy được (`build.ps1 -Core dotnet`, `AXIOM_CORE=dotnet package.sh`) để
-đối chiếu. Hai bản dùng chung `core.json`, `core.db` và Core API v1 nên đổi qua lại không mất dữ liệu.
+Hợp đồng với phần còn lại **không đổi**: Core API v1, `core.json`, `core.db` (schema 2), nguồn cấu hình
+(`AXIOM_*` → HKCU / `~/.config/axiom-office/config.json` → mặc định), tên mutex một-phiên-bản. Nhờ vậy
+add-in, extension LibreOffice và MCP không phải đổi gì.
+
+**Cách làm: song song dần.** Bản Go đã qua **toàn bộ** `tests/core/test_core_e2e.py` (155 kiểm tra) và được
+đóng gói phát hành từ G6 (`scripts/build.ps1`, `scripts/linux/package.sh`). Trước khi bỏ bản .NET, bộ e2e đã
+chạy trên **cả hai** bản (155/155 mỗi bản) để chắc không lệch hành vi; bốn vùng test chỉ bản .NET có
+(policy, xoay vòng log, `core.json`, chọn port + khoá một-phiên-bản) đã được port sang Go trước khi xoá.
 
 | Giai đoạn | Nội dung | Phần e2e | Trạng thái |
 |---|---|---|---|
@@ -65,8 +67,8 @@ AXIOM_E2E_CORE_EXE=/duong/dan/axiom-core python tests/core/test_core_e2e.py --on
 | `internal/memory` | `Memory/MemoryText.cs`, `MemoryStore.cs`, `MemoryRetriever.cs`, `MemoryExtractor.cs`, `MemoryService.cs` |
 | `internal/mcp` | `Mcp/McpTransport.cs`, `McpManager.cs`, `Tools/VisualTool.cs` (phần quy tắc đã tách sang `internal/tools`) |
 
-`prompts/extract.txt` là bản sao của `src/AxiomOffice.Core/Memory/Prompts/extract.txt` (Go không nhúng được
-file ngoài module); CI so sánh hai file nên không thể lệch.
+`prompts/extract.txt` (prompt của bộ trích xuất memory) là **nguồn duy nhất** trong repo, nhúng vào binary
+bằng `go:embed`.
 
 Khác biệt có chủ ý: bản Go **giữ luôn listener** của port tìm được (bản .NET thả port rồi Kestrel mới bind lại,
 có khe để tiến trình khác chiếm), dừng êm khi nhận SIGTERM (systemd `--user`), và **hủy các lượt đang chạy

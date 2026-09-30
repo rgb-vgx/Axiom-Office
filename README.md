@@ -503,8 +503,7 @@ Agent Core đọc cùng khoá trên. Biến môi trường `AXIOM_*` (`AXIOM_COR
 **Yêu cầu:** .NET Framework 4.8, Visual Studio 2022 Build Tools (`csc` Roslyn, C# 7.3). Python
 chỉ cần cho bộ test. **Agent Core** (`AxiomOffice.Core.exe`) là bản Go trong `core-go/`
 ([thiết kế](core-go/README.md)) nên cần **Go 1.26+**; không có Go thì `build.ps1` vẫn build
-add-in + Host và bỏ qua Core. Muốn đối chiếu bản .NET cũ thì cần .NET 10 SDK (cài không cần
-admin bằng `scripts\install-dotnet-sdk.ps1`) và chạy `build.ps1 -Core dotnet`.
+add-in + Host và bỏ qua Core.
 
 ```powershell
 scripts\build.ps1              # build AxiomOffice.dll + AxiomOffice.Host.exe vào src\AxiomOffice\bin\Release
@@ -572,8 +571,8 @@ python tests\lo\test_extension.py
 python tests\lo\test_chat.py
 python tests\live\test_live_libreoffice.py [--apps writer,calc,impress] [--ui] [--ai]
 python3 tests/live/test_live_libreoffice.py [--apps writer,calc,impress] [--ui] [--ai]   # Linux
-# Agent Core: unit test + test vòng đời trên tiến trình thật (cần .NET 10 SDK)
-dotnet test tests\core\AxiomOffice.Core.Tests
+# Agent Core (Go): unit test (cần Go 1.26+; chạy được cả Windows lẫn Linux)
+cd core-go && go test ./...
 # Agent Core e2e: Core thật + LLM giả + bridge giả (không cần Office)
 tools\excel-mcp\.venv\Scripts\python.exe tests\core\test_core_e2e.py
 # ... chỉ vài phần (fake_bridge,guards,skills,memory,confirm,mcp,visual,setup,shutdown,anthropic,
@@ -727,9 +726,9 @@ tar -xzf axiom-office-linux-x64-0.1.0.tar.gz && cd axiom-office-linux-x64-0.1.0
   ghi thẳng vào `config.json`.
 - Đóng gói lại từ mã nguồn: `scripts/linux/package.sh [--rid linux-arm64]` (cần .NET SDK 10);
   đóng gói/cài/gỡ nhanh bản dev: `scripts/libreoffice.sh package|install|status|log|uninstall`.
-- **CI**: `.github/workflows/ci.yml` — job `linux` chạy unit test extension + xUnit của Core + build MCP +
+- **CI**: `.github/workflows/ci.yml` — job `linux` chạy unit test extension + build MCP +
   cài LibreOffice/Python UNO rồi chạy toàn bộ test lệnh bridge và test MCP có tool live, cuối cùng đóng gói
-  tarball làm artifact; job `windows` chạy unit test, Core, build net48 (add-in + Host) và test MCP.
+  tarball làm artifact; job `windows` chạy unit test, `go test`, build net48 (add-in + Host) và test MCP.
 
 Trạng thái đã kiểm chứng trên Ubuntu 24.04 + LibreOffice 24.2 (KDE Plasma X11): 159/159 test lệnh (headless
 và có cửa sổ), 201/201 test Agent Core (Linux và Windows), 70/70 test MCP có tool live, parity MCP với bản
@@ -768,15 +767,13 @@ src/AxiomOffice.Host/         AxiomOffice.Host.exe: companion + MCP server
 src/AxiomOffice.Mcp/          MCP server đa nền tảng (.NET 10, `axiom-office-mcp`) - dùng chung mã nguồn
                               tool với AxiomOffice.Host (compile lại Mcp\*.cs + lớp Compat cho Linux:
                               config.json/HKCU, session XDG, JSON, .xls qua LibreOffice)
-src/AxiomOffice.Core/         Agent Core (.NET 10, theo New_arch.md) - net10.0, chạy cả Windows lẫn Linux
-  Agent/                      Orchestrator, RunManager, RunEventStream (SSE), PromptBuilder, ContextAssembler
-  Models/                     codec OpenAI/Anthropic + vòng lặp agent (ModelClient)
-  Office/                     đọc session registry, gọi bridge (/health, /cmd, /commands)
-  Tools/                      tool registry + office_action (allowlist theo ForAgent)
-  Memory/                     SQLite: conversations, messages, runs, tool_calls
-  Api/, Config/, Logging/     endpoint v1, cấu hình HKCU (Windows) / config.json (Linux) + AXIOM_*, log core.log
-tests/core/                   test Agent Core: xUnit + e2e (fake_llm.py, test_core_e2e.py)
-scripts/                      build, install, uninstall, legacy (gỡ bản WpsAiBridge), core (tắt Core), install-dotnet-sdk, package, libreoffice
+core-go/                      Agent Core viết bằng Go (New_arch.md; thiết kế riêng: core-go/README.md)
+  cmd/axiom-core/             main: một Core mỗi người dùng, chọn port, core.json, dừng êm khi nhận SIGTERM
+  internal/agent/             Orchestrator, RunManager, luồng sự kiện SSE, prompt, ngữ cảnh, xác nhận
+  internal/model/             codec OpenAI/Anthropic + vòng lặp agent; internal/skills, internal/memory, internal/mcp
+  internal/api/               endpoint /v1 (health, runs, skills, memory, mcp, setup) + guard
+tests/core/                   test Agent Core: e2e (fake_llm.py, test_core_e2e.py, fakes.py)
+scripts/                      build, install, uninstall, legacy (gỡ bản WpsAiBridge), core (tắt Core), package, libreoffice
   libreoffice.sh              Linux: đóng gói/cài/gỡ .oxt bằng unopkg của người dùng
   package_oxt.py              đóng gói .oxt (Windows + Linux)
   generate_mcp_commands.py    sinh danh sách lệnh nhúng cho axiom-office-mcp (từ registry extension)

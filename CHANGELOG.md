@@ -5,6 +5,20 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Removed — bỏ Agent Core bản .NET (C#) khỏi repo
+- Xoá `src/AxiomOffice.Core` (53 file / 8.393 dòng) và `tests/core/AxiomOffice.Core.Tests` (22 file / 3.624
+  dòng, 228 test xUnit) sau khi bản Go đã qua **cả hai** bộ e2e (155/155 mỗi bản) và 159 test trên LibreOffice
+  thật. `scripts/install-dotnet-sdk.ps1` cũng bỏ (chỉ tồn tại để build bản .NET)
+- **Port trước, xoá sau**: bốn vùng chỉ bản .NET có test đã được chuyển sang Go trước khi xoá — `corelog`
+  (định dạng dòng, ghi lỗi kèm tên kiểu qua `corelog.ErrorDetail`, xoay vòng file), `corefile` (`core.json`
+  ghi atomic, file thiếu/hỏng, xoá lại lần hai), `policy` (luật xác nhận lưu/xuất, ghi đè, `replaceAll` trên
+  tài liệu dài) và chọn port + khoá một-phiên-bản (`cmd/axiom-core`, `internal/instance`)
+- Cắt các dây nối: `build.ps1` bỏ tham số `-Core` và nhánh `dotnet publish`; `package.sh` bỏ `AXIOM_CORE=dotnet`;
+  CI bỏ hai bước `dotnet test tests/core/AxiomOffice.Core.Tests` và bước so sánh `prompts/extract.txt`
+  (nay chỉ còn một bản, nhúng bằng `go:embed`); `catalog/setup.json` giờ chỉ sinh catalog cho add-in + extension + Go
+- Tài liệu cập nhật theo: README (cây thư mục, lệnh test, yêu cầu build), `STATUS.md`, `core-go/README.md`
+  và một ghi chú ở `New_arch.md` (phần .NET còn lại là thiết kế ban đầu)
+
 ### Fixed — Wizard thiết lập (Linux): nút "Quay lại" bấm không được
 - **Gốc bệnh**: ở hàng nút dưới cùng, nhãn trạng thái (`FixedText` nền trắng, rộng `WIDTH - 2*PAD -
   2*BUTTON_W - 24` = 284 px, đặt tại `PAD`) trùm trọn nút "Quay lại" (rộng 110 px, cùng hàng). Điều khiển

@@ -1,9 +1,6 @@
 param(
     # Tu tat cac tien trinh dang lock AxiomOffice.dll/.Host.exe (Word/Excel/PowerPoint/WPS/companion) thay vi dung build.
-    [switch]$Kill,
-    # Agent Core nao: "go" (mac dinh, binary ~11MB khong can runtime - core-go/README.md) hoac "dotnet"
-    # (ban .NET 10 self-contained ~48MB) khi can doi chieu.
-    [ValidateSet("go", "dotnet")][string]$Core = "go"
+    [switch]$Kill
 )
 
 $ErrorActionPreference = "Stop"
@@ -11,7 +8,6 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $srcDir = Join-Path $root "src\AxiomOffice"
 $hostDir = Join-Path $root "src\AxiomOffice.Host"
-$coreDir = Join-Path $root "src\AxiomOffice.Core"
 $out = Join-Path $srcDir "bin\Release"
 $stage = Join-Path $out ".stage"
 $coreExe = Join-Path $out "AxiomOffice.Core.exe"
@@ -134,37 +130,18 @@ $stagedExe = Join-Path $stage "AxiomOffice.Host.exe"
 & $csc @commonArgs @hostArgs /target:exe "/out:$stagedExe" $hostSources
 if ($LASTEXITCODE -ne 0) { throw "Host build failed with exit code $LASTEXITCODE" }
 
-# Agent Core: version lay tu DLL add-in vua build de /health cua Core khop version bridge (New_arch.md muc 10).
+# Agent Core (Go): version lay tu DLL add-in vua build de /health cua Core khop version bridge (New_arch.md muc 10).
+# Mot binary, khong can .NET runtime tren may nguoi dung (core-go/README.md).
 $coreVersion = [System.Reflection.AssemblyName]::GetAssemblyName($stagedDll).Version.ToString(3)
-
-# Mac dinh: ban Go (core-go/) - mot binary, khong can .NET runtime tren may nguoi dung.
-if ($Core -eq "go") {
-    $go = Get-Command go -ErrorAction SilentlyContinue
-    if ($null -eq $go) {
-        Write-Host "Khong tim thay go: bo qua Agent Core. Cai Go 1.26+ (hoac chay build.ps1 -Core dotnet de dung ban .NET)." -ForegroundColor Yellow
-    } else {
-        # -C: chay go trong core-go/ du build.ps1 duoc goi tu dau.
-        $goDir = Join-Path $root "core-go"
-        & $go.Source build -C $goDir -trimpath -ldflags "-s -w -X main.version=$coreVersion" -o $coreExe ./cmd/axiom-core
-        if ($LASTEXITCODE -ne 0) { throw "Agent Core (Go) build failed with exit code $LASTEXITCODE" }
-        Write-Output "Built Agent Core (Go): $coreExe (version $coreVersion)"
-    }
-} elseif ($Core -eq "dotnet") {
-$dotnet = Find-Dotnet
-if ($null -eq $dotnet) {
-    Write-Host "Khong tim thay dotnet: bo qua Agent Core (AxiomOffice.Core.exe). Chay scripts\install-dotnet-sdk.ps1 roi build lai." -ForegroundColor Yellow
+$go = Get-Command go -ErrorAction SilentlyContinue
+if ($null -eq $go) {
+    Write-Host "Khong tim thay go: bo qua Agent Core (AxiomOffice.Core.exe). Cai Go 1.26+ roi build lai." -ForegroundColor Yellow
 } else {
-    $coreStage = Join-Path $stage "core"
-    # EnableCompressionInSingleFile: 103MB -> ~48MB (do that tren may nay).
-    # IncludeNativeLibrariesForSelfExtract: SQLite can e_sqlite3.dll native - phai nhung vao exe, neu
-    # khong thi ban publish chi co AxiomOffice.Core.exe se loi "SqliteConnection type initializer".
-    & $dotnet publish $coreDir -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:Version=$coreVersion -o $coreStage --nologo
-    if ($LASTEXITCODE -ne 0) { throw "Agent Core publish failed with exit code $LASTEXITCODE" }
-    $builtCore = Join-Path $coreStage "AxiomOffice.Core.exe"
-    if (-not (Test-Path -LiteralPath $builtCore)) { throw "Agent Core publish did not produce $builtCore" }
-    Copy-Item -LiteralPath $builtCore -Destination $coreExe -Force
-    Write-Output "Built Agent Core (.NET): $coreExe (version $coreVersion)"
-}
+    # -C: chay go trong core-go/ du build.ps1 duoc goi tu dau.
+    $goDir = Join-Path $root "core-go"
+    & $go.Source build -C $goDir -trimpath -ldflags "-s -w -X main.version=$coreVersion" -o $coreExe ./cmd/axiom-core
+    if ($LASTEXITCODE -ne 0) { throw "Agent Core build failed with exit code $LASTEXITCODE" }
+    Write-Output "Built Agent Core: $coreExe (version $coreVersion)"
 }
 
 foreach ($file in @($stagedDll, $stagedExe)) {
