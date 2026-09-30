@@ -961,6 +961,76 @@ def test_cancel(work: str, token: str, bridge: FakeBridge, document_path: str, s
         llm.stop()
 
 
+def test_mcp_http(work: str, token: str, bridge: FakeBridge, document_path: str, session_dir: str) -> None:
+    """MCP qua Streamable HTTP (`mcp.json` dang `url`): bat tay, giu Mcp-Session-Id, doc ca JSON lan SSE.
+
+    Phan `mcp` chi phu transport stdio (server built-in + lenh trong mcp.json); duong `url` (Claude Desktop
+    kieu may chu tu xa, proxy noi bo) truoc day chua co test nao chay.
+    """
+    json_server = fakes.McpHttpServer("json")
+    sse_server = fakes.McpHttpServer("sse")
+    data_dir = os.path.join(work, "core-mcp-http")
+    os.makedirs(data_dir, exist_ok=True)
+    with open(os.path.join(data_dir, "mcp.json"), "w", encoding="utf-8") as handle:
+        json.dump({"mcpServers": {
+            "http-json": {"url": json_server.url, "trusted": True},
+            "http-sse": {"url": sse_server.url, "trusted": True},
+        }}, handle)
+
+    llm = FakeLlm(work, [
+        {"tool": "mcp__http-json__echo", "arguments": {"text": "xin chao"}},
+        {"tool": "mcp__http-sse__echo", "arguments": {"text": "chao lai"}},
+        {"text": "Da goi xong hai may chu MCP qua HTTP"},
+    ])
+    core = Core(data_dir, session_dir, llm, token, {"AXIOM_MEMORY_AUTO_EXTRACT": "0"})
+    office = {"port": bridge.port, "pid": bridge.pid, "app": "et", "family": "office"}
+    try:
+        status, listing = http_json(core.base + "/v1/mcp", token=token)
+        servers = {item["name"]: item for item in listing["result"]["servers"]}
+        check("http-json" in servers and "http-sse" in servers,
+              "GET /v1/mcp: co server cau hinh bang url", sorted(servers))
+        check(servers["http-json"]["transport"] == "http" and servers["http-json"]["trusted"] is True
+              and not servers["http-json"]["error"],
+              "server url bao transport=http, khong loi", servers["http-json"])
+        check(servers["http-json"]["tools"] == ["mcp__http-json__echo"]
+              and servers["http-sse"]["tools"] == ["mcp__http-sse__echo"],
+              "tool cua server url duoc dang ky dung ten",
+              (servers["http-json"]["tools"], servers["http-sse"]["tools"]))
+
+        status, created = core.run("Goi hai may chu MCP qua HTTP", office,
+                                   document={"name": "bao-cao.xlsx", "fullName": document_path})
+        run_id = created["result"]["runId"]
+        events = core.events(run_id)
+        check(events[-1][0] == "run.completed", "luot chay voi MCP HTTP ket thuc binh thuong", [item[0] for item in events])
+        finished = [payload.get("data", {}) for kind, payload in events if kind == "tool.finished"]
+        check(len(finished) == 2 and all(item.get("ok") for item in finished),
+              "hai tool MCP HTTP chay thanh cong", [(i.get("tool"), i.get("ok")) for i in finished])
+
+        bodies = [item["body"] for item in llm.requests()]
+
+        def tool_text(index: int) -> str:
+            messages = bodies[index]["messages"]
+            return next((message.get("content", "") for message in reversed(messages) if message.get("role") == "tool"), "")
+
+        check("xin chao qua json" in tool_text(1), "may chu tra JSON: ket qua dung", tool_text(1)[:120])
+        check("chao lai qua sse" in tool_text(2), "may chu tra SSE: ket qua dung", tool_text(2)[:120])
+
+        check(not json_server.refused and not sse_server.refused,
+              "client giu Mcp-Session-Id qua cac request sau", (json_server.refused, sse_server.refused))
+        check(all(item["headers"].get("mcp-protocol-version") for item in json_server.requests),
+              "request gui kem MCP-Protocol-Version",
+              [item["headers"].get("mcp-protocol-version") for item in json_server.requests][:3])
+
+        status, audit = http_json(f"{core.base}/v1/audit?runId={run_id}", token=token)
+        tools = [item["tool"] for item in reversed(audit["result"]["calls"])]
+        check(tools == ["mcp__http-json__echo", "mcp__http-sse__echo"], "audit ghi tool MCP HTTP", tools)
+    finally:
+        core.stop()
+        llm.stop()
+        json_server.stop()
+        sse_server.stop()
+
+
 def test_confirm(work: str, token: str, bridge: FakeBridge, document_path: str, session_dir: str) -> None:
     """Giai doan 4 (New_arch.md 8.6, 12): policy xac nhan - dong y / tu choi / het gio; audit day du."""
     llm = FakeLlm(work, [
@@ -1349,7 +1419,7 @@ def test_office(core: Core, port: int, pid: int) -> None:
 
 # Cac phan chay duoc rieng (--only); /health luon chay truoc.
 SECTIONS = ["fake_bridge", "guards", "skills", "memory", "confirm", "mcp", "visual", "setup", "shutdown",
-            "anthropic", "embeddings", "summarize", "cancel"]
+            "anthropic", "embeddings", "summarize", "cancel", "mcp_http"]
 
 # Phan phu thuoc: `guards` dung chung kich ban LLM voi `fake_bridge` (kich ban tuan tu) nen chay mot minh
 # se lech buoc -> --only tu keo theo phan can truoc.
@@ -1467,6 +1537,8 @@ def main() -> int:
                 test_summarize(work, token, bridge, document_path, session_dir)
             if wanted("cancel"):
                 test_cancel(work, token, bridge, document_path, session_dir)
+            if wanted("mcp_http"):
+                test_mcp_http(work, token, bridge, document_path, session_dir)
     finally:
         if core is not None:
             core.stop()

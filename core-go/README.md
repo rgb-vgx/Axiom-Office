@@ -23,6 +23,7 @@ bản .NET vẫn nằm trong repo và vẫn chạy được (`build.ps1 -Core do
 | G8 | phủ nốt hai vùng chưa có e2e: codec Anthropic (chạy thật) và embedding (cosine + tìm theo nghĩa) | `anthropic`, `embeddings` | ✔ |
 | G9 | phủ đường tóm tắt hội thoại dài (chỉ khi vượt mốc 20 tin nhắn) | `summarize` | ✔ |
 | G10 | phủ nút Dừng, `interactive=false` (`ai.ask`), PATCH memory và xóa cứng toàn bộ | `cancel`, `confirm`, `memory` | ✔ |
+| G11 | phủ MCP transport HTTP (URL server, session id, response JSON + SSE) | `mcp_http` | ✔ |
 
 ## Build
 

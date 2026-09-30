@@ -37,6 +37,7 @@ mutex một-phiên-bản. Nhờ vậy add-in/extension/MCP không phải đổi 
 | G8 | Phủ codec Anthropic (chạy thật) và embedding (cosine + tìm theo nghĩa) |
 | G9 | Phủ tóm tắt hội thoại dài (chỉ khi vượt mốc 20 tin nhắn) |
 | G10 | Phủ nút **Dừng** (`/cancel`), `interactive=false` (`ai.ask`), PATCH memory, xoá cứng toàn bộ |
+| G11 | Phủ MCP transport **HTTP** (`mcp.json` dạng `url`): session id, response JSON và SSE |
 
 Kích thước: Core Go **11,9 MB** (bản .NET self-contained: 51,6 MB), không cần runtime trên máy người dùng.
 
@@ -55,9 +56,9 @@ Kích thước: Core Go **11,9 MB** (bản .NET self-contained: 51,6 MB), không
 
 | Bộ kiểm thử | Kết quả |
 |---|---|
-| e2e Core — **bản Go** (13 phần, Windows) | **145/145** |
-| e2e Core — **bản .NET** (đối chiếu) | **145/145** |
-| e2e trên **Linux** đúng lệnh CI (12 phần) | **133/133** |
+| e2e Core — **bản Go** (14 phần, Windows) | **155/155** |
+| e2e Core — **bản .NET** (đối chiếu) | **155/155** |
+| e2e trên **Linux** đúng lệnh CI (13 phần) | **143/143** |
 | LibreOffice thật (gói mới, Core Go) | **159/159** |
 | Wizard thiết lập (dialog thật, X ảo) | **12/12** |
 | `go test ./...` (core-go) | 10/10 gói |
@@ -81,7 +82,6 @@ phần với binary Go, so sánh `prompts/extract.txt` giữa hai bản, cài Li
 |---|---|---|
 | **Wizard Windows bấm tay trong Word/Excel/WPS** | Chưa | Đã biên dịch sạch và dựng vào `bin\Release`; cần bạn mở app bấm thử (máy này không chạy Office) |
 | e2e `--office` (Office thật + add-in, `test_office`) | Chưa chạy trong đợt này | Cần mở Excel thật; đã có từ các đợt trước |
-| MCP transport **HTTP** (server cấu hình bằng `url`) | Chưa có test | Chỉ transport stdio được kiểm (server built-in `office` + `mcp.json` dạng `command`) |
 | Trích xuất memory với **LLM thật** | Chưa | Đã kiểm bằng LLM giả (e2e) và unit test `ParseFacts`; chưa chạy model thật |
 | Đọc/ghi **HKCU** bằng test tự động trên Windows | Một phần | Đối chiếu tay: Core Go đọc đúng endpoint/model/token/DPAPI của bạn; test tự động hiện dùng `AXIOM_*` |
 | **Push remote** | Chưa | Bạn yêu cầu chỉ commit |
@@ -119,12 +119,11 @@ bash scripts/linux/package.sh     # gói Linux (AXIOM_CORE=dotnet để dùng b�
 ```
 
 Các phần e2e chạy riêng được: `fake_bridge`, `guards`, `skills`, `memory`, `confirm`, `mcp`, `visual`,
-`setup`, `shutdown`, `anthropic`, `embeddings`, `summarize`, `cancel`.
+`setup`, `shutdown`, `anthropic`, `embeddings`, `summarize`, `cancel`, `mcp_http`.
 
 ## 6. Việc nên làm tiếp (đề xuất)
 
 1. **Bạn bấm thử wizard Windows** trong Word/Excel/WPS (5 bước, nhất là **Thử ngay**) rồi báo lại.
-2. Có test cho **MCP transport HTTP** (dựng server HTTP nhỏ trong `tests/core/fakes.py`).
-3. Chạy `--real-llm` cho **memory** (trích xuất bằng model thật) khi muốn chắc chắn chất lượng fact.
-4. Cân nhắc **bỏ hẳn bản Core .NET** sau một thời gian chạy thật ổn định (khi đó `SetupCatalog.cs` chỉ còn
+2. Chạy `--real-llm` cho **memory** (trích xuất bằng model thật) khi muốn chắc chắn chất lượng fact.
+3. Cân nhắc **bỏ hẳn bản Core .NET** sau một thời gian chạy thật ổn định (khi đó `SetupCatalog.cs` chỉ còn
    dùng cho add-in, và `prompts/extract.txt` chỉ còn một bản).

@@ -5,11 +5,14 @@ Dung cho cac phan e2e chua co LLM gia tuong ung:
   - anthropic_handler: {endpoint}/messages theo dinh dang Anthropic (tool_use -> tool_result, anh base64).
   - embedding_handler: /embeddings kieu OpenAI-compatible voi vector dieu khien duoc (kiem thu chong
     trung bang cosine va tim theo nghia).
+  - McpHttpServer: MCP server kieu Streamable HTTP (tra JSON hoac SSE, co Mcp-Session-Id) de kiem thu
+    mcp.json dang `url`.
 """
 from __future__ import annotations
 
 import json
 import threading
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 
@@ -119,3 +122,101 @@ def embedding_handler(marker_vectors: dict[str, list[float]], default: list[floa
         return {"object": "list", "data": data, "model": (body or {}).get("model", "fake-embed")}, 200
 
     return handler
+
+
+class McpHttpServer:
+    """MCP server kieu Streamable HTTP (JSON-RPC qua POST) de kiem thu mcp.json dang `url`.
+
+    mode="json": tra application/json; mode="sse": tra text/event-stream voi mot dong `data:` — hai kieu
+    response ma core phai doc duoc. Cap Mcp-Session-Id o initialize va BAT BUOC client gui lai o cac request
+    sau (dung nhu MCP that, de bat loi khong giu session).
+    """
+
+    def __init__(self, mode: str = "json"):
+        outer = self
+        self.mode = mode
+        self.requests: list[dict] = []
+        self.session = "sess-" + uuid.uuid4().hex[:8]
+        self.refused: list[str] = []
+        self.tools = [
+            {"name": "echo", "description": "Tra lai chuoi da gui",
+             "inputSchema": {"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"]}},
+        ]
+
+        class Handler(BaseHTTPRequestHandler):
+            protocol_version = "HTTP/1.1"
+
+            def log_message(self, *args) -> None:
+                pass
+
+            def _send(self, payload: dict | None, status: int, session: str = "") -> None:
+                if payload is None:
+                    data = b""
+                    content_type = "application/json"
+                elif outer.mode == "sse":
+                    data = ("data: " + json.dumps(payload, ensure_ascii=False) + "\n\n").encode("utf-8")
+                    content_type = "text/event-stream"
+                else:
+                    data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+                    content_type = "application/json"
+                self.send_response(status)
+                self.send_header("Content-Type", content_type)
+                if session:
+                    self.send_header("Mcp-Session-Id", session)
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                if data:
+                    self.wfile.write(data)
+
+            def do_POST(self) -> None:
+                length = int(self.headers.get("Content-Length", "0"))
+                raw = self.rfile.read(length).decode("utf-8") if length else "{}"
+                try:
+                    body = json.loads(raw)
+                except json.JSONDecodeError:
+                    body = {}
+                outer.requests.append({"headers": {k.lower(): v for k, v in self.headers.items()}, "body": body})
+                payload, status, session = outer.handle(body, self.headers)
+                self._send(payload, status, session)
+
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.port = self.server.server_address[1]
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+
+    @property
+    def url(self) -> str:
+        return "http://127.0.0.1:%d/mcp" % self.port
+
+    def handle(self, body: dict, headers) -> tuple[dict | None, int, str]:
+        """Tra (payload, status, header phien can gui kem)."""
+        method = body.get("method")
+        message_id = body.get("id")
+        session = headers.get("Mcp-Session-Id", "")
+
+        if method == "initialize":
+            return ({"jsonrpc": "2.0", "id": message_id,
+                     "result": {"protocolVersion": "2025-06-18", "capabilities": {},
+                                "serverInfo": {"name": "mau-http", "version": "1.0.0"}}}, 200, self.session)
+        if method == "notifications/initialized":
+            return None, 202, self.session
+        if session != self.session:
+            self.refused.append("thieu Mcp-Session-Id o %s" % method)
+            return {"jsonrpc": "2.0", "id": message_id,
+                    "error": {"code": -32000, "message": "missing or wrong Mcp-Session-Id"}}, 400, ""
+        if method == "tools/list":
+            return {"jsonrpc": "2.0", "id": message_id, "result": {"tools": self.tools}}, 200, ""
+        if method == "tools/call":
+            params = body.get("params") or {}
+            if params.get("name") != "echo":
+                return {"jsonrpc": "2.0", "id": message_id,
+                        "error": {"code": -32602, "message": "unknown tool " + str(params.get("name"))}}, 200, ""
+            text = str((params.get("arguments") or {}).get("text", ""))
+            return ({"jsonrpc": "2.0", "id": message_id,
+                     "result": {"content": [{"type": "text", "text": text + " qua " + self.mode}]}}, 200, "")
+        return {"jsonrpc": "2.0", "id": message_id,
+                "error": {"code": -32601, "message": "method not supported"}}, 200, ""
+
+    def stop(self) -> None:
+        self.server.shutdown()
+        self.server.server_close()

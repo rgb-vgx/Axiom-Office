@@ -34,8 +34,11 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
   `run.cancelled`, agent không sửa tài liệu nữa, `GET /v1/runs/{id}` báo `cancelled`, hủy lại → 409, và Core
   vẫn khỏe để chạy lượt mới. Phần `memory` thêm ca xóa cứng toàn bộ (`?scope=all&confirm=true`, thiếu
   `confirm` → 400) — nút "Xóa toàn bộ ghi nhớ" trong dialog
-- Bộ e2e giờ **145 kiểm tra**, tất cả đều xanh trên **cả hai bản** (.NET và Go); CI (Linux) chạy 12 phần
-  (`shutdown`, `anthropic`, `embeddings`, `summarize`, `cancel` là năm phần mới thêm)
+- Phần e2e **`mcp_http`**: MCP qua **Streamable HTTP** (`mcp.json` dạng `url`) — bắt tay `initialize`, giữ
+  `Mcp-Session-Id` cho các request sau, gửi kèm `MCP-Protocol-Version`, đọc được cả response dạng JSON lẫn
+  dạng SSE, tool đặt tên `mcp__<server>__<tool>` và vào audit. Trước đây chỉ transport stdio có test
+- Bộ e2e giờ **155 kiểm tra** (14 phần chạy riêng được), tất cả đều xanh trên **cả hai bản** (.NET và Go);
+  CI (Linux) chạy 13 phần (143 kiểm tra)
 
 ### Added — Wizard thiết lập cho người dùng không chuyên (Windows + Linux)
 - **Một nội dung, hai bộ vẽ**: câu chữ + preset nhà cung cấp nằm ở `catalog/setup.json`, sinh ra
