@@ -58,6 +58,12 @@ namespace AxiomOffice.Ai
         public static readonly Font Caption = new Font("Segoe UI", 8.25f);
         public static readonly Font CaptionBold = new Font("Segoe UI Semibold", 8.25f);
 
+        // Wizard thiết lập (dialog rời, không phải sidebar): cần thang chữ rõ hơn pane - cửa sổ 640px mà tiêu đề
+        // chỉ 11pt thì mọi thứ trông ngang hàng. Thêm ba bậc, KHÔNG đổi các bậc cũ của pane.
+        public static readonly Font DialogTitle = new Font("Segoe UI Semibold", 14f);
+        public static readonly Font DialogSubtitle = new Font("Segoe UI", 10f);
+        public static readonly Font FieldLabel = new Font("Segoe UI Semibold", 9.5f);
+
         public const int PadX = 12;
         public const int GapMessage = 12;
         public const int GapBeforeTools = 8;

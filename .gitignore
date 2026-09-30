@@ -11,3 +11,5 @@ __pycache__/
 *.pyc
 /dist/
 .ua
+# Anh render cua test thi giac wizard (tests/ui/shots.ps1)
+tests/ui/out/

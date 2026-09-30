@@ -5,6 +5,28 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed — Wizard thiết lập (Windows): soi lại giao diện từ ảnh render thật
+- **Có ảnh để soi**: thêm `tests/ui/shots.ps1` + `tests/ui/SetupWizardShots.cs` — biên dịch harness chung với
+  mã nguồn add-in (không đụng `bin\Release`, không cần Office/WPS), mở `SetupWizardForm` thật, nhảy qua 5
+  bước rồi lưu PNG vào `tests/ui/out/` (không commit). Mọi thay đổi bố cục/màu/chữ từ nay so được trước–sau
+- **Bảng điều khiển WinForms trộn hai ngôn ngữ thị giác**: TextBox/CheckBox mặc định vẽ viền vuông + tick 3D
+  trong khi nút của Axiom vốn phẳng bo góc, nhìn như hai sản phẩm ghép lại. Thêm `Ai/SetupWizardControls.cs`
+  (tách khỏi `PaneControls.cs` đang dùng chung với pane): `FieldBox` (ô nhập bo góc 1px, viền đổi màu khi
+  focus), `ToggleBox` (checkbox phẳng, bấm được cả nhãn, Space để bật/tắt), `StatusBadge` (đĩa tròn + ✓/!/✗
+  thay cho ký tự trần trông như lỗi gõ), `CardBox` (thẻ bo góc theo sắc thái trung tính/thành công/cảnh
+  báo/lỗi) và `StepBar` (5 đoạn indigo thay cho `●○○○○` ở cỡ 8.25pt — khó thấy và trùng nghĩa với chữ
+  "bước 2/5" bên cạnh)
+- Bước 1–5 chỉnh theo: tiêu đề/phụ đề dùng cỡ chữ riêng (`PaneTheme.DialogTitle/DialogSubtitle/FieldLabel`),
+  đường kẻ 1px trên hàng nút, ô nhập có nhãn đậm phía trên (bỏ nhãn nằm lẫn trong placeholder), 4 nhà cung
+  cấp xếp lưới 2×2 đều nhau (tính theo số nhà cung cấp, không hardcode), Enter ở bất kỳ ô nào = "Kiểm tra kết
+  nối", bước kiểm tra máy đổi thành danh sách thẻ (huy hiệu + kết luận + chi tiết + nút sửa trong thẻ, nút
+  "Kiểm tra lại" xuống dưới danh sách), bước 5 tóm tắt dạng cặp nhãn/giá trị (4 dòng: Model · Máy chủ AI ·
+  Ghi nhớ dài hạn · Agent Core — trước đây dồn thành một đoạn văn có dấu "·" nên khó quét) và nút "Thử ngay
+  trên tài liệu đang mở" giãn hết chiều ngang
+- Sửa lỗi nhìn thấy được khi render: thẻ kết quả thử kết nối bị hàng nút cắt mất chân, lưới chip nhà cung
+  cấp tràn chữ khi có 4 mục, và chữ trong thẻ kết quả dính lên mép trên (nay canh giữa)
+- Nút "← Quay lại" trên Windows đã có sẵn và vẫn bấm được (lỗi nút này là của bản Linux, xem mục ở dưới)
+
 ### Removed — bỏ Agent Core bản .NET (C#) khỏi repo
 - Xoá `src/AxiomOffice.Core` (53 file / 8.393 dòng) và `tests/core/AxiomOffice.Core.Tests` (22 file / 3.624
   dòng, 228 test xUnit) sau khi bản Go đã qua **cả hai** bộ e2e (155/155 mỗi bản) và 159 test trên LibreOffice

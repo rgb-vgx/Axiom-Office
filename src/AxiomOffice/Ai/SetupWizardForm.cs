@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Threading;
@@ -23,10 +23,12 @@ namespace AxiomOffice.Ai
         private readonly string _catalogProblem;
 
         private readonly Panel _content = new Panel();
+        private readonly StepBar _stepBar = new StepBar();
         private readonly Label _stepLabel = new Label();
         private readonly Label _titleLabel = new Label();
         private readonly Label _subtitleLabel = new Label();
         private readonly Panel _footer = new Panel();
+        private readonly Panel _footerDivider = new Panel();
         private readonly ChipButton _back = new ChipButton("← Quay lại");
         private readonly ChipButton _later = new ChipButton("Để sau");
         private readonly SendButton _next = new SendButton();
@@ -41,6 +43,10 @@ namespace AxiomOffice.Ai
         private readonly TextBox _apiKey = new TextBox();
         private readonly ComboBox _model = new ComboBox();
         private readonly Label _keyLink = new Label();
+        private readonly CardBox _probeCard = new CardBox();
+        private readonly FieldBox _endpointBox;
+        private readonly FieldBox _apiKeyBox;
+        private readonly FieldBox _modelBox;
         private readonly Label _probe = new Label();
         private readonly ChipButton _test = new ChipButton("Kiểm tra kết nối");
         private readonly ChipButton _loadModels = new ChipButton("Tải danh sách model");
@@ -52,13 +58,15 @@ namespace AxiomOffice.Ai
         private readonly List<Label> _checkLines = new List<Label>();
 
         // Buoc 4: tinh nang.
-        private readonly CheckBox _memory = new CheckBox();
-        private readonly CheckBox _autoExtract = new CheckBox();
-        private readonly CheckBox _visualQa = new CheckBox();
+        private readonly ToggleBox _memory = new ToggleBox();
+        private readonly ToggleBox _autoExtract = new ToggleBox();
+        private readonly ToggleBox _visualQa = new ToggleBox();
         private readonly ChipButton _advanced = new ChipButton("Tuỳ chọn nâng cao…");
+        private readonly ChipButton _again = new ChipButton("Kiểm tra lại");
 
         // Buoc 5: thu ngay.
-        private readonly Label _summary = new Label();
+        private readonly Panel _summaryPanel = new Panel();
+        private readonly CardBox _tryResultCard = new CardBox();
         private readonly ChipButton _tryNow = new ChipButton("Thử ngay trên tài liệu đang mở");
         private readonly Label _tryResult = new Label();
 
@@ -78,6 +86,16 @@ namespace AxiomOffice.Ai
             Font = PaneTheme.Body;
             BackColor = PaneTheme.PaneBg;
             KeyPreview = true;
+
+            // Ba ô nhập dùng chung kiểu "khung bo góc + TextBox phẳng" của Axiom thay vì viền vuông của WinForms.
+            _endpoint.Font = PaneTheme.Small;
+            _apiKey.Font = PaneTheme.Small;
+            _apiKey.UseSystemPasswordChar = true;
+            _model.Font = PaneTheme.Small;
+            _model.DropDownStyle = ComboBoxStyle.DropDown;
+            _endpointBox = new FieldBox(_endpoint);
+            _apiKeyBox = new FieldBox(_apiKey);
+            _modelBox = new FieldBox(_model);
 
             BuildChrome();
             BuildWelcome();
@@ -100,30 +118,36 @@ namespace AxiomOffice.Ai
 
         private void BuildChrome()
         {
+            // Chi bao buoc: thanh 5 doan (de thay) + chu "bước N/5" (de doc) - thay cho cham ●○○○○ o co 8.25pt.
+            _stepBar.Location = new Point(24, 20);
             _stepLabel.AutoSize = false;
-            _stepLabel.Location = new Point(24, 18);
-            _stepLabel.Size = new Size(Width0 - 48, 18);
-            _stepLabel.Font = PaneTheme.Caption;
+            _stepLabel.Location = new Point(24 + _stepBar.Width + 12, 16);
+            _stepLabel.Size = new Size(200, 18);
+            _stepLabel.Font = PaneTheme.Small;
             _stepLabel.ForeColor = PaneTheme.TextMuted;
 
             _titleLabel.AutoSize = false;
-            _titleLabel.Location = new Point(24, 38);
-            _titleLabel.Size = new Size(Width0 - 48, 28);
-            _titleLabel.Font = PaneTheme.EmptyTitle;
+            _titleLabel.Location = new Point(24, 40);
+            _titleLabel.Size = new Size(Width0 - 48, 32);
+            _titleLabel.Font = PaneTheme.DialogTitle;
             _titleLabel.ForeColor = PaneTheme.TextPrimary;
 
             _subtitleLabel.AutoSize = false;
-            _subtitleLabel.Location = new Point(24, 68);
-            _subtitleLabel.Size = new Size(Width0 - 48, 34);
-            _subtitleLabel.Font = PaneTheme.Small;
+            _subtitleLabel.Location = new Point(24, 76);
+            _subtitleLabel.Size = new Size(Width0 - 48, 40);
+            _subtitleLabel.Font = PaneTheme.DialogSubtitle;
             _subtitleLabel.ForeColor = PaneTheme.TextSecondary;
 
-            _content.Location = new Point(0, 106);
-            _content.Size = new Size(Width0, Height0 - 106 - 64);
+            _content.Location = new Point(0, 124);
+            _content.Size = new Size(Width0, Height0 - 124 - 64);
             _content.BackColor = PaneTheme.PaneBg;
 
-            _footer.Location = new Point(0, Height0 - 64);
-            _footer.Size = new Size(Width0, 64);
+            _footerDivider.Location = new Point(0, Height0 - 64);
+            _footerDivider.Size = new Size(Width0, 1);
+            _footerDivider.BackColor = PaneTheme.Divider;
+
+            _footer.Location = new Point(0, Height0 - 63);
+            _footer.Size = new Size(Width0, 63);
             _footer.BackColor = PaneTheme.PaneBg;
 
             _later.Location = new Point(24, 16);
@@ -145,7 +169,8 @@ namespace AxiomOffice.Ai
             }
 
             _footer.Controls.AddRange(buttons);
-            Controls.AddRange(new Control[] { _stepLabel, _titleLabel, _subtitleLabel, _content, _footer });
+            Controls.AddRange(new Control[] { _stepBar, _stepLabel, _titleLabel, _subtitleLabel, _content,
+                _footerDivider, _footer });
             KeyDown += delegate (object sender, KeyEventArgs e)
             {
                 if (e.KeyCode == Keys.Escape)
@@ -189,7 +214,8 @@ namespace AxiomOffice.Ai
 
             _titleLabel.Text = title;
             _subtitleLabel.Text = step.Subtitle;
-            _stepLabel.Text = StepsDots(index);
+            _stepBar.Step = index;
+            _stepLabel.Text = "bước " + (index + 1) + "/5";
 
             _back.Visible = index > 0 && index < 4;
             _later.Visible = index < 4;
@@ -208,19 +234,8 @@ namespace AxiomOffice.Ai
 
             if (index == 4)
             {
-                _summary.Text = SummaryText();
+                RefreshSummary();
             }
-        }
-
-        private static string StepsDots(int index)
-        {
-            string text = "";
-            for (int i = 0; i < 5; i++)
-            {
-                text += i == index ? "●" : "○";
-            }
-
-            return text + "   bước " + (index + 1) + "/5";
         }
 
         private void OnNext()
@@ -252,33 +267,67 @@ namespace AxiomOffice.Ai
         private void BuildWelcome()
         {
             Panel panel = NewStep();
-            var body = new Label
+            int y = 0;
+
+            panel.Controls.Add(new Label
             {
                 AutoSize = false,
-                Location = new Point(24, 6),
-                Size = new Size(Width0 - 48, 210),
-                Font = PaneTheme.Body,
-                ForeColor = PaneTheme.TextSecondary
+                Location = new Point(24, y),
+                Size = new Size(Width0 - 48, 46),
+                Font = PaneTheme.DialogSubtitle,
+                ForeColor = PaneTheme.TextSecondary,
+                Text = "AI đọc và sửa trực tiếp tài liệu đang mở trong Word, Excel hoặc PowerPoint. "
+                    + "Axiom Office sẽ hỏi bạn ba việc:"
+            });
+            y += 56;
+
+            // Ba muc danh so bang huy hieu tron: truoc day la mot doan chu voi so thu tu go tay nen cac dong le
+            // nhau, dong thu ba khong thang hang voi hai dong dau.
+            string[] items =
+            {
+                "Kiểm tra máy đã sẵn sàng chưa",
+                "Kết nối tới máy chủ AI (máy chủ công ty hoặc tài khoản riêng)",
+                "Chọn những gì AI được làm thêm",
             };
+            for (int index = 0; index < items.Length; index++)
+            {
+                var badge = new StatusBadge();
+                badge.SetGlyph((index + 1).ToString(), PaneTheme.ActionBg);
+                badge.Location = new Point(24, y);
 
-            string text = "AI đọc và sửa trực tiếp tài liệu đang mở trong Word, Excel hoặc PowerPoint.\r\n\r\n"
-                + "Axiom Office sẽ hỏi bạn ba điều:\r\n"
-                + "   1.  Kiểm tra máy đã sẵn sàng chưa\r\n"
-                + "   2.  Kết nối tới máy chủ AI (của công ty hoặc tài khoản riêng)\r\n"
-                + "   3.  Chọn những gì AI được làm thêm\r\n\r\n"
-                + "Mất khoảng một phút. Có thể mở lại mục \"Thiết lập…\" bất cứ lúc nào.";
+                panel.Controls.Add(badge);
+                panel.Controls.Add(new Label
+                {
+                    AutoSize = false,
+                    Location = new Point(24 + 30, y - 2),
+                    Size = new Size(Width0 - 48 - 30, 24),
+                    Font = PaneTheme.Body,
+                    ForeColor = PaneTheme.TextPrimary,
+                    Text = items[index]
+                });
+                y += 32;
+            }
 
+            y += 10;
+            var note = new Label
+            {
+                AutoSize = false,
+                Location = new Point(24, y),
+                Size = new Size(Width0 - 48, 46),
+                Font = PaneTheme.Small,
+                ForeColor = PaneTheme.TextMuted,
+                Text = "Mở lại mục \"Thiết lập…\" trong thẻ Axiom Office bất cứ lúc nào."
+            };
             if (_info != null && _info.Version.Length > 0)
             {
-                text += "\r\n\r\nPhiên bản: " + _info.Version;
+                note.Text += "  ·  Phiên bản " + _info.Version;
             }
             else if (!string.IsNullOrEmpty(_catalogProblem))
             {
-                text += "\r\n\r\n(Agent Core chưa chạy — dùng bản thiết lập có sẵn trong ứng dụng.)";
+                note.Text += "\r\n(Chưa đọc được Agent Core — dùng bản thiết lập có sẵn trong ứng dụng.)";
             }
 
-            body.Text = text;
-            panel.Controls.Add(body);
+            panel.Controls.Add(note);
         }
 
         // ---------- B2: kiem tra may ----------
@@ -287,19 +336,18 @@ namespace AxiomOffice.Ai
         {
             Panel panel = NewStep();
             _checks.Location = new Point(24, 0);
-            _checks.Size = new Size(Width0 - 48, 260);
+            _checks.Size = new Size(Width0 - 48, 10);
             _checks.BackColor = PaneTheme.PaneBg;
 
-            var again = new ChipButton("Kiểm tra lại");
-            again.Location = new Point(24, 268);
-            again.Size = new Size(120, 30);
-            again.Click += delegate
+            _again.Location = new Point(24, 0);          // dat lai sau khi ve xong danh sach (xem RefreshChecks)
+            _again.Size = new Size(130, 30);
+            _again.Click += delegate
             {
                 CoreClient.Instance.RestartCore(out _);
                 RefreshChecks();
             };
 
-            panel.Controls.AddRange(new Control[] { _checks, again });
+            panel.Controls.AddRange(new Control[] { _checks, _again });
         }
 
         private void RefreshChecks()
@@ -316,43 +364,59 @@ namespace AxiomOffice.Ai
 
             foreach (CheckRow row in rows)
             {
-                var icon = new Label
+                // Moi dong la mot the bo goc: huy hieu tron + tieu de dam + chi tiet mo + nut Sua trong the. Truoc
+                // day la ba control roi tren nen trang nen "cai gi sai" va "sua the nao" khong gan voi nhau.
+                var card = new CardBox
                 {
-                    AutoSize = false,
-                    Location = new Point(0, y + 2),
-                    Size = new Size(24, 20),
-                    Font = PaneTheme.Body,
-                    ForeColor = row.Danger ? PaneTheme.Danger : (row.Warn ? PaneTheme.TextMuted : PaneTheme.Success),
-                    Text = row.Icon
+                    Location = new Point(0, y),
+                    Size = new Size(Width0 - 48, 54),
+                    Tone = row.Danger ? "danger" : row.Warn ? "warn" : "success"
                 };
 
-                var text = new Label
+                var badge = new StatusBadge { Location = new Point(14, 17) };
+                badge.Set(!row.Danger && !row.Warn, row.Warn, row.Danger);
+
+                var title = new Label
                 {
                     AutoSize = false,
-                    Location = new Point(26, y),
-                    Size = new Size(Width0 - 48 - 26 - 130, 40),
-                    Font = PaneTheme.Small,
+                    Location = new Point(44, 9),
+                    Size = new Size(Width0 - 48 - 44 - 14 - (row.Fixable ? 140 : 0), 20),
+                    Font = PaneTheme.SmallBold,
                     ForeColor = PaneTheme.TextPrimary,
-                    Text = row.Title + "\r\n" + row.Detail
+                    Text = row.Title
                 };
 
-                _checks.Controls.Add(icon);
-                _checks.Controls.Add(text);
-                _checkLines.Add(text);
+                var detail = new Label
+                {
+                    AutoSize = false,
+                    Location = new Point(44, 28),
+                    Size = new Size(Width0 - 48 - 44 - 14 - (row.Fixable ? 140 : 0), 20),
+                    Font = PaneTheme.Small,
+                    ForeColor = PaneTheme.TextMuted,
+                    Text = row.Detail
+                };
+
+                card.Controls.Add(badge);
+                card.Controls.Add(title);
+                card.Controls.Add(detail);
+                _checkLines.Add(detail);
 
                 if (row.Fixable)
                 {
-                    string label = row.FixLabel;
-                    ChipButton fix = new ChipButton(label);
-                    fix.Location = new Point(Width0 - 48 - 120, y + 4);
-                    fix.Size = new Size(120, 28);
+                    ChipButton fix = new ChipButton(row.FixLabel);
+                    fix.Location = new Point(card.Width - 130, 12);
+                    fix.Size = new Size(116, 30);
                     string fixId = row.Id;
                     fix.Click += delegate { RunFix(fixId); };
-                    _checks.Controls.Add(fix);
+                    card.Controls.Add(fix);
                 }
 
-                y += 48;
+                _checks.Controls.Add(card);
+                y += 62;
             }
+
+            _checks.Height = Math.Max(10, y - 8);
+            _again.Location = new Point(0, _checks.Height + 12);
         }
 
         private sealed class CheckRow
@@ -377,9 +441,11 @@ namespace AxiomOffice.Ai
                 Id = "core",
                 Icon = running ? "✓" : "✗",
                 Title = running ? "Agent Core đang chạy" : "Agent Core chưa chạy",
+                // Dong chi tiet phai la cau nguoi dung hieu duoc: truoc day in nguyen van loi ky thuat cua Core
+                // (vd "khong thay"), khong noi len duoc phai lam gi. Loi goc van nam trong core.log.
                 Detail = running
                     ? "Bộ não chạy nền của Axiom Office (cổng " + SetupInfo.Text("port", info.Core, "?") + ")."
-                    : (string.IsNullOrEmpty(error) ? "Bấm \"Khởi động Core\" để chạy lại." : error),
+                    : "Bấm \"Khởi động Core\" để Axiom Office tự chạy lại (chi tiết kỹ thuật ở core.log).",
                 Danger = !running,
                 Fixable = !running,
                 FixLabel = "Khởi động Core"
@@ -490,47 +556,49 @@ namespace AxiomOffice.Ai
             Panel panel = NewStep();
             int y = 0;
 
-            panel.Controls.Add(Label2("AI của bạn nằm ở đâu?", 24, y, 400, true));
-
+            // Nha cung cap: luoi 2 cot, be rong theo chu (truoc day chip co dinh 140px nen "May chu cua cong ty"
+            // bi cat thanh "May chu cua co..." - nguoi dung khong doc duoc lua chon cua chinh minh).
+            panel.Controls.Add(FieldLabel("AI của bạn nằm ở đâu?", 24, y));
             y += 26;
-            foreach (SetupProviderInfo provider in SetupCatalog.Providers)
+
+            // O rong bang nhau theo cot (luoi 2x3 gon gan, khong con chip ngang ngan khac nhau). Nhan dai nhat
+            // "May chu cua cong ty" ~170px nen 292px la du, khong bao gio bi cat.
+            int columnWidth = (Width0 - 48 - 8) / 2;
+            for (int index = 0; index < SetupCatalog.Providers.Count; index++)
             {
+                SetupProviderInfo provider = SetupCatalog.Providers[index];
                 var chip = new ChipButton(provider.Label);
-                chip.Location = new Point(24, y);
-                chip.Size = new Size(140, 30);
+                chip.Location = new Point(24 + (index % 2) * (columnWidth + 8), y + (index / 2) * 36);
+                chip.Size = new Size(columnWidth, 30);
                 string id = provider.Id;
                 chip.Click += delegate { SelectProvider(id); };
                 _providerChips.Add(chip);
                 panel.Controls.Add(chip);
-                y += 36;
             }
 
-            y += 6;
-            panel.Controls.Add(Label2("Địa chỉ máy chủ", 24, y, 300, false));
+            y = 26 + ((SetupCatalog.Providers.Count + 1) / 2) * 36 + 8;
+            panel.Controls.Add(FieldLabel("Địa chỉ máy chủ", 24, y));
             y += 20;
-            _endpoint.Location = new Point(24, y);
-            _endpoint.Size = new Size(Width0 - 48, 26);
-            _endpoint.Font = PaneTheme.Small;
-            panel.Controls.Add(_endpoint);
+            _endpointBox.Location = new Point(24, y);
+            _endpointBox.Size = new Size(Width0 - 48, 30);
+            panel.Controls.Add(_endpointBox);
 
-            y += 34;
-            panel.Controls.Add(Label2("Khoá truy cập", 24, y, 300, false));
+            y += 38;
+            panel.Controls.Add(FieldLabel("Khoá truy cập", 24, y));
             _keyLink.AutoSize = true;
-            _keyLink.Location = new Point(140, y + 2);
-            _keyLink.Font = PaneTheme.Caption;
+            _keyLink.Location = new Point(24 + TextRenderer.MeasureText("Khoá truy cập", PaneTheme.FieldLabel).Width + 10, y + 1);
+            _keyLink.Font = PaneTheme.Small;
             _keyLink.ForeColor = PaneTheme.AccentFg;
             _keyLink.Cursor = Cursors.Hand;
             _keyLink.Click += delegate { OpenKeyPage(); };
             panel.Controls.Add(_keyLink);
 
             y += 20;
-            _apiKey.Location = new Point(24, y);
-            _apiKey.Size = new Size(Width0 - 48 - 130, 26);
-            _apiKey.Font = PaneTheme.Small;
-            _apiKey.UseSystemPasswordChar = true;
-            panel.Controls.Add(_apiKey);
+            _apiKeyBox.Location = new Point(24, y);
+            _apiKeyBox.Size = new Size(Width0 - 48 - 128, 30);
+            panel.Controls.Add(_apiKeyBox);
 
-            _showKey.Location = new Point(Width0 - 48 - 120, y - 2);
+            _showKey.Location = new Point(24 + Width0 - 48 - 120, y);
             _showKey.Size = new Size(120, 30);
             _showKey.Click += delegate
             {
@@ -539,47 +607,76 @@ namespace AxiomOffice.Ai
             };
             panel.Controls.Add(_showKey);
 
-            y += 36;
-            panel.Controls.Add(Label2("Model", 24, y, 300, false));
+            y += 38;
+            panel.Controls.Add(FieldLabel("Model", 24, y));
             y += 20;
-            _model.Location = new Point(24, y);
-            _model.Size = new Size(Width0 - 48 - 160, 26);
-            _model.Font = PaneTheme.Small;
-            _model.DropDownStyle = ComboBoxStyle.DropDown;
-            panel.Controls.Add(_model);
+            _modelBox.Location = new Point(24, y);
+            _modelBox.Size = new Size(Width0 - 48 - 150, 30);
+            panel.Controls.Add(_modelBox);
 
-            _loadModels.Location = new Point(Width0 - 48 - 150, y - 2);
-            _loadModels.Size = new Size(150, 30);
+            _loadModels.Location = new Point(24 + Width0 - 48 - 142, y);
+            _loadModels.Size = new Size(142, 30);
             _loadModels.Click += delegate { LoadModels(); };
             panel.Controls.Add(_loadModels);
 
-            y += 40;
+            // Enter o bat ky o nao cung = "Kiem tra ket noi" (truoc day Enter khong lam gi).
+            KeyEventHandler submit = delegate (object sender, KeyEventArgs e)
+            {
+                if (e.KeyCode == Keys.Enter)
+                {
+                    e.Handled = true;
+                    e.SuppressKeyPress = true;
+                    TestConnection();
+                }
+            };
+            _endpoint.KeyDown += submit;
+            _apiKey.KeyDown += submit;
+            _model.KeyDown += submit;
+
+            y += 38;
             _test.Location = new Point(24, y);
-            _test.Size = new Size(160, 32);
+            _test.Size = new Size(170, 32);
             _test.Click += delegate { TestConnection(); };
             panel.Controls.Add(_test);
 
+            // Ket qua/thong bao nam trong the ngay duoi cac o nhap (khong con nam canh nut o day khung).
+            y += 36;
+            _probeCard.Location = new Point(24, y);
+            _probeCard.Size = new Size(Width0 - 48, 46);
             _probe.AutoSize = false;
-            _probe.Location = new Point(196, y - 2);
-            _probe.Size = new Size(Width0 - 48 - 180, 60);
+            _probe.Location = new Point(12, 6);
+            _probe.Size = new Size(Width0 - 48 - 24, 34);
+            // Thong bao 1 dong phai nam giua the, neu khong chu dinh le tren va the trong nhu bi ho.
+            _probe.TextAlign = ContentAlignment.MiddleLeft;
             _probe.Font = PaneTheme.Small;
             _probe.ForeColor = PaneTheme.TextSecondary;
-            panel.Controls.Add(_probe);
+            _probeCard.Controls.Add(_probe);
+            panel.Controls.Add(_probeCard);
 
             SelectProvider(_info != null && _info.ProviderId.Length > 0 ? _info.ProviderId : "company");
         }
 
-        private static Label Label2(string text, int x, int y, int width, bool strong)
+        private static Label FieldLabel(string text, int x, int y)
         {
             return new Label
             {
                 AutoSize = false,
                 Location = new Point(x, y),
-                Size = new Size(width, 20),
+                Size = new Size(Width0 - 48, 20),
                 Text = text,
-                Font = strong ? PaneTheme.SmallBold : PaneTheme.Small,
-                ForeColor = PaneTheme.TextSecondary
+                Font = PaneTheme.FieldLabel,
+                ForeColor = PaneTheme.TextPrimary
             };
+        }
+
+        // Trang thai o the ket qua: "neutral" (mo ta nha cung cap), "success", "danger".
+        private void SetProbe(string text, string tone)
+        {
+            _probe.Text = text;
+            _probe.ForeColor = tone == "danger" ? PaneTheme.DangerFg
+                : tone == "success" ? PaneTheme.Success
+                : PaneTheme.TextSecondary;
+            _probeCard.Tone = tone;
         }
 
         private void SelectProvider(string id)
@@ -624,8 +721,7 @@ namespace AxiomOffice.Ai
                 _model.SelectedIndex = 0;
             }
 
-            _probe.Text = provider.Description;
-            _probe.ForeColor = PaneTheme.TextMuted;
+            SetProbe(provider.Description, "neutral");
         }
 
         // Nha cung cap "may chu cua cong ty" khong dien san dia chi: giu gia tri dang dung neu co.
@@ -661,8 +757,7 @@ namespace AxiomOffice.Ai
             SetupProviderInfo provider = SetupCatalog.FindProvider(_providerId);
             string codec = provider != null ? provider.Codec : "openai";
             _loadModels.Enabled = false;
-            _probe.ForeColor = PaneTheme.TextMuted;
-            _probe.Text = "Đang tải danh sách model…";
+            SetProbe("Đang tải danh sách model…", "neutral");
 
             string endpoint = _endpoint.Text.Trim();
             string key = _apiKey.Text.Trim();
@@ -677,10 +772,9 @@ namespace AxiomOffice.Ai
                     _loadModels.Enabled = true;
                     if (models == null)
                     {
-                        _probe.ForeColor = PaneTheme.Danger;
-                        _probe.Text = "✗ " + (error ?? "Không lấy được danh sách model.")
-                            + (string.IsNullOrEmpty(hint) ? "" : "\r\n" + hint)
-                            + "\r\nVẫn có thể tự gõ tên model ở ô trên.";
+                        SetProbe((error ?? "Không lấy được danh sách model.")
+                            + (string.IsNullOrEmpty(hint) ? "" : " " + hint)
+                            + " Vẫn có thể tự gõ tên model ở ô trên.", "danger");
                         return;
                     }
 
@@ -691,8 +785,7 @@ namespace AxiomOffice.Ai
                         _model.Items.Add(name);
                     }
 
-                    _probe.ForeColor = PaneTheme.TextSecondary;
-                    _probe.Text = "Đã tải " + models.Count + " model. Chọn một model ở ô trên.";
+                    SetProbe("Đã tải " + models.Count + " model. Chọn một model ở ô trên.", "neutral");
                     if (!string.IsNullOrEmpty(chosen))
                     {
                         _model.Text = chosen;
@@ -715,14 +808,12 @@ namespace AxiomOffice.Ai
 
             if (endpoint.Length == 0 || model.Length == 0)
             {
-                _probe.ForeColor = PaneTheme.Danger;
-                _probe.Text = "✗ Điền đủ Địa chỉ máy chủ và Model rồi thử lại.";
+                SetProbe("Điền đủ Địa chỉ máy chủ và Model rồi thử lại.", "danger");
                 return;
             }
 
             _test.Enabled = false;
-            _probe.ForeColor = PaneTheme.TextMuted;
-            _probe.Text = "Đang kiểm tra kết nối…";
+            SetProbe("Đang kiểm tra kết nối…", "neutral");
 
             var form = this;
             Task.Factory.StartNew(delegate
@@ -733,14 +824,12 @@ namespace AxiomOffice.Ai
                     _test.Enabled = true;
                     if (probe.Ok)
                     {
-                        _probe.ForeColor = PaneTheme.Success;
-                        _probe.Text = "✓ Kết nối tốt (" + probe.Seconds.ToString("0.0") + " giây) — máy chủ trả lời \""
-                            + Shorten(probe.Reply, 40) + "\".";
+                        SetProbe("Kết nối tốt (" + probe.Seconds.ToString("0.0") + " giây) — máy chủ trả lời \""
+                            + Shorten(probe.Reply, 40) + "\".", "success");
                         return;
                     }
 
-                    _probe.ForeColor = PaneTheme.Danger;
-                    _probe.Text = "✗ " + probe.Message + (string.IsNullOrEmpty(probe.Hint) ? "" : "\r\n" + probe.Hint);
+                    SetProbe(probe.Message + (string.IsNullOrEmpty(probe.Hint) ? "" : " " + probe.Hint), "danger");
                 });
             });
         }
@@ -804,31 +893,21 @@ namespace AxiomOffice.Ai
             int y = 0;
             foreach (SetupFeatureInfo feature in SetupCatalog.Features)
             {
-                CheckBox box = FeatureBox(feature.Key);
+                // ToggleBox ve tick phang theo bang mau cua Axiom; CheckBox cua WinForms ve o vuong kieu 3D nen
+                // dat canh cac nut phang cua pane thi nhu hai san pham ghep lai.
+                ToggleBox box = FeatureBox(feature.Key);
                 box.Location = new Point(24, y);
-                box.Size = new Size(Width0 - 48, 24);
+                box.Size = new Size(Width0 - 48, 46);
                 box.Text = feature.Label;
-                box.Font = PaneTheme.SmallBold;
-                box.ForeColor = PaneTheme.TextPrimary;
+                box.Hint = feature.Description;
                 box.Checked = FeatureValue(feature.Key);
-
-                var hint = new Label
-                {
-                    AutoSize = false,
-                    Location = new Point(42, y + 22),
-                    Size = new Size(Width0 - 70, 34),
-                    Font = PaneTheme.Caption,
-                    ForeColor = PaneTheme.TextMuted,
-                    Text = feature.Description
-                };
-
                 panel.Controls.Add(box);
-                panel.Controls.Add(hint);
-                y += 62;
+                y += 58;
             }
 
-            _advanced.Location = new Point(24, y + 6);
-            _advanced.Size = new Size(180, 30);
+            y += 4;
+            _advanced.Location = new Point(24, y);
+            _advanced.Size = new Size(190, 32);
             _advanced.Click += delegate
             {
                 using (var form = new SettingsForm())
@@ -842,19 +921,18 @@ namespace AxiomOffice.Ai
             };
             panel.Controls.Add(_advanced);
 
-            var note = new Label
+            panel.Controls.Add(new Label
             {
                 AutoSize = false,
-                Location = new Point(214, y + 10),
-                Size = new Size(Width0 - 48 - 200, 40),
-                Font = PaneTheme.Caption,
+                Location = new Point(24 + 190 + 12, y + 6),
+                Size = new Size(Width0 - 48 - 190 - 12, 40),
+                Font = PaneTheme.Small,
                 ForeColor = PaneTheme.TextMuted,
-                Text = "Cổng của Agent Core, hạn giờ, model ghi nhớ… nằm trong Tuỳ chọn nâng cao."
-            };
-            panel.Controls.Add(note);
+                Text = "Mở để đổi cổng Agent Core, hạn giờ, model ghi nhớ."
+            });
         }
 
-        private CheckBox FeatureBox(string key)
+        private ToggleBox FeatureBox(string key)
         {
             if (key == "MemoryEnabled")
             {
@@ -904,62 +982,108 @@ namespace AxiomOffice.Ai
         private void BuildDone()
         {
             Panel panel = NewStep();
-            _summary.AutoSize = false;
-            _summary.Location = new Point(24, 0);
-            _summary.Size = new Size(Width0 - 48, 90);
-            _summary.Font = PaneTheme.Body;
-            _summary.ForeColor = PaneTheme.TextPrimary;
-            panel.Controls.Add(_summary);
+            int y = 0;
 
-            _tryNow.Location = new Point(24, 96);
-            _tryNow.Size = new Size(260, 32);
+            // Tom tat dang cap nhan (xam, cot trai) + gia tri (dam): truoc day la mot doan van voi dau "·" nen
+            // khoang 5 thong tin tron vao nhau, kho quet lai.
+            _summaryPanel.Location = new Point(24, y);
+            _summaryPanel.Size = new Size(Width0 - 48, 122);      // 4 dong x 30px
+            _summaryPanel.BackColor = PaneTheme.PaneBg;
+            panel.Controls.Add(_summaryPanel);
+            y += 130;
+
+            _tryNow.Location = new Point(24, y);
+            _tryNow.Size = new Size(Width0 - 48, 34);
             _tryNow.Click += delegate { TryNow(); };
             panel.Controls.Add(_tryNow);
 
+            y += 42;
+            _tryResultCard.Location = new Point(24, y);
+            _tryResultCard.Size = new Size(Width0 - 48, 54);
+            _tryResultCard.Visible = false;      // chua thu thi khong hien o trang
             _tryResult.AutoSize = false;
-            _tryResult.Location = new Point(24, 136);
-            _tryResult.Size = new Size(Width0 - 48, 70);
+            _tryResult.Location = new Point(12, 8);
+            _tryResult.Size = new Size(Width0 - 48 - 24, 38);
+            _tryResult.TextAlign = ContentAlignment.MiddleLeft;   // cung ly do nhu the ket qua thu ket noi
             _tryResult.Font = PaneTheme.Small;
             _tryResult.ForeColor = PaneTheme.TextSecondary;
-            panel.Controls.Add(_tryResult);
+            _tryResultCard.Controls.Add(_tryResult);
+            panel.Controls.Add(_tryResultCard);
 
-            var hint = new Label
+            y += 62;
+            panel.Controls.Add(new Label
             {
                 AutoSize = false,
-                Location = new Point(24, 212),
-                Size = new Size(Width0 - 48, 60),
-                Font = PaneTheme.Caption,
+                Location = new Point(24, y),
+                Size = new Size(Width0 - 48, 40),
+                Font = PaneTheme.Small,
                 ForeColor = PaneTheme.TextMuted,
-                Text = "Mở lại \"Ask AI\" trong thẻ Axiom Office để bắt đầu. Muốn Claude Code/Desktop điều khiển "
-                    + "Word/LibreOffice qua MCP thì lấy cấu hình trong Cài đặt nâng cao."
-            };
-            panel.Controls.Add(hint);
+                Text = "Mở lại \"Ask AI\" trong thẻ Axiom Office để bắt đầu."
+            });
         }
 
-        private string SummaryText()
+        // Tom tat duoc ve lai moi lan vao buoc 5 (gia tri lay tu cac o cua buoc 3 va 4).
+        private void RefreshSummary()
         {
+            _summaryPanel.Controls.Clear();
             string model = _model.Text.Trim();
             string endpoint = _endpoint.Text.Trim();
-            string memory = _memory.Checked ? "bật" : "tắt";
-            string core = _info != null ? "Agent Core: cổng " + SetupInfo.Text("port", _info.Core, "?") : "Agent Core: chưa chạy";
-            return "AI:  " + (model.Length > 0 ? model : "(chưa chọn)") + " · " + (endpoint.Length > 0 ? endpoint : "(chưa có địa chỉ)")
-                + "\r\nGhi nhớ dài hạn: " + memory + " · " + core
-                + "\r\n\r\nBấm \"Thử ngay\" để Axiom Office viết một câu ngắn vào tài liệu đang mở — "
-                + "cách chắc chắn nhất để biết mọi thứ đã chạy.";
+            string core = _info != null ? "cổng " + SetupInfo.Text("port", _info.Core, "?") : "chưa chạy";
+            string[][] rows =
+            {
+                new[] { "Model", model.Length > 0 ? model : "(chưa chọn)" },
+                new[] { "Máy chủ AI", endpoint.Length > 0 ? endpoint : "(chưa có địa chỉ)" },
+                new[] { "Ghi nhớ dài hạn", _memory.Checked ? "bật" : "tắt" },
+                // Trang thai Core la mot su that rieng, khong duoc dan vao gia tri cua dong tren: gop lai thi
+                // nguoi dung doc thanh "ghi nho: bat, core chua chay" nhu the hai thu lien quan voi nhau.
+                new[] { "Agent Core", core },
+            };
+
+            int y = 0;
+            foreach (string[] row in rows)
+            {
+                _summaryPanel.Controls.Add(new Label
+                {
+                    AutoSize = false,
+                    Location = new Point(0, y),
+                    Size = new Size(150, 22),
+                    Font = PaneTheme.Small,
+                    ForeColor = PaneTheme.TextMuted,
+                    Text = row[0]
+                });
+                _summaryPanel.Controls.Add(new Label
+                {
+                    AutoSize = false,
+                    Location = new Point(154, y - 1),
+                    Size = new Size(_summaryPanel.Width - 154, 22),
+                    Font = PaneTheme.SmallBold,
+                    ForeColor = PaneTheme.TextPrimary,
+                    Text = row[1]
+                });
+                y += 30;
+            }
+        }
+
+        private void SetTryResult(string text, string tone)
+        {
+            _tryResultCard.Visible = true;
+            _tryResult.Text = text;
+            _tryResult.ForeColor = tone == "danger" ? PaneTheme.DangerFg
+                : tone == "success" ? PaneTheme.Success
+                : PaneTheme.TextSecondary;
+            _tryResultCard.Tone = tone;
         }
 
         private void TryNow()
         {
             if (_host == null)
             {
-                _tryResult.ForeColor = PaneTheme.Danger;
-                _tryResult.Text = "Không có tài liệu đang mở để thử. Mở một tài liệu rồi bấm Thử ngay.";
+                SetTryResult("Không có tài liệu đang mở để thử. Mở một tài liệu rồi bấm Thử ngay.", "danger");
                 return;
             }
 
             _tryNow.Enabled = false;
-            _tryResult.ForeColor = PaneTheme.TextMuted;
-            _tryResult.Text = "Đang chạy thử…";
+            SetTryResult("Đang chạy thử…", "neutral");
 
             var form = this;
             Task.Factory.StartNew(delegate
@@ -995,14 +1119,12 @@ namespace AxiomOffice.Ai
                     _tryNow.Enabled = true;
                     if (reply != null)
                     {
-                        _tryResult.ForeColor = PaneTheme.Success;
-                        _tryResult.Text = "✓ Xong: " + Shorten(reply, 160);
+                        SetTryResult("Xong: " + Shorten(reply, 160), "success");
                         return;
                     }
 
-                    _tryResult.ForeColor = PaneTheme.Danger;
-                    _tryResult.Text = "✗ Chưa chạy được: " + (error ?? "không rõ lỗi")
-                        + "\r\nKiểm tra lại bước \"Kết nối máy chủ AI\".";
+                    SetTryResult("Chưa chạy được: " + (error ?? "không rõ lỗi")
+                        + " — kiểm tra lại bước Kết nối máy chủ AI.", "danger");
                 });
             });
         }

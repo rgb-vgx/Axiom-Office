@@ -573,6 +573,8 @@ python tests\live\test_live_libreoffice.py [--apps writer,calc,impress] [--ui] [
 python3 tests/live/test_live_libreoffice.py [--apps writer,calc,impress] [--ui] [--ai]   # Linux
 # Agent Core (Go): unit test (cần Go 1.26+; chạy được cả Windows lẫn Linux)
 cd core-go && go test ./...
+# Wizard thiết lập (Windows): render wizard thật ra ảnh từng bước để soi giao diện (không cần Office)
+powershell -ExecutionPolicy Bypass -File tests\ui\shots.ps1 [-OutDir <thư mục>]   # ảnh vào tests\ui\out\
 # Agent Core e2e: Core thật + LLM giả + bridge giả (không cần Office)
 tools\excel-mcp\.venv\Scripts\python.exe tests\core\test_core_e2e.py
 # ... chỉ vài phần (fake_bridge,guards,skills,memory,confirm,mcp,visual,setup,shutdown,anthropic,
@@ -792,6 +794,7 @@ src/AxiomOffice.LibreOffice/  extension Python UNO cho LibreOffice (nói cùng g
 tests/live/                   test mọi lệnh bridge trên Office/WPS thật
 tests/lo/                     unit test extension LibreOffice (không cần LibreOffice: uno giả)
 tests/mcp-host/               test parity MCP + registry lệnh + round-trip với Office thật
+tests/ui/                     render wizard thiết lập (Windows) ra ảnh từng bước để soi giao diện
 tools/*-mcp/                  MCP servers Python (legacy)
 ```
 
