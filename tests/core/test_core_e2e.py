@@ -1013,6 +1013,10 @@ def test_office(core: Core, port: int, pid: int) -> None:
 # Cac phan chay duoc rieng (--only); /health luon chay truoc.
 SECTIONS = ["fake_bridge", "guards", "skills", "memory", "confirm", "mcp", "visual", "setup"]
 
+# Phan phu thuoc: `guards` dung chung kich ban LLM voi `fake_bridge` (kich ban tuan tu) nen chay mot minh
+# se lech buoc -> --only tu keo theo phan can truoc.
+REQUIRES = {"guards": ["fake_bridge"]}
+
 
 def main() -> int:
     parser = argparse.ArgumentParser()
@@ -1028,6 +1032,12 @@ def main() -> int:
     unknown = [name for name in only if name not in SECTIONS]
     if unknown:
         parser.error("phan khong co: " + ", ".join(unknown))
+    for name in list(only):
+        for needed in REQUIRES.get(name, []):
+            if needed not in only:
+                only.append(needed)
+                print("--only %s: chay them %s (phan phu thuoc)" % (name, needed))
+    only = [name for name in SECTIONS if name in only]
 
     def wanted(section: str) -> bool:
         return not only or section in only
