@@ -103,6 +103,40 @@ public class CoreConfigTests
         Assert.Equal(expected, Load(env: new() { ["AXIOM_MEMORY_ENABLED"] = raw }).MemoryEnabled);
     }
 
+    // Linux: khoa API luu trong keyring (libsecret) -> config.json chi giu "libsecret:<ten khoa>".
+    // Test dung secret-tool gia trong PATH de khong dung vao keyring that (va chay duoc ca khi may khong co).
+    [Fact]
+    public void Api_key_libsecret_doc_tu_keyring()
+    {
+        Assert.Equal("", Secrets.Unprotect("libsecret:LlmApiKey"));   // khong co secret-tool -> coi nhu chua cau hinh
+
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.Equal("sk-bi-mat", Secrets.Unprotect("sk-bi-mat"));
+            return;
+        }
+
+        string directory = Path.Combine(Path.GetTempPath(), "axiom-secret-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        string previous = Environment.GetEnvironmentVariable("PATH") ?? "";
+        try
+        {
+            string tool = Path.Combine(directory, "secret-tool");
+            File.WriteAllText(tool, "#!/bin/sh\ncase \"$*\" in\n  *\"key LlmApiKey\"*) echo sk-tu-keyring ;;\n  *) exit 1 ;;\nesac\n");
+            File.SetUnixFileMode(tool, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+            Environment.SetEnvironmentVariable("PATH", directory + Path.PathSeparator + previous);
+
+            Assert.Equal("sk-tu-keyring", Secrets.Unprotect("libsecret:LlmApiKey"));
+            Assert.Equal("sk-tu-keyring", Load(registry: new() { ["LlmApiKey"] = "libsecret:LlmApiKey" }).LlmApiKey);
+            Assert.Equal("", Secrets.Unprotect("libsecret:KhongCo"));   // loi tu secret-tool -> rong
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PATH", previous);
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     [Fact]
     public void Api_key_dpapi_duoc_giai_ma_con_khoa_thuong_giu_nguyen()
     {

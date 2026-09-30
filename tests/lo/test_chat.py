@@ -307,6 +307,47 @@ class CoreLaunchTests(unittest.TestCase):
         self.assertNotIn("start_new_session", options)
 
 
+class SecretStoreTests(unittest.TestCase):
+    """Khoa API tren Linux (axiom.config.protect_secret): keyring qua secret-tool, khong co thi luu thuong."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="axiom-secret-")
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        mock.patch.object(config, "IS_WINDOWS", False).start()
+        self.addCleanup(mock.patch.stopall)
+
+    def _tool(self, code: int) -> str:
+        """secret-tool gia: chay duoc ca Windows (.cmd) lan Linux (shell script), tra ve ma loi dat truoc."""
+        if os.name == "nt":
+            name, body = "secret-tool.cmd", "@exit /b %d\r\n" % code
+        else:
+            name, body = "secret-tool", "#!/bin/sh\nexit %d\n" % code
+        path = os.path.join(self.tmp, name)
+        with open(path, "w", encoding="utf-8", newline="") as handle:
+            handle.write(body)
+        os.chmod(path, 0o755)
+        return path
+
+    def test_khong_co_secret_tool_thi_luu_thang(self):
+        with mock.patch.object(config.shutil, "which", lambda name: None):
+            self.assertEqual(config.protect_secret("sk-1"), "sk-1")
+            self.assertEqual(config.protect_secret(""), "")
+
+    def test_co_secret_tool_thi_tra_libsecret(self):
+        tool = self._tool(0)
+        with mock.patch.object(config.shutil, "which", lambda name: tool):
+            self.assertEqual(config.protect_secret("sk-1", "LlmApiKey"), "libsecret:LlmApiKey")
+
+    def test_secret_tool_loi_thi_luu_thang(self):
+        tool = self._tool(1)
+        with mock.patch.object(config.shutil, "which", lambda name: tool):
+            self.assertEqual(config.protect_secret("sk-1", "LlmApiKey"), "sk-1")
+
+    def test_rong_thi_khong_goi_keyring(self):
+        with mock.patch.object(config.shutil, "which", lambda name: self._tool(0)):
+            self.assertEqual(config.protect_secret(""), "")
+
+
 class SessionSweepTests(unittest.TestCase):
     """Don file session cua lan chay truoc (axiom.sessions.sweep): pid da chet, hoac heartbeat qua cu.
 

@@ -545,7 +545,7 @@ powershell -ExecutionPolicy Bypass -File tests\mcp-host\office_roundtrip.ps1 -Di
 powershell -ExecutionPolicy Bypass -File tests\mcp-host\office_roundtrip.ps1 -Dir <thư_mục_output> -Verify
 # Unit test của các MCP Python (legacy)
 cd tools\word-mcp; .venv\Scripts\python.exe -m unittest discover -s tests
-# Làn LibreOffice: 52 unit test (giải mã tham số + registry lệnh khớp bản C#, logic pane, theme + đọc SSE của
+# Làn LibreOffice: 56 unit test (giải mã tham số + registry lệnh khớp bản C#, logic pane, theme + đọc SSE của
 # Core) và test mọi lệnh trên LibreOffice thật (script tự mở LibreOffice bằng profile người dùng;
 # --ui: bản có cửa sổ; --ai: ai.ask). Chạy được cả trên Linux (đường dẫn soffice tự dò, tắt app bằng
 # SIGTERM, token đọc từ ~/.config/axiom-office/config.json).
@@ -678,17 +678,25 @@ Yêu cầu: LibreOffice 7.x trở lên + Python UNO (`python3-uno`). **Không c�
 Agent Core self-contained (`linux-x64`).
 
 ```bash
-# Gói phát hành: dist/axiom-office-linux-x64-<ver>.tar.gz (Core + .oxt + install.sh)
+# Gói phát hành: dist/axiom-office-linux-x64-<ver>.tar.gz (Core + MCP + skills + .oxt + install.sh)
 tar -xzf axiom-office-linux-x64-0.1.0.tar.gz && cd axiom-office-linux-x64-0.1.0
 ./install.sh --endpoint http://localhost:20128/v1 --model <tên-model> --api-key -   # - = đọc key từ stdin
+./install.sh --systemd          # tuỳ chọn: Core chạy thường trực (systemd --user)
 ./install.sh --uninstall [--purge]                                                  # gỡ (--purge xoá cả cấu hình/dữ liệu)
 ```
 
 - Cài **không cần root**, chỉ dùng `unopkg` của người dùng. Script **không tự tắt LibreOffice**: đang chạy
   thì dừng lại và nhắc bạn đóng.
-- Vị trí: Core `~/.local/share/axiom-office/core/`, cấu hình `~/.config/axiom-office/config.json`
-  (quyền `0600`, khoá API lưu thường — Linux không có DPAPI), session dùng chung
+- Vị trí: Core `~/.local/share/axiom-office/core/` (kèm `core/skills/` — 8 skill dựng sẵn, Core nạp sẵn
+  không cần cấu hình), MCP `~/.local/share/axiom-office/mcp/`, cấu hình
+  `~/.config/axiom-office/config.json` (quyền `0600`), session dùng chung
   `$XDG_RUNTIME_DIR/axiom-office/sessions`, log `~/.local/share/axiom-office/bridge.log`.
+- **Khoá API trên Linux**: pane **Cài đặt** lưu vào **keyring** của người dùng qua `secret-tool` (libsecret)
+  khi máy có — `config.json` chỉ giữ `libsecret:LlmApiKey`; máy không có keyring thì lưu thẳng trong file
+  `0600`. Core giải mã cả hai, và hiểu cả `dpapi:` (coi như chưa cấu hình nếu không phải máy Windows đã mã hoá).
+- **`--systemd`** (tuỳ chọn): cài unit `axiom-office-core.service` vào `~/.config/systemd/user/`,
+  `enable --now`; gỡ bằng `--uninstall`. Mặc định Core chỉ chạy khi cần (pane tự khởi động) — unit chỉ để
+  Core sẵn sàng từ đầu phiên.
 - `CoreExe` trong cấu hình trỏ tới Core ở chỗ khác; bỏ trống thì pane tự dùng Core đã cài (kèm `install.sh`).
   Trên Windows, Core chưa chạy thì pane tự khởi động nó; trên Linux cũng vậy (tách session, không chết theo
   LibreOffice).
@@ -696,10 +704,14 @@ tar -xzf axiom-office-linux-x64-0.1.0.tar.gz && cd axiom-office-linux-x64-0.1.0
   ghi thẳng vào `config.json`.
 - Đóng gói lại từ mã nguồn: `scripts/linux/package.sh [--rid linux-arm64]` (cần .NET SDK 10);
   đóng gói/cài/gỡ nhanh bản dev: `scripts/libreoffice.sh package|install|status|log|uninstall`.
+- **CI**: `.github/workflows/ci.yml` — job `linux` chạy unit test extension + xUnit của Core + build MCP +
+  cài LibreOffice/Python UNO rồi chạy toàn bộ test lệnh bridge và test MCP có tool live, cuối cùng đóng gói
+  tarball làm artifact; job `windows` chạy unit test, Core, build net48 (add-in + Host) và test MCP.
 
 Trạng thái đã kiểm chứng trên Ubuntu 24.04 + LibreOffice 24.2 (KDE Plasma X11): 159/159 test lệnh (headless
-và có cửa sổ), 200/200 test Agent Core, và một lượt `ai.ask` thật trong cả ba app (Writer/Calc/Impress) —
-model tự gọi skill, sửa tài liệu thật. Pane chạy ở **cả hai chỗ**: deck trong sidebar và pane neo bên phải.
+và có cửa sổ), 201/201 test Agent Core (Linux và Windows), 70/70 test MCP có tool live, parity MCP với bản
+Python 103/103, và một lượt `ai.ask` thật trong cả ba app (Writer/Calc/Impress) — model tự gọi skill, sửa
+tài liệu thật. Pane chạy ở **cả hai chỗ**: deck trong sidebar và pane neo bên phải.
 
 ## Troubleshooting
 
@@ -745,8 +757,10 @@ scripts/                      build, install, uninstall, legacy (gỡ bản WpsA
   libreoffice.sh              Linux: đóng gói/cài/gỡ .oxt bằng unopkg của người dùng
   package_oxt.py              đóng gói .oxt (Windows + Linux)
   generate_mcp_commands.py    sinh danh sách lệnh nhúng cho axiom-office-mcp (từ registry extension)
-  linux/install.sh            cài cho người dùng cuối Linux: Core + MCP vào ~/.local/share, .oxt, config.json
-  linux/package.sh            tarball linux-x64/arm64: Core + MCP self-contained + .oxt + install.sh
+  linux/install.sh            cài cho người dùng cuối Linux: Core + MCP vào ~/.local/share, .oxt, config.json,
+                              --systemd (unit axiom-office-core.service), in cấu hình MCP
+  linux/package.sh            tarball linux-x64/arm64: Core + MCP self-contained + skills/ + .oxt + install.sh
+  linux/axiom-office-core.service.in  unit systemd --user cho Agent Core
 scripts/dist/                 install.cmd, uninstall.cmd, HUONG-DAN-CAI-DAT.txt (vào gói cài)
 src/AxiomOffice.LibreOffice/  extension Python UNO cho LibreOffice (nói cùng giao thức bridge)
   python/axiom_job.py         component UNO: job OnStartApp -> axiom.bridge.start

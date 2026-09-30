@@ -1,0 +1,16 @@
+# Agent Core chay thuong truc (systemd --user). install.sh thay @CORE_EXE@ bang duong dan that.
+# Khong bat buoc: pane tu khoi dong Core khi can; unit nay danh cho ai muon Core san sang tu dau phien.
+[Unit]
+Description=Axiom Office Agent Core
+After=graphical-session-pre.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=@CORE_EXE@
+Restart=on-failure
+RestartSec=3
+# Core chi nghe 127.0.0.1 (cong CorePort trong ~/.config/axiom-office/config.json) - khong mo ra mang.
+
+[Install]
+WantedBy=default.target

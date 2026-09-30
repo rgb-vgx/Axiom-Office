@@ -5,6 +5,24 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Nốt phần L3 cho Linux: skill trong gói, libsecret, systemd, CI
+- **Skill dựng sẵn trong gói**: `scripts/linux/package.sh` chép `skills/` (8 skill + `_design/tokens.json`)
+  vào `core/skills` — Core nạp sẵn nguồn "builtin" cạnh binary, máy mới cài không cần cấu hình `SkillDirs`
+- **libsecret cho khoá API trên Linux** (`LibreOffice_arch.md` mục 9): pane **Cài đặt** lưu khoá vào keyring
+  qua `secret-tool` khi máy có, `config.json` chỉ giữ `libsecret:LlmApiKey`; Core (`Secrets.Unprotect`) đọc
+  lại từ keyring. Máy không có `secret-tool`, keyring khoá, hoặc khoá `dpapi:` của máy Windows khác → coi
+  như chưa cấu hình (không làm Core dừng), và vẫn giữ đường lưu thường trong file `0600`
+- **systemd --user (tuỳ chọn)**: `install.sh --systemd` sinh unit từ `axiom-office-core.service.in`, trỏ
+  thẳng tới Core vừa cài rồi `enable --now`; `--uninstall` gỡ unit. Phiên không có systemd --user thì bỏ qua
+  và báo rõ. Mặc định Core vẫn chỉ chạy khi cần (pane tự khởi động)
+- **CI GitHub Actions** (`.github/workflows/ci.yml`): job `linux` (Ubuntu 24.04) chạy unit test extension,
+  xUnit của Core, build MCP, cài LibreOffice + `python3-uno` rồi chạy toàn bộ test lệnh bridge trên
+  LibreOffice thật, test MCP kèm tool live, cuối cùng đóng gói tarball làm artifact; job `windows` chạy unit
+  test, Core, build net48 (add-in + Host) và test MCP (không có Office/WPS trong runner nên không chạy làn live)
+- Script shell trong repo (`scripts/libreoffice.sh`, `scripts/linux/*.sh`) được đánh dấu thực thi trong git
+- Test: `tests/lo` 56 test (thêm `SecretStoreTests` cho `protect_secret`); `tests/core` 201 test (thêm
+  `Api_key_libsecret_doc_tu_keyring` dùng `secret-tool` giả trong PATH, không đụng keyring thật)
+
 ### Added — MCP server đa nền tảng `axiom-office-mcp` (LibreOffice_arch.md mục 11)
 - **`src/AxiomOffice.Mcp`** (`net10.0`, `axiom-office-mcp`): MCP stdio 50 tool — 20 tool file (docx/xlsx/
   pptx/csv: đọc, tạo, sửa, format, export) + tool live gọi bridge qua HTTP + `office_sessions`. **Dùng

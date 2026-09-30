@@ -115,7 +115,7 @@ So với Windows: `AxiomOffice.dll` → **`axiom-office.oxt`**; `AxiomOffice.Cor
 | Windows | Linux | Nội dung |
 |---|---|---|
 | `HKCU\Software\AxiomOffice` | `$XDG_CONFIG_HOME/axiom-office/config.json` (mặc định `~/.config/…`), quyền `0600` | Token, LLM, bật/tắt Core/memory/QA |
-| DPAPI `dpapi:<base64>` | **Đã làm:** lưu trong `config.json` `0600` (libsecret `secret-tool` để sau) | API key |
+| DPAPI `dpapi:<base64>` | **Đã làm:** keyring qua `secret-tool` (libsecret) → `libsecret:<ten khoa>`; máy không có keyring thì lưu trong `config.json` `0600` | API key |
 | `%LOCALAPPDATA%\AxiomOffice\core\core.db`, `skills\`, `mcp.json`, log | `$XDG_DATA_HOME/axiom-office/` (mặc định `~/.local/share/…`) | Dữ liệu bền |
 | `%LOCALAPPDATA%\AxiomOffice\core.json`, `sessions\` | `$XDG_RUNTIME_DIR/axiom-office/` (không có thì `~/.cache/axiom-office/run`) | Trạng thái sống, xoá khi đăng xuất |
 
@@ -280,11 +280,11 @@ Thay đổi trong `src/AxiomOffice.Core` (một codebase cho cả hai nền tả
 |---|---|
 | Target | `net10.0` (bỏ `-windows`); publish `-r linux-x64` và `-r win-x64`, single-file tự chứa |
 | Cấu hình | `IConfigSource`: `RegistryConfigSource` (Windows) / `JsonConfigSource` (`config.json`, Linux); ưu tiên vẫn là biến môi trường `AXIOM_*` → nguồn nền tảng |
-| Khoá API | `Secrets`: DPAPI (Windows) / giá trị trong `config.json` quyền `0600` (Linux — **libsecret chưa làm**; `dpapi:` từ Windows coi như chưa cấu hình) |
+| Khoá API | `Secrets`: DPAPI (Windows) / libsecret qua `secret-tool` (Linux, `libsecret:<ten khoa>`; không có keyring thì giá trị trong `config.json` `0600`); `dpapi:` từ máy Windows khác coi như chưa cấu hình |
 | Đường dẫn | `CorePaths` theo XDG (mục 4) |
-| Một bản mỗi người dùng | Named mutex của .NET vẫn dùng (chạy đúng trên Unix); **file lock** trên `$XDG_RUNTIME_DIR/axiom-office/core.lock` là việc còn lại |
+| Một bản mỗi người dùng | Named mutex của .NET vẫn dùng (chạy đúng trên Unix); file lock `$XDG_RUNTIME_DIR/axiom-office/core.lock` chưa cần vì mutex đã đủ |
 | Session registry | `SessionDirectory` đọc thêm thư mục Linux; tên file `{pid}-{kind}.json` (một process ba session) |
-| Khởi động Core | Pane/extension chạy `<data_dir>/core/AxiomOffice.Core` (hoặc `CoreExe`), tách khỏi process soffice bằng `start_new_session=True`; tuỳ chọn `systemd --user` unit chưa làm |
+| Khởi động Core | Pane/extension chạy `<data_dir>/core/AxiomOffice.Core` (hoặc `CoreExe`), tách khỏi process soffice bằng `start_new_session=True`; tuỳ chọn `install.sh --systemd` cài unit `axiom-office-core.service` (systemd --user) |
 | MCP built-in | `office` = `axiom-office-mcp` cạnh binary Core (mục 11) |
 | QA thị giác | Không đổi: gọi bridge `app.screenshot` |
 | Kiểm tra `InvariantGlobalization` | Đã xử lý (bỏ dấu bằng bảng tường minh) — chạy giống nhau trên Linux |
@@ -387,11 +387,15 @@ axiom-office-linux-x64-0.1.0/
 4. Cập nhật `~/.config/axiom-office/config.json` (`0600`): chỉ ghi khoá nào được truyền
    (`--endpoint/--model/--api-key`, `--api-key -` đọc từ stdin); giữ nguyên token và cấu hình cũ khi nâng cấp.
 5. Chép `mcp/` vào `~/.local/share/axiom-office/mcp` và in đoạn cấu hình MCP cho Claude Code/Desktop.
+6. `--systemd` (tuỳ chọn): sinh unit từ `axiom-office-core.service.in`, `systemctl --user enable --now`
+   (phiên không có systemd --user thì bỏ qua và báo rõ).
+
+Skill dựng sẵn nằm trong gói ở `core/skills` (Core nạp nguồn "builtin" cạnh binary) — không cần `SkillDirs`.
 
 `--uninstall [--purge]`: `unopkg remove org.axiomoffice.bridge`, xoá `<data_dir>/core`; `--purge` xoá thêm
 `~/.config/axiom-office`, `~/.local/share/axiom-office` và `$XDG_RUNTIME_DIR/axiom-office`.
 
-Còn lại so với kế hoạch: thư mục `skills/` dựng sẵn, `HUONG-DAN-CAI-DAT.txt` riêng, và gọi
+Còn lại so với kế hoạch: `HUONG-DAN-CAI-DAT.txt` riêng (hiện README.txt + `--help`) và gọi
 `/v1/admin/shutdown` khi gỡ (hiện chỉ gửi `SIGTERM` cho tiến trình Core).
 
 Flatpak/Snap LibreOffice chạy trong sandbox: extension vẫn cài được qua `unopkg` của bản đó, nhưng
@@ -542,7 +546,8 @@ Khác biệt Windows → Linux phải xử lý:
 | Bản Windows của MCP (`AxiomOffice.Host.exe mcp`) dùng `JavaScriptSerializer` (chỉ có trên .NET Framework), COM cho `.xls`, HKCU | Lớp `Compat/` cho bản .NET 10: `JavaScriptSerializer` trên `System.Text.Json`, `.xls` qua LibreOffice, cấu hình HKCU/config.json (mục 11) |
 | Lệnh bridge gửi từ MCP trên Linux không có tiền tố nào để biết đang nói với LibreOffice hay WPS | `Config.PortForKind` trên Linux luôn trỏ về `PortLibreOffice` (47851/47852/47853) — cùng cổng với extension |
 
-Chưa làm ở L3: CI Ubuntu (mục 12).
+CI Ubuntu: `.github/workflows/ci.yml` (job `linux` chạy unit test + Core + MCP + toàn bộ test trên
+LibreOffice thật + đóng gói; job `windows` chạy unit test + Core + build net48 + test MCP).
 
 ### Giai đoạn L2: Core đa nền tảng + pane
 
@@ -558,7 +563,7 @@ Chưa làm ở L3: CI Ubuntu (mục 12).
 - [x] `axiom-office-mcp` (`net10.0`, linux-x64) + test so với bản Python — làm bằng cách compile lại mã nguồn
       tool của `AxiomOffice.Host` với `PORTABLE` thay vì tách `AxiomOffice.Files` (mục 11); win-x64 vẫn dùng
       `AxiomOffice.Host.exe mcp` (đã có sẵn, không cần bản thứ hai).
-- [x] `install.sh` / `uninstall.sh`, tarball, hướng dẫn; CI Ubuntu (CI còn lại).
+- [x] `install.sh` / `uninstall.sh`, tarball (kèm `skills/` + `mcp/`), hướng dẫn; CI Ubuntu.
 - **Xong khi**: cài từ tarball trên máy sạch Ubuntu/Fedora không cần root (trừ gói `python3-uno` nếu
   thiếu); Claude Code dùng được `axiom-office-mcp` với LibreOffice đang mở; CI xanh.
 

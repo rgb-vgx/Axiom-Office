@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 # Cai Axiom Office cho LibreOffice tren Linux (LibreOffice_arch.md giai doan L3) - khong can root.
 #
-#   ./install.sh [--endpoint URL] [--model NAME] [--api-key KEY|-] cai / nang cap (- = doc khoa tu stdin)
-#   ./install.sh --uninstall [--purge]                            go (--purge xoa ca cau hinh va du lieu)
+#   ./install.sh [--endpoint URL] [--model NAME] [--api-key KEY|-] [--systemd]   cai / nang cap
+#                 (--api-key - = doc khoa tu stdin; --systemd = bat Core chay thuong truc bang systemd --user)
+#   ./install.sh --uninstall [--purge]                                           go (--purge xoa ca cau hinh, du lieu)
 #
 # Chay tu thu muc giai nen cua axiom-office-linux-x64-<ver>.tar.gz (co core/ va *.oxt canh script):
 #   - Agent Core -> ~/.local/share/axiom-office/core (extension tu khoi dong khi can)
 #   - extension -> unopkg cua nguoi dung
 #   - cau hinh  -> ~/.config/axiom-office/config.json (quyen 0600; giu khoa cu, chi ghi khoa duoc truyen)
+#   - MCP       -> ~/.local/share/axiom-office/mcp (in san doan cau hinh cho Claude Code/Desktop)
 # Khong bao gio tat LibreOffice cua nguoi dung: dang chay thi dung lai va nhac dong.
 set -euo pipefail
 
@@ -17,17 +19,20 @@ CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/axiom-office"
 CORE_DIR="$DATA_DIR/core"
 MCP_DIR="$DATA_DIR/mcp"
 EXTENSION_ID="org.axiomoffice.bridge"
+UNIT_NAME="axiom-office-core.service"
+UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 UNOPKG="${UNOPKG:-$(command -v unopkg || echo /usr/lib/libreoffice/program/unopkg)}"
 
-ENDPOINT="" MODEL="" API_KEY="" UNINSTALL=0 PURGE=0
+ENDPOINT="" MODEL="" API_KEY="" UNINSTALL=0 PURGE=0 SYSTEMD=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --endpoint) ENDPOINT="$2"; shift 2 ;;
         --model) MODEL="$2"; shift 2 ;;
         --api-key) API_KEY="$2"; shift 2 ;;
+        --systemd) SYSTEMD=1; shift ;;
         --uninstall) UNINSTALL=1; shift ;;
         --purge) PURGE=1; shift ;;
-        -h|--help) sed -n '2,11p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
         *) echo "Tham so la: $1 (xem --help)" >&2; exit 2 ;;
     esac
 done
@@ -84,6 +89,30 @@ if missing:
 EOF
 }
 
+systemd_available() {
+    command -v systemctl >/dev/null 2>&1 && systemctl --user show-environment >/dev/null 2>&1
+}
+
+enable_systemd() {
+    [ "$SYSTEMD" = 1 ] || return 0
+    systemd_available || { echo "  (bo qua --systemd: khong co systemd --user trong phien nay)"; return 0; }
+    mkdir -p "$UNIT_DIR"
+    # Unit tro thang toi binary vua cai; %h khong dung duoc vi DATA_DIR co the bi doi bang XDG_DATA_HOME.
+    sed "s|@CORE_EXE@|$CORE_DIR/AxiomOffice.Core|" "$HERE/axiom-office-core.service.in" > "$UNIT_DIR/$UNIT_NAME"
+    systemctl --user daemon-reload
+    systemctl --user enable --now "$UNIT_NAME"
+    echo "  Agent Core chay thuong truc: systemctl --user status $UNIT_NAME"
+}
+
+disable_systemd() {
+    if [ -f "$UNIT_DIR/$UNIT_NAME" ]; then
+        systemd_available && systemctl --user disable --now "$UNIT_NAME" >/dev/null 2>&1 || true
+        rm -f "$UNIT_DIR/$UNIT_NAME"
+        systemd_available && systemctl --user daemon-reload >/dev/null 2>&1 || true
+        echo "Da go unit $UNIT_NAME"
+    fi
+}
+
 install() {
     local oxt
     oxt="$(ls "$HERE"/AxiomOffice-LibreOffice-*.oxt 2>/dev/null | sort | tail -1)"
@@ -118,8 +147,13 @@ install() {
         echo "4/4 MCP server: khong co trong goi, bo qua"
     fi
 
+    enable_systemd
+
     echo
     echo "Xong. Mo LibreOffice Writer/Calc/Impress: menu Axiom Office > Ask AI (hoac sidebar)."
+    if [ "$SYSTEMD" != 1 ] && systemd_available; then
+        echo "(Core chay khi can; muon Core san sang tu dau phien: ./install.sh --systemd)"
+    fi
     echo
     print_mcp_config
 }
@@ -137,6 +171,7 @@ print_mcp_config() {
 
 uninstall() {
     assert_libreoffice_closed
+    disable_systemd
     stop_core
     "$UNOPKG" remove "$EXTENSION_ID" 2>/dev/null && echo "Da go extension $EXTENSION_ID" || echo "(extension chua cai)"
     rm -rf "$CORE_DIR" "$MCP_DIR"

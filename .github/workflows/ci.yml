@@ -1,0 +1,115 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # Linux la nen tang chinh cua lan LibreOffice (LibreOffice_arch.md): chay duoc ca test that voi soffice.
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Unit test extension LibreOffice (khong can LibreOffice)
+        run: python3 -m unittest discover -s tests/lo -v
+
+      - name: Agent Core (xUnit)
+        run: dotnet test tests/core/AxiomOffice.Core.Tests -c Release
+
+      - name: Build MCP server
+        run: dotnet build src/AxiomOffice.Mcp -c Release
+
+      - name: MCP server (khong can app dang mo)
+        run: python3 tests/mcp-host/test_mcp_portable.py src/AxiomOffice.Mcp/bin/Release/net10.0/axiom-office-mcp.dll
+
+      - name: Cai LibreOffice + Python UNO
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libreoffice python3-uno
+          soffice --version
+
+      - name: Cai extension + test moi lenh bridge tren LibreOffice that
+        run: |
+          bash scripts/libreoffice.sh install
+          bash scripts/libreoffice.sh status
+          python3 tests/live/test_live_libreoffice.py
+
+      - name: MCP + tool live (LibreOffice dang mo)
+        run: |
+          setsid soffice --headless --calc --norestore >/tmp/soffice.out 2>&1 </dev/null &
+          for _ in $(seq 40); do curl -s --max-time 1 http://127.0.0.1:47852/health >/dev/null && break; sleep 1; done
+          python3 tests/mcp-host/test_mcp_portable.py src/AxiomOffice.Mcp/bin/Release/net10.0/axiom-office-mcp.dll --live
+
+      - name: Dong goi tarball (Core + MCP + oxt)
+        run: bash scripts/linux/package.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: axiom-office-linux-x64
+          path: dist/axiom-office-linux-x64-*.tar.gz
+          if-no-files-found: error
+
+  # Windows: add-in COM (net48) + duong MCP cua AxiomOffice.Host. Khong co Office/WPS trong runner nen
+  # chi chay phan khong can app: unit test, Agent Core, build MCP va bo test MCP portable.
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Unit test extension LibreOffice
+        run: python -m unittest discover -s tests/lo -v
+
+      - name: Agent Core (xUnit)
+        run: dotnet test tests/core/AxiomOffice.Core.Tests -c Release
+
+      - name: Build add-in + Host (net48)
+        shell: pwsh
+        run: |
+          # build.ps1 cua project tat app dang giu DLL; runner sach nen chi can phan build.
+          $csc = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin\Roslyn\csc.exe"
+          if (-not (Test-Path $csc)) { throw "khong thay csc cua VS 2022 Build Tools" }
+          $fw = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319"
+          $stage = Join-Path $env:TEMP "axiom-ci"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          $addin = @(Get-ChildItem -Path src\AxiomOffice -Recurse -Filter *.cs | Where-Object { $_.FullName -notlike "*\bin\*" -and $_.FullName -notlike "*\obj\*" } | ForEach-Object { $_.FullName })
+          $hosts = @($addin + @(Get-ChildItem -Path src\AxiomOffice.Host -Recurse -Filter *.cs | ForEach-Object { $_.FullName }))
+          $common = @("/nologo", "/platform:x64", "/langversion:7.3", "/codepage:65001",
+                      "/r:$fw\mscorlib.dll", "/r:$fw\System.dll", "/r:$fw\System.Core.dll",
+                      "/r:$fw\System.Web.Extensions.dll", "/r:$fw\System.Windows.Forms.dll",
+                      "/r:$fw\System.Drawing.dll", "/r:$fw\System.Security.dll", "/r:$fw\Microsoft.CSharp.dll")
+          $hostOnly = @("/r:$fw\System.IO.Compression.dll", "/r:$fw\System.IO.Compression.FileSystem.dll",
+                        "/r:$fw\System.Xml.dll", "/r:$fw\System.Xml.Linq.dll",
+                        "/resource:src\AxiomOffice.Host\Mcp\Templates\default.docx,AxiomOffice.Mcp.default.docx",
+                        "/resource:src\AxiomOffice.Host\Mcp\Templates\default.pptx,AxiomOffice.Mcp.default.pptx")
+          & $csc @common /target:library "/out:$stage\AxiomOffice.dll" $addin
+          if ($LASTEXITCODE -ne 0) { throw "add-in build failed" }
+          & $csc @common @hostOnly /target:exe "/out:$stage\AxiomOffice.Host.exe" $hosts
+          if ($LASTEXITCODE -ne 0) { throw "host build failed" }
+          Write-Host "net48 build OK"
+
+      - name: Build MCP server
+        run: dotnet build src/AxiomOffice.Mcp -c Release
+
+      - name: MCP server (khong can app dang mo)
+        run: python tests/mcp-host/test_mcp_portable.py src/AxiomOffice.Mcp/bin/Release/net10.0/axiom-office-mcp.dll

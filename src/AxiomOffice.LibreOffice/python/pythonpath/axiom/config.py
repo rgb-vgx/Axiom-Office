@@ -9,9 +9,12 @@ from __future__ import annotations
 import json
 import os
 import secrets
+import shutil
+import subprocess
 import sys
 
 IS_WINDOWS = sys.platform.startswith("win")
+LIBSECRET_PREFIX = "libsecret:"   # gia tri trong config.json tro toi khoa luu trong keyring (Core hieu cung ten)
 DEFAULT_PORT = 47851          # Writer; Calc +1, Impress +2
 KINDS = ("wps", "et", "wpp")  # ten loai app dung chung voi Office/WPS
 
@@ -82,13 +85,17 @@ def set_value(name: str, value) -> None:
     os.chmod(path, 0o600)
 
 
-def protect_secret(text: str) -> str:
-    """Ma hoa khoa API bang DPAPI (CurrentUser, khong entropy) nhu add-in: 'dpapi:<base64>'.
+def protect_secret(text: str, name: str = "LlmApiKey") -> str:
+    """Ma hoa khoa API truoc khi ghi cau hinh.
 
-    Core giai ma dung dinh dang nay (Secrets.Unprotect); gia tri khong ma hoa van duoc chap nhan.
+    Windows: DPAPI (CurrentUser, khong entropy) nhu add-in -> 'dpapi:<base64>'.
+    Linux: libsecret qua `secret-tool` (neu co) -> 'libsecret:<ten khoa>'; khong co thi giu gia tri thuong
+    (config.json quyen 0600). Core giai ma ca hai dinh dang (Secrets.Unprotect); gia tri thuong van duoc chap nhan.
     """
-    if not text or not IS_WINDOWS:
+    if not text:
         return text
+    if not IS_WINDOWS:
+        return _libsecret_store(name, text) or text
     try:
         import base64
         import ctypes
@@ -112,6 +119,19 @@ def protect_secret(text: str) -> str:
         return "dpapi:" + base64.b64encode(encrypted).decode("ascii")
     except Exception:  # noqa: BLE001 - khong ma hoa duoc thi luu thang
         return text
+
+
+def _libsecret_store(name: str, text: str) -> str:
+    """Luu vao keyring cua nguoi dung; tra 'libsecret:<ten khoa>' hoac '' neu may khong co secret-tool."""
+    tool = shutil.which("secret-tool")
+    if not tool:
+        return ""
+    try:
+        done = subprocess.run([tool, "store", "--label=Axiom Office: " + name, "service", "axiom-office",
+                               "key", name], input=text, text=True, capture_output=True, timeout=15)
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return "libsecret:" + name if done.returncode == 0 else ""
 
 
 def token() -> str:

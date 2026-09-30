@@ -58,6 +58,11 @@ SETTINGS_FLAGS = (
     ("VisualQaEnabled", "QA thị giác: gửi ảnh trang cho model (VisualQaEnabled)", False),
 )
 MEMORY_LIST_TIMEOUT = 10
+# Noi luu cau hinh: noi ro theo he dieu hanh de nguoi dung biet dang sua file nao.
+STORAGE_HINT = (r"Cấu hình dùng chung với add-in (HKCU\Software\AxiomOffice). Agent Core đọc lúc khởi động."
+                if config.IS_WINDOWS else
+                "Cấu hình dùng chung với Agent Core (~/.config/axiom-office/config.json). Khoá API lưu vào "
+                "keyring nếu máy có secret-tool, không thì trong file quyền 0600.")
 
 
 def _label(dialog: ChildWindow, name: str, y: int, text: str, width: int = 134) -> None:
@@ -82,8 +87,9 @@ def open_settings(pane) -> None:
     for name, label, default in SETTINGS_FIELDS:
         current = config.value(name, default)
         if name == "LlmApiKey":
-            # Gia tri da ma hoa (dpapi:...) khong hien lai; de trong = giu nguyen khoa cu.
-            text = "" if str(current or "").startswith("dpapi:") else str(current or "")
+            # Gia tri da ma hoa (dpapi:/libsecret:) khong hien lai; de trong = giu nguyen khoa cu.
+            stored = str(current or "")
+            text = "" if stored.startswith(("dpapi:", config.LIBSECRET_PREFIX)) else stored
             _edit(dialog, name, y, 150, 306, text, EchoChar=0x2022, HelpText="Để trống = giữ khoá đã lưu")
         else:
             _edit(dialog, name, y, 150, 306, str(current or ""))
@@ -98,7 +104,7 @@ def open_settings(pane) -> None:
 
     dialog.add("FixedText", "status", PositionX=12, PositionY=y + 6, Width=446, Height=40, MultiLine=True,
                TextColor=theme.TEXT_MUTED, FontHeight=theme.SIZE_CAPTION,
-               Label="Cấu hình dùng chung với add-in (HKCU\\Software\\AxiomOffice). Agent Core đọc lúc khởi động.")
+               Label=STORAGE_HINT)
     _button(dialog, "save", 12, 342, 90, "Lưu")
     _button(dialog, "check", 108, 342, 110, "Kiểm tra Core")
     _button(dialog, "restart", 224, 342, 110, "Tắt Core")
@@ -110,7 +116,7 @@ def open_settings(pane) -> None:
                 text = str(dialog.value(name, "Text") or "").strip()
                 if name == "LlmApiKey":
                     if text:
-                        config.set_value(name, config.protect_secret(text))
+                        config.set_value(name, config.protect_secret(text, name))
                     continue
                 config.set_value(name, text)
             for name, _, _ in SETTINGS_FLAGS:
