@@ -11,6 +11,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"axiomoffice/core/internal/config"
 )
 
 func TestStripThoughts(t *testing.T) {
@@ -146,6 +148,36 @@ func TestRunAgentToolLoopAndNudge(t *testing.T) {
 	}
 	if fmt.Sprint(result.Transcript) == "[]" {
 		t.Fatal("transcript should record the tool call and the nudge")
+	}
+}
+
+// Doi cau hinh LLM (model/key/provider) trong Cai dat phai co hieu luc NGAY o luot sau, khong can khoi
+// dong lai Core: Source doc lai cau hinh moi lan lay client, va chi tao client moi khi chu ky doi.
+func TestSourceReloadsConfig(t *testing.T) {
+	cfg := config.Config{LlmProvider: "openai", LlmEndpoint: "http://a/v1", LlmModel: "m1", LlmApiKey: "k1"}
+	source := NewSource(http.DefaultClient, func() config.Config { return cfg })
+
+	first := source.Current()
+	if first.Model != "m1" || first.Codec.Name() != "openai" {
+		t.Fatalf("client dau: %+v", first)
+	}
+	if again := source.Current(); again != first {
+		t.Fatal("cau hinh khong doi -> dung lai client cu")
+	}
+
+	cfg.LlmModel = "m2"
+	cfg.LlmRequestTimeoutSeconds = 40
+	second := source.Current()
+	if second == first {
+		t.Fatal("doi model -> phai tao client moi")
+	}
+	if second.Model != "m2" || second.RequestTimeout != 40*time.Second {
+		t.Fatalf("client moi: model=%q timeout=%s", second.Model, second.RequestTimeout)
+	}
+
+	cfg.LlmProvider = "anthropic"
+	if third := source.Current(); third.Codec.Name() != "anthropic" {
+		t.Fatalf("doi provider -> codec phai doi: %q", third.Codec.Name())
 	}
 }
 
