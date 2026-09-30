@@ -60,8 +60,24 @@ public sealed class SessionDirectory(string directory)
 {
     public const double StaleSeconds = 90;
 
-    public static string DefaultDirectory => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AxiomOffice", "sessions");
+    // Windows: %LOCALAPPDATA%\AxiomOffice\sessions (add-in). Linux: $XDG_RUNTIME_DIR/axiom-office/sessions
+    // (khong co thi ~/.cache/axiom-office/sessions) - dung cho extension LibreOffice ghi.
+    public static string DefaultDirectory
+    {
+        get
+        {
+            if (OperatingSystem.IsWindows())
+            {
+                return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AxiomOffice", "sessions");
+            }
+
+            string? runtime = Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR");
+            string root = string.IsNullOrWhiteSpace(runtime)
+                ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".cache")
+                : runtime;
+            return Path.Combine(root, "axiom-office", "sessions");
+        }
+    }
 
     public string Directory => directory;
 

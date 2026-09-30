@@ -27,8 +27,12 @@ import tempfile
 import time
 import urllib.error
 import urllib.request
-import winreg
 import zlib
+
+try:
+    import winreg  # Windows: token o HKCU; Linux (test LibreOffice) doc ~/.config/axiom-office/config.json
+except ImportError:  # pragma: no cover - chi Linux/macOS
+    winreg = None
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 HOST_EXE = os.path.join(ROOT, "src", "AxiomOffice", "bin", "Release", "AxiomOffice.Host.exe")
@@ -48,8 +52,12 @@ def check(ok, name, detail=""):
 
 
 def token():
-    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\AxiomOffice") as key:
-        return winreg.QueryValueEx(key, "Token")[0]
+    if winreg is not None:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\AxiomOffice") as key:
+            return winreg.QueryValueEx(key, "Token")[0]
+    base = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
+    with open(os.path.join(base, "axiom-office", "config.json"), encoding="utf-8") as handle:
+        return json.load(handle).get("Token", "")
 
 
 def http(port, method, path, body=None, headers=None, timeout=60):

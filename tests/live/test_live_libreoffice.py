@@ -32,7 +32,8 @@ if hasattr(sys.stdout, "reconfigure"):
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from test_live_commands import Bridge, RESULTS, check, tiny_png  # noqa: E402
 
-SOFFICE = r"C:\Program Files\LibreOffice\program\soffice.exe"
+IS_WINDOWS = sys.platform.startswith("win")
+SOFFICE = r"C:\Program Files\LibreOffice\program\soffice.exe" if IS_WINDOWS else (shutil.which("soffice") or "/usr/bin/soffice")
 PORTS = {"writer": 47851, "calc": 47852, "impress": 47853}
 KINDS = {"writer": "wps", "calc": "et", "impress": "wpp"}
 
@@ -47,6 +48,9 @@ def health(port):
 
 
 def soffice_processes():
+    if not IS_WINDOWS:
+        out = subprocess.run(["pgrep", "-f", "soffice.bin"], capture_output=True, text=True).stdout
+        return out.split()
     out = subprocess.run(["tasklist", "/FI", "IMAGENAME eq soffice.bin", "/NH"], capture_output=True, text=True).stdout
     return [line.split()[1] for line in out.splitlines() if line.strip().startswith("soffice.bin")]
 
@@ -65,10 +69,28 @@ def launch(ui):
         if info:
             return info["pid"]
         time.sleep(1.0)
-    raise SystemExit("bridge không lên ở port %d (extension đã cài chưa? chạy scripts\\libreoffice.ps1 -Install)" % PORTS["writer"])
+    raise SystemExit("bridge không lên ở port %d (extension đã cài chưa? chạy scripts\\libreoffice.ps1 -Install hoặc "
+                     "scripts/libreoffice.sh install)" % PORTS["writer"])
 
 
 def close_app(pid):
+    if not IS_WINDOWS:
+        import signal
+
+        try:
+            os.kill(int(pid), signal.SIGTERM)
+        except OSError:
+            return
+        deadline = time.time() + 20
+        while time.time() < deadline:
+            if str(pid) not in soffice_processes():
+                return
+            time.sleep(0.5)
+        try:
+            os.kill(int(pid), signal.SIGKILL)
+        except OSError:
+            pass
+        return
     subprocess.run(["taskkill", "/PID", str(pid)], capture_output=True)
     deadline = time.time() + 20
     while time.time() < deadline:

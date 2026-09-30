@@ -142,12 +142,14 @@ public class StorageTests : IDisposable
     }
 
     [Theory]
-    [InlineData("C:\\Docs\\Bao Cao.DOCX", @"c:\docs\bao cao.docx")]
-    [InlineData("c:/docs/bao-cao.docx", @"c:\docs\bao-cao.docx")]
-    [InlineData("   ", null)]
-    [InlineData(null, null)]
-    public void DocumentKey_chuan_hoa_duong_dan(string? input, string? expected)
+    [InlineData("C:\\Docs\\Bao Cao.DOCX", @"c:\docs\bao cao.docx", "C:\\Docs\\Bao Cao.DOCX")]
+    [InlineData("c:/docs/bao-cao.docx", @"c:\docs\bao-cao.docx", "c:/docs/bao-cao.docx")]
+    [InlineData(" /home/an/Bao Cao.odt ", @"\home\an\bao cao.odt", "/home/an/Bao Cao.odt")]
+    [InlineData("   ", null, null)]
+    [InlineData(null, null, null)]
+    public void DocumentKey_chuan_hoa_duong_dan(string? input, string? windows, string? unix)
     {
-        Assert.Equal(expected, Agent.Orchestrator.DocumentKey(input));
+        // Windows khong phan biet hoa/thuong -> chuan hoa; Linux phan biet -> giu nguyen (chi bo khoang trang).
+        Assert.Equal(OperatingSystem.IsWindows() ? windows : unix, Agent.Orchestrator.DocumentKey(input));
     }
 }

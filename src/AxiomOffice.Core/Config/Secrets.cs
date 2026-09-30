@@ -21,6 +21,12 @@ public static class Secrets
             return raw;
         }
 
+        if (!OperatingSystem.IsWindows())
+        {
+            // Khoa DPAPI chi giai ma duoc tren dung may Windows cua nguoi dung: coi nhu chua cau hinh.
+            return "";
+        }
+
         try
         {
             byte[] encrypted = Convert.FromBase64String(raw[Prefix.Length..]);
@@ -39,6 +45,12 @@ public static class Secrets
         if (string.IsNullOrEmpty(value))
         {
             return "";
+        }
+
+        if (!OperatingSystem.IsWindows())
+        {
+            // Linux: config.json quyen 0600 cua nguoi dung la lop bao ve (LibreOffice_arch.md muc 9).
+            return value;
         }
 
         byte[] encrypted = ProtectedData.Protect(Encoding.UTF8.GetBytes(value), null, DataProtectionScope.CurrentUser);

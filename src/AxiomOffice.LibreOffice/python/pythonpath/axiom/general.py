@@ -4,7 +4,6 @@ from __future__ import annotations
 import base64
 import json
 import os
-import subprocess
 import tempfile
 import time
 import urllib.error
@@ -57,37 +56,14 @@ def app_info(env, params):
 # ---- ai.ask: chuyen sang Agent Core (interactive=false) ----
 
 def _core_base_url():
-    path = os.path.join(config.data_dir(), "core.json")
-    try:
-        with open(path, encoding="utf-8") as handle:
-            port = int(json.load(handle).get("port") or 0)
-    except (OSError, ValueError, TypeError):
-        port = 0
-    if port > 0 and _core_health("http://127.0.0.1:%d" % port):
-        return "http://127.0.0.1:%d" % port
-    exe = config.value("CoreExe")
-    if exe and os.path.isfile(str(exe)):
-        log.info("ai.ask: starting Agent Core %s" % exe)
-        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-        subprocess.Popen([str(exe)], cwd=os.path.dirname(str(exe)), creationflags=flags)
-        for _ in range(60):
-            time.sleep(0.5)
-            try:
-                with open(path, encoding="utf-8") as handle:
-                    port = int(json.load(handle).get("port") or 0)
-            except (OSError, ValueError, TypeError):
-                continue
-            if port > 0 and _core_health("http://127.0.0.1:%d" % port):
-                return "http://127.0.0.1:%d" % port
-    return None
+    # Cung duong khoi dong voi pane (core.ensure): CoreExe hoac vi tri cai mac dinh tren Linux.
+    from . import core
 
-
-def _core_health(base: str) -> bool:
     try:
-        with urllib.request.urlopen(base + "/health", timeout=2) as response:
-            return response.status == 200
-    except (OSError, urllib.error.URLError):
-        return False
+        return core.ensure()[0]
+    except core.CoreError as exc:
+        log.info("ai.ask: %s" % exc)
+        return None
 
 
 def _core_call(base: str, method: str, path: str, body=None, timeout: float = 30):
@@ -113,7 +89,7 @@ def ai_ask(env, params):
         raise values.ParamError("'prompt' is required")
     base = _core_base_url()
     if base is None:
-        raise RuntimeError("Agent Core is not running (start AxiomOffice.Core.exe or set CoreExe)")
+        raise RuntimeError("Agent Core is not running (start AxiomOffice.Core or set CoreExe)")
     from . import bridge
 
     port = next((p for k, p, _ in bridge._STATE.get("servers", []) if k == env.kind), 0)  # noqa: SLF001

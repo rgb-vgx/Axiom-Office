@@ -108,7 +108,9 @@ public sealed class Orchestrator(
             }
 
             // Memory dai han (giai doan 3, muc 8.5): tai lieu chua luu (khong co duong dan) -> khong co memory tai lieu.
-            string? memoryDocumentKey = documentKey != null && documentKey.Contains('\\') ? documentKey : null;
+            string? memoryDocumentKey = documentKey != null && (documentKey.Contains('\\') || documentKey.StartsWith('/'))
+                ? documentKey
+                : null;
             MemoryContext memoryContext = MemoryContext.Empty;
             if (memory is { Enabled: true })
             {
@@ -410,7 +412,13 @@ public sealed class Orchestrator(
             return null;
         }
 
-        string value = fullName.Trim().Replace('/', '\\').ToLowerInvariant();
+        string value = fullName.Trim();
+        if (OperatingSystem.IsWindows())
+        {
+            // Windows khong phan biet hoa/thuong va chap nhan ca '/'.
+            value = value.Replace('/', '\\').ToLowerInvariant();
+        }
+
         return value.Length == 0 ? null : value;
     }
 

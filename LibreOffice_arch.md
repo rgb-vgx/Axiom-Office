@@ -115,7 +115,7 @@ So với Windows: `AxiomOffice.dll` → **`axiom-office.oxt`**; `AxiomOffice.Cor
 | Windows | Linux | Nội dung |
 |---|---|---|
 | `HKCU\Software\AxiomOffice` | `$XDG_CONFIG_HOME/axiom-office/config.json` (mặc định `~/.config/…`), quyền `0600` | Token, LLM, bật/tắt Core/memory/QA |
-| DPAPI `dpapi:<base64>` | libsecret (`secret-tool`, nếu có) → không có thì lưu trong `config.json` `0600` | API key |
+| DPAPI `dpapi:<base64>` | **Đã làm:** lưu trong `config.json` `0600` (libsecret `secret-tool` để sau) | API key |
 | `%LOCALAPPDATA%\AxiomOffice\core\core.db`, `skills\`, `mcp.json`, log | `$XDG_DATA_HOME/axiom-office/` (mặc định `~/.local/share/…`) | Dữ liệu bền |
 | `%LOCALAPPDATA%\AxiomOffice\core.json`, `sessions\` | `$XDG_RUNTIME_DIR/axiom-office/` (không có thì `~/.cache/axiom-office/run`) | Trạng thái sống, xoá khi đăng xuất |
 
@@ -280,11 +280,11 @@ Thay đổi trong `src/AxiomOffice.Core` (một codebase cho cả hai nền tả
 |---|---|
 | Target | `net10.0` (bỏ `-windows`); publish `-r linux-x64` và `-r win-x64`, single-file tự chứa |
 | Cấu hình | `IConfigSource`: `RegistryConfigSource` (Windows) / `JsonConfigSource` (`config.json`, Linux); ưu tiên vẫn là biến môi trường `AXIOM_*` → nguồn nền tảng |
-| Khoá API | `ISecretStore`: DPAPI (Windows) / libsecret qua `secret-tool` nếu có, không thì giá trị trong `config.json` quyền `0600` (Linux) |
+| Khoá API | `Secrets`: DPAPI (Windows) / giá trị trong `config.json` quyền `0600` (Linux — **libsecret chưa làm**; `dpapi:` từ Windows coi như chưa cấu hình) |
 | Đường dẫn | `CorePaths` theo XDG (mục 4) |
-| Một bản mỗi người dùng | Named mutex của .NET trên Unix dựa trên file và không đảm bảo giữa các bản build → thay bằng **file lock** (`FileStream` `FileShare.None`) trên `$XDG_RUNTIME_DIR/axiom-office/core.lock` |
+| Một bản mỗi người dùng | Named mutex của .NET vẫn dùng (chạy đúng trên Unix); **file lock** trên `$XDG_RUNTIME_DIR/axiom-office/core.lock` là việc còn lại |
 | Session registry | `SessionDirectory` đọc thêm thư mục Linux; tên file `{pid}-{kind}.json` (một process ba session) |
-| Khởi động Core | Pane/extension chạy `~/.local/lib/axiom-office/axiom-office-core` (tách khỏi process soffice, `setsid`); tuỳ chọn `systemd --user` unit |
+| Khởi động Core | Pane/extension chạy `<data_dir>/core/AxiomOffice.Core` (hoặc `CoreExe`), tách khỏi process soffice bằng `start_new_session=True`; tuỳ chọn `systemd --user` unit chưa làm |
 | MCP built-in | `office` = `axiom-office-mcp` cạnh binary Core (mục 11) |
 | QA thị giác | Không đổi: gọi bridge `app.screenshot` |
 | Kiểm tra `InvariantGlobalization` | Đã xử lý (bỏ dấu bằng bảng tường minh) — chạy giống nhau trên Linux |
@@ -343,29 +343,32 @@ Sidebar deck **"Axiom Office"** (hiện với Writer, Calc, Impress), panel dự
 
 ## 12. Cài đặt, đóng gói, gỡ
 
-Gói `axiom-office-linux-x64-<version>.tar.gz`:
+Gói `axiom-office-linux-x64-<version>.tar.gz` (do `scripts/linux/package.sh` sinh ra từ mã nguồn):
 
 ```
-axiom-office/
-  axiom-office.oxt
-  bin/axiom-office-core        (single-file tự chứa, chmod +x)
-  bin/axiom-office-mcp
-  skills/                      (skill dựng sẵn + _design/tokens.json)
-  install.sh  uninstall.sh  HUONG-DAN-CAI-DAT.txt
+axiom-office-linux-x64-0.1.0/
+  core/                        Agent Core self-contained linux-x64 (máy đích không cần .NET)
+  AxiomOffice-LibreOffice-0.1.0.oxt
+  install.sh                   cài / --uninstall [--purge] / --help
+  README.txt
 ```
 
 `install.sh` (không cần root):
 
-1. Kiểm tra `soffice` (≥ 7.4) và Python UNO (`soffice --headless` chạy thử một macro Python in ra phiên
-   bản); thiếu `python3-uno` / `libreoffice-script-provider-python` thì in lệnh cài theo distro
-   (`apt`/`dnf`, **cần root — người dùng tự chạy**).
-2. Chép `bin/` và `skills/` vào `~/.local/lib/axiom-office/`.
-3. `unopkg add --force axiom-office.oxt` (extension của người dùng; LibreOffice phải đóng).
-4. Tạo `~/.config/axiom-office/config.json` (`0600`) với token ngẫu nhiên nếu chưa có; giữ cấu hình cũ khi nâng cấp.
-5. In đoạn cấu hình MCP cho Claude Desktop/Code (`axiom-office-mcp`).
+1. Kiểm tra `unopkg` và Python UNO (`python3 -c 'import uno'`); thiếu thì in lệnh cài theo distro
+   (`apt`: `python3-uno`, `dnf`: `libreoffice-pyuno`, **cần root — người dùng tự chạy**).
+2. Dừng Core cũ đang chạy từ thư mục cài (chỉ tiến trình Core, không phải LibreOffice), rồi chép `core/`
+   vào `~/.local/share/axiom-office/core`.
+3. `unopkg add --force` (extension của người dùng). LibreOffice phải đóng — script dừng lại và nhắc,
+   **không tự tắt**.
+4. Cập nhật `~/.config/axiom-office/config.json` (`0600`): chỉ ghi khoá nào được truyền
+   (`--endpoint/--model/--api-key`, `--api-key -` đọc từ stdin); giữ nguyên token và cấu hình cũ khi nâng cấp.
 
-`uninstall.sh [--purge]`: tắt Core (`/v1/admin/shutdown`), `unopkg remove org.axiomoffice.bridge`, xoá
-`~/.local/lib/axiom-office`; `--purge` xoá cả `~/.config/axiom-office` và `~/.local/share/axiom-office`.
+`--uninstall [--purge]`: `unopkg remove org.axiomoffice.bridge`, xoá `<data_dir>/core`; `--purge` xoá thêm
+`~/.config/axiom-office`, `~/.local/share/axiom-office` và `$XDG_RUNTIME_DIR/axiom-office`.
+
+Còn lại so với kế hoạch: `axiom-office-mcp` trong gói, thư mục `skills/` dựng sẵn, `HUONG-DAN-CAI-DAT.txt`
+riêng, và gọi `/v1/admin/shutdown` khi gỡ (hiện chỉ gửi `SIGTERM` cho tiến trình Core).
 
 Flatpak/Snap LibreOffice chạy trong sandbox: extension vẫn cài được qua `unopkg` của bản đó, nhưng
 kết nối `127.0.0.1` tới Core ngoài sandbox và quyền chạy binary có thể bị chặn → **đợt này chỉ hỗ trợ
@@ -484,18 +487,47 @@ và container lồng nhau (tự cắt khi cuộn) + `ScrollBar`. Những điều
 | Tạo lại container thứ hai ở cùng chỗ có lúc không vẽ | Pane neo đóng = ẩn, mở lại = hiện (không huỷ/tạo lại) |
 | Edit nhiều dòng chèn "\n" trước khi `keyPressed` tới listener | Bỏ đúng ký tự xuống dòng tại vị trí con trỏ (`getSelection().Min`) trước khi gửi |
 
+### 14.4 Chạy thật trên Linux (30/09/2026)
+
+Máy kiểm chứng: Ubuntu 24.04, LibreOffice 24.2.7.2 (`python3-uno`, VCL kf5 trên phiên KDE Plasma X11),
+.NET SDK 10.0.401 (chỉ để build; máy đích không cần).
+
+| Việc | Kết quả |
+|---|---|
+| Unit test extension (không cần LibreOffice) | 46/46 |
+| `tests/live/test_live_libreoffice.py` headless | 159/159 |
+| `tests/live/test_live_libreoffice.py --ui` | 159/159 |
+| Agent Core (`dotnet test`) | 200/200 (trên Linux **và** trên Windows) |
+| `ai.ask` thật qua Core + LLM (Writer/Calc/Impress) | Pass: model tự nạp skill, sửa tài liệu thật (Writer 25s, Calc 53s) |
+| Pane trong sidebar (KDE) và pane neo (dock) | Pass, có ảnh chụp |
+
+Khác biệt Windows → Linux phải xử lý:
+
+| Hiện tượng | Xử lý |
+|---|---|
+| Cấu hình, khoá API, thư mục dữ liệu, session của Core đều gắn Windows | `JsonConfigSource` (`~/.config/axiom-office/config.json`, cùng tên khoá), `Secrets` trả plaintext khi không có DPAPI, `CorePaths.DefaultRoot()`/`SessionDirectory` theo XDG (`~/.local/share`, `$XDG_RUNTIME_DIR`) |
+| `DocumentKey` hạ chữ thường + đổi `/` thành `\` (đúng cho Windows) làm sai memory tài liệu trên Linux | Chỉ chuẩn hoá khi `OperatingSystem.IsWindows()`; `memoryDocumentKey` nhận cả đường dẫn bắt đầu bằng `/` |
+| Core do extension khởi động là tiến trình con của `soffice` → chết theo khi LibreOffice thoát | `core.launch()` trên Linux dùng `start_new_session=True` (không SIGHUP, không chung process group) |
+| `general.ai_ask` có bản sao logic khởi động Core (chỉ biết `CoreExe`, không biết vị trí cài) | Gộp về `core.ensure()`; `core_exe()` thêm vị trí cài `<data_dir>/core/AxiomOffice.Core` do `install.sh` đặt |
+| Sidebar của VCL trên Linux cấp cho panel chiều cao **lớn hơn** vùng vẽ thật (thanh tiêu đề deck cao hơn LibreOffice tính) → footer "Sẵn sàng"/"Hoàn tác lượt này" bị thanh trạng thái che | Trừ `theme.SIDEBAR_BOTTOM_INSET` (12px) khi pane nằm trong sidebar |
+| Font mono mặc định trên Linux rộng hơn Consolas → mã lệnh bị cắt ở mép phải (`writer.insertTable` → `writer.insertTabl`) | Ưu tiên đủ chỗ cho mã lệnh (nới giới hạn 45% bề rộng), chừa 2px mép, rút gọn tên kiểu lỗi ở dòng lỗi |
+| Script test giả định `tasklist`/`taskkill`/`winreg`/`winreg` token và đường dẫn `soffice.exe` | Bộ live test dò `soffice` qua PATH, `pgrep`/`SIGTERM`, token đọc từ `config.json`; `winreg` import mềm |
+
+Chưa làm ở L3: `AxiomOffice.Files` + `axiom-office-mcp` cho Linux và CI Ubuntu (mục 11 và 12).
+
 ### Giai đoạn L2: Core đa nền tảng + pane
 
-- [ ] `IConfigSource`/`ISecretStore`, publish linux-x64, khởi động Core từ extension.
-- [ ] Sidebar Ask AI (chat, tiến trình, "Dùng kỹ năng", thẻ xác nhận, "Đã ghi nhớ" + Xoá, Dừng, Hoàn tác
+- [x] `IConfigSource`/`ISecretStore`, publish linux-x64, khởi động Core từ extension.
+- [x] Sidebar Ask AI (chat, tiến trình, "Dùng kỹ năng", thẻ xác nhận, "Đã ghi nhớ" + Xoá, Dừng, Hoàn tác
       lượt, Trò chuyện mới), dialog Cài đặt + Quản lý ghi nhớ.
 - **Xong khi**: trên LibreOffice thật (có UI) chạy 3 yêu cầu mẫu (công văn, bảng điểm, slide báo cáo)
   qua pane; "làm tiếp" dùng ngữ cảnh lượt trước; xác nhận/hoàn tác chạy; Core Windows vẫn pass toàn bộ test.
+  → **Đạt** (30/09/2026): xem 14.4; Core Windows 200/200 vẫn xanh sau khi đổi sang `net10.0`.
 
 ### Giai đoạn L3: Làn file + MCP + đóng gói
 
 - [ ] `AxiomOffice.Files` (`net10.0`), `axiom-office-mcp` (linux-x64, win-x64), test so với bản Python.
-- [ ] `install.sh` / `uninstall.sh`, tarball, hướng dẫn; CI Ubuntu.
+- [x] `install.sh` / `uninstall.sh`, tarball, hướng dẫn; CI Ubuntu (CI còn lại).
 - **Xong khi**: cài từ tarball trên máy sạch Ubuntu/Fedora không cần root (trừ gói `python3-uno` nếu
   thiếu); Claude Code dùng được `axiom-office-mcp` với LibreOffice đang mở; CI xanh.
 

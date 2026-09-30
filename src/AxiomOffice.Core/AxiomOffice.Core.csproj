@@ -3,7 +3,7 @@
   <!-- Agent Core: process rieng cua agent (New_arch.md). .NET 10, chi nghe 127.0.0.1.
        Version duoc build.ps1 truyen vao (-p:Version=) de khop voi AxiomOffice.dll. -->
   <PropertyGroup>
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <AssemblyName>AxiomOffice.Core</AssemblyName>
     <RootNamespace>AxiomOffice.Core</RootNamespace>
     <Nullable>enable</Nullable>

@@ -50,7 +50,7 @@ SETTINGS_FIELDS = (
     ("LlmEndpoint", "Endpoint", ""),
     ("LlmModel", "Model", ""),
     ("LlmApiKey", "API key", ""),
-    ("CoreExe", "AxiomOffice.Core.exe", ""),
+    ("CoreExe", "Agent Core (CoreExe)", ""),
 )
 SETTINGS_FLAGS = (
     ("MemoryEnabled", "Ghi nhớ dài hạn (MemoryEnabled)", True),

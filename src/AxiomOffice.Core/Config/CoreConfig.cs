@@ -65,9 +65,18 @@ public sealed class CoreConfig
 
     public bool DynamicPort => CorePort == 0;
 
+    // Windows: HKCU\Software\AxiomOffice (dung chung voi add-in). Linux/macOS: ~/.config/axiom-office/config.json
+    // (dung chung voi extension LibreOffice) - cung ten khoa.
     public static CoreConfig Load(IConfiguration config)
     {
-        return From(config, new RegistrySource(RegistryKeyPath));
+        return From(config, DefaultSource());
+    }
+
+    public static IRegistrySource DefaultSource()
+    {
+        return OperatingSystem.IsWindows()
+            ? new RegistrySource(RegistryKeyPath)
+            : new JsonConfigSource(JsonConfigSource.DefaultPath);
     }
 
     public static CoreConfig From(IConfiguration config, IRegistrySource registry)

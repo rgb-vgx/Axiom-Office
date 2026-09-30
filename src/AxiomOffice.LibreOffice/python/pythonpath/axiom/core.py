@@ -94,10 +94,9 @@ def ensure(port: int = 0) -> tuple[str, int]:
         if health(base):
             return base, candidate
 
-    exe = config.value("CoreExe")
-    if exe and os.path.isfile(str(exe)):
-        flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-        subprocess.Popen([str(exe)], cwd=os.path.dirname(str(exe)), creationflags=flags)
+    exe = core_exe()
+    if exe:
+        launch(exe)
         deadline = time.time() + START_TIMEOUT_SECONDS
         while time.time() < deadline:
             time.sleep(0.5)
@@ -107,7 +106,30 @@ def ensure(port: int = 0) -> tuple[str, int]:
                 if health(base):
                     return base, int(info["port"])
         raise CoreError("Agent Core khong san sang sau %ds" % START_TIMEOUT_SECONDS)
-    raise CoreError("Agent Core chua chay. Chay AxiomOffice.Core.exe (hoac dat CoreExe trong cau hinh) roi thu lai.")
+    raise CoreError("Agent Core chua chay. Chay AxiomOffice.Core (hoac dat CoreExe trong cau hinh) roi thu lai.")
+
+
+def core_exe() -> str:
+    """`CoreExe` trong cau hinh; khong co thi cho mac dinh cua scripts/linux/install.sh (<data_dir>/core/AxiomOffice.Core)."""
+    exe = config.value("CoreExe")
+    if exe and os.path.isfile(str(exe)):
+        return str(exe)
+    if not config.IS_WINDOWS:
+        default = os.path.join(config.data_dir(), "core", "AxiomOffice.Core")
+        if os.access(default, os.X_OK):
+            return default
+    return ""
+
+
+def launch(exe: str) -> None:
+    # Core song doc lap voi LibreOffice: Windows khong mo console; Linux tach session (khong chet theo soffice/SIGHUP).
+    options = {"cwd": os.path.dirname(exe), "stdin": subprocess.DEVNULL, "stdout": subprocess.DEVNULL,
+               "stderr": subprocess.DEVNULL}
+    if config.IS_WINDOWS:
+        options["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    else:
+        options["start_new_session"] = True
+    subprocess.Popen([exe], **options)
 
 
 def start_run(base: str, prompt: str, port: int, kind: str, document=None, conversation_id: str | None = None,

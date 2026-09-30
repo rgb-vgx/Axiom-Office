@@ -106,6 +106,15 @@ public class CoreConfigTests
     [Fact]
     public void Api_key_dpapi_duoc_giai_ma_con_khoa_thuong_giu_nguyen()
     {
+        if (!OperatingSystem.IsWindows())
+        {
+            // Linux: khong co DPAPI - khoa luu thuong (config.json 0600); khoa dpapi: tu Windows thi bo qua.
+            Assert.Equal("sk-bi-mat-123", Secrets.Protect("sk-bi-mat-123"));
+            Assert.Equal("sk-tho", Load(registry: new() { ["LlmApiKey"] = "sk-tho" }).LlmApiKey);
+            Assert.Equal("", Load(registry: new() { ["LlmApiKey"] = "dpapi:AQAAANCMnd8B" }).LlmApiKey);
+            return;
+        }
+
         string encrypted = Secrets.Protect("sk-bi-mat-123");
         Assert.StartsWith("dpapi:", encrypted);
 

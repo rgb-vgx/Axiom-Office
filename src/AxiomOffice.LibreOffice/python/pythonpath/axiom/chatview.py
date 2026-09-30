@@ -227,7 +227,8 @@ class ChatView:
             try:
                 # getPreferredSize thieu vai pixel voi font mono: lay them theo so ky tu cho chac.
                 measured = max(int(id_control.getPreferredSize().Width) + 10, len(action_id) * 7 + 8)
-                id_w = min(int(width * 0.45), measured)
+                # Uu tien hien du ma lenh (font mono tren Linux rong hon Consolas); nhan ben trai tu xuong dong.
+                id_w = min(measured, max(int(width * 0.45), width - theme.ICON - 8 - 90))
             except Exception:  # noqa: BLE001
                 id_w = 120
         label_left = theme.ICON + 8
@@ -241,17 +242,15 @@ class ChatView:
                            ScaleImage=False, BackgroundColor=theme.PANE_BG, Tabstop=False)
         set_icon(image, icon, theme.ICON)
         if id_control is not None:
-            widget.resize_part(id_control, dx=width - id_w, w=id_w)
+            widget.resize_part(id_control, dx=width - id_w - 2, w=id_w)   # chua 2px: glyph mono sat mep bi cat
         widget.width, widget.height = width, label_h
         return widget
 
     def _tool(self, item: dict) -> Widget:
         action = item.get("action") or ""
         if item.get("state") == "error":
-            error = str(item.get("error") or "lỗi")
-            if len(error) > 160:
-                error = error[:157] + "…"
-            return self._line("error", "%s — %s" % (theme.label_for(action), error), theme.DANGER_FG, action)
+            return self._line("error", "%s — %s" % (theme.label_for(action), theme.error_summary(item.get("error"))),
+                              theme.DANGER_FG, action)
         return self._line("ok", theme.label_for(action), theme.TEXT_SECONDARY, action)
 
     def _skill(self, item: dict) -> Widget:

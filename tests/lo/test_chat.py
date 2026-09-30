@@ -9,10 +9,13 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import sys
+import tempfile
 import threading
 import types
 import unittest
+from unittest import mock
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -102,6 +105,17 @@ class ThemeTests(unittest.TestCase):
 
     def test_plain_reply_strips_markdown_marks(self):
         self.assertEqual(theme.plain_reply("**Xong** `writer.heading`"), "Xong writer.heading")
+
+    def test_error_summary_bo_ten_kieu_loi_va_cat_bot(self):
+        # Ten kieu loi (tu dai khong co khoang trang) lam dong thao tac khong xuong dong duoc -> bo di.
+        self.assertEqual(theme.error_summary("ArgumentException: 'rows' and 'cols' are required"), "'rows' and 'cols' are required")
+        self.assertEqual(theme.error_summary("com.sun.star.lang.DisposedException: Document closed"), "Document closed")
+        self.assertEqual(theme.error_summary("RuntimeError: boom"), "boom")
+        self.assertEqual(theme.error_summary("binh thuong"), "binh thuong")
+        self.assertEqual(theme.error_summary(""), "lỗi")
+        self.assertEqual(theme.error_summary(None), "lỗi")
+        long_error = "x" * 300
+        self.assertEqual(theme.error_summary(long_error), "x" * 157 + "…")
 
     def _png_size(self, data: bytes):
         self.assertEqual(data[:8], b"\x89PNG\r\n\x1a\n")
@@ -237,6 +251,59 @@ class SessionTests(unittest.TestCase):
         session.begin("x")
         session.tick({"rounds": 4, "seconds": 8.2})
         self.assertIn("4 vòng", session.status)
+
+
+class CoreLaunchTests(unittest.TestCase):
+    """Khoi dong Agent Core (axiom.core): CoreExe -> vi tri cai mac dinh cua scripts/linux/install.sh."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="axiom-core-")
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        # config.IS_WINDOWS la bien module: gia lap Linux tren may Windows va nguoc lai.
+        mock.patch.object(core.config, "IS_WINDOWS", False).start()
+        mock.patch.object(core.config, "data_dir", lambda: self.tmp).start()
+        mock.patch.object(core.config, "value", lambda name, default=None: None).start()
+        self.addCleanup(mock.patch.stopall)
+
+    def _installed(self, executable: bool) -> str:
+        path = os.path.join(self.tmp, "core", "AxiomOffice.Core")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write("#!/bin/sh\n")
+        os.chmod(path, 0o755 if executable else 0o644)
+        return path
+
+    def test_core_exe_uutien_coreexe_roi_vi_tri_cai(self):
+        installed = self._installed(executable=True)
+        self.assertEqual(core.core_exe(), installed)
+        # CoreExe tro sai duong dan -> van dung vi tri cai.
+        mock.patch.object(core.config, "value", lambda name, default=None: "/khong/co/AxiomOffice.Core").start()
+        self.assertEqual(core.core_exe(), installed)
+
+    def test_core_exe_rong_khi_thieu_hoac_khong_chay_duoc(self):
+        self.assertEqual(core.core_exe(), "")
+        if os.name != "nt":                       # Windows: os.access(X_OK) chi kiem tra file ton tai
+            self._installed(executable=False)     # co file nhung thieu quyen chay
+            self.assertEqual(core.core_exe(), "")
+
+    def test_launch_tach_session_tren_linux(self):
+        calls = []
+        with mock.patch.object(core.subprocess, "Popen", lambda argv, **kw: calls.append((argv, kw))):
+            core.launch("/opt/axiom/AxiomOffice.Core")
+        argv, options = calls[0]
+        self.assertEqual(argv, ["/opt/axiom/AxiomOffice.Core"])
+        self.assertEqual(options["cwd"], "/opt/axiom")
+        self.assertIs(options["start_new_session"], True)   # khong chet theo LibreOffice/SIGHUP
+        self.assertNotIn("creationflags", options)
+
+    def test_launch_an_console_tren_windows(self):
+        core.config.IS_WINDOWS = True
+        calls = []
+        with mock.patch.object(core.subprocess, "Popen", lambda argv, **kw: calls.append((argv, kw))):
+            core.launch(r"C:\Axiom\AxiomOffice.Core.exe")
+        options = calls[0][1]
+        self.assertIn("creationflags", options)
+        self.assertNotIn("start_new_session", options)
 
 
 class CoreSseTests(unittest.TestCase):

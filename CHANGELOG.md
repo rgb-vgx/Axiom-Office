@@ -5,6 +5,32 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — LibreOffice trên Linux (LibreOffice_arch.md giai đoạn L2–L3)
+- **Agent Core chạy được trên Linux**: `TargetFramework` `net10.0` (bỏ `-windows`); cấu hình đọc từ
+  `~/.config/axiom-office/config.json` (`JsonConfigSource`, cùng tên khoá với HKCU — giá trị bool ghi
+  `1/0`, `SkillDirs` là mảng), khoá API để plaintext trong file `0600` (không có DPAPI), dữ liệu theo XDG
+  (`~/.local/share/axiom-office`), session ở `$XDG_RUNTIME_DIR/axiom-office/sessions`. `DocumentKey` chỉ
+  hạ chữ thường/đổi `\` trên Windows (Linux phân biệt hoa thường), memory tài liệu nhận đường dẫn `/`
+- **Extension**: dùng chung một mã nguồn cho hai hệ điều hành; pane tự khởi động Core từ vị trí cài
+  (`<data_dir>/core/AxiomOffice.Core`) khi chưa có `CoreExe`, và trên Linux tách hẳn session khỏi `soffice`
+  (`start_new_session`) để Core không chết theo LibreOffice; `ai.ask` dùng chung đường khởi động với pane
+  (trước đây có bản sao riêng, không biết vị trí cài)
+- **Đóng gói & cài đặt cho Linux** (`scripts/linux/`): `package.sh` tạo
+  `dist/axiom-office-linux-x64-<ver>.tar.gz` (Core self-contained + `.oxt` + `install.sh`, máy đích không
+  cần .NET); `install.sh` cài không cần root (Core vào `~/.local/share/axiom-office/core`, `unopkg add
+  --force`, ghi `config.json` `0600`, giữ cấu hình cũ khi nâng cấp, `--api-key -` đọc key từ stdin),
+  `--uninstall [--purge]`. Bổ sung `scripts/libreoffice.sh` (Linux) và `scripts/package_oxt.py` (dùng chung
+  hai hệ điều hành) bên cạnh bản PowerShell
+- **Sửa lỗi chỉ thấy trên Linux**: footer pane bị thanh trạng thái che (sidebar VCL cấp chiều cao lớn hơn
+  vùng vẽ thật — trừ 12px khi ở trong sidebar); mã lệnh bị cắt ở mép phải do font mono rộng hơn Consolas;
+  dòng lỗi rút gọn tên kiểu lỗi (`ArgumentException: …`) để xuống dòng được trong cột nhãn hẹp
+- Test: bộ live test chạy được trên Linux (`soffice` theo PATH, tắt app bằng SIGTERM, token đọc từ
+  `config.json`, `winreg` import mềm); `tests/lo` 46 unit test (thêm `theme.error_summary`, khởi động Core
+  theo nền tảng)
+- Đã kiểm chứng trên Ubuntu 24.04 + LibreOffice 24.2 (KDE Plasma X11): 159/159 test lệnh headless và
+  159/159 có cửa sổ, Agent Core 200/200 (Linux và Windows), lượt `ai.ask` thật trên Writer/Calc/Impress,
+  pane chạy ở cả deck sidebar lẫn pane neo bên phải (ảnh chụp trong phiên X ảo và phiên KDE thật)
+
 ### Changed — pane Ask AI của LibreOffice làm lại theo thiết kế pane Office
 - Giao diện giống pane Word/Excel/PowerPoint: `axiom/theme.py` (bản LibreOffice của `PaneTheme`: cùng mã
   màu, font Segoe UI, cỡ chữ, khoảng cách, nhãn tiếng Việt cho từng lệnh, gợi ý theo app), `axiom/widgets.py`

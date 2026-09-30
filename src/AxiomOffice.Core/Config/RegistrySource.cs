@@ -16,6 +16,11 @@ public sealed class RegistrySource(string keyPath) : IRegistrySource
 {
     public string? GetString(string name)
     {
+        if (!OperatingSystem.IsWindows())
+        {
+            return null;
+        }
+
         try
         {
             using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(keyPath);

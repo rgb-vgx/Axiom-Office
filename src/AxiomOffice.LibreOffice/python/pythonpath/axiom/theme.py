@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import struct
 import sys
 import zlib
@@ -72,6 +73,9 @@ BUBBLE_MAX_USER = 0.80
 BUBBLE_MAX_AI = 0.92
 HEADER_H = 48
 FOOTER_H = 28
+# Sidebar LibreOffice (VCL kf5/gtk tren Linux) cap cho panel cao hon vung nhin thay vai pixel (thanh tieu de deck
+# ve cao hon LibreOffice tinh) -> footer bi thanh trang thai che. Chua khoang nay o day pane trong sidebar.
+SIDEBAR_BOTTOM_INSET = 0 if IS_WINDOWS else 12
 COMPOSER_H = 98
 SEND_W = 64
 SEND_H = 30
@@ -168,6 +172,13 @@ def empty_state(kind: str) -> tuple[str, str, tuple]:
 def plain_reply(text: str) -> str:
     """Tra loi cua model hien bang nhan thuong (khong co markdown): bo ** va ` de khoi lo ky hieu."""
     return (text or "").replace("**", "").replace("`", "").strip()
+
+
+def error_summary(error: str) -> str:
+    """Thong bao loi hien tren dong thao tac: bo ten kieu loi (ArgumentException: ...) - chuoi dai lien
+    mach khong xuong dong duoc trong cot nhan hep cua pane."""
+    text = re.sub(r"^[A-Za-z_.]*(Exception|Error):\s*", "", (error or "").strip())
+    return text[:157] + "…" if len(text) > 160 else (text or "lỗi")
 
 
 # ---------------------------------------------------------------- PNG

@@ -277,9 +277,11 @@ internal sealed class CoreProcess : IDisposable
             throw new InvalidOperationException("Khong tim thay goc repo (scripts/build.ps1) tu " + AppContext.BaseDirectory);
         }
 
+        // Windows: AxiomOffice.Core.exe; Linux/macOS: apphost khong duoi (AxiomOffice.Core).
         string bin = Path.Combine(dir.FullName, "src", "AxiomOffice.Core", "bin");
+        string name = OperatingSystem.IsWindows() ? "AxiomOffice.Core.exe" : "AxiomOffice.Core";
         string[] found = Directory.Exists(bin)
-            ? Directory.GetFiles(bin, "AxiomOffice.Core.exe", SearchOption.AllDirectories)
+            ? Directory.GetFiles(bin, name, SearchOption.AllDirectories)
             : [];
         if (found.Length == 0)
         {

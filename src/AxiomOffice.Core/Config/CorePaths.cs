@@ -1,7 +1,9 @@
 namespace AxiomOffice.Core.Config;
 
 // Vi tri file cua Core (New_arch.md muc 7.1, 8.5.1, 8.9):
-//   mac dinh  : %LOCALAPPDATA%\AxiomOffice\{core.json, core.log} + ...\core\core.db
+//   Windows   : %LOCALAPPDATA%\AxiomOffice\{core.json, core.log} + ...\core\core.db
+//   Linux     : $XDG_DATA_HOME/axiom-office (mac dinh ~/.local/share/axiom-office) - cung cho extension
+//               LibreOffice tim core.json (LibreOffice_arch.md muc 4)
 //   AXIOM_CORE_DATA_DIR: ca ba nam trong thu muc do (test khong lam ban du lieu that).
 public sealed class CorePaths
 {
@@ -37,8 +39,21 @@ public sealed class CorePaths
             return new CorePaths(Path.GetFullPath(dataDirOverride.Trim()), true);
         }
 
-        string local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        return new CorePaths(Path.Combine(local, "AxiomOffice"), false);
+        return new CorePaths(DefaultRoot(), false);
+    }
+
+    public static string DefaultRoot()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AxiomOffice");
+        }
+
+        string? xdg = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
+        string root = string.IsNullOrWhiteSpace(xdg)
+            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local", "share")
+            : xdg;
+        return Path.Combine(root, "axiom-office");
     }
 
     public void EnsureDirectories()

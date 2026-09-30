@@ -420,6 +420,11 @@ Office không an toàn đa luồng — thiếu cổng này Word từng crash (AV
 
 ## Cấu hình
 
+Windows: `HKCU\Software\AxiomOffice`. Linux: `~/.config/axiom-office/config.json` (`$XDG_CONFIG_HOME`) —
+**cùng tên khoá**, giá trị số/bool ghi dạng JSON (`SkillDirs` là mảng hoặc chuỗi phân cách `;`). Extension
+LibreOffice và Agent Core đọc chung file này, nên đổi trong pane **Cài đặt** là cả hai bên thấy ngay.
+Thứ tự ưu tiên: `AXIOM_*` (biến môi trường) → HKCU/config.json → mặc định.
+
 `HKCU\Software\AxiomOffice`:
 
 | Value | Kiểu | Mặc định | Ý nghĩa |
@@ -509,12 +514,14 @@ powershell -ExecutionPolicy Bypass -File tests\mcp-host\office_roundtrip.ps1 -Di
 powershell -ExecutionPolicy Bypass -File tests\mcp-host\office_roundtrip.ps1 -Dir <thư_mục_output> -Verify
 # Unit test của các MCP Python (legacy)
 cd tools\word-mcp; .venv\Scripts\python.exe -m unittest discover -s tests
-# Làn LibreOffice: 41 unit test (giải mã tham số + registry lệnh khớp bản C#, logic pane, theme + đọc SSE của
+# Làn LibreOffice: 46 unit test (giải mã tham số + registry lệnh khớp bản C#, logic pane, theme + đọc SSE của
 # Core) và test mọi lệnh trên LibreOffice thật (script tự mở LibreOffice bằng profile người dùng;
-# --ui: bản có cửa sổ; --ai: ai.ask)
+# --ui: bản có cửa sổ; --ai: ai.ask). Chạy được cả trên Linux (đường dẫn soffice tự dò, tắt app bằng
+# SIGTERM, token đọc từ ~/.config/axiom-office/config.json).
 python tests\lo\test_extension.py
 python tests\lo\test_chat.py
 python tests\live\test_live_libreoffice.py [--apps writer,calc,impress] [--ui] [--ai]
+python3 tests/live/test_live_libreoffice.py [--apps writer,calc,impress] [--ui] [--ai]   # Linux
 # Agent Core: unit test + test vòng đời trên tiến trình thật (cần .NET 10 SDK)
 dotnet test tests\core\AxiomOffice.Core.Tests
 # Agent Core e2e: Core thật + LLM giả + bridge giả (không cần Office)
@@ -562,8 +569,10 @@ Cùng một DLL, một lần cài phục vụ cả hai bộ app:
 ## LibreOffice
 
 Cùng giao thức, cùng tên lệnh với add-in — nhưng bridge nằm trong **extension Python UNO**
-(`src\AxiomOffice.LibreOffice`), không phải COM add-in, nên không cần .NET và chạy được cả trên Linux
-(thiết kế: `LibreOffice_arch.md`; giai đoạn L2–L3 cho Linux/sidebar chưa làm).
+(`src\AxiomOffice.LibreOffice`), không phải COM add-in, nên không cần .NET và chạy được cả **Windows** lẫn
+**Linux** (thiết kế: `LibreOffice_arch.md`). Trên Linux, Agent Core đọc cấu hình từ
+`~/.config/axiom-office/config.json` thay cho HKCU, và **không cần .NET trên máy đích**: bản phát hành kèm
+Core self-contained.
 
 ```powershell
 # Đóng LibreOffice trước (unopkg từ chối chạy khi soffice đang mở); script không tự tắt app của bạn.
@@ -631,7 +640,35 @@ Khác bản Office (do UNO):
   (`alreadyOpen: true`) thay vì gọi `loadComponentFromURL` — tránh hộp thoại "đã mở" chặn main thread.
 - `/health` có thêm `stuck`: `true` khi main thread không trả lời (thường là một hộp thoại đang mở);
   lệnh khi đó trả lỗi `Busy` nêu rõ phải đóng hộp thoại.
-- `ui.askpane` chưa có trong LibreOffice (giai đoạn L3) — gọi sẽ báo lỗi rõ ràng.
+
+### Linux
+
+Yêu cầu: LibreOffice 7.x trở lên + Python UNO (`python3-uno`). **Không cần .NET** — bản phát hành kèm
+Agent Core self-contained (`linux-x64`).
+
+```bash
+# Gói phát hành: dist/axiom-office-linux-x64-<ver>.tar.gz (Core + .oxt + install.sh)
+tar -xzf axiom-office-linux-x64-0.1.0.tar.gz && cd axiom-office-linux-x64-0.1.0
+./install.sh --endpoint http://localhost:20128/v1 --model <tên-model> --api-key -   # - = đọc key từ stdin
+./install.sh --uninstall [--purge]                                                  # gỡ (--purge xoá cả cấu hình/dữ liệu)
+```
+
+- Cài **không cần root**, chỉ dùng `unopkg` của người dùng. Script **không tự tắt LibreOffice**: đang chạy
+  thì dừng lại và nhắc bạn đóng.
+- Vị trí: Core `~/.local/share/axiom-office/core/`, cấu hình `~/.config/axiom-office/config.json`
+  (quyền `0600`, khoá API lưu thường — Linux không có DPAPI), session dùng chung
+  `$XDG_RUNTIME_DIR/axiom-office/sessions`, log `~/.local/share/axiom-office/bridge.log`.
+- `CoreExe` trong cấu hình trỏ tới Core ở chỗ khác; bỏ trống thì pane tự dùng Core đã cài (kèm `install.sh`).
+  Trên Windows, Core chưa chạy thì pane tự khởi động nó; trên Linux cũng vậy (tách session, không chết theo
+  LibreOffice).
+- Bỏ qua các tham số LLM khi cài thì cấu hình sau trong pane **Cài đặt** (endpoint/model/API key) — dialog
+  ghi thẳng vào `config.json`.
+- Đóng gói lại từ mã nguồn: `scripts/linux/package.sh [--rid linux-arm64]` (cần .NET SDK 10);
+  đóng gói/cài/gỡ nhanh bản dev: `scripts/libreoffice.sh package|install|status|log|uninstall`.
+
+Trạng thái đã kiểm chứng trên Ubuntu 24.04 + LibreOffice 24.2 (KDE Plasma X11): 159/159 test lệnh (headless
+và có cửa sổ), 200/200 test Agent Core, và một lượt `ai.ask` thật trong cả ba app (Writer/Calc/Impress) —
+model tự gọi skill, sửa tài liệu thật. Pane chạy ở **cả hai chỗ**: deck trong sidebar và pane neo bên phải.
 
 ## Troubleshooting
 
@@ -662,15 +699,19 @@ src/AxiomOffice/              COM add-in (net48)
   Ribbon/                     Ribbon XML + xử lý nút
 src/AxiomOffice.Host/         AxiomOffice.Host.exe: companion + MCP server
   Mcp/                        giao thức MCP, tool file (OOXML) + live, template docx/pptx nhúng
-src/AxiomOffice.Core/         Agent Core (.NET 10, theo New_arch.md)
+src/AxiomOffice.Core/         Agent Core (.NET 10, theo New_arch.md) - net10.0, chạy cả Windows lẫn Linux
   Agent/                      Orchestrator, RunManager, RunEventStream (SSE), PromptBuilder, ContextAssembler
   Models/                     codec OpenAI/Anthropic + vòng lặp agent (ModelClient)
   Office/                     đọc session registry, gọi bridge (/health, /cmd, /commands)
   Tools/                      tool registry + office_action (allowlist theo ForAgent)
   Memory/                     SQLite: conversations, messages, runs, tool_calls
-  Api/, Config/, Logging/     endpoint v1, cấu hình HKCU + AXIOM_*, log core.log
+  Api/, Config/, Logging/     endpoint v1, cấu hình HKCU (Windows) / config.json (Linux) + AXIOM_*, log core.log
 tests/core/                   test Agent Core: xUnit + e2e (fake_llm.py, test_core_e2e.py)
-scripts/                      build, install, uninstall, legacy (gỡ bản WpsAiBridge), core (tắt Core), install-dotnet-sdk, package, libreoffice (đóng gói/cài .oxt)
+scripts/                      build, install, uninstall, legacy (gỡ bản WpsAiBridge), core (tắt Core), install-dotnet-sdk, package, libreoffice
+  libreoffice.sh              Linux: đóng gói/cài/gỡ .oxt bằng unopkg của người dùng
+  package_oxt.py              đóng gói .oxt (Windows + Linux)
+  linux/install.sh            cài cho người dùng cuối Linux: Core vào ~/.local/share, .oxt, config.json
+  linux/package.sh            tarball linux-x64/arm64: Core self-contained + .oxt + install.sh
 scripts/dist/                 install.cmd, uninstall.cmd, HUONG-DAN-CAI-DAT.txt (vào gói cài)
 src/AxiomOffice.LibreOffice/  extension Python UNO cho LibreOffice (nói cùng giao thức bridge)
   python/axiom_job.py         component UNO: job OnStartApp -> axiom.bridge.start

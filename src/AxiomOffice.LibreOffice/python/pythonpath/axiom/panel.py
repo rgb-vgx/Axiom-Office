@@ -186,7 +186,8 @@ class PaneUI:
     # ---------------------------------------------------------------- layout
 
     def resize(self, width: int, height: int) -> None:
-        self._width, self._height = max(260, width), max(320, height)
+        inset = theme.SIDEBAR_BOTTOM_INSET if self.in_sidebar else 0
+        self._width, self._height = max(260, width), max(320, height) - inset
         w, h = self._width, self._height
         pad = theme.PAD_X
         # header
