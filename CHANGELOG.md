@@ -16,10 +16,21 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
   khỏi hàng nút, xuống đáy vùng nội dung — xem mục "chỗ của câu trạng thái" bên dưới. Nhờ vậy không còn điều
   khiển nào chồng lên nút bấm được trong hàng nút nữa
 - **Vì sao mở wizard lại thấy bước 2/5**: máy đã có `LlmEndpoint` + `LlmModel` thì `_apply_collect` cố ý
-  nhảy `welcome → checks` để vào thẳng màn kiểm tra / sửa lỗi. Trước đây "Quay lại" không bấm được nên
-  người dùng thành ra mắc kẹt ở đó
+  nhảy `welcome → checks` để vào thẳng màn kiểm tra / sửa lỗi — nên "Quay lại" không bấm được là mắc kẹt
+  hẳn ở đó. Cái nhảy bước này nay đã bỏ (xem mục "bước mở đầu" bên dưới)
 - Kiểm thử: `tests/live/test_setup_wizard.py` thêm `click_in_window` (bấm chuột THẬT theo toạ độ model, tự
   trừ lề cửa sổ) và 2 kiểm tra: về lại bước kiểm tra máy, rồi bấm "Quay lại" phải lui về bước chào mừng
+
+### Changed — Wizard thiết lập: luôn mở ở bước 1/5 (Chào mừng)
+- Trước đây máy đã có `LlmEndpoint` + `LlmModel` thì `_apply_collect` (Linux) và `ShowStep(Configured() ? 1 : 0)`
+  (Windows) tự nhảy sang bước 2/5 để vào thẳng màn kiểm tra / sửa lỗi. Người dùng mở wizard ra là thấy mình ở
+  bước 2/5 mà không rõ vì sao
+- Nay wizard **luôn mở ở bước 1/5**; kết quả kiểm tra vẫn chạy nền và điền sẵn vào các dòng của bước 2, nên
+  bấm "Tiếp tục →" là thấy ngay. Hai bản (LibreOffice + Windows) sửa cùng lúc cho khớp nhau
+- `SetupState.configured` (chỉ dùng cho việc nhảy bước này) đã bỏ; bên C# `Configured()` vẫn giữ vì còn dùng
+  để đổi tiêu đề bước kiểm tra khi máy đã thiết lập
+- Kiểm thử: `tests/live/test_setup_wizard.py` chặt lại — mở wizard phải đúng bước `welcome`, và mở lại sau khi
+  bấm X cũng phải về bước 1/5 (trước đây chấp nhận cả `checks`)
 
 ### Changed — Wizard thiết lập (Linux): chỗ của câu trạng thái ("Mọi thứ đều ổn.")
 - **Câu đó là gì**: `_status_message()` — câu kết luận của màn "Kiểm tra máy", liệt kê những mục chưa đạt.

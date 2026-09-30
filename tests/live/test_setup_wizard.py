@@ -228,8 +228,10 @@ def main() -> int:
 
         # Doi "kiem tra may" (chay nen luc mo) xong: thao tac bam trong luc wizard ban se bi bo qua.
         state = wait(lambda item: item.get("step") in ("welcome", "checks") and not item.get("busy"))
-        # May da thiet lap (co LlmEndpoint + LlmModel) thi wizard vao thang man kiem tra (sua loi).
-        check(state.get("step") in ("welcome", "checks"), "wizard mo duoc", json.dumps(state, ensure_ascii=False)[:200])
+        # Wizard luon mo o buoc 1/5 (Chao mung), ke ca khi may da thiet lap: ket qua kiem tra chi dien vao cac
+        # dong cua buoc 2, khong tu nhay buoc.
+        check(state.get("step") == "welcome", "wizard mo o buoc 1/5 (Chao mung)",
+              json.dumps(state, ensure_ascii=False)[:200])
         check(state.get("coreError") == "", "wizard doc duoc trang thai tu Agent Core", state.get("coreError"))
         # Nut "Quay lai" phai bam duoc bang chuot that: nhan trang thai o hang nut tung de len no (rong hon)
         # nen nuot het cu bam, va `ui.setup` thi khong bao gio lo ra loi nay.
@@ -327,8 +329,8 @@ def main() -> int:
         check(closed and wait_until(lambda: not search_windows(TITLE)),
               "bam X tren thanh tieu de dong han wizard", json.dumps(search_windows(TITLE)))
         reopened = call({})
-        check(reopened.get("step") in ("welcome", "checks"),
-              "mo lai sau khi bam X -> wizard MOI (trang thai cu da duoc don)", reopened.get("step"))
+        check(reopened.get("step") == "welcome",
+              "mo lai sau khi bam X -> wizard MOI, ve buoc 1/5 (trang thai cu da duoc don)", reopened.get("step"))
     finally:
         if fake is not None:
             fake.terminate()

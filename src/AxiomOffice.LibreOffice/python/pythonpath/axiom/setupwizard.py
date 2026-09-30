@@ -551,8 +551,9 @@ class Wizard:
             set_icon(row["icon"], "dot" if ok is None else ("ok" if ok else "error"), 12, theme.PANE_BG)
             set_prop(row["detail"], "Label", detail or row["meta"]["help"])
         self._paint_checks()
-        if self.state.step_id == "welcome" and self.state.configured:
-            self.state.go("checks")          # da thiet lap roi thi vao thang man kiem tra / sua loi
+        # Ket qua kiem tra chi dien vao cac dong; KHONG tu nhay buoc: wizard luon mo o buoc 1/5 (Chao mung) va
+        # nguoi dung bam "Tiep tuc" de sang buoc 2. Truoc day may da thiet lap thi nhay thang `welcome -> checks`,
+        # lam nguoi dung mo wizard ra la thay minh o buoc 2/5 khong ro vi sao.
 
     # ---------------------------------------------------------------- sua loi
 

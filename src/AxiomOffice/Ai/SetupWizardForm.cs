@@ -85,10 +85,12 @@ namespace AxiomOffice.Ai
             BuildConnect();
             BuildFeatures();
             BuildDone();
-            ShowStep(Configured() ? 1 : 0);
+            // Luon mo o buoc 1/5 (Chao mung): may da thiet lap thi nguoi dung van bam "Tiep tuc" de sang buoc
+            // kiem tra. Truoc day nhay thang buoc 2/5 khien nguoi dung khong ro vi sao minh o do.
+            ShowStep(0);
         }
 
-        // Da co endpoint + model: wizard vao thang buoc kiem tra (khiem luon man sua chua).
+        // Da co endpoint + model (dung de doi tieu de buoc kiem tra khi may da thiet lap).
         private bool Configured()
         {
             return !string.IsNullOrEmpty(Config.LlmEndpoint) && !string.IsNullOrEmpty(Config.LlmModel);

@@ -44,7 +44,6 @@ class SetupState:
         self.checks = []                 # [{"id", "ok", "detail", "fixable", "fixed"}]
         self.core_error = ""             # Core khong chay / khong cai
         self.core_info = {}
-        self.configured = False           # Core bao da co dia chi + model (mo lai wizard thi vao man kiem tra)
         self.touched = False              # nguoi dung da nhap/chon o buoc ket noi -> Core khong duoc ghi de
         self.done = False                # da bam "Hoan tat" (co luu cau hinh)
 
@@ -228,7 +227,6 @@ class SetupState:
         self.core_info = dict(result.get("core") or {})
         current = dict(result.get("current") or {})
         self.has_stored_key = bool(current.get("hasKey"))
-        self.configured = bool(current.get("configured"))
         # "Kiem tra may" chay nen ngay khi wizard mo; neu nguoi dung da go/chon truoc khi no xong thi KHONG ghi
         # de (truoc day dia chi vua go bi thay bang gia tri cu trong cau hinh).
         if not self.touched:
@@ -250,7 +248,6 @@ class SetupState:
     def apply_core_error(self, message: str) -> None:
         self.core_error = message
         self.core_info = {}
-        self.configured = False
 
     def problem_ids(self, problems: list) -> list:
         """Id cac van de Core bao (de UI danh dau dong kiem tra tuong ung)."""
