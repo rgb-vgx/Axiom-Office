@@ -286,6 +286,29 @@ class ResultTests(unittest.TestCase):
         self.assertIn("Calc", setup.SetupState("et").replace_document_hint())
         self.assertIn("Impress", setup.SetupState("wpp").replace_document_hint())
 
+class CheckVerdictTests(unittest.TestCase):
+    """Cau ket luan o cuoi man "Kiem tra may" (dong trang thai)."""
+
+    def test_moi_thu_dat_thi_bao_on(self):
+        self.assertEqual(setup.checks_verdict([("Agent Core đang chạy", True), ("Cầu nối", True)]),
+                         "Mọi thứ đều ổn.")
+
+    def test_co_viec_chua_xong_thi_liet_ke_dung_cac_viec_do(self):
+        self.assertEqual(setup.checks_verdict([("Agent Core đang chạy", False), ("Cầu nối", True),
+                                               ("Tệp cấu hình", False)]),
+                         "Cần chú ý: Agent Core đang chạy; Tệp cấu hình")
+
+    def test_chua_kiem_tra_xong_thi_khong_noi_gi(self):
+        # Truoc day cho nay tra ve "Mọi thứ đều ổn." ngay khi vua mo wizard (chua kiem tra gi ca).
+        self.assertEqual(setup.checks_verdict([("Agent Core đang chạy", None), ("Cầu nối", True)]), "")
+
+    def test_loi_core_duoc_uu_tien_hon_danh_sach(self):
+        self.assertEqual(setup.checks_verdict([("Agent Core đang chạy", False)], "Không chạy được Agent Core."),
+                         "Không chạy được Agent Core.")
+
+    def test_khong_co_dong_nao_thi_coi_nhu_on(self):
+        self.assertEqual(setup.checks_verdict([]), "Mọi thứ đều ổn.")
+
 class CatalogViewTests(unittest.TestCase):
     def test_metadata_check_khop_catalog(self):
         meta = setup.check_meta("core")

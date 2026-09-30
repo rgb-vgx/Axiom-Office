@@ -275,6 +275,22 @@ class SetupState:
         return ("Mở menu Axiom Office → Hỏi AI (hoặc tab Axiom Office ở sidebar) để bắt đầu trong %s."
                 % names.get(self.kind, "LibreOffice"))
 
+def checks_verdict(rows: list, core_error: str = "") -> str:
+    """Cau ket luan o cuoi man "Kiem tra may" (dong trang thai trong setupwizard.py).
+
+    `rows` la [(nhan, ok)] voi ok True/False/None; None = chua co ket qua kiem tra.
+    Chua kiem tra xong thi tra ve "" - khong duoc noi "moi thu deu on" khi chua biet gi.
+    Loi Core duoc uu tien vi no la nguyen nhan cua phan lon cac dong con lai.
+    """
+    if core_error:
+        return core_error
+    if any(ok is None for _label, ok in rows):
+        return ""
+    pending = [label for label, ok in rows if ok is False]
+    if not pending:
+        return "Mọi thứ đều ổn."
+    return "Cần chú ý: " + "; ".join(pending)
+
 def payload_to_test_result(result) -> dict:
     """Ket qua POST /v1/llm/test. `core.call` tra ve `result` (khong con vo {"ok":...}).
 

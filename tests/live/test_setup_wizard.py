@@ -234,12 +234,22 @@ def main() -> int:
         # Nut "Quay lai" phai bam duoc bang chuot that: nhan trang thai o hang nut tung de len no (rong hon)
         # nen nuot het cu bam, va `ui.setup` thi khong bao gio lo ra loi nay.
         check(call({"step": "checks"}).get("step") == "checks", "wizard ve lai buoc kiem tra may", "")
+        # Dong trang thai nam trong vung noi dung, duoi danh sach kiem tra: kiem tra xong thi no phai co cau KET
+        # LUAN (khong phai cau tien do "Đang xử lý…" cua mot thao tac nao khac, va khong duoc de trong).
+        state = wait(lambda item: item.get("step") == "checks" and not item.get("busy"), 20)
+        verdict = state.get("statusLine") or ""
+        check(bool(verdict) and not verdict.startswith("Đang "),
+              "buoc kiem tra may: dong trang thai la cau ket luan", json.dumps(verdict, ensure_ascii=False))
         if click_in_window(TITLE, 71, 485):        # giua nut "Quay lai": PAD + BACK_W/2, y 470..500 (setupwizard)
             state = wait(lambda item: item.get("step") == "welcome", 10)
             check(state.get("step") == "welcome", "bam chuot vao nut \"Quay lai\" -> lui ve buoc chao mung",
                   state.get("step"))
 
         check(call({"step": "connect"}).get("step") == "connect", "wizard nhay sang buoc ket noi", "")
+        # Buoc ket noi co dong ket qua rieng (test_line) o dung cho do -> dong trang thai de trong, khong chen
+        # them mot cau khac vao cung mot cho.
+        line = call({}).get("statusLine")
+        check(line == "", "buoc ket noi: khong dung them dong trang thai", json.dumps(line, ensure_ascii=False))
 
         fake, port = start_fake_llm(work)
         call({"endpoint": "http://127.0.0.1:%d/v1" % port, "provider": "company", "model": ""})

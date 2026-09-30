@@ -29,6 +29,7 @@ PAD = 16
 CONTENT_Y = 114
 CONTENT_H = 340
 ROW_H = 44
+STATUS_Y, STATUS_H = 420, 40    # dong trang thai: day vung noi dung, ngay tren duong ke chan trang (462)
 BUTTON_W, BUTTON_H = 150, 30
 BACK_W = 110            # nut "Quay lai" hep hon nut chinh
 GAP = 12                # khe giua cac dieu khien o hang nut
@@ -98,6 +99,8 @@ class Wizard:
         self.state = setup.SetupState(self.kind)
         self.busy = False
         self._token = 0
+        self._note = ""            # thong bao ngan han (ket qua vua lam xong) - xem _set_note
+        self._note_step = ""       # buoc sinh ra thong bao; doi buoc thi bo
         self._writing = False     # dang ghi o nhap tu code -> TextListener bo qua
         self.closed = False       # da goi close() (bam X co the bao nhieu lan)
         # Dialog that (co X window rieng): cua so con VCL trong vung tai lieu khong bam duoc (xem awt.Dialog).
@@ -138,14 +141,18 @@ class Wizard:
         self.back_button.place(PAD, 470)
         self.next_button.place(WIDTH - PAD - BUTTON_W, 470)
         self.later_link.place(WIDTH - PAD - BUTTON_W - 2 * GAP - self.later_link.width, 478)
-        # Nhan trang thai la FixedText nen duc: de len dieu khien bam duoc nao la no nuot het cu bam o do
-        # (VCL con nang no len moi lan doi Label), va nut "Quay lai" nam trong vung no phu nen bam mai khong
-        # an. Vi vay no phai nam gon trong khoang trong giua nut "Quay lai" va link "De sau"; do dai lay theo
-        # vi tri that cua link de doi cau chu link khong lam no chong lai.
-        status_x = PAD + BACK_W + GAP
-        status_w = self.later_link.x - GAP - status_x
-        self.status = self._chrome(s, status_x, 470, status_w, 30, MultiLine=True, TextColor=theme.TEXT_MUTED,
-                                   NoLabel=True, font=(theme.FONT, theme.SIZE_CAPTION))
+        # Hang nut chi con dieu huong. Dong trang thai ("Mọi thứ đều ổn." / "Cần chú ý: ...") la KET LUAN cua
+        # buoc nen nam o day vung noi dung - ngay duoi cai no noi ve - chu khong chen vao giua cac nut:
+        #   1) cho chen vao hang nut chi ~250px (giua "Quay lai" va "De sau") nen cau dai bi cat cut;
+        #   2) no la FixedText nen duc: de len dieu khien bam duoc la nuot het cu bam o do, ma VCL con nang no
+        #      len moi lan doi Label - de ngay tren nut "Quay lai" thi nut do bam khong an.
+        # Vung 420..462 khong buoc nao dung den: noi dung dai nhat la buoc ket noi (ket thuc o 456), nhung buoc
+        # do da co dong ket qua rieng ngay tai do (test_line) nen dong trang thai duoc an di (xem _show_step).
+        # Chieu cao 40 du cho hai dong chu: cau ket luan dai nhat ("Cần chú ý: ..." liet ke nhieu muc) khong bi
+        # cat cut nhu khi no phai chen vao hang nut.
+        self.status = self._chrome(s, PAD, STATUS_Y, WIDTH - 2 * PAD, STATUS_H, MultiLine=True,
+                                   TextColor=theme.TEXT_MUTED, NoLabel=True,
+                                   font=(theme.FONT, theme.SIZE_CAPTION))
 
         self._build_welcome()
         self._build_checks()
@@ -338,6 +345,11 @@ class Wizard:
             box.place(PAD, CONTENT_Y)
             box.set_visible(step_id == state.step_id)
         self.back_button.set_visible(not state.is_first)
+        if self._note_step != state.step_id:
+            self._note = ""       # thong bao ngan han chi song trong buoc da sinh ra no
+        # Buoc ket noi da co dong ket qua rieng o dung cho nay (test_line, 414..456) nen khong dung them dong
+        # trang thai nua; cac buoc khac deu trong.
+        self.status.setVisible(state.step_id != "connect")      # control awt: setVisible (khong phai Widget.set_visible)
         self._set_next()
         self._refresh_step()
 
@@ -410,19 +422,29 @@ class Wizard:
 
         set_icon(self.test_icon, state.test_kind() or "dot", 12, theme.PANE_BG)
         set_prop(self.test_line, "Label", state.test_line())
-        set_prop(self.status, "Label", "Đang xử lý…" if self.busy else state.models_status)
 
     def _refresh_status(self) -> None:
-        if self.busy:
-            set_prop(self.status, "Label", "Đang xử lý…")
-        elif self.state.step_id != "connect":
-            set_prop(self.status, "Label", self.state.core_error or self._status_message())
+        set_prop(self.status, "Label", self._status_message())
+
+    def _set_note(self, text: str) -> None:
+        """Thong bao ngan han (ket qua vua lam xong). Tu tat khi doi buoc, khong de lai cau cu tren man khac."""
+        self._note = text
+        self._note_step = self.state.step_id
+        self._refresh_status()
 
     def _status_message(self) -> str:
-        pending = [row["meta"]["label"] for row in self.check_rows if row.get("ok") is False]
-        if not pending:
-            return "Mọi thứ đều ổn."
-        return "Cần chú ý: " + "; ".join(pending)
+        """Cau o dong trang thai: dang chay > vua lam xong > ket luan cua buoc kiem tra may.
+
+        Ket luan chi thuoc buoc kiem tra may: cac buoc khac khong co gi de ket luan thi de trong.
+        """
+        if self.busy:
+            return "Đang xử lý…"
+        if self._note:
+            return self._note
+        if self.state.step_id != "checks":
+            return ""
+        return setup.checks_verdict([(row["meta"]["label"], row.get("ok")) for row in self.check_rows],
+                                    self.state.core_error)
 
     def _mcp_line(self) -> str:
         path = os.path.join(config.data_dir(), "mcp", "axiom-office-mcp")
@@ -558,7 +580,7 @@ class Wizard:
             return
         self.busy = True
         self.next_button.set_enabled(False)
-        set_prop(self.status, "Label", "Đang sửa…")
+        self._set_note("Đang sửa…")
         self._async(lambda: self._apply_fix(check_id), lambda result: self._after_fix(result))
 
     def _apply_fix(self, check_id: str) -> dict:
@@ -578,7 +600,9 @@ class Wizard:
     def _after_fix(self, result: dict) -> None:
         message = result.get("message") or result.get("__error__") or ""
         if message:
-            set_prop(self.status, "Label", message)
+            # Phai la `_set_note`: `refresh_async` ngay duoi day se ve lai buoc va xoa cau vua ghi neu ghi thang
+            # vao nhan (nguoi dung khong bao gio doc duoc ket qua sua).
+            self._set_note(message)
         self.refresh_async()
 
     def _restart_core(self) -> None:
@@ -711,14 +735,16 @@ class Wizard:
         if self.busy:
             return
         self._read_fields()      # lay gia tri nguoi dung vua go trong o (chua can roi o)
+        # Cau o day thuoc ve danh sach model -> tra loi ngay canh nut "Tải danh sách model" (models_hint), khong
+        # phai o dong trang thai chan duoi (buoc ket noi khong dung dong do).
         if not self.state.endpoint:
-            set_prop(self.status, "Label", "Điền địa chỉ máy chủ AI trước.")
+            set_prop(self.models_hint, "Label", "Điền địa chỉ máy chủ AI trước.")
+            self.models_hint.setVisible(True)      # co the dang bi an vi con danh sach lan truoc
             return
         self.busy = True
         self.state.loading_models = True
         self.next_button.set_enabled(False)
         set_prop(self.models_hint, "Label", "Đang lấy danh sách model…")
-        set_prop(self.status, "Label", "Đang lấy danh sách model…")
         query = urlencode(self.state.models_query())
         self._async(lambda: core.call(core.ensure()[0], "GET", "/v1/llm/models?" + query), self._after_models)
 
@@ -854,7 +880,7 @@ class Wizard:
             message_box(self.ctx, self.window.window(), "Không lưu được",
                         "Không ghi được cấu hình: %s" % exc, 3)
             return
-        set_prop(self.status, "Label", "Đã lưu. Cấu hình mới dùng được ngay, không cần khởi động lại.")
+        self._set_note("Đã lưu. Cấu hình mới dùng được ngay, không cần khởi động lại.")
 
 def drive(wizard: "Wizard", params: dict) -> dict:
     """Dieu khien wizard tu ben ngoai (test live, hoac quan tri vien cau hinh san qua bridge) roi tra trang thai.
@@ -921,7 +947,15 @@ def status(wizard: "Wizard") -> dict:
         "coreError": state.core_error,
         "features": dict(state.features),
         "selectedPos": _selected_pos(wizard),
+        "statusLine": _label(wizard.status),
     }
+
+def _label(control) -> str:
+    """Chu dang hien tren mot control ("" neu control da bi huy hoac khong co nhan)."""
+    try:
+        return str(control.getModel().getPropertyValue("Label") or "")
+    except Exception:  # noqa: BLE001
+        return ""
 
 def _selected_pos(wizard: "Wizard"):
     """Muc dang chon trong ListBox model (-1: chua chon muc nao; "khong doc duoc": control da bi huy).

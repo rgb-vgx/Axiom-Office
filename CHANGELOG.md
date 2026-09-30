@@ -12,14 +12,35 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
   nút "Quay lại" chết hẳn. Đo trên LibreOffice thật bằng xdotool: bấm "Tiếp tục →" ăn (đổi bước), bấm "Quay
   lại" ở 5 điểm khác nhau đều không, và `mouseEntered` của nút không hề chạy (không có hiệu ứng hover).
   `ui.setup` không bao giờ lộ ra lỗi này vì nó đổi bước bằng API chứ không bằng chuột
-- Nay nhãn trạng thái nằm gọn trong khoảng trống **giữa** nút "Quay lại" và link "Để sau"
-  (`status_x = PAD + BACK_W + GAP`, bề rộng lấy theo vị trí thật của link), không chồng lên điều khiển bấm
-  được nào; thêm hằng số `BACK_W`/`GAP` và ghi lại cái bẫy này ngay chỗ dựng giao diện
+- Hàng nút nay **chỉ còn điều hướng** (`← Quay lại` · `Để sau` · `Tiếp tục →`); nhãn trạng thái được đưa ra
+  khỏi hàng nút, xuống đáy vùng nội dung — xem mục "chỗ của câu trạng thái" bên dưới. Nhờ vậy không còn điều
+  khiển nào chồng lên nút bấm được trong hàng nút nữa
 - **Vì sao mở wizard lại thấy bước 2/5**: máy đã có `LlmEndpoint` + `LlmModel` thì `_apply_collect` cố ý
   nhảy `welcome → checks` để vào thẳng màn kiểm tra / sửa lỗi. Trước đây "Quay lại" không bấm được nên
   người dùng thành ra mắc kẹt ở đó
 - Kiểm thử: `tests/live/test_setup_wizard.py` thêm `click_in_window` (bấm chuột THẬT theo toạ độ model, tự
   trừ lề cửa sổ) và 2 kiểm tra: về lại bước kiểm tra máy, rồi bấm "Quay lại" phải lui về bước chào mừng
+
+### Changed — Wizard thiết lập (Linux): chỗ của câu trạng thái ("Mọi thứ đều ổn.")
+- **Câu đó là gì**: `_status_message()` — câu kết luận của màn "Kiểm tra máy", liệt kê những mục chưa đạt.
+  Trước đây nó nằm ở hàng nút, nên (a) chỉ được ~250 px giữa nút "Quay lại" và link "Để sau" nên câu dài bị
+  cắt bằng "…", (b) chen vào chỗ của điều hướng, và (c) chính nó là thứ nuốt cú bấm vào nút "Quay lại"
+- **Chỗ mới**: đáy **vùng nội dung** (`STATUS_Y/STATUS_H = 420, 40`, rộng hết `WIDTH - 2*PAD`), ngay dưới
+  danh sách kiểm tra mà nó nói về — đúng nguyên tắc "câu kết luận đặt cạnh thứ nó kết luận", và đủ hai dòng
+  nên câu dài nhất không còn bị cắt. Vùng 420..462 không bước nào dùng đến; hàng nút chỉ còn điều hướng
+- Bước "Kết nối máy chủ AI" **không dùng** dòng này: nó đã có dòng kết quả riêng (`test_line`, 414..456) và
+  gợi ý cạnh nút "Tải danh sách model" (`models_hint`) — `_show_step` ẩn dòng trạng thái ở bước đó
+- **Không còn nói "Mọi thứ đều ổn." khi chưa kiểm tra gì**: dòng nào chưa có kết quả (`ok is None`) thì
+  chưa kết luận, để trống. Trước đây mở wizard là thấy ngay câu đó dù máy chưa được kiểm tra
+- Lỗi Core vẫn được ưu tiên hiện trước danh sách (nó là nguyên nhân của phần lớn các dòng còn lại), nhưng
+  nay hiện đủ hai dòng thay vì bị cắt
+- Phần quyết định câu chữ tách thành hàm thuần `setup.checks_verdict()` (có test trong `tests/lo/test_setup.py`)
+- **Sửa kèm**: câu kết quả sau khi bấm "Sửa" (`_after_fix`) và câu "Đã lưu. …" trước đây ghi thẳng vào nhãn
+  rồi bị lần vẽ lại ngay sau đó xoá mất, nên người dùng không bao giờ đọc được; nay đi qua `_set_note()`
+  (thông báo ngắn hạn, tự tắt khi đổi bước). Câu "Điền địa chỉ máy chủ AI trước." của nút "Tải danh sách
+  model" cũng chuyển về `models_hint` — cạnh đúng thứ nó nói tới
+- Kiểm thử: `tests/live/test_setup_wizard.py` đọc thêm `statusLine` từ `ui.setup` và kiểm tra dòng trạng thái
+  ở bước kiểm tra máy là câu kết luận (không phải câu tiến độ), còn ở bước kết nối thì để trống
 
 ### Fixed — Calc (LibreOffice): công thức nhiều tham số bị Err:508, và lỗi công thức bị báo sai
 - **Gốc bệnh**: bản LibreOffice 24.2 trên máy này đòi `;` làm dấu phân cách tham số, còn agent viết công
