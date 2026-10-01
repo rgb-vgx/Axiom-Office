@@ -272,6 +272,26 @@ def test_calc(b, out):
           key="et.addChart kiểu lạ")
     b.cmd("et.addChart", {"sheet": "Sheet1", "type": "line"}, expect_ok=False, key="et.addChart thiếu range")
 
+    # Điền bằng công thức: chi phí token của agent tính theo TỪNG Ô nó viết ra, nên bảng nghìn dòng phải
+    # đi bằng một công thức + một lệnh điền, không phải gửi từng ô.
+    filled = b.cmd("et.fillRange", {"sheet": "Sheet1", "range": "P1:P20", "formula": "=ROW()*2"}) or {}
+    check(filled.get("filled") == 20 and filled.get("sheet") == "Sheet1", "Calc fillRange điền đủ số ô", filled)
+    column = (b.cmd("et.readRange", {"range": "P1:P20", "sheet": "Sheet1"}, record=False) or {}).get("values") or []
+    check(len(column) == 20 and column[0][0] == 2 and column[19][0] == 40,
+          "Calc fillRange dịch công thức theo dòng (ROW()*2 -> 2..40)", column[:2] + column[-2:])
+
+    b.cmd("et.writeRange", {"sheet": "Sheet1", "range": "R1", "values": [[1, 10], [2, 20], [3, 30]]})
+    b.cmd("et.fillRange", {"sheet": "Sheet1", "range": "T1:T3", "formula": "=R1*2"})
+    shifted = (b.cmd("et.readRange", {"range": "T1:T3", "sheet": "Sheet1"}, record=False) or {}).get("values") or []
+    check([row[0] for row in shifted] == [2, 4, 6],
+          "Calc fillRange dịch tham chiếu TƯƠNG ĐỐI (=R1*2 -> =R2*2, =R3*2)", shifted)
+
+    # Khối 2D: điền ngang rồi điền dọc, mỗi cột lấy hàng đầu đã điền xong làm nguồn.
+    b.cmd("et.fillRange", {"sheet": "Sheet1", "range": "V1:W2", "formula": "=ROW()+COLUMN()"})
+    block = (b.cmd("et.readRange", {"range": "V1:W2", "sheet": "Sheet1"}, record=False) or {}).get("values") or []
+    check(block == [[23, 24], [24, 25]], "Calc fillRange điền được cả khối 2D", block)
+    b.cmd("et.fillRange", {"sheet": "Sheet1", "formula": "=ROW()"}, expect_ok=False, key="et.fillRange thiếu range")
+
     b.cmd("et.writeRange", {"range": "A7", "values": [["hoàn tác tôi"]]}, key="et.writeRange before undo")
     b.cmd("et.undo", {"count": 1})
     check((b.cmd("et.readRange", {"range": "A7"}, record=False) or {}).get("values", [[None]])[0][0] is None,

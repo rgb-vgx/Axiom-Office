@@ -23,6 +23,9 @@ namespace AxiomOffice.Bridge
                 Command("et.readRange", "et", EtReadRange, "Đọc vùng, ví dụ `A1:C10`", Req("range"), Opt("sheet")).ForAgent(),
                 Command("et.writeRange", "et", EtWriteRange, "Ghi vùng bắt đầu từ ô trên-trái `range`",
                     Req("range", "top-left cell e.g. 'A1'"), Req("values", "2D array of rows e.g. [[\"Tên\",\"Điểm\"],[\"An\",9.5]]"), Opt("sheet")).ForAgent(),
+                Command("et.fillRange", "et", EtFillRange,
+                    "Viết MỘT công thức vào ô góc trên-trái của `range` rồi điền ra cả vùng, tham chiếu tương đối tự dịch (dùng cho bảng nghìn dòng: đừng gửi từng ô)",
+                    Req("range", "the whole area e.g. 'B2:H1000'"), Opt("formula", "written to the top-left cell first"), Opt("sheet")).ForAgent(),
                 Command("et.formatRange", "et", EtFormatRange, "Định dạng vùng (màu dạng `#RRGGBB`, `horizontal` left/center/right)",
                     Req("range"), Opt("bold"), Opt("italic"), Opt("fontSize"), Opt("fontColor"), Opt("fillColor"), Opt("numFmt"), Opt("horizontal"), Opt("wrap"), Opt("sheet")).ForAgent(),
                 Command("et.addChart", "et", EtAddChart,
@@ -152,6 +155,53 @@ namespace AxiomOffice.Bridge
             {
                 { "written", rowCount * colCount },
                 { "sheet", Convert.ToString(sheet.Name) }
+            };
+        }
+
+        // Viết MỘT công thức vào ô góc rồi điền ra cả vùng (AutoFill của Excel tự dịch tham chiếu tương
+        // đối, và làm được cả khối 2D trong một lần). Chi phí token của agent tính theo TỪNG Ô nó viết
+        // ra, nên bảng nghìn dòng phải đi bằng đường này chứ không gửi từng ô.
+        private static Dictionary<string, object> EtFillRange(IAppHost host, Dictionary<string, object> p)
+        {
+            string address = ParamString(p, "range", null);
+            if (string.IsNullOrEmpty(address))
+            {
+                throw new InvalidOperationException("'range' is required: the whole area to fill, e.g. 'B2:H1000'");
+            }
+            string sheetName = ParamString(p, "sheet", null);
+            dynamic app = host.Application;
+            dynamic wb = EnsureWorkbook(app);
+            dynamic sheet = string.IsNullOrEmpty(sheetName) ? wb.ActiveSheet : wb.Worksheets[sheetName];
+            dynamic target = sheet.Range[address];
+            dynamic corner = target.Cells[1, 1];
+
+            string formula = ParamString(p, "formula", null);
+            if (!string.IsNullOrEmpty(formula))
+            {
+                corner.Formula = formula;
+            }
+
+            int rows = Convert.ToInt32(target.Rows.Count);
+            int cols = Convert.ToInt32(target.Columns.Count);
+            if (rows > 1 || cols > 1)
+            {
+                corner.AutoFill(target, 0);   // xlFillDefault
+            }
+
+            var sample = new List<object>();
+            for (int r = 1; r <= Math.Min(rows, 3); r++)
+            {
+                var line = new List<object>();
+                for (int c = 1; c <= Math.Min(cols, 3); c++)
+                {
+                    line.Add(Convert.ToString(target.Cells[r, c].Formula));
+                }
+                sample.Add(line);
+            }
+            return new Dictionary<string, object>
+            {
+                { "filled", rows * cols }, { "range", address }, { "sheet", Convert.ToString(sheet.Name) },
+                { "sample", sample }
             };
         }
 

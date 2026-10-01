@@ -442,6 +442,24 @@
     ]
   },
   {
+    "name": "et.fillRange",
+    "kind": "et",
+    "params": [
+      {
+        "name": "range",
+        "hint": "the whole area e.g. 'B2:H1000'"
+      },
+      {
+        "name": "formula",
+        "hint": "written to the top-left cell first"
+      },
+      {
+        "name": "sheet",
+        "hint": null
+      }
+    ]
+  },
+  {
     "name": "et.formatRange",
     "kind": "et",
     "params": [

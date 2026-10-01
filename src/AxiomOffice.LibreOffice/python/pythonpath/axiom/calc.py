@@ -279,6 +279,54 @@ def write_range(env, params):
     return result
 
 
+def fill_range(env, params):
+    """Viet MOT cong thuc vao o goc roi dien ra ca vung, tham chieu tuong doi tu dich.
+
+    Vi sao can: chi phi token cua agent tinh theo TUNG O no viet ra. Mot bang 1000 dong x 8 cot viet
+    tung o la ~8000 gia tri model phai phat ra; viet mot cong thuc roi dien thi chi con mot gia tri.
+    Do ngay 02/10/2026 bang probe UNO rieng: fillAuto(TO_BOTTOM/TO_RIGHT, 1) dich tham chieu tuong doi
+    dung (=$D$1+ROW()*B1 -> *B2 -> *B3; =F2*2 -> =G2*2 -> =H2*2).
+    """
+    address = values.string(params, "range")
+    if not address:
+        raise values.ParamError("'range' is required: the whole area to fill, e.g. 'B2:H1000'")
+    doc = env.document
+    sheet = _sheet(doc, params)
+    target = _range(sheet, address)
+    bounds = target.RangeAddress
+    rows = bounds.EndRow - bounds.StartRow + 1
+    cols = bounds.EndColumn - bounds.StartColumn + 1
+
+    formula = values.string(params, "formula")
+    errors = []
+    if formula:
+        corner = target.getCellByPosition(0, 0)
+        if formula.startswith("="):
+            error, written = _write_formula(corner, formula, {})
+            if error:
+                errors.append({"cell": _cell_address(bounds.StartColumn, bounds.StartRow, 0, 0),
+                               "formula": written, "error": error, "text": corner.getString()})
+        else:
+            corner.setString(formula)
+
+    # Dien ngang truoc (hang dau), roi dien doc tung cot: Microsoft Excel lam dung thu tu nay, va nho
+    # vay moi cot lay hang dau da dien xong lam nguon.
+    if cols > 1:
+        target.getCellRangeByPosition(0, 0, cols - 1, 0).fillAuto(
+            uno.Enum("com.sun.star.sheet.FillDirection", "TO_RIGHT"), 1)
+    if rows > 1:
+        direction = uno.Enum("com.sun.star.sheet.FillDirection", "TO_BOTTOM")
+        for c in range(cols):
+            target.getCellRangeByPosition(c, 0, c, rows - 1).fillAuto(direction, 1)
+
+    result = {"filled": rows * cols, "range": address, "sheet": sheet.Name,
+              "sample": [[target.getCellByPosition(c, r).getFormula()
+                          for c in range(min(cols, 3))] for r in range(min(rows, 3))]}
+    if errors:
+        result["formulaErrors"] = errors
+    return result
+
+
 def format_range(env, params):
     address = values.string(params, "range")
     if not address:
@@ -434,6 +482,11 @@ command("et.writeRange", "et", write_range,
         "(dấu phẩy); nếu máy dùng dấu chấm phẩy thì tự đổi. Công thức còn lỗi trả về ở `formulaErrors`",
         req("range", "top-left cell e.g. 'A1'"), req("values", "2D array of rows e.g. [[\"Tên\",\"Điểm\"],[\"An\",9.5]]"), opt("sheet"),
         agent=True, undo=True)
+command("et.fillRange", "et", fill_range,
+        "Viết MỘT công thức vào ô góc trên-trái của `range` rồi điền ra cả vùng, tham chiếu tương đối tự "
+        "dịch (dùng cho bảng nghìn dòng: đừng gửi từng ô)",
+        req("range", "the whole area e.g. 'B2:H1000'"), opt("formula", "written to the top-left cell first"),
+        opt("sheet"), agent=True, undo=True)
 command("et.formatRange", "et", format_range, "Định dạng vùng", req("range"), opt("bold"), opt("italic"), opt("fontSize"),
         opt("fontColor"), opt("fillColor"), opt("numFmt"), opt("horizontal"), opt("wrap"), opt("sheet"), agent=True, undo=True)
 command("et.addChart", "et", add_chart,
