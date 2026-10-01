@@ -157,7 +157,17 @@ func (anthropicCodec) ParseStream(body []byte) (*Turn, string) {
 	}
 	turn.Text = text.String()
 	turn.HasText = turn.Text != ""
-	turn.Raw = json.RawMessage(body)
+	// Anthropic nhan Raw lam `content` cua tin assistant, tuc la MANG cac block - khong phai body SSE.
+	blocksOut := []any{}
+	if turn.Text != "" {
+		blocksOut = append(blocksOut, map[string]any{"type": "text", "text": turn.Text})
+	}
+	for _, call := range turn.ToolCalls {
+		blocksOut = append(blocksOut, map[string]any{
+			"type": "tool_use", "id": call.ID, "name": call.Name, "input": json.RawMessage(call.Arguments),
+		})
+	}
+	turn.Raw, _ = json.Marshal(blocksOut)
 	return turn, ""
 }
 

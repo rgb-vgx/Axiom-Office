@@ -124,7 +124,6 @@ func (openAICodec) ParseStream(body []byte) (*Turn, string) {
 	}
 	turn.Text = text.String()
 	turn.HasText = turn.Text != ""
-	turn.Raw = json.RawMessage(body)
 	for _, index := range order {
 		entry := partials[index]
 		arguments := entry.args.String()
@@ -133,6 +132,25 @@ func (openAICodec) ParseStream(body []byte) (*Turn, string) {
 		}
 		turn.ToolCalls = append(turn.ToolCalls, ToolCall{ID: entry.id, Name: entry.name, Arguments: arguments})
 	}
+	// Raw phai la MOT message assistant that (khong phai body SSE): AppendAssistant dua thang vao
+	// hoi thoai gui lai cho nha cung cap. Ghep sai thi tin nhan bi bo va cac tin `role: tool` thanh
+	// mo coi -> nha cung cap tra 400.
+	var content any
+	if turn.Text != "" {
+		content = turn.Text
+	}
+	message := map[string]any{"role": "assistant", "content": content}
+	if len(turn.ToolCalls) > 0 {
+		calls := make([]any, 0, len(turn.ToolCalls))
+		for _, call := range turn.ToolCalls {
+			calls = append(calls, map[string]any{
+				"type": "function", "id": call.ID,
+				"function": map[string]any{"name": call.Name, "arguments": call.Arguments},
+			})
+		}
+		message["tool_calls"] = calls
+	}
+	turn.Raw, _ = json.Marshal(message)
 	return turn, ""
 }
 

@@ -1,7 +1,9 @@
 package model
 
 import (
+	"encoding/json"
 	"io"
+	"strings"
 	"testing"
 	"time"
 )
@@ -129,6 +131,65 @@ func TestAnthropicParseStream(t *testing.T) {
 	if len(turn.ToolCalls) != 1 || turn.ToolCalls[0].Name != "office_action" ||
 		turn.ToolCalls[0].Arguments != `{"action":"app.info"}` {
 		t.Fatalf("tool call = %+v", turn.ToolCalls)
+	}
+}
+
+const toolCallStream = "data: {\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"index\":0,\"id\":\"call_00_abc\",\"type\":\"function\",\"function\":{\"name\":\"office_action\",\"arguments\":\"\"}}]}}]}\n\n" +
+	"data: {\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{}\"}}]}}]}\n\n" +
+	"data: {\"choices\":[{\"index\":0,\"finish_reason\":\"tool_calls\",\"delta\":{}}]}\n\n" +
+	"data: [DONE]\n\n"
+
+// Raw sau khi stream phai la MOT message assistant that, vi AppendAssistant dua thang no vao hoi thoai
+// gui lai cho nha cung cap. Tung de nguyen ca body SSE vao Raw, khien tin nhan bi bo va cac tin
+// `role: tool` thanh mo coi - nha cung cap tra 400 (gap that ngay 02/10/2026).
+func TestStreamTurnSurvivesAppendAssistant(t *testing.T) {
+	turn, errText := (openAICodec{}).ParseStream([]byte(toolCallStream))
+	if errText != "" {
+		t.Fatalf("loi parse: %s", errText)
+	}
+	turns := (openAICodec{}).AppendAssistant(nil, turn)
+	if len(turns) != 1 {
+		t.Fatalf("tin nhan assistant bi bo: %d tin", len(turns))
+	}
+	raw, err := json.Marshal(turns[0])
+	if err != nil {
+		t.Fatalf("khong marshal duoc: %v", err)
+	}
+	var parsed struct {
+		Role      string `json:"role"`
+		ToolCalls []struct {
+			ID       string `json:"id"`
+			Function struct {
+				Name      string `json:"name"`
+				Arguments string `json:"arguments"`
+			} `json:"function"`
+		} `json:"tool_calls"`
+	}
+	if err := json.Unmarshal(raw, &parsed); err != nil {
+		t.Fatalf("tin gui lai khong phai JSON hop le: %v (%s)", err, raw)
+	}
+	if parsed.Role != "assistant" || len(parsed.ToolCalls) != 1 || parsed.ToolCalls[0].ID != "call_00_abc" {
+		t.Fatalf("tin gui lai sai: %s", raw)
+	}
+	if parsed.ToolCalls[0].Function.Name != "office_action" || parsed.ToolCalls[0].Function.Arguments != "{}" {
+		t.Fatalf("function sai: %s", raw)
+	}
+
+	// Anthropic: Raw la MANG block, khong phai object.
+	anthropicTurn, errText := (anthropicCodec{}).ParseStream([]byte(
+		"data: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"tool_use\",\"id\":\"toolu_1\",\"name\":\"office_action\"}}\n\n" +
+			"data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{}\"}}\n\n" +
+			"data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"tool_use\"}}\n\n"))
+	if errText != "" {
+		t.Fatalf("loi parse anthropic: %s", errText)
+	}
+	anthropicTurns := (anthropicCodec{}).AppendAssistant(nil, anthropicTurn)
+	if len(anthropicTurns) != 1 {
+		t.Fatalf("tin nhan anthropic bi bo: %d tin", len(anthropicTurns))
+	}
+	blocks, _ := json.Marshal(anthropicTurns[0])
+	if !strings.Contains(string(blocks), `"tool_use"`) || !strings.Contains(string(blocks), "toolu_1") {
+		t.Fatalf("block gui lai sai: %s", blocks)
 	}
 }
 
