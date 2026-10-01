@@ -58,7 +58,7 @@ Cai (khong can root; dong LibreOffice truoc):
     ./install.sh --systemd      # tuy chon: cho Agent Core chay thuong truc (systemd --user)
 
 Dung: mo Writer/Calc/Impress -> menu Axiom Office > Ask AI (pane nam trong sidebar).
-MCP cho Claude Code/Desktop: dung chinh core/AxiomOffice.Core voi tham so `mcp all`; install.sh in san
+MCP cho Claude Code/Desktop: dung chinh core/AxiomOffice.Core voi tham so "mcp all"; install.sh in san
 doan cau hinh mcpServers khi cai xong.
 Go:  ./install.sh --uninstall [--purge]
 
