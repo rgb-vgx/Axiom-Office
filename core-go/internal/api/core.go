@@ -15,6 +15,9 @@ func mapCore(mux *http.ServeMux, deps *Deps) {
 		if deps.Stores.Error != "" {
 			memoryError = deps.Stores.Error
 		}
+		// provider/model/memory doc tu cau hinh song: nguoi dung doi trong wizard thi /health phai
+		// thay ngay, khong bao gia tri luc Core khoi dong.
+		cfg := deps.Live()
 		OK(w, map[string]any{
 			"app":           "core",
 			"pid":           pid(),
@@ -24,10 +27,10 @@ func mapCore(mux *http.ServeMux, deps *Deps) {
 			"started":       deps.Runtime.StartedText(),
 			"uptimeSeconds": math.Round(time.Since(deps.Runtime.Started).Seconds()*10) / 10,
 			"dataDir":       deps.Paths.Root,
-			"memory":        deps.Stores.Status(deps.Config.MemoryEnabled),
+			"memory":        deps.Stores.Status(cfg.MemoryEnabled),
 			"memoryError":   memoryError,
-			"provider":      deps.Config.LlmProvider,
-			"model":         deps.Config.LlmModel,
+			"provider":      cfg.LlmProvider,
+			"model":         cfg.LlmModel,
 		})
 	}
 	mux.HandleFunc("GET /health", health)
