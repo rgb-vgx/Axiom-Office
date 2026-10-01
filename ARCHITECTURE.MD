@@ -372,7 +372,7 @@ flowchart LR
 | AD-6 | SSE bằng poll-diff 500ms | Chạy giống nhau trên Office và WPS, không cần COM event sink | Trễ tới 500ms |
 | AD-7 | Agent chỉ có một tool `office_action` | Prompt gọn, thêm lệnh không đổi schema tool | Model phải đọc danh sách lệnh trong mô tả |
 | AD-8 | Registry lệnh khai báo cạnh handler | Một chỗ sửa; dispatcher, agent, MCP, README không lệch nhau | Mô tả tiếng Việt và gợi ý tiếng Anh nằm cùng dòng |
-| AD-9 | MCP server C# trong cùng exe | Người dùng không cần Python; dùng chung cấu hình và registry | Tự viết JSON-RPC và engine OOXML |
+| AD-9 | MCP server C# trong cùng exe | Người dùng không cần Python; dùng chung cấu hình và registry | Tự viết JSON-RPC và engine OOXML. **Cập nhật 01/10/2026**: Windows giữ nguyên bản C# trong `Host.exe`; Linux chuyển sang subcommand `mcp` của Agent Core Go (cùng hợp đồng tool, bỏ hẳn .NET trên máy Linux) |
 | AD-10 | Mọi đăng ký trong HKCU | Không cần admin | Chỉ cài cho từng người dùng |
 | AD-11 | Agent Core là process riêng .NET 10 (single-file tự chứa) | Dùng được thư viện hiện đại (Kestrel, SQLite), một agent cho mọi app, không làm nặng process Office | Exe ~50MB; thêm một process và giao thức HTTP nội bộ |
 | AD-12 | Core chỉ thao tác tài liệu qua bridge (`/cmd`), không gọi COM | Một đường thực thi lệnh duy nhất (allowlist, ComGate, Undo); Core không phụ thuộc Office | Mỗi lệnh thêm một vòng HTTP loopback |

@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -24,6 +25,7 @@ import (
 	"axiomoffice/core/internal/corelog"
 	"axiomoffice/core/internal/instance"
 	"axiomoffice/core/internal/mcp"
+	"axiomoffice/core/internal/mcpserver"
 	"axiomoffice/core/internal/memory"
 	"axiomoffice/core/internal/model"
 	"axiomoffice/core/internal/office"
@@ -38,7 +40,27 @@ func main() {
 	os.Exit(run())
 }
 
+// officeMcpHost: duong dan toi MCP server built-in "office" canh binary Core, dung lam
+// ServerConfig.Command (mcp.LoadConfigs luon them Args ["mcp"]).
+//   - Windows: AxiomOffice.Host.exe (ban C#, net48) - giu nguyen.
+//   - Linux:   chinh binary nay, chay subcommand `mcp` (ban Go).
+func officeMcpHost(exe string) string {
+	if runtime.GOOS == "windows" {
+		return filepath.Join(filepath.Dir(exe), "AxiomOffice.Host.exe")
+	}
+	return exe
+}
+
 func run() int {
+	// `AxiomOffice.Core mcp [all|word|excel|ppt] [--list]` - MCP server qua stdio tren Linux
+	// (ban Windows van dung AxiomOffice.Host.exe mcp net48). Phai chan TRUOC mutex mot-phien-ban:
+	// Core sinh tien trinh con nay bang chinh binary cua no, nen no khong duoc di qua nhanh khoa
+	// (khong thi tien trinh con thay mutex da bi giu va thoat ngay).
+	if len(os.Args) > 1 && os.Args[1] == "mcp" {
+		mcpserver.SetVersion(version)
+		return mcpserver.Run(os.Args[2:])
+	}
+
 	cfg := config.Load()
 	paths := config.NewPaths(cfg.DataDirOverride)
 	if err := paths.EnsureDirectories(); err != nil {
@@ -101,8 +123,8 @@ func run() int {
 		memoryService.QueueEmbeddingBackfill()
 	}
 
-	// MCP client (muc 8.7): server built-in "office" = AxiomOffice.Host.exe mcp canh binary (lan file) + mcp.json.
-	mcpClient := mcp.NewManager(paths.McpConfigFile, filepath.Join(filepath.Dir(exe), "AxiomOffice.Host.exe"), httpClient)
+	// MCP client (muc 8.7): server built-in "office" (lan file) + mcp.json. Xem officeMcpHost.
+	mcpClient := mcp.NewManager(paths.McpConfigFile, officeMcpHost(exe), httpClient)
 	mcp.SetClientVersion(version)
 
 	// Bridge + session registry: noi Core dieu khien add-in/extension dang chay.

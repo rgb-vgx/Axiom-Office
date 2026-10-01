@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Dong goi ban Linux: dist/axiom-office-linux-x64-<ver>.tar.gz gom
 #   core/ (Agent Core linux-x64 - binary Go, may dich khong can runtime + skills/ dung san),
-#   mcp/ (axiom-office-mcp cho Claude Code/Desktop), AxiomOffice-LibreOffice-<ver>.oxt, install.sh, README.txt.
-# Can Go 1.26+ (Agent Core) va .NET SDK 10 (MCP server). Chay duoc tren Linux hoac Git Bash/WSL.
+#   AxiomOffice-LibreOffice-<ver>.oxt, install.sh, README.txt.
+# MCP server nam ngay trong core/: chay `core/AxiomOffice.Core mcp all`. Khong con .NET o day.
+# Can Go 1.26+. Chay duoc tren Linux hoac Git Bash/WSL.
 #
 #   scripts/linux/package.sh [--rid linux-x64|linux-arm64]
 set -euo pipefail
@@ -10,7 +11,6 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 RID="linux-x64"
 [ "${1:-}" = "--rid" ] && RID="$2"
-DOTNET="${DOTNET:-$(command -v dotnet || echo "$HOME/.dotnet/dotnet")}"
 PYTHON="$(command -v python3 || command -v python)"
 
 VERSION="$(sed -n 's/^VERSION = "\(.*\)"/\1/p' "$ROOT/src/AxiomOffice.LibreOffice/python/pythonpath/axiom/__init__.py" | tr -d '\r')"
@@ -40,10 +40,6 @@ mkdir -p "$STAGE/core/skills"
 cp -a "$ROOT/skills/." "$STAGE/core/skills/"
 find "$STAGE/core/skills" -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
 
-echo "== MCP server ($RID, self-contained)"
-"$DOTNET" publish "$ROOT/src/AxiomOffice.Mcp" -c Release -r "$RID" --self-contained \
-    -p:DebugType=none -o "$STAGE/mcp" -v q -nologo
-chmod +x "$STAGE/mcp/axiom-office-mcp"
 
 echo "== Extension LibreOffice"
 "$PYTHON" "$ROOT/scripts/package_oxt.py" --out "$STAGE" >/dev/null
@@ -62,10 +58,11 @@ Cai (khong can root; dong LibreOffice truoc):
     ./install.sh --systemd      # tuy chon: cho Agent Core chay thuong truc (systemd --user)
 
 Dung: mo Writer/Calc/Impress -> menu Axiom Office > Ask AI (pane nam trong sidebar).
-MCP cho Claude Code/Desktop: install.sh in san doan cau hinh mcpServers khi cai xong.
+MCP cho Claude Code/Desktop: dung chinh core/AxiomOffice.Core voi tham so `mcp all`; install.sh in san
+doan cau hinh mcpServers khi cai xong.
 Go:  ./install.sh --uninstall [--purge]
 
-Vi tri: Core ~/.local/share/axiom-office/core, MCP ~/.local/share/axiom-office/mcp,
+Vi tri: Core + MCP ~/.local/share/axiom-office/core,
         cau hinh ~/.config/axiom-office/config.json, log ~/.local/share/axiom-office/bridge.log
 EOF
 

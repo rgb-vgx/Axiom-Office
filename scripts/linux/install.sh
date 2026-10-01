@@ -17,6 +17,8 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/axiom-office"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/axiom-office"
 CORE_DIR="$DATA_DIR/core"
+# MCP server ban Linux la subcommand `mcp` cua chinh Agent Core, khong con thu muc rieng.
+# MCP_DIR chi con de don sach ban cai cu (truoc day la axiom-office-mcp .NET tuong trung).
 MCP_DIR="$DATA_DIR/mcp"
 EXTENSION_ID="org.axiomoffice.bridge"
 UNIT_NAME="axiom-office-core.service"
@@ -137,14 +139,10 @@ install() {
     echo "3/4 Cau hinh -> $CONFIG_DIR/config.json"
     write_config
 
-    if [ -x "$HERE/mcp/axiom-office-mcp" ]; then
-        echo "4/4 MCP server -> $MCP_DIR"
-        rm -rf "$MCP_DIR.new"
-        cp -a "$HERE/mcp" "$MCP_DIR.new"
+    echo "4/4 MCP server: nam trong Core ($CORE_DIR/AxiomOffice.Core mcp)"
+    if [ -d "$MCP_DIR" ]; then
         rm -rf "$MCP_DIR"
-        mv "$MCP_DIR.new" "$MCP_DIR"
-    else
-        echo "4/4 MCP server: khong co trong goi, bo qua"
+        echo "    (da don $MCP_DIR cua ban cai cu)"
     fi
 
     enable_systemd
@@ -163,10 +161,10 @@ print_mcp_config() {
     echo "Them MCP server (Claude Code: claude mcp add, hoac file cau hinh MCP):"
     echo "  {"
     echo "    \"mcpServers\": {"
-    echo "      \"office\": { \"command\": \"$MCP_DIR/axiom-office-mcp\", \"args\": [\"all\"] }"
+    echo "      \"office\": { \"command\": \"$CORE_DIR/AxiomOffice.Core\", \"args\": [\"mcp\", \"all\"] }"
     echo "    }"
     echo "  }"
-    echo "  (\"args\": [\"word\"] / [\"excel\"] / [\"ppt\"] neu chi muon mot nhom tool)"
+    echo "  (\"args\": [\"mcp\",\"word\"] / [\"mcp\",\"excel\"] / [\"mcp\",\"ppt\"] neu chi muon mot nhom tool)"
 }
 
 uninstall() {

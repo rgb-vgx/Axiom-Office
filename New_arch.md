@@ -164,7 +164,7 @@ flowchart LR
 |---|---|---|
 | **Add-in** | UI pane, bridge, registry lệnh, ComGate, Undo, SSE; khởi động Core; client của Core; agent dự phòng | Không thêm memory, skill, MCP client vào add-in |
 | **Agent Core** | Vòng agent, gọi LLM, tool registry, skills, memory, policy, audit, MCP client, lưu hội thoại | Không gọi COM trực tiếp; mọi thao tác tài liệu đi qua `POST /cmd` của bridge |
-| **Host.exe** | Giữ nguyên (MCP server 50 tool, companion, `commands`, `llm-test`) | Không gộp vào Core ở đợt này |
+| **Host.exe** | Giữ nguyên trên Windows (MCP server 50 tool, companion, `commands`, `llm-test`) | Không gộp vào Core. **Cập nhật 01/10/2026**: bản Linux không dùng Host.exe — MCP server là subcommand `mcp` của Core Go, cùng hợp đồng tool |
 
 ### 4.3 Mô hình process
 

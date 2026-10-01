@@ -20,10 +20,12 @@ import threading
 import zipfile
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+# MCP server: Windows la AxiomOffice.Host.exe mcp (net48), Linux la subcommand `mcp` cua Agent Core (Go).
+# Duong dan o day chi la phuong an du phong khi khong truyen tham so - CI luon truyen duong dan that.
 CANDIDATES = [
-    os.path.join(ROOT, "src", "AxiomOffice.Mcp", "bin", "Release", "net10.0", "axiom-office-mcp.dll"),
-    os.path.join(ROOT, "src", "AxiomOffice.Mcp", "bin", "Release", "net10.0", "axiom-office-mcp"),
     os.path.join(ROOT, "src", "AxiomOffice", "bin", "Release", "AxiomOffice.Host.exe"),
+    os.path.join(ROOT, "src", "AxiomOffice", "bin", "Release", "AxiomOffice.Core.exe"),
+    os.path.join(ROOT, "src", "AxiomOffice", "bin", "Release", "AxiomOffice.Core"),
 ]
 
 RESULTS: list[tuple[bool, str, str]] = []

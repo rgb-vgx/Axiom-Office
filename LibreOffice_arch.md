@@ -336,6 +336,13 @@ Sidebar deck **"Axiom Office"** (hiện với Writer, Calc, Impress), panel dự
 
 ## 11. Làn file (MCP) trên Linux
 
+> **Cập nhật (01/10/2026)** — mục này ghi lại thiết kế **cũ** (`axiom-office-mcp`, .NET 10, compile lại
+> `Host/Mcp/*.cs` với ký hiệu `PORTABLE`). Thiết kế đó **đã bị thay**: MCP server bản Linux nay là subcommand
+> `mcp` của chính Agent Core Go, dùng engine OOXML viết lại bằng Go (`core-go/internal/{ooxml,xlsx,docx,pptx,
+> sheet}`); dự án `src/AxiomOffice.Mcp` và các nhánh `#if PORTABLE` đã bị xoá. Hợp đồng tool (50 tool, tên,
+> tham số, cách trả lỗi) và mọi khác biệt so với bản Windows ở bảng dưới vẫn giữ nguyên giá trị. Xem
+> [core-go/README.md](core-go/README.md) và [STATUS.md](STATUS.md) mục 2.2.
+>
 > **Đã làm (30/09/2026)** — làm khác kế hoạch ban đầu ở chỗ *không* tách thư viện `AxiomOffice.Files`:
 > `src/AxiomOffice.Mcp` (`net10.0`, `axiom-office-mcp`) **compile lại chính** `src/AxiomOffice.Host/Mcp/*.cs`
 > với ký hiệu `PORTABLE` — một nguồn duy nhất cho 20 tool file + tool live của cả hai bản, không có bản sao
@@ -359,7 +366,7 @@ Kế hoạch ban đầu (giữ lại để đối chiếu):
 
 Khác biệt so với bản Windows (đã chấp nhận):
 
-| Việc | Bản Windows (`AxiomOffice.Host.exe mcp`) | Bản .NET 10 (`axiom-office-mcp`) |
+| Việc | Bản Windows (`AxiomOffice.Host.exe mcp`) | Bản Linux (`AxiomOffice.Core mcp`, trước là `axiom-office-mcp` .NET 10) |
 |---|---|---|
 | Cấu hình, token, port | HKCU `Software\AxiomOffice` | HKCU trên Windows, `~/.config/axiom-office/config.json` trên Linux (`PortLibreOffice`, mặc định 47851) |
 | Thư mục session | `%LOCALAPPDATA%\AxiomOffice\sessions` | `$XDG_RUNTIME_DIR/axiom-office/sessions` (Linux) |

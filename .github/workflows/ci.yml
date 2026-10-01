@@ -8,15 +8,12 @@ on:
 
 jobs:
   # Linux la nen tang chinh cua lan LibreOffice (LibreOffice_arch.md): chay duoc ca test that voi soffice.
+  # Khong con .NET o day: MCP server ban Linux la subcommand `mcp` cua chinh Agent Core (Go).
   linux:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "10.0.x"
 
       - uses: actions/setup-python@v5
         with:
@@ -25,30 +22,34 @@ jobs:
       - name: Unit test extension LibreOffice (khong can LibreOffice)
         run: python3 -m unittest discover -s tests/lo -v
 
-      - name: Build MCP server
-        run: dotnet build src/AxiomOffice.Mcp -c Release
-
-      - name: MCP server (khong can app dang mo)
-        run: python3 tests/mcp-host/test_mcp_portable.py src/AxiomOffice.Mcp/bin/Release/net10.0/axiom-office-mcp.dll
-
       - uses: actions/setup-go@v5
         with:
           go-version-file: core-go/go.mod
           cache-dependency-path: core-go/go.sum
 
-      - name: Agent Core ban Go (go test + build + e2e cac phan da port)
+      - name: File sinh khong duoc lech nguon
         run: |
           python3 scripts/generate_setup_catalog.py --check
+          python3 scripts/generate_mcp_commands.py --check
+          python3 scripts/generate_templates.py --check
+
+      - name: Agent Core ban Go (go test + build + e2e day du)
+        run: |
           cd core-go
           go vet ./...
           go test ./...
           CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o "$RUNNER_TEMP/gocore/axiom-core" ./cmd/axiom-core
           cp -r ../skills "$RUNNER_TEMP/gocore/"
           cd ..
-          # Phan mcp can AxiomOffice.Host.exe (chi co tren Windows) nen bo qua o day.
+          # Core sinh chinh no lam MCP server built-in "office" nen phan mcp chay duoc ca tren Linux.
           export AXIOM_E2E_CORE_EXE="$RUNNER_TEMP/gocore/axiom-core"
-          PARTS=fake_bridge,guards,skills,confirm,memory,visual,setup,shutdown,anthropic,embeddings,summarize,cancel,mcp_http
+          PARTS=fake_bridge,guards,skills,confirm,memory,mcp,visual,setup,shutdown,anthropic,embeddings,summarize,cancel,mcp_http
           python3 tests/core/test_core_e2e.py --only "$PARTS"
+
+      - name: MCP server ban Go (khong can app dang mo)
+        env:
+          AXIOM_MCP_ARGS: mcp all
+        run: python3 tests/mcp-host/test_mcp_portable.py "$RUNNER_TEMP/gocore/axiom-core"
 
       - name: Cai LibreOffice + Python UNO (+ xvfb cho phan giao dien)
         run: |
@@ -68,10 +69,12 @@ jobs:
           xvfb-run -a python3 tests/live/test_setup_wizard.py
 
       - name: MCP + tool live (LibreOffice dang mo)
+        env:
+          AXIOM_MCP_ARGS: mcp all
         run: |
           setsid soffice --headless --calc --norestore >/tmp/soffice.out 2>&1 </dev/null &
           for _ in $(seq 40); do curl -s --max-time 1 http://127.0.0.1:47852/health >/dev/null && break; sleep 1; done
-          python3 tests/mcp-host/test_mcp_portable.py src/AxiomOffice.Mcp/bin/Release/net10.0/axiom-office-mcp.dll --live
+          python3 tests/mcp-host/test_mcp_portable.py "$RUNNER_TEMP/gocore/axiom-core" --live
 
       - name: Dong goi tarball (Core + MCP + oxt)
         run: bash scripts/linux/package.sh
@@ -82,17 +85,13 @@ jobs:
           path: dist/axiom-office-linux-x64-*.tar.gz
           if-no-files-found: error
 
-  # Windows: add-in COM (net48) + duong MCP cua AxiomOffice.Host. Khong co Office/WPS trong runner nen
-  # chi chay phan khong can app: unit test, Agent Core, build MCP va bo test MCP portable.
+  # Windows: add-in COM (net48) + MCP server C# trong AxiomOffice.Host.exe. Khong co Office/WPS trong
+  # runner nen chi chay phan khong can app: unit test, Agent Core, build net48 va bo test MCP portable.
   windows:
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "10.0.x"
 
       - uses: actions/setup-python@v5
         with:
@@ -135,9 +134,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "host build failed" }
           Write-Host "net48 build OK"
 
-      - name: Build MCP server
-        run: dotnet build src/AxiomOffice.Mcp -c Release
-
       - name: Agent Core ban Go (e2e day du tren Windows)
         shell: pwsh
         run: |
@@ -147,10 +143,10 @@ jobs:
           go build -trimpath -ldflags "-s -w" -o "$stage\axiom-core.exe" ./cmd/axiom-core
           Set-Location ..
           Copy-Item -Recurse skills $stage
-          # Server MCP built-in "office" = Host.exe canh binary (nhu goi phat hanh).
+          # Server MCP built-in "office" = AxiomOffice.Host.exe canh binary (nhu goi phat hanh).
           Copy-Item (Join-Path $env:TEMP "axiom-ci\AxiomOffice.Host.exe") $stage
           $env:AXIOM_E2E_CORE_EXE = Join-Path $stage "axiom-core.exe"
           python tests/core/test_core_e2e.py
 
-      - name: MCP server (khong can app dang mo)
-        run: python tests/mcp-host/test_mcp_portable.py src/AxiomOffice.Mcp/bin/Release/net10.0/axiom-office-mcp.dll
+      - name: MCP server ban Windows (AxiomOffice.Host.exe mcp, khong can app)
+        run: python tests/mcp-host/test_mcp_portable.py "$env:TEMP\axiom-ci\AxiomOffice.Host.exe"

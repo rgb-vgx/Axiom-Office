@@ -129,12 +129,13 @@ class CatalogTests(unittest.TestCase):
                 self.assertEqual(set(param), {"name", "required", "hint"})
 
     def test_mcp_live_commands_khop_registry(self):
-        """`src\\AxiomOffice.Mcp\\live-commands.json` (nhúng vào axiom-office-mcp) phải khớp registry này.
+        """`catalog/live-commands.json` (nguồn duy nhất) phải khớp registry này.
 
-        Bản Windows lấy danh sách lệnh từ CommandCatalog của add-in; bản .NET 10 không có add-in nên nhúng
-        sẵn file - lệch nghĩa là mô tả tool `*_command` nói sai việc bridge làm được.
+        Bản Windows lấy danh sách lệnh từ CommandCatalog của add-in; bản chạy độc lập (MCP server .NET 10
+        cũ, MCP server Go) không có add-in nên nhúng sẵn file này - lệch nghĩa là mô tả tool `*_command`
+        nói sai việc bridge làm được. Agent Core bản Go nhúng qua `livecommands_gen.go` (sinh từ file này).
         """
-        path = os.path.join(ROOT, "src", "AxiomOffice.Mcp", "live-commands.json")
+        path = os.path.join(ROOT, "catalog", "live-commands.json")
         with open(path, encoding="utf-8", newline="") as handle:
             text = handle.read().replace("\r\n", "\n")
         expected = [{"name": item["name"], "kind": item["kind"],

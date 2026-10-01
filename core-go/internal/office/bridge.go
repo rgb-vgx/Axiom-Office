@@ -63,21 +63,38 @@ type cachedCatalog struct {
 type BridgeClient struct {
 	http  *http.Client
 	token string
-	mu    sync.Mutex
-	cache map[int]cachedCatalog
+	// CommandTimeout: tran thoi gian cho POST /cmd. Mac dinh DefaultCommandTimeout; MCP server dat
+	// 330s vi lenh ai.ask co the chay toi 5 phut.
+	CommandTimeout time.Duration
+	mu             sync.Mutex
+	cache          map[int]cachedCatalog
 }
 
 func NewBridgeClient(httpClient *http.Client, token string) *BridgeClient {
 	return &BridgeClient{http: httpClient, token: token, cache: map[int]cachedCatalog{}}
 }
 
+func (b *BridgeClient) commandTimeout() time.Duration {
+	if b.CommandTimeout > 0 {
+		return b.CommandTimeout
+	}
+	return DefaultCommandTimeout
+}
+
 // Command gui mot lenh POST /cmd. Khong tra loi loi giao thuc: OK=false kem RawJSON de model tu xu ly.
 func (b *BridgeClient) Command(ctx context.Context, port int, action string, params any) BridgeResult {
-	body := map[string]any{"action": action, "params": params}
-	if params == nil {
-		body["params"] = map[string]any{}
-	}
-	return b.send(ctx, port, "/cmd", body, DefaultCommandTimeout)
+	return b.send(ctx, port, "/cmd", commandBody(action, params), b.commandTimeout())
+}
+
+// CommandRaw tra nguyen van body cua POST /cmd - dung cho cac tool MCP live (khong dien giai gi).
+// Loi ket noi cung duoc boc san thanh {"ok":false,"error":...} nen ben goi chi viec tra tiep.
+func (b *BridgeClient) CommandRaw(ctx context.Context, port int, action string, params any) string {
+	return b.send(ctx, port, "/cmd", commandBody(action, params), b.commandTimeout()).RawJSON
+}
+
+// HealthRaw tra nguyen van body cua GET /health.
+func (b *BridgeClient) HealthRaw(ctx context.Context, port int) string {
+	return b.send(ctx, port, "/health", nil, HealthTimeout).RawJSON
 }
 
 func (b *BridgeClient) Health(ctx context.Context, port int) map[string]any {
@@ -86,6 +103,16 @@ func (b *BridgeClient) Health(ctx context.Context, port int) map[string]any {
 		return nil
 	}
 	return result.Result
+}
+
+func commandBody(action string, params any) map[string]any {
+	body := map[string]any{"action": action}
+	if params == nil {
+		body["params"] = map[string]any{}
+	} else {
+		body["params"] = params
+	}
+	return body
 }
 
 // GetCommands bo lenh cua DLL dang chay, cache theo port (muc 7.5).

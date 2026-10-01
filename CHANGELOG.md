@@ -5,6 +5,41 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed (BREAKING nội bộ) — MCP server bản Linux chuyển sang Go, bỏ dự án .NET 10
+- **Bản Windows không đổi**: MCP server vẫn là `AxiomOffice.Host.exe mcp` (net48, `src/AxiomOffice.Host/Mcp/`).
+- **Bản Linux nay là subcommand của chính Core**: `AxiomOffice.Core mcp [all|word|excel|ppt] [--list]`
+  (`core-go/internal/mcpserver/`) — gói Linux không còn file MCP riêng, máy đích vẫn không cần runtime nào.
+  Subcommand được chặn **trước** mutex một-phiên-bản (Core sinh tiến trình con bằng chính binary của nó).
+- Xoá `src/AxiomOffice.Mcp` (dự án .NET 10 + `Compat/BridgeCompat.cs` + `Compat/PortableJson.cs`) và dọn các
+  nhánh `#if PORTABLE` trong mã C# dùng chung; bản C# còn đúng một cấu hình net48.
+- **Hợp đồng tool giữ nguyên**: cùng 50 tool (20 file docx/xlsx/pptx/csv + 30 live + `office_sessions`), cùng
+  tên, cùng tham số, cùng câu chữ mô tả, cùng cách trả lỗi (`isError` cho lỗi trong tool, `-32602` cho tool
+  lạ). `mcp.LoadConfigs` không đổi: server built-in `office` vẫn là `{command, args: ["mcp"]}`, chỉ khác
+  `command` theo nền tảng (hàm `officeMcpHost`).
+- Engine OOXML viết lại bằng Go, port trung thành từ `Host/Mcp/*.cs`: `internal/ooxml` (zip/part/rels/
+  content-types, chỉ ghi lại part bị sửa nên chart/ảnh/pivot/macro giữ nguyên), `internal/xlsx`,
+  `internal/docx`, `internal/pptx`, `internal/sheet` (A1, CSV/TSV), `internal/filesafe`, `internal/textutil`.
+  Hai regex lookbehind của bản C# (`FormulaShift`, `ReplaceSheetReference`) được thay bằng quét chỉ số và tự
+  kiểm tra ký tự kề, vì RE2 của Go không hỗ trợ lookbehind.
+- Giữ nguyên **có chủ ý** hai hành vi trông như lỗi của bản C# vì chúng nằm trong hợp đồng parity:
+  `ReplaceSheetReference` thay dạng có nháy bằng tên mới không nháy khi tên đơn giản, và `IsDateFormat` chỉ
+  xét phần trước dấu `;` đầu tiên. Riêng thông báo `excel_convert to='parquet'` đổi từ "in the C# server"
+  sang "in this server" cho đúng sự thật (bộ test chỉ kiểm chữ "parquet").
+- `catalog/live-commands.json` là nguồn duy nhất cho danh sách lệnh bridge (trước ở
+  `src/AxiomOffice.Mcp/live-commands.json`); `scripts/generate_mcp_commands.py` sinh thêm
+  `core-go/internal/mcpserver/livecommands_gen.go`. Template `default.docx`/`default.pptx` vẫn một nguồn ở
+  `src/AxiomOffice.Host/Mcp/Templates/`, bản Go giữ bản sao trong `core-go/internal/templates/` và
+  `scripts/generate_templates.py --check` (CI chạy) báo lỗi nếu lệch.
+- CI: job **linux** bỏ hẳn .NET (không còn `dotnet build`), kiểm ba file sinh không lệch nguồn, chạy e2e
+  **14 phần** (đã gồm `mcp`, vì Core tự làm MCP server) và bộ MCP portable nhắm vào binary Go; job **windows**
+  bỏ .NET SDK, chạy bộ MCP portable nhắm vào `AxiomOffice.Host.exe mcp`.
+- `scripts/linux/package.sh` bỏ bước `dotnet publish`; `scripts/linux/install.sh` in cấu hình `mcpServers`
+  trỏ vào `core/AxiomOffice.Core` với `args: ["mcp", "all"]` và dọn thư mục `mcp/` của bản cài cũ.
+- Kiểm chứng đợt này: `test_mcp_portable.py` **61/61** cho cả binary Go và `AxiomOffice.Host.exe mcp`;
+  `test_mcp_host.py` (parity sâu với python-docx/openpyxl/python-pptx) **103/103** cho binary Go;
+  `tests/mcp-host/oracle_diff.py` (công cụ mới: chạy cùng kịch bản trên bản Go **và** bản C#, so từng bước)
+  **61/62**, một bước khác chỉ vì câu chữ thông báo `parquet`.
+
 ### Docs — cài đặt trên máy mới tinh (Windows + Ubuntu)
 - README mục **Cài đặt cho người dùng** nay nói rõ máy đích không phải cài gì thêm, và điều kiện dễ bỏ sót
   nhất là **bitness**: add-in đóng gói x64 nên Office/WPS 32-bit cài xong vẫn không thấy tab — kèm lệnh

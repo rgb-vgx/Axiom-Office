@@ -12,7 +12,8 @@ hướng dẫn dùng ở [README.md](README.md); lịch sử thay đổi ở [CH
 |---|---|---|
 | **Add-in COM** (`src/AxiomOffice`, net48) | Word/Excel/PowerPoint + WPS, Windows | Chạy được; đã kiểm chứng trên Office/WPS thật ở các đợt trước. Đợt này **chưa** chạy lại làn `--office` |
 | **Agent Core** (`core-go/`, Go) | Windows + Linux | **Đã thay bản .NET làm bản phát hành** (G1–G10), qua toàn bộ e2e của bản .NET |
-| **MCP server** (`src/AxiomOffice.Mcp`, net10) | Windows + Linux | Không đổi trong đợt này; parity 61/61 |
+| **MCP server** — Windows (`src/AxiomOffice.Host/Mcp`, net48) | Windows | Giữ nguyên, chạy trong `AxiomOffice.Host.exe mcp`; 61/61 |
+| **MCP server** — Linux (`core-go/internal/mcpserver`, Go) | Linux | **Mới**: subcommand `AxiomOffice.Core mcp`; 61/61 và 103/103, khớp bản C# từng bước |
 | **Extension LibreOffice** (Python UNO) | Linux (LibreOffice) | Chạy được; 159/159 trên LibreOffice thật + wizard 20/20 với Core Go |
 | **Wizard thiết lập** | Windows (WinForms) + Linux (awt) | Bản Linux đã chạy thật (20/20); **bản Windows mới chỉ biên dịch sạch, chưa bấm tay trong Office** |
 
@@ -40,7 +41,27 @@ mutex một-phiên-bản. Nhờ vậy add-in/extension/MCP không phải đổi 
 
 Kích thước: Core Go **11,9 MB** (bản .NET self-contained: 51,6 MB), không cần runtime trên máy người dùng.
 
-### 2.2 Wizard thiết lập cho người dùng không chuyên
+### 2.2 MCP server bản Linux chuyển sang Go (`core-go/internal/mcpserver/`) — G12
+
+Bản C# đa nền tảng (`src/AxiomOffice.Mcp`, net10 — biên dịch lại `src/AxiomOffice.Host/Mcp/*.cs` với ký
+hiệu `PORTABLE`) đã được thay bằng subcommand `AxiomOffice.Core mcp`; dự án .NET 10 cùng hai lớp shim
+`Compat/` đã bị xoá, và các nhánh `#if PORTABLE` trong mã C# dùng chung cũng được dọn (bản C# còn đúng
+một cấu hình: net48 cho Windows).
+
+| Phần | Nội dung |
+|---|---|
+| Giao thức | JSON-RPC 2.0 mỗi message một dòng qua stdio, stdout chỉ dành giao thức, batch, `-32700/-32600/-32601/-32602`, `initialize`/`ping`/`tools/list`/`tools/call` |
+| Engine OOXML | `ooxml` (zip/part/rels/content-types, chỉ ghi lại part bị sửa), `xlsx` (shared strings, style, bảng, công thức), `docx`, `pptx`, `sheet` (A1, CSV/TSV) |
+| 20 tool file | `doc_*` (5), `excel_*` (11), `ppt_*` (4) — tên và tham số giống hệt bản C# |
+| 30 tool live | `word_*` (14), `ppt_*` (11), `wps_*` (4) + `office_sessions`; gọi bridge qua HTTP, cổng tra từ cấu hình |
+| Nguồn dùng chung | `catalog/live-commands.json` → sinh `core-go/internal/mcpserver/livecommands_gen.go`; template `default.docx`/`default.pptx` giữ một nguồn, Go giữ bản sao có `--check` trong CI |
+| Đo lệch | `tests/mcp-host/oracle_diff.py` chạy cùng kịch bản trên bản Go và bản C#, so từng bước |
+
+Hai chỗ cố ý giữ nguyên hành vi của bản C# dù trông như lỗi: `ReplaceSheetReference` thay dạng **có**
+nháy bằng tên mới **không** nháy khi tên đơn giản, và `IsDateFormat` chỉ xét phần trước dấu `;` đầu tiên.
+Cả hai đều nằm trong hợp đồng mà bộ parity kiểm tra, nên sửa chúng sẽ làm lệch bản Windows.
+
+### 2.3 Wizard thiết lập cho người dùng không chuyên
 
 - **Core API**: `GET /v1/setup`, `POST /v1/llm/test`, `GET /v1/llm/models` + `Setup/LlmErrors.cs` dịch lỗi sang
   tiếng Việt kèm gợi ý sửa. Khoá API không vào log/response.
@@ -51,7 +72,7 @@ Kích thước: Core Go **11,9 MB** (bản .NET self-contained: 51,6 MB), không
 - Câu chữ + preset nằm ở một nguồn `catalog/setup.json` → sinh ra `SetupCatalog.cs` (C#, dùng chung add-in và
   Core), `axiom/setup_catalog.py` (Python) và `core-go/internal/setup/catalog_gen.go` (Go); CI kiểm tra không lệch.
 
-### 2.3 Kiểm chứng (số liệu mới nhất, 30/09/2026)
+### 2.4 Kiểm chứng (số liệu mới nhất, 01/10/2026)
 
 | Bộ kiểm thử | Kết quả |
 |---|---|
@@ -60,20 +81,25 @@ Kích thước: Core Go **11,9 MB** (bản .NET self-contained: 51,6 MB), không
 | e2e trên **Linux** đúng lệnh CI (13 phần) | **143/143** |
 | LibreOffice thật (gói mới, Core Go) | **159/159** |
 | Wizard thiết lập (dialog thật, X ảo) | **20/20** |
-| `go test ./...` (core-go) | 14 gói (Windows) · 15 gói (Linux, thêm `internal/instance`) |
-| `tests/lo` · MCP parity | 106 · 61/61 |
+| `go test ./...` (core-go) | 18 gói |
+| `tests/lo` · MCP parity | 106 |
+| `test_mcp_portable.py` — binary Go (`AxiomOffice.Core mcp all`) | **61/61** |
+| `test_mcp_portable.py` — `AxiomOffice.Host.exe mcp all` (Windows, sau khi dọn `#if PORTABLE`) | **61/61** |
+| `test_mcp_host.py` — parity sâu với python-docx/openpyxl/python-pptx, binary Go | **103/103** |
+| `oracle_diff.py` — Go ↔ C# trên cùng kịch bản (docx/pptx/excel) | 61/62 (1 khác là câu chữ thông báo `parquet`, cố ý) |
 | `--real-llm` (model thật trong HKCU) | **4/4** — nạp đúng skill (`bao-cao-thang`, `bang-diem`, `van-ban-hanh-chinh`), câu "in đậm" không nạp skill thiết kế |
 | Đối chiếu khoá API DPAPI với bản .NET | cùng plaintext (dài 35, sha256 `bec24e97c4893251`) |
 | libsecret (keyring Linux, qua `secret-tool` giả) | đọc được khoá; thiếu khoá → coi như chưa cấu hình |
 | `systemd --user` (Linux) | `enabled` + `active`, `/health` OK, đúng port 47840 |
 | Đóng gói | Windows: `bin\Release` có Core Go 1.0.0 + DLL + Host + skills; Linux: tar.gz 39 MB với `core/AxiomOffice.Core` là ELF chạy độc lập |
 
-### 2.4 CI
+### 2.5 CI
 
-`.github/workflows/ci.yml`: job **linux** chạy unit test extension, build MCP, `go vet`/`go test`, e2e 13
-phần với binary Go, cài LibreOffice rồi chạy bộ live + wizard, và đóng gói tarball; job **windows** chạy
-unit test, `go vet`/`go test`, build net48, và **toàn bộ e2e của bản Go**
-(kèm `AxiomOffice.Host.exe` như gói phát hành).
+`.github/workflows/ci.yml`: job **linux** không còn cài .NET — chạy unit test extension, kiểm ba file sinh
+không lệch nguồn, `go vet`/`go test`, e2e **14 phần** (đã gồm `mcp`, vì Core tự làm MCP server), bộ MCP
+portable nhắm vào binary Go, rồi cài LibreOffice chạy bộ live + wizard và đóng gói tarball. Job **windows**
+chạy unit test, `go test`, build net48, **toàn bộ e2e của bản Go** (kèm `AxiomOffice.Host.exe` như gói phát
+hành) và bộ MCP portable nhắm vào `AxiomOffice.Host.exe mcp`.
 
 ## 3. Chưa làm / chưa kiểm chứng
 
@@ -112,7 +138,11 @@ scripts\package.ps1               # zip phát hành
 ```bash
 cd core-go && go test ./... && go build -o axiom-core.exe ./cmd/axiom-core     # Core Go
 AXIOM_E2E_CORE_EXE=<binary> python tests/core/test_core_e2e.py [--only <phần,...>]
-bash scripts/linux/package.sh     # gói Linux (Core Go + MCP + .oxt)
+bash scripts/linux/package.sh     # gói Linux (Core Go + .oxt; MCP nằm trong Core)
+
+# MCP server (Linux; trên Windows là AxiomOffice.Host.exe mcp):
+AXIOM_MCP_ARGS="mcp all" python tests/mcp-host/test_mcp_portable.py <binary>
+python tests/mcp-host/oracle_diff.py    # đối chiếu Go ↔ C# trên cùng kịch bản
 ```
 
 Các phần e2e chạy riêng được: `fake_bridge`, `guards`, `skills`, `memory`, `confirm`, `mcp`, `visual`,
@@ -123,3 +153,8 @@ Các phần e2e chạy riêng được: `fake_bridge`, `guards`, `skills`, `memo
 1. **Bạn bấm thử wizard Windows** trong Word/Excel/WPS (5 bước, nhất là **Thử ngay**) rồi báo lại.
 2. Chạy `--real-llm` cho **memory** (trích xuất bằng model thật) khi muốn chắc chắn chất lượng fact.
 3. Dọn `tools/` (các MCP server Python cũ) nếu không còn dùng.
+4. Chạy `test_mcp_host.py` (parity sâu) **trên Linux** — đợt này mới chạy được trên Windows; máy Linux
+   không kết nối được lúc kiểm. Trên Linux cần venv có `mcp`/`python-docx`/`openpyxl`/`python-pptx`
+   (xem ghi chú máy kiểm chứng) và đặt `AXIOM_MCP_NO_CATALOG=1`.
+5. `src/AxiomOffice.Core/` và `src/WpsAiBridge.Native/` chỉ còn là thư mục build cũ (không được git
+   theo dõi) — xoá được nếu muốn cây làm việc gọn.

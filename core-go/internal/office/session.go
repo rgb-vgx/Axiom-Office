@@ -4,7 +4,6 @@ package office
 
 import (
 	"encoding/json"
-	"math"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -62,11 +61,12 @@ func parseSession(data []byte, file string) (*Session, bool) {
 	if pid <= 0 || port <= 0 {
 		return nil, false
 	}
-	age := 0.0
-	if raw.LastSeenEpoch > 0 {
-		age = math.Max(0, float64(time.Now().UnixMilli())/1000.0-raw.LastSeenEpoch)
+	// Thieu lastSeenEpoch thi lay theo thoi diem sua file, giong ban C#.
+	modified := time.Now()
+	if info, err := os.Stat(file); err == nil {
+		modified = info.ModTime()
 	}
-	age = math.Round(age*10) / 10
+	age := ageFromEpoch(raw.LastSeenEpoch, modified)
 	return &Session{
 		Pid: pid, App: raw.App, Family: raw.Family, Port: port, Host: raw.Host, Version: raw.Version,
 		AgeSeconds: age, Document: raw.Document, DocumentPath: raw.DocumentPath, File: file,
