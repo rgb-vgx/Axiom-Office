@@ -1187,7 +1187,7 @@ flowchart TD
     j --> k["Nền: trích xuất memory · tóm tắt hội thoại · tăng hits"]
 ```
 
-- Một lượt đang chạy cho mỗi port; trần 300s và 200k token (`run.stopped`).
+- Một lượt đang chạy cho mỗi port; **không trần thời gian** (kiểm soát bằng 100 vòng + 200k token + nút Dừng).
 - `ContextAssembler`: các lượt gần nhất trong ~8.000 token, vượt thì dùng tóm tắt (cập nhật mỗi 20 tin).
 
 ### 22.4 Model gateway

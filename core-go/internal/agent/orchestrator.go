@@ -34,10 +34,20 @@ type Request struct {
 }
 
 const (
-	DefaultMaxSeconds = 300
-	MaxMaxSeconds     = 900
-	DefaultMaxTokens  = 200_000
-	MaxMaxTokens      = 1_000_000
+	// DefaultMaxSeconds = 0: khong dat tran thoi gian cho mot luot. Luot chay duoc kiem soat bang so
+	// vong, so token va nut Dung cua nguoi dung - giong opencode va goclaw, ca hai deu khong co
+	// wall-clock cho mot luot. Ben goi van dat duoc (maxSeconds > 0) khi can, vi du ai.ask goi dong bo
+	// tu mot agent khac thi khong the cho vo han.
+	DefaultMaxSeconds = 0
+	MaxMaxSeconds     = 86400
+
+	// DefaultMaxRounds: tran dem duoc thay cho tran dong ho. 100 vong la rong rai cho mot task tai
+	// lieu (task "bang diem 5 hoc sinh" ton 12 vong) ma van chan duoc vong lap vo ich.
+	DefaultMaxRounds = 100
+	MaxMaxRounds     = 1_000
+
+	DefaultMaxTokens = 200_000
+	MaxMaxTokens     = 1_000_000
 )
 
 // ParseRequest doc body JSON thanh Request (loi -> mo ta tieng cho client).
@@ -55,7 +65,8 @@ func ParseRequest(body map[string]any) (*Request, string) {
 		return nil, "'office.port' is required (find it with office_sessions / GET /session)"
 	}
 
-	maxSeconds := clamp(intOfDefault(tryMap(body["options"])["maxSeconds"], DefaultMaxSeconds), 30, MaxMaxSeconds)
+	maxSeconds := clamp(intOfDefault(tryMap(body["options"])["maxSeconds"], DefaultMaxSeconds), 0, MaxMaxSeconds)
+	maxRounds := clamp(intOfDefault(tryMap(body["options"])["maxRounds"], DefaultMaxRounds), 1, MaxMaxRounds)
 	maxTokens := clamp(intOfDefault(tryMap(body["options"])["maxTokens"], DefaultMaxTokens), 1_000, MaxMaxTokens)
 
 	var document *DocumentContext
@@ -85,7 +96,8 @@ func ParseRequest(body map[string]any) (*Request, string) {
 		Family:         textOf(off["family"]),
 		Document:       document,
 		Options: model.AgentOptions{
-			MaxTokens: maxTokens, Deadline: time.Duration(maxSeconds) * time.Second,
+			MaxRounds: maxRounds, MaxTokens: maxTokens,
+			Deadline:          time.Duration(maxSeconds) * time.Second,
 			MaxResponseTokens: model.DefaultMaxResponseTokens,
 		},
 		Interactive: interactive,

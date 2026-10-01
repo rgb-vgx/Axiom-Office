@@ -133,12 +133,18 @@ def launch(exe: str) -> None:
 
 
 def start_run(base: str, prompt: str, port: int, kind: str, document=None, conversation_id: str | None = None,
-              interactive: bool = True, pid: int | None = None, max_seconds: int = 300) -> dict:
+              interactive: bool = True, pid: int | None = None, max_seconds: int = 0) -> dict:
+    # max_seconds = 0 (mac dinh) = khong dat tran thoi gian: luot chay do so vong, ngan sach token va
+    # nut Dung kiem soat. Pane di theo duong nay (co SSE + nut Dung). Chi gui khi ben goi chu dong
+    # muon gioi han, vi du buoc "Thu ngay" cua wizard.
+    options = {"maxTokens": 200000, "interactive": interactive}
+    if max_seconds > 0:
+        options["maxSeconds"] = max_seconds
     body = {
         "prompt": prompt,
         "office": {"port": port, "pid": pid or os.getpid(), "app": kind, "family": "libreoffice"},
         "document": document or {},
-        "options": {"maxSeconds": max_seconds, "maxTokens": 200000, "interactive": interactive},
+        "options": options,
     }
     if conversation_id:
         body["conversationId"] = conversation_id

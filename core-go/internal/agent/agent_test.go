@@ -240,20 +240,31 @@ func TestParseRequestValidatesAndClamps(t *testing.T) {
 	if request.Interactive {
 		t.Fatalf("interactive=false phai duoc ton trong: %+v", request)
 	}
-	if request.Options.Deadline != 30*time.Second || request.Options.MaxTokens != 1000 {
+	// maxSeconds = 1 duoc ton trong (khong con san 30s); maxRounds lay mac dinh.
+	if request.Options.Deadline != 1*time.Second || request.Options.MaxTokens != 1000 ||
+		request.Options.MaxRounds != DefaultMaxRounds {
 		t.Fatalf("phai bi chan tren/duoi: %+v", request.Options)
 	}
 	if request.Document.SelectionText != "chon" || request.Document.Name != "a.xlsx" {
 		t.Fatalf("document = %+v", request.Document)
 	}
 
-	// Mac dinh: interactive = true (pane co nguoi bam xac nhan), tran thoi gian 300s.
+	// Mac dinh: interactive = true (pane co nguoi bam xac nhan) va KHONG tran thoi gian.
 	fallback, _ := ParseRequest(map[string]any{
 		"prompt": "x", "office": map[string]any{"port": float64(1)},
-		"options": map[string]any{"maxSeconds": float64(99999), "maxTokens": float64(99999999)},
+		"options": map[string]any{"maxTokens": float64(99999999)},
 	})
-	if !fallback.Interactive || fallback.Options.Deadline != 900*time.Second || fallback.Options.MaxTokens != 1_000_000 {
-		t.Fatalf("tran tren sai: %+v", fallback)
+	if !fallback.Interactive || fallback.Options.Deadline != 0 || fallback.Options.MaxTokens != 1_000_000 {
+		t.Fatalf("mac dinh phai la khong tran thoi gian: %+v", fallback)
+	}
+
+	// Dat tran tren thi van bi kep: 1 ngay la muc cao nhat nhan.
+	capped, _ := ParseRequest(map[string]any{
+		"prompt": "x", "office": map[string]any{"port": float64(1)},
+		"options": map[string]any{"maxSeconds": float64(99999), "maxRounds": float64(99999)},
+	})
+	if capped.Options.Deadline != time.Duration(MaxMaxSeconds)*time.Second || capped.Options.MaxRounds != MaxMaxRounds {
+		t.Fatalf("tran tren sai: %+v", capped.Options)
 	}
 }
 

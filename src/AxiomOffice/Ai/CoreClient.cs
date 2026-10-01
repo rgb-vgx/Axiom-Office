@@ -172,7 +172,9 @@ namespace AxiomOffice.Ai
                 { "family", host != null && host.IsOfficeHost ? "office" : "wps" }
             };
             request["document"] = document;
-            request["options"] = new Dictionary<string, object> { { "maxSeconds", 300 }, { "maxTokens", 200000 }, { "interactive", interactive } };
+            // Khong dat maxSeconds: luot chay do so vong, ngan sach token va nut Dung kiem soat.
+            // Pane di theo SSE va co nut Dung nen khong can tran dong ho (giong opencode/goclaw).
+            request["options"] = new Dictionary<string, object> { { "maxTokens", 200000 }, { "interactive", interactive } };
 
             string error;
             string responseText = PostJson(baseUrl + "/v1/runs", Serialize(request), 30000, cancel, out error);

@@ -18,12 +18,12 @@ const DefaultMaxResponseTokens = 16384
 type AgentOptions struct {
 	MaxRounds         int           // 0 = khong gioi han so vong
 	MaxTokens         int           // tran token ca luot (mac dinh 200000)
-	Deadline          time.Duration // tran thoi gian ca luot (mac dinh 300s)
+	Deadline          time.Duration // 0 = khong tran thoi gian (mac dinh); > 0 moi dat
 	MaxResponseTokens int           // mac dinh DefaultMaxResponseTokens
 }
 
 func DefaultAgentOptions() AgentOptions {
-	return AgentOptions{MaxTokens: 200_000, Deadline: DefaultDeadline, MaxResponseTokens: DefaultMaxResponseTokens}
+	return AgentOptions{MaxTokens: 200_000, MaxResponseTokens: DefaultMaxResponseTokens}
 }
 
 type AgentCallbacks struct {
@@ -79,11 +79,14 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 		return done(false, "", "Model is not configured", "config")
 	}
 
-	deadline := options.Deadline
-	if deadline <= 0 {
-		deadline = DefaultDeadline
+	// Khong dat tran thoi gian mac dinh: mot luot duoc kiem soat bang so vong, ngan sach token va
+	// nut Dung cua nguoi dung - giong opencode va goclaw (ca hai deu khong co wall-clock cho luot).
+	// Deadline > 0 van duoc ton trong khi ben goi chu dong dat (vi du ai.ask goi dong bo).
+	var cancel context.CancelFunc = func() {}
+	runCtx := ctx
+	if options.Deadline > 0 {
+		runCtx, cancel = context.WithTimeout(ctx, options.Deadline)
 	}
-	runCtx, cancel := context.WithTimeout(ctx, deadline)
 	defer cancel()
 	stopped := func() AgentResult {
 		if ctx.Err() != nil {
@@ -91,7 +94,7 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 			return done(false, "", "cancelled by user", "cancelled")
 		}
 		result.TimedOut = true
-		return done(false, "", fmt.Sprintf("agent timed out after %.0fs", deadline.Seconds()), "timeout")
+		return done(false, "", fmt.Sprintf("agent timed out after %.0fs", options.Deadline.Seconds()), "timeout")
 	}
 
 	turns := make([]Message, 0, len(prior)+1)

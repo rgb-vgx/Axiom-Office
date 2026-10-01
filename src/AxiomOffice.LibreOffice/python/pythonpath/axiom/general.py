@@ -98,6 +98,8 @@ def ai_ask(env, params):
         "prompt": prompt,
         "office": {"port": port, "pid": os.getpid(), "app": env.kind, "family": "libreoffice"},
         "document": {"name": (info or {}).get("name"), "fullName": (info or {}).get("fullName")},
+        # ai.ask la RPC dong bo cho agent ben ngoai: khong the cho vo han, nen van tu dat tran 300s
+        # (vong cho duoi day la 330s). Khac voi pane - duong do khong tran, co SSE va nut Dung.
         "options": {"maxSeconds": 300, "maxTokens": 200000, "interactive": False},
     })
     run_id = started["runId"]

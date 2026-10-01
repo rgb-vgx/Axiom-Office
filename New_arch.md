@@ -432,8 +432,10 @@ sequenceDiagram
 ```
 
 - Trạng thái run: `queued` → `running` → `completed` | `failed` | `cancelled` | `timedout`.
-- Giữ hành vi đã kiểm chứng của `LlmClient`: không giới hạn số vòng; trần 300s mỗi run (cấu hình
-  được qua `options.maxSeconds`, tối đa 900s); 60s mỗi request; hủy cắt request đang chờ ngay;
+- Giữ hành vi đã kiểm chứng của `LlmClient`: **không trần thời gian cho một lượt** (bỏ 2026-10-02 —
+  trần đồng hồ cắt ngang task dài; nay kiểm soát bằng `options.maxRounds` mặc định 100, ngân sách
+  token và nút Dừng, giống opencode/goclaw); bên gọi vẫn tự đặt được `options.maxSeconds` khi cần
+  (ví dụ `ai.ask` gọi đồng bộ, tối đa 86400s); 60s mỗi request; hủy cắt request đang chờ ngay;
   provider không hỗ trợ tools (lỗi chứa "tool") thì tắt tools và chạy như chat.
 - **Trần token mỗi run** (`options.maxTokens`, mặc định 200k, tối đa 1M): cộng dồn `usage` mỗi
   request; vượt trần thì dừng với `run.timedout`-style event `run.stopped` (`error: "token budget

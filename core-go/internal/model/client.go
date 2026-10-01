@@ -16,10 +16,10 @@ import (
 )
 
 const (
-	// DefaultRequestTimeout: model free cham co luc can hon 60s cho mot luot tra loi dai
-	// (chinh bang LlmRequestTimeoutSeconds / AXIOM_LLM_REQUEST_TIMEOUT). Tran ca luot van la 300s.
+	// DefaultRequestTimeout: tran cho MOT request toi nha cung cap (chinh bang
+	// LlmRequestTimeoutSeconds / AXIOM_LLM_REQUEST_TIMEOUT). Mot luot chay khong co tran thoi gian -
+	// no duoc kiem soat bang so vong, ngan sach token va nut Dung.
 	DefaultRequestTimeout = 120 * time.Second
-	DefaultDeadline       = 300 * time.Second
 	MaxRetryAfter         = 10 * time.Second
 
 	EmptyReplyNudge = "Your last reply was empty. Continue the task with the tools, or if it is already done, reply with a short summary."

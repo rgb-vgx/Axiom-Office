@@ -5,6 +5,19 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed — bỏ trần thời gian của một lượt agent
+- **Không còn trần đồng hồ cho một lượt chạy.** Đợt trước trần là 300s mặc định (tối đa 900s), và nó
+  cắt ngang task dài trước khi agent kịp làm gì. Cả hai dự án tham khảo (opencode, goclaw) đều không
+  có wall-clock cho một lượt — họ kiểm soát bằng số vòng, số tool call và ngân sách ngữ cảnh.
+- Thay bằng `options.maxRounds` (mặc định **100**, tối đa 1000) + ngân sách token + nút **Dừng**.
+  `options.maxSeconds` vẫn dùng được khi bên gọi tự muốn đặt (tối đa 86400s).
+- Ba client đổi theo, có chủ ý khác nhau: **pane** (add-in Windows `CoreClient.cs`, extension
+  `panel.py`) **không gửi trần** vì đi theo SSE và có nút Dừng; **bước "Thử ngay"** của wizard tự đặt
+  120s vì nó chờ đồng bộ; **`ai.ask`** (`general.py`) vẫn giữ 300s vì là RPC đồng bộ cho agent bên
+  ngoài — không thể chờ vô hạn.
+- `DefaultDeadline` bỏ khỏi `internal/model` (không còn ai dùng).
+
+
 ### Changed (BREAKING nội bộ) — MCP server bản Linux chuyển sang Go, bỏ dự án .NET 10
 - **Bản Windows không đổi**: MCP server vẫn là `AxiomOffice.Host.exe mcp` (net48, `src/AxiomOffice.Host/Mcp/`).
 - **Bản Linux nay là subcommand của chính Core**: `AxiomOffice.Core mcp [all|word|excel|ppt] [--list]`

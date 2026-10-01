@@ -810,7 +810,8 @@ class Wizard:
         port = next((p for k, p, _ in bridge._STATE.get("servers", []) if k == self.kind), 0)  # noqa: SLF001
         if not port:
             return {"message": "Chưa thấy cầu nối trong ứng dụng — mở lại tài liệu rồi thử lại."}
-        run = core.start_run(base, "Viết một câu chào ngắn vào tài liệu", port, self.kind)
+        # Buoc "Thu ngay" cho dong bo (khong co nut Dung) nen tu dat tran 120s - vua bang vong cho duoi day.
+        run = core.start_run(base, "Viết một câu chào ngắn vào tài liệu", port, self.kind, max_seconds=120)
         run_id = (run or {}).get("runId") if isinstance(run, dict) else None
         if not run_id:
             return {"message": "Agent Core không nhận được yêu cầu thử."}
