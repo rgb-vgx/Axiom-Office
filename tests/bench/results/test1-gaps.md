@@ -56,6 +56,18 @@ run `r_e82a67a129d65ae1b98dec8ef70ced45`.
   như thiết kế, mỗi khối 60–70 hàng.
 - Hết ngân sách token ở đây. Chưa có công thức P&L, chưa KPI, chưa Dashboard, chưa Checks, chưa change test.
 
+## Một lượt chạy lại KHÔNG dùng được làm bằng chứng
+
+Sau khi thêm `et.fillRange`, tôi chạy lại Axiom trên cùng đề (05:1x–05:2x). Kết quả **không dùng được**:
+LibreOffice mất tài liệu giữa chừng, 90 trong 94 tool call trả về cùng một lỗi
+`InvalidOperationException: no active spreadsheet`.
+
+Nguyên nhân là **va chạm môi trường**, không phải lỗi agent: phiên Claude Code cho Test 2 đang chạy song
+song và tự mở/đóng instance LibreOffice của nó. Từ đây về sau hai bên phải chạy **tuần tự**.
+
+Nhưng lượt hỏng đó phơi ra một lỗi thật của vòng lặp agent: model gọi **cùng một lệnh với cùng một lỗi
+90 lần liên tiếp** và đốt hết 1.000.088 token vào đó, không tự biết dừng. Đã sửa (xem #7 bên dưới).
+
 ## Khoảng cách
 
 | # | Khoảng cách | Bằng chứng | Vì sao |
@@ -66,6 +78,7 @@ run `r_e82a67a129d65ae1b98dec8ef70ced45`.
 | 4 | **Không có Dashboard/chart** | Đề yêu cầu "Use charts where appropriate"; trước phiên này bridge không có lệnh chart nào | Thiếu năng lực, không phải thiếu kế hoạch |
 | 5 | **Không có change test** | Đề mục J yêu cầu đổi Revenue Growth 5% → 10% rồi **kiểm chứng lại**; Axiom dừng trước khi tới đó | Hệ quả của #1 và #2 |
 | 6 | **Bị cắt vì ngân sách token của MỘT phản hồi thì mất cả lượt** | Hai lượt chạy trước cùng chết ở `finish_reason=length`, content rỗng | Vòng lặp agent chưa biết nhắc model viết nhỏ lại |
+| 7 | **Không có phanh khi tool hỏng lặp lại** | Lượt chạy lại: 90/94 tool call là **cùng một lệnh với cùng một lỗi** (`no active spreadsheet`), đốt 1.000.088 token | Vòng lặp agent chỉ đếm vòng và token, không nhận ra "lặp y hệt" |
 
 Điểm **không** phải khoảng cách: `et.addSheet`/`et.renameSheet` đã đủ dùng — model tạo đúng 11 sheet
 một lần, không đoán tên lệnh lần nào.
@@ -87,6 +100,10 @@ Làm trong phiên này, mỗi cái đều có test chạy thật:
    `=$D$1+ROW()*B1 → *B2 → *B3`, `=F2*2 → =G2*2 → =H2*2`, và điền được cả khối 2D.
 5. **Cứu lượt chạy bị cắt vì hết ngân sách token của một phản hồi** (commit `94208c9`) — khoảng cách #6.
 6. **Luật khảo sát có mức trong system prompt** (commit `94208c9`) — khoảng cách #3.
+7. **Phanh khi tool hỏng lặp lại** (`AgentOptions.MaxIdenticalFailures`, mặc định 3 vòng) — khoảng
+   cách #7. Một vòng chỉ toàn lỗi mà chu ký (tên tool + đối số + kết quả) y hệt vòng trước, lặp 3 lần
+   thì lượt chạy dừng với thông báo nói rõ, thay vì để model đốt hết ngân sách. Lỗi **đổi** mỗi vòng
+   thì không cắt — model có thể đang thử cách khác (có test riêng cho cả hai chiều).
 
 ## Còn lại, chưa làm
 

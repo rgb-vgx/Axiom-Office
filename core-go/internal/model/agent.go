@@ -24,6 +24,11 @@ type AgentOptions struct {
 	MaxTokens         int           // tran token ca luot (mac dinh 200000)
 	Deadline          time.Duration // 0 = khong tran thoi gian (mac dinh); > 0 moi dat
 	MaxResponseTokens int           // mac dinh DefaultMaxResponseTokens
+	// MaxIdenticalFailures: dung han khi model lap lai Y HET mot tool call da hong bay nhieu vong lien
+	// tiep. Do ngay 02/10/2026: mot luot chay goi et.listSheets 90 lan voi cung mot loi ("no active
+	// spreadsheet") va dot het 1.000.088 token vao do - model khong tu biet dung. 0 = khong kiem.
+	MaxIdenticalFailures int
+
 	// Verify: bat buoc agent TU KIEM CHUNG truoc khi ket thuc mot luot co sua tai lieu.
 	//
 	// Do duoc tu ba bo khung chay cung mot prompt (02/10/2026): bo khung tu kiem chung roi sua
@@ -34,8 +39,16 @@ type AgentOptions struct {
 }
 
 func DefaultAgentOptions() AgentOptions {
-	return AgentOptions{MaxTokens: 200_000, MaxResponseTokens: DefaultMaxResponseTokens, Verify: true}
+	return AgentOptions{
+		MaxTokens:            200_000,
+		MaxResponseTokens:    DefaultMaxResponseTokens,
+		Verify:               true,
+		MaxIdenticalFailures: DefaultMaxIdenticalFailures,
+	}
 }
+
+// DefaultMaxIdenticalFailures: so vong lap lai y het mot tool call hong truoc khi dung luot chay.
+const DefaultMaxIdenticalFailures = 3
 
 type AgentCallbacks struct {
 	Transcript   func(line string)
@@ -125,6 +138,8 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 	// mutated: luot nay da sua tai lieu chua; verified: da yeu cau tu kiem chung chua. Moi luot chi
 	// kiem chung MOT lan - du de bat loi that, khong du de quay vong vo tan.
 	mutated, verified := false, false
+	// Chan vong lap: chu ky cua vong truoc va so vong lien tiep lap lai y het.
+	identicalFailures, lastFailure := 0, ""
 	for options.MaxRounds <= 0 || result.Rounds < options.MaxRounds {
 		result.ToolsDisabled = !toolsEnabled
 		if runCtx.Err() != nil {
@@ -234,6 +249,22 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 		}
 		turns = c.Codec.AppendToolResults(turns, results)
 
+		// Chan vong lap vo ich: model lap lai Y HET mot tool call da hong thi dung han, thay vi de no
+		// dot het ngan sach (do ngay 02/10/2026: 90 lan goi cung mot lenh cung mot loi).
+		if signature := failureSignature(turn.ToolCalls, results); signature == "" {
+			identicalFailures, lastFailure = 0, ""
+		} else if signature == lastFailure {
+			identicalFailures++
+		} else {
+			identicalFailures, lastFailure = 1, signature
+		}
+		if options.MaxIdenticalFailures > 0 && identicalFailures >= options.MaxIdenticalFailures {
+			call := turn.ToolCalls[0]
+			return done(false, "", fmt.Sprintf("the model repeated the same failing call %d times in a row "+
+				"(%s: %s) - stopping instead of repeating", identicalFailures, call.Name,
+				Truncate(results[0].ResultJSON, 200)), "internal")
+		}
+
 		if total := result.InputTokens + result.OutputTokens; options.MaxTokens > 0 && total > options.MaxTokens {
 			result.Stopped = true
 			return done(false, "", fmt.Sprintf("token budget exceeded (%d > %d)", total, options.MaxTokens), "provider")
@@ -242,6 +273,27 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 
 	// Chi xay ra khi ben goi tu dat gioi han vong: bao chua xong, khong gia lam cau tra loi.
 	return done(false, "", fmt.Sprintf("agent stopped after %d rounds without a final answer", options.MaxRounds), "provider")
+}
+
+// failureSignature: chu ky cua mot vong CHI toan loi - rong khi co it nhat mot tool chay duoc.
+// Gop ten tool + doi so + ket qua, nen "cung mot loi" phai la cung mot loi that, khong phai trung
+// nhau o chuoi thong bao chung.
+func failureSignature(calls []ToolCall, results []ToolResult) string {
+	if len(results) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(results))
+	for index, result := range results {
+		if result.OK {
+			return ""
+		}
+		arguments := ""
+		if index < len(calls) {
+			arguments = calls[index].Arguments
+		}
+		parts = append(parts, result.Name+" "+arguments+" "+result.ResultJSON)
+	}
+	return strings.Join(parts, "\n")
 }
 
 func safeExecute(ctx context.Context, execute Executor, call ToolCall) (result ToolResult) {

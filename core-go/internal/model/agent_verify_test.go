@@ -3,6 +3,7 @@ package model
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -212,6 +213,47 @@ func TestRunAgentRecoversFromTruncatedReply(t *testing.T) {
 	}
 	if failed.Rounds != 3 {
 		t.Fatalf("chi nhac hai lan: rounds=%d", failed.Rounds)
+	}
+}
+
+// Lap lai Y HET mot tool call da hong thi dung han. Do ngay 02/10/2026: mot luot chay goi cung mot lenh
+// cung mot loi 90 lan va dot het ngan sach token vao do - model khong tu biet dung.
+func TestRunAgentStopsOnRepeatedIdenticalFailure(t *testing.T) {
+	server, _ := verifyServer(t, []string{replyToolCall})
+	client := NewClient(server.Client(), "openai", server.URL, "", "m")
+	result := client.RunAgent(context.Background(), "s", nil, "u", mutatingTools(),
+		func(ctx context.Context, call ToolCall) ToolResult {
+			return ToolResult{CallID: call.ID, Name: call.Name, OK: false,
+				ResultJSON: `{"ok":false,"error":"no active spreadsheet"}`}
+		}, DefaultAgentOptions(), AgentCallbacks{})
+
+	if result.OK || !strings.Contains(result.Error, "repeated the same failing call 3 times") {
+		t.Fatalf("phai dung han khi lap lai cung mot loi: %+v", result)
+	}
+	if result.Rounds != 3 {
+		t.Fatalf("dung ngay o vong lap thu 3: rounds=%d", result.Rounds)
+	}
+}
+
+// Loi DOI moi vong thi khong phai la lap: model co the dang thu cach khac, khong duoc cat ngang.
+func TestRunAgentKeepsGoingWhenFailureChanges(t *testing.T) {
+	server, _ := verifyServer(t, []string{replyToolCall})
+	client := NewClient(server.Client(), "openai", server.URL, "", "m")
+	attempt := 0
+	options := DefaultAgentOptions()
+	options.MaxRounds = 6
+	result := client.RunAgent(context.Background(), "s", nil, "u", mutatingTools(),
+		func(ctx context.Context, call ToolCall) ToolResult {
+			attempt++
+			return ToolResult{CallID: call.ID, Name: call.Name, OK: false,
+				ResultJSON: fmt.Sprintf(`{"ok":false,"error":"lan thu %d"}`, attempt)}
+		}, options, AgentCallbacks{})
+
+	if strings.Contains(result.Error, "repeated the same failing call") {
+		t.Fatalf("loi doi moi vong khong duoc coi la lap: %+v", result)
+	}
+	if attempt != 6 {
+		t.Fatalf("phai chay het 6 vong: %d", attempt)
 	}
 }
 
