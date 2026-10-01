@@ -257,6 +257,45 @@ func TestRunAgentKeepsGoingWhenFailureChanges(t *testing.T) {
 	}
 }
 
+// Ngan sach token chi tinh phan phai tra that: token doc tu cache gan nhu mien phi. Do ngay 02/10/2026,
+// mot luot chay dung 1.005.301 token trong do 806.400 doc tu cache (97% trung) ma van bi dung vi "het
+// ngan sach" - tuc la ngan sach bi an mat phan lon.
+func TestBillableTokensIgnoresCache(t *testing.T) {
+	cases := []struct {
+		result AgentResult
+		want   int
+	}{
+		// Khong cache: y nguyen nhu cu.
+		{AgentResult{InputTokens: 1000, OutputTokens: 200}, 1200},
+		// Phan lon doc tu cache.
+		{AgentResult{InputTokens: 1_005_301 - 170_823, OutputTokens: 170_823, CachedTokens: 806_400}, 198_901},
+		// Nha cung cap bao cache nhieu hon ca input (vo ly) thi khong duoc am.
+		{AgentResult{InputTokens: 100, OutputTokens: 50, CachedTokens: 500}, 150},
+	}
+	for _, item := range cases {
+		if got := item.result.BillableTokens(); got != item.want {
+			t.Errorf("BillableTokens(%+v) = %d, want %d", item.result, got, item.want)
+		}
+	}
+}
+
+// Cache lam ngan sach dung lau hon: cung mot luot, khong cache thi dung, co cache thi chay tiep.
+func TestRunAgentBudgetCountsOnlyBillableTokens(t *testing.T) {
+	reply := `{"choices":[{"message":{"role":"assistant","content":null,"tool_calls":[{"id":"c","function":{"name":"t","arguments":"{}"}}]}}],"usage":{"prompt_tokens":20000,"completion_tokens":100,"prompt_cache_hit_tokens":19000}}`
+	server, _ := verifyServer(t, []string{reply})
+	options := DefaultAgentOptions()
+	options.MaxTokens = 5000   // nho hon raw (20100/vong) nhung lon hon billable (1100/vong)
+	options.MaxRounds = 4
+	result := runOn(server, false, options)
+
+	if result.Stopped {
+		t.Fatalf("phai tinh theo token phai tra that, khong dung vi raw: %+v", result)
+	}
+	if result.CachedTokens != 19000*4 {
+		t.Fatalf("phai cong don cache: %+v", result.CachedTokens)
+	}
+}
+
 // So cache ca luot la tong cac vong.
 func TestRunAgentSumsCachedTokens(t *testing.T) {
 	cachedCall := `{"choices":[{"message":{"role":"assistant","content":null,"tool_calls":[{"id":"c1","function":{"name":"t","arguments":"{}"}}]}}],"usage":{"prompt_tokens":10,"completion_tokens":1,"prompt_cache_hit_tokens":7}}`

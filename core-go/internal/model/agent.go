@@ -79,6 +79,21 @@ type AgentResult struct {
 	Verified bool
 }
 
+// BillableTokens: so token phai tra that, tuc la phan nha cung cap THAT SU phai tinh.
+//
+// Phan doc tu cache gan nhu mien phi (DeepSeek, OpenAI va Anthropic deu tinh khoang 1/10 gia thuong),
+// nen dem no vao ngan sach thi ngan sach bi an mat phan lon: do ngay 02/10/2026, mot luot chay dung
+// 1.005.301 token trong do 806.400 doc tu cache - 97% la trung, ma van bi dung vi "het ngan sach".
+func (r AgentResult) BillableTokens() int {
+	// Nha cung cap bao cache nhieu hon ca so token vao la vo ly: khi do BO QUA han con so cache thay vi
+	// lay no lam input mien phi - huong sai nay chi lam ngan sach chat hon, khong the bi lay bot.
+	cached := r.CachedTokens
+	if cached < 0 || cached > r.InputTokens {
+		cached = 0
+	}
+	return r.InputTokens - cached + r.OutputTokens
+}
+
 // Executor chay mot tool. Loi (panic) cua tool khong lam hong luot chay: tra ve model de no tu xu ly.
 type Executor func(ctx context.Context, call ToolCall) ToolResult
 
@@ -265,9 +280,10 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 				Truncate(results[0].ResultJSON, 200)), "internal")
 		}
 
-		if total := result.InputTokens + result.OutputTokens; options.MaxTokens > 0 && total > options.MaxTokens {
+		if billable := result.BillableTokens(); options.MaxTokens > 0 && billable > options.MaxTokens {
 			result.Stopped = true
-			return done(false, "", fmt.Sprintf("token budget exceeded (%d > %d)", total, options.MaxTokens), "provider")
+			return done(false, "", fmt.Sprintf("token budget exceeded (billable %d > %d; raw %d with %d from cache)",
+				billable, options.MaxTokens, result.InputTokens+result.OutputTokens, result.CachedTokens), "provider")
 		}
 	}
 

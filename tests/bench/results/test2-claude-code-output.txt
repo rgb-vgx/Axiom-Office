@@ -1,0 +1,6 @@
+file: Inventory_Optimization_Workbook.ods (64.9 MB)
+sheets (12): Raw_SKU_Data | Product_Master | Demand_History | Inventory | Forecast | Safety_Stock | Reorder_Point | EOQ | Risk | Optimization | Dashboard | Checks
+formula cells: 2156652
+chart objects: 4
+conditional formatting: 34
+named expressions: 1

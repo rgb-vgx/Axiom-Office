@@ -1,0 +1,67 @@
+  1 et.listSheets    ok   null
+  2                  ok   {"name":"bao-cao-du-lieu"}
+  3                  ok   {"name":"_design","path":"tokens.json"}
+  4 et.renameSheet   ok   {"name":"Raw_Data","sheet":"Sheet1"}
+  5 et.addSheet      ok   {"index":1,"name":"Assumptions"}
+  6 et.addSheet      ok   {"index":2,"name":"Revenue"}
+  7 et.addSheet      ok   {"index":3,"name":"COGS"}
+  8 et.addSheet      ok   {"index":4,"name":"PnL"}
+  9 et.addSheet      ok   {"index":5,"name":"Budget_vs_Actual"}
+ 10 et.addSheet      ok   {"index":6,"name":"Forecast"}
+ 11 et.addSheet      ok   {"index":7,"name":"Scenarios"}
+ 12 et.addSheet      ok   {"index":8,"name":"KPI"}
+ 13 et.addSheet      ok   {"index":9,"name":"Dashboard"}
+ 14 et.addSheet      ok   {"index":10,"name":"Checks"}
+ 15 et.writeRange    ok   {"range":"A1","sheet":"Raw_Data","values":[["Transaction_ID","Date","Region","Product","Customer_Segment","Rev
+ 16 et.writeRange    ok   {"range":"F2","sheet":"Raw_Data","values":[[1000],[2000],[3000]]}
+ 17 et.fillRange     ok   {"formula":"=F2*1.5","range":"G2:G4"}
+ 18 et.writeRange    ok   {"range":"G2:G4","sheet":"Checks","values":[[""],[""],[""]]}
+ 19 et.writeRange    ok   {"range":"F2:F4","sheet":"Raw_Data","values":[[""],[""],[""]]}
+ 20 et.writeRange    ok   {"range":"G2:G4","sheet":"Checks","values":[[""],[""],[""]]}
+ 21 et.writeRange    ok   {"range":"A2","sheet":"Raw_Data","values":[[1001],[1002],[1003],[1004],[1005],[1006],[1007],[1008],[1009],[101
+ 22 et.fillRange     ok   {"formula":"=\"TXN\"&TEXT(ROW()-1,\"0000\")","range":"A2:A1211","sheet":"Raw_Data"}
+ 23 et.fillRange     ok   {"formula":"=DATE(2024,1,1)+INT((ROW()-2)/100)*30+MOD(ROW()-2,28)","range":"B2:B1211","sheet":"Raw_Data"}
+ 24 et.readRange     ok   {"range":"A1:C5","sheet":"Raw_Data"}
+ 25 et.writeRange    ok   {"range":"B2","sheet":"Raw_Data","values":[["=DATE(2024,1,1)+INT((ROW()-2)/100)*30"]]}
+ 26 et.writeRange    ok   {"range":"L1","sheet":"Raw_Data","values":[["=TODAY()"],["=DATE(2024,1,1)"],["=SUM(1,2)"],["=EOMONTH(TODAY(),0
+ 27 et.writeRange    ok   {"range":"L1","sheet":"Raw_Data","values":[["=TODAY()"],["=DATE(2024;1;1)"],["=SUM(1;2)"],["=EOMONTH(TODAY();0
+ 28 et.readRange     ok   {"range":"L1:L5","sheet":"Raw_Data"}
+ 29 et.writeRange    ok   {"range":"Y1:Y32","sheet":"Raw_Data","values":[["=QUARTILE.INC(L1:L5;1)"],["=PERCENTILE.INC(L1:L5;0.25)"],["=S
+ 30 et.readRange     ok   {"range":"Y1:Y32","sheet":"Raw_Data"}
+ 31 et.writeRange    ok   {"range":"L1:L5","sheet":"Raw_Data","values":[[""],[""],[""],[""],[""]]}
+ 32 et.writeRange    ok   {"range":"Y1:Y32","sheet":"Raw_Data","values":[[""],[""],[""],[""],[""],[""],[""],[""],[""],[""],[""],[""],[""
+ 33 et.writeRange    ok   {"range":"A1:A3","sheet":"Checks","values":[[10],[20],[30]]}
+ 34 et.fillRange     ok   {"formula":"=A1*2","range":"B1:B3","sheet":"Checks"}
+ 35 et.writeRange    ok   {"range":"A1:B3","sheet":"Checks","values":[["",""],["",""],["",""]]}
+ 36 et.fillRange     ok   {"formula":"=DATE(2024;1;1)+INT((ROW()-2)/100)*30+MOD(ROW()-2;99)","range":"B2:B1211","sheet":"Raw_Data"}
+ 37 et.fillRange     ok   {"formula":"=INDEX({\"North\";\"South\";\"East\";\"West\";\"Central\"};MOD(INT((ROW()-2)/25);5)+1)","range":"C
+ 38 et.readRange     ok   {"range":"A1:E6","sheet":"Raw_Data"}
+ 39 et.fillRange     ok   {"formula":"=INDEX({\"Alpha\";\"Beta\";\"Gamma\";\"Delta\";\"Epsilon\";\"Zeta\"};MOD(INT((ROW()-2)/7);6)+1)","
+ 40 et.fillRange     ok   {"formula":"=INDEX({\"Enterprise\";\"SMB\";\"Consumer\";\"Government\"};MOD(INT((ROW()-2)/13);4)+1)","range":"
+ 41 et.fillRange     ok   {"formula":"=IF(MOD(ROW();173)=0;\"\";IF(MOD(ROW();251)=0;ROUND((1+ROUND(MOD(ROW()*97+13;997)/997*24;0))*40;0)
+ 42 et.fillRange     ok   {"formula":"=IF(ROW()>1211;\"DUPLICATE\";\"NORMAL\")","range":"J2:J1225","sheet":"Raw_Data"}
+ 43 et.writeRange    ok   {"range":"A1:D9","sheet":"Revenue","values":[["REVENUE MODEL & ACTUALS","","",""],["Unit price list drives Raw
+ 44 et.readRange     ok   {"range":"A3:D9","sheet":"Revenue"}
+ 45 et.fillRange     ok   {"formula":"=IF(I2=\"\";\"\";I2*INDEX(Revenue.$B$4:$B$9;MATCH(D2;Revenue.$A$4:$A$9;0)))","range":"F2:F1211","s
+ 46 et.fillRange     ok   {"formula":"=IF(I2=\"\";\"\";ROUND(I2*INDEX(Revenue.$B$4:$B$9;MATCH(D2;Revenue.$A$4:$A$9;0))*IF(MOD(ROW();331)
+ 47 et.fillRange     ok   {"formula":"=IF(F2=\"\";\"\";ROUND(F2*INDEX(Assumptions.$D$5:$D$9;MATCH(D2;Assumptions.$C$5:$C$9;0));2))","ran
+ 48 et.fillRange     ok   {"formula":"=IF(F2=\"\";\"\";ROUND(F2*INDEX(Assumptions.$D$11:$D$15;MATCH(D2;Assumptions.$C$11:$C$15;0));2))",
+ 49 et.writeRange    ok   {"range":"A1","sheet":"Assumptions","values":[["ASSUMPTIONS & DRIVERS","","",""],["Blue cells are inputs. Chan
+ 50 et.writeRange    ok   {"range":"A17","sheet":"Assumptions","values":[["","","",""],["2. FORECAST DRIVERS","","",""],["","","Driver",
+ 51 et.readRange     ok   {"range":"A17:D27","sheet":"Assumptions"}
+ 52 et.writeRange    ok   {"range":"E28","sheet":"Assumptions","values":[["3. SCENARIO SELECTOR"],["Change cell F30 (1 = Base, 2 = Upsid
+ 53 et.writeRange    ok   {"range":"A28","sheet":"Assumptions","values":[["","","","","3. SCENARIO SELECTOR","","","",""],["","","","","
+ 54 et.readRange     ok   {"range":"E28:I40","sheet":"Assumptions"}
+ 55 et.fillRange     ok   {"formula":"=IF(I2=\"\";\"\";ROUND(I2*INDEX(Revenue.$B$4:$B$9;MATCH(D2;Revenue.$A$4:$A$9;0))*IF(MOD(ROW();331)
+ 56 et.fillRange     ok   {"formula":"=IF(F2=\"\";\"\";ROUND(F2*INDEX(Assumptions.$D$5:$D$9;MATCH(D2;Assumptions.$C$5:$C$9;0));2))","ran
+ 57 et.fillRange     ok   {"formula":"=IF(F2=\"\";\"\";ROUND(F2*INDEX(Assumptions.$D$11:$D$15;MATCH(C2;Assumptions.$C$11:$C$15;0));2))",
+ 58 et.readRange     ok   {"range":"A1:J6","sheet":"Raw_Data"}
+ 59 et.fillRange     ok   {"formula":"=A3","range":"A1212:I1225","sheet":"Raw_Data"}
+ 60 et.readRange     ok   {"range":"A1211:J1214","sheet":"Raw_Data"}
+ 61 et.fillRange     ok   {"formula":"=IF(COUNT(F2:I2)<4;\"MISSING_VAL\";\"OK\")","range":"K2:K1225","sheet":"Raw_Data"}
+ 62 et.fillRange     ok   {"formula":"=IF(K2<>\"OK\";\"n/a\";IF(OR(F2>QUARTILE.INC($F$2:$F$1211;3)+3*IQR;OR(F2<MAX(0;QUARTILE.INC($F$2:$
+ 63 et.writeRange    ok   {"range":"A42","sheet":"Assumptions","values":[["4. DATA QUALITY THRESHOLDS (Tukey 3 x IQR fences on Raw_Data)
+ 64 et.fillRange     ok   {"formula":"=IF(MOD(ROW();173)=0;\"\";IF(MOD(ROW();331)=0;200;IF(MOD(ROW();401)=0;120;1+ROUND(MOD(ROW()*97+13;
+ 65 et.readRange     ok   {"range":"A43:C47","sheet":"Assumptions"}
+ 66 et.writeRange    ok   {"range":"K43","sheet":"Assumptions","values":[[1],[2],["",""],[4],["",""],[6],["=COUNT(K43:K48)"],["=LARGE(K4
+ 67 et.readRange     ok   {"range":"K43:K53","sheet":"Assumptions"}

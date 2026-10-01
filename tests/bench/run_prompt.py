@@ -46,10 +46,9 @@ def main() -> int:
         "prompt": prompt,
         "office": {"port": int(bridge_port), "pid": int(pid), "app": "et", "family": "libreoffice"},
         "document": {"name": "Untitled 1"},
-        # Ngan sach token ca luot: dat rong rai vi Axiom tra token theo TUNG O no viet ra, khac han cach
-        # viet script cua Claude Code (xem tests/bench/results/test1-gaps.md). Doi so nay de do xem bai
-        # co lam xong duoc khong, khong phai de chan no.
-        "options": {"maxRounds": 100, "maxTokens": 1500000},
+        # Ngan sach token ca luot, tinh theo token PHAI TRA THAT (cache khong tinh). De 400k cho de so
+        # giua cac lan chay: cung mot con so, doi cach tinh thi luot chay di duoc bao xa.
+        "options": {"maxRounds": 100, "maxTokens": 400000},
     }, token)
     if not created.get("ok"):
         print("KHONG TAO DUOC LUOT CHAY:", created)
