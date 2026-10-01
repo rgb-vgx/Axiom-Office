@@ -53,7 +53,7 @@ func (openAICodec) Parse(body []byte) (*Turn, string) {
 			Completion int `json:"completion_tokens"`
 		} `json:"usage"`
 	}
-	if err := json.Unmarshal(body, &root); err != nil {
+	if err := decodeFirst(body, &root); err != nil {
 		return nil, "invalid provider response: " + err.Error()
 	}
 	if len(root.Choices) == 0 || len(root.Choices[0].Message) == 0 || string(root.Choices[0].Message) == "null" {

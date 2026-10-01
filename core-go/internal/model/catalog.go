@@ -2,7 +2,6 @@ package model
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -63,7 +62,7 @@ func ParseModels(body []byte) []string {
 		} `json:"data"`
 	}
 	names := []string{}
-	if json.Unmarshal(body, &root) != nil {
+	if decodeFirst(body, &root) != nil {
 		return names
 	}
 	seen := map[string]bool{}

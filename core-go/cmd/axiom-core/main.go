@@ -159,12 +159,13 @@ func run() int {
 
 	mux := http.NewServeMux()
 	server.Handler = api.Handler(&api.Deps{
-		Config:  cfg,
-		Paths:   paths,
-		Runtime: runtime,
-		HTTP:    httpClient,
-		Stores:  stores,
-		Skills:  skillIndex,
+		Config:     cfg,
+		LoadConfig: config.Load, // cau hinh song: khoa API co the doi khi Core dang chay
+		Paths:      paths,
+		Runtime:    runtime,
+		HTTP:       httpClient,
+		Stores:     stores,
+		Skills:     skillIndex,
 
 		Manager:      manager,
 		Orchestrator: orchestrator,

@@ -34,7 +34,14 @@ func (r *Runtime) StartedText() string {
 
 // Deps: phu thuoc cua cac endpoint (khong dung DI container, giong ban .NET).
 type Deps struct {
-	Config  config.Config
+	// Config la anh chup luc Core khoi dong (guard token, ten mutex, duong dan...). Truong nao nguoi
+	// dung co the doi khi Core dang chay - nhat la LlmApiKey nam trong keyring/HKCU - phai doc qua
+	// LoadConfig, khong duoc dung anh chup.
+	Config config.Config
+
+	// LoadConfig doc lai cau hinh tu nguon moi lan goi. nil = dung Config (cho test).
+	LoadConfig func() config.Config
+
 	Paths   config.Paths
 	Runtime *Runtime
 	HTTP    *http.Client
@@ -53,6 +60,14 @@ type Deps struct {
 
 	// Stop dung Core (POST /v1/admin/shutdown).
 	Stop func()
+}
+
+// Live tra ve cau hinh hien tai, khong phai anh chup luc khoi dong.
+func (d *Deps) Live() config.Config {
+	if d.LoadConfig != nil {
+		return d.LoadConfig()
+	}
+	return d.Config
 }
 
 // Handler dung mux + guard cho toan bo Core API.

@@ -52,7 +52,8 @@ func mapSetup(mux *http.ServeMux, deps *Deps) {
 
 		apiKey := request.apiKey
 		if apiKey == "" {
-			apiKey = deps.Config.LlmApiKey
+			// Doc lai cau hinh: khoa co the vua duoc nhap/luu sau khi Core da chay.
+			apiKey = deps.Live().LlmApiKey
 		}
 		client := model.NewClient(deps.HTTP, request.codec, request.endpoint, apiKey, request.model)
 		client.RequestTimeout = testTimeout
@@ -142,7 +143,8 @@ func (a adHoc) missing() string {
 }
 
 func setupPayload(deps *Deps) map[string]any {
-	cfg := deps.Config
+	// Cau hinh hien tai de wizard dien san vao form - phai la ban moi nhat, khong phai anh chup.
+	cfg := deps.Live()
 	presets := make([]any, 0, len(setup.Data.Providers))
 	for _, provider := range setup.Data.Providers {
 		presets = append(presets, map[string]any{

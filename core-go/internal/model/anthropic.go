@@ -48,7 +48,7 @@ func (anthropicCodec) Parse(body []byte) (*Turn, string) {
 			Output int `json:"output_tokens"`
 		} `json:"usage"`
 	}
-	if err := json.Unmarshal(body, &root); err != nil {
+	if err := decodeFirst(body, &root); err != nil {
 		return nil, "invalid provider response: " + err.Error()
 	}
 	var blocks []struct {
