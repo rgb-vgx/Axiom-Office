@@ -103,13 +103,15 @@ func (anthropicCodec) ParseStream(body []byte) (*Turn, string) {
 			} `json:"delta"`
 			Message struct {
 				Usage struct {
-					Input  int `json:"input_tokens"`
-					Output int `json:"output_tokens"`
+					Input     int `json:"input_tokens"`
+					Output    int `json:"output_tokens"`
+					CacheRead int `json:"cache_read_input_tokens"`
 				} `json:"usage"`
 			} `json:"message"`
 			Usage struct {
-				Input  int `json:"input_tokens"`
-				Output int `json:"output_tokens"`
+				Input     int `json:"input_tokens"`
+				Output    int `json:"output_tokens"`
+				CacheRead int `json:"cache_read_input_tokens"`
 			} `json:"usage"`
 		}
 		// Su kien hong chi bi bo qua, khong lam hong ca luot.
@@ -119,6 +121,7 @@ func (anthropicCodec) ParseStream(body []byte) (*Turn, string) {
 		switch event.Type {
 		case "message_start":
 			turn.InputTokens = event.Message.Usage.Input
+			turn.CachedTokens = cachedFrom(event.Message.Usage.CacheRead)
 		case "content_block_start":
 			entry := entryFor(event.Index)
 			entry.kind = event.ContentBlock.Type
@@ -176,8 +179,9 @@ func (anthropicCodec) Parse(body []byte) (*Turn, string) {
 		Content    json.RawMessage `json:"content"`
 		StopReason string          `json:"stop_reason"`
 		Usage      struct {
-			Input  int `json:"input_tokens"`
-			Output int `json:"output_tokens"`
+			Input     int `json:"input_tokens"`
+			Output    int `json:"output_tokens"`
+			CacheRead int `json:"cache_read_input_tokens"`
 		} `json:"usage"`
 	}
 	if err := decodeFirst(body, &root); err != nil {
@@ -194,6 +198,7 @@ func (anthropicCodec) Parse(body []byte) (*Turn, string) {
 		return nil, "unexpected provider response (no content blocks)"
 	}
 	turn := &Turn{InputTokens: root.Usage.Input, OutputTokens: root.Usage.Output, Raw: root.Content,
+		CachedTokens: cachedFrom(root.Usage.CacheRead),
 		FinishReason: normalizeStopReason(root.StopReason)}
 	var texts []string
 	for _, block := range blocks {

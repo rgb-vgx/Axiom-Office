@@ -149,3 +149,69 @@ func TestOfficeActionDeclinedDoesNotCallBridge(t *testing.T) {
 		t.Fatalf("da tu choi thi khong duoc goi bridge (goi %d lan)", calls)
 	}
 }
+
+// Lenh khong co trong allowlist thi loi phai noi NGAY con nhung lenh nao cung nhom. Log 02/10/2026: mot
+// luot chay doan ~30 ten lenh tu nghi ra (et.createSheet, et.insertSheet, et.addSheet...) chi vi khong
+// tin rang lenh no can khong ton tai - moi vong doan la mot vong goi model bi dot.
+func TestOfficeActionUnknownActionListsAvailableActions(t *testing.T) {
+	tool := NewOfficeActionTool(catalog(), "et")
+	result := tool.Invoke(context.Background(), map[string]any{"action": "et.createSheet"}, &RunContext{})
+
+	if result.OK {
+		t.Fatalf("lenh la phai bi tu choi: %+v", result)
+	}
+	for _, wanted := range []string{"not an available action", "et.writeRange", "do not invent action names"} {
+		if !strings.Contains(result.JSON, wanted) {
+			t.Errorf("thieu %q trong loi: %s", wanted, result.JSON)
+		}
+	}
+	// Chi liet ke nhom cung tien to, khong do ca danh sach cua moi app.
+	if strings.Contains(result.JSON, "wpp.deleteSlide") {
+		t.Errorf("go sai trong nhom et thi chi can liet ke nhom et: %s", result.JSON)
+	}
+
+	// Go sai tien to thi phai thay HET lenh cua app nay (tool "et" chi co lenh et + lenh chung).
+	other := tool.Invoke(context.Background(), map[string]any{"action": "vu.vut"}, &RunContext{})
+	if !strings.Contains(other.JSON, "Available actions are: ") ||
+		!strings.Contains(other.JSON, "et.writeRange") || !strings.Contains(other.JSON, "et.saveAs") {
+		t.Errorf("khong ro nhom thi phai liet ke het: %s", other.JSON)
+	}
+}
+
+// Vai lenh phai duoc coi la CO sua tai lieu: day la dau vao quyet dinh luot chay co phai tu kiem
+// chung khong. Doan sai theo huong "co sua" chi ton mot vong doc lai; doan sai theo huong "chi doc"
+// thi mot lan ghi that bi bo qua buoc kiem chung.
+func TestChangesDocumentClassification(t *testing.T) {
+	readOnly := []string{"et.readRange", "et.checkRange", "et.listSheets", "writer.getText",
+		"writer.selection", "writer.checkTables", "wpp.listSlides", "wpp.checkLayout", "app.info"}
+	for _, action := range readOnly {
+		if ChangesDocument(action) {
+			t.Errorf("%s chi doc, khong duoc tinh la sua tai lieu", action)
+		}
+	}
+	// save/saveAs/exportPdf chep tai lieu ra file, khong doi tai lieu dang mo.
+	for _, action := range []string{"et.save", "et.saveAs", "et.exportPdf", "writer.saveAs", "wpp.exportPdf"} {
+		if ChangesDocument(action) {
+			t.Errorf("%s khong doi tai lieu dang mo", action)
+		}
+	}
+	// Lenh sua, VA ca lenh la chua tung thay bao gio - mac dinh phai la "co sua".
+	for _, action := range []string{"et.writeRange", "et.formatRange", "writer.typeText", "writer.undo",
+		"wpp.addSlide", "wpp.deleteSlide", "lenh.moi.them.sau.nay"} {
+		if !ChangesDocument(action) {
+			t.Errorf("%s phai tinh la co sua tai lieu", action)
+		}
+	}
+
+	// Tool MCP: tool doc cua server office built-in biet truoc; tool nguoi dung tu cau hinh thi khong.
+	for _, name := range []string{"office_sessions", "excel_read", "word_read_text", "ppt_list_slides", "echo"} {
+		if MCPChangesState(name) {
+			t.Errorf("%s chi doc", name)
+		}
+	}
+	for _, name := range []string{"excel_write", "word_insert_table", "ppt_add_slide", "may-chu-nguoi-dung.dat.lich"} {
+		if !MCPChangesState(name) {
+			t.Errorf("%s phai tinh la co ghi", name)
+		}
+	}
+}

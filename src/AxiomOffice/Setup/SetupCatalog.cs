@@ -105,6 +105,8 @@ namespace AxiomOffice.Setup
         {
             new SetupFeatureInfo("MemoryEnabled", "Nhớ những điều tôi đã dặn", "Axiom Office ghi nhớ quy ước của bạn (ví dụ: luôn dùng Times New Roman 13) để lần sau khỏi nhắc lại.", true),
             new SetupFeatureInfo("MemoryAutoExtract", "Tự rút ra điều đáng nhớ sau mỗi lượt", "Tiện hơn, nhưng tốn thêm một lượt gọi model sau mỗi yêu cầu.", true),
+            new SetupFeatureInfo("VerifyWorkEnabled", "Tự kiểm chứng sau khi sửa", "Sửa tài liệu xong, AI đọc lại rồi mới trả lời — chậm hơn một nhịp nhưng ít sót lỗi.", true),
+            new SetupFeatureInfo("LlmShowReasoning", "Hiện phần AI đang suy nghĩ", "Xem được AI nghĩ gì trước khi trả lời; tốn thêm token mỗi lượt.", false),
             new SetupFeatureInfo("VisualQaEnabled", "Cho AI xem ảnh trang tài liệu", "Giúp AI soát bố cục; tốn nhiều token và cần model đọc được ảnh.", false),
         };
 

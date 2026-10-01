@@ -128,6 +128,18 @@ namespace AxiomOffice.Bridge
             get { return ReadInt("VisualQaEnabled", 0) != 0; }
         }
 
+        // Tự kiểm chứng: sau khi sửa tài liệu, agent đọc lại rồi mới trả lời (bật mặc định).
+        public static bool VerifyWorkEnabled
+        {
+            get { return ReadInt("VerifyWorkEnabled", 1) != 0; }
+        }
+
+        // Hiện suy luận của model trong khung chat (tắt mặc định: tốn token và chậm hơn).
+        public static bool LlmShowReasoning
+        {
+            get { return ReadInt("LlmShowReasoning", 0) != 0; }
+        }
+
         public static bool WriteDword(string name, int value)
         {
             try

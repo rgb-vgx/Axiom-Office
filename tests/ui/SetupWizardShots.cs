@@ -55,6 +55,16 @@ internal static class SetupWizardShots
         Grab(form, Path.Combine(outDir, "3-connect-filled.png"));
 
         form.Close();
+
+        // Cài đặt (mở từ pane và từ "Tuỳ chọn nâng cao" của wizard): nhiều cờ xếp theo toạ độ cứng nên phải
+        // soi lại mỗi lần thêm/bớt một tuỳ chọn, kẻo cờ mới chồng lên nút Lưu.
+        var settings = new SettingsForm();
+        settings.StartPosition = FormStartPosition.Manual;
+        settings.Location = new Point(0, 0);
+        settings.Show();
+        Pump();
+        Grab(settings, Path.Combine(outDir, "6-settings.png"));
+        settings.Close();
     }
 
     private static void SetText(object form, string field, string value)

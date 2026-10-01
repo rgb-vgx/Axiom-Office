@@ -180,6 +180,12 @@ def error_summary(error: str) -> str:
     text = re.sub(r"^[A-Za-z_.]*(Exception|Error):\s*", "", (error or "").strip())
     return text[:157] + "…" if len(text) > 160 else (text or "lỗi")
 
+def reasoning_preview(text: str, limit: int = 200) -> str:
+    """Dong xem truoc cua khoi suy luan khi chua mo rong: phan suy luan cua model thuong dai vai nghin
+    ky tu, do het ra khung chat thi khong con cho cho viec that. Gop khoang trang cho vua mot dong."""
+    flat = " ".join((text or "").split())
+    return flat[:limit - 1] + "…" if len(flat) > limit else flat
+
 
 # ---------------------------------------------------------------- PNG
 

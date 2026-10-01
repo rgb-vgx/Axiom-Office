@@ -43,6 +43,8 @@ var liveCommands = []liveCommand{
 	{Name: "et.newWorkbook", Kind: "et", Params: []liveCommandParam{}},
 	{Name: "et.open", Kind: "et", Params: []liveCommandParam{{Name: "path", Hint: ""}}},
 	{Name: "et.listSheets", Kind: "et", Params: []liveCommandParam{}},
+	{Name: "et.addSheet", Kind: "et", Params: []liveCommandParam{{Name: "name", Hint: ""}, {Name: "index", Hint: "0-based, default: append"}}},
+	{Name: "et.renameSheet", Kind: "et", Params: []liveCommandParam{{Name: "sheet", Hint: ""}, {Name: "name", Hint: ""}}},
 	{Name: "et.activateSheet", Kind: "et", Params: []liveCommandParam{{Name: "sheet", Hint: ""}}},
 	{Name: "et.readRange", Kind: "et", Params: []liveCommandParam{{Name: "range", Hint: ""}, {Name: "sheet", Hint: ""}}},
 	{Name: "et.writeRange", Kind: "et", Params: []liveCommandParam{{Name: "range", Hint: "top-left cell e.g. 'A1'"}, {Name: "values", Hint: "2D array of rows e.g. [[\"Tên\",\"Điểm\"],[\"An\",9.5]]"}, {Name: "sheet", Hint: ""}}},

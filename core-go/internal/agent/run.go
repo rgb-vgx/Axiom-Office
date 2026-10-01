@@ -38,8 +38,13 @@ type Run struct {
 	Rounds         int
 	InputTokens    int
 	OutputTokens   int
-	Seconds        float64
-	ToolCalls      int
+	// CachedTokens: phan InputTokens doc tu cache cua nha cung cap - do cache co trung khong, khong
+	// phai tham so. 0 khi nha cung cap khong cache hoac khong bao.
+	CachedTokens int
+	// Verified: luot nay co sua tai lieu nen da duoc yeu cau doc lai truoc khi tra loi.
+	Verified  bool
+	Seconds   float64
+	ToolCalls int
 	Transcript     []string
 	Events         *EventStream
 	Confirmations  *Confirmations
@@ -86,6 +91,8 @@ func (r *Run) JSON() map[string]any {
 		"rounds":         r.Rounds,
 		"inputTokens":    r.InputTokens,
 		"outputTokens":   r.OutputTokens,
+		"cachedTokens":   r.CachedTokens,
+		"verified":       r.Verified,
 		"seconds":        round2(r.Seconds),
 		"toolCalls":      r.ToolCalls,
 		"lastEvent":      r.Events.LastSeq(),

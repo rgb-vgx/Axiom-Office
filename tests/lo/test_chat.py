@@ -88,6 +88,48 @@ class ItemTests(unittest.TestCase):
         session.reset()
         self.assertEqual(session.items, [])
 
+    def test_reasoning_is_one_block_per_turn(self):
+        """Suy luận: MỘT mục cho cả lượt, mỗi vòng ghi đè - phần suy luận dài vài nghìn ký tự nên gom
+        hết các vòng lại sẽ lấp hết khung chat."""
+        session = chat.ChatSession("wps")
+        session.begin("phân tích")
+        session.handle_event({"type": "run.reasoning", "data": {"round": 1, "text": "nghĩ bước một"}})
+        block = session.items[-1]
+        self.assertEqual((block["kind"], block["text"], block["round"]), ("reasoning", "nghĩ bước một", 1))
+
+        session.handle_event({"type": "run.reasoning", "data": {"round": 2, "text": "nghĩ bước hai"}})
+        self.assertEqual(self.kinds(session).count("reasoning"), 1, "không được thêm mục thứ hai")
+        self.assertEqual((block["text"], block["round"], block["rev"]), ("nghĩ bước hai", 2, 1))
+
+    def test_reasoning_open_when_short_collapsed_when_long(self):
+        session = chat.ChatSession("wps")
+        session.begin("x")
+        session.handle_event({"type": "run.reasoning", "data": {"round": 1, "text": "ngắn"}})
+        self.assertTrue(session.items[-1]["expanded"], "suy luận ngắn thì mở sẵn")
+        self.assertEqual(session.items[-1]["rev"], 0)
+
+        session.handle_event({"type": "run.reasoning", "data": {"round": 2, "text": "d" * 500}})
+        self.assertTrue(session.items[-1]["expanded"], "vòng sau không được tự thu lại mục người dùng đang xem")
+
+        other = chat.ChatSession("wps")
+        other.begin("x")
+        other.handle_event({"type": "run.reasoning", "data": {"round": 1, "text": "d" * 500}})
+        block = other.items[-1]
+        self.assertFalse(block["expanded"], "suy luận dài thì thu lại thành một dòng")
+        other.toggle_reasoning(block)
+        self.assertTrue(block["expanded"])
+        self.assertEqual(block["rev"], 1)
+
+    def test_reasoning_ignored_when_empty_and_reset_each_turn(self):
+        session = chat.ChatSession("wps")
+        session.begin("x")
+        session.handle_event({"type": "run.reasoning", "data": {"round": 1, "text": "   "}})
+        self.assertEqual(self.kinds(session), ["user"], "suy luận rỗng không tạo mục")
+
+        session.handle_event({"type": "run.reasoning", "data": {"round": 1, "text": "a"}})
+        session.begin("y")
+        self.assertIsNone(session.reasoning, "lượt mới bắt đầu khối suy luận mới")
+
 
 class ThemeTests(unittest.TestCase):
     def test_labels(self):
@@ -106,6 +148,12 @@ class ThemeTests(unittest.TestCase):
 
     def test_plain_reply_strips_markdown_marks(self):
         self.assertEqual(theme.plain_reply("**Xong** `writer.heading`"), "Xong writer.heading")
+
+    def test_reasoning_preview_gop_khoang_trang_va_cat_bot(self):
+        self.assertEqual(theme.reasoning_preview("  nghĩ\n\n  bước   một "), "nghĩ bước một")
+        preview = theme.reasoning_preview("d" * 500)
+        self.assertEqual(len(preview), 200)
+        self.assertTrue(preview.endswith("…"))
 
     def test_error_summary_bo_ten_kieu_loi_va_cat_bot(self):
         # Ten kieu loi (tu dai khong co khoang trang) lam dong thao tac khong xuong dong duoc -> bo di.

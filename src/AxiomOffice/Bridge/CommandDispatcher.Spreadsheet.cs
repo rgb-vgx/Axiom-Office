@@ -16,6 +16,9 @@ namespace AxiomOffice.Bridge
                 Command("et.newWorkbook", "et", EtNewWorkbook, "Tạo workbook mới"),
                 Command("et.open", "et", EtOpen, "Mở .xlsx/.xls/.csv", Req("path")),
                 Command("et.listSheets", "et", EtListSheets, "Danh sách sheet + sheet đang active").ForAgent(),
+                Command("et.addSheet", "et", EtAddSheet, "Thêm sheet mới (bỏ trống `name` thì đặt tên Sheet1, Sheet2...)",
+                    Opt("name"), Opt("index", "0-based, default: append")).ForAgent(),
+                Command("et.renameSheet", "et", EtRenameSheet, "Đổi tên sheet", Req("sheet"), Req("name")).ForAgent(),
                 Command("et.activateSheet", "et", EtActivateSheet, "Chuyển sheet", Req("sheet")).ForAgent(),
                 Command("et.readRange", "et", EtReadRange, "Đọc vùng, ví dụ `A1:C10`", Req("range"), Opt("sheet")).ForAgent(),
                 Command("et.writeRange", "et", EtWriteRange, "Ghi vùng bắt đầu từ ô trên-trái `range`",
@@ -212,6 +215,87 @@ namespace AxiomOffice.Bridge
             dynamic wb = app.ActiveWorkbook;
             wb.Worksheets[sheetName].Activate();
             return new Dictionary<string, object> { { "active", sheetName } };
+        }
+
+        // Thêm sheet mới. Không có lệnh này thì agent không dựng được sổ nhiều sheet trên tài liệu đang mở
+        // (log 02/10: model thử ~30 tên lệnh tự nghĩ ra rồi bỏ cuộc). Tên bỏ trống -> Sheet1, Sheet2...
+        // tránh trùng; `index` là vị trí chèn (1-based như Excel/WPS, mặc định là cuối).
+        private static Dictionary<string, object> EtAddSheet(IAppHost host, Dictionary<string, object> p)
+        {
+            dynamic app = host.Application;
+            dynamic wb = EnsureWorkbook(app);
+            var existing = new List<string>();
+            int count = Convert.ToInt32(wb.Worksheets.Count);
+            for (int i = 1; i <= count; i++)
+            {
+                existing.Add(Convert.ToString(wb.Worksheets[i].Name));
+            }
+
+            string name = ParamString(p, "name", null);
+            if (string.IsNullOrEmpty(name))
+            {
+                // So nho nhat con trong (Sheet1, Sheet2...), giong ban LibreOffice - hai lan chay cung mot thu.
+                int suffix = 1;
+                while (existing.Contains("Sheet" + suffix))
+                {
+                    suffix++;
+                }
+                name = "Sheet" + suffix;
+            }
+            else if (existing.Contains(name))
+            {
+                throw new InvalidOperationException("a sheet named '" + name + "' already exists (sheets: " +
+                    string.Join(", ", existing) + ")");
+            }
+
+            // `index` 0-based giong ban LibreOffice (Excel/WPS dem sheet tu 1, nen phai doi o day).
+            int insertAt = Math.Max(0, Math.Min(ParamInt(p, "index", count), count));
+            dynamic sheet = insertAt >= count
+                ? wb.Worksheets.Add(Type.Missing, wb.Worksheets[count])
+                : wb.Worksheets.Add(Type.Missing, wb.Worksheets[insertAt + 1]);
+            sheet.Name = name;
+            sheet.Activate();
+            return new Dictionary<string, object> { { "sheet", name }, { "sheets", SheetNames(wb) } };
+        }
+
+        private static Dictionary<string, object> EtRenameSheet(IAppHost host, Dictionary<string, object> p)
+        {
+            string oldName = ParamString(p, "sheet", null);
+            string newName = ParamString(p, "name", null);
+            if (string.IsNullOrEmpty(oldName))
+            {
+                throw new InvalidOperationException("'sheet' is required");
+            }
+            if (string.IsNullOrEmpty(newName))
+            {
+                throw new InvalidOperationException("'name' is required");
+            }
+            dynamic app = host.Application;
+            dynamic wb = app.ActiveWorkbook;
+            var names = SheetNames(wb);
+            if (!names.Contains(oldName))
+            {
+                throw new InvalidOperationException("no sheet named '" + oldName + "' (sheets: " +
+                    string.Join(", ", names) + ")");
+            }
+            if (newName != oldName && names.Contains(newName))
+            {
+                throw new InvalidOperationException("a sheet named '" + newName + "' already exists (sheets: " +
+                    string.Join(", ", names) + ")");
+            }
+            wb.Worksheets[oldName].Name = newName;   // Excel tự cập nhật công thức trỏ tên cũ
+            return new Dictionary<string, object> { { "sheet", newName }, { "sheets", SheetNames(wb) } };
+        }
+
+        private static List<string> SheetNames(dynamic wb)
+        {
+            var names = new List<string>();
+            int count = Convert.ToInt32(wb.Worksheets.Count);
+            for (int i = 1; i <= count; i++)
+            {
+                names.Add(Convert.ToString(wb.Worksheets[i].Name));
+            }
+            return names;
         }
 
         private static Dictionary<string, object> EtExportPdf(IAppHost host, Dictionary<string, object> p)

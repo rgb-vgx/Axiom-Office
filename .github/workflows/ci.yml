@@ -43,7 +43,7 @@ jobs:
           cd ..
           # Core sinh chinh no lam MCP server built-in "office" nen phan mcp chay duoc ca tren Linux.
           export AXIOM_E2E_CORE_EXE="$RUNNER_TEMP/gocore/axiom-core"
-          PARTS=fake_bridge,guards,skills,confirm,memory,mcp,visual,setup,shutdown,anthropic,embeddings,summarize,cancel,mcp_http
+          PARTS=fake_bridge,guards,skills,confirm,memory,mcp,visual,setup,shutdown,anthropic,embeddings,summarize,cancel,mcp_http,verify
           python3 tests/core/test_core_e2e.py --only "$PARTS"
 
       - name: MCP server ban Go (khong can app dang mo)

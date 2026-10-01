@@ -111,6 +111,49 @@ def activate_sheet(env, params):
     return {"active": name}
 
 
+def add_sheet(env, params):
+    """Them sheet moi. Khong co lenh nay thi agent khong dung duoc so nhieu sheet tren tai lieu dang mo.
+
+    Ten bo trong -> dat ten kieu Excel (Sheet1, Sheet2...) va tranh trung. `index` la vi tri chen (0-based,
+    mac dinh la cuoi). Sheet moi duoc chuyen sang active de nguoi dung nhin thay no dang duoc dien.
+    """
+    doc = env.document
+    sheets = _ensure_sheet(doc)
+    existing = list(sheets.getElementNames())
+    name = values.string(params, "name")
+    if not name:
+        # So nho nhat con trong (Sheet1, Sheet2...), giong ban C# - hai lan chay cung mot thu.
+        index = 1
+        while ("Sheet%d" % index) in existing:
+            index += 1
+        name = "Sheet%d" % index
+    if name in existing:
+        raise values.ParamError("a sheet named '%s' already exists (sheets: %s)" % (name, ", ".join(existing)))
+    position = max(0, min(values.integer(params, "index", len(existing)), len(existing)))
+    sheets.insertNewByName(name, position)
+    doc.getCurrentController().setActiveSheet(sheets.getByName(name))
+    return {"sheet": name, "sheets": list(sheets.getElementNames())}
+
+
+def rename_sheet(env, params):
+    """Doi ten sheet. LibreOffice tu cap nhat moi cong thuc tro tên cu, nen khong phai sua tay."""
+    old = values.string(params, "sheet")
+    new = values.string(params, "name")
+    if not old:
+        raise values.ParamError("'sheet' is required")
+    if not new:
+        raise values.ParamError("'name' is required")
+    doc = env.document
+    sheets = _ensure_sheet(doc)
+    existing = list(sheets.getElementNames())
+    if old not in existing:
+        raise values.ParamError("no sheet named '%s' (sheets: %s)" % (old, ", ".join(existing)))
+    if new in existing and new != old:
+        raise values.ParamError("a sheet named '%s' already exists (sheets: %s)" % (new, ", ".join(existing)))
+    sheets.getByName(old).setName(new)
+    return {"sheet": new, "sheets": list(sheets.getElementNames())}
+
+
 def read_range(env, params):
     address = values.string(params, "range", "A1") or "A1"
     doc = env.document
@@ -274,6 +317,10 @@ def check_range(env, params):
 command("et.newWorkbook", "et", lambda env, p: documents.open_document(env.ctx, "et", None), "Tạo sổ tính mới")
 command("et.open", "et", lambda env, p: documents.open_document(env.ctx, "et", values.string(p, "path")), "Mở .xlsx/.xls/.ods/.csv", req("path"))
 command("et.listSheets", "et", list_sheets, "Danh sách sheet + sheet đang active", agent=True)
+command("et.addSheet", "et", add_sheet,
+        "Thêm sheet mới (bỏ trống `name` thì đặt tên Sheet1, Sheet2...)", opt("name"), opt("index", "0-based, default: append"),
+        agent=True, undo=True)
+command("et.renameSheet", "et", rename_sheet, "Đổi tên sheet", req("sheet"), req("name"), agent=True, undo=True)
 command("et.activateSheet", "et", activate_sheet, "Chuyển sheet", req("sheet"), agent=True)
 command("et.readRange", "et", read_range, "Đọc vùng, ví dụ `A1:C10`", req("range"), opt("sheet"), agent=True)
 command("et.writeRange", "et", write_range,

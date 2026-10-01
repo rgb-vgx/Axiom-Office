@@ -209,5 +209,125 @@ class WriteRangeTests(unittest.TestCase):
         self.assertEqual(sheet.cell(6, 2).formula, "9.5")     # so -> setValue
 
 
+# ---------------------------------------------------------------- quan ly sheet
+
+class FakeNamedSheet:
+    def __init__(self, name: str):
+        self.name = name
+
+    def getName(self) -> str:
+        return self.name
+
+    def setName(self, name: str) -> None:
+        self.name = name
+
+
+class FakeBook:
+    """So gia du de chay et.addSheet/et.renameSheet.
+
+    Giu danh sach theo THU TU cac doi tuong sheet (khong phai danh sach ten), de setName() doi ten that
+    giong LibreOffice: getElementNames() doc ten hien tai cua tung sheet.
+    """
+
+    def __init__(self, names=("Sheet1",)):
+        self.order = [FakeNamedSheet(name) for name in names]
+        self.active = names[0]
+        self.title = "Untitled 1"
+
+    def names(self):
+        return [sheet.getName() for sheet in self.order]
+
+    def getTitle(self) -> str:
+        return self.title
+
+    def getSheets(self):
+        return self
+
+    def getElementNames(self):
+        return tuple(self.names())
+
+    def getByName(self, name):
+        for sheet in self.order:
+            if sheet.getName() == name:
+                return sheet
+        raise KeyError(name)
+
+    def insertNewByName(self, name: str, position: int) -> None:
+        self.order.insert(position, FakeNamedSheet(name))
+
+    def getCurrentController(self):
+        book = self
+
+        def active():
+            return book.getByName(book.active)
+
+        def set_active(sheet):
+            book.active = sheet.getName()
+
+        return types.SimpleNamespace(getActiveSheet=active, setActiveSheet=set_active)
+
+
+def book_env(book):
+    return types.SimpleNamespace(document=book)
+
+
+class SheetTests(unittest.TestCase):
+    """et.addSheet/et.renameSheet - khong co hai lenh nay thi agent khong dung duoc so nhieu sheet tren
+    tai lieu dang mo (log 02/10/2026: model thu ~30 ten lenh tu nghi ra roi bo cuoc)."""
+
+    def test_them_sheet_dat_ten_va_chuyen_sang_active(self):
+        book = FakeBook()
+        result = calc.add_sheet(book_env(book), {"name": "Raw_Data"})
+        self.assertEqual(result["sheet"], "Raw_Data")
+        self.assertEqual(result["sheets"], ["Sheet1", "Raw_Data"])
+        self.assertEqual(book.active, "Raw_Data", "sheet moi phai duoc chuyen sang de nguoi dung nhin thay")
+
+    def test_bo_trong_ten_thi_dat_ten_kieu_excel_va_tranh_trung(self):
+        book = FakeBook(("Sheet1", "Sheet2", "Raw_Data"))
+        self.assertEqual(calc.add_sheet(book_env(book), {})["sheet"], "Sheet3")
+
+    def test_trung_ten_thi_bao_loi_kem_danh_sach(self):
+        book = FakeBook(("Sheet1",))
+        with self.assertRaises(calc.values.ParamError) as caught:
+            calc.add_sheet(book_env(book), {"name": "Sheet1"})
+        self.assertIn("already exists", str(caught.exception))
+        self.assertIn("Sheet1", str(caught.exception))
+
+    def test_index_chen_dung_vi_tri_va_kep_trong_khoang(self):
+        book = FakeBook(("A", "B"))
+        calc.add_sheet(book_env(book), {"name": "Giua", "index": 1})
+        self.assertEqual(book.names(), ["A", "Giua", "B"])
+        calc.add_sheet(book_env(book), {"name": "Cuoi", "index": 99})
+        self.assertEqual(book.names(), ["A", "Giua", "B", "Cuoi"], "index qua lon thi them vao cuoi")
+
+    def test_doi_ten_sheet(self):
+        book = FakeBook(("Sheet1", "Raw"))
+        result = calc.rename_sheet(book_env(book), {"sheet": "Sheet1", "name": "Dashboard"})
+        self.assertEqual(result["sheets"], ["Dashboard", "Raw"])
+        self.assertEqual(book.getByName("Dashboard").getName(), "Dashboard")
+
+    def test_doi_ten_sheet_khong_ton_tai(self):
+        book = FakeBook(("Sheet1",))
+        with self.assertRaises(calc.values.ParamError) as caught:
+            calc.rename_sheet(book_env(book), {"sheet": "KhongCo", "name": "X"})
+        self.assertIn("no sheet named 'KhongCo'", str(caught.exception))
+
+    def test_doi_ten_thanh_ten_da_co_thi_tu_choi(self):
+        book = FakeBook(("A", "B"))
+        with self.assertRaises(calc.values.ParamError) as caught:
+            calc.rename_sheet(book_env(book), {"sheet": "A", "name": "B"})
+        self.assertIn("already exists", str(caught.exception))
+        self.assertEqual(book.names(), ["A", "B"], "tu choi thi khong duoc doi gi")
+        # Doi ten thanh chinh no thi vo hai (model hay goi lai cho chac).
+        self.assertEqual(calc.rename_sheet(book_env(book), {"sheet": "A", "name": "A"})["sheet"], "A")
+
+    def test_thieu_tham_so_bat_buoc(self):
+        book = FakeBook(("A",))
+        with self.assertRaises(calc.values.ParamError):
+            calc.rename_sheet(book_env(book), {"sheet": "A"})
+        with self.assertRaises(calc.values.ParamError):
+            calc.rename_sheet(book_env(book), {"name": "B"})
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -242,6 +242,13 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 
 	callbacks := model.AgentCallbacks{
 		Transcript: func(line string) { run.Transcript = append(run.Transcript, line) },
+		// Suy luan cua model hien cho nguoi dung xem (muc 7.4): chi co khi nguoi dung bat
+		// LlmShowReasoning - xem model.Client.ShowReasoning. Pane nao khong biet su kien nay thi bo qua.
+		Reasoning: func(round int, text string) {
+			run.Events.Publish("run.reasoning", map[string]any{
+				"round": round, "text": text, "model": client.Model,
+			})
+		},
 		ToolStarted: func(call model.ToolCall) {
 			run.ToolCalls++
 			action, params := readCall(call)
@@ -279,14 +286,20 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 		},
 	}
 
+	// Tu kiem chung doc lai tu cau hinh moi luot (nhu VisualQaEnabled): doi trong Cai dat co hieu luc ngay.
+	options := request.Options
+	options.Verify = o.Config().VerifyWorkEnabled
+
 	result := client.RunAgent(ctx, systemPrompt, assembled.PriorTurns, request.Prompt, registry.ModelTools(),
 		func(inner context.Context, call model.ToolCall) model.ToolResult {
 			return executeTool(inner, registry, call, runContext)
-		}, request.Options, callbacks)
+		}, options, callbacks)
 
 	run.Rounds = result.Rounds
 	run.InputTokens = result.InputTokens
 	run.OutputTokens = result.OutputTokens
+	run.CachedTokens = result.CachedTokens
+	run.Verified = result.Verified
 	run.Seconds = result.Seconds
 
 	switch {
@@ -297,6 +310,7 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 		run.Events.Publish("run.completed", map[string]any{
 			"reply": result.Text, "rounds": result.Rounds, "seconds": round2(result.Seconds),
 			"inputTokens": result.InputTokens, "outputTokens": result.OutputTokens,
+			"cachedTokens": result.CachedTokens,
 		})
 	case result.Cancelled:
 		run.Status = StatusCancelled
@@ -360,6 +374,14 @@ func (o *Orchestrator) finish(run *Run) {
 	message := "run " + run.ID + " " + run.Status + ": " + strconv.Itoa(run.Rounds) + " rounds, " +
 		strconv.Itoa(run.ToolCalls) + " tool calls, " + strconv.Itoa(run.InputTokens) + "+" +
 		strconv.Itoa(run.OutputTokens) + " tokens, " + strconv.FormatFloat(run.Seconds, 'f', 1, 64) + "s"
+	// So token doc tu cache la so DO chat luong tien to: tien to doi moi vong thi cache khong bao gio
+	// trung, va moi vong tra tien day du. Ghi ra de con biet duong ma sua.
+	if run.CachedTokens > 0 {
+		message += ", " + strconv.Itoa(run.CachedTokens) + " cached"
+	}
+	if run.Verified {
+		message += ", self-verified"
+	}
 	if run.Error != "" {
 		message += " - " + run.Error
 	}
@@ -439,9 +461,10 @@ func executeTool(ctx context.Context, registry *tools.Registry, call model.ToolC
 		// Tham so khong phai JSON: tool se bao thieu 'action'.
 		arguments = nil
 	}
-	result := tool.Invoke(ctx, arguments, run)
+	output := tool.Invoke(ctx, arguments, run)
 	return model.ToolResult{
-		CallID: call.ID, Name: call.Name, ResultJSON: result.JSON, OK: result.OK, ImageDataURL: result.ImageDataURL,
+		CallID: call.ID, Name: call.Name, ResultJSON: output.JSON, OK: output.OK,
+		ImageDataURL: output.ImageDataURL, Mutating: output.Mutating,
 	}
 }
 

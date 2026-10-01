@@ -348,6 +348,7 @@ def test_fake_bridge(core: Core, bridge: FakeBridge, llm: FakeLlm, document_path
         {"tool": "office_action", "arguments": {"action": "et.writeRange", "params": {"range": "A1", "values": [["a", 1]]}}},
         {"text": "Da ghi xong bang diem"},
     ]
+    start = len(llm.requests())
     status, reply = core.run("ghi bang diem", office, document=document)
     check(status == 200 and reply["ok"] is True, "POST /v1/runs tao luot chay", reply)
     if not reply.get("ok"):
@@ -369,7 +370,14 @@ def test_fake_bridge(core: Core, bridge: FakeBridge, llm: FakeLlm, document_path
 
     run = core.get_run(run_id)
     check(run["status"] == "completed" and run["reply"] == "Da ghi xong bang diem", "GET /v1/runs/{id} co ket qua", run)
-    check(run["rounds"] == 2 and run["toolCalls"] == 1, "dem vong va tool call", run)
+    # Luot nay CO sua tai lieu (et.writeRange) nen buoc tu kiem chung bat buoc chay: 3 vong = goi tool,
+    # tra loi nhap, roi tra loi lai sau khi duoc yeu cau doc lai. Cau tra loi nhap khong duoc tra ve.
+    check(run["rounds"] == 3 and run["toolCalls"] == 1, "dem vong va tool call", run)
+    check(run["verified"] is True, "luot co sua tai lieu thi da tu kiem chung", run)
+
+    agent_calls = [item["body"] for item in llm.requests()[start:]]
+    check(len(agent_calls) == 3 and "check the work you just did" in json.dumps(agent_calls[-1], ensure_ascii=False),
+          "vong cuoi mang loi nhac tu kiem chung", [len(json.dumps(body)) for body in agent_calls])
 
     conversation = core.conversation(conversation_id)
     roles = [message["role"] for message in conversation["messages"]]
@@ -1417,9 +1425,99 @@ def test_office(core: Core, port: int, pid: int) -> None:
     check(rows and rows[0][:2] == ["Ten", "Diem"], "tai lieu that su doi (A1:B1)", rows)
 
 
+def test_verify(work: str, token: str, bridge: FakeBridge, document_path: str, session_dir: str) -> None:
+    """Tu kiem chung sau khi sua tai lieu (mac dinh BAT) - New_arch.md muc 8.1.
+
+    Do duoc tu ba bo khung chay cung mot prompt (02/10/2026): bo khung khong tu kiem chung thi phai co
+    nguoi nhac moi chay tiep. Bai nay kiem ba mat: co kiem chung, tat duoc, va khi lan doc lai THAT SU
+    phat hien thieu thi agent sua tiep roi moi ket thuc.
+    """
+    office = {"port": bridge.port, "pid": bridge.pid, "app": "et", "family": "office"}
+    document = {"name": os.path.basename(document_path), "fullName": document_path}
+
+    def run_case(name: str, script: list, extra_env: dict) -> tuple:
+        data_dir = os.path.join(work, "core-verify-" + name)
+        os.makedirs(data_dir, exist_ok=True)
+        llm = FakeLlm(work, script)
+        core = Core(data_dir, session_dir, llm, token,
+                    dict({"AXIOM_MEMORY_AUTO_EXTRACT": "0"}, **extra_env))
+        try:
+            bridge.commands.clear()
+            status, created = core.run("ghi bang diem", office, document=document)
+            if status != 200 or not created.get("ok"):
+                return core, llm, bridge, None, [], {}
+            run_id = created["result"]["runId"]
+            # events() cho den khi luot chay ket thuc; phai goi TRUOC get_run, khong thi con 'running'.
+            events = core.events(run_id)
+            return core, llm, bridge, core.get_run(run_id), events, created["result"]
+        finally:
+            pass
+
+    # 1. Mac dinh: ghi -> tra loi nhap -> duoc yeu cau doc lai -> DOC LAI PHAT HIEN THIEU -> sua tiep.
+    core, llm, _, run, events, _ = run_case("on", [
+        {"tool": "office_action", "arguments": {"action": "et.writeRange", "params": {"range": "A1", "values": [["Ten", "Diem"]]}}},
+        {"text": "Da ghi bang diem."},
+        # Buoc rieng cua luot kiem chung: doc lai roi bo sung dong con thieu.
+        {"on_verify": True, "tool": "office_action",
+         "arguments": {"action": "et.writeRange", "params": {"range": "A4", "values": [["Binh", 8]]}}},
+        {"text": "Doc lai thay thieu mot dong, da bo sung."},
+    ], {})
+    try:
+        check(run is not None, "tu kiem chung: luot chay xong", run)
+        if run is None:
+            return
+        check(run["status"] == "completed" and run["reply"] == "Doc lai thay thieu mot dong, da bo sung.",
+              "cau tra loi SAU khi doc lai moi duoc tra ve (cau nhap bi bo)", run)
+        check(run["verified"] is True, "GET /v1/runs/{id} bao da tu kiem chung", run)
+        # 2 vong tool (ghi + sua sau khi doc lai) + 1 vong tra loi nhap + 1 vong tra loi cuoi.
+        check(run["rounds"] == 4 and run["toolCalls"] == 2, "so vong va tool call cua luot co kiem chung", run)
+        check(bridge.actions() == ["et.writeRange", "et.writeRange"],
+              "lenh sua sau khi doc lai co xuong bridge that", bridge.actions())
+        check(isinstance(run.get("cachedTokens"), int), "run bao so token doc tu cache", run)
+    finally:
+        core.stop()
+        llm.stop()
+
+    # 2. Tat tu kiem chung: dung ngay o cau tra loi dau, khong co vong doc lai.
+    core, llm, _, run, events, _ = run_case("off", [
+        {"tool": "office_action", "arguments": {"action": "et.writeRange", "params": {"range": "A1", "values": [["Ten", "Diem"]]}}},
+        {"text": "Da ghi bang diem."},
+    ], {"AXIOM_VERIFY_WORK": "0"})
+    try:
+        check(run is not None, "tat kiem chung: luot chay xong", run)
+        if run is None:
+            return
+        check(run["verified"] is False and run["rounds"] == 2, "tat VerifyWorkEnabled thi khong co vong doc lai", run)
+    finally:
+        core.stop()
+        llm.stop()
+
+    # 3. Bat hien suy luan: Core phat run.reasoning de pane hien cho nguoi dung.
+    reasoning = "Nguoi dung can bang diem; toi se ghi vao A1 roi kiem tra lai."
+    core, llm, _, run, events, _ = run_case("reasoning", [
+        {"raw": {"id": "chatcmpl-fake", "object": "chat.completion", "model": "fake",
+                 "choices": [{"index": 0, "finish_reason": "stop",
+                              "message": {"role": "assistant", "content": "Xong.", "reasoning_content": reasoning}}],
+                 "usage": {"prompt_tokens": 50, "completion_tokens": 10, "prompt_cache_hit_tokens": 40}}},
+    ], {"AXIOM_LLM_SHOW_REASONING": "1"})
+    try:
+        check(run is not None, "suy luan: luot chay xong", run)
+        if run is None:
+            return
+        published = [payload.get("data", {}) for kind, payload in events if kind == "run.reasoning"]
+        check(len(published) == 1 and published[0].get("text") == reasoning and published[0].get("round") == 1,
+              "Core phat run.reasoning voi dung phan suy luan", published)
+        # Suy luan KHONG duoc tron vao cau tra loi.
+        check(run["reply"] == "Xong.", "cau tra loi chi co content, khong lan suy luan", run)
+        check(run["cachedTokens"] == 40, "so token doc tu cache xuong den run", run)
+    finally:
+        core.stop()
+        llm.stop()
+
+
 # Cac phan chay duoc rieng (--only); /health luon chay truoc.
 SECTIONS = ["fake_bridge", "guards", "skills", "memory", "confirm", "mcp", "visual", "setup", "shutdown",
-            "anthropic", "embeddings", "summarize", "cancel", "mcp_http"]
+            "anthropic", "embeddings", "summarize", "cancel", "mcp_http", "verify"]
 
 # Phan phu thuoc: `guards` dung chung kich ban LLM voi `fake_bridge` (kich ban tuan tu) nen chay mot minh
 # se lech buoc -> --only tu keo theo phan can truoc.
@@ -1539,6 +1637,8 @@ def main() -> int:
                 test_cancel(work, token, bridge, document_path, session_dir)
             if wanted("mcp_http"):
                 test_mcp_http(work, token, bridge, document_path, session_dir)
+            if wanted("verify"):
+                test_verify(work, token, bridge, document_path, session_dir)
     finally:
         if core is not None:
             core.stop()

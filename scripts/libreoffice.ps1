@@ -92,6 +92,29 @@ function Install-Oxt([string]$oxt) {
     Write-Host "Installed $oxt"
 }
 
+function Set-CoreExe {
+    # Khac Linux (install.sh dat Core vao <data_dir>/core), tren Windows khong co buoc nao dien duong dan
+    # Agent Core cho extension LibreOffice - core_exe() tra rong nen pane khong tu khoi dong duoc Core, va
+    # nguoi dung phai tu dien "Agent Core (CoreExe)" trong Cai dat. Chi dien khi dang o cay ma nguon da
+    # build, va khong ghi de lua chon san co cua nguoi dung.
+    $core = Join-Path $root "src\AxiomOffice\bin\Release\AxiomOffice.Core.exe"
+    if (-not (Test-Path -LiteralPath $core)) {
+        Write-Output "Khong thay $core - extension se khong tu khoi dong duoc Agent Core (dat CoreExe trong Cai dat)."
+        return
+    }
+    $key = "HKCU:\Software\AxiomOffice"
+    if (-not (Test-Path -LiteralPath $key)) {
+        New-Item -Path $key -Force | Out-Null
+    }
+    $current = (Get-ItemProperty -Path $key -Name CoreExe -ErrorAction SilentlyContinue).CoreExe
+    if ($current) {
+        Write-Output "CoreExe da co ($current) - giu nguyen."
+        return
+    }
+    New-ItemProperty -Path $key -Name CoreExe -Value $core -PropertyType String -Force | Out-Null
+    Write-Output "CoreExe -> $core"
+}
+
 function Uninstall-Oxt {
     Assert-LibreOfficeClosed
     & $unopkg remove org.axiomoffice.bridge
@@ -147,6 +170,7 @@ if ($Package -or $Install) {
 }
 if ($Install) {
     Install-Oxt $script:oxt
+    Set-CoreExe
 }
 if ($Status) {
     Show-Status

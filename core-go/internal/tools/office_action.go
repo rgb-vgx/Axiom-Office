@@ -23,6 +23,13 @@ const (
 	// UndoRule: khong co lenh dinh dang bang, model undo 2 lan (xoa bang + ghi chu) roi dung lai tu dau.
 	UndoRule = "Change existing content in place (e.g. writer.formatTable to restyle a table); " +
 		"never use undo to start over - only undo when the user asks."
+
+	// ChunkRule: tham so cua MOT lan goi phai nam gon trong MOT phan hoi cua model. Bang vai nghin dong
+	// gui trong mot lan thi chinh phan tra loi do het ngan sach token truoc khi viet xong - do duoc ngay
+	// 02/10/2026: mot luot chay chet voi finish_reason=length khi co gui ca bang lon.
+	ChunkRule = "Build up large sheets in chunks (a few hundred rows per call, continuing from the next " +
+		"row): every argument of one call has to fit in a single reply, so one gigantic values array makes " +
+		"the reply run out of tokens before it is finished. "
 )
 
 func NewOfficeActionTool(catalog *office.CommandCatalog, appKind string) *OfficeActionTool {
@@ -59,7 +66,7 @@ func (t *OfficeActionTool) Description() string {
 	return "Read and modify the LIVE document that is currently open in the office application. " +
 		"Call this for every document change the user asks for so it happens immediately on screen. " +
 		"Array params such as values must be real JSON arrays of rows, not objects. " +
-		UndoRule + " " +
+		UndoRule + " " + ChunkRule +
 		"Available actions (with params): " + t.signatures
 }
 
@@ -73,6 +80,28 @@ func (t *OfficeActionTool) Parameters() json.RawMessage {
 // AllowedActions: danh sach lenh duoc phep (test dung).
 func (t *OfficeActionTool) AllowedActions() []string { return t.names }
 
+// availableLine: cau noi ro con nhung lenh nao. Cung nhom (cung tien to "et."/"writer."/"wpp.") thi chi
+// liet ke nhom do - model go sai tien to thi can biet ca nhom con lai; go sai giua chung thi can thay het.
+func (t *OfficeActionTool) availableLine(action string) string {
+	prefix := ""
+	if index := strings.Index(action, "."); index >= 0 {
+		prefix = action[:index+1]
+	}
+	same := make([]string, 0, len(t.names))
+	all := make([]string, 0, len(t.names))
+	for _, name := range t.names {
+		all = append(all, name)
+		if prefix != "" && strings.HasPrefix(name, prefix) {
+			same = append(same, name)
+		}
+	}
+	if len(same) > 0 {
+		return "Available " + strings.TrimSuffix(prefix, ".") + " actions are: " + strings.Join(same, ", ") +
+			". Only these exist; do not invent action names."
+	}
+	return "Available actions are: " + strings.Join(all, ", ") + ". Only these exist; do not invent action names."
+}
+
 func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any, run *RunContext) Result {
 	action := stringArg(arguments, "action")
 	if action == "" {
@@ -82,11 +111,12 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 	action = CanonicalAction(action, t.names)
 	if _, ok := t.allowed[action]; !ok {
 		// Model chi duoc goi lenh co trong mo ta tool (chan writer.closeAll, ai.ask long nhau...).
-		return Result{
-			JSON: ErrorJSON("'" + action + "' is not an available action; use one of the actions listed " +
-				"in the office_action tool description"),
-			Action: action,
-		}
+		//
+		// Loi phai noi NGAY co nhung lenh nao: log 02/10/2026, mot luot chay doan ~30 ten lenh tu nghi ra
+		// (et.createSheet, et.insertSheet, et.addSheet...) chi vi khong tin rang lenh no can khong ton tai.
+		// Liet ke lai danh sach ngay tai cho bao loi cat vong doan do som hon la bat model doc lai mo ta.
+		message := "'" + action + "' is not an available action. " + t.availableLine(action)
+		return Result{JSON: ErrorJSON(message), Action: action}
 	}
 
 	params := NormalizeParams(arguments["params"])
@@ -107,7 +137,9 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 	}
 
 	result := run.Bridge.Command(ctx, run.Office.Port, action, params)
-	return Result{JSON: result.RawJSON, OK: result.OK, Action: action}
+	// Lenh that bai thi tai lieu khong doi -> khong tinh la da sua.
+	return Result{JSON: result.RawJSON, OK: result.OK, Action: action,
+		Mutating: result.OK && ChangesDocument(action)}
 }
 
 // CanonicalAction: ten lenh viet sai nhe ("et_writeRange"; hoa/thuong khac) thi quy ve ten dung trong

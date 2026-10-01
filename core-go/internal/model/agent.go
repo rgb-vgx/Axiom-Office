@@ -20,10 +20,17 @@ type AgentOptions struct {
 	MaxTokens         int           // tran token ca luot (mac dinh 200000)
 	Deadline          time.Duration // 0 = khong tran thoi gian (mac dinh); > 0 moi dat
 	MaxResponseTokens int           // mac dinh DefaultMaxResponseTokens
+	// Verify: bat buoc agent TU KIEM CHUNG truoc khi ket thuc mot luot co sua tai lieu.
+	//
+	// Do duoc tu ba bo khung chay cung mot prompt (02/10/2026): bo khung tu kiem chung roi sua
+	// (Claude Code: 36 lan sua sau khi doc lai) xong viec va khong can ai nhac; bo khung ghi mot lan
+	// roi tra loi thi phai co nguoi nhac moi chay tiep. Cac lenh doc lai da co san tu truoc
+	// (et.checkRange, writer.checkTables, wpp.checkLayout) nhung khong ai buoc model dung chung.
+	Verify bool
 }
 
 func DefaultAgentOptions() AgentOptions {
-	return AgentOptions{MaxTokens: 200_000, MaxResponseTokens: DefaultMaxResponseTokens}
+	return AgentOptions{MaxTokens: 200_000, MaxResponseTokens: DefaultMaxResponseTokens, Verify: true}
 }
 
 type AgentCallbacks struct {
@@ -31,6 +38,9 @@ type AgentCallbacks struct {
 	RoundStarted func(round int)
 	ToolStarted  func(call ToolCall)
 	ToolFinished func(result ToolResult)
+	// Reasoning: phan suy nghi cua model cho mot vong (rong khi model khong suy luan hoac da tat).
+	// Goi mot lan moi vong co suy luan, voi TOAN BO phan suy luan cua vong do.
+	Reasoning func(round int, text string)
 }
 
 type AgentResult struct {
@@ -41,12 +51,15 @@ type AgentResult struct {
 	Rounds        int
 	InputTokens   int
 	OutputTokens  int
+	CachedTokens  int // phan InputTokens doc tu cache cua nha cung cap (0 = khong cache/khong bao)
 	Seconds       float64
 	Transcript    []string
 	Cancelled     bool
 	TimedOut      bool
 	Stopped       bool // dung vi tran token
 	ToolsDisabled bool
+	// Verified: luot nay co sua tai lieu nen da duoc yeu cau tu kiem chung truoc khi tra loi.
+	Verified bool
 }
 
 // Executor chay mot tool. Loi (panic) cua tool khong lam hong luot chay: tra ve model de no tu xu ly.
@@ -105,6 +118,9 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 
 	toolsEnabled := len(tools) > 0
 	nudged := false
+	// mutated: luot nay da sua tai lieu chua; verified: da yeu cau tu kiem chung chua. Moi luot chi
+	// kiem chung MOT lan - du de bat loi that, khong du de quay vong vo tan.
+	mutated, verified := false, false
 	for options.MaxRounds <= 0 || result.Rounds < options.MaxRounds {
 		result.ToolsDisabled = !toolsEnabled
 		if runCtx.Err() != nil {
@@ -142,6 +158,10 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 		}
 		result.InputTokens += turn.InputTokens
 		result.OutputTokens += turn.OutputTokens
+		result.CachedTokens += turn.CachedTokens
+		if turn.Reasoning != "" && callbacks.Reasoning != nil {
+			callbacks.Reasoning(result.Rounds, turn.Reasoning)
+		}
 
 		if len(turn.ToolCalls) == 0 {
 			reply := StripThoughts(turn.Text)
@@ -166,6 +186,16 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 				}
 				return done(false, "", detail, "provider")
 			}
+			// Luot nay da sua tai lieu ma chua doc lai lan nao: bat model tu kiem chung truoc khi
+			// ket thuc. Day la khac biet do duoc giua cac bo khung chay cung mot prompt - xem
+			// AgentOptions.Verify. Cau tra loi hien tai duoc giu lai lam ban nhap de model doi chieu.
+			if options.Verify && mutated && !verified {
+				verified, result.Verified = true, true
+				addLine("(sua tai lieu - yeu cau tu kiem chung truoc khi ket thuc)")
+				turns = c.Codec.AppendAssistant(turns, turn)
+				turns = append(turns, map[string]any{"role": "user", "content": VerifyWorkNudge})
+				continue
+			}
 			return done(true, reply, "", "")
 		}
 
@@ -181,6 +211,9 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 			toolStarted := time.Now()
 			toolResult := safeExecute(runCtx, execute, call)
 			toolResult.Ms = time.Since(toolStarted).Milliseconds()
+			if toolResult.Mutating {
+				mutated = true
+			}
 			results = append(results, toolResult)
 			if callbacks.ToolFinished != nil {
 				callbacks.ToolFinished(toolResult)

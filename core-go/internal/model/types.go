@@ -32,16 +32,30 @@ type ToolResult struct {
 	OK           bool
 	Ms           int64
 	ImageDataURL string
+	// Mutating: tool nay co lam THAY DOI tai lieu khong. Chi luot co thay doi moi can tu kiem chung
+	// truoc khi tra loi, nen day la dau vao cua buoc kiem chung (xem AgentOptions.Verify).
+	Mutating bool
 }
 
 // Turn: mot luot tra loi cua model (co tool call hoac cau tra loi cuoi). Raw giu nguyen phan assistant
 // de gui lai y nguyen o vong sau.
 type Turn struct {
-	Text         string
-	HasText      bool
+	Text    string
+	HasText bool
+	// Reasoning: phan suy nghi cua model reasoning (`reasoning_content`), tach khoi cau tra loi.
+	// Rong khi model khong suy luan hoac da tat bang `thinking: {type: disabled}`.
+	Reasoning string
 	ToolCalls    []ToolCall
 	InputTokens  int
 	OutputTokens int
+	// CachedTokens: so token cua prompt duoc doc tu cache cua nha cung cap - phan re va nhanh nhat
+	// cua mot luot. Moi nha cung cap goi mot kieu: DeepSeek `prompt_cache_hit_tokens`, OpenAI
+	// `prompt_tokens_details.cached_tokens`, Anthropic `cache_read_input_tokens`. 0 khi khong cache
+	// hoac nha cung cap khong bao - KHONG co nghia la hong.
+	//
+	// Day la so DO, khong phai tham so: DeepSeek va OpenAI cache ngam theo tien to on dinh, khong
+	// co gi phai gui len. Giu so nay de biet tien to cua minh co on dinh that khong.
+	CachedTokens int
 	Raw          json.RawMessage
 
 	// FinishReason la ly do may chu dung lai ("stop", "tool_calls", "length"...). Rong khi may chu

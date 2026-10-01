@@ -386,6 +386,7 @@ namespace AxiomOffice.Ai
             _busy = true;
             _toolCount = 0;
             _runEdits = 0;
+            _reasoningBlock = null;   // mỗi lượt một khối suy luận riêng
             _undoLink.Visible = false;
             _lastPrompt = promptText;
             _insertLink.Visible = false;
@@ -479,6 +480,13 @@ namespace AxiomOffice.Ai
                     string memoryId = item.Id;
                     string memoryText = item.Text ?? "";
                     PostToUi(delegate { ShowMemoryNote(memoryId, memoryText); });
+                    return;
+                }
+                if (item.Type == "run.reasoning" && !string.IsNullOrEmpty(item.Text))
+                {
+                    string reasoning = item.Text;
+                    int round = item.Round;
+                    PostToUi(delegate { ShowReasoning(reasoning, round); });
                     return;
                 }
                 string line = ProgressLine(item);
@@ -628,6 +636,21 @@ namespace AxiomOffice.Ai
                 card.SetResolved(resolved.Approved, resolved.By);
                 _confirmCards.Remove(resolved.ConfirmationId);
             }
+        }
+
+        // Khối suy luận của lượt đang chạy (chỉ có khi người dùng bật LlmShowReasoning). Một khối cho cả
+        // lượt: mỗi vòng ghi đè bằng phần mới nhất để pane không bị lấp bởi văn bản suy luận.
+        private ReasoningBlock _reasoningBlock;
+
+        private void ShowReasoning(string text, int round)
+        {
+            if (_reasoningBlock == null)
+            {
+                _reasoningBlock = new ReasoningBlock(text, round);
+                _chat.AddBlock(_reasoningBlock);
+                return;
+            }
+            _reasoningBlock.Update(text, round);
         }
 
         // Memory đã hiện trong pane (không hiện lại khi hỏi lại kết quả trích xuất nền).

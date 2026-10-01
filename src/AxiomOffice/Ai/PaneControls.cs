@@ -1313,6 +1313,117 @@ namespace AxiomOffice.Ai
         }
     }
 
+    // Khối suy luận của model (chỉ có khi người dùng bật LlmShowReasoning). Thẻ mờ, thu gọn được: phần
+    // suy luận thường dài vài nghìn ký tự, để nguyên thì lấn hết chỗ của việc thật. Khác bong bóng AI ở
+    // chỗ đây là cái model đang NGHĨ, không phải câu nó TRẢ LỜI người dùng.
+    internal sealed class ReasoningBlock : Control
+    {
+        // Suy luận dài hơn ngưỡng này thì thu lại thành một dòng; ngắn hơn thì mở sẵn.
+        public const int InlineLimit = 320;
+
+        private readonly Label _title;
+        private readonly Label _text;
+        private readonly LinkLabel _toggle;
+        private string _full = "";
+        private bool _expanded;
+
+        public ReasoningBlock(string text, int round)
+        {
+            AccessibleRole = AccessibleRole.StaticText;
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+            _title = PaneTheme.MakeLabel("", PaneTheme.CaptionBold, PaneTheme.TextMuted);
+            _text = PaneTheme.MakeLabel("", PaneTheme.Tool, PaneTheme.TextSecondary);
+            _toggle = PaneTheme.MakeLink("Hiện", PaneTheme.CaptionBold);
+            foreach (Control control in new Control[] { _title, _text, _toggle })
+            {
+                control.BackColor = PaneTheme.PaneBg;
+                Controls.Add(control);
+            }
+            _toggle.LinkClicked += delegate { SetExpanded(!_expanded); };
+            Update(text, round);
+        }
+
+        // Mỗi vòng chạy ghi đè bằng phần suy luận mới nhất; lựa chọn mở/thu của người dùng được giữ.
+        public void Update(string text, int round)
+        {
+            bool first = _full.Length == 0;
+            _full = text ?? "";
+            _title.Text = round > 0 ? "Suy luận · vòng " + round : "Suy luận";
+            if (first)
+            {
+                _expanded = _full.Length <= InlineLimit;
+            }
+            Apply();
+        }
+
+        public void SetExpanded(bool expanded)
+        {
+            _expanded = expanded;
+            Apply();
+        }
+
+        private void Apply()
+        {
+            _text.Text = _expanded ? _full : Preview(_full);
+            _toggle.Text = _expanded ? "Ẩn" : "Hiện";
+            _toggle.AccessibleName = _expanded ? "Thu gọn phần suy luận" : "Xem đầy đủ phần suy luận";
+            if (Parent != null)
+            {
+                // Đổi chiều cao thì FlowLayoutPanel phải xếp lại; Measure() chạy trong lượt xếp đó.
+                Parent.PerformLayout();
+            }
+        }
+
+        // Một dòng mờ khi thu gọn. Cắt theo ký tự nhưng không cắt đôi một cặp surrogate.
+        public static string Preview(string text)
+        {
+            string flat = Regex.Replace(text ?? "", @"\s+", " ").Trim();
+            if (flat.Length <= InlineLimit)
+            {
+                return flat;
+            }
+            int cut = InlineLimit - 1;
+            if (cut > 0 && char.IsHighSurrogate(flat[cut - 1]))
+            {
+                cut--;
+            }
+            return flat.Substring(0, cut) + "…";
+        }
+
+        public void Measure(int width)
+        {
+            int pad = PaneTheme.Px(8);
+            int inner = Math.Max(PaneTheme.Px(60), width - pad * 2 - PaneTheme.Px(6));
+            int top = pad / 2 + PaneTheme.Px(2);
+            int toggleWidth = _toggle.PreferredSize.Width + PaneTheme.Px(8);
+            int titleHeight = PaneTheme.MeasureHeight("Suy luận", _title.Font, inner);
+            _title.SetBounds(pad + PaneTheme.Px(6), top, Math.Max(PaneTheme.Px(40), inner - toggleWidth), titleHeight);
+            _toggle.Location = new Point(pad + PaneTheme.Px(6) + inner - toggleWidth, top + PaneTheme.Px(2));
+            int textHeight = PaneTheme.MeasureHeight(_text.Text, _text.Font, inner);
+            int textTop = top + titleHeight + PaneTheme.Px(2);
+            _text.SetBounds(pad + PaneTheme.Px(6), textTop, inner, textHeight);
+            Size = new Size(width, textTop + textHeight + pad / 2 + PaneTheme.Px(2));
+        }
+
+        protected override void OnPaintBackground(PaintEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            PaneTheme.ClearToParent(this, g);
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            var rect = new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f);
+            using (var path = PaneTheme.RoundedPath(rect, PaneTheme.PxF(PaneTheme.RadiusControl)))
+            using (var pen = new Pen(PaneTheme.Divider))
+            {
+                g.DrawPath(pen, path);
+            }
+            // Vạch mờ bên trái: dấu hiệu "đây là phần suy luận", không phải nội dung trả lời.
+            using (var strip = new SolidBrush(PaneTheme.TextMuted))
+            {
+                g.FillRectangle(strip, 0, PaneTheme.Px(6), PaneTheme.Px(3), Math.Max(1, Height - PaneTheme.Px(12)));
+            }
+        }
+    }
+
     internal sealed class ChatList : FlowLayoutPanel
     {
         private readonly ToolTip _toolTip = new ToolTip();
@@ -1504,10 +1615,16 @@ namespace AxiomOffice.Ai
                 var card = control as ErrorCard;
                 var note = control as MemoryNote;
                 var confirm = control as ConfirmCard;
+                var reasoning = control as ReasoningBlock;
                 if (confirm != null)
                 {
                     confirm.Measure(available);
                     bottom = PaneTheme.GapMessage;
+                }
+                else if (reasoning != null)
+                {
+                    reasoning.Measure(available);
+                    bottom = nextIsTool ? PaneTheme.GapToolLine : PaneTheme.GapMessage;
                 }
                 else if (note != null)
                 {

@@ -38,8 +38,27 @@ func (t *MCPTool) Invoke(ctx context.Context, arguments map[string]any, run *Run
 	}
 
 	text, ok := t.bound.Call(ctx, arguments)
-	return Result{JSON: mcp.ResultJSON(text, ok), OK: ok, Action: name}
+	return Result{JSON: mcp.ResultJSON(text, ok), OK: ok, Action: name,
+		Mutating: ok && MCPChangesState(name)}
 }
+
+// mcpReadOnly: cac tool MCP chi doc trang thai, khong ghi file nao. Danh sach nay gom dung cac tool
+// doc cua server office built-in (xem mcpserver/filetools_*.go); moi tool khac - ke ca tool cua server
+// nguoi dung tu cau hinh, va cac tool lenh live chay duoc ca doc lan ghi - deu tinh la CO ghi.
+//
+// Cung nguyen tac voi noDocumentChange: doan sai theo huong "co ghi" chi ton mot vong doc lai, doan
+// sai theo huong "chi doc" thi bo qua buoc kiem chung cua mot lan ghi that.
+var mcpReadOnly = map[string]bool{
+	"echo": true, "office_sessions": true,
+	"doc_get_text": true, "doc_find_text": true, "doc_extract_table": true, "doc_profile": true,
+	"excel_read": true, "excel_profile": true,
+	"ppt_get_text": true, "ppt_list_slides": true, "ppt_profile": true, "ppt_health": true,
+	"word_read_text": true, "word_health": true,
+	"wps_health": true, "wps_live_read_range": true,
+}
+
+// MCPChangesState: tool MCP nay co ghi gi khong (theo ten tool).
+func MCPChangesState(name string) bool { return !mcpReadOnly[name] }
 
 func truncateJSON(arguments map[string]any) string {
 	if len(arguments) == 0 {

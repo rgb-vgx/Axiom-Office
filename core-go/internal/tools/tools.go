@@ -17,7 +17,30 @@ type Result struct {
 	OK           bool
 	Action       string
 	ImageDataURL string
+	// Mutating: lenh nay DA lam thay doi noi dung tai lieu. Chi luot co thay doi that moi can tu
+	// kiem chung truoc khi tra loi (model.AgentOptions.Verify) - luot chi doc ma bat doc lai thi chi
+	// ton them mot vong vo ich.
+	Mutating bool
 }
+
+// noDocumentChange: cac lenh KHONG doi noi dung tai lieu dang mo - doc de tra loi, chay chan doan,
+// hoac ghi tai lieu ra file (save/saveAs/exportPdf khong sua tai lieu, chi chep no ra cho khac).
+//
+// Moi lenh khac - ke ca lenh them sau nay chua co trong bang nay - duoc coi la CO sua tai lieu. Do la
+// huong sai an toan: kiem chung thua chi ton mot vong doc lai, con bo sot thi cau tra loi sai duoc
+// gui cho nguoi dung nhu dung roi.
+var noDocumentChange = map[string]bool{
+	"app.info": true, "app.screenshot": true,
+	"et.readRange": true, "et.checkRange": true, "et.listSheets": true,
+	"et.save": true, "et.saveAs": true, "et.exportPdf": true,
+	"writer.getText": true, "writer.selection": true, "writer.checkTables": true,
+	"writer.save": true, "writer.saveAs": true, "writer.exportPdf": true,
+	"wpp.listSlides": true, "wpp.checkLayout": true,
+	"wpp.save": true, "wpp.saveAs": true, "wpp.exportPdf": true,
+}
+
+// ChangesDocument: lenh nay co lam doi noi dung tai lieu dang mo khong.
+func ChangesDocument(action string) bool { return !noDocumentChange[action] }
 
 // RunContext: trang thai cua mot luot chay ma tool can (muc 8.3).
 type RunContext struct {

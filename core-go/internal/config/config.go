@@ -40,7 +40,16 @@ type Config struct {
 	// gian, chi bi chan boi watchdog "khong nhan duoc byte nao" (300s).
 	LlmRequestTimeoutSeconds int
 	ConfirmTimeoutSeconds    int
-	VisualQaEnabled          bool
+	// LlmShowReasoning: bat phan suy luan cua model reasoning (`reasoning_content`) de pane hien cho
+	// nguoi dung xem model dang nghi gi. MAC DINH TAT: bat len thi model dot ngan sach token vao phan
+	// nghi truoc khi tra loi, va tren prompt lon tung cho ra cau tra loi RONG (finish_reason=length) -
+	// xem CHANGELOG 02/10/2026. Doi lai nguoi dung thay duoc qua trinh suy nghi.
+	LlmShowReasoning bool
+	// VerifyWorkEnabled: agent tu doc lai tai lieu sau khi sua, truoc khi tra loi (xem
+	// model.AgentOptions.Verify). MAC DINH BAT: do duoc la bo khung khong tu kiem chung thi phai co
+	// nguoi nhac moi chay tiep, con bo khung tu kiem chung thi xong viec mot minh.
+	VerifyWorkEnabled bool
+	VisualQaEnabled   bool
 	LlmApiKey                string
 	MemoryModel              string
 	EmbeddingModel           string
@@ -88,6 +97,8 @@ func From(env Env, source Source) Config {
 		LlmModel:                 text(env, "AXIOM_LLM_MODEL", source, "LlmModel"),
 		LlmRequestTimeoutSeconds: clamp(intValue(env, "AXIOM_LLM_REQUEST_TIMEOUT", source, "LlmRequestTimeoutSeconds", 0), 0, 600),
 		ConfirmTimeoutSeconds:    clamp(intValue(env, "AXIOM_CONFIRM_TIMEOUT", source, "ConfirmTimeoutSeconds", 120), 1, 3600),
+		LlmShowReasoning:         flag(env, "AXIOM_LLM_SHOW_REASONING", source, "LlmShowReasoning", false),
+		VerifyWorkEnabled:        flag(env, "AXIOM_VERIFY_WORK", source, "VerifyWorkEnabled", true),
 		VisualQaEnabled:          flag(env, "AXIOM_VISUAL_QA", source, "VisualQaEnabled", false),
 		LlmApiKey:                Unprotect(text(env, "AXIOM_LLM_API_KEY", source, "LlmApiKey")),
 		MemoryModel:              text(env, "AXIOM_MEMORY_MODEL", source, "MemoryModel"),

@@ -5,6 +5,42 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — agent tự kiểm chứng, hiện suy luận, đo cache
+- **Agent tự kiểm chứng trước khi trả lời** (`VerifyWorkEnabled`, mặc định **BẬT**). Luot nào có lệnh
+  SỬA tài liệu thì sau khi model định trả lời, harness chen một lượt nữa yêu cầu nó đọc lại bằng chính
+  các lệnh có sẵn (`et.readRange`/`et.checkRange`, `writer.getText`/`writer.checkTables`,
+  `wpp.listSlides`/`wpp.checkLayout`) rồi sửa nếu thiếu, xong mới trả lời người dùng. Các lệnh chẩn đoán
+  này vốn đã có từ trước nhưng không ai buộc model dùng.
+  - **Vì sao**: đo trên ba bộ khung chạy cùng một prompt và cùng một model (02/10/2026). Bộ khung tự
+    kiểm chứng rồi sửa thì xong việc một mình (36 lần sửa sau khi đọc lại, không cần ai nhắc); bộ khung
+    ghi một lần rồi trả lời thì phải có người nhắc mới chạy tiếp.
+  - Luot CHỈ ĐỌC không tốn thêm vòng nào: `tool.ChangesDocument` quyết định theo tên lệnh. Lệnh lạ
+    (kể cả lệnh thêm sau này) mặc định tính là "có sửa" — đoán sai theo hướng đó chỉ tốn một vòng đọc
+    lại, còn đoán sai hướng ngược lại thì bỏ qua bước kiểm chứng của một lần ghi thật.
+  - Kiểm chứng chạy đúng MỘT lần mỗi lượt, không quay vòng vô tận. Tắt được bằng `VerifyWorkEnabled=0`
+    (Cài đặt của pane, hoặc `AXIOM_VERIFY_WORK=0`).
+- **Hiện phần suy luận của model cho người dùng** (`LlmShowReasoning`, mặc định tắt). Bật thì Core phát
+  thêm sự kiện `run.reasoning` (`round`, `text`, `model`); pane vẽ một khối mờ "Suy luận · vòng N", suy
+  luận ngắn thì mở sẵn, dài thì thu thành một dòng bấm "Hiện" để xem đủ. Mỗi lượt một khối, mỗi vòng ghi
+  đè bằng phần mới nhất nên khung chat không bị lấp.
+  - Vẫn TẮT mặc định vì bật lên thì model dồn `max_tokens` vào phần nghĩ trước khi trả lời (đã đo: có
+    lần ra câu trả lời rỗng với `finish_reason=length` trên prompt lớn) — đổi lại người dùng thấy được
+    quá trình suy nghĩ.
+- **Đo được prompt caching**: `Turn.CachedTokens` đọc cả ba kiểu tên (`prompt_cache_hit_tokens` của
+  DeepSeek, `prompt_tokens_details.cached_tokens` của OpenAI, `cache_read_input_tokens` của Anthropic),
+  cộng dồn vào `AgentResult.CachedTokens`, ghi ra log lượt chạy và trường `cachedTokens` của
+  `GET /v1/runs/{id}`. Không có gì phải gửi lên để bật cache (cả ba nhà cung cấp đều cache ngầm theo
+  tiền tố ổn định) — số này để BIẾT tiền tố của mình có ổn định thật không, thay vì đoán.
+- `Run.Verified` + trường `verified` trong `GET /v1/runs/{id}`: lượt này có sửa tài liệu và đã được yêu
+  cầu tự kiểm chứng.
+- Hướng dẫn khảo sát trước và đọc lại sau khi sửa vào system prompt (`agent.ReconRule`, `agent.CheckRule`).
+
+### Fixed — pane LibreOffice trên Windows không tự khởi động được Agent Core
+- `scripts/libreoffice.ps1 -Install` nay điền `CoreExe` vào `HKCU\Software\AxiomOffice` (chỉ khi đang ở
+  trong cây mã nguồn đã build, và không ghi đè lựa chọn sẵn có của người dùng). Trước đây trên Windows
+  không bước nào điền giá trị này — khác Linux, nơi `install.sh` đặt Core vào `<data_dir>/core` — nên
+  `core.core_exe()` trả rỗng và pane không tự khởi động được Core; phải tự gõ đường dẫn vào Cài đặt.
+
 ### Changed — bỏ trần thời gian của một lượt agent
 - **Không còn trần đồng hồ cho một lượt chạy.** Đợt trước trần là 300s mặc định (tối đa 900s), và nó
   cắt ngang task dài trước khi agent kịp làm gì. Cả hai dự án tham khảo (opencode, goclaw) đều không

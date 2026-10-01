@@ -74,6 +74,8 @@ class ChatView:
     def sync(self, session, stick: bool = None) -> None:
         """Ve cac muc moi/doi, roi xep lai va cuon xuong cuoi neu dang o cuoi (hoac stick=True)."""
         at_bottom = self.offset >= self.total - self.rect[3] - 4
+        # Giu lai de link "Hien/An" tren khoi suy luan bam nguoc duoc vao session (xem _toggle_reasoning).
+        self.session = session
         items = session.items
         if len(items) < len(self.rendered):          # Tro chuyen moi
             self.clear()
@@ -174,6 +176,7 @@ class ChatView:
             "info": self._info,
             "memory": self._memory,
             "confirm": self._confirm,
+            "reasoning": self._reasoning,
             "error": self._error,
         }.get(item["kind"], self._info)
         widget = builder(item)
@@ -317,6 +320,22 @@ class ChatView:
             "cancelled": ("Đã dừng — không thực hiện: " + label, theme.TEXT_SECONDARY),
         }.get(state, ("Đã trả lời: " + label, theme.TEXT_SECONDARY))
         return self._card(theme.CHIP_HOVER, theme.CHIP_BORDER, title, color, "", [])
+
+    def _reasoning(self, item: dict) -> Widget:
+        """Khoi suy luan cua model: the mo, khong phai bong bong tra loi - de phan biet ro cai model
+        dang NGHI voi cai no TRA LOI nguoi dung."""
+        round_number = item.get("round")
+        title = "Suy luận · vòng %s" % round_number if round_number else "Suy luận"
+        expanded = item.get("expanded")
+        body = item.get("text", "") if expanded else theme.reasoning_preview(item.get("text", ""))
+        label = "Ẩn" if expanded else "Hiện"
+        return self._card(theme.AI_BG, theme.CHIP_BORDER, title, theme.TEXT_MUTED, body,
+                          [(label, lambda: self._toggle_reasoning(item))])
+
+    def _toggle_reasoning(self, item: dict) -> None:
+        session = getattr(self, "session", None)
+        if session is not None:
+            session.toggle_reasoning(item)   # tang rev -> sync ve lai dung muc nay
 
     def _memory(self, item: dict) -> Widget:
         state = item.get("state")

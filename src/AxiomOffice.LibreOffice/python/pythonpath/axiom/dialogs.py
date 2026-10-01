@@ -78,6 +78,8 @@ SETTINGS_FIELDS = (
 SETTINGS_FLAGS = (
     ("MemoryEnabled", "Ghi nhớ dài hạn (MemoryEnabled)", True),
     ("MemoryAutoExtract", "Tự trích xuất ghi nhớ sau lượt (MemoryAutoExtract)", True),
+    ("VerifyWorkEnabled", "Tự kiểm chứng: đọc lại tài liệu sau khi sửa trước khi trả lời (VerifyWorkEnabled)", True),
+    ("LlmShowReasoning", "Hiện suy luận của model trong khung chat (LlmShowReasoning)", False),
     ("VisualQaEnabled", "QA thị giác: gửi ảnh trang cho model (VisualQaEnabled)", False),
 )
 MEMORY_LIST_TIMEOUT = 10

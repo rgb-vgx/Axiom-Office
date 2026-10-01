@@ -349,8 +349,9 @@ Mỗi event có `seq` tăng dần, `runId`, `time`. Tên event và dữ liệu:
 | `tool.finished` | `callId`, `ok`, `error?`, `ms` | Tick xanh / x đỏ |
 | `confirm.required` | `confirmationId`, `action`, `reason`, `paramsPreview` | Thẻ xác nhận Đồng ý / Từ chối |
 | `memory.written` | `id`, `scope`, `text` | Dòng nhỏ "Đã ghi nhớ: …" (bấm để xoá) |
+| `run.reasoning` | `round`, `text`, `model` | Khối "Suy luận · vòng N" (mờ, bấm Hiện/Ẩn). Chỉ phát khi bật `LlmShowReasoning` |
 | `message.delta` | `text` | (tuỳ chọn, nếu provider stream) |
-| `run.completed` | `reply`, `rounds`, `seconds` | Bubble trả lời |
+| `run.completed` | `reply`, `rounds`, `seconds`, `inputTokens`, `outputTokens`, `cachedTokens` | Bubble trả lời |
 | `run.failed` | `error`, `kind` (`provider`, `config`, `office`, `internal`) | ErrorCard |
 | `run.cancelled` | `seconds` | Trạng thái đã dừng |
 | `run.timedout` | `seconds` | ErrorCard + Thử lại |

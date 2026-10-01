@@ -24,6 +24,8 @@ namespace AxiomOffice.Ai
         private readonly CheckBox _memory;
         private readonly CheckBox _autoExtract;
         private readonly CheckBox _visual;
+        private readonly CheckBox _verify;
+        private readonly CheckBox _reasoning;
 
         public SettingsForm()
         {
@@ -32,7 +34,7 @@ namespace AxiomOffice.Ai
             MaximizeBox = false;
             MinimizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
-            ClientSize = new Size(500, 334);
+            ClientSize = new Size(500, 382);
             Font = SystemFonts.MessageBoxFont;
 
             var lblProvider = new Label { Text = "Provider:", Left = 14, Top = 19, Width = 90 };
@@ -65,18 +67,23 @@ namespace AxiomOffice.Ai
             _core = new CheckBox { Text = "Dùng Agent Core (hội thoại liên tục, kỹ năng, ghi nhớ)", Left = 110, Top = 186, Width = 370 };
             _memory = new CheckBox { Text = "Ghi nhớ dài hạn", Left = 110, Top = 210, Width = 150 };
             _autoExtract = new CheckBox { Text = "Tự ghi nhớ sau mỗi lượt", Left = 270, Top = 210, Width = 210 };
-            var manage = new Button { Text = "Quản lý ghi nhớ…", Left = 110, Top = 236, Width = 150 };
+            var manage = new Button { Text = "Quản lý ghi nhớ…", Left = 110, Top = 232, Width = 150 };
+            // Tự kiểm chứng (bật mặc định): sửa tài liệu xong thì đọc lại rồi mới trả lời.
+            _verify = new CheckBox { Text = "Tự kiểm chứng: đọc lại tài liệu sau khi sửa trước khi trả lời", Left = 110, Top = 256, Width = 370 };
+            // Suy luận (tắt mặc định): hiện phần model nghĩ, đổi lại tốn token và chậm hơn.
+            _reasoning = new CheckBox { Text = "Hiện suy luận của model trong khung chat (tốn token)", Left = 110, Top = 276, Width = 370 };
             // QA thị giác (New_arch.md 8.4.6): tắt mặc định vì mỗi ảnh tốn nhiều token; cần model đọc được ảnh.
-            _visual = new CheckBox { Text = "Cho AI xem ảnh chụp cửa sổ (tốn token)", Left = 270, Top = 239, Width = 210 };
+            // Riêng một dòng: để cạnh nút "Quản lý ghi nhớ" thì nhãn bị cắt cụt.
+            _visual = new CheckBox { Text = "Cho AI xem ảnh chụp cửa sổ (tốn token)", Left = 110, Top = 296, Width = 370 };
 
-            _status = new Label { Left = 14, Top = 270, Width = 466, Height = 18, AutoEllipsis = true, ForeColor = SystemColors.GrayText };
+            _status = new Label { Left = 14, Top = 322, Width = 466, Height = 18, AutoEllipsis = true, ForeColor = SystemColors.GrayText };
 
-            _test = new Button { Text = "Test", Left = 110, Top = 294, Width = 80 };
-            var save = new Button { Text = "Save", Left = 312, Top = 294, Width = 80 };
-            var cancel = new Button { Text = "Cancel", Left = 400, Top = 294, Width = 80 };
+            _test = new Button { Text = "Test", Left = 110, Top = 346, Width = 80 };
+            var save = new Button { Text = "Save", Left = 312, Top = 346, Width = 80 };
+            var cancel = new Button { Text = "Cancel", Left = 400, Top = 346, Width = 80 };
 
             Controls.AddRange(new Control[] { lblProvider, _provider, lblEndpoint, _endpoint, lblKey, _apiKey, lblModel, _model, hint,
-                lblAgent, _core, _memory, _autoExtract, manage, _visual, _status, _test, save, cancel });
+                lblAgent, _core, _memory, _autoExtract, manage, _visual, _verify, _reasoning, _status, _test, save, cancel });
             _memory.CheckedChanged += delegate { _autoExtract.Enabled = _memory.Checked; };
             manage.Click += delegate
             {
@@ -124,6 +131,8 @@ namespace AxiomOffice.Ai
             _autoExtract.Checked = Config.MemoryAutoExtract;
             _autoExtract.Enabled = _memory.Checked;
             _visual.Checked = Config.VisualQaEnabled;
+            _verify.Checked = Config.VerifyWorkEnabled;
+            _reasoning.Checked = Config.LlmShowReasoning;
             if (string.IsNullOrEmpty(_endpoint.Text))
             {
                 _endpoint.Text = DefaultEndpoint();
@@ -163,6 +172,8 @@ namespace AxiomOffice.Ai
             saved &= Config.WriteDword("MemoryEnabled", _memory.Checked ? 1 : 0);
             saved &= Config.WriteDword("MemoryAutoExtract", _autoExtract.Checked ? 1 : 0);
             saved &= Config.WriteDword("VisualQaEnabled", _visual.Checked ? 1 : 0);
+            saved &= Config.WriteDword("VerifyWorkEnabled", _verify.Checked ? 1 : 0);
+            saved &= Config.WriteDword("LlmShowReasoning", _reasoning.Checked ? 1 : 0);
             if (!saved)
             {
                 _status.Text = "Failed to save settings to the registry";

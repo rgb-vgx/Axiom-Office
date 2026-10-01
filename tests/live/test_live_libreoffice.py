@@ -237,6 +237,19 @@ def test_calc(b, out):
     b.cmd("et.writeRange", {"range": "M1", "values": [["Mã", "Giá"], ["x", "12"], ["y", "15"]]}, key="et.writeRange numbers as text")
     text_qa = b.cmd("et.checkRange", {"range": "M1:N3"}, key="et.checkRange numbers as text") or {}
     check("numbers-as-text" in {i.get("type") for i in text_qa.get("issues", [])}, "Calc checkRange bắt số lưu dạng chữ", text_qa)
+    # Quản lý sheet: không có et.addSheet thì agent không dựng được sổ nhiều sheet trên tài liệu đang mở
+    # (log 02/10/2026: model thử ~30 tên lệnh tự nghĩ ra rồi bỏ cuộc).
+    added = b.cmd("et.addSheet", {"name": "Raw_Data"}) or {}
+    check(added.get("sheet") == "Raw_Data" and "Raw_Data" in (added.get("sheets") or []),
+          "Calc addSheet thêm sheet có tên", added)
+    auto = b.cmd("et.addSheet", {}) or {}
+    check(auto.get("sheet", "").startswith("Sheet"), "Calc addSheet bỏ trống tên thì đặt tên SheetN", auto)
+    sheets = b.cmd("et.listSheets") or {}
+    check(sheets.get("activeSheet") == auto.get("sheet"), "Calc addSheet chuyển sang sheet mới", sheets)
+    renamed = b.cmd("et.renameSheet", {"sheet": auto.get("sheet"), "name": "Data_Cleaning"}) or {}
+    check("Data_Cleaning" in (renamed.get("sheets") or []), "Calc renameSheet đổi tên được", renamed)
+    b.cmd("et.addSheet", {"name": "Raw_Data"}, expect_ok=False, key="et.addSheet trùng tên")
+    b.cmd("et.renameSheet", {"sheet": "Không có", "name": "X"}, expect_ok=False, key="et.renameSheet sheet lạ")
     b.cmd("et.activateSheet", {"sheet": "Sheet1"})
     b.cmd("et.activateSheet", {"sheet": "Không có"}, expect_ok=False, key="et.activateSheet unknown")
     b.cmd("et.writeRange", {"range": "A7", "values": [["hoàn tác tôi"]]}, key="et.writeRange before undo")

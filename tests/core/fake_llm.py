@@ -44,9 +44,13 @@ _CALLS = 0
 
 _ROUTED_INDEX: dict[int, int] = {}
 
+# Cau trong loi nhac tu kiem chung cua Core (model.VerifyWorkNudge, core-go/internal/model/client.go).
+# test_fake_bridge kiem tra chinh chuoi nay trong request, nen doi ben Go ma quen doi day thi se do ngay.
+VERIFY_MARK = "check the work you just did"
+
 
 def sequential() -> list[dict]:
-    return [step for step in SCRIPT if "when" not in step]
+    return [step for step in SCRIPT if "when" not in step and "on_verify" not in step]
 
 
 def routed_step(body: dict) -> dict | None:
@@ -75,6 +79,64 @@ def next_step() -> dict:
         _INDEX += 1
         _CALLS += 1
     return step
+
+
+def is_verification_round(body: dict) -> bool:
+    """True khi request HIEN TAI la luot tu kiem chung.
+
+    Core chen loi nhac kiem chung thanh mot tin user, va tin do nam lai trong lich su den het luot - nen
+    phai xet dung tin CUOI CUNG, khong phai ca body.
+    """
+    messages = body.get("messages") or []
+    if not messages:
+        return False
+    content = messages[-1].get("content")
+    if isinstance(content, str):
+        return VERIFY_MARK in content
+    if isinstance(content, list):
+        return any(isinstance(block, dict) and VERIFY_MARK in str(block.get("text", "")) for block in content)
+    return False
+
+
+def verification_step(body: dict) -> dict | None:
+    """Buoc rieng cho luot tu kiem chung, khi kich ban khai bao `"on_verify": true`.
+
+    Chi dung MOT lan. Bai test muon buoc doc lai phat hien loi that thi khai bao buoc nay (thuong la mot
+    tool call sua tiep); khong khai bao thi `verification_reply` tra loi khang dinh nhu binh thuong.
+    """
+    if not is_verification_round(body):
+        return None
+    for position, step in enumerate(SCRIPT):
+        if not step.get("on_verify"):
+            continue
+        with _LOCK:
+            index = _ROUTED_INDEX.get(position, 0)
+            _ROUTED_INDEX[position] = index + 1
+        if index == 0:
+            return dict(step)
+    return None
+
+
+def verification_reply(body: dict) -> dict | None:
+    """Luot TU KIEM CHUNG: Core chen them mot tin user sau khi agent da sua tai lieu (VerifyWorkEnabled).
+
+    Fake tra lai dung cau tra loi nhap truoc do - giong mot model doc lai roi khang dinh lai la dung. Luot
+    nay KHONG tieu thu buoc nao cua kich ban, nen moi kich ban cu van chay y nguyen khi tinh nang bat mac
+    dinh. Muon kiem chung bat ra loi thi viet mot bai rieng dung buoc {"raw": ...}.
+    """
+    if not is_verification_round(body):
+        return None
+    for message in reversed(body.get("messages", [])):
+        if message.get("role") != "assistant":
+            continue
+        content = message.get("content")
+        if isinstance(content, str) and content.strip():
+            return {"text": content}
+        if isinstance(content, list):
+            text = "".join(block.get("text", "") for block in content if isinstance(block, dict) and block.get("type") == "text")
+            if text.strip():
+                return {"text": text}
+    return {"text": "Da kiem tra lai."}
 
 
 def build_response(step: dict) -> dict:
@@ -167,7 +229,7 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"error": {"message": "model `%s` does not exist" % UNKNOWN_MODEL}}, 404)
             return
 
-        step = routed_step(parsed) or next_step()
+        step = verification_step(parsed) or verification_reply(parsed) or routed_step(parsed) or next_step()
         delay = float(step.get("delay", 0))
         if delay > 0:
             time.sleep(delay)

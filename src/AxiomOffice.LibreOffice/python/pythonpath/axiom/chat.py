@@ -17,6 +17,8 @@ READ_ONLY_ACTIONS = {
     "et.undo", "wps.listSlides", "wpp.listSlides", "wpp.checkLayout", "wpp.save", "wpp.saveAs", "wpp.exportPdf",
 }
 TERMINAL_STATUS = ("completed", "cancelled", "timedout", "stopped", "failed")
+# Suy luan ngan hon nguong nay thi hien thang; dai hon thi thu lai thanh mot dong (bam de mo).
+REASONING_INLINE_LIMIT = 320
 
 
 def is_edit(action: str | None) -> bool:
@@ -34,6 +36,7 @@ class ChatSession:
         self.items: list[dict] = []
         self.notes: list[dict] = []          # ghi nho vua ghi trong luot: {id, text}
         self.pending: dict | None = None     # the xac nhan dang cho
+        self.reasoning: dict | None = None   # muc suy luan cua luot nay (chi khi nguoi dung bat)
         self.conversation_id: str | None = None
         self.run_id: str | None = None
         self.running = False
@@ -51,6 +54,7 @@ class ChatSession:
         self.error = None
         self.pending = None
         self.notes = []
+        self.reasoning = None
         self._edits = 0
         self._tools = []
         self.run_id = run_id
@@ -111,6 +115,8 @@ class ChatSession:
             model = data.get("model")
             if model:
                 self.status = "Đang chạy · %s" % model
+        elif kind == "run.reasoning":
+            self._reasoning(data)
         elif kind == "tool.finished":
             action = data.get("action") or data.get("tool") or "?"
             if data.get("tool") in ("load_skill", "remember") and data.get("ok"):
@@ -150,6 +156,27 @@ class ChatSession:
             if kind == "run.failed":
                 self.error = str(data.get("error") or "lỗi")
         self._changed()
+
+    def _reasoning(self, data: dict) -> None:
+        """Suy luan cua model cho mot vong (chi co khi nguoi dung bat LlmShowReasoning trong Cai dat).
+
+        Mot muc DUY NHAT cho ca luot, moi vong ghi de bang phan suy luan moi nhat: nguoi dung doi mat
+        theo dong moi nhat, va khung chat khong bi mot khoi van dai vai nghin ky tu choan het. Muc nay
+        duoc mo rong san khi con ngan, con van dai thi thu lai thanh mot dong mo bam vao de xem.
+        """
+        text = str(data.get("text") or "").strip()
+        if not text:
+            return
+        round_number = int(data.get("round") or 0)
+        if self.reasoning is None:
+            self.reasoning = self._add("reasoning", text=text, round=round_number,
+                                       expanded=len(text) <= REASONING_INLINE_LIMIT)
+        else:
+            self.touch(self.reasoning, text=text, round=round_number)
+
+    def toggle_reasoning(self, item: dict) -> None:
+        """Bam 'Hien'/'An' tren khoi suy luan."""
+        self.touch(item, expanded=not item.get("expanded"))
 
     def tick(self, run: dict) -> None:
         """Cap nhat tu vong hoi trang thai (khi khong dung duoc SSE)."""
@@ -225,6 +252,7 @@ class ChatSession:
         self.items = []
         self.notes = []
         self.pending = None
+        self.reasoning = None
         self.conversation_id = None
         self.run_id = None
         self.error = None

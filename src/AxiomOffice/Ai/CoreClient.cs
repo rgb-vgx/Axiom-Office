@@ -36,6 +36,7 @@ namespace AxiomOffice.Ai
         public int Rounds;
         public int InputTokens;
         public int OutputTokens;
+        public int Round;       // run.reasoning: vòng chạy đã sinh ra phần suy luận này
     }
 
     // Client HTTP + SSE toi AxiomOffice.Core.exe: tim Core qua core.json, khoi dong khi can (muc 7.1),
@@ -608,6 +609,11 @@ namespace AxiomOffice.Ai
                 if (data.ContainsKey("rounds"))
                 {
                     item.Rounds = Convert.ToInt32(data["rounds"]);
+                }
+
+                if (data.ContainsKey("round"))
+                {
+                    item.Round = Convert.ToInt32(data["round"]);
                 }
 
                 if (data.ContainsKey("inputTokens"))

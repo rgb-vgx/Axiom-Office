@@ -28,6 +28,14 @@ const (
 	MaxRetryAfter = 10 * time.Second
 
 	EmptyReplyNudge = "Your last reply was empty. Continue the task with the tools, or if it is already done, reply with a short summary."
+
+	// VerifyWorkNudge: cau nhac khi luot da sua tai lieu (AgentOptions.Verify). YEU CAU DOC LAI bang
+	// lenh that, khong phai tu hoi lai suy nghi - model tu danh gia bang tri nho thi luon thay dung.
+	VerifyWorkNudge = "Before you finish: check the work you just did. Read the document back with the " +
+		"actions available to you (for example et.readRange or et.checkRange, et.listSheets, writer.getText " +
+		"or writer.checkTables, wpp.listSlides or wpp.checkLayout) and compare what is really there with what " +
+		"the user asked for: values, ranges, cell types, sheet or slide names, headings and formatting. " +
+		"Fix anything missing or wrong with more tool calls, then reply with the short summary."
 )
 
 // DefaultRetryDelays: loi tam thoi cua nha cung cap (429, 500/502/503/504, rot mang) thu lai co cho tang dan.
@@ -49,6 +57,12 @@ type Client struct {
 	RetryDelays []time.Duration
 	// Stream: gui `stream: true` va doc SSE. Tat cho loi goi ngan.
 	Stream bool
+	// ShowReasoning: bat phan suy luan cua model reasoning de nguoi dung nhin thay no dang nghi gi.
+	//
+	// Mac dinh TAT: model reasoning dot het `max_tokens` vao phan nghi roi tra ve content rong
+	// (finish_reason=length) tren prompt lon - xem CHANGELOG 02/10/2026. Tat thi tra loi nhanh va
+	// chac hon nhieu (do duoc: 2,0s so voi 15,6s). Bat len thi phan suy luan hien o pane.
+	ShowReasoning bool
 }
 
 func NewClient(httpClient *http.Client, provider, endpoint, apiKey, model string) *Client {
@@ -158,12 +172,32 @@ func (c *Client) post(ctx, userCtx context.Context, body map[string]any, stream 
 			body["stream_options"] = map[string]any{"include_usage": true}
 		}
 	}
+	// Tat suy luan cho model reasoning: khong co cai nay thi prompt lon bi dot het max_tokens vao
+	// phan nghi va content tra ve rong. Chi gui cho codec OpenAI (Anthropic co `thinking` khac dang).
+	if c.Codec.Name() == "openai" {
+		mode := "disabled"
+		if c.ShowReasoning {
+			mode = "enabled"
+		}
+		body["thinking"] = map[string]any{"type": mode}
+	}
 	payload, err := json.Marshal(body)
 	if err != nil {
 		return nil, "invalid request: " + err.Error(), 0
 	}
+	droppedThinking := false
 	for attempt := 0; ; attempt++ {
 		text, errText, status, retryAfter := c.postOnce(ctx, userCtx, payload)
+		// Nha cung cap khong biet tham so `thinking` (OpenAI that, vai gateway khac) -> bo no roi
+		// thu lai ngay, va tat han cho cac lan sau. Tu lanh, nguoi dung khong phai cau hinh gi.
+		if text == nil && status == 400 && !droppedThinking {
+			droppedThinking = true
+			delete(body, "thinking")
+			if payload, err = json.Marshal(body); err == nil {
+				corelog.Info("model %s: provider tu choi tham so thinking - bo qua va thu lai", c.Model)
+				continue
+			}
+		}
 		if text != nil || ctx.Err() != nil || attempt >= len(c.RetryDelays) || !IsTransient(status, errText) {
 			return text, errText, status
 		}

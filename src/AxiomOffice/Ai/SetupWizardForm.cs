@@ -60,6 +60,8 @@ namespace AxiomOffice.Ai
         // Buoc 4: tinh nang.
         private readonly ToggleBox _memory = new ToggleBox();
         private readonly ToggleBox _autoExtract = new ToggleBox();
+        private readonly ToggleBox _verify = new ToggleBox();
+        private readonly ToggleBox _reasoning = new ToggleBox();
         private readonly ToggleBox _visualQa = new ToggleBox();
         private readonly ChipButton _advanced = new ChipButton("Tuỳ chọn nâng cao…");
         private readonly ChipButton _again = new ChipButton("Kiểm tra lại");
@@ -917,6 +919,8 @@ namespace AxiomOffice.Ai
 
                 _memory.Checked = Config.MemoryEnabled;
                 _autoExtract.Checked = Config.MemoryAutoExtract;
+                _verify.Checked = Config.VerifyWorkEnabled;
+                _reasoning.Checked = Config.LlmShowReasoning;
                 _visualQa.Checked = Config.VisualQaEnabled;
             };
             panel.Controls.Add(_advanced);
@@ -944,6 +948,16 @@ namespace AxiomOffice.Ai
                 return _autoExtract;
             }
 
+            if (key == "VerifyWorkEnabled")
+            {
+                return _verify;
+            }
+
+            if (key == "LlmShowReasoning")
+            {
+                return _reasoning;
+            }
+
             return _visualQa;
         }
 
@@ -959,6 +973,16 @@ namespace AxiomOffice.Ai
                 return Config.MemoryAutoExtract;
             }
 
+            if (key == "VerifyWorkEnabled")
+            {
+                return Config.VerifyWorkEnabled;
+            }
+
+            if (key == "LlmShowReasoning")
+            {
+                return Config.LlmShowReasoning;
+            }
+
             return Config.VisualQaEnabled;
         }
 
@@ -966,6 +990,8 @@ namespace AxiomOffice.Ai
         {
             bool ok = Config.WriteDword("MemoryEnabled", _memory.Checked ? 1 : 0)
                 & Config.WriteDword("MemoryAutoExtract", _autoExtract.Checked ? 1 : 0)
+                & Config.WriteDword("VerifyWorkEnabled", _verify.Checked ? 1 : 0)
+                & Config.WriteDword("LlmShowReasoning", _reasoning.Checked ? 1 : 0)
                 & Config.WriteDword("VisualQaEnabled", _visualQa.Checked ? 1 : 0);
             if (!ok && showMessage)
             {

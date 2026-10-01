@@ -56,7 +56,7 @@ func (openAICodec) ParseStream(body []byte) (*Turn, string) {
 	if len(payloads) == 0 {
 		return (openAICodec{}).Parse(body)
 	}
-	var text strings.Builder
+	var text, reasoning strings.Builder
 	type partial struct {
 		id   string
 		name string
@@ -69,8 +69,9 @@ func (openAICodec) ParseStream(body []byte) (*Turn, string) {
 		var chunk struct {
 			Choices []struct {
 				Delta struct {
-					Content   string `json:"content"`
-					ToolCalls []struct {
+					Content          string `json:"content"`
+					ReasoningContent string `json:"reasoning_content"`
+					ToolCalls        []struct {
 						Index    *int   `json:"index"`
 						ID       string `json:"id"`
 						Function struct {
@@ -84,6 +85,12 @@ func (openAICodec) ParseStream(body []byte) (*Turn, string) {
 			Usage *struct {
 				Prompt     int `json:"prompt_tokens"`
 				Completion int `json:"completion_tokens"`
+				// DeepSeek bao phan doc tu cache o hai truong rieng...
+				PromptCacheHit int `json:"prompt_cache_hit_tokens"`
+				// ...con OpenAI bao trong prompt_tokens_details.
+				PromptDetails struct {
+					Cached int `json:"cached_tokens"`
+				} `json:"prompt_tokens_details"`
 			} `json:"usage"`
 		}
 		// Frame hong chi bi bo qua, khong lam hong ca luot.
@@ -92,6 +99,7 @@ func (openAICodec) ParseStream(body []byte) (*Turn, string) {
 		}
 		if chunk.Usage != nil {
 			turn.InputTokens, turn.OutputTokens = chunk.Usage.Prompt, chunk.Usage.Completion
+			turn.CachedTokens = cachedFrom(chunk.Usage.PromptCacheHit, chunk.Usage.PromptDetails.Cached)
 		}
 		if len(chunk.Choices) == 0 {
 			continue
@@ -101,6 +109,7 @@ func (openAICodec) ParseStream(body []byte) (*Turn, string) {
 			turn.FinishReason = choice.FinishReason
 		}
 		text.WriteString(choice.Delta.Content)
+		reasoning.WriteString(choice.Delta.ReasoningContent)
 		for _, call := range choice.Delta.ToolCalls {
 			index := 0
 			if call.Index != nil {
@@ -124,6 +133,7 @@ func (openAICodec) ParseStream(body []byte) (*Turn, string) {
 	}
 	turn.Text = text.String()
 	turn.HasText = turn.Text != ""
+	turn.Reasoning = reasoning.String()
 	for _, index := range order {
 		entry := partials[index]
 		arguments := entry.args.String()
@@ -161,8 +171,12 @@ func (openAICodec) Parse(body []byte) (*Turn, string) {
 			FinishReason string          `json:"finish_reason"`
 		} `json:"choices"`
 		Usage struct {
-			Prompt     int `json:"prompt_tokens"`
-			Completion int `json:"completion_tokens"`
+			Prompt         int `json:"prompt_tokens"`
+			Completion     int `json:"completion_tokens"`
+			PromptCacheHit int `json:"prompt_cache_hit_tokens"`
+			PromptDetails  struct {
+				Cached int `json:"cached_tokens"`
+			} `json:"prompt_tokens_details"`
 		} `json:"usage"`
 	}
 	if err := decodeFirst(body, &root); err != nil {
@@ -173,8 +187,9 @@ func (openAICodec) Parse(body []byte) (*Turn, string) {
 	}
 	raw := root.Choices[0].Message
 	var message struct {
-		Content   json.RawMessage `json:"content"`
-		ToolCalls []struct {
+		Content          json.RawMessage `json:"content"`
+		ReasoningContent string          `json:"reasoning_content"`
+		ToolCalls        []struct {
 			ID       string `json:"id"`
 			Function struct {
 				Name      string          `json:"name"`
@@ -186,7 +201,8 @@ func (openAICodec) Parse(body []byte) (*Turn, string) {
 		return nil, "invalid provider response: " + err.Error()
 	}
 	turn := &Turn{InputTokens: root.Usage.Prompt, OutputTokens: root.Usage.Completion, Raw: raw,
-		FinishReason: root.Choices[0].FinishReason}
+		CachedTokens: cachedFrom(root.Usage.PromptCacheHit, root.Usage.PromptDetails.Cached),
+		FinishReason: root.Choices[0].FinishReason, Reasoning: message.ReasoningContent}
 	var text string
 	if json.Unmarshal(message.Content, &text) == nil && len(message.Content) > 0 && string(message.Content) != "null" {
 		turn.Text, turn.HasText = text, true

@@ -372,6 +372,34 @@
     "params": []
   },
   {
+    "name": "et.addSheet",
+    "kind": "et",
+    "params": [
+      {
+        "name": "name",
+        "hint": null
+      },
+      {
+        "name": "index",
+        "hint": "0-based, default: append"
+      }
+    ]
+  },
+  {
+    "name": "et.renameSheet",
+    "kind": "et",
+    "params": [
+      {
+        "name": "sheet",
+        "hint": null
+      },
+      {
+        "name": "name",
+        "hint": null
+      }
+    ]
+  },
+  {
     "name": "et.activateSheet",
     "kind": "et",
     "params": [
