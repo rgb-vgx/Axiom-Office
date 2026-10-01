@@ -1,0 +1,40 @@
+TONG tool call: 37
+[('et.writeRange', 12), ('et.addSheet', 10), ('et.readRange', 8), ('', 5), ('et.listSheets', 1), ('et.renameSheet', 1)]
+
+  1                  ok   {"name":"bang-diem"}
+  2                  ok   {"name":"bao-cao-du-lieu"}
+  3 et.listSheets    ok   null
+  4 et.renameSheet   ok   {"name":"Raw_Data","sheet":"Sheet1"}
+  5 et.addSheet      ok   {"name":"Assumptions"}
+  6 et.addSheet      ok   {"name":"Revenue"}
+  7 et.addSheet      ok   {"name":"COGS"}
+  8 et.addSheet      ok   {"name":"PnL"}
+  9 et.addSheet      ok   {"name":"Budget_vs_Actual"}
+ 10 et.addSheet      ok   {"name":"Forecast"}
+ 11 et.addSheet      ok   {"name":"Scenarios"}
+ 12 et.addSheet      ok   {"name":"KPI"}
+ 13 et.addSheet      ok   {"name":"Dashboard"}
+ 14 et.addSheet      ok   {"name":"Checks"}
+ 15 et.writeRange    ok   {"range":"A1:B2","sheet":"Raw_Data","values":[["2024-01-15","=DATE(2024,1,15)"],[45306,"x"]]}
+ 16 et.readRange     ok   {"range":"A1:B3","sheet":"Raw_Data"}
+ 17 et.writeRange    ok   {"range":"D1:H1","sheet":"Raw_Data","values":[["=1+2","=SUM(A2:A3)","=IF(1>0,\"Y\",\"N\")","=EOMONTH(A2,0)","=
+ 18 et.readRange     ok   {"range":"D1:H1","sheet":"Raw_Data"}
+ 19                  LOI  
+ 20                  LOI  
+ 21                  LOI  
+ 22 et.writeRange    ok   {"range":"A1","sheet":"Assumptions","values":[["ASSUMPTIONS - ENTERPRISE FP&A MODEL"],[""],["PERIOD SETUP",""]
+ 23 et.readRange     ok   {"range":"A16:C27","sheet":"Assumptions"}
+ 24 et.readRange     ok   {"range":"A1:C16","sheet":"Assumptions"}
+ 25 et.writeRange    ok   {"range":"E24","sheet":"Assumptions","values":[["=C22"],["=IF(C22=1,\"yes1\",\"no1\")"],["=IF(C22=1,10,20)"],[
+ 26 et.readRange     ok   {"range":"E24:E30","sheet":"Assumptions"}
+ 27 et.writeRange    ok   {"range":"F24","sheet":"Assumptions","values":[[1],[2],[3],[1],["1"],[1.5],[42]]}
+ 28 et.readRange     ok   {"range":"C30:F30","sheet":"Assumptions"}
+ 29 et.readRange     ok   {"range":"C20:C28","sheet":"Assumptions"}
+ 30 et.writeRange    ok   {"range":"G24","sheet":"Assumptions","values":[["=$C$22"],["=Assumptions.C22"],["=IF($C$22=1,\"yes\",\"no\")"]
+ 31 et.writeRange    ok   {"range":"A1","sheet":"Assumptions","values":[["ASSUMPTIONS - ENTERPRISE FP&A MODEL",""],["",""],["PERIOD SETU
+ 32 et.readRange     ok   {"range":"A21:B36","sheet":"Assumptions"}
+ 33 et.writeRange    ok   {"range":"A1","sheet":"Raw_Data","values":[["Date","Region","Product","Customer Segment","Revenue","COGS","Ope
+ 34 et.writeRange    ok   {"range":"A42","sheet":"Raw_Data","values":[[45346,"APAC","Analytics Cloud","Enterprise",14493.13,8625.55,1290
+ 35 et.writeRange    ok   {"range":"A103","sheet":"Raw_Data","values":[[45407,"APAC","Enterprise Suite","Mid-Market",7245.57,3885.3,657.
+ 36 et.writeRange    ok   {"range":"A167","sheet":"Raw_Data","values":[[45471,"EMEA","Analytics Cloud","Enterprise",12520.56,7724.91,131
+ 37 et.writeRange    ok   {"range":"A229","sheet":"Raw_Data","values":[[45533,"APAC","Support Plan","SMB",2064.51,1202.06,245.74,1],[455

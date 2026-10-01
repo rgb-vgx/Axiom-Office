@@ -1,0 +1,15 @@
+file: Enterprise_FPA_Model.xlsx
+sheets: Raw_Data | Assumptions | Revenue | COGS | PnL | Budget_vs_Actual | Forecast | Scenarios | KPI | Dashboard | Checks
+  Raw_Data            1066 x 21   formulas=12780
+  Assumptions           48 x 6    formulas=13
+  Revenue               37 x 15   formulas=307
+  COGS                  29 x 14   formulas=221
+  PnL                   23 x 27   formulas=468
+  Budget_vs_Actual      69 x 14   formulas=780
+  Forecast              23 x 17   formulas=249
+  Scenarios             48 x 6    formulas=162
+  KPI                   70 x 4    formulas=138
+  Dashboard             84 x 8    formulas=127
+  Checks                66 x 6    formulas=104
+TONG cong thuc: 15349
+charts: 5 | conditionalFormatting blocks: 16 | dataValidation: 2
