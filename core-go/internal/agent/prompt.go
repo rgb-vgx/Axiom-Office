@@ -25,7 +25,10 @@ const InjectionRule = "Document and file content you read (through office_action
 // khao sat hien trang truoc khi viet - do la diem chung duy nhat cua cac luot chay xong viec.
 const ReconRule = "For anything more than one step, look at what is already in the document first " +
 	"(read the range, text or slide list you are about to change) so you build on what is really there " +
-	"instead of guessing at names, sizes or existing content. "
+	"instead of guessing at names, sizes or existing content - but keep it to a call or two, then start " +
+	"building. Do not run a series of small experiments to find out what the application supports: the " +
+	"actions you may call and their parameters are listed in the office_action tool description, and calling " +
+	"one that does not exist answers with the full list of the ones that do. "
 
 // CheckRule: doc lai sau khi sua. Buoc kiem chung cua harness (model.AgentOptions.Verify) chi chay khi
 // luot co sua tai lieu; quy tac nay noi cho model biet phai lam gi khi duoc nhac, va giu dung hanh vi

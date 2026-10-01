@@ -180,6 +180,41 @@ func TestCachedTokensAreRead(t *testing.T) {
 	}
 }
 
+// Mot phan hoi bi cat ngang vi het ngan sach token cua CHINH no (finish_reason=length, content rong)
+// khong duoc huy ca luot chay: hai luot chay that ngay 02/10/2026 chet han o day sau khi da lam duoc
+// nhieu. Nhac viet nho lai roi lam tiep.
+func TestRunAgentRecoversFromTruncatedReply(t *testing.T) {
+	truncated := `{"choices":[{"finish_reason":"length","message":{"role":"assistant","content":""}}],"usage":{"prompt_tokens":5,"completion_tokens":9}}`
+	server, bodies := verifyServer(t, []string{truncated, truncated,
+		`{"choices":[{"message":{"role":"assistant","content":"xong"}}]}`})
+	result := runOn(server, false, DefaultAgentOptions())
+
+	if !result.OK || result.Text != "xong" {
+		t.Fatalf("phai cuu duoc luot chay: %+v", result)
+	}
+	if result.Rounds != 3 {
+		t.Fatalf("hai loi nhac khac nhau roi moi tra loi: rounds=%d", result.Rounds)
+	}
+	sent := bodies()
+	// Lan nhac thu hai phai noi ve VIEC BI CAT, khac lan nhac "tra loi rong" chung chung.
+	if !strings.Contains(sent[1], "empty") {
+		t.Fatalf("vong 2 phai la loi nhac tra loi rong: %s", sent[1])
+	}
+	if !strings.Contains(sent[2], "cut off by the response token limit") {
+		t.Fatalf("vong 3 phai la loi nhac viet nho lai: %s", sent[2])
+	}
+
+	// Cat ngang mai thi van phai dung lai, khong nhac vo han.
+	forever, _ := verifyServer(t, []string{truncated})
+	failed := runOn(forever, false, DefaultAgentOptions())
+	if failed.OK || !strings.Contains(failed.Error, "finish_reason=length") {
+		t.Fatalf("cat mai thi phai bao loi ro ly do: %+v", failed)
+	}
+	if failed.Rounds != 3 {
+		t.Fatalf("chi nhac hai lan: rounds=%d", failed.Rounds)
+	}
+}
+
 // So cache ca luot la tong cac vong.
 func TestRunAgentSumsCachedTokens(t *testing.T) {
 	cachedCall := `{"choices":[{"message":{"role":"assistant","content":null,"tool_calls":[{"id":"c1","function":{"name":"t","arguments":"{}"}}]}}],"usage":{"prompt_tokens":10,"completion_tokens":1,"prompt_cache_hit_tokens":7}}`

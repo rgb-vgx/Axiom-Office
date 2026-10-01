@@ -252,6 +252,26 @@ def test_calc(b, out):
     b.cmd("et.renameSheet", {"sheet": "Không có", "name": "X"}, expect_ok=False, key="et.renameSheet sheet lạ")
     b.cmd("et.activateSheet", {"sheet": "Sheet1"})
     b.cmd("et.activateSheet", {"sheet": "Không có"}, expect_ok=False, key="et.activateSheet unknown")
+    # Biểu đồ: Test 1 và Test 4 của bộ benchmark đều yêu cầu "use charts"; không có lệnh này thì
+    # Dashboard chỉ là bảng số.
+    chart = b.cmd("et.addChart", {"sheet": "Sheet1", "range": "A1:C3", "type": "line", "title": "Điểm",
+                                  "anchor": "E10"}) or {}
+    check(chart.get("chart") and chart.get("type") == "line" and chart.get("range") == "A1:C3",
+          "Calc addChart tạo biểu đồ", chart)
+    # Kiểu phải là kiểu ĐỌC LẠI được từ tài liệu, không phải điều vừa xin (một bản LibreOffice từng từ
+    # chối đổi kiểu; khi đó typeApplied phải là false chứ không được hứa suông).
+    check(chart.get("typeApplied") and chart.get("diagram") == "line",
+          "Calc addChart đặt đúng kiểu và đọc lại được", chart)
+    check(chart.get("titleApplied"), "Calc addChart đặt được tiêu đề (HasMainTitle)", chart)
+    charts = b.cmd("et.listCharts", {"sheet": "Sheet1"}) or {}
+    names = [item.get("name") for item in (charts.get("charts") or [])]
+    check(chart.get("chart") in names, "Calc listCharts thấy biểu đồ vừa tạo", charts)
+    check(any(item.get("diagram") == "line" for item in (charts.get("charts") or [])),
+          "Calc listCharts đọc lại được kiểu biểu đồ", charts)
+    b.cmd("et.addChart", {"sheet": "Sheet1", "range": "A1:C3", "type": "donut"}, expect_ok=False,
+          key="et.addChart kiểu lạ")
+    b.cmd("et.addChart", {"sheet": "Sheet1", "type": "line"}, expect_ok=False, key="et.addChart thiếu range")
+
     b.cmd("et.writeRange", {"range": "A7", "values": [["hoàn tác tôi"]]}, key="et.writeRange before undo")
     b.cmd("et.undo", {"count": 1})
     check((b.cmd("et.readRange", {"range": "A7"}, record=False) or {}).get("values", [[None]])[0][0] is None,

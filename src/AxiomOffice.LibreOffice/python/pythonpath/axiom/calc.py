@@ -304,6 +304,112 @@ def format_range(env, params):
     return {"sheet": _active_sheet_name(env, params), "range": address}
 
 
+def _diagram(kind: str):
+    """Kieu bieu do theo ten nguoi dung go -> service diagram cua UNO."""
+    services = {
+        "column": "com.sun.star.chart.BarDiagram",
+        "bar": "com.sun.star.chart.BarDiagram",
+        "line": "com.sun.star.chart.LineDiagram",
+        "pie": "com.sun.star.chart.PieDiagram",
+        "area": "com.sun.star.chart.AreaDiagram",
+        "scatter": "com.sun.star.chart.XYDiagram",
+    }
+    if kind not in services:
+        raise values.ParamError("'type' must be one of %s, got '%s'" % ("/".join(sorted(services)), kind))
+    return services[kind], kind == "bar"
+
+
+def add_chart(env, params):
+    """Chen bieu do tu mot vung du lieu. Khong co lenh nay thi Dashboard chi la bang so."""
+    address = values.string(params, "range")
+    if not address:
+        raise values.ParamError("'range' is required")
+    kind = (values.string(params, "type", "column") or "column").lower()
+    service, horizontal = _diagram(kind)
+    doc = env.document
+    sheet = _sheet(doc, params)
+    source = _range(sheet, address)
+    anchor = values.string(params, "anchor", "A1") or "A1"
+
+    # Kich thuoc tinh bang cm (nguoi dung de hinh dung hon 1/100 mm cua UNO).
+    width = int(round(values.number(params, "width", 12.0) * 1000))
+    height = int(round(values.number(params, "height", 7.0) * 1000))
+    cell = _range(sheet, anchor)
+    position = cell.Position
+    rect = uno.createUnoStruct("com.sun.star.awt.Rectangle")
+    rect.X, rect.Y, rect.Width, rect.Height = position.X, position.Y, max(1000, width), max(1000, height)
+
+    name = values.string(params, "name") or ("Chart%d" % (sheet.Charts.Count + 1))
+    if sheet.Charts.hasByName(name):
+        raise values.ParamError("a chart named '%s' already exists on sheet '%s'" % (name, sheet.Name))
+    # Tham so 3 nhan CellRangeAddress; 4/5 bao UNO lay ten cot/dong lam nhan chu giai.
+    sheet.Charts.addNewByName(name, rect, (source.RangeAddress,), True, True)
+
+    chart = sheet.Charts.getByName(name).getEmbeddedObject()
+    type_applied = True
+    try:
+        chart.Diagram = chart.createInstance(service)
+        if horizontal:
+            chart.Diagram.Vertical = False        # BarDiagram nam ngang
+    except Exception:  # noqa: BLE001 - giu kieu mac dinh con hon hong ca lenh
+        type_applied = False
+
+    title = values.string(params, "title")
+    title_applied = False
+    if title:
+        try:
+            # Thuoc tinh la HasMainTitle, KHONG phai HasTitle: ban LibreOffice nay khong co HasTitle
+            # (do ngay 02/10/2026 bang probe UNO rieng).
+            chart.HasMainTitle = True
+            chart.Title.String = title
+            title_applied = True
+        except Exception:  # noqa: BLE001
+            pass
+
+    # Doc lai kieu THAT SU cua bieu do thay vi lap lai dieu minh vua xin: neu ban LibreOffice tu choi
+    # doi kieu thi nguoi goi phai biet, khong duoc nghe loi hua.
+    actual = _diagram_kind(chart)
+    return {"chart": name, "sheet": sheet.Name, "type": kind, "diagram": actual,
+            "typeApplied": type_applied and actual == kind, "titleApplied": title_applied,
+            "range": address, "anchor": anchor}
+
+
+def _diagram_kind(chart) -> str:
+    """Kieu that cua bieu do, quy ve cung bo ten voi ban C# (column/bar/line/pie/area/scatter).
+
+    LibreOffice gop cot va thanh lam mot BarDiagram, phan biet bang thuoc tinh Vertical - neu tra ve
+    nguyen ten service thi hai ban se tra hai kieu gia tri khac nhau cho cung mot hop dong.
+    """
+    try:
+        service = chart.Diagram.getDiagramType()
+    except Exception:  # noqa: BLE001
+        return ""
+    names = {"BarDiagram": "bar", "LineDiagram": "line", "PieDiagram": "pie",
+             "AreaDiagram": "area", "XYDiagram": "scatter"}
+    kind = names.get(service.rsplit(".", 1)[-1])
+    if kind == "bar":
+        try:
+            if chart.Diagram.Vertical:
+                return "column"
+        except Exception:  # noqa: BLE001
+            pass
+    return kind or service
+
+
+def list_charts(env, params):
+    """Ten + kieu that cua tung bieu do - de agent tu kiem chung Dashboard, khong phai tin loi hua."""
+    sheet = _sheet(env.document, params)
+    items = []
+    for name in sheet.Charts.getElementNames():
+        entry = {"name": name, "diagram": ""}
+        try:
+            entry["diagram"] = _diagram_kind(sheet.Charts.getByName(name).getEmbeddedObject())
+        except Exception:  # noqa: BLE001
+            pass
+        items.append(entry)
+    return {"sheet": sheet.Name, "charts": items}
+
+
 def undo(env, params):
     return documents.undo(env.document, values.integer(params, "count", 1))
 
@@ -330,6 +436,12 @@ command("et.writeRange", "et", write_range,
         agent=True, undo=True)
 command("et.formatRange", "et", format_range, "Định dạng vùng", req("range"), opt("bold"), opt("italic"), opt("fontSize"),
         opt("fontColor"), opt("fillColor"), opt("numFmt"), opt("horizontal"), opt("wrap"), opt("sheet"), agent=True, undo=True)
+command("et.addChart", "et", add_chart,
+        "Chèn biểu đồ từ vùng dữ liệu; `type` column/bar/line/pie/area/scatter, `width`/`height` tính bằng cm",
+        req("range", "source data e.g. 'A1:B13'"), opt("type", "column (default)/bar/line/pie/area/scatter"),
+        opt("title"), opt("name"), opt("anchor", "top-left cell, default 'A1'"),
+        opt("width", "cm, default 12"), opt("height", "cm, default 7"), opt("sheet"), agent=True, undo=True)
+command("et.listCharts", "et", list_charts, "Danh sách biểu đồ trên sheet", opt("sheet"), agent=True)
 command("et.undo", "et", undo, "Hoàn tác", opt("count"), agent=True)
 command("et.exportPdf", "et", lambda env, p: documents.export_pdf(env.document, "et", values.string(p, "path")),
         "Xuất PDF", req("path"), agent=True)

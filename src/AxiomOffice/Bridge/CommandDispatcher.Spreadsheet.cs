@@ -25,6 +25,12 @@ namespace AxiomOffice.Bridge
                     Req("range", "top-left cell e.g. 'A1'"), Req("values", "2D array of rows e.g. [[\"Tên\",\"Điểm\"],[\"An\",9.5]]"), Opt("sheet")).ForAgent(),
                 Command("et.formatRange", "et", EtFormatRange, "Định dạng vùng (màu dạng `#RRGGBB`, `horizontal` left/center/right)",
                     Req("range"), Opt("bold"), Opt("italic"), Opt("fontSize"), Opt("fontColor"), Opt("fillColor"), Opt("numFmt"), Opt("horizontal"), Opt("wrap"), Opt("sheet")).ForAgent(),
+                Command("et.addChart", "et", EtAddChart,
+                    "Chèn biểu đồ từ vùng dữ liệu; `type` column/bar/line/pie/area/scatter, `width`/`height` tính bằng cm",
+                    Req("range", "source data e.g. 'A1:B13'"), Opt("type", "column (default)/bar/line/pie/area/scatter"),
+                    Opt("title"), Opt("name"), Opt("anchor", "top-left cell, default 'A1'"),
+                    Opt("width", "cm, default 12"), Opt("height", "cm, default 7"), Opt("sheet")).ForAgent(),
+                Command("et.listCharts", "et", EtListCharts, "Danh sách biểu đồ trên sheet", Opt("sheet")).ForAgent(),
                 Command("et.undo", "et", EtUndo, "Hoàn tác", Opt("count")).ForAgent(),
                 Command("et.exportPdf", "et", EtExportPdf, "Xuất PDF", Req("path")).ForAgent(),
                 Command("et.save", "et", (host, p) => SaveDocument(host, "et", null), "Lưu").ForAgent(),
@@ -285,6 +291,123 @@ namespace AxiomOffice.Bridge
             }
             wb.Worksheets[oldName].Name = newName;   // Excel tự cập nhật công thức trỏ tên cũ
             return new Dictionary<string, object> { { "sheet", newName }, { "sheets", SheetNames(wb) } };
+        }
+
+        // Kiểu biểu đồ theo tên người dùng gõ -> hằng số XlChartType của Excel.
+        private static int ChartType(string kind)
+        {
+            switch (kind)
+            {
+                case "column": return 51;     // xlColumnClustered
+                case "bar": return 57;        // xlBarClustered
+                case "line": return 4;        // xlLine
+                case "pie": return 5;         // xlPie
+                case "area": return 1;        // xlArea
+                case "scatter": return -4169; // xlXYScatter
+                default:
+                    throw new InvalidOperationException(
+                        "'type' must be one of area/bar/column/line/pie/scatter, got '" + kind + "'");
+            }
+        }
+
+        // Chèn biểu đồ từ một vùng dữ liệu. Không có lệnh này thì Dashboard chỉ là bảng số.
+        private static Dictionary<string, object> EtAddChart(IAppHost host, Dictionary<string, object> p)
+        {
+            string address = ParamString(p, "range", null);
+            if (string.IsNullOrEmpty(address))
+            {
+                throw new InvalidOperationException("'range' is required");
+            }
+            string kind = (ParamString(p, "type", "column") ?? "column").ToLowerInvariant();
+            int xlType = ChartType(kind);
+            string sheetName = ParamString(p, "sheet", null);
+            string anchor = ParamString(p, "anchor", "A1") ?? "A1";
+            dynamic app = host.Application;
+            dynamic wb = EnsureWorkbook(app);
+            dynamic sheet = string.IsNullOrEmpty(sheetName) ? wb.ActiveSheet : wb.Worksheets[sheetName];
+
+            // cm -> point (Excel dùng point cho vị trí/kích thước shape).
+            double width = Math.Max(30, ParamDouble(p, "width", 12.0) * 28.3465);
+            double height = Math.Max(30, ParamDouble(p, "height", 7.0) * 28.3465);
+            dynamic anchorCell = sheet.Range[anchor];
+
+            string name = ParamString(p, "name", null);
+            if (string.IsNullOrEmpty(name))
+            {
+                name = "Chart" + (Convert.ToInt32(sheet.ChartObjects().Count) + 1);
+            }
+            else
+            {
+                foreach (dynamic existing in sheet.ChartObjects())
+                {
+                    if (Convert.ToString(existing.Name) == name)
+                    {
+                        throw new InvalidOperationException("a chart named '" + name +
+                            "' already exists on sheet '" + Convert.ToString(sheet.Name) + "'");
+                    }
+                }
+            }
+
+            dynamic shape = sheet.Shapes.AddChart2(-1, xlType, anchorCell.Left, anchorCell.Top, width, height);
+            shape.Name = name;
+            shape.Chart.SetSourceData(sheet.Range[address]);
+            string title = ParamString(p, "title", null);
+            bool titleApplied = false;
+            if (!string.IsNullOrEmpty(title))
+            {
+                shape.Chart.HasTitle = true;
+                shape.Chart.ChartTitle.Text = title;
+                titleApplied = true;
+            }
+            // Đọc lại kiểu THẬT SỰ của biểu đồ thay vì lặp lại điều vừa xin (giống bản LibreOffice).
+            string diagram = ChartKindName(shape.Chart);
+            return new Dictionary<string, object>
+            {
+                { "chart", name }, { "sheet", Convert.ToString(sheet.Name) },
+                { "type", kind }, { "diagram", diagram },
+                { "typeApplied", diagram == kind }, { "titleApplied", titleApplied },
+                { "range", address }, { "anchor", anchor }
+            };
+        }
+
+        // Kiểu thật -> cùng bộ tên với bản LibreOffice (column/bar/line/pie/area/scatter).
+        private static string ChartKindName(dynamic chart)
+        {
+            try
+            {
+                switch (Convert.ToInt32(chart.ChartType))
+                {
+                    case 51: return "column";
+                    case 57: return "bar";
+                    case 4: return "line";
+                    case 5: return "pie";
+                    case 1: return "area";
+                    case -4169: return "scatter";
+                    default: return "type" + Convert.ToInt32(chart.ChartType);
+                }
+            }
+            catch (Exception)
+            {
+                return "";
+            }
+        }
+
+        private static Dictionary<string, object> EtListCharts(IAppHost host, Dictionary<string, object> p)
+        {
+            string sheetName = ParamString(p, "sheet", null);
+            dynamic app = host.Application;
+            dynamic wb = EnsureWorkbook(app);
+            dynamic sheet = string.IsNullOrEmpty(sheetName) ? wb.ActiveSheet : wb.Worksheets[sheetName];
+            var charts = new List<object>();
+            foreach (dynamic item in sheet.ChartObjects())
+            {
+                charts.Add(new Dictionary<string, object>
+                {
+                    { "name", Convert.ToString(item.Name) },
+                    { "diagram", ChartKindName(item.Chart) }
+                });
+            }
+            return new Dictionary<string, object> { { "sheet", Convert.ToString(sheet.Name) }, { "charts", charts } };
         }
 
         private static List<string> SheetNames(dynamic wb)

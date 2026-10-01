@@ -75,6 +75,8 @@ class FakeRange:
     def __init__(self, sheet, col: int, row: int):
         self.sheet, self.col, self.row = sheet, col, row
         self.RangeAddress = types.SimpleNamespace(StartColumn=col, StartRow=row)
+        # add_chart neo bieu do theo Position cua o (1/100 mm trong LibreOffice that).
+        self.Position = types.SimpleNamespace(X=col, Y=row)
 
     def getCellByPosition(self, c: int, r: int) -> FakeCell:
         return self.sheet.cell(self.col + c, self.row + r)
@@ -327,6 +329,190 @@ class SheetTests(unittest.TestCase):
             calc.rename_sheet(book_env(book), {"sheet": "A"})
         with self.assertRaises(calc.values.ParamError):
             calc.rename_sheet(book_env(book), {"name": "B"})
+
+
+# ---------------------------------------------------------------- bieu do
+
+class FakeBox:
+    """Thay cho com.sun.star.awt.Rectangle cua uno.createUnoStruct (khong co UNO trong test nay)."""
+
+    def __init__(self):
+        self.X = self.Y = self.Width = self.Height = 0
+
+
+class FakeChart:
+    """Thay cho doi tuong bieu do nhung trong sheet (XChartDocument rut gon)."""
+
+    def __init__(self, name: str):
+        self.name, self.diagram = name, None
+        self.hasTitle = False
+        self.Title = types.SimpleNamespace(String="")
+
+    def getEmbeddedObject(self):
+        return self
+
+    def createInstance(self, service: str):
+        # getDiagramType() la cach doc lai kieu THAT SU - ban that co, va probe 02/10/2026 xac nhan.
+        return types.SimpleNamespace(service=service, Vertical=True, getDiagramType=lambda: service)
+
+    # UNO dat thuoc tinh chu hoa dau (chart.Diagram, chart.HasMainTitle) - day moi la ten ban that dung.
+    # HasTitle KHONG ton tai tren ban LibreOffice nay (do bang probe rieng ngay 02/10/2026).
+    @property
+    def Diagram(self):
+        return self.diagram
+
+    @Diagram.setter
+    def Diagram(self, value):
+        self.diagram = value
+
+    @property
+    def HasMainTitle(self):
+        return self.hasTitle
+
+    @HasMainTitle.setter
+    def HasMainTitle(self, value):
+        self.hasTitle = value
+
+
+class FakeCharts:
+    def __init__(self, sheet):
+        self.sheet, self.items = sheet, {}
+
+    @property
+    def Count(self):
+        return len(self.items)
+
+    def hasByName(self, name):
+        return name in self.items
+
+    def getElementNames(self):
+        return list(self.items)
+
+    def addNewByName(self, name, rect, ranges, column_headers, row_headers):
+        chart = FakeChart(name)
+        chart.rect, chart.ranges = rect, ranges
+        chart.column_headers, chart.row_headers = column_headers, row_headers
+        self.items[name] = chart
+
+    def getByName(self, name):
+        return self.items[name]
+
+
+class ChartSheet:
+    """Sheet gia co ca o lan tap bieu do (FakeSheet khong co Charts)."""
+
+    def __init__(self, name: str = "Sheet1"):
+        self.name = name
+        self.Charts = FakeCharts(self)
+
+    # UNO phoi thuoc tinh `Name` (khong phai getName) - day la cho ban that hay dung.
+    @property
+    def Name(self) -> str:
+        return self.name
+
+    def getName(self) -> str:
+        return self.name
+
+    def getCellRangeByName(self, address: str) -> FakeRange:
+        letters = "".join(ch for ch in address if ch.isalpha())
+        digits = "".join(ch for ch in address if ch.isdigit())
+        col = 0
+        for ch in letters.upper():
+            col = col * 26 + (ord(ch) - ord("A") + 1)
+        return FakeRange(self, col - 1, int(digits) - 1)
+
+
+class ChartBook:
+    def __init__(self, names=("Sheet1",)):
+        self.sheets = {name: ChartSheet(name) for name in names}
+
+    def getSheets(self):
+        return self
+
+    def getElementNames(self):
+        return tuple(self.sheets)
+
+    def getByName(self, name):
+        return self.sheets[name]
+
+
+class ChartSheetTests(unittest.TestCase):
+    """et.addChart/et.listCharts - khong co thi Dashboard chi la bang so."""
+
+    def setUp(self):
+        # uno.createUnoStruct chi duoc goi trong add_chart; o day thay bang hop gia.
+        self._uno = calc.uno
+        calc.uno = types.SimpleNamespace(createUnoStruct=lambda name: FakeBox())
+
+    def tearDown(self):
+        calc.uno = self._uno
+
+    def _sheet_with_charts(self):
+        book = ChartBook()
+        return book, book.getByName("Sheet1")
+
+    def test_type_map_va_ten_kieu_sai(self):
+        self.assertEqual(calc._diagram("column")[0], "com.sun.star.chart.BarDiagram")
+        self.assertEqual(calc._diagram("line")[0], "com.sun.star.chart.LineDiagram")
+        self.assertEqual(calc._diagram("pie")[0], "com.sun.star.chart.PieDiagram")
+        self.assertEqual(calc._diagram("scatter")[0], "com.sun.star.chart.XYDiagram")
+        self.assertTrue(calc._diagram("bar")[1], "kieu bar nam ngang")
+        self.assertFalse(calc._diagram("column")[1])
+        with self.assertRaises(calc.values.ParamError) as caught:
+            calc._diagram("donut")
+        self.assertIn("'type' must be one of", str(caught.exception))
+
+    def test_them_bieu_do_dat_ten_va_neo_dung_o(self):
+        book, sheet = self._sheet_with_charts()
+        result = calc.add_chart(book_env(book), {"sheet": "Sheet1", "range": "A1:B13",
+                                                "type": "line", "title": "Doanh thu", "anchor": "D2"})
+        self.assertEqual(result["chart"], "Chart1")
+        self.assertEqual(result["type"], "line")
+        chart = sheet.Charts.items["Chart1"]
+        self.assertTrue(chart.column_headers, "lay ten cot lam nhan chu giai")
+        self.assertEqual(chart.rect.Width, 12000, "12cm")
+        self.assertEqual(chart.rect.Height, 7000, "7cm")
+        self.assertEqual(chart.rect.X, 3, "neo o D2: cot D = index 3")
+        self.assertEqual(chart.rect.Y, 1, "neo o D2: dong 2 = index 1")
+        self.assertEqual(chart.diagram.service, "com.sun.star.chart.LineDiagram")
+        self.assertTrue(chart.hasTitle)
+        self.assertEqual(chart.Title.String, "Doanh thu")
+        # Ket qua phai noi kieu THAT SU doc lai duoc, quy ve cung bo ten voi ban C#.
+        self.assertEqual(result["diagram"], "line")
+        self.assertTrue(result["typeApplied"])
+        self.assertTrue(result["titleApplied"])
+
+    def test_cot_va_thanh_la_hai_kieu_khac_nhau_du_cung_mot_service(self):
+        book, _ = self._sheet_with_charts()
+        column = calc.add_chart(book_env(book), {"sheet": "Sheet1", "range": "A1:B2",
+                                                 "name": "Cot", "type": "column"})
+        bar = calc.add_chart(book_env(book), {"sheet": "Sheet1", "range": "A1:B2",
+                                              "name": "Thanh", "type": "bar"})
+        self.assertEqual((column["diagram"], column["typeApplied"]), ("column", True))
+        self.assertEqual((bar["diagram"], bar["typeApplied"]), ("bar", True),
+                         "LibreOffice gop cot/thanh lam BarDiagram, phai doc Vertical moi phan biet duoc")
+
+    def test_thieu_range_thi_bao_loi(self):
+        book, _ = self._sheet_with_charts()
+        with self.assertRaises(calc.values.ParamError) as caught:
+            calc.add_chart(book_env(book), {"sheet": "Sheet1"})
+        self.assertIn("'range' is required", str(caught.exception))
+
+    def test_trung_ten_bieu_do_thi_tu_choi(self):
+        book, _ = self._sheet_with_charts()
+        calc.add_chart(book_env(book), {"sheet": "Sheet1", "range": "A1:B2", "name": "KPI"})
+        with self.assertRaises(calc.values.ParamError) as caught:
+            calc.add_chart(book_env(book), {"sheet": "Sheet1", "range": "A1:B2", "name": "KPI"})
+        self.assertIn("already exists", str(caught.exception))
+
+    def test_list_charts_tra_ten_va_kieu_that(self):
+        book, _ = self._sheet_with_charts()
+        calc.add_chart(book_env(book), {"sheet": "Sheet1", "range": "A1:B2", "name": "Mot", "type": "pie"})
+        calc.add_chart(book_env(book), {"sheet": "Sheet1", "range": "A1:B2", "name": "Hai", "type": "line"})
+        charts = calc.list_charts(book_env(book), {"sheet": "Sheet1"})["charts"]
+        self.assertEqual([item["name"] for item in charts], ["Mot", "Hai"])
+        self.assertEqual([item["diagram"] for item in charts], ["pie", "line"],
+                         "listCharts phai doc lai duoc kieu that de agent tu kiem chung")
 
 
 if __name__ == "__main__":

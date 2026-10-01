@@ -5,6 +5,33 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — biểu đồ trên tài liệu đang mở (et.addChart / et.listCharts)
+- Hai lệnh mới cho CẢ HAI bridge (extension LibreOffice và add-in Windows). Bộ benchmark Calc
+  (`libre_calc_agent_extreme_benchmark`) yêu cầu "Use charts where appropriate" ở Test 1 và
+  "Create charts for:" ở Test 4 — trước đây không có cách nào tạo biểu đồ trên tài liệu đang mở, nên
+  Dashboard chỉ có thể là bảng số.
+- `et.addChart {range, type?, title?, name?, anchor?, width?, height?, sheet?}`: `type` là
+  column/bar/line/pie/area/scatter, `anchor` là ô neo góc trên-trái, `width`/`height` tính bằng cm.
+- `et.listCharts {sheet?}` trả về tên + **kiểu thật** của từng biểu đồ.
+- Kết quả `addChart` nói **kiểu đọc lại được** (`diagram`) và `typeApplied`, không lặp lại điều vừa xin:
+  đo bằng probe UNO ngày 02/10/2026 cho thấy thuộc tính đặt tiêu đề là `HasMainTitle` chứ **không phải**
+  `HasTitle` (bản LibreOffice này không có `HasTitle`), và gán `chart.Diagram` thì chạy được và đọc lại
+  được bằng `getDiagramType()`. `column` và `bar` cùng là `BarDiagram` của LibreOffice nên phải đọc
+  thêm thuộc tính `Vertical` mới phân biệt được — hai bridge quy về cùng bộ tên nên so sánh được với nhau.
+
+### Fixed — lượt chạy bị cắt vì hết ngân sách token của MỘT phản hồi
+- Trước: `finish_reason=length` với content rỗng làm **hỏng cả lượt chạy**. Hai lượt chạy thật ngày
+  02/10/2026 (cùng prompt FP&A trên LibreOffice) chết hẳn ở đây sau khi đã làm được nhiều việc.
+- Nay: nhắc model viết nhỏ lại rồi làm tiếp (`TruncatedReplyNudge`), tối đa một lần, rồi mới bỏ cuộc.
+  Trần token mỗi phản hồi cũng nâng 16384 → 32768 (model đang dùng khai `maxOutput` 384000).
+- Thêm luật vào system prompt: khảo sát chỉ một-hai lời gọi rồi bắt tay dựng bài, không chạy một loạt
+  thí nghiệm nhỏ để dò xem ứng dụng hỗ trợ gì — danh sách lệnh đã nằm trong mô tả `office_action`, và
+  gọi một lệnh không tồn tại thì lỗi trả về kèm danh sách lệnh có thật.
+
+### Added — tests/bench: đọc transcript Claude Code để lấy CÁCH làm, không chỉ kết quả
+- `tests/bench/summarize.py`: thống kê tool call, lệnh Bash, file ghi/sửa, token, và trả lời cuối của
+  một phiên `.jsonl`. Dùng cho việc đối chiếu benchmark (xem `tests/bench/README.md`).
+
 ### Added — agent tự kiểm chứng, hiện suy luận, đo cache
 - **Agent tự kiểm chứng trước khi trả lời** (`VerifyWorkEnabled`, mặc định **BẬT**). Luot nào có lệnh
   SỬA tài liệu thì sau khi model định trả lời, harness chen một lượt nữa yêu cầu nó đọc lại bằng chính

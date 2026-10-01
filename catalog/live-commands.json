@@ -488,6 +488,54 @@
     ]
   },
   {
+    "name": "et.addChart",
+    "kind": "et",
+    "params": [
+      {
+        "name": "range",
+        "hint": "source data e.g. 'A1:B13'"
+      },
+      {
+        "name": "type",
+        "hint": "column (default)/bar/line/pie/area/scatter"
+      },
+      {
+        "name": "title",
+        "hint": null
+      },
+      {
+        "name": "name",
+        "hint": null
+      },
+      {
+        "name": "anchor",
+        "hint": "top-left cell, default 'A1'"
+      },
+      {
+        "name": "width",
+        "hint": "cm, default 12"
+      },
+      {
+        "name": "height",
+        "hint": "cm, default 7"
+      },
+      {
+        "name": "sheet",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "et.listCharts",
+    "kind": "et",
+    "params": [
+      {
+        "name": "sheet",
+        "hint": null
+      }
+    ]
+  },
+  {
     "name": "et.undo",
     "kind": "et",
     "params": [

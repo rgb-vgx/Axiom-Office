@@ -49,6 +49,8 @@ var liveCommands = []liveCommand{
 	{Name: "et.readRange", Kind: "et", Params: []liveCommandParam{{Name: "range", Hint: ""}, {Name: "sheet", Hint: ""}}},
 	{Name: "et.writeRange", Kind: "et", Params: []liveCommandParam{{Name: "range", Hint: "top-left cell e.g. 'A1'"}, {Name: "values", Hint: "2D array of rows e.g. [[\"Tên\",\"Điểm\"],[\"An\",9.5]]"}, {Name: "sheet", Hint: ""}}},
 	{Name: "et.formatRange", Kind: "et", Params: []liveCommandParam{{Name: "range", Hint: ""}, {Name: "bold", Hint: ""}, {Name: "italic", Hint: ""}, {Name: "fontSize", Hint: ""}, {Name: "fontColor", Hint: ""}, {Name: "fillColor", Hint: ""}, {Name: "numFmt", Hint: ""}, {Name: "horizontal", Hint: ""}, {Name: "wrap", Hint: ""}, {Name: "sheet", Hint: ""}}},
+	{Name: "et.addChart", Kind: "et", Params: []liveCommandParam{{Name: "range", Hint: "source data e.g. 'A1:B13'"}, {Name: "type", Hint: "column (default)/bar/line/pie/area/scatter"}, {Name: "title", Hint: ""}, {Name: "name", Hint: ""}, {Name: "anchor", Hint: "top-left cell, default 'A1'"}, {Name: "width", Hint: "cm, default 12"}, {Name: "height", Hint: "cm, default 7"}, {Name: "sheet", Hint: ""}}},
+	{Name: "et.listCharts", Kind: "et", Params: []liveCommandParam{{Name: "sheet", Hint: ""}}},
 	{Name: "et.undo", Kind: "et", Params: []liveCommandParam{{Name: "count", Hint: ""}}},
 	{Name: "et.exportPdf", Kind: "et", Params: []liveCommandParam{{Name: "path", Hint: ""}}},
 	{Name: "et.save", Kind: "et", Params: []liveCommandParam{}},

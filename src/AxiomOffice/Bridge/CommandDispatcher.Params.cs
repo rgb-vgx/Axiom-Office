@@ -84,6 +84,31 @@ namespace AxiomOffice.Bridge
             return v;
         }
 
+        // Như ParamInt nhưng giữ phần thập phân (kích thước biểu đồ tính bằng cm).
+        private static double ParamDouble(Dictionary<string, object> p, string name, double fallback)
+        {
+            object v;
+            if (p == null || !p.TryGetValue(name, out v) || v == null)
+            {
+                return fallback;
+            }
+            v = UnwrapScalar(v);
+            try
+            {
+                var text = v as string;
+                double number;
+                if (text != null && double.TryParse(text.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out number))
+                {
+                    return number;
+                }
+                return Convert.ToDouble(v, CultureInfo.InvariantCulture);
+            }
+            catch (Exception ex) when (ex is FormatException || ex is InvalidCastException || ex is OverflowException)
+            {
+                throw new ArgumentException("'" + name + "' must be a number, got " + DescribeValue(v));
+            }
+        }
+
         private static bool ParamBool(Dictionary<string, object> p, string name, bool fallback)
         {
             object v;

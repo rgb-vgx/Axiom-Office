@@ -310,7 +310,7 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 		run.Events.Publish("run.completed", map[string]any{
 			"reply": result.Text, "rounds": result.Rounds, "seconds": round2(result.Seconds),
 			"inputTokens": result.InputTokens, "outputTokens": result.OutputTokens,
-			"cachedTokens": result.CachedTokens,
+			"cachedTokens": result.CachedTokens, "verified": result.Verified,
 		})
 	case result.Cancelled:
 		run.Status = StatusCancelled

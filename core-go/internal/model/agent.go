@@ -13,7 +13,11 @@ import (
 // call; het ngan sach thi tra ve finish_reason=length voi content rong. De 4096 thi cac luot lam
 // viec that (prompt dai + nhieu tool) hay bi "provider returned an empty reply" - do that ngay
 // 01/10/2026 voi ocg/deepseek-v4.1-flash.
-const DefaultMaxResponseTokens = 16384
+//
+// Nang len 32768 ngay 02/10/2026 sau khi HAI luot chay that cung chet o finish_reason=length: model
+// gom mot bang vai nghin dong vao mot lan goi, phan suy luan cong voi phan tra loi vuot 16384. Model
+// dang dung (ocg/deepseek-v4.1-flash) khai maxOutput 384000, nen 32768 van con rong rai.
+const DefaultMaxResponseTokens = 32768
 
 type AgentOptions struct {
 	MaxRounds         int           // 0 = khong gioi han so vong
@@ -117,7 +121,7 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 	turns = append(turns, map[string]any{"role": "user", "content": userPrompt})
 
 	toolsEnabled := len(tools) > 0
-	nudged := false
+	nudged, truncated := false, false
 	// mutated: luot nay da sua tai lieu chua; verified: da yeu cau tu kiem chung chua. Moi luot chi
 	// kiem chung MOT lan - du de bat loi that, khong du de quay vong vo tan.
 	mutated, verified := false, false
@@ -173,6 +177,14 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 				continue
 			}
 			if strings.TrimSpace(reply) == "" {
+				// Bi cat ngang vi het ngan sach token cua CHINH phan hoi nay: nhac viet nho lai roi lam
+				// tiep, thay vi nem di ca luot chay da lam duoc nhieu. Chi thu mot lan.
+				if turn.FinishReason == "length" && !truncated {
+					truncated = true
+					addLine("(phan hoi bi cat vi het ngan sach token - nhac viet nho lai)")
+					turns = append(turns, map[string]any{"role": "user", "content": TruncatedReplyNudge})
+					continue
+				}
 				// Kem ly do may chu dung lai: finish_reason=length nghia la model dot het ngan sach
 				// token vao phan suy luan truoc khi viet duoc gi - thuong gap voi model reasoning.
 				detail := "provider returned an empty reply"

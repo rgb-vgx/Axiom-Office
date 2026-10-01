@@ -29,6 +29,14 @@ const (
 
 	EmptyReplyNudge = "Your last reply was empty. Continue the task with the tools, or if it is already done, reply with a short summary."
 
+	// TruncatedReplyNudge: cau nhac khi mot phan hoi bi cat ngang vi het ngan sach token cua CHINH no
+	// (finish_reason=length). Ngay 02/10/2026 hai luot chay that chet han o day: model gom ca bang vai
+	// nghin dong vao mot lan goi, phan hoi bi cat truoc khi viet xong, content rong -> ca luot bi huy.
+	// Nhac viet nho lai thi luot chay con cuu duoc, thay vi nem di toan bo cong da lam.
+	TruncatedReplyNudge = "Your previous reply was cut off by the response token limit before it finished, " +
+		"so nothing usable came back. Continue the task, but keep every reply small: write a few hundred " +
+		"rows per call and continue from the next row in the following call, instead of one huge call."
+
 	// VerifyWorkNudge: cau nhac khi luot da sua tai lieu (AgentOptions.Verify). YEU CAU DOC LAI bang
 	// lenh that, khong phai tu hoi lai suy nghi - model tu danh gia bang tri nho thi luon thay dung.
 	VerifyWorkNudge = "Before you finish: check the work you just did. Read the document back with the " +
