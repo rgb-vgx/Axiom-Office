@@ -1,0 +1,315 @@
+  1                  ok   {"name":"bao-cao-du-lieu"}
+  2 et.listSheets    ok   null
+  3                  ok   {"name":"_design","path":"tokens.json"}
+  4 et.readRange     ok   {"range":"A1:J20","sheet":"Sheet1"}
+  5 et.renameSheet   ok   {"name":"Raw_Data","sheet":"Sheet1"}
+  6 et.addSheet      ok   {"name":"Assumptions"}
+  7 et.addSheet      ok   {"name":"Revenue"}
+  8 et.addSheet      ok   {"name":"COGS"}
+  9 et.addSheet      ok   {"name":"PnL"}
+ 10 et.addSheet      ok   {"name":"Budget_vs_Actual"}
+ 11 et.addSheet      ok   {"name":"Forecast"}
+ 12 et.addSheet      ok   {"name":"Scenarios"}
+ 13 et.addSheet      ok   {"name":"KPI"}
+ 14 et.addSheet      ok   {"name":"Dashboard"}
+ 15 et.addSheet      ok   {"name":"Checks"}
+ 16 et.writeRange    ok   {"range":"A1","sheet":"Raw_Data","values":[["Trans_ID","Date","Region","Product","Customer_Segment",
+ 17 et.writeRange    ok   {"range":"M1","sheet":"Raw_Data","values":[["QC_Outlier_Threshold (3 x median revenue)","QC_Total_Re
+ 18 et.writeRange    ok   {"range":"N1","sheet":"Raw_Data","values":[["=ROUND(3*MEDIAN($F$2:$F$1041),0)","=COUNTA($A$2:$A$1041
+ 19 et.fillRange     ok   {"formula":"=\"TXN\"&TEXT(ROW()-1,\"00000\")","range":"A2:A1041","sheet":"Raw_Data"}
+ 20 et.fillRange     ok   {"formula":"=(DATE(2024,1,1)+(ROW()-2))","range":"B2:B1041","sheet":"Raw_Data"}
+ 21 et.fillRange     ok   {"formula":"=CHOOSE(MOD(ROW(),4)+1,\"North\",\"South\",\"East\",\"West\")","range":"C2:C1041","sheet
+ 22 et.fillRange     ok   {"formula":"=CHOOSE(MOD(ROW()*3,4)+1,\"Product A\",\"Product B\",\"Product C\",\"Product D\")","rang
+ 23 et.fillRange     ok   {"formula":"=CHOOSE(MOD(ROW()*5,3)+1,\"Enterprise\",\"SMB\",\"Consumer\")","range":"E2:E1041","sheet
+ 24 et.fillRange     ok   {"formula":"=ROUND(4000+160*MOD(ROW()*7,97)+6200*MOD(ROW()*11,13)/13,0)","range":"F2:F1041","sheet":
+ 25 et.fillRange     ok   {"formula":"=ROUND(MOD(ROW()*17,23)/100,2)","range":"G2:G1041","sheet":"Raw_Data"}
+ 26 et.fillRange     ok   {"formula":"=ROUND(1400+220*MOD(ROW()*13,37),0)","range":"H2:H1041","sheet":"Raw_Data"}
+ 27 et.fillRange     ok   {"formula":"=1+MOD(ROW()*19,50)","range":"I2:I1041","sheet":"Raw_Data"}
+ 28 et.fillRange     ok   {"formula":"=$B2&\"|\"&$C2&\"|\"&$D2&\"|\"&$E2&\"|\"&$F2","range":"J2:J1041","sheet":"Raw_Data"}
+ 29 et.fillRange     ok   {"formula":"=DATE(2024;1;1)+(ROW()-2)","range":"B2:B1041","sheet":"Raw_Data"}
+ 30 et.fillRange     ok   {"formula":"=ROUND(4000+160*MOD(ROW()*7;97)+6200*MOD(ROW()*11;13)/13;0)","range":"F2:F1041","sheet":
+ 31 et.fillRange     ok   {"formula":"=ROUND(MOD(ROW()*17;23)/100;2)","range":"G2:G1041","sheet":"Raw_Data"}
+ 32 et.fillRange     ok   {"formula":"=1+MOD(ROW()*19;50)","range":"I2:I1041","sheet":"Raw_Data"}
+ 33 et.fillRange     ok   {"formula":"=$B2&\"|\"&$C2&\"|\"&$D2&\"|\"&$E2&\"|\"&$F2","range":"J2:J1041","sheet":"Raw_Data"}
+ 34 et.writeRange    ok   {"range":"N1","sheet":"Raw_Data","values":[["=ROUND(3*MEDIAN($F$2:$F$1041);0)","=COUNTA($A$2:$A$1041
+ 35 et.fillRange     ok   {"formula":"=DATE(2024;1;1)+INT((ROW()-2)*731/1040)","range":"B2:B1041","sheet":"Raw_Data"}
+ 36 et.writeRange    ok   {"range":"P1","sheet":"Raw_Data","values":[["=SUMIFS(Raw_Data.$F$2:$F$1041;Raw_Data.$B$2:$B$1041;\">
+ 37 et.readRange     ok   {"range":"P1:R1","sheet":"Raw_Data"}
+ 38 et.readRange     ok   {"range":"A1:N4","sheet":"Raw_Data"}
+ 39 et.writeRange    ok   {"range":"U1","sheet":"Raw_Data","values":[["=MAX($F$2:$F$1041)"],["=MEDIAN($F$2:$F$1041)"],["=MIN($
+ 40 et.readRange     ok   {"range":"U1:U6","sheet":"Raw_Data"}
+ 41 et.writeRange    ok   {"range":"A1","sheet":"Raw_Data","values":[["Trans_ID","Date","Region","Product","Customer_Segment",
+ 42 et.writeRange    ok   {"range":"N1","sheet":"Raw_Data","values":[["","","","",""]]}
+ 43 et.writeRange    ok   {"range":"U1","sheet":"Raw_Data","values":[[""],[""],[""],[""],[""],[""]]}
+ 44 et.writeRange    ok   {"range":"P1","sheet":"Raw_Data","values":[["CONTROL PANEL (Raw_Data)","Value"],["Lognormal_mu",9.21
+ 45 et.writeRange    ok   {"range":"Q5","sheet":"Raw_Data","values":[["=ROUND(EXP($Q$2+$Q$3^2/2)*$Q$4;0)"]]}
+ 46 et.readRange     ok   {"range":"P1:Q11","sheet":"Raw_Data"}
+ 47 et.writeRange    ok   {"range":"K2","sheet":"Raw_Data","values":[["=LET(_i;MOD(48271*ROW()-31516;2147483647);_u;_i/2147483
+ 48 et.writeRange    ok   {"range":"K2","sheet":"Raw_Data","values":[["=ROUND($Q$4*EXP($Q$2+$Q$3*MIN(3.3;MAX(-3.3;SQRT(-2*LN(M
+ 49 et.readRange     ok   {"range":"K2:K2","sheet":"Raw_Data"}
+ 50 et.fillRange     ok   {"formula":"=ROUND($Q$4*EXP($Q$2+$Q$3*MIN(3.3;MAX(-3.3;SQRT(-2*LN(MAX(0.0005;MOD(48271*ROW()-31516;2
+ 51 et.writeRange    ok   {"range":"O1","sheet":"Raw_Data","values":[["=MIN($N$2:$N$1041)"],["=MAX($N$2:$N$1041)"],["=AVERAGE(
+ 52 et.readRange     ok   {"range":"O1:O5","sheet":"Raw_Data"}
+ 53 et.fillRange     ok   {"formula":"=ROUND($K2*CHOOSE(MOD(ROW();5)+1;0.85;0.9;0.94;0.99;1.02);0)","range":"F2:F1041","sheet"
+ 54 et.writeRange    ok   {"range":"Q4","sheet":"Raw_Data","values":[[0.935]]}
+ 55 et.writeRange    ok   {"range":"O1","sheet":"Raw_Data","values":[["=MIN($F$2:$F$1041)"],["=MAX($F$2:$F$1041)"],["=AVERAGE(
+ 56 et.readRange     ok   {"range":"O1:O8","sheet":"Raw_Data"}
+ 57 et.fillRange     ok   {"formula":"=ROUND($Q$4*EXP($Q$2+$Q$3*MIN(3.3;MAX(-3.3;SQRT(-2*LN(MAX(0.0005;MOD(48271*ROW()-31516;2
+ 58 et.readRange     ok   {"range":"O1:O8","sheet":"Raw_Data"}
+ 59 et.fillRange     ok   {"formula":"=\"TXN\"&TEXT(ROW()-1;\"00000\")","range":"A2:A1044","sheet":"Raw_Data"}
+ 60 et.fillRange     ok   {"formula":"=DATE(2024;1;1)+INT((ROW()-2)*364/1043)","range":"B2:B1044","sheet":"Raw_Data"}
+ 61 et.fillRange     ok   {"formula":"=CHOOSE(MOD(ROW();4)+1;\"North\";\"South\";\"East\";\"West\")","range":"C2:C1044","sheet
+ 62 et.fillRange     ok   {"formula":"=CHOOSE(MOD(ROW()*3;5)+1;\"Product A\";\"Product B\";\"Product C\";\"Product D\";\"Produ
+ 63 et.fillRange     ok   {"formula":"=CHOOSE(MOD(ROW()*5;3)+1;\"Enterprise\";\"SMB\";\"Consumer\")","range":"E2:E1044","sheet
+ 64 et.fillRange     ok   {"formula":"=ROUND($L$2*EXP($L$3+$L$4*MIN(3.3;MAX(-3.3;SQRT(-2*LN(MAX(0.0005;MOD(48271*ROW()-31516;2
+ 65 et.fillRange     ok   {"formula":"=ROUND(MOD(ROW()*17;23)/100;2)","range":"G2:G1044","sheet":"Raw_Data"}
+ 66 et.fillRange     ok   {"formula":"=ROUND(F2*0.08;0)","range":"H2:H1044","sheet":"Raw_Data"}
+ 67 et.fillRange     ok   {"formula":"=MAX(1;ROUND(F2/220;0))","range":"I2:I1044","sheet":"Raw_Data"}
+ 68 et.fillRange     ok   {"formula":"=$B2&\"|\"&$C2&\"|\"&$D2&\"|\"&$E2","range":"J2:J1044","sheet":"Raw_Data"}
+ 69 et.writeRange    ok   {"range":"L1","sheet":"Raw_Data","values":[["Generator_mu","Generator_sigma","Generator_Scale","Outl
+ 70 et.writeRange    ok   {"range":"Q4","sheet":"Raw_Data","values":[[0.935],["=ROUND(EXP($Q$2+$Q$3^2/2)*$Q$4;0)"],["=ROUND(EX
+ 71                  LOI  
+ 72 et.fillRange     ok   {"formula":"=IF(N(F2)>=4*$L$5;\"Outlier\";IF(OR(N($C2)=0;N($D2)=0;N($F2)=0;N($G2)<0;N($H2)=0;N($I2)<
+ 73 et.writeRange    ok   {"range":"F1007","sheet":"Raw_Data","values":[[132540],[151200],[98500],[178650],[112340],[265900],[
+ 74 et.writeRange    ok   {"range":"K1035","sheet":"Raw_Data","values":[["=K985"],["=K986"],["=K987"],["=K988"],["=K989"],["=K
+ 75 et.writeRange    ok   {"range":"F990","sheet":"Raw_Data","values":[[""]]}
+ 76 et.writeRange    ok   {"range":"C991","sheet":"Raw_Data","values":[[""]]}
+ 77 et.writeRange    ok   {"range":"D992","sheet":"Raw_Data","values":[[""]]}
+ 78 et.writeRange    ok   {"range":"I993","sheet":"Raw_Data","values":[[""]]}
+ 79 et.writeRange    ok   {"range":"F994","sheet":"Raw_Data","values":[[""]]}
+ 80 et.writeRange    ok   {"range":"E995","sheet":"Raw_Data","values":[[""]]}
+ 81 et.writeRange    ok   {"range":"F996","sheet":"Raw_Data","values":[[""]]}
+ 82 et.writeRange    ok   {"range":"C997","sheet":"Raw_Data","values":[[""]]}
+ 83 et.writeRange    ok   {"range":"G998","sheet":"Raw_Data","values":[[""]]}
+ 84 et.writeRange    ok   {"range":"D999","sheet":"Raw_Data","values":[[""]]}
+ 85 et.writeRange    ok   {"range":"F1000","sheet":"Raw_Data","values":[[""]]}
+ 86 et.writeRange    ok   {"range":"H1001","sheet":"Raw_Data","values":[[""]]}
+ 87 et.writeRange    ok   {"range":"E1002","sheet":"Raw_Data","values":[[""]]}
+ 88 et.writeRange    ok   {"range":"F1003","sheet":"Raw_Data","values":[[""]]}
+ 89 et.writeRange    ok   {"range":"I1004","sheet":"Raw_Data","values":[[""]]}
+ 90 et.writeRange    ok   {"range":"C1005","sheet":"Raw_Data","values":[[""]]}
+ 91 et.writeRange    ok   {"range":"F1006","sheet":"Raw_Data","values":[[""]]}
+ 92 et.writeRange    ok   {"range":"L1","sheet":"Raw_Data","values":[["Series_Source","","",""],["=\"Month \"&(ROW()-1)&\" (\"
+ 93 et.writeRange    ok   {"range":"F1007","sheet":"Raw_Data","values":[[-85000]]}
+ 94 et.writeRange    ok   {"range":"O2","sheet":"Raw_Data","values":[[""]]}
+ 95 et.writeRange    ok   {"range":"L1","sheet":"Raw_Data","values":[["Series_Source","QC_Outlier_Threshold (3x median + 5% gu
+ 96 et.writeRange    ok   {"range":"Q4","sheet":"Raw_Data","values":[[0.935],["=ROUND(EXP($Q$2+$Q$3^2/2)*$Q$4;0)"],["=ROUND(EX
+ 97 et.fillRange     ok   {"formula":"=IF(OR(N(F2)<0;N(F2)>=$L$5);\"Outlier\";IF(OR(N($C2)=0;N($D2)=0;N($F2)=0;N($G2)<0;N($H2)
+ 98 et.writeRange    ok   {"range":"Q1","sheet":"Raw_Data","values":[["TEST_MEDIAN","=MEDIAN($F$2:$F$1044)","=COUNT($F$2:$F$10
+ 99 et.readRange     ok   {"range":"Q1:X1","sheet":"Raw_Data"}
+100 et.writeRange    ok   {"range":"K1","sheet":"Raw_Data","values":[["","","","",""],["","","","",""],["","","","",""],["",""
+101 et.writeRange    ok   {"range":"Q1","sheet":"Raw_Data","values":[["CONTROL PANEL (Raw_Data)","Value"],["Lognormal_mu",9.21
+102 et.writeRange    ok   {"range":"K5","sheet":"Raw_Data","values":[["Generator_mu","=$Q$2"],["Generator_sigma","=$Q$3"],["Ge
+103 et.writeRange    ok   {"range":"K2","sheet":"Raw_Data","values":[["=IF(OR(N(F2)<0;N(F2)>=$L$8);\"Outlier\";IF(OR(N($C2)=0;
+104 et.writeRange    ok   {"range":"Q1","sheet":"Raw_Data","values":[["TEST_Threshold","=ROUND(3*MEDIAN($F$2:$F$1044);0)","=ME
+105 et.readRange     ok   {"range":"Q1:U12","sheet":"Raw_Data"}
+106 et.readRange     ok   {"range":"A1:I6","sheet":"Raw_Data"}
+107 et.readRange     ok   {"range":"F988:I1010","sheet":"Raw_Data"}
+108 et.fillRange     ok   {"formula":"=ROUND($L$4*EXP($L$2+$L$3*MIN(3.3;MAX(-3.3;SQRT(-2*LN(MAX(0.0005;MOD(48271*ROW()-31516;2
+109 et.fillRange     ok   {"formula":"=ROUND(F2*0.08;0)","range":"H2:H1044","sheet":"Raw_Data"}
+110 et.fillRange     ok   {"formula":"=MAX(1;ROUND(F2/220;0))","range":"I2:I1044","sheet":"Raw_Data"}
+111 et.readRange     ok   {"range":"A1:I5","sheet":"Raw_Data"}
+112 et.readRange     ok   {"range":"Q1:U8","sheet":"Raw_Data"}
+113 et.writeRange    ok   {"range":"K2","sheet":"Raw_Data","values":[["","","","",""],["","","","",""],["","","","",""],["",""
+114 et.writeRange    ok   {"range":"L1","sheet":"Raw_Data","values":[["Generator_mu","Generator_sigma","Generator_Scale","Outl
+115 et.writeRange    ok   {"range":"R11","sheet":"Raw_Data","values":[["none"]]}
+116 et.readRange     ok   {"range":"L1:P12","sheet":"Raw_Data"}
+117 et.readRange     ok   {"range":"Q1:U16","sheet":"Raw_Data"}
+118 et.writeRange    ok   {"range":"Q1","sheet":"Raw_Data","values":[["","","","",""],["","","","",""],["","","","",""],["",""
+119 et.writeRange    ok   {"range":"Q1","sheet":"Raw_Data","values":[["CONTROL PANEL (Raw_Data)","Value"],["Lognormal_mu",9.21
+120 et.writeRange    ok   {"range":"L1","sheet":"Raw_Data","values":[["Generator_mu","Generator_sigma","Generator_Scale","Outl
+121 et.writeRange    ok   {"range":"Q1","sheet":"Raw_Data","values":[["CONTROL PANEL (Raw_Data)","Value"],["Lognormal_mu",9.21
+122 et.fillRange     ok   {"formula":"=ROUND($L$4*EXP($L$2+$L$3*MIN(3.3;MAX(-3.3;SQRT(-2*LN(MAX(0.0005;MOD(48271*ROW()-31516;2
+123 et.readRange     ok   {"range":"L1:M6","sheet":"Raw_Data"}
+124 et.readRange     ok   {"range":"R1:R13","sheet":"Raw_Data"}
+125 et.writeRange    ok   {"range":"Q1","sheet":"Raw_Data","values":[["CONTROL PANEL (Raw_Data)","Value"],["Lognormal_mu",9.21
+126 et.writeRange    ok   {"range":"L1","sheet":"Raw_Data","values":[["Generator_mu",9.21034037197618],["Generator_sigma",0.3]
+127 et.writeRange    ok   {"range":"L1","sheet":"Raw_Data","values":[["Generator_mu",9.21034037197618],["Generator_sigma",0.3]
+128 et.fillRange     ok   {"formula":"=ROUND($M$3*EXP($M$1+$M$2*MIN(3.3;MAX(-3.3;SQRT(-2*LN(MAX(0.0005;MOD(48271*ROW()-31516;2
+129 et.fillRange     ok   {"formula":"=ROUND(F2*0.08;0)","range":"H2:H1044","sheet":"Raw_Data"}
+130 et.fillRange     ok   {"formula":"=MAX(1;ROUND(F2/220;0))","range":"I2:I1044","sheet":"Raw_Data"}
+131 et.fillRange     ok   {"formula":"=IF(OR(N(F2)<0;N(F2)>=$M$5);\"Outlier\";IF(OR(N($C2)=0;N($D2)=0;N($F2)=0;N($G2)<0;N($H2)
+132 et.writeRange    ok   {"range":"M5","sheet":"Raw_Data","values":[["=ROUND(3*MEDIAN($F$2:$F$1044)*1.05;0)"]]}
+133 et.writeRange    ok   {"range":"R5","sheet":"Raw_Data","values":[["=$M$5"]]}
+134 et.writeRange    ok   {"range":"R11","sheet":"Raw_Data","values":[["=MEDIAN($F$2:$F$1044)"]]}
+135 et.readRange     ok   {"range":"A1:I5","sheet":"Raw_Data"}
+136 et.readRange     ok   {"range":"L1:M6","sheet":"Raw_Data"}
+137 et.readRange     ok   {"range":"R1:R12","sheet":"Raw_Data"}
+138 et.readRange     ok   {"range":"F1000:I1016","sheet":"Raw_Data"}
+139 et.fillRange     ok   {"formula":"=IF(OR(N(F2)<0;N(F2)>=$M$5);\"Outlier\";IF(OR($C2=\"\";$D2=\"\";$E2=\"\";N($F2)=0;N($G2)
+140 et.writeRange    ok   {"range":"B1035","sheet":"Raw_Data","values":[["=$B$1018","=$C$1018","=$D$1018","=$E$1018","=$F$1018
+141 et.writeRange    ok   {"range":"F990","sheet":"Raw_Data","values":[[""]]}
+142 et.writeRange    ok   {"range":"F994","sheet":"Raw_Data","values":[[""]]}
+143 et.writeRange    ok   {"range":"F996","sheet":"Raw_Data","values":[[""]]}
+144 et.writeRange    ok   {"range":"F1000","sheet":"Raw_Data","values":[[""]]}
+145 et.writeRange    ok   {"range":"F1003","sheet":"Raw_Data","values":[[""]]}
+146 et.writeRange    ok   {"range":"F1006","sheet":"Raw_Data","values":[[""]]}
+147 et.writeRange    ok   {"range":"I993","sheet":"Raw_Data","values":[[""]]}
+148 et.writeRange    ok   {"range":"I1004","sheet":"Raw_Data","values":[[""]]}
+149 et.writeRange    ok   {"range":"H1001","sheet":"Raw_Data","values":[[""]]}
+150 et.writeRange    ok   {"range":"F1007","sheet":"Raw_Data","values":[[-85000],[265900],[312800],[198400],[152600],[286500],
+151 et.readRange     ok   {"range":"Q1:R12","sheet":"Raw_Data"}
+152 et.readRange     ok   {"range":"I1005:J1018","sheet":"Raw_Data"}
+153 et.fillRange     ok   {"formula":"=ROUND((1+MOD(ROW()*17;23))/100;2)","range":"G2:G1044","sheet":"Raw_Data"}
+154 et.readRange     ok   {"range":"Q4:R12","sheet":"Raw_Data"}
+155 et.readRange     ok   {"range":"A1:K4","sheet":"Raw_Data"}
+156 et.writeRange    ok   {"range":"A1","sheet":"Assumptions","values":[["Enterprise FP&A — Assumptions & Drivers","","",""],[
+157 et.writeRange    ok   {"range":"B32","sheet":"Assumptions","values":[["=PnL.$M$4"],["=PnL.$M$8"],["=PnL.$N$4"],["=PnL.$N$9
+158 et.writeRange    ok   {"range":"B38","sheet":"Assumptions","values":[["=Raw_Data.$R$6"],["=Raw_Data.$R$7"],["=Raw_Data.$R$
+159 et.writeRange    ok   {"range":"A1","sheet":"Revenue","values":[["Month","Month_Start","Period","Revenue_$000","YoY_Growth
+160 et.writeRange    ok   {"range":"A2","sheet":"Revenue","values":[["=TEXT(B2;\"MMM-YY\")","=DATE(2024;1;1)","Actual","",""],
+161 et.fillRange     ok   {"formula":"=SUMIFS(Raw_Data.$F$2:$F$1044;Raw_Data.$B$2:$B$1044;\">=\"&$B2;Raw_Data.$B$2:$B$1044;\"<
+162 et.fillRange     ok   {"formula":"=D2*(1+Assumptions.$B$27)","range":"D14:D25","sheet":"Revenue"}
+163 et.fillRange     ok   {"formula":"=D14/D2-1","range":"E14:E25","sheet":"Revenue"}
+164 et.fillRange     ok   {"formula":"=SUMIFS(Raw_Data.$F$2:$F$1044;Raw_Data.$B$2:$B$1044;\">=\"&$B2;Raw_Data.$B$2:$B$1044;\"<
+165 et.readRange     ok   {"range":"A1:E26","sheet":"Revenue"}
+166 et.fillRange     ok   {"formula":"=IF(OR(N(F2)<0;N(F2)>=$M$5);\"Outlier\";IF(OR($C2=\"\";$D2=\"\";$E2=\"\";N($F2)=0;N($G2)
+167 et.writeRange    ok   {"range":"A30","sheet":"Assumptions","values":[["5. BASELINE ANCHORS (run-rate from actuals)","","",
+168 et.writeRange    ok   {"range":"A1","sheet":"Revenue","values":[["Month","Month_Start","Revenue_$","Growth_MoM","Period"],
+169 et.writeRange    ok   {"range":"A1","sheet":"COGS","values":[["Month","Month_Start","Revenue_$","COGS_$","COGS_%_of_Revenu
+170 et.writeRange    ok   {"range":"A27","sheet":"COGS","values":[["","",""],["SUMMARY","",""],["Actual FY2024 COGS","=SUM($D$
+171 et.readRange     ok   {"range":"A27:L31","sheet":"COGS"}
+172 et.fillRange     ok   {"formula":"=Revenue.$C2*AVERAGEIFS(Raw_Data.$G$2:$G$1044;Raw_Data.$B$2:$B$1044;\">=\"&$B2;Raw_Data.
+173 et.readRange     ok   {"range":"A1:H14","sheet":"COGS"}
+174 et.fillRange     ok   {"formula":"=ROUND(F2*(0.52+MOD(ROW()*13;15)/100);2)","range":"G2:G1044","sheet":"Raw_Data"}
+175 et.fillRange     ok   {"formula":"=SUMIFS(Raw_Data.$F$2:$F$1044;Raw_Data.$B$2:$B$1044;\">=\"&$B2;Raw_Data.$B$2:$B$1044;\"<
+176 et.fillRange     ok   {"formula":"=SUMIFS(Raw_Data.$G$2:$G$1044;Raw_Data.$B$2:$B$1044;\">=\"&$B2;Raw_Data.$B$2:$B$1044;\"<
+177 et.readRange     ok   {"range":"A1:J14","sheet":"COGS"}
+178 et.readRange     ok   {"range":"A26:E31","sheet":"Revenue"}
+179 et.writeRange    ok   {"range":"C2","sheet":"Revenue","values":[["=SUMPRODUCT((Raw_Data.$B$2:$B$1044>=$B2)*(Raw_Data.$B$2:
+180 et.writeRange    ok   {"range":"D2","sheet":"COGS","values":[["=SUMPRODUCT((Raw_Data.$B$2:$B$1044>=$B2)*(Raw_Data.$B$2:$B$
+181 et.readRange     ok   {"range":"B2:C2","sheet":"Revenue"}
+182 et.readRange     ok   {"range":"B2:D2","sheet":"COGS"}
+183 et.writeRange    ok   {"range":"G1","sheet":"Revenue","values":[["T1","T2","T3","T4","T5"],["=SUMPRODUCT((Raw_Data.$K$2:$K
+184 et.readRange     ok   {"range":"G1:K2","sheet":"Revenue"}
+185 et.readRange     ok   {"range":"J1:M6","sheet":"Raw_Data"}
+186 et.writeRange    ok   {"range":"S1","sheet":"Raw_Data","values":[["=COUNTIF($K$2:$K$1044;\"Valid\")","=COUNTIF($K$2:$K$104
+187 et.readRange     ok   {"range":"A2:K4","sheet":"Raw_Data"}
+188 et.readRange     ok   {"range":"R1:R12","sheet":"Raw_Data"}
+189 et.fillRange     ok   {"formula":"=IF(OR(N(F2)<0;N(F2)>=$M$5);\"Outlier\";IF(OR($C2=\"\";$D2=\"\";$E2=\"\";N($F2)<=0;N($G2
+190 et.writeRange    ok   {"range":"G1","sheet":"Revenue","values":[["T1","T2","T3","T4","T5"],["","","","",""]]}
+191 et.readRange     ok   {"range":"Q1:R12","sheet":"Raw_Data"}
+192 et.readRange     ok   {"range":"A1:G14","sheet":"Revenue"}
+193 et.writeRange    ok   {"range":"G1","sheet":"Revenue","values":[["","","","",""]]}
+194 et.writeRange    ok   {"range":"C14","sheet":"Revenue","values":[["=AVERAGE($C$2:$C$13)*(1+Assumptions.$B$27)"]]}
+195 et.fillRange     ok   {"formula":"=SUMPRODUCT((Raw_Data.$B$2:$B$1044>=$B2)*(Raw_Data.$B$2:$B$1044<DATE(YEAR($B2);MONTH($B2
+196 et.writeRange    ok   {"range":"B31","sheet":"Assumptions","values":[["=Revenue.$B$28/12"]]}
+197 et.readRange     ok   {"range":"A1:G26","sheet":"Revenue"}
+198 et.readRange     ok   {"range":"A1:G14","sheet":"COGS"}
+199 et.writeRange    ok   {"range":"A1","sheet":"PnL","values":[["Profit & Loss — monthly, actual FY2024 and forecast FY2025 (
+200 et.writeRange    ok   {"range":"A4","sheet":"PnL","values":[["Revenue"],["COGS"],["Gross Profit"],["Gross Margin %"],["Ope
+201 et.fillRange     ok   {"formula":"=Revenue.$C2","range":"B4:M4","sheet":"PnL"}
+202 et.fillRange     ok   {"formula":"=Revenue.$C14","range":"O4:Z4","sheet":"PnL"}
+203 et.writeRange    ok   {"range":"N4","sheet":"PnL","values":[["=SUM(B4:M4)","=SUM(O4:Z4)"]]}
+204 et.fillRange     ok   {"formula":"=COGS.$D2","range":"B5:M5","sheet":"PnL"}
+205 et.fillRange     ok   {"formula":"=COGS.$D14","range":"O5:Z5","sheet":"PnL"}
+206 et.writeRange    ok   {"range":"N5","sheet":"PnL","values":[["=SUM(B5:M5)","=SUM(O5:Z5)"]]}
+207 et.fillRange     ok   {"formula":"=B$4-B$5","range":"B6:AA6","sheet":"PnL"}
+208 et.fillRange     ok   {"formula":"=B6/B4","range":"B7:AA7","sheet":"PnL"}
+209 et.fillRange     ok   {"formula":"=SUMPRODUCT((Raw_Data.$B$2:$B$1044>=$B$2)*(Raw_Data.$B$2:$B$1044<DATE(YEAR($B$2);MONTH($
+210 et.writeRange    ok   {"range":"O8","sheet":"PnL","values":[["=Assumptions.$B$32*(1+Assumptions.$B$29)"]]}
+211 et.fillRange     ok   {"formula":"=O8*(1+Assumptions.$B$29)","range":"P8:Z8","sheet":"PnL"}
+212 et.writeRange    ok   {"range":"N8","sheet":"PnL","values":[["=SUM(B8:M8)","=SUM(O8:Z8)"]]}
+213 et.readRange     ok   {"range":"A2:AA8","sheet":"PnL"}
+214 et.writeRange    ok   {"range":"B4","sheet":"PnL","values":[["=Revenue.$C2","=Revenue.$C3","=Revenue.$C4","=Revenue.$C5","
+215 et.writeRange    ok   {"range":"O4","sheet":"PnL","values":[["=Revenue.$C14","=Revenue.$C15","=Revenue.$C16","=Revenue.$C1
+216 et.writeRange    ok   {"range":"B5","sheet":"PnL","values":[["=COGS.$D2","=COGS.$D3","=COGS.$D4","=COGS.$D5","=COGS.$D6","
+217 et.writeRange    ok   {"range":"O5","sheet":"PnL","values":[["=COGS.$D14","=COGS.$D15","=COGS.$D16","=COGS.$D17","=COGS.$D
+218 et.writeRange    ok   {"range":"N7","sheet":"PnL","values":[["=N6/N4","=AA6/AA4"]]}
+219 et.writeRange    ok   {"range":"N10","sheet":"PnL","values":[["=N9/N4","=AA9/AA4"]]}
+220 et.writeRange    ok   {"range":"N14","sheet":"PnL","values":[["=N13/N4","=AA13/AA4"]]}
+221 et.writeRange    ok   {"range":"O8","sheet":"PnL","values":[["=Assumptions.$B$32*(1+Assumptions.$B$29)"]]}
+222 et.fillRange     ok   {"formula":"=B$6-B$8","range":"B9:AA9","sheet":"PnL"}
+223 et.fillRange     ok   {"formula":"=B9/B$4","range":"B10:AA10","sheet":"PnL"}
+224 et.fillRange     ok   {"formula":"=B$4*Assumptions.$B$11","range":"B11:AA11","sheet":"PnL"}
+225 et.fillRange     ok   {"formula":"=B9-B11","range":"B12:AA12","sheet":"PnL"}
+226 et.fillRange     ok   {"formula":"=Assumptions.$B$12/1000","range":"B13:AA13","sheet":"PnL"}
+227 et.fillRange     ok   {"formula":"=B12-B13","range":"B14:AA14","sheet":"PnL"}
+228 et.fillRange     ok   {"formula":"=MAX(0;B14)*Assumptions.$B$10","range":"B15:AA15","sheet":"PnL"}
+229 et.fillRange     ok   {"formula":"=B14-B15","range":"B16:AA16","sheet":"PnL"}
+230 et.fillRange     ok   {"formula":"=B16/B$4","range":"B17:AA17","sheet":"PnL"}
+231 et.readRange     ok   {"range":"A2:AA17","sheet":"PnL"}
+232 et.writeRange    ok   {"range":"AA8","sheet":"PnL","values":[["=SUM(O8:Z8)"]]}
+233 et.writeRange    ok   {"range":"B39","sheet":"Assumptions","values":[["=COUNTA(Raw_Data.$A$2:$A$1044)"],["=COUNTIF(Raw_Dat
+234 et.readRange     ok   {"range":"A28:D45","sheet":"Assumptions"}
+235 et.readRange     ok   {"range":"A26:B31","sheet":"COGS"}
+236 et.writeRange    ok   {"range":"A47","sheet":"Assumptions","values":[["7. BUDGET DRIVERS (the FY2024 plan)","","",""],["It
+237 et.writeRange    ok   {"range":"A1","sheet":"Budget_vs_Actual","values":[["Budget vs Actual — monthly and YTD comparison (
+238 et.fillRange     ok   {"formula":"=Assumptions.$B$49*(1+Assumptions.$B$50)^(ROW()-5)","range":"B5:B16","sheet":"Budget_vs_
+239 et.fillRange     ok   {"formula":"=PnL.$B$4","range":"C5:C16","sheet":"Budget_vs_Actual"}
+240 et.writeRange    ok   {"range":"A5","sheet":"Budget_vs_Actual","values":[["=PnL.$B$3"],["=PnL.$C$3"],["=PnL.$D$3"],["=PnL.
+241 et.writeRange    ok   {"range":"C5","sheet":"Budget_vs_Actual","values":[["=PnL.$B$4","=PnL.$C$4","=PnL.$D$4","=PnL.$E$4",
+242 et.writeRange    ok   {"range":"H5","sheet":"Budget_vs_Actual","values":[["=PnL.$B$9","=PnL.$C$9","=PnL.$D$9","=PnL.$E$9",
+243 et.fillRange     ok   {"formula":"=C5-B5","range":"D5:D16","sheet":"Budget_vs_Actual"}
+244 et.fillRange     ok   {"formula":"=IF(B5=0;\"n/a\";D5/B5)","range":"E5:E16","sheet":"Budget_vs_Actual"}
+245 et.fillRange     ok   {"formula":"=IF(D5>=0;\"Favorable\";\"Unfavorable\")","range":"F5:F16","sheet":"Budget_vs_Actual"}
+246 et.fillRange     ok   {"formula":"=B5*(1-Assumptions.$B$51)","range":"G5:G16","sheet":"Budget_vs_Actual"}
+247 et.fillRange     ok   {"formula":"=H5-G5","range":"I5:I16","sheet":"Budget_vs_Actual"}
+248 et.fillRange     ok   {"formula":"=IF(G5=0;\"n/a\";I5/G5)","range":"J5:J16","sheet":"Budget_vs_Actual"}
+249 et.fillRange     ok   {"formula":"=IF(I5>=0;\"Favorable\";\"Unfavorable\")","range":"K5:K16","sheet":"Budget_vs_Actual"}
+250 et.writeRange    ok   {"range":"A17","sheet":"Budget_vs_Actual","values":[["FY2024 Total","=SUM(B5:B16)","=SUM(C5:C16)","=
+251 et.writeRange    ok   {"range":"A19","sheet":"Budget_vs_Actual","values":[["YTD COMPARISON (cumulative through month) — FY
+252 et.writeRange    ok   {"range":"A21","sheet":"Budget_vs_Actual","values":[["=$A$5","=$A$6","=$A$7","=$A$8","=$A$9","=$A$10
+253 et.writeRange    ok   {"range":"B21","sheet":"Budget_vs_Actual","values":[["=B5","=B21+B6","=B22+B7","=B23+B8","=B24+B9","
+254 et.writeRange    ok   {"range":"C21","sheet":"Budget_vs_Actual","values":[["=C5","=C21+C6","=C22+C7","=C23+C8","=C24+C9","
+255 et.fillRange     ok   {"formula":"=C21-B21","range":"D21:D32","sheet":"Budget_vs_Actual"}
+256 et.fillRange     ok   {"formula":"=IF(B21=0;\"n/a\";D21/B21)","range":"E21:E32","sheet":"Budget_vs_Actual"}
+257 et.fillRange     ok   {"formula":"=IF(D21>=0;\"Favorable\";\"Unfavorable\")","range":"F21:F32","sheet":"Budget_vs_Actual"}
+258 et.writeRange    ok   {"range":"G21","sheet":"Budget_vs_Actual","values":[["=G5","=G21+G6","=G22+G7","=G23+G8","=G24+G9","
+259 et.writeRange    ok   {"range":"H21","sheet":"Budget_vs_Actual","values":[["=H5","=H21+H6","=H22+H7","=H23+H8","=H24+H9","
+260 et.fillRange     ok   {"formula":"=H21-G21","range":"I21:I32","sheet":"Budget_vs_Actual"}
+261 et.fillRange     ok   {"formula":"=IF(G21=0;\"n/a\";I21/G21)","range":"J21:J32","sheet":"Budget_vs_Actual"}
+262 et.fillRange     ok   {"formula":"=IF(I21>=0;\"Favorable\";\"Unfavorable\")","range":"K21:K32","sheet":"Budget_vs_Actual"}
+263 et.writeRange    ok   {"range":"A34","sheet":"Budget_vs_Actual","values":[["BUDGET RECONCILIATION","",""],["Item","Value",
+264 et.readRange     ok   {"range":"A1:K20","sheet":"Budget_vs_Actual"}
+265 et.writeRange    ok   {"range":"C5","sheet":"Budget_vs_Actual","values":[["=PnL.$B$4"],["=PnL.$C$4"],["=PnL.$D$4"],["=PnL.
+266 et.writeRange    ok   {"range":"H5","sheet":"Budget_vs_Actual","values":[["=PnL.$B$9"],["=PnL.$C$9"],["=PnL.$D$9"],["=PnL.
+267 et.readRange     ok   {"range":"D5:K6","sheet":"Budget_vs_Actual"}
+268 et.readRange     ok   {"range":"A17:K17","sheet":"Budget_vs_Actual"}
+269 et.writeRange    ok   {"range":"A1","sheet":"Forecast","values":[["12-Month Forecast (FY2025) — driven entirely by Assumpt
+270 et.fillRange     ok   {"formula":"=Revenue.$A14","range":"A3:A14","sheet":"Forecast"}
+271 et.fillRange     ok   {"formula":"=Revenue.$B14","range":"B3:B14","sheet":"Forecast"}
+272 et.fillRange     ok   {"formula":"=Assumptions.$B$22","range":"C3:C14","sheet":"Forecast"}
+273 et.fillRange     ok   {"formula":"=Assumptions.$B$27","range":"D3:D14","sheet":"Forecast"}
+274 et.fillRange     ok   {"formula":"=Revenue.$C14","range":"E3:E14","sheet":"Forecast"}
+275 et.fillRange     ok   {"formula":"=Assumptions.$B$28","range":"F3:F14","sheet":"Forecast"}
+276 et.fillRange     ok   {"formula":"=COGS.$D14","range":"G3:G14","sheet":"Forecast"}
+277 et.fillRange     ok   {"formula":"=Assumptions.$B$29","range":"H3:H14","sheet":"Forecast"}
+278 et.fillRange     ok   {"formula":"=PnL.$O$8","range":"I3:I14","sheet":"Forecast"}
+279 et.fillRange     ok   {"formula":"=E3-G3","range":"J3:J14","sheet":"Forecast"}
+280 et.fillRange     ok   {"formula":"=J3-I3","range":"K3:K14","sheet":"Forecast"}
+281 et.fillRange     ok   {"formula":"=K3/E3","range":"L3:L14","sheet":"Forecast"}
+282 et.fillRange     ok   {"formula":"=E3/Revenue.$C2-1","range":"M3:M14","sheet":"Forecast"}
+283 et.writeRange    ok   {"range":"A16","sheet":"Forecast","values":[["FORECAST SUMMARY (all cells reference Assumptions)",""
+284 et.readRange     ok   {"range":"A1:M27","sheet":"Forecast"}
+285 et.writeRange    ok   {"range":"I3","sheet":"Forecast","values":[["=PnL.$O$8"],["=PnL.$P$8"],["=PnL.$Q$8"],["=PnL.$R$8"],[
+286 et.readRange     ok   {"range":"A3:M14","sheet":"Forecast"}
+287 et.readRange     ok   {"range":"A1:D56","sheet":"Assumptions"}
+288 et.fillRange     ok   {"formula":"=Assumptions.$B$48*(1+Assumptions.$B$49)^(ROW()-5)","range":"B5:B16","sheet":"Budget_vs_
+289 et.fillRange     ok   {"formula":"=B5*(1-Assumptions.$B$50)-Assumptions.$B$51*(1+Assumptions.$B$52)^(ROW()-5)","range":"G5
+290 et.fillRange     ok   {"formula":"=Assumptions.$B$49*(1+Assumptions.$B$50)^(ROW()-5)","range":"B5:B16","sheet":"Budget_vs_
+291 et.fillRange     ok   {"formula":"=B5*(1-Assumptions.$B$51)-Assumptions.$B$52*(1+Assumptions.$B$53)^(ROW()-5)","range":"G5
+292 et.readRange     ok   {"range":"A5:K6","sheet":"Budget_vs_Actual"}
+293 et.readRange     ok   {"range":"A17:K17","sheet":"Budget_vs_Actual"}
+294 et.writeRange    ok   {"range":"A1","sheet":"Scenarios","values":[["Scenario Analysis — FY2025 outcomes; the selector on A
+295 et.writeRange    ok   {"range":"A5","sheet":"Scenarios","values":[["Base Case","=Assumptions.$B$17","=Assumptions.$C$17","
+296 et.writeRange    ok   {"range":"A9","range2":"","sheet":"Scenarios","values":[["MODEL OUTPUT BY SELECTED SCENARIO (must eq
+297 et.readRange     ok   {"range":"A1:M25","sheet":"Scenarios"}
+298 et.writeRange    ok   {"range":"A9","sheet":"Scenarios","values":[["MODEL OUTPUT BY SELECTED SCENARIO (Active column must 
+299 et.readRange     ok   {"range":"A9:F24","sheet":"Scenarios"}
+300 et.writeRange    ok   {"range":"K5","sheet":"Scenarios","values":[["=(I5-F5*Assumptions.$B$11-12*Assumptions.$B$12/1000)*(
+301 et.writeRange    ok   {"range":"B16","sheet":"Scenarios","values":[["=(B14-B11*Assumptions.$B$11-12*Assumptions.$B$12/1000
+302 et.writeRange    ok   {"range":"L5","sheet":"Scenarios","values":[["=K5/F5"],["=K6/F6"],["=K7/F7"]]}
+303 et.readRange     ok   {"range":"A5:L7","sheet":"Scenarios"}
+304 et.readRange     ok   {"range":"A11:F17","sheet":"Scenarios"}
+305 et.writeRange    ok   {"range":"A1","sheet":"KPI","values":[["KPI Dashboard — financial, transaction and dimensional metri
+306 et.writeRange    ok   {"range":"A28","sheet":"KPI","values":[["C. REVENUE BY REGION (FY2024 valid transactions)","","","",
+307 et.writeRange    ok   {"range":"A17","sheet":"KPI","values":[["B. TRANSACTION & DATA-QUALITY KPIs","","","",""],["KPI","Va
+308 et.readRange     ok   {"range":"A1:E26","sheet":"KPI"}
+309 et.readRange     ok   {"range":"A27:E59","sheet":"KPI"}
+310 et.writeRange    ok   {"range":"N13","sheet":"PnL","values":[["=SUM(B13:M13)","=SUM(O13:Z13)"]]}
+311 et.readRange     ok   {"range":"N4:N17","sheet":"PnL"}
+312 et.readRange     ok   {"range":"AA4:AA17","sheet":"PnL"}
+313 et.writeRange    ok   {"range":"AA13","sheet":"PnL","values":[["=SUM(O13:Z13)"]]}
+314 et.readRange     ok   {"range":"AA13:AA16","sheet":"PnL"}
+315 et.readRange     ok   {"range":"B5:B16","sheet":"KPI"}

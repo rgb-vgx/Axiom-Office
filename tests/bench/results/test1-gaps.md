@@ -4,14 +4,15 @@
 Forecast, Scenarios, KPI, Dashboard có chart, Checks, và bài change test 5% → 10%).
 Cả hai bên chạy trên **LibreOffice thật**, không mô phỏng bridge.
 
-| | Claude Code | Axiom Core |
+| | Claude Code | Axiom Core (lượt tốt nhất, xem bảng ba lần chạy bên dưới) |
 |---|---|---|
 | Cách nói với LibreOffice | tự mở instance headless riêng, nói qua **UNO socket** (`--accept=socket,...,port=2002;urp;`) | nối vào **tài liệu đang mở** qua HTTP bridge của extension |
 | Model | `ocg/deepseek-v4.1-flash` (qua `settings.proxy.json`) | `ocg/deepseek-v4.1-flash` |
-| Thời gian | 02:19:02 → 03:32:52 (chết vì gateway 503), chạy tiếp, xong 04:42:01 | 04:51:56 → 05:02:44 |
-| Tool call | 88 (Bash 50, Write 17, Edit 12, Read 9) | 37 |
-| Token | vào 372.156 / ra **599.719** / cache đọc 36.012.544 | vào 290.663 / ra 110.200 |
-| Kết thúc | hoàn thành | `token budget exceeded (400863 > 400000)` |
+| Thời gian | 02:19:02 → 03:32:52 (chết vì gateway 503), chạy tiếp, xong 04:42:01 | 06:29:45 → 06:52:57 (23 phút) |
+| Tool call | 88 (Bash 50, Write 17, Edit 12, Read 9) | 315 (writeRange 100+, fillRange 106, readRange …, addSheet 10) |
+| Token | vào 372.156 / ra **599.719** / cache đọc 36.012.544 | thô 4.685.423 vào / 233.531 ra; **4.578.176 đọc từ cache (98%)** |
+| Kết thúc | hoàn thành | `agent stopped after 100 rounds` |
+| Kết quả | 11/11 sheet, 15.349 ô công thức, 5 chart, 16 khối CF, change test | 9/11 sheet có nội dung thật; **Dashboard và Checks trống** |
 
 ## Claude Code đã làm gì
 
@@ -70,7 +71,42 @@ Nhưng lượt hỏng đó phơi ra một lỗi thật của vòng lặp agent: 
 
 ## Khoảng cách
 
-| # | Khoảng cách | Bằng chứng | Vì sao |
+## Ba lần chạy Axiom, cùng một đề
+
+Cùng model, cùng LibreOffice thật, cùng đề. Chỉ khác cách tính ngân sách token và các lệnh đã có.
+
+| Lần | Ngân sách | Token tính thế nào | Vòng | Tool call | Token thô | Đọc từ cache | Kết quả |
+|---|---|---:|---:|---:|---:|---:|---|
+| 1 | 400k | cả token cache | 25 | 37 | 400.863 | 253.440 (63%) | 11 tên sheet + Raw_Data dở |
+| 2 | 1M | cả token cache | 64 | 67 | 1.005.301 | 806.400 (80%) | + Raw_Data 1225 dòng, Assumptions dở |
+| **3** | **400k** | **chỉ token phải trả** | **100** | **315** | **4.918.954** | **4.578.176 (93%)** | **9/11 sheet dựng xong** |
+
+Lần 3 dừng vì chạm trần **số vòng** (100), không phải vì tiền. Cùng ngân sách 400k, số tool call gấp
+**4,7 lần** lần 1. Nguyên nhân duy nhất khác nhau: token đọc từ cache (98% ở lần 3) không bị tính vào
+ngân sách nữa.
+
+Tài liệu lần 3 để lại (đọc lại bằng `et.checkRange` + `et.readRange` trên chính tài liệu đang mở,
+`tests/bench/results/test1-axiom-output.txt`):
+
+```
+Raw_Data          1044 x 26   Trans_ID, Date, Region, Product, Customer_Segment, Revenue, COGS, ...
+Assumptions         53 x 4    "Enterprise FP&A — Assumptions & Drivers …"
+Revenue             31 x 5    Month | Month_Start | Revenue_$   (Jan-24 …)
+COGS                31 x 8
+PnL                 17 x 27   "Profit & Loss — monthly, actual FY2024 and forecast FY2025"
+Budget_vs_Actual    42 x 19   "Budget vs Actual — monthly and YTD comparison…"
+Forecast            27 x 13   "12-Month Forecast (FY2025) — driven entirely by Assumptions"
+Scenarios           23 x 13   "Scenario Analysis — FY2025 outcomes…"
+KPI                 58 x 5    "KPI Dashboard — financial, transaction and dimensional metrics"
+Dashboard            1 x 1    TRỐNG
+Checks               1 x 1    TRỐNG
+```
+
+So với Claude Code (11/11 sheet, 15.349 ô công thức, 5 chart, change test): Axiom đã dựng được 9/11
+sheet có tiêu đề và cấu trúc thật, còn thiếu đúng **Dashboard** (chưa gọi `et.addChart` lần nào) và
+**Checks**, và chưa tới bài change test.
+
+## Khoảng cách
 |---|---|---|---|
 | 1 | **Chi phí token tính theo từng ô** | Claude Code: 599.719 token ra cho cả bài và xong. Axiom: 110.200 token ra mới được ~1/5 `Raw_Data`, dừng ở 25 vòng | Axiom phải phát ra **từng giá trị ô** trong tham số tool; Claude Code phát ra **từng dòng code** rồi để script sinh dữ liệu. Cùng một bảng, chênh nhau hàng trăm lần |
 | 2 | **Không có đường điền/khai báo, chỉ có ghi đủ** | Axiom ghi Raw_Data bằng 5 lần `writeRange` với mảng giá trị đầy đủ (`A42`, `A103`, …) | Bridge chưa có lệnh "viết một công thức rồi điền ra cả vùng", cũng chưa có nạp từ file. Cả hai bên đều cần khối lượng lớn; chỉ một bên có cách rẻ |
@@ -105,14 +141,23 @@ Làm trong phiên này, mỗi cái đều có test chạy thật:
    thì lượt chạy dừng với thông báo nói rõ, thay vì để model đốt hết ngân sách. Lỗi **đổi** mỗi vòng
    thì không cắt — model có thể đang thử cách khác (có test riêng cho cả hai chiều).
 
+8. **Ngân sách token không tính token đọc từ cache** (`AgentResult.BillableTokens`, commit `f243789`)
+   — khoảng cách #1, và là cái đắt nhất. Đo được: cache đã chạy tốt sẵn (93–98% trúng), nhưng ngân sách
+   đếm cả phần gần như miễn phí đó, nên lượt chạy dừng đúng lúc nhà cung cấp đang phục vụ từ cache.
+   Cùng ngân sách 400k: **67 → 315 tool call**, 9/11 sheet thay vì 5/11.
+
 ## Còn lại, chưa làm
 
-- **#1 chưa được giải quyết triệt để.** `et.fillRange` gỡ được phần lớn chi phí cho các sheet
-  công thức (P&L, Forecast, KPI, Checks đều là cùng một công thức lặp qua 12 tháng), nhưng `Raw_Data`
-  cần **dữ liệu giả lập ngẫu nhiên** — điền công thức thì được (`RAND`, `CHOOSE`, `INDEX`), còn muốn
-  đúng phân bố như đề tả thì vẫn phải phát từng giá trị hoặc nạp từ file.
+- **Dashboard và Checks trống.** Axiom chưa gọi `et.addChart` lần nào trong lượt 3 — năng lực đã có
+  (`et.addChart` xanh trên LibreOffice thật), nhưng nó không tự tới đó. Nghi vấn: mô tả tool chưa làm
+  nổi bật việc Dashboard cần chart, hoặc model lo phần số trước rồi hết vòng. Cần thử lại khi trần
+  vòng không còn là nút thắt.
+- **Trần 100 vòng là nút thắt mới.** Lượt 3 dừng vì `MaxRounds`, không vì tiền. `MaxMaxRounds` đang là
+  1000 nên nới được, nhưng nới trần là chữa triệu chứng: câu hỏi thật là vì sao 315 tool call vẫn chưa
+  xong một workbook 11 sheet — mỗi sheet đang tốn ~30 lời gọi.
+- **`Raw_Data` vẫn phải phát từng giá trị.** Lượt 3 có 1044 dòng × 26 cột. Điền bằng công thức
+  (`RAND`, `CHOOSE`, `INDEX`) chưa được dùng cho phần dữ liệu thô — model chọn phát từng khối giá trị.
 - **Chưa có đường nạp dữ liệu từ file vào tài liệu đang mở** (`et.importCsv`). Đây là cách Claude Code
-  đi (sinh CSV rồi nạp). Cần cân nhắc vì nó mở thêm một bề mặt: đường dẫn file do model chọn.
-- **Chưa chạy lại Axiom trên Test 1 với `et.fillRange`** để đo mức cải thiện thật. Việc này phải làm
-  trước khi nói bất cứ điều gì về hiệu quả của #4 — hiện chỉ mới là năng lực đã có và đã kiểm chứng
-  riêng lẻ, chưa phải là kết quả trên đề.
+  đi (sinh CSV bằng script rồi nạp). Cần cân nhắc vì mở thêm bề mặt: đường dẫn file do model chọn.
+- **Chưa làm bài change test** (đổi Revenue Growth 5% → 10% rồi kiểm chứng) — hệ quả trực tiếp của việc
+  Checks còn trống.

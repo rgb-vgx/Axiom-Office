@@ -1,0 +1,22 @@
+Raw_Data           rows=1044  cols=26   issues=8
+   A1:C3 = [["Trans_ID", "Date", "Region"], ["TXN00001", 45292.0, "East"], ["TXN00002", 45292.0, "West"]]
+Assumptions        rows=53    cols=4    issues=10
+   A1:C3 = [["Enterprise FP&A — Assumptions & Drivers", null, null], ["Every forecast, budget, scenario, KPI and check is driven by the cells below. Change a dri
+Revenue            rows=31    cols=5    issues=4
+   A1:C3 = [["Month", "Month_Start", "Revenue_$"], ["Jan-24", 45292.0, 1011.184], ["Feb-24", 45323.0, 938.952]]
+COGS               rows=31    cols=8    issues=7
+   A1:C3 = [["Month", "Month_Start", "Revenue_$"], ["Jan-24", 45292.0, 1011.184], ["Feb-24", 45323.0, 938.952]]
+PnL                rows=17    cols=27   issues=56
+   A1:C3 = [["Profit & Loss — monthly, actual FY2024 and forecast FY2025 ($ thousands)", null, null], [null, 45292.0, 45323.0], ["Line item ($000)", "Jan-24", "F
+Budget_vs_Actual   rows=42    cols=19   issues=43
+   A1:C3 = [["Budget vs Actual — monthly and YTD comparison ($ thousands; variance = Actual - Budget)", null, null], [null, null, null], ["MONTHLY COMPARISON — F
+Forecast           rows=27    cols=13   issues=33
+   A1:C3 = [["12-Month Forecast (FY2025) — driven entirely by Assumptions; no hardcoded values", null, null], ["Month", "Month_Start", "Scenario"], ["Jan-25", 45
+Scenarios          rows=23    cols=13   issues=35
+   A1:C3 = [["Scenario Analysis — FY2025 outcomes; the selector on Assumptions!B22 switches the whole model", null, null], [null, null, null], ["CASE OUTPUTS (ea
+KPI                rows=58    cols=5    issues=17
+   A1:C3 = [["KPI Dashboard — financial, transaction and dimensional metrics (all formula-driven)", null, null], [null, null, null], ["A. HEADLINE FINANCIAL KPIs
+Dashboard          rows=1     cols=1    issues=0
+   A1:C3 = [[null, null, null], [null, null, null], [null, null, null]]
+Checks             rows=1     cols=1    issues=0
+   A1:C3 = [[null, null, null], [null, null, null], [null, null, null]]
