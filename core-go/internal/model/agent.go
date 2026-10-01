@@ -7,15 +7,23 @@ import (
 	"time"
 )
 
+// DefaultMaxResponseTokens: tran token cho MOT phan hoi cua model (truong max_tokens gui len).
+//
+// Model suy luan (reasoning) dot ngan sach nay vao phan suy nghi TRUOC khi viet content hay tool
+// call; het ngan sach thi tra ve finish_reason=length voi content rong. De 4096 thi cac luot lam
+// viec that (prompt dai + nhieu tool) hay bi "provider returned an empty reply" - do that ngay
+// 01/10/2026 voi ocg/deepseek-v4.1-flash.
+const DefaultMaxResponseTokens = 16384
+
 type AgentOptions struct {
 	MaxRounds         int           // 0 = khong gioi han so vong
 	MaxTokens         int           // tran token ca luot (mac dinh 200000)
 	Deadline          time.Duration // tran thoi gian ca luot (mac dinh 300s)
-	MaxResponseTokens int           // mac dinh 4096
+	MaxResponseTokens int           // mac dinh DefaultMaxResponseTokens
 }
 
 func DefaultAgentOptions() AgentOptions {
-	return AgentOptions{MaxTokens: 200_000, Deadline: DefaultDeadline, MaxResponseTokens: 4096}
+	return AgentOptions{MaxTokens: 200_000, Deadline: DefaultDeadline, MaxResponseTokens: DefaultMaxResponseTokens}
 }
 
 type AgentCallbacks struct {
@@ -140,7 +148,18 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 				continue
 			}
 			if strings.TrimSpace(reply) == "" {
-				return done(false, "", "provider returned an empty reply", "provider")
+				// Kem ly do may chu dung lai: finish_reason=length nghia la model dot het ngan sach
+				// token vao phan suy luan truoc khi viet duoc gi - thuong gap voi model reasoning.
+				detail := "provider returned an empty reply"
+				if turn.FinishReason != "" {
+					detail += " (finish_reason=" + turn.FinishReason
+					if turn.FinishReason == "length" {
+						detail += " - model het ngan sach token truoc khi tra loi)"
+					} else {
+						detail += ")"
+					}
+				}
+				return done(false, "", detail, "provider")
 			}
 			return done(true, reply, "", "")
 		}

@@ -42,8 +42,9 @@ func (anthropicCodec) BuildRequest(model, systemPrompt string, turns []Message, 
 
 func (anthropicCodec) Parse(body []byte) (*Turn, string) {
 	var root struct {
-		Content json.RawMessage `json:"content"`
-		Usage   struct {
+		Content    json.RawMessage `json:"content"`
+		StopReason string          `json:"stop_reason"`
+		Usage      struct {
 			Input  int `json:"input_tokens"`
 			Output int `json:"output_tokens"`
 		} `json:"usage"`
@@ -61,7 +62,8 @@ func (anthropicCodec) Parse(body []byte) (*Turn, string) {
 	if len(root.Content) == 0 || json.Unmarshal(root.Content, &blocks) != nil || blocks == nil {
 		return nil, "unexpected provider response (no content blocks)"
 	}
-	turn := &Turn{InputTokens: root.Usage.Input, OutputTokens: root.Usage.Output, Raw: root.Content}
+	turn := &Turn{InputTokens: root.Usage.Input, OutputTokens: root.Usage.Output, Raw: root.Content,
+		FinishReason: root.StopReason}
 	var texts []string
 	for _, block := range blocks {
 		switch block.Type {

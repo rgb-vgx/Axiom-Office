@@ -32,6 +32,28 @@ func TestParseToleratesTrailingSSETerminator(t *testing.T) {
 	}
 }
 
+// finish_reason phai duoc giu lai: model suy luan het ngan sach token thi content rong va
+// finish_reason="length" - do la manh moi de chan doan "provider returned an empty reply".
+func TestParseCarriesFinishReason(t *testing.T) {
+	body := []byte(`{"choices":[{"message":{"role":"assistant","content":""},"finish_reason":"length"}],"usage":{}}`)
+	turn, errText := (openAICodec{}).Parse(body)
+	if errText != "" {
+		t.Fatalf("loi parse: %s", errText)
+	}
+	if turn.FinishReason != "length" {
+		t.Fatalf("FinishReason = %q, muon \"length\"", turn.FinishReason)
+	}
+
+	anthropicBody := []byte(`{"content":[{"type":"text","text":"x"}],"stop_reason":"max_tokens","usage":{}}`)
+	turn, errText = (anthropicCodec{}).Parse(anthropicBody)
+	if errText != "" {
+		t.Fatalf("loi parse anthropic: %s", errText)
+	}
+	if turn.FinishReason != "max_tokens" {
+		t.Fatalf("FinishReason = %q, muon \"max_tokens\"", turn.FinishReason)
+	}
+}
+
 // Body hong that thi van phai bao loi - khong duoc nuot loi.
 func TestParseStillRejectsGarbage(t *testing.T) {
 	if _, errText := (openAICodec{}).Parse([]byte("day khong phai JSON")); errText == "" {

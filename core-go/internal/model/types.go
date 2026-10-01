@@ -43,6 +43,11 @@ type Turn struct {
 	InputTokens  int
 	OutputTokens int
 	Raw          json.RawMessage
+
+	// FinishReason la ly do may chu dung lai ("stop", "tool_calls", "length"...). Rong khi may chu
+	// khong tra. Dung de giai thich ca "model tra loi rong": het ngan sach token giua phan suy luan
+	// thi content rong va finish_reason = "length".
+	FinishReason string
 }
 
 // ConversationTurn: mot luot cu (bang messages) dua vao ngu canh.

@@ -46,7 +46,8 @@ func (openAICodec) BuildRequest(model, systemPrompt string, turns []Message, too
 func (openAICodec) Parse(body []byte) (*Turn, string) {
 	var root struct {
 		Choices []struct {
-			Message json.RawMessage `json:"message"`
+			Message      json.RawMessage `json:"message"`
+			FinishReason string          `json:"finish_reason"`
 		} `json:"choices"`
 		Usage struct {
 			Prompt     int `json:"prompt_tokens"`
@@ -73,7 +74,8 @@ func (openAICodec) Parse(body []byte) (*Turn, string) {
 	if err := json.Unmarshal(raw, &message); err != nil {
 		return nil, "invalid provider response: " + err.Error()
 	}
-	turn := &Turn{InputTokens: root.Usage.Prompt, OutputTokens: root.Usage.Completion, Raw: raw}
+	turn := &Turn{InputTokens: root.Usage.Prompt, OutputTokens: root.Usage.Completion, Raw: raw,
+		FinishReason: root.Choices[0].FinishReason}
 	var text string
 	if json.Unmarshal(message.Content, &text) == nil && len(message.Content) > 0 && string(message.Content) != "null" {
 		turn.Text, turn.HasText = text, true

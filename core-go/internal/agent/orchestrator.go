@@ -85,7 +85,8 @@ func ParseRequest(body map[string]any) (*Request, string) {
 		Family:         textOf(off["family"]),
 		Document:       document,
 		Options: model.AgentOptions{
-			MaxTokens: maxTokens, Deadline: time.Duration(maxSeconds) * time.Second, MaxResponseTokens: 4096,
+			MaxTokens: maxTokens, Deadline: time.Duration(maxSeconds) * time.Second,
+			MaxResponseTokens: model.DefaultMaxResponseTokens,
 		},
 		Interactive: interactive,
 	}, ""
