@@ -168,8 +168,8 @@ func TestExcelFormatRangeAndTable(t *testing.T) {
 	require(t, server, "excel_format_range", map[string]any{
 		"path": path, "sheet": "Data", "cell_range": "A1:B1",
 		"styles": map[string]any{
-			"font": map[string]any{"bold": true, "color": "#FF0000", "size": 14},
-			"fill": map[string]any{"color": "#FFFF00"},
+			"font":      map[string]any{"bold": true, "color": "#FF0000", "size": 14},
+			"fill":      map[string]any{"color": "#FFFF00"},
 			"alignment": map[string]any{"horizontal": "center", "wrap": true},
 			"numFmt":    "#,##0.00",
 		},
@@ -282,4 +282,3 @@ func TestExcelCsvRoundTrip(t *testing.T) {
 		t.Fatalf("range cua csv sai: %v", read["range"])
 	}
 }
-

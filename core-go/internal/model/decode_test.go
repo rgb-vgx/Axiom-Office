@@ -44,13 +44,19 @@ func TestParseCarriesFinishReason(t *testing.T) {
 		t.Fatalf("FinishReason = %q, muon \"length\"", turn.FinishReason)
 	}
 
-	anthropicBody := []byte(`{"content":[{"type":"text","text":"x"}],"stop_reason":"max_tokens","usage":{}}`)
-	turn, errText = (anthropicCodec{}).Parse(anthropicBody)
-	if errText != "" {
-		t.Fatalf("loi parse anthropic: %s", errText)
-	}
-	if turn.FinishReason != "max_tokens" {
-		t.Fatalf("FinishReason = %q, muon \"max_tokens\"", turn.FinishReason)
+	// Anthropic tra "max_tokens"/"tool_use"/"end_turn"; quy ve cung bo gia tri voi OpenAI de phan
+	// xu ly dung chung o tang tren (vi du nhanh bao "het ngan sach token khi suy luan").
+	for _, item := range []struct{ stopReason, want string }{
+		{"max_tokens", "length"}, {"tool_use", "tool_calls"}, {"end_turn", "stop"}, {"stop_sequence", "stop"},
+	} {
+		anthropicBody := []byte(`{"content":[{"type":"text","text":"x"}],"stop_reason":"` + item.stopReason + `","usage":{}}`)
+		turn, errText = (anthropicCodec{}).Parse(anthropicBody)
+		if errText != "" {
+			t.Fatalf("loi parse anthropic: %s", errText)
+		}
+		if turn.FinishReason != item.want {
+			t.Fatalf("stop_reason %q -> %q, muon %q", item.stopReason, turn.FinishReason, item.want)
+		}
 	}
 }
 

@@ -16,11 +16,16 @@ import (
 )
 
 const (
-	// DefaultRequestTimeout: tran cho MOT request toi nha cung cap (chinh bang
-	// LlmRequestTimeoutSeconds / AXIOM_LLM_REQUEST_TIMEOUT). Mot luot chay khong co tran thoi gian -
-	// no duoc kiem soat bang so vong, ngan sach token va nut Dung.
-	DefaultRequestTimeout = 120 * time.Second
-	MaxRetryAfter         = 10 * time.Second
+	// DefaultChatTimeout: tran cho mot loi goi NGAN, khong stream (kiem tra cau hinh, tom tat hoi
+	// thoai). Luot agent thi khong co tran nay.
+	DefaultChatTimeout = 120 * time.Second
+
+	// DefaultIdleTimeout: khong nhan duoc byte nao trong bao lau thi coi nhu ket noi treo va huy -
+	// thay cho tran thoi gian tong. Lay theo chunkTimeout cua goclaw (300s); do that voi
+	// ocg/deepseek-v4.1-flash: mot prompt ~2k token co luc nghi hon 2 phut truoc khi nha byte dau.
+	DefaultIdleTimeout = 300 * time.Second
+
+	MaxRetryAfter = 10 * time.Second
 
 	EmptyReplyNudge = "Your last reply was empty. Continue the task with the tools, or if it is already done, reply with a short summary."
 )
@@ -30,24 +35,32 @@ var DefaultRetryDelays = []time.Duration{time.Second, 2 * time.Second, 4 * time.
 
 // Client goi mot model (ModelClient.cs).
 type Client struct {
-	http           *http.Client
-	Codec          Codec
-	endpoint       string
-	apiKey         string
-	Model          string
+	http     *http.Client
+	Codec    Codec
+	endpoint string
+	apiKey   string
+	Model    string
+
+	// RequestTimeout: tran cho MOT request; 0 = khong tran (mac dinh cho luot agent). Loi goi ngan
+	// nhu Chat tu dat tran rieng.
 	RequestTimeout time.Duration
-	RetryDelays    []time.Duration
+	// IdleTimeout: khong nhan duoc byte nao trong bao lau thi huy request; 0 = khong kiem.
+	IdleTimeout time.Duration
+	RetryDelays []time.Duration
+	// Stream: gui `stream: true` va doc SSE. Tat cho loi goi ngan.
+	Stream bool
 }
 
 func NewClient(httpClient *http.Client, provider, endpoint, apiKey, model string) *Client {
 	return &Client{
-		http:           httpClient,
-		Codec:          NewCodec(provider),
-		endpoint:       NormalizeEndpoint(endpoint),
-		apiKey:         apiKey,
-		Model:          model,
-		RequestTimeout: DefaultRequestTimeout,
-		RetryDelays:    DefaultRetryDelays,
+		http:        httpClient,
+		Codec:       NewCodec(provider),
+		endpoint:    NormalizeEndpoint(endpoint),
+		apiKey:      apiKey,
+		Model:       model,
+		IdleTimeout: DefaultIdleTimeout,
+		RetryDelays: DefaultRetryDelays,
+		Stream:      true,
 	}
 }
 
@@ -95,11 +108,13 @@ func (c *Client) Chat(ctx context.Context, systemPrompt, userPrompt string, maxT
 	if maxTokens <= 0 {
 		maxTokens = 2048
 	}
-	callCtx, cancel := context.WithTimeout(ctx, c.RequestTimeout)
+	callCtx, cancel := context.WithTimeout(ctx, c.ShortCallTimeout())
 	defer cancel()
 	body := c.Codec.BuildRequest(c.Model, systemPrompt,
 		[]Message{map[string]any{"role": "user", "content": userPrompt}}, nil, false, maxTokens)
-	text, errText, status := c.post(callCtx, ctx, body)
+	// Loi goi ngan: khong stream, va vi body khong phai SSE nen Parse thường dung duoc.
+	body["stream"] = false
+	text, errText, status := c.post(callCtx, ctx, body, false)
 	if text == nil {
 		if status > 0 {
 			return "", fmt.Sprintf("HTTP %d: %s", status, Truncate(errText, 300)), false
@@ -116,6 +131,15 @@ func (c *Client) Chat(ctx context.Context, systemPrompt, userPrompt string, maxT
 	return StripThoughts(turn.Text), "", true
 }
 
+// ShortCallTimeout: tran cho mot loi goi NGAN - Chat (kiem tra cau hinh, tom tat) va trich xuat
+// memory. Luot agent khong dung ham nay vi no khong co tran thoi gian.
+func (c *Client) ShortCallTimeout() time.Duration {
+	if c.RequestTimeout > 0 {
+		return c.RequestTimeout
+	}
+	return DefaultChatTimeout
+}
+
 func IsTransient(status int, errText string) bool {
 	switch status {
 	case 429, 500, 502, 503, 504:
@@ -125,7 +149,15 @@ func IsTransient(status int, errText string) bool {
 }
 
 // post gui body, thu lai khi loi tam thoi. userCtx de phan biet nguoi dung huy voi het gio.
-func (c *Client) post(ctx, userCtx context.Context, body map[string]any) ([]byte, string, int) {
+// stream = true thi bat SSE va xin kem usage (chi OpenAI hieu stream_options).
+func (c *Client) post(ctx, userCtx context.Context, body map[string]any, stream bool) ([]byte, string, int) {
+	if stream {
+		body["stream"] = true
+		if c.Codec.Name() == "openai" {
+			// Khong co cai nay thi khung cuoi khong mang usage, mat so token cua luot.
+			body["stream_options"] = map[string]any{"include_usage": true}
+		}
+	}
 	payload, err := json.Marshal(body)
 	if err != nil {
 		return nil, "invalid request: " + err.Error(), 0
@@ -154,7 +186,9 @@ func (c *Client) post(ctx, userCtx context.Context, body map[string]any) ([]byte
 }
 
 func (c *Client) postOnce(ctx, userCtx context.Context, payload []byte) ([]byte, string, int, time.Duration) {
-	requestCtx, cancel := context.WithTimeout(ctx, c.RequestTimeout)
+	// Khong dat tran thoi gian tong: ben goi quyet dinh (Chat dat 120s, luot agent khong dat).
+	// Ket noi treo bi chan bang watchdog "khong nhan duoc byte nao" ben duoi.
+	requestCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	request, err := http.NewRequestWithContext(requestCtx, http.MethodPost, BuildURL(c.endpoint, c.Codec.Path()), bytes.NewReader(payload))
 	if err != nil {
@@ -164,12 +198,16 @@ func (c *Client) postOnce(ctx, userCtx context.Context, payload []byte) ([]byte,
 	ApplyAuth(request, c.Codec.Name(), c.apiKey)
 	response, err := c.http.Do(request)
 	if err != nil {
-		return nil, transportError(err, ctx, userCtx, c.RequestTimeout), 0, 0
+		return nil, transportError(err, ctx, userCtx, c.IdleTimeout), 0, 0
 	}
 	defer response.Body.Close()
-	text, err := io.ReadAll(response.Body)
+	reader := newIdleReader(response.Body, c.IdleTimeout, cancel)
+	text, err := io.ReadAll(reader)
 	if err != nil {
-		return nil, transportError(err, ctx, userCtx, c.RequestTimeout), 0, 0
+		if reader.Stalled() {
+			return nil, fmt.Sprintf("provider sent nothing for %ds", int(c.IdleTimeout.Seconds())), 0, 0
+		}
+		return nil, transportError(err, ctx, userCtx, c.IdleTimeout), 0, 0
 	}
 	if response.StatusCode >= 200 && response.StatusCode < 300 {
 		return text, "", response.StatusCode, 0

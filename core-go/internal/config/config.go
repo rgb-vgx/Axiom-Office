@@ -25,16 +25,19 @@ type Source interface {
 
 // Config la anh chup cau hinh tai mot thoi diem (Load lai moi luot de doi LLM co hieu luc ngay).
 type Config struct {
-	CorePort                 int
-	SingleInstance           bool
-	MutexName                string
-	Token                    string
-	CoreEnabled              bool
-	MemoryEnabled            bool
-	MemoryAutoExtract        bool
-	LlmProvider              string
-	LlmEndpoint              string
-	LlmModel                 string
+	CorePort          int
+	SingleInstance    bool
+	MutexName         string
+	Token             string
+	CoreEnabled       bool
+	MemoryEnabled     bool
+	MemoryAutoExtract bool
+	LlmProvider       string
+	LlmEndpoint       string
+	LlmModel          string
+	// LlmRequestTimeoutSeconds: tran cho mot loi goi NGAN (kiem tra cau hinh, tom tat, trich xuat
+	// memory). 0 = dung mac dinh 120s. Luot agent KHONG dung gia tri nay - no khong co tran thoi
+	// gian, chi bi chan boi watchdog "khong nhan duoc byte nao" (300s).
 	LlmRequestTimeoutSeconds int
 	ConfirmTimeoutSeconds    int
 	VisualQaEnabled          bool

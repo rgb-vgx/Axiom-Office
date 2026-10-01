@@ -524,4 +524,3 @@ func EmptyZip() []byte {
 	_ = writer.Close()
 	return buffer.Bytes()
 }
-

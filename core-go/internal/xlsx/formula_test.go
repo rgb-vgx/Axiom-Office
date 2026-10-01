@@ -45,13 +45,13 @@ func TestShiftFormula(t *testing.T) {
 
 func TestQuoteSheet(t *testing.T) {
 	cases := map[string]string{
-		"Data":     "Data",
-		"_a1":      "_a1",
-		"a.b":      "a.b",
-		"Trang 1":  "'Trang 1'",
-		"a'b":      "'a''b'",
-		"1sheet":   "'1sheet'",
-		"a-b":      "'a-b'",
+		"Data":    "Data",
+		"_a1":     "_a1",
+		"a.b":     "a.b",
+		"Trang 1": "'Trang 1'",
+		"a'b":     "'a''b'",
+		"1sheet":  "'1sheet'",
+		"a-b":     "'a-b'",
 	}
 	for name, want := range cases {
 		if got := QuoteSheet(name); got != want {

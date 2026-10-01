@@ -190,10 +190,8 @@ func Extract(ctx context.Context, client *model.Client, input ExtractionInput) (
 	user, tempIDs := BuildUserMessage(input)
 	lastError := "no reply"
 	for attempt := 0; attempt < 2; attempt++ {
-		timeout := client.RequestTimeout
-		if timeout < 30*time.Second {
-			timeout = 30 * time.Second
-		}
+		// Dung chung tran "loi goi ngan" voi Chat: cau hinh 0 thi lay 120s, khong tut xuong 30s.
+		timeout := client.ShortCallTimeout()
 		callCtx, cancel := context.WithTimeout(ctx, timeout)
 		message := user
 		if attempt > 0 {

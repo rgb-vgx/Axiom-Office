@@ -43,6 +43,99 @@ func (openAICodec) BuildRequest(model, systemPrompt string, turns []Message, too
 	return body
 }
 
+// ParseStream doc body SSE cua /chat/completions va gom cac delta thanh mot Turn.
+//
+// Hinh dang that (lay tu proxy 9router ngay 02/10/2026): moi frame la mot
+// `chat.completion.chunk`; `choices[0].delta` co `content` va `reasoning_content` rieng. Tool call
+// den lam hai pha: frame dau mang ca `id` va `function.name`, cac frame sau chi mang tung manh
+// `function.arguments` - nen phai ghep theo `index`.
+//
+// Body khong phai SSE (may chu bo qua `stream: true`) thi roi ve Parse.
+func (openAICodec) ParseStream(body []byte) (*Turn, string) {
+	payloads := ssePayloads(body)
+	if len(payloads) == 0 {
+		return (openAICodec{}).Parse(body)
+	}
+	var text strings.Builder
+	type partial struct {
+		id   string
+		name string
+		args strings.Builder
+	}
+	partials := map[int]*partial{}
+	order := []int{}
+	turn := &Turn{}
+	for _, payload := range payloads {
+		var chunk struct {
+			Choices []struct {
+				Delta struct {
+					Content   string `json:"content"`
+					ToolCalls []struct {
+						Index    *int   `json:"index"`
+						ID       string `json:"id"`
+						Function struct {
+							Name      string `json:"name"`
+							Arguments string `json:"arguments"`
+						} `json:"function"`
+					} `json:"tool_calls"`
+				} `json:"delta"`
+				FinishReason string `json:"finish_reason"`
+			} `json:"choices"`
+			Usage *struct {
+				Prompt     int `json:"prompt_tokens"`
+				Completion int `json:"completion_tokens"`
+			} `json:"usage"`
+		}
+		// Frame hong chi bi bo qua, khong lam hong ca luot.
+		if err := json.Unmarshal([]byte(payload), &chunk); err != nil {
+			continue
+		}
+		if chunk.Usage != nil {
+			turn.InputTokens, turn.OutputTokens = chunk.Usage.Prompt, chunk.Usage.Completion
+		}
+		if len(chunk.Choices) == 0 {
+			continue
+		}
+		choice := chunk.Choices[0]
+		if choice.FinishReason != "" {
+			turn.FinishReason = choice.FinishReason
+		}
+		text.WriteString(choice.Delta.Content)
+		for _, call := range choice.Delta.ToolCalls {
+			index := 0
+			if call.Index != nil {
+				index = *call.Index
+			}
+			entry, seen := partials[index]
+			if !seen {
+				entry = &partial{}
+				partials[index] = entry
+				order = append(order, index)
+			}
+			// id va name chi den mot lan; arguments den tung manh.
+			if call.ID != "" {
+				entry.id = call.ID
+			}
+			if call.Function.Name != "" && entry.name == "" {
+				entry.name = call.Function.Name
+			}
+			entry.args.WriteString(call.Function.Arguments)
+		}
+	}
+	turn.Text = text.String()
+	turn.HasText = turn.Text != ""
+	turn.Raw = json.RawMessage(body)
+	for _, index := range order {
+		entry := partials[index]
+		arguments := entry.args.String()
+		if arguments == "" {
+			arguments = "{}"
+		}
+		turn.ToolCalls = append(turn.ToolCalls, ToolCall{ID: entry.id, Name: entry.name, Arguments: arguments})
+	}
+	return turn, ""
+}
+
 func (openAICodec) Parse(body []byte) (*Turn, string) {
 	var root struct {
 		Choices []struct {

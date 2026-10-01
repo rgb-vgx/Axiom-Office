@@ -356,9 +356,9 @@ func TestStylesDeriveAndDateCell(t *testing.T) {
 
 func TestRgbValidation(t *testing.T) {
 	cases := map[string]string{
-		"#FF0000": "FF0000",
-		"ff0000":  "FF0000",
-		"#00ff00": "00FF00",
+		"#FF0000":  "FF0000",
+		"ff0000":   "FF0000",
+		"#00ff00":  "00FF00",
 		"FF112233": "112233",
 	}
 	for input, want := range cases {

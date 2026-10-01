@@ -7,14 +7,14 @@ import (
 
 // Content type cua cac part trong workbook.
 const (
-	WorksheetContentType      = "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"
-	sharedStringsContentType  = "application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"
-	tableContentType          = "application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml"
-	stylesContentType         = "application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"
-	workbookContentType       = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"
-	macroWorkbookContentType  = "application/vnd.ms-excel.sheet.macroEnabled.main+xml"
-	templateContentType       = "application/vnd.openxmlformats-officedocument.spreadsheetml.template.main+xml"
-	macroTemplateContentType  = "application/vnd.ms-excel.template.macroEnabled.main+xml"
+	WorksheetContentType     = "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"
+	sharedStringsContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"
+	tableContentType         = "application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml"
+	stylesContentType        = "application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"
+	workbookContentType      = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"
+	macroWorkbookContentType = "application/vnd.ms-excel.sheet.macroEnabled.main+xml"
+	templateContentType      = "application/vnd.openxmlformats-officedocument.spreadsheetml.template.main+xml"
+	macroTemplateContentType = "application/vnd.ms-excel.template.macroEnabled.main+xml"
 )
 
 // WorkbookPart mac dinh cua workbook moi.

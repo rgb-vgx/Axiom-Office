@@ -116,7 +116,7 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 		}
 
 		body := c.Codec.BuildRequest(c.Model, systemPrompt, turns, tools, toolsEnabled, options.MaxResponseTokens)
-		responseText, errText, status := c.post(runCtx, ctx, body)
+		responseText, errText, status := c.post(runCtx, ctx, body, c.Stream)
 		if responseText == nil {
 			if runCtx.Err() != nil {
 				return stopped()
@@ -134,7 +134,9 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 			return done(false, "", detail, "provider")
 		}
 
-		turn, parseError := c.Codec.Parse(responseText)
+		// Luot agent gui stream: true, nen body thuong la SSE; ParseStream tu roi ve Parse khi may
+		// chu bo qua stream va tra JSON mot cuc.
+		turn, parseError := c.Codec.ParseStream(responseText)
 		if turn == nil {
 			return done(false, "", parseError, "provider")
 		}
