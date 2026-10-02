@@ -1,0 +1,5 @@
+service co chu 'Conditional': []
+XSheetConditionalEntries methods: ['Count', 'ElementNames', 'ElementType', 'ImplementationId', 'ImplementationName', 'SupportedServiceNames', 'Types', 'addNew', 'clear', 'createEnumeration', 'getByIndex', 'getByName', 'getCount', 'getElementNames', 'getElementType', 'getImplementationId', 'getImplementationName', 'getSupportedServiceNames', 'getTypes', 'hasByName']
+sheet.ConditionalFormats type: pyuno
+  methods: ['ConditionalFormats', 'ImplementationId', 'Length', 'Types', 'createByRange', 'getConditionalFormats', 'getImplementationId', 'getLength', 'getTypes', 'queryAdapter', 'queryInterface', 'removeByID']
+  formats.createInstance LOI: AttributeError: createInstance

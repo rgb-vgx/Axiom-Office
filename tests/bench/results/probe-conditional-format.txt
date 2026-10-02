@@ -1,0 +1,7 @@
+range.ConditionalFormat?   True
+sheet.ConditionalFormats? True
+duong 1 LOI: com.sun.star.uno.RuntimeException: Couldn't convert <uno.com.sun.star.sheet.TableConditionalEntry object at 0x0000000001A257F0> to a UNO type; caught exception: <class 'AttributeError'>: 'com.sun.star.sheet.TableConditionalEntry' object has no attribute 'getTypes', traceback follows
+no traceback available
+
+duong 2 LOI: AttributeError: createInstance
+trong file .ods: <style:map>=0 | table:condition=0
