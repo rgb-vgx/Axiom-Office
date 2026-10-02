@@ -106,6 +106,59 @@ nói ra lợi ích — bảng 50.000 dòng giờ dựng được bằng công th
    lượt tính toàn bộ tài liệu, đắt hơn phần tính tăng dần mà nó thay thế. Đã hoàn tác, và ghi số đo ngay
    trong `write_range` để lần sau không ai thêm lại.
 
+## Kiểm tra tính đúng đắn (đợt sau, 02/10/2026)
+
+Chạy lại Test 2 với ngân sách 1.000.000 và **lưu tài liệu** (lượt đầu không lưu nên mất file): 131 vòng,
+457 tool call, `verified=True`, 38 phút → `result/axiom-test2wide.ods`.
+
+Đếm theo TỪNG SHEET (`ods_summary.py`), không đếm tổng:
+
+```
+Assumptions       503 dong /   2.504 cong thuc      Reorder_Point     401 /  4.800
+Raw_SKU_Data   52.001 dong / 936.000 cong thuc      EOQ               401 /  5.600
+Product_Master    401 /   5.200                     Risk              401 /  7.600
+Demand_History 52.001 / 676.000                     Optimization      401 /  8.800
+Inventory         401 /   9.200                     Dashboard          24 /     73
+Forecast          401 /   3.612                     Checks             20 /     48
+Safety_Stock      401 /   4.801
+```
+
+**Cả 12 sheet đều có nội dung** — nhưng ba vấn đề thật:
+
+1. **Phân tích chỉ phủ 400 trong 52.001 dòng.** `Raw_SKU_Data` có 52.001 dòng, còn `Inventory`,
+   `Forecast`, `Safety_Stock`, `Reorder_Point`, `EOQ`, `Risk`, `Optimization` mỗi sheet chỉ 401 dòng
+   (tiêu đề + 400). Lượt chạy đầu tiên cũng vậy (ba sheet 50.001 dòng, còn lại 6.001). Claude Code làm
+   **cả 50.001 dòng** ở mọi sheet phân tích.
+2. **Chính Dashboard tự mâu thuẫn.** Phụ đề `A2` ghi *"Live formulas over 50,000 unique SKU-loc…"*,
+   nhưng chú thích `D5`/`D11` ghi *"over 400 SKUs"* / *"across 400 SKUs"*, và mọi công thức chỉ phủ
+   `Inventory.$F$2:$F$401`. Agent biết nó chỉ làm 400 — và vẫn để dòng quảng cáo 50.000 ở trên.
+3. **Sheet `Checks` KHÔNG phải sheet kiểm tra.** Nó không có một ô chữ nào; 27 công thức trong đó là
+   công thức thử dùng một lần (`COUNTIF`, `MATCH`, `SUMPRODUCT`, `SUMIF`, `AVERAGEIF`, `COUNTIFS`,
+   `dashboard.sum(...)`) trên `Dashboard.$AC$1:$AC$3` — dấu vết của việc agent dò xem LibreOffice hỗ trợ
+   hàm nào, rồi để nguyên lại.
+
+Quét chữ trong cả file để chắc: **`PASS` = 0, `FAIL` = 0, số ô chứa chữ "Check" = 0**. Đề yêu cầu
+"Display a clear PASS/FAIL status for each check" — không có gì cả. (File Claude Code cùng bài:
+`PASS` = 247, `FAIL` = 88.)
+
+### Đối chiếu bốn file Axiom
+
+Cùng phép quét, cho thấy đây là **thiếu sót không đều**, không phải "Axiom luôn quên":
+
+| File | PASS | FAIL | Sheet Checks có thật? |
+|---|---|---|---|
+| Test 1 wide | 116 | 40 | có |
+| **Test 2 wide** | **0** | **0** | **không** |
+| **Test 3** | **0** | **0** | **không** (sheet trống hoàn toàn) |
+| Test 4 wide | 59 | 21 | có |
+
+### Cách đo đã sửa
+
+Tổng số công thức là thước đo tồi — nó che mất cả 9 sheet rỗng ở Test 3 lẫn việc sheet "Checks" chỉ là
+chỗ thử hàm. Từ nay báo cáo theo **từng sheet**, và kiểm ba tầng: cấu trúc → công thức hay số cứng →
+**đọc nội dung xem có đúng thứ mang tên nó không**. Ba công cụ ở `tests/bench/`:
+`ods_summary.py`, `formulas.py`, `scan.py`.
+
 ## Còn lại, chưa làm
 
 - **Gom nhiều lần ghi trong một vòng** (khoảng cách #2). Hướng đúng là một lệnh ghi được NHIỀU vùng

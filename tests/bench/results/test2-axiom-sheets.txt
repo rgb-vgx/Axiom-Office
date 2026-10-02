@@ -1,0 +1,14 @@
+sheet                      dong  cong thuc    o chu   chart?
+Assumptions                 503       2504     2866        0
+Raw_SKU_Data              52001     936000   936018        0
+Product_Master              401       5200     5213        0
+Demand_History            52001     676000   676012        0
+Inventory                   401       9200     9223        0
+Forecast                    401       3612     3621        0
+Safety_Stock                401       4801     4813        0
+Reorder_Point               401       4800     4812        0
+EOQ                         401       5600     5614        0
+Risk                        401       7600     7619        0
+Optimization                401       8800     8822        0
+Dashboard                    24         73      170        0
+Checks                       20         48       56        0

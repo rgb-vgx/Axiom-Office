@@ -1,0 +1,13 @@
+sheet                      dong  cong thuc    o chu   chart?
+Raw_SKU_Data              50501     101000   851597        0
+Product_Master             5001       5000    75015        0
+Demand_History            50001     150000   892340        0
+Inventory                 50001     200000   698745        0
+Forecast                  50001     250000   550011        0
+Safety_Stock              50001     200000   649410        0
+Reorder_Point             50001     250000   600012        0
+EOQ                       50001     200000   600011        0
+Risk                      50001     450000   950019        0
+Optimization              50001     350000   700003        0
+Dashboard                   171        464      714        8
+Checks                      132        188      613        0
