@@ -5,6 +5,27 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed — `AxiomOffice.Host.exe mcp` chuyển tiếp sang Agent Core (bản Go)
+- Bước đầu để chỉ còn **một** bản MCP server. Trên Windows, MCP server nay là
+  `AxiomOffice.Core.exe mcp …`; `AxiomOffice.Host.exe mcp …` **giữ nguyên giao diện** nhưng chuyển tiếp
+  sang Core, nên người dùng đã cấu hình MCP client trỏ vào `Host.exe` **không phải đổi gì**.
+- Chuyển tiếp ở mức **byte** trên stdin/stdout/stderr: giao thức là JSON theo dòng trên stdout, giải mã
+  rồi mã hoá lại chỉ thêm một chỗ để sai.
+- **Thiếu Core thì chạy bản C# như cũ** — gói cài có thể không kèm Core (máy build không có Go thì
+  `scripts/build.ps1` bỏ qua), không để ai bị kẹt. `--in-process` ép chạy bản C# khi cần so sánh.
+- **Vì sao**: hai bản MCP 50 tool là hai chỗ để lệch nhau. Ngày 02/10/2026 phải sửa **cùng một lỗi hai
+  lần** (`empty-reference` ở `checks.py` và `Checks.cs`; tên chart ở `calc.py` và `Spreadsheet.cs`), và
+  một lỗi chỉ có ở C# (`(?P<…>)` của Python không phải cú pháp nhóm có tên của .NET) đã làm
+  `Host.exe` chết ngay khi gọi — biên dịch vẫn xanh.
+- Bản Go **đã chạy được MCP trên Windows**: `test_mcp_portable.py` **70/70** nhắm vào
+  `AxiomOffice.Core.exe` (đo trước khi đổi, không phải suy đoán).
+- **Còn nợ một thứ**: đọc `.xls`. Bản C# dùng COM (Excel/WPS), bản Go dùng `soffice` — đây là chỗ dùng
+  COM **duy nhất** của bản C#. Trên Windows, người dùng có Office mà không có LibreOffice sẽ mất `.xls`
+  (mọi định dạng khác là OOXML, đọc trực tiếp, không cần gì thêm). Chưa xử lý; nếu làm thì sẽ ghi rõ
+  trong README trước.
+- `AxiomOffice.Host.exe` **vẫn còn** ba vai trò khác: cầu COM companion (`… wps|et|wpp|word|excel|ppt`),
+  `commands --json` (bài parity đang dùng), và `llm-test`.
+
 ### Fixed — et.addChart hỏng trên MỌI sheet chưa có biểu đồ (tên chart duy nhất theo tài liệu)
 - **Tên chart trong LibreOffice là duy nhất theo TÀI LIỆU, không theo sheet.** Guard cũ chỉ hỏi
   `sheet.Charts.hasByName(name)` — mà sheet chưa có chart thì luôn trả về "chưa có" — nên nó cho qua rồi
