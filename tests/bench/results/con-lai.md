@@ -214,3 +214,47 @@ LibreOffice trước, Windows sau.
 
 **Không làm**: tăng budget/round-cap để "xong cho rồi", concurrency bridge, tắt auto-calc (đã đo
 là sai), prompt động mất cache, thêm LLM planner thứ hai.
+
+### Kết quả A/B Test 3 — n=1 mỗi bên (03/10/2026)
+
+Model: `oc/muse-spark-1.3-contributor-free` (bạn chọn; `ocg/deepseek-v4.1-flash` đang dính weekly limit
+của proxy — probe qua `POST /v1/llm/test` trước mỗi lượt). Cùng đề `test3.txt`, cùng ngân sách
+1.000.000/300 vòng, cùng bridge **64 lệnh** (bản extension mới CỐ Ý chưa nạp vào LO lúc chạy — stash
+`calc.py` trước khi LO khởi động, pop ngay sau đó, để hai bên cùng contract). Bằng chứng:
+`C:\Users\ThuyetMT\test\bench\axiom-test3ab-{base,head}.log` + `result\axiom-test3ab-{base,head}.ods`.
+
+| | CONTROL (`da699e1`, trước PlanRule) | VARIANT (HEAD: PlanRule + skill 9–10) |
+|---|---|---|
+| Kết thúc | `stopped` @1.000.056 | `stopped` @1.026.952 — **cả hai hết ngân sách, chưa verify** |
+| Vòng / tool call | 168 / 183 | 216 / 227 |
+| **Wall** | 92,7 phút | **47,7 phút (−49%)** |
+| Token ra / cache_hit | 497.160 / 0,900 | **368.822 (−26%)** / 0,930 |
+| Sheet | **14/14** (có README) | 13 (thiếu README) |
+| Chart | 0 | **6** (Dashboard) |
+| Schedule / Dependencies | 5.001 / 4.901 dòng | **101 / 2.001 dòng — nông hơn hẳn** |
+| Tasks | 70.000 công thức | 110.000 công thức |
+| by_tool khác biệt | writeRange=34, fillRange=98 | **writeRanges=33** (lệnh batch), fillRange=122, readRange=52, addChart=3 |
+
+Đọc số (n=1 — model free dao động mạnh, quy ước vẫn là ≥3 lần/bên nên CHƯA KẾT LUẬN ai hơn):
+- Variant **nhanh gấp đôi, tiết kiệm 26% token ra**, dùng `et.writeRanges` đúng như thiết kế, nạp đúng
+  skill `mo-hinh-nhieu-sheet`.
+- Nhưng hai bên "tiêu tiền" vào chỗ KHÁC nhau: variant làm Dashboard/chart đầy hơn thì Schedule/
+  Dependencies nông hơn — và **cả hai đều chưa tới bước tự soát** (`verified=None`). Bài Test 3 với
+  model này @1M chưa bài nào xong: phải tách "xong được không" khỏi "tốn bao nhiêu" (đúng bài học mục 6).
+
+### Bài học vận hành A/B — ghi để lần sau khỏi mất lượt chạy (03/10/2026)
+
+1. **Cô lập document là bắt buộc.** Lượt variant #1 hỏng vì `et.newWorkbook` không cô lập: extension
+   chọn document qua `documents.active()` có fallback *"không có active thì lấy tài liệu cùng loại cuối
+   cùng"*, nên giữa chừng mọi lệnh rơi vào workbook của CONTROL (bằng chứng `listSheets` trả
+   `workbook=test3-base.ods`), saveAs cuối lưu nhầm tài liệu đối thủ. Bằng chứng giữ ở
+   `result\axiom-test3ab-head-CONTAMINATED.ods`. Một lượt clean phải có **đúng một document**:
+   restart LO → `et.newWorkbook` → kiểm `GET /session` trước khi chạy.
+2. **Restart LO sau `taskkill /F` có thể mở ra không có document nào** (mọi lệnh trả
+   "no active spreadsheet") — tạo lại qua `et.newWorkbook`, kiểm `GET /session`.
+3. **Sửa extension phải `scripts/libreoffice.ps1 -Install`** (đóng gói `.oxt` + `unopkg add`): LO chạy
+   từ gói đã cài, không đọc source. Bằng chứng: 4 case live mới fail 100% khi chưa cài lại → **286/286
+   pass** ngay sau khi cài.
+4. **Giữ contract bridge cũ cho A/B prompt/skill**: stash file extension trước khi LO khởi động, pop
+   ngay sau — bộ lệnh trong bộ nhớ LO là bản cũ, đĩa trở lại bản mới.
+5. Trước mỗi lượt: probe model qua `POST /v1/llm/test` (model free đổi vận cả ngày).
