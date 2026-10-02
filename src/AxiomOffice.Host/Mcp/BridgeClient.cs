@@ -38,7 +38,62 @@ namespace AxiomOffice.Host.Mcp
             {
                 throw new ArgumentException("unknown app '" + app + "' (expected wps/et/wpp for WPS or word/excel/ppt for Microsoft Office, or pass port)");
             }
-            return Config.PortForKind(target.Key, target.Value);
+            int guessed = Config.PortForKind(target.Key, target.Value);
+
+            // Session registry là sự THẬT (bridge nào đang chạy), cấu hình chỉ là phỏng đoán theo tên app.
+            // Trên Windows tên app không nói được họ nào: "et"/"wps"/"wpp" luôn trả về cổng WPS, nên bridge
+            // LibreOffice đang chạy (47852) không bao giờ khớp. Đo ngày 02/10/2026: wps_live_write_range
+            // trên Windows trỏ vào 47822 trong khi LibreOffice ở 47852, và chính office_sessions báo đúng
+            // 47852 — hai tool của cùng một server nói ngược nhau.
+            //
+            // Giữ nguyên hành vi cũ khi cấu hình đúng: có session ở đúng cổng đó thì dùng cổng đó. Chỉ khi
+            // cấu hình trỏ vào một cổng KHÔNG có bridge nào mới lấy cổng của session đang chạy.
+            var ports = SessionPorts(target.Key);
+            if (ports.Count == 0)
+            {
+                return guessed;
+            }
+
+            return ports.Contains(guessed) ? guessed : ports[0];
+        }
+
+        // Cổng của các bridge thuộc `kind` đang chạy, đọc thẳng file session (không gọi /health - rẻ hơn
+        // Sessions vì ở đây chỉ cần biết có bridge nào của họ ứng dụng này, không cần biết nó có khỏe không).
+        private static List<int> SessionPorts(string kind)
+        {
+            var ports = new List<int>();
+            string directory = SessionRegistry.Directory;
+            if (!System.IO.Directory.Exists(directory))
+            {
+                return ports;
+            }
+
+            var json = Json.Create();
+            foreach (string path in System.IO.Directory.GetFiles(directory, "*.json"))
+            {
+                try
+                {
+                    var data = json.DeserializeObject(File.ReadAllText(path, Encoding.UTF8)) as Dictionary<string, object>;
+                    if (data == null || !data.ContainsKey("app") || Convert.ToString(data["app"]) != kind)
+                    {
+                        continue;
+                    }
+
+                    int pid = ToInt(data, "pid");
+                    int port = ToInt(data, "port");
+                    if (port > 0 && IsProcessAlive(pid))
+                    {
+                        ports.Add(port);
+                    }
+                }
+                catch (Exception)
+                {
+                    // file đang được ghi lại: bỏ qua
+                }
+            }
+
+            ports.Sort();
+            return ports;
         }
 
         public static string BaseUrl(string app, int? port)

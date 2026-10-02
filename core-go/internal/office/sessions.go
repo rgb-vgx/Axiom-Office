@@ -13,6 +13,33 @@ import (
 // healthProbeTimeout: tran thoi gian hoi /health cua tung session khi liet ke (giong ban C#).
 const healthProbeTimeout = 1500 * time.Millisecond
 
+// Ports doc THANG cac file session (khong hoi /health) va tra ve cong cua nhung bridge thuoc `app`.
+//
+// Re hon Sessions vi khong probe: dung o duong phan giai cong, noi chi can biet "co bridge nao cua ho
+// ung dung nay khong" chu khong can biet no con khoe khong.
+func (d *Directory) Ports(app string) []int {
+	ports := []int{}
+	entries, err := os.ReadDir(d.Path)
+	if err != nil {
+		return ports
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(strings.ToLower(entry.Name()), ".json") {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(d.Path, entry.Name()))
+		if err != nil {
+			continue
+		}
+		session, ok := parseSession(data, filepath.Join(d.Path, entry.Name()))
+		if ok && session.App == app && session.Port > 0 && IsAlive(session.Pid) {
+			ports = append(ports, session.Port)
+		}
+	}
+	sort.Ints(ports)
+	return ports
+}
+
 // Sessions liet ke moi bridge dang song, them healthy/ageSeconds/file va don file cua bridge da chet.
 // Sap xep theo family roi port - dung cho tool MCP `office_sessions`
 // (port cua BridgeClient.Sessions trong src/AxiomOffice.Host/Mcp/BridgeClient.cs).

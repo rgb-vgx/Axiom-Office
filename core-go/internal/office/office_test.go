@@ -173,3 +173,53 @@ func portOf(t *testing.T, raw string) int {
 	}
 	return value
 }
+
+// writeAppSession: nhu writeSessionFile nhung doi duoc ten app (helper kia co dinh "et").
+func writeAppSession(t *testing.T, dir, name string, pid, port int, app string) {
+	t.Helper()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	payload := map[string]any{
+		"pid": pid, "app": app, "family": "libreoffice", "port": port, "host": "soffice", "version": "0.1.0",
+		"lastSeenEpoch": float64(time.Now().UnixMilli()) / 1000.0,
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, name+".json"), data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Ports: cong cua cac bridge thuoc mot ho ung dung, doc THANG tu file session (khong hoi /health).
+//
+// Dung o duong phan giai cong cua tool MCP live. Do 02/10/2026: tren Windows ten app ("et"/"wps"/"wpp")
+// luon tra ve cong WPS, nen wps_live_write_range tro vao 47822 trong khi bridge LibreOffice dang chay o
+// 47852 - va chinh office_sessions bao dung 47852. Registry la su that, cau hinh chi la phong doan.
+func TestPortsListsLiveSessionsOfOneApp(t *testing.T) {
+	dir := t.TempDir()
+	alive := os.Getpid()
+	writeAppSession(t, dir, "et-1", alive, 47852, "et")
+	writeAppSession(t, dir, "et-2", alive, 47822, "et")
+	writeAppSession(t, dir, "wps-1", alive, 47851, "wps")
+	writeAppSession(t, dir, "et-chet", 999_999_999, 47899, "et") // pid khong ton tai
+	if err := os.WriteFile(filepath.Join(dir, "hong.json"), []byte("{khong phai json"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	directory := &Directory{Path: dir}
+	if got := directory.Ports("et"); len(got) != 2 || got[0] != 47822 || got[1] != 47852 {
+		t.Fatalf("Ports(et) = %v (phai sap xep, bo bridge chet va file hong)", got)
+	}
+	if got := directory.Ports("wps"); len(got) != 1 || got[0] != 47851 {
+		t.Fatalf("Ports(wps) = %v", got)
+	}
+	if got := directory.Ports("khong-co-ho-nay"); len(got) != 0 {
+		t.Fatalf("ho la phai tra rong: %v", got)
+	}
+	if got := (&Directory{Path: filepath.Join(dir, "khong-ton-tai")}).Ports("et"); len(got) != 0 {
+		t.Fatalf("thu muc khong ton tai phai tra rong: %v", got)
+	}
+}

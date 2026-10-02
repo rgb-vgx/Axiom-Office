@@ -48,7 +48,26 @@ func resolvePort(app string, port int, hasPort bool) (int, error) {
 	if !ok {
 		return 0, errUnknownApp(app)
 	}
-	return config.BridgePortForKind(config.DefaultSource(), target.kind, target.officeHost), nil
+	guessed := config.BridgePortForKind(config.DefaultSource(), target.kind, target.officeHost)
+
+	// Session registry la su THAT (bridge nao dang chay), cau hinh chi la phong doan theo ten app. Tren
+	// Windows ten app khong noi duoc ho nao: "et"/"wps"/"wpp" luon tra ve cong WPS, nen bridge
+	// LibreOffice dang chay (47852) khong bao gio khop. Do ngay 02/10/2026: wps_live_write_range tren
+	// Windows tro vao 47822 trong khi LibreOffice o 47852, va chinh office_sessions bao dung 47852 -
+	// hai tool cua cung mot server noi nguoc nhau.
+	//
+	// Giu nguyen hanh vi cu khi cau hinh dung: co session o dung cong do thi dung cong do. Chi khi cau
+	// hinh tro vao mot cong KHONG co bridge nao thi moi lay cong cua session dang chay.
+	ports := office.NewDirectory("").Ports(target.kind)
+	if len(ports) == 0 {
+		return guessed, nil
+	}
+	for _, port := range ports {
+		if port == guessed {
+			return guessed, nil
+		}
+	}
+	return ports[0], nil
 }
 
 type unknownAppError struct{ app string }
