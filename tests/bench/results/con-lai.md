@@ -151,7 +151,7 @@ soát trước khi trả bài** — và cả hai lượt đó đều dừng vì 
 **Còn lại**: đối chiếu **từng ô** trên các sheet tất định (Inputs, Assumptions) — chỗ đó so được thật vì
 không phụ thuộc ngẫu nhiên.
 
-## 6. Ngân sách 400k cắt oan — ĐÃ ĐO ĐƯỢC
+## 6. Ngân sách 400k cắt oan — ĐÃ ĐO ĐƯỢC VÀ ĐÃ SỬA MẶC ĐỊNH
 
 Cả bốn lượt Axiom ở 400k đều dừng vì ngân sách. Đó là con số **tôi tự đặt** trong `run_prompt.py`,
 không phải giới hạn sản phẩm (`MaxMaxTokens` là 1.000.000). Chạy lại Test 4 với 1.000.000:
@@ -162,5 +162,6 @@ không phải giới hạn sản phẩm (`MaxMaxTokens` là 1.000.000). Chạy l
 Lý do: kích thước phản hồi của model dao động rất mạnh giữa các lần chạy (lượt bị cắt: 306.816 token ra
 / 79 vòng; lượt rộng: 141.269 / 293 vòng). Một ngân sách vừa khít sẽ cắt oan những lượt lẽ ra đã xong.
 
-**Cần làm**: đặt lại ngân sách mặc định cho các lần đo tiếp theo (1.000.000, hoặc bỏ hẳn trần khi đo
-"có xong được không"), và tách hai câu hỏi ra: *có xong không* và *xong trong bao nhiêu token*.
+**Đã sửa**: `run_prompt.py` nay mặc định **1.000.000** (trước 400.000), kèm lý do và số đo ngay trong
+chú thích để lần sau không ai hạ xuống lại. Vẫn truyền được số khác qua tham số thứ 8 khi muốn đo
+"xong trong bao nhiêu token" — tách hai câu hỏi *có xong không* và *tốn bao nhiêu*.

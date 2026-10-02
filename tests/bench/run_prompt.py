@@ -57,9 +57,15 @@ def main() -> int:
     token = sys.argv[6] if len(sys.argv) > 6 else ""
     # Tuy chon: <file_luu> <max_tokens>.
     #   <file_luu>  - luu tai lieu ra day sau khi luot chay ket thuc.
-    #   <max_tokens> - ngan sach token PHAI TRA cho ca luot (mac dinh 400000; Core chan tren o 1.000.000).
+    #   <max_tokens> - ngan sach token PHAI TRA cho ca luot (mac dinh 1000000; Core chan tren o 1.000.000).
+    #
+    # MAC DINH 1.000.000, khong phai 400.000 nhu truoc. Ly do da do: bon luot o 400k deu dung vi ngan
+    # sach, va luot chay lai Test 4 voi 1.000.000 thi XONG CA BAI (8/8 sheet, 5 chart, verified=true) ma
+    # chi ton 375.806 token phai tra - IT HON 404.021 cua luot bi cat o 400k, du lam 3,7 lan so tool call.
+    # Kich thuoc phan hoi cua model dao dong rat manh giua cac lan chay, nen mot ngan sach vua khit se cat
+    # oan nhung luot le ra da xong. Xem tests/bench/results/con-lai.md muc 6.
     save_path = sys.argv[7] if len(sys.argv) > 7 else ""
-    max_tokens = int(sys.argv[8]) if len(sys.argv) > 8 else 400000
+    max_tokens = int(sys.argv[8]) if len(sys.argv) > 8 else 1000000
     # <max_rounds>: tran so vong. Mac dinh 300; Core chan tren o 1000.
     max_rounds = int(sys.argv[9]) if len(sys.argv) > 9 else 300
     with open(prompt_file, encoding="utf-8") as handle:
