@@ -16,11 +16,16 @@ namespace AxiomOffice.Bridge
                 Command("et.newWorkbook", "et", EtNewWorkbook, "Tạo workbook mới"),
                 Command("et.open", "et", EtOpen, "Mở .xlsx/.xls/.csv", Req("path")),
                 Command("et.listSheets", "et", EtListSheets, "Danh sách sheet + sheet đang active").ForAgent(),
+                Command("et.sheetInfo", "et", EtSheetInfo,
+                    "Kích thước dùng thật của TỪNG sheet trong một lời gọi (`usedRange`/`rows`/`cols`/`empty`) — " +
+                    "dùng để soát sheet nào thực sự có nội dung, không chỉ có tên").ForAgent(),
                 Command("et.addSheet", "et", EtAddSheet, "Thêm sheet mới (bỏ trống `name` thì đặt tên Sheet1, Sheet2...)",
                     Opt("name"), Opt("index", "0-based, default: append")).ForAgent(),
                 Command("et.renameSheet", "et", EtRenameSheet, "Đổi tên sheet", Req("sheet"), Req("name")).ForAgent(),
                 Command("et.activateSheet", "et", EtActivateSheet, "Chuyển sheet", Req("sheet")).ForAgent(),
-                Command("et.readRange", "et", EtReadRange, "Đọc vùng, ví dụ `A1:C10`", Req("range"), Opt("sheet")).ForAgent(),
+                Command("et.readRange", "et", EtReadRange,
+                    "Đọc vùng, ví dụ `A1:C10`; `formulas=true` trả về công thức (ô không có công thức = null)",
+                    Req("range"), Opt("sheet"), Opt("formulas", "true = trả mảng `formulas` thay cho `values`")).ForAgent(),
                 Command("et.writeRange", "et", EtWriteRange, "Ghi vùng bắt đầu từ ô trên-trái `range`",
                     Req("range", "top-left cell e.g. 'A1'"), Req("values", "2D array of rows e.g. [[\"Tên\",\"Điểm\"],[\"An\",9.5]]"), Opt("sheet")).ForAgent(),
                 Command("et.importCsv", "et", EtImportCsv,
@@ -123,12 +128,91 @@ namespace AxiomOffice.Bridge
             dynamic wb = app.ActiveWorkbook;
             dynamic sheet = string.IsNullOrEmpty(sheetName) ? wb.ActiveSheet : wb.Worksheets[sheetName];
             dynamic range = sheet.Range[address];
-            object value = range.Value2;
-            return new Dictionary<string, object>
+            var result = new Dictionary<string, object>
             {
                 { "sheet", Convert.ToString(sheet.Name) },
-                { "range", address },
-                { "values", ToMatrix(value) }
+                { "range", address }
+            };
+            if (ParamBool(p, "formulas", false))
+            {
+                // Chỉ CÔNG THỨC: ô không có công thức -> null (giống bản LibreOffice).
+                result["formulas"] = ToFormulaMatrix(range.Formula);
+                return result;
+            }
+            result["values"] = ToMatrix(range.Value2);
+            return result;
+        }
+
+        // range.Formula: ô có công thức -> chuỗi bắt đầu '='; ô không có công thức -> giá trị của nó.
+        // Cần để agent phân biệt số gõ tay với kết quả tính — values không phân biệt được (bench
+        // 02/10/2026: sheet Checks của Test 2 toàn chữ PASS gõ tay mà đọc values ra vẫn "đúng").
+        private static object ToFormulaMatrix(object value)
+        {
+            Func<object, object> cell = raw =>
+            {
+                string s = Convert.ToString(raw);
+                return s != null && s.StartsWith("=") ? (object)s : null;
+            };
+            Array array = value as Array;
+            if (array == null)
+            {
+                return new List<List<object>> { new List<object> { cell(value) } };
+            }
+            int r0 = array.GetLowerBound(0);
+            int r1 = array.GetUpperBound(0);
+            int c0 = array.GetLowerBound(1);
+            int c1 = array.GetUpperBound(1);
+            var rows = new List<List<object>>();
+            for (int r = r0; r <= r1; r++)
+            {
+                var row = new List<object>();
+                for (int c = c0; c <= c1; c++)
+                {
+                    row.Add(cell(array.GetValue(r, c)));
+                }
+                rows.Add(row);
+            }
+            return rows;
+        }
+
+        private static Dictionary<string, object> EtSheetInfo(IAppHost host, Dictionary<string, object> p)
+        {
+            // Kích thước dùng thật từng sheet — cùng contract với calc.py sheet_info. Excel UsedRange
+            // luôn gom ít nhất A1 nên sheet chưa chạm tới -> 1x1 và ô đó trống -> empty.
+            dynamic app = host.Application;
+            dynamic wb = EnsureWorkbook(app);
+            var sheets = new List<object>();
+            for (int i = 1; i <= Convert.ToInt32(wb.Worksheets.Count); i++)
+            {
+                dynamic ws = wb.Worksheets[i];
+                dynamic used = ws.UsedRange;
+                int rows = Convert.ToInt32(used.Rows.Count);
+                int cols = Convert.ToInt32(used.Columns.Count);
+                bool empty;
+                if (rows <= 1 && cols <= 1)
+                {
+                    dynamic one = used.Cells[1, 1];
+                    string formula = Convert.ToString(one.Formula) ?? "";
+                    string value = Convert.ToString(one.Value2) ?? "";
+                    empty = !formula.StartsWith("=") && string.IsNullOrEmpty(value);
+                }
+                else
+                {
+                    empty = false;   // vùng dùng > 1x1: có dữ liệu hoặc có định dạng agent đã đặt
+                }
+                sheets.Add(new Dictionary<string, object>
+                {
+                    { "name", Convert.ToString(ws.Name) },
+                    { "usedRange", empty ? null : Convert.ToString(used.Address).Replace("$", "") },
+                    { "rows", empty ? 0 : rows },
+                    { "cols", empty ? 0 : cols },
+                    { "empty", empty }
+                });
+            }
+            return new Dictionary<string, object>
+            {
+                { "activeSheet", Convert.ToString(app.ActiveSheet.Name) },
+                { "sheets", sheets }
             };
         }
 

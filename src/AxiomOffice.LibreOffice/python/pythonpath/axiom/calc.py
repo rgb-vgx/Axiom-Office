@@ -104,6 +104,48 @@ def list_sheets(env, params):
     return {"workbook": doc.getTitle(), "activeSheet": _active_name(doc), "sheets": list(sheets.getElementNames())}
 
 
+def sheet_info(env, params):
+    """Kích thước dùng thật của TỪNG sheet trong một lời gọi — thay vì đọc lại từng sheet.
+
+    Vì sao cần (đo được ở bench 02-03/10/2026): Test 2 để sheet phân tích phủ 400/52.001 dòng mà agent
+    vẫn báo xong; Test 3 để 9 sheet TRỐNG hoàn toàn. `et.listSheets` chỉ trả tên nên cách duy nhất là
+    `readRange` từng sheet — đúng mắt xích 174 lần `readRange` ở lượt Test 4 rộng.
+
+    `empty=True` nghĩa là sheet không có gì (chỉ có tên) — không được tính là đã làm. Một sheet chỉ
+    bị định dạng mà không có dữ liệu thì coi là CÓ nội dung: người dùng/agent đã chạm vào sheet đó,
+    và `rows` vẫn nói đúng kích thước thật.
+    """
+    from .checks import address as range_address
+
+    doc = env.document
+    sheets = _ensure_sheet(doc)
+    items = []
+    for name in sheets.getElementNames():
+        sheet = sheets.getByName(name)
+        cursor = sheet.createCursor()
+        cursor.gotoEndOfUsedArea(True)
+        bounds = cursor.getRangeAddress()
+        rows = bounds.EndRow - bounds.StartRow + 1
+        cols = bounds.EndColumn - bounds.StartColumn + 1
+        if rows <= 0 or cols <= 0:
+            empty = True                     # bản UNO có nơi trả EndRow=-1 khi sheet chưa dùng tới
+        elif rows == 1 and cols == 1:
+            cell = sheet.getCellByPosition(bounds.StartColumn, bounds.StartRow)
+            formula = cell.getFormula()
+            empty = not ((isinstance(formula, str) and formula.startswith("="))
+                         or cell.getString() or cell.getError())
+        else:
+            empty = False                    # vùng dùng > 1x1: có dữ liệu hoặc có định dạng agent đã đặt
+        items.append({
+            "name": name,
+            "usedRange": None if empty else range_address(bounds),
+            "rows": 0 if empty else rows,
+            "cols": 0 if empty else cols,
+            "empty": empty,
+        })
+    return {"activeSheet": _active_name(doc), "sheets": items}
+
+
 def activate_sheet(env, params):
     name = values.string(params, "sheet")
     if not name:
@@ -163,7 +205,36 @@ def read_range(env, params):
     address = values.string(params, "range", "A1") or "A1"
     doc = env.document
     range_ = _range(_sheet(doc, params), address)
-    return {"sheet": _active_sheet_name(env, params), "range": address, "values": _to_matrix(range_.getDataArray())}
+    name = _active_sheet_name(env, params)
+    if values.boolean(params, "formulas", False):
+        # Chi CONG THUC: o khong cong thuc -> null (khac chuoi rong - khong co ai nham lan).
+        return {"sheet": name, "range": address, "formulas": _formulas(range_)}
+    return {"sheet": name, "range": address, "values": _to_matrix(range_.getDataArray())}
+
+
+def _formulas(range_) -> list:
+    """Công thức của vùng: ô có công thức -> chuỗi bắt đầu '=', ô không có công thức -> None.
+
+    Vì sao cần: `values` không phân biệt được số gõ tay với kết quả tính — bench chính mình phải viết
+    `formulas.py` đọc thẳng gói ODF mới thấy sheet Checks của Test 2 toàn chữ PASS gõ tay, mà agent
+    đọc bằng `values` thì không biết (đọc giá trị ra giống hệt nhau).
+
+    Một lời gọi `getFormulaArray()` thay vì từng ô: vùng 50.000 dòng thì lặp ô là hàng trăm nghìn lời
+    gọi UNO. Không có `getFormulaArray` (bản cũ/lạ) mới lặp ô.
+    """
+    try:
+        array = range_.getFormulaArray()
+    except Exception:  # noqa: BLE001 - bản UNO không có
+        rows = range_.getRows().getCount()
+        cols = range_.getColumns().getCount()
+        array = [[range_.getCellByPosition(c, r).getFormula() for c in range(cols)] for r in range(rows)]
+    out = []
+    for row in array:
+        line = []
+        for item in row:
+            line.append(item if isinstance(item, str) and item.startswith("=") else None)
+        out.append(line)
+    return out
 
 
 def _active_sheet_name(env, params):
@@ -893,12 +964,18 @@ def check_range(env, params):
 command("et.newWorkbook", "et", lambda env, p: documents.open_document(env.ctx, "et", None), "Tạo sổ tính mới")
 command("et.open", "et", lambda env, p: documents.open_document(env.ctx, "et", values.string(p, "path")), "Mở .xlsx/.xls/.ods/.csv", req("path"))
 command("et.listSheets", "et", list_sheets, "Danh sách sheet + sheet đang active", agent=True)
+command("et.sheetInfo", "et", sheet_info,
+        "Kích thước dùng thật của TỪNG sheet trong một lời gọi (`usedRange`/`rows`/`cols`/`empty`) — "
+        "dùng để soát sheet nào thực sự có nội dung, không chỉ có tên",
+        agent=True)
 command("et.addSheet", "et", add_sheet,
         "Thêm sheet mới (bỏ trống `name` thì đặt tên Sheet1, Sheet2...)", opt("name"), opt("index", "0-based, default: append"),
         agent=True, undo=True)
 command("et.renameSheet", "et", rename_sheet, "Đổi tên sheet", req("sheet"), req("name"), agent=True, undo=True)
 command("et.activateSheet", "et", activate_sheet, "Chuyển sheet", req("sheet"), agent=True)
-command("et.readRange", "et", read_range, "Đọc vùng, ví dụ `A1:C10`", req("range"), opt("sheet"), agent=True)
+command("et.readRange", "et", read_range,
+        "Đọc vùng, ví dụ `A1:C10`; `formulas=true` trả về công thức (ô không có công thức = null)",
+        req("range"), opt("sheet"), opt("formulas", "true = trả mảng `formulas` thay cho `values`"), agent=True)
 command("et.writeRange", "et", write_range,
         "Ghi vùng từ ô góc trên-trái; `values` là mảng 2 chiều. Công thức viết theo cú pháp en-US "
         "(dấu phẩy); nếu máy dùng dấu chấm phẩy thì tự đổi. Công thức còn lỗi trả về ở `formulaErrors`",

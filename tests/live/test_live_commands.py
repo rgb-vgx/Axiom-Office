@@ -309,6 +309,18 @@ def test_spreadsheet(b, out, run_ai):
     computed = b.cmd("et.readRange", {"range": "O2:Q3"}, key="et.readRange công thức nhiều tham số") or {}
     check(computed.get("values") == [[8.5, 8.5, "Giỏi"], [7.0, 7.0, "Khá"]],
           "Excel công thức nhiều tham số tính đúng ở mọi dấu phân cách", computed)
+    # Đọc CÔNG THỨC: values không phân biệt số gõ tay với kết quả tính (bench 02/10/2026: sheet Checks
+    # toàn chữ PASS gõ tay mà đọc values ra vẫn "đúng").
+    fx = b.cmd("et.readRange", {"range": "O2:Q3", "formulas": True}, key="et.readRange formulas") or {}
+    fx_rows = fx.get("formulas") or []
+    check(len(fx_rows) == 2 and fx_rows[0][0] is None
+          and all(isinstance(row[c], str) and row[c].startswith("=") for row in fx_rows for c in (1, 2)),
+          "Excel readRange formulas: ô số gõ tay là null, ô công thức bắt đầu '='", fx)
+    # Kích thước dùng thật từng sheet: sheet có dữ liệu phải báo đúng rows, không được nói chung chung.
+    info = b.cmd("et.sheetInfo", {}, key="et.sheetInfo") or {}
+    check(info.get("activeSheet") and (info.get("sheets") or [])
+          and any(s.get("rows", 0) >= 3 and s.get("empty") is False for s in info["sheets"]),
+          "Excel sheetInfo: sheet có dữ liệu báo đúng kích thước, không empty", info)
     multi_qa = b.cmd("et.checkRange", {"range": "O1:Q3"}, key="et.checkRange công thức nhiều tham số") or {}
     check("error-values" not in {i.get("type") for i in multi_qa.get("issues", [])},
           "Excel checkRange không báo lỗi công thức sau khi tự đổi dấu phân cách", multi_qa)
@@ -438,7 +450,7 @@ def test_commands(port, label):
 
     sample = next((c for c in commands if c.get("name") == "et.readRange"), None)
     check(sample is not None and sample.get("kind") == "et" and sample.get("agent") is True
-          and [p.get("name") for p in sample.get("params") or []] == ["range", "sheet"]
+          and [p.get("name") for p in sample.get("params") or []] == ["range", "sheet", "formulas"]
           and all("required" in p and "hint" in p for p in sample["params"]),
           label + " /commands đủ trường name/kind/agent/summary/params", sample)
 

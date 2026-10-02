@@ -372,6 +372,11 @@
     "params": []
   },
   {
+    "name": "et.sheetInfo",
+    "kind": "et",
+    "params": []
+  },
+  {
     "name": "et.addSheet",
     "kind": "et",
     "params": [
@@ -420,6 +425,10 @@
       {
         "name": "sheet",
         "hint": null
+      },
+      {
+        "name": "formulas",
+        "hint": "true = trả mảng `formulas` thay cho `values`"
       }
     ]
   },

@@ -409,8 +409,7 @@ công cụ); lệnh khai báo cạnh handler trong `src/AxiomOffice/Bridge/Comma
 | `writer.formatSelection` | `bold?`, `italic?`, `underline?`, `size?`, `color?`, `font?`, `alignment?` | Định dạng vùng chọn | ✓ |
 | `writer.setParagraphAlignment` | `alignment` | Căn đoạn: left/center/right/justify | ✓ |
 | `writer.insertTable` | `rows?`, `cols?`, `values?`, `style?` | Chèn bảng; `rows`/`cols` tự suy ra/nới theo `values` | ✓ |
-| `writer.formatTable` | `table?`, `style?`, `font?`, `size?`, `color?`, `headerFill?`, `headerColor?`, `headerBold?`, `bandFill?`, `borderColor?`, `borders?`, `alignment?`, `autoFit?` | Định dạng bảng có sẵn (mặc định: bảng tại con trỏ, không có thì bảng cuối); phần host không hỗ trợ trả về trong `skipped` | ✓ |
-| `writer.checkTables` | — | QA cấu trúc (chỉ đọc): số dòng/cột, ô trống, ô tiêu đề lẫn đoạn văn | ✓ |
+| `writer.formatTable` | `table?`, `style?`, `font?`, `size?`, `color?`, `headerFill?`, `headerColor?`, `headerBold?`, `bandFill?`, `borderColor?`, `borders?`, `alignment?`, `autoFit?` | Định dạng bảng CÓ SẴN (không tạo lại): kiểu, font, màu hàng tiêu đề, màu sọc, viền, căn lề, co giãn | ✓ |
 | `writer.insertPageBreak` | — | Ngắt trang | ✓ |
 | `writer.insertImage` | `path`, `width?`, `height?` | Chèn ảnh tại con trỏ (kích thước theo point) | ✓ |
 | `writer.insertHyperlink` | `url`, `text?` | Chèn liên kết | ✓ |
@@ -420,14 +419,23 @@ công cụ); lệnh khai báo cạnh handler trong `src/AxiomOffice/Bridge/Comma
 | `writer.save` | — | Lưu | ✓ |
 | `writer.saveAs` | `path` | Lưu thành file mới | ✓ |
 | `writer.closeAll` | — | **Đóng mọi tài liệu, không lưu** |  |
-| `et.newWorkbook` | — | Tạo workbook mới (agent không dùng: làm trên sổ đang mở; Excel trống thì `listSheets`/`writeRange`/`formatRange` tự tạo sổ) | |
+| `et.newWorkbook` | — | Tạo workbook mới |  |
 | `et.open` | `path` | Mở .xlsx/.xls/.csv |  |
 | `et.listSheets` | — | Danh sách sheet + sheet đang active | ✓ |
+| `et.sheetInfo` | — | Kích thước dùng thật của TỪNG sheet trong một lời gọi (`usedRange`/`rows`/`cols`/`empty`) — dùng để soát sheet nào thực sự có nội dung, không chỉ có tên | ✓ |
+| `et.addSheet` | `name?`, `index?` | Thêm sheet mới (bỏ trống `name` thì đặt tên Sheet1, Sheet2...) | ✓ |
+| `et.renameSheet` | `sheet`, `name` | Đổi tên sheet | ✓ |
 | `et.activateSheet` | `sheet` | Chuyển sheet | ✓ |
-| `et.readRange` | `range`, `sheet?` | Đọc vùng, ví dụ `A1:C10` | ✓ |
+| `et.readRange` | `range`, `sheet?`, `formulas?` | Đọc vùng, ví dụ `A1:C10`; `formulas=true` trả về công thức (ô không có công thức = null) | ✓ |
 | `et.writeRange` | `range`, `values`, `sheet?` | Ghi vùng bắt đầu từ ô trên-trái `range` | ✓ |
+| `et.importCsv` | `path`, `range?`, `sheet?`, `delimiter?`, `encoding?` | Nạp một file CSV vào sổ: không có `range` thì tạo sheet mới đặt tên theo tên file, có `range` thì ghi vào ô góc đó | ✓ |
+| `et.writeRanges` | `writes`, `sheet?` | Ghi NHIỀU vùng trong MỘT lời gọi: `writes` là mảng {range, values, sheet?}. Dùng khi cần viết nhiều khối trong cùng một phản hồi (bớt vòng qua bridge). Kiểm hết tham số trước khi ghi: một vùng sai thì không vùng nào được ghi | ✓ |
+| `et.fillRange` | `range`, `formula?`, `sheet?` | Viết MỘT công thức vào ô góc trên-trái của `range` rồi điền ra cả vùng, tham chiếu tương đối tự dịch (dùng cho bảng nghìn dòng: đừng gửi từng ô) | ✓ |
 | `et.formatRange` | `range`, `bold?`, `italic?`, `fontSize?`, `fontColor?`, `fillColor?`, `numFmt?`, `horizontal?`, `wrap?`, `sheet?` | Định dạng vùng (màu dạng `#RRGGBB`, `horizontal` left/center/right) | ✓ |
-| `et.checkRange` | `range?`, `sheet?` | QA cấu trúc (chỉ đọc): tiêu đề trống, kiểu lẫn lộn, số dạng chữ, số lẻ chưa có number format, ô lỗi, dữ liệu lạc ngoài bảng | ✓ |
+| `et.addChart` | `range`, `type?`, `title?`, `name?`, `anchor?`, `width?`, `height?`, `sheet?` | Chèn biểu đồ từ vùng dữ liệu; `type` column/bar/line/pie/area/scatter, `width`/`height` tính bằng cm | ✓ |
+| `et.listCharts` | `sheet?` | Danh sách biểu đồ trên sheet | ✓ |
+| `et.setConditionalFormat` | `range`, `rules`, `sheet?` | Đặt định dạng điều kiện cho vùng: `rules` là mảng rule, mỗi rule có operator (less/lessEqual/greater/greaterEqual/equal/notEqual/between/notBetween/formula), formula1, formula2 (chỉ between), và bold/italic/fontColor/fillColor. Gọi lại trên cùng vùng thì THAY rule cũ của vùng đó, nên nhiều rule trên một vùng phải để trong MỘT lần gọi | ✓ |
+| `et.listConditionalFormats` | `range?`, `sheet?` | Liệt kê định dạng điều kiện đang có (đọc lại để tự kiểm); bỏ trống `range` thì soi vùng đang dùng | ✓ |
 | `et.undo` | `count?` | Hoàn tác | ✓ |
 | `et.exportPdf` | `path` | Xuất PDF | ✓ |
 | `et.save` | — | Lưu | ✓ |
@@ -442,10 +450,12 @@ công cụ); lệnh khai báo cạnh handler trong `src/AxiomOffice/Bridge/Comma
 | `wpp.addTable` | `rows?`, `cols?`, `values?`, `slide?`, `left?`, `top?`, `width?`, `height?` | Bảng; `rows`/`cols` tự suy ra/nới theo `values` | ✓ |
 | `wpp.setNotes` | `text`, `slide?` | Ghi chú thuyết trình | ✓ |
 | `wpp.deleteSlide` | `slide?` | Xoá slide (mặc định slide cuối) | ✓ |
-| `wpp.checkLayout` | `slide?` | QA cấu trúc (chỉ đọc): chữ tràn khung, shape ra ngoài slide, shape chồng nhau, chữ < 12pt, slide quá nhiều chữ | ✓ |
 | `wpp.exportPdf` | `path` | Xuất PDF | ✓ |
 | `wpp.save` | — | Lưu | ✓ |
 | `wpp.saveAs` | `path` | Lưu thành file mới | ✓ |
+| `writer.checkTables` | — | Soát các bảng (chỉ đọc): số dòng/cột, ô trống, ô tiêu đề lẫn đoạn văn | ✓ |
+| `et.checkRange` | `range?`, `sheet?` | Soát bảng dữ liệu (chỉ đọc): tiêu đề trống, kiểu lẫn lộn, số dạng chữ, number format, dữ liệu lạc ngoài bảng | ✓ |
+| `wpp.checkLayout` | `slide?` | Soát bố cục slide (chỉ đọc): chữ tràn khung, shape ra ngoài slide, shape chồng nhau, chữ quá nhỏ | ✓ |
 
 Lệnh `writer.*` tự kích hoạt tài liệu có cửa sổ hiển thị nếu `ActiveDocument` là tài liệu ẩn.
 App đang bận (dialog mở, đang gõ trong ô Excel) thì bridge tự thử lại lỗi COM "busy" tối đa 10 lần

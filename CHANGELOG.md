@@ -5,6 +5,26 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — `et.sheetInfo` + `et.readRange {formulas}`: hai lệnh VERIFY mà agent đang thiếu
+- **Đọc được công thức**: `et.readRange {formulas: true}` trả mảng `formulas` — ô có công thức → chuỗi
+  bắt đầu `=`, ô không có công thức → `null`. Vì sao cần: `values` **không phân biệt** số gõ tay với kết
+  quả tính; bench chính mình phải viết `formulas.py` đọc thẳng gói ODF mới thấy sheet `Checks` của Test 2
+  toàn chữ PASS gõ tay mà agent đọc `values` không biết. Một lời gọi `getFormulaArray()` cho cả vùng
+  (vùng 50.000 dòng mà lặp ô là hàng trăm nghìn lời gọi UNO), không có hàm đó mới lặp ô.
+- **`et.sheetInfo`**: kích thước dùng thật của TỪNG sheet trong một lời gọi (`usedRange`/`rows`/`cols`/
+  `empty`) — thay vì `readRange` từng sheet (mắt xích của 174 lần `readRange` ở lượt Test 4 rộng). Số đo
+  buộc phải có: Test 2 để sheet phân tích phủ **400/52.001 dòng** mà agent vẫn báo xong; Test 3 để **9
+  sheet TRỐNG** hoàn toàn. Sheet mới chỉ có tên → `empty=true, rows=0`; sheet chỉ bị định dạng → coi là
+  có nội dung (agent đã chạm vào sheet đó, và `rows` vẫn nói đúng kích thước thật).
+- Cả hai lệnh có ở **hai làn** (LibreOffice Python + Excel/WPS C#, cùng contract tham số), vào
+  `catalog/live-commands.json` (**65 lệnh**) + `livecommands_gen.go`; bảng README sinh lại bằng đúng
+  `AxiomOffice.Host.exe commands --markdown`.
+- Kiểm chứng đã chạy: `tests/lo/test_extension.py` **19/19** (registry Python ↔ catalog ↔ C# khớp),
+  `go build` + `go test ./internal/mcpserver ./internal/agent` xanh, `py_compile` đủ. **Bài live trên
+  LibreOffice thật phải chờ A/B Test 3 xong** (hai bên dùng chung profile LibreOffice — chạy song song
+  từng làm mất tài liệu); case mới đã nằm sẵn trong `test_live_libreoffice.py` (Calc) và
+  `test_live_commands.py` (Excel).
+
 ### Added — metric A/B trong harness + `PlanRule`: chốt roadmap hiệu năng (bước 0/1)
 - `tests/bench/run_prompt.py` in dòng `METRIC` cuối mỗi lượt chạy, lấy ngay từ sự kiện SSE (không đụng
   Core): `billable_in`/`billable_out`/`billable` tách riêng (input − cache + output), `cache_hit`,

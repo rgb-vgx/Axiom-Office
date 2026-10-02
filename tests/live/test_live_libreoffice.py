@@ -253,6 +253,20 @@ def test_calc(b, out):
     b.cmd("et.renameSheet", {"sheet": "Không có", "name": "X"}, expect_ok=False, key="et.renameSheet sheet lạ")
     b.cmd("et.activateSheet", {"sheet": "Sheet1"})
     b.cmd("et.activateSheet", {"sheet": "Không có"}, expect_ok=False, key="et.activateSheet unknown")
+    # Đọc CÔNG THỨC: values không phân biệt số gõ tay với kết quả tính — bench 02/10/2026 phải viết
+    # formulas.py đọc thẳng gói ODF mới thấy sheet Checks của Test 2 toàn chữ PASS gõ tay.
+    fx = b.cmd("et.readRange", {"range": "C1:C3", "formulas": True}, key="et.readRange formulas") or {}
+    check(fx.get("formulas") == [[None], ["=B2*2"], ["=B3*2"]],
+          "Calc readRange formulas: ô gõ tay là null, ô công thức giữ chuỗi '='", fx)
+    # Kích thước dùng thật từng sheet: bài Test 2 để phân tích 400/52.001 dòng, Test 3 để 9 sheet
+    # TRỐNG mà agent vẫn báo xong — một lời gọi phải thấy ngay sheet nào có nội dung, sheet nào chỉ tên.
+    info = b.cmd("et.sheetInfo", {}, key="et.sheetInfo") or {}
+    by_name = {s.get("name"): s for s in info.get("sheets") or []}
+    check(by_name.get("Sheet1", {}).get("empty") is False and by_name.get("Sheet1", {}).get("rows", 0) >= 3,
+          "Calc sheetInfo: Sheet1 có dữ liệu thì không empty", info)
+    check(by_name.get("Raw_Data", {}).get("empty") is True and by_name.get("Raw_Data", {}).get("rows") == 0
+          and by_name.get("Data_Cleaning", {}).get("empty") is True,
+          "Calc sheetInfo: sheet mới chỉ có tên thì empty=True rows=0", info)
     # Biểu đồ: Test 1 và Test 4 của bộ benchmark đều yêu cầu "use charts"; không có lệnh này thì
     # Dashboard chỉ là bảng số.
     chart = b.cmd("et.addChart", {"sheet": "Sheet1", "range": "A1:C3", "type": "line", "title": "Điểm",
