@@ -1,282 +1,176 @@
-et.listSheets    ok   {}
-                 ok   {"name":"bao-cao-du-lieu"}
-                 ok   {"name":"_design","path":"tokens.json"}
-et.renameSheet   ok   {"name":"Inputs","sheet":"Sheet1"}
-et.addSheet      ok   {"name":"Assumptions"}
-et.addSheet      ok   {"name":"Distributions"}
-et.addSheet      ok   {"name":"Simulation"}
-et.addSheet      ok   {"name":"Statistics"}
-et.addSheet      ok   {"name":"Sensitivity"}
-et.addSheet      ok   {"name":"Dashboard"}
-et.addSheet      ok   {"name":"Checks"}
-et.writeRange    ok   {"range":"A1","sheet":"Inputs","values":[["MONTE CARLO RISK SIMULATION — PROJECT FINANCIAL MODEL",""
-et.writeRange    ok   {"range":"AA1","sheet":"Simulation","values":[["=ROW()"],["=ROW()"],["=ROW()"],["=ROW()"],["=ROW()"]
-et.readRange     ok   {"range":"AA1:AA3","sheet":"Simulation"}
-et.readRange     ok   {"range":"C1:C30","sheet":"Inputs"}
-et.fillRange     ok   {"formula":"=RAND()","range":"B2:B10001","sheet":"Simulation"}
-et.writeRange    ok   {"range":"A1","sheet":"Assumptions","values":[["ASSUMPTIONS — UNCERTAIN DRIVERS AND THEIR PROBABILIT
-et.writeRange    ok   {"range":"A1","sheet":"Distributions","values":[["DISTRIBUTIONS — PROBABILITY DISTRIBUTION LIBRARY",
-et.readRange     ok   {"range":"C4:G12","sheet":"Assumptions"}
-et.readRange     ok   {"range":"B16:E24","sheet":"Distributions"}
-et.fillRange     LOI  {"formula":"=Inputs!$C$5","range":"Assumptions!C5:C5","sheet":"Assumptions"}
-et.fillRange     LOI  {"formula":"=$D$5+($E$5-$D$5)*B16","range":"Distributions!C16:C16","sheet":"Distributions"}
-et.fillRange     ok   {"formula":"=Inputs!$C$5","range":"C5:C5","sheet":"Assumptions"}
-et.fillRange     ok   {"formula":"=$D$5+($E$5-$D$5)*B16","range":"C16:C16","sheet":"Distributions"}
-et.readRange     ok   {"range":"B16:E18","sheet":"Distributions"}
-et.readRange     ok   {"range":"B4:G5","sheet":"Assumptions"}
-et.writeRange    ok   {"range":"H1","sheet":"Distributions","values":[["=1+1"],["=Inputs!C5"],["=SUM(D16:E16)"],["=D5*2"],
-et.readRange     ok   {"range":"H1:H6","sheet":"Distributions"}
-et.writeRange    ok   {"range":"J1","sheet":"Distributions","values":[["=SUM(1,2)"],["=$D$5"],["=D5"],["=NORM.INV(0.5,0,1)
-et.writeRange    ok   {"range":"L1","sheet":"Distributions","values":[["1+1"],["SUM(1;2)"],["=SUM(1;2)"],["=IF(1>0;5;6)"],
-et.readRange     ok   {"range":"J1:L8","sheet":"Distributions"}
-et.writeRange    ok   {"range":"N1","sheet":"Distributions","values":[["=Inputs.C5"],["='Inputs'!C5"],["=Inputs!C5"],["=In
-et.readRange     ok   {"range":"N1:N6","sheet":"Distributions"}
-et.writeRange    ok   {"range":"N10","sheet":"Distributions","values":[["=L6"],["=L6+1"],["=L8"],["=L6*2"],["=SUM(L6:L7)"]
-et.readRange     ok   {"range":"N10:N16","sheet":"Distributions"}
-et.writeRange    ok   {"range":"H1","sheet":"Distributions","values":[["","","","","","",""],["","","","","","",""],["",""
-et.writeRange    ok   {"range":"AA1","sheet":"Simulation","values":[[""],[""],[""],[""],[""]]}
-et.writeRange    ok   {"range":"A1","sheet":"Assumptions","values":[["ASSUMPTIONS — UNCERTAIN DRIVERS AND THEIR PROBABILIT
-et.writeRange    ok   {"range":"A1","sheet":"Distributions","values":[["DISTRIBUTIONS — PROBABILITY DISTRIBUTION LIBRARY",
-et.readRange     ok   {"range":"B4:G12","sheet":"Assumptions"}
-et.readRange     ok   {"range":"A16:E24","sheet":"Distributions"}
-et.writeRange    ok   {"range":"A15","sheet":"Distributions","values":[["Distribution","U (0..1)","X = quantile(U)","Param
-et.readRange     ok   {"range":"A15:H24","sheet":"Distributions"}
-et.readRange     ok   {"range":"A27:D32","sheet":"Distributions"}
-et.writeRange    ok   {"range":"A1","sheet":"Simulation","values":[["Sim #","Seed U (A)","Revenue U","COGS U","OpCost U","
-et.fillRange     ok   {"formula":"=ROW()-1","range":"A2:A10001","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=RAND()","range":"C2:C10001","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=RAND()","range":"D2:D10001","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=RAND()","range":"E2:E10001","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=RAND()","range":"F2:F10001","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=RAND()","range":"G2:G10001","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=RAND()","range":"H2:H10001","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=RAND()","range":"I2:I10001","sheet":"Simulation"}
-                 LOI  
-et.fillRange     ok   {"formula":"=RAND()","range":"J2:J10001","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=MIN(Assumptions.G5,MAX(Assumptions.E5,IF(C2<=(Assumptions.F5-Assumptions.E5)/(Assumptio
-et.fillRange     ok   {"formula":"=MIN(1,MAX(0,NORM.INV(D2,Assumptions.E6,Assumptions.F6)))","range":"L2:L10001","sheet":"
-et.fillRange     ok   {"formula":"=MIN(1,MAX(0,NORM.INV(E2,Assumptions.E7,Assumptions.F7)))","range":"M2:M10001","sheet":"
-et.fillRange     ok   {"formula":"=NORM.INV(F2,Assumptions.E8,Assumptions.F8)","range":"N2:N10001","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=Assumptions.E9+(Assumptions.F9-Assumptions.E9)*G2","range":"O2:O10001","sheet":"Simulat
-et.fillRange     ok   {"formula":"=Assumptions.E10+(Assumptions.F10-Assumptions.E10)*H2","range":"P2:P10001","sheet":"Simu
-et.fillRange     ok   {"formula":"=MIN(Assumptions.G11,MAX(Assumptions.E11,IF(I2<=(Assumptions.F11-Assumptions.E11)/(Assum
-et.fillRange     ok   {"formula":"=ROUND(Assumptions.E12+(Assumptions.F12-Assumptions.E12)*J2,0)","range":"R2:R10001","she
-et.fillRange     ok   {"formula":"=1-L2-M2","range":"S2:S10001","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=K2*S2","range":"T2:T10001","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=-Inputs.C5+NPV(P2,T2*(1-Inputs.C10)*(1+N2)^(ROW()-2),Q2)","range":"U2:U10001","sheet":"
-et.fillRange     ok   {"formula":"=U2/Q2","range":"V2:V10001","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=T2*(1-Inputs.C10)+Q2","range":"W2:W10001","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=Inputs.C9","range":"X2:X10001","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=Q2","range":"Y2:Y10001","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=SUM(T2,T2*(1+N2),T2*(1+N2)^2,T2*(1+N2)^3,T2*(1+N2)^4)","range":"Z2:Z10001","sheet":"Sim
-et.fillRange     ok   {"formula":"=MIN(Assumptions.$G$5,MAX(Assumptions.$E$5,IF(C2<=(Assumptions.$F$5-Assumptions.$E$5)/(A
-et.fillRange     ok   {"formula":"=MIN(1,MAX(0,NORM.INV(D2,Assumptions.$E$6,Assumptions.$F$6)))","range":"L2:L10001","shee
-et.fillRange     ok   {"formula":"=MIN(1,MAX(0,NORM.INV(E2,Assumptions.$E$7,Assumptions.$F$7)))","range":"M2:M10001","shee
-et.fillRange     ok   {"formula":"=NORM.INV(F2,Assumptions.$E$8,Assumptions.$F$8)","range":"N2:N10001","sheet":"Simulation
-et.fillRange     ok   {"formula":"=Assumptions.$E$9+(Assumptions.$F$9-Assumptions.$E$9)*G2","range":"O2:O10001","sheet":"S
-et.fillRange     ok   {"formula":"=Assumptions.$E$10+(Assumptions.$F$10-Assumptions.$E$10)*H2","range":"P2:P10001","sheet"
-et.fillRange     ok   {"formula":"=MIN(Assumptions.$G$11,MAX(Assumptions.$E$11,IF(I2<=(Assumptions.$F$11-Assumptions.$E$11
-et.fillRange     ok   {"formula":"=ROUND(Assumptions.$E$12+(Assumptions.$F$12-Assumptions.$E$12)*J2,0)","range":"R2:R10001
-et.fillRange     ok   {"formula":"=K2*(1-L2-M2)*(1+0.4*(O2/Inputs.$C$11-1))","range":"T2:T10001","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=-Inputs.$C$8+NPV(P2,T2*(1-Inputs.$C$10)*(1+N2)^(ROW()-2),Q2)","range":"U2:U10001","shee
-et.fillRange     ok   {"formula":"=U2/Q2","range":"V2:V10001","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=T2*(1-Inputs.$C$10)*(1-L2-M2)+Q2","range":"W2:W10001","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=Inputs.$C$9","range":"X2:X10001","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=SUM(T2,T2*(1+N2),T2*(1+N2)^2,T2*(1+N2)^3,T2*(1+N2)^4)","range":"Z2:Z10001","sheet":"Sim
-et.readRange     ok   {"range":"A1:Z4","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=Inputs.$C$19","range":"B2:B10001","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=K2*(1-L2-M2)*(1+Inputs.$C$18*(O2/Inputs.$C$11-1))","range":"T2:T10001","sheet":"Simulat
-et.fillRange     ok   {"formula":"=-Inputs.$C$8+NPV(P2,T2*(1-Inputs.$C$17)*(1+N2)^(ROW()-2),Q2)","range":"U2:U10001","shee
-et.fillRange     ok   {"formula":"=T2*(1-Inputs.$C$17)+Q2","range":"W2:W10001","sheet":"Simulation"}
-et.writeRange    ok   {"range":"AA1","sheet":"Simulation","values":[["REF: Sim #","REF: Revenue Y1","REF: COGS %","REF: Op
-et.fillRange     ok   {"formula":"=A2","range":"AA2:AA10001","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=K2","range":"AB2:AB10001","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=L2","range":"AC2:AC10001","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=M2","range":"AD2:AD10001","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=N2","range":"AE2:AE10001","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=O2","range":"AF2:AF10001","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=P2","range":"AG2:AG10001","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=Q2","range":"AH2:AH10001","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=R2","range":"AI2:AI10001","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=T2","range":"AJ2:AJ10001","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=U2","range":"AK2:AK10001","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=V2","range":"AL2:AL10001","sheet":"Simulation"}
-et.readRange     ok   {"range":"K2:W4","sheet":"Simulation"}
-et.writeRange    ok   {"range":"C8","sheet":"Inputs","values":[[30000000000]]}
-et.writeRange    ok   {"range":"C25","sheet":"Inputs","values":[[45000000000]]}
-et.writeRange    ok   {"range":"C26","sheet":"Inputs","values":[[10000000000]]}
-et.fillRange     ok   {"formula":"=T2*(1-Inputs.$C$17)","range":"W2:W10001","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=SUM(K2,K2*(1+N2),K2*(1+N2)^2,K2*(1+N2)^3,K2*(1+N2)^4)","range":"Z2:Z10001","sheet":"Sim
-et.writeRange    ok   {"range":"Y1","sheet":"Simulation","values":[["CapEx (ref)","Revenue Total (5Y)"]]}
-et.fillRange     LOI  {"formula":"=Inputs.C20","range":"Assumptions!C15","sheet":"Assumptions"}
-et.readRange     ok   {"range":"A13:C22","sheet":"Assumptions"}
-et.readRange     ok   {"range":"K2:W4","sheet":"Simulation"}
-et.readRange     ok   {"range":"B14:C28","sheet":"Inputs"}
-et.writeRange    ok   {"range":"C29","sheet":"Inputs","values":[[111]]}
-et.writeRange    ok   {"range":"D5","sheet":"Inputs","sheet2":"","values":[[]]}
-et.readRange     ok   {"range":"C28:D32","sheet":"Inputs"}
-et.writeRange    ok   {"range":"C26","sheet":"Inputs","values":[[0]]}
-et.writeRange    ok   {"range":"A29","sheet":"Inputs","values":[["","","","",""],["4. MODEL DEFINITIONS AND METHODOLOGY","
-et.writeRange    ok   {"range":"C15","sheet":"Assumptions","values":[["=Inputs.C20"]]}
-et.writeRange    ok   {"range":"X1","sheet":"Simulation","values":[["Years with CF","CapEx (ref)","Revenue Total (life)"]]
-et.writeRange    ok   {"range":"AM1","sheet":"Simulation","values":[["CF Y1","CF Y2","CF Y3","CF Y4","CF Y5","CF Y6"]]}
-et.writeRange    ok   {"range":"B44","sheet":"Inputs","values":[["RAND() streams: 9 streams x 10,000 rows"]]}
-et.writeRange    ok   {"range":"X1","sheet":"Simulation","values":[["Base duration (ref)","CapEx (ref)","Revenue Total (li
-et.writeRange    ok   {"range":"AM1","sheet":"Simulation","values":[["CF Y1","CF Y2","CF Y3","CF Y4","CF Y5","CF Y6","NPV 
-et.fillRange     ok   {"formula":"=IF(COLUMN()-COLUMN($AM$1)+1<=$R2,$W2*(1+$N2)^(COLUMN()-COLUMN($AM$1)),0)","range":"AM2:
-et.fillRange     ok   {"formula":"=-Inputs.$C$8+NPV($P2,$AM2:$AR2,$Q2)","range":"U2:U10001","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=IF(ABS($N2)<0.0001,$K2*$R2,$K2*((1+$N2)^$R2-1)/$N2)","range":"Z2:Z10001","sheet":"Simul
-et.writeRange    ok   {"range":"AS1","sheet":"Simulation","values":[["NPV residual"]]}
-et.fillRange     ok   {"formula":"=SUMPRODUCT($AM2:$AR2/(1+$P2)^(COLUMN($AM$1:$AR$1)-COLUMN($AM$1)+1))-($U2+Inputs.$C$8)",
-et.readRange     ok   {"range":"K2:W3","sheet":"Simulation"}
-et.readRange     ok   {"range":"AM2:AS3","sheet":"Simulation"}
-et.writeRange    ok   {"range":"J1","sheet":"Distributions","values":[[1],[1],[1],[1],["=NPV(0.1,J1:J4)"],["=SUMPRODUCT(J1
-et.readRange">
-<｜｜DSML｜｜ parameter name="params" string="false">{"range": "J1:J8", "sheet": "Distributions"} LOI  null
-et.readRange     ok   {"range":"J1:J8","sheet":"Distributions"}
-et.fillRange     ok   {"formula":"=-Inputs.$C$8+NPV($P2,$AM2:$AR2)","range":"U2:U10001","sheet":"Simulation"}
-et.writeRange    ok   {"range":"J1","sheet":"Distributions","values":[["","","","","","","",""],["","","","","","","",""],
-et.readRange     ok   {"range":"U2:AS4","sheet":"Simulation"}
-et.writeRange    ok   {"range":"AT1","sheet":"Simulation","values":[["COGS amount","Op Cost amount"]]}
-et.fillRange     ok   {"formula":"=T2*L2","range":"AT2:AT10001","sheet":"Simulation"}
-et.fillRange     ok   {"formula":"=T2*M2","range":"AU2:AU10001","sheet":"Simulation"}
-et.writeRange    ok   {"range":"A1","sheet":"Statistics","values":[["STATISTICS — SIMULATION OUTPUT DISTRIBUTIONS","","","
-et.writeRange    ok   {"range":"A26","sheet":"Statistics","values":[["PART 2 - RISK ANALYSIS: PROBABILITY OF BREACHING A T
-et.fillRange     ok   {"formula":"=T2-AT2-AU2","range":"AJ2:AJ10001","sheet":"Simulation"}
-et.writeRange    ok   {"range":"E5","sheet":"Statistics","values":[["=AVERAGE(Simulation.$AJ$2:$AJ$10001)"],["=MEDIAN(Simu
-et.writeRange    ok   {"range":"C31","sheet":"Statistics","values":[["=COUNTIF(Simulation.$AJ$2:$AJ$10001,\"<\"&$B$31)/Ass
-et.writeRange    ok   {"range":"C31","sheet":"Statistics","values":[["=COUNTIF(Simulation.$AJ$2:$AJ$10001,\"<\"&$B$31)/Ass
-et.readRange     ok   {"range":"A26:H36","sheet":"Statistics"}
-et.readRange     ok   {"range":"A4:H22","sheet":"Statistics"}
-et.readRange     ok   {"range":"A22:C31","sheet":"Inputs"}
-et.readRange     ok   {"range":"C4:C22","sheet":"Inputs"}
-et.writeRange    ok   {"range":"A8","sheet":"Inputs","values":[["4","Initial Investment",0.6,"% of revenue","Capital outla
-et.writeRange    ok   {"range":"C24","sheet":"Inputs","values":[[10000000000],[2000000000],[0],[0]]}
-et.fillRange     ok   {"formula":"=K2*(1+Inputs.$C$18*(O2/Inputs.$C$11-1))","range":"T2:T10001","sheet":"Simulation"}
-et.writeRange    ok   {"range":"C17","sheet":"Assumptions","values":[["=Inputs.C24"],["=Inputs.C25"],["=Inputs.C26"],["=In
-et.writeRange    ok   {"range":"C8","sheet":"Inputs","values":[[30000000000]]}
-et.writeRange    ok   {"range":"E11","sheet":"Assumptions","values":[["=F11*0.9","=Inputs.C8/C5","=F11*1.1"]]}
-et.fillRange     ok   {"formula":"=K2*MIN(Assumptions.$G$11,MAX(Assumptions.$E$11,IF(I2<=(Assumptions.$F$11-Assumptions.$E
-et.writeRange    ok   {"range":"B8","sheet":"Inputs","values":[["Initial Investment (% of revenue)"]]}
-et.readRange     ok   {"range":"T2:W4","sheet":"Simulation"}
-et.readRange     ok   {"range":"B5:H16","sheet":"Statistics"}
-et.fillRange     ok   {"formula":"=AJ2*(1-Inputs.$C$17)","range":"W2:W10001","sheet":"Simulation"}
-et.readRange     ok   {"range":"B5:H16","sheet":"Statistics"}
-et.readRange     ok   {"range":"B29:E34","sheet":"Statistics"}
-et.readRange     ok   {"range":"A13:C23","sheet":"Assumptions"}
-et.writeRange    ok   {"range":"C16","sheet":"Assumptions","values":[["=Inputs.C25"],["=Inputs.C26"],["=Inputs.C27"],["=In
-et.readRange     ok   {"range":"A37:B56","sheet":"Statistics"}
-et.readRange     ok   {"range":"A29:E49","sheet":"Inputs"}
-et.writeRange    ok   {"range":"A43","sheet":"Inputs","values":[["5. REPRODUCIBILITY","","","",""],["Random seed","=C19","
-et.readRange     ok   {"range":"A43:C50","sheet":"Inputs"}
-et.readRange     ok   {"range":"B5:H19","sheet":"Statistics"}
-et.writeRange    ok   {"range":"A1","sheet":"Sensitivity","values":[["SENSITIVITY — WHICH ASSUMPTIONS DRIVE THE VARIANCE O
-et.writeRange    ok   {"range":"D17","sheet":"Sensitivity","values":[["=C17","=C17+C18","=C17+C18+C19","=C17+C18+C19+C20",
-et.writeRange    ok   {"range":"G17","sheet":"Sensitivity","values":[["=F17","=F17+F18","=F17+F18+F19","=F17+F18+F19+F20",
-et.readRange     ok   {"range":"A5:J21","sheet":"Sensitivity"}
-et.writeRange    ok   {"range":"A16","sheet":"Sensitivity","values":[["Rank","ROI variance driver","Contribution to ROI va
-et.writeRange    ok   {"range":"D17","sheet":"Sensitivity","values":[["=C17"],["=D17+C18"],["=D18+C19"],["=D19+C20"],["=D2
-et.writeRange    ok   {"range":"G17","sheet":"Sensitivity","values":[["=F17"],["=G17+F18"],["=G18+F19"],["=G19+F20"],["=G2
-et.readRange     ok   {"range":"A16:H21","sheet":"Sensitivity"}
-et.writeRange    ok   {"range":"D17","sheet":"Sensitivity","values":[["","","",""],["=C18","=C18+C19","=C18+C19+C20","=C18
-et.readRange     ok   {"range":"A16:H22","sheet":"Sensitivity"}
-et.writeRange    ok   {"range":"D18","sheet":"Sensitivity","values":[["=C18"],["=D18+C19"],["=D19+C20"],["=D20+C21"],["=D2
-et.readRange     ok   {"range":"D18:D22","sheet":"Sensitivity"}
-et.fillRange     LOI  {"formula":"=F17","range":"Sensitivity!N17","sheet":"Sensitivity"}
-et.readRange     ok   {"range":"F18:L22","sheet":"Sensitivity"}
-et.writeRange    ok   {"range":"G18","sheet":"Sensitivity","values":[["=F18"],["=G18+F19"],["=G19+F20"],["=G20+F21"],["=G2
-et.readRange     ok   {"range":"A16:G23","sheet":"Sensitivity"}
-et.writeRange    ok   {"range":"A11","sheet":"Sensitivity","values":[["","","","","","","","","",""],["","","","","","",""
-et.writeRange    ok   {"range":"A11","sheet":"Sensitivity","values":[["","","","","","","","","",""],["B. RANKED DRIVERS -
-et.readRange     ok   {"range":"A13:G20","sheet":"Sensitivity"}
-et.writeRange    ok   {"range":"A13","sheet":"Sensitivity","values":[["Rank","ROI variance driver","Contribution to ROI va
-et.writeRange    ok   {"range":"A12","sheet":"Sensitivity","values":[["B. RANKED DRIVERS - WHERE TO FOCUS","","","","","",
-et.readRange     ok   {"range":"A12:G21","sheet":"Sensitivity"}
-et.readRange     ok   {"range":"A22:J32","sheet":"Sensitivity"}
-et.writeRange    ok   {"range":"A24","sheet":"Sensitivity","values":[["Driver","Low case","Base case","High case","Swing i
-et.readRange     ok   {"range":"A24:H31","sheet":"Sensitivity"}
-et.writeRange    ok   {"range":"F25","sheet":"Sensitivity","values":[["=ABS($E$25/($C$25/Inputs.$C$8))"],["=ABS($E$26/($C$
-et.writeRange    ok   {"range":"G25","sheet":"Sensitivity","values":[["=RANK($E$25,$E$25:$E$30,0)"],["=RANK($E$26,$E$25:$E
-et.writeRange    ok   {"range":"H25","sheet":"Sensitivity","values":[["=RANK($F$25,$F$25:$F$30,0)"],["=RANK($F$26,$F$25:$F
-et.readRange     ok   {"range":"A24:H31","sheet":"Sensitivity"}
-et.writeRange    LOI  "{\"range\": \"A1\", \"sheet\": \"Dashboard\", \"values\": [[\"MONTE CARLO RISK DASHBOARD\", \"\", \
-et.writeRange    ok   {"range":"B34","sheet":"Dashboard","values":[["=Statistics.$B$44"],["=Statistics.$E$5"],["=Statistic
-et.readRange     ok   {"range":"A1:D32","sheet":"Dashboard"}
-et.writeRange    ok   {"range":"A1","sheet":"Dashboard","values":[["MONTE CARLO RISK DASHBOARD","","",""],["Project financ
-et.readRange     ok   {"range":"A1:D38","sheet":"Dashboard"}
-et.readRange     ok   {"range":"A14:C22","sheet":"Assumptions"}
-et.readRange     ok   {"range":"C23:C28","sheet":"Inputs"}
-et.writeRange    ok   {"range":"C16","sheet":"Assumptions","values":[["=Inputs.C23"],["=Inputs.C24"],["=Inputs.C25"],["=In
-et.readRange     ok   {"range":"A14:C22","sheet":"Assumptions"}
-et.writeRange    ok   {"range":"C16","sheet":"Assumptions","values":[["=Inputs.C5"],["=Inputs.C24"],["=Inputs.C25"],["=Inp
-et.readRange     ok   {"range":"A14:C22","sheet":"Assumptions"}
-et.readRange     ok   {"range":"B29:E34","sheet":"Statistics"}
-et.writeRange    ok   {"range":"C17","sheet":"Assumptions","values":[["=Inputs.C24"],["=Inputs.C25"],["=Inputs.C26"],["=In
-et.readRange     ok   {"range":"A14:C22","sheet":"Assumptions"}
-et.readRange     ok   {"range":"B30:E35","sheet":"Statistics"}
-et.writeRange    ok   {"range":"C23","sheet":"Inputs","values":[[10000000000],[2000000000],[0],[0]]}
-et.writeRange    ok   {"range":"B29","sheet":"Statistics","values":[["=Assumptions.$C$19","=COUNTIF(Simulation.$V$2:$V$100
-et.writeRange    ok   {"range":"C15","sheet":"Assumptions","values":[["=Inputs.C20"],["=Inputs.C5"],["=Inputs.C24"],["=Inp
-et.readRange     ok   {"range":"A14:C22","sheet":"Assumptions"}
-et.readRange     ok   {"range":"A28:E34","sheet":"Statistics"}
-et.writeRange    ok   {"range":"C58","sheet":"Assumptions","values":[[111]]}
-et.writeRange    ok   {"range":"C59","sheet":"Assumptions","values":[[222]]}
-et.readRange     ok   {"range":"C55:C60","sheet":"Assumptions"}
-et.writeRange    ok   {"range":"C17","sheet":"Assumptions","values":[["=Inputs.C24"],["=Inputs.C25"],["=Inputs.C26"]]}
-et.readRange     ok   {"range":"A14:C23","sheet":"Assumptions"}
-et.readRange     ok   {"range":"C23:C28","sheet":"Inputs"}
-et.writeRange    ok   {"range":"C60","sheet":"Assumptions","values":[[999]]}
-et.readRange     ok   {"range":"C59:C62","sheet":"Assumptions"}
-et.writeRange    ok   {"range":"C13","sheet":"Assumptions","values":[["","","",""],["","","",""],["=Inputs.C20","","",""],
-et.readRange     ok   {"range":"A15:C24","sheet":"Assumptions"}
-et.readRange     ok   {"range":"C58:C62","sheet":"Assumptions"}
-et.fillRange     ok   {"formula":"=Inputs.C24","range":"C59:C62","sheet":"Assumptions"}
-et.readRange     ok   {"range":"C58:C63","sheet":"Assumptions"}
-et.writeRange    ok   {"range":"C59","sheet":"Assumptions","values":[["",""],["",""],["",""],["",""]]}
-et.writeRange    ok   {"range":"C18","sheet":"Assumptions","values":[["=Inputs.C24","=Inputs.C25","=Inputs.C26","=Inputs.C
-et.readRange     ok   {"range":"A17:H23","sheet":"Assumptions"}
-et.writeRange    ok   {"range":"C22","sheet":"Assumptions","values":[[""]]}
-et.writeRange    ok   {"range":"F17:F18","sheet":"Assumptions","values":[[""],[""]]}
-et.writeRange    LOI  {"range":"A1","sheet":"Checks","values":[["VALIDATION - AUTOMATED INTEGRITY CHECKS","","","","",""],
-et.readRange     ok   {"range":"A1:F6","sheet":"Checks"}
-et.readRange     ok   {"range":"A4:F28","sheet":"Checks"}
-et.writeRange    ok   {"range":"D14","sheet":"Checks","values":[["=COUNTIF(Simulation.$C$2:$K$10001,\"<0\")+COUNTIF(Simula
-et.writeRange    ok   {"range":"D26","sheet":"Checks","values":[["=SUMPRODUCT(ISFORMULA(Statistics.$B$5:$H$16)*1)"],["=IF(
-et.readRange     ok   {"range":"D13:F14","sheet":"Checks"}
-et.readRange     ok   {"range":"D25:F26","sheet":"Checks"}
-et.fillRange     ok   {"formula":"=COUNTIF(Simulation.$C$2:$K$10001,\"<0\")+COUNTIF(Simulation.$C$2:$K$10001,\">1\")","ran
-et.fillRange     ok   {"formula":"=IF(COUNTIF(Simulation.$C$2:$K$10001,\"<0\")+COUNTIF(Simulation.$C$2:$K$10001,\">1\")=0,
-et.fillRange     ok   {"formula":"=SUMPRODUCT(ISFORMULA(Statistics.$B$5:$H$16)*1)","range":"D26:D26","sheet":"Checks"}
-et.fillRange     ok   {"formula":"=IF(SUMPRODUCT(ISFORMULA(Statistics.$B$5:$H$16)*1)=84,\"PASS\",\"FAIL\")","range":"E26:E
-et.readRange     ok   {"range":"A4:F32","sheet":"Checks"}
-et.fillRange     ok   {"formula":"=COUNTIF(Simulation.$C$2:$K$10001,\"<0\")+COUNTIF(Simulation.$C$2:$K$10001,\">1\")","ran
-et.fillRange     ok   {"formula":"=IF(COUNTIF(Simulation.$C$2:$K$10001,\"<0\")+COUNTIF(Simulation.$C$2:$K$10001,\">1\")=0,
-et.fillRange     ok   {"formula":"=SUMPRODUCT(ISERROR(Simulation.$U$2:$V$10001)*1)+SUMPRODUCT(ISERROR(Simulation.$AJ$2:$AJ
-et.readRange     ok   {"range":"A10:F18","sheet":"Checks"}
-et.fillRange     ok   {"formula":"=COUNTIF(Simulation.$C$2:$K$10001,\"<0\")+COUNTIF(Simulation.$C$2:$K$10001,\">1\")","ran
-et.fillRange     ok   {"formula":"=IF(COUNTIF(Simulation.$C$2:$K$10001,\"<0\")+COUNTIF(Simulation.$C$2:$K$10001,\">1\")=0,
-et.fillRange     ok   {"formula":"=SUMPRODUCT(ISERROR(Simulation.$U$2:$V$10001)*1)+SUMPRODUCT(ISERROR(Simulation.$AJ$2:$AJ
-et.readRange     ok   {"range":"A12:F18","sheet":"Checks"}
-et.writeRange    ok   {"range":"C12","sheet":"Checks","values":[["Expected","Observed","Status","Note"],["0","=MAX(ABS(MIN
-et.readRange     ok   {"range":"A4:F29","sheet":"Checks"}
-et.writeRange    ok   {"range":"A9","sheet":"Checks","values":[["8","Uniform distributions are ordered a < b","Lower bound
-et.readRange     ok   {"range":"A4:F33","sheet":"Checks"}
-et.writeRange    ok   {"range":"A9","sheet":"Checks","values":[["5","Invalid distributions","Only Uniform / Normal / Trian
-et.readRange     ok   {"range":"A4:F32","sheet":"Checks"}
-et.writeRange    ok   {"range":"A12","sheet":"Checks","values":[["8","Uniform distributions are ordered a < b","Lower boun
-et.readRange     ok   {"range":"A4:F30","sheet":"Checks"}
-et.writeRange    ok   {"range":"A15","sheet":"Checks","values":[["11","Invalid financial outputs (error values in the engi
-et.readRange     ok   {"range":"A4:F30","sheet":"Checks"}
-et.writeRange    ok   {"range":"A18","sheet":"Checks","values":[["14","Initial investment is never zero or negative","0 of
-et.readRange     ok   {"range":"A4:F30","sheet":"Checks"}
-et.writeRange    ok   {"range":"A21","sheet":"Checks","values":[["17","Percentile consistency (NPV column)","0 violations"
-et.readRange     ok   {"range":"A4:E30","sheet":"Checks"}
-et.writeRange    ok   {"range":"A24","sheet":"Checks","values":[["20","Percentile rank agrees with the reported probabilit
-et.readRange     ok   {"range":"A4:E32","sheet":"Checks"}
-et.writeRange    ok   {"range":"B14","sheet":"Checks","values":[["Random draws inside [0,1]"],["Invalid financial outputs 
-et.readRange     ok   {"range":"A12:E18","sheet":"Checks"}
-et.fillRange     ok   {"formula":"=COUNTIF(Simulation.$C$2:$K$10001,\"<0\")+COUNTIF(Simulation.$C$2:$K$10001,\">1\")","ran
-et.fillRange     ok   {"formula":"=IF(COUNTIF(Simulation.$C$2:$K$10001,\"<0\")+COUNTIF(Simulation.$C$2:$K$10001,\">1\")=0,
-et.fillRange     ok   {"formula":"=IF(COUNTIF($E$5:$E$28,\"FAIL\")=0,\"ALL CHECKS PASS\",\"MODEL NEEDS ATTENTION\")","rang
-et.fillRange     ok   {"formula":"=COUNTIF($E$5:$E$28,\"PASS\")","range":"B30:B30","sheet":"Checks"}
-et.fillRange     ok   {"formula":"=COUNTIF($E$5:$E$28,\"FAIL\")","range":"D30:D30","sheet":"Checks"}
+et.listSheets ok
+ LOI
+ ok
+ ok
+et.renameSheet LOI
+et.writeRange LOI
+et.renameSheet ok
+et.writeRange ok
+et.addSheet ok
+et.addSheet ok
+et.addSheet ok
+et.addSheet ok
+et.addSheet ok
+et.addSheet ok
+et.addSheet ok
+et.writeRange ok
+et.readRange ok
+et.readRange ok
+et.writeRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.writeRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange">
+<｜｜DSML｜｜ parameter name="params" string="false">{"fillColor": "#1F4E79", "fontColor": "#FFFFFF", "bold": true, "horizontal": "center", "wrap": true, "range": "A4:J4", "sheet": "Assumptions"} LOI
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.writeRange ok
+et.writeRange ok
+et.readRange ok
+et.writeRange ok
+et.readRange ok
+et.writeRange ok
+et.readRange ok
+et.writeRange ok
+et.writeRange ok
+et.writeRange ok
+et.readRange ok
+et.writeRange ok
+et.writeRange ok
+et.readRange ok
+et.writeRange ok
+et.writeRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.checkRange ok
+et.checkRange ok
+et.writeRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.formatRange ok
+et.writeRange ok
+et.writeRange ok
+et.fillRange ok
+et.readRange ok
+et.fillRange ok
+et.writeRange ok
+et.writeRange ok
+et.writeRange ok
+et.writeRange ok
+et.writeRange ok
+et.readRange ok
+et.writeRange ok
+et.writeRange ok
+et.readRange ok
+et.writeRange ok
+et.readRange ok
+et.writeRange ok
+et.readRange ok
+et.fillRange ok
+et.fillRange ok
+et.fillRange ok
+et.fillRange ok
+et.fillRange ok
+et.fillRange ok
+et.fillRange ok
+et.fillRange ok
+et.fillRange ok
+et.fillRange ok
+et.writeRange ok
+et.fillRange ok
+et.fillRange ok
+et.fillRange ok
+et.fillRange ok
+et.fillRange ok
+et.fillRange ok
+et.fillRange ok
+et.fillRange ok
+et.fillRange ok
+et.fillRange ok
+et.fillRange ok
+et.fillRange ok
+et.fillRange ok
+et.fillRange ok
+et.fillRange ok
+et.fillRange ok
+et.fillRange ok
+et.fillRange ok
+et.fillRange ok
+et.fillRange ok
+et.fillRange ok
+et.fillRange ok
+et.fillRange ok
+et.fillRange ok
+et.fillRange ok
+et.readRange ok
+et.readRange ok
+et.writeRange ok
