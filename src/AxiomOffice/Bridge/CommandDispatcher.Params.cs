@@ -235,6 +235,69 @@ namespace AxiomOffice.Bridge
         // Đọc tham số mảng 2 chiều (values của writeRange/insertTable/addTable). Model đôi khi gửi mảng
         // bọc trong {"item": ...} hoặc dạng chuỗi JSON: gỡ ra được thì dùng, sai dạng thì báo lỗi kèm ví dụ
         // để model tự sửa ở vòng sau (trước đây bị bỏ qua âm thầm mà vẫn trả ok).
+        // ParamObjects: mảng ĐỐI TƯỢNG trong params (ví dụ `rules` của et.setConditionalFormat).
+        // Nhận cả mảng đã giải mã lẫn chuỗi JSON, vì có client gửi mảng dưới dạng chuỗi (ParamMatrix
+        // cũng phải đỡ trường hợp đó).
+        private static List<Dictionary<string, object>> ParamObjects(Dictionary<string, object> p, string name)
+        {
+            object raw;
+            if (p == null || !p.TryGetValue(name, out raw) || raw == null)
+            {
+                return null;
+            }
+            var text = raw as string;
+            if (text != null && text.TrimStart().StartsWith("[", StringComparison.Ordinal))
+            {
+                try
+                {
+                    raw = new System.Web.Script.Serialization.JavaScriptSerializer().DeserializeObject(text);
+                }
+                catch (Exception)
+                {
+                }
+            }
+            var items = new List<Dictionary<string, object>>();
+            var list = raw as IList;
+            if (list == null)
+            {
+                var single = AsStringMap(raw);
+                if (single != null)
+                {
+                    items.Add(single);
+                }
+                return items;
+            }
+            foreach (object item in list)
+            {
+                var row = AsStringMap(item);
+                if (row != null)
+                {
+                    items.Add(row);
+                }
+            }
+            return items;
+        }
+
+        private static Dictionary<string, object> AsStringMap(object value)
+        {
+            var row = value as Dictionary<string, object>;
+            if (row != null)
+            {
+                return row;
+            }
+            var map = value as IDictionary;
+            if (map == null)
+            {
+                return null;
+            }
+            row = new Dictionary<string, object>();
+            foreach (DictionaryEntry entry in map)
+            {
+                row[Convert.ToString(entry.Key)] = entry.Value;
+            }
+            return row;
+        }
+
         private static List<IList> ParamMatrix(Dictionary<string, object> p, string name, bool required)
         {
             object raw;

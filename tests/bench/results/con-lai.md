@@ -31,8 +31,17 @@ xuất sang `.xlsx` → `<conditionalFormatting>=1`, `<dxf>=1`.
 **Hệ quả**: không cần đi đường OOXML (saveAs → sửa gói → mở lại) như Claude Code. Làm được ngay
 **trên tài liệu đang mở**.
 
-**Cần làm**: đưa vào bridge thành `et.setConditionalFormat` / `et.listConditionalFormats` (và bản C#
-cho Excel/WPS nếu muốn parity), thêm vào `catalog/live-commands.json` để model thấy.
+**Đã làm xong (02/10/2026)**: `et.setConditionalFormat` + `et.listConditionalFormats` cho bridge
+LibreOffice, đã vào `catalog/live-commands.json` (62 lệnh) và `livecommands_gen.go`. Bằng chứng chạy
+thật trên LibreOffice: `python tests/live/test_live_libreoffice.py` phần Calc **137/137**, trong đó có
+vòng `tên -> ghi -> đọc lại -> tên` cho **mọi** toán tử, ca gọi lại trên cùng vùng (phải THAY chứ không
+cộng dồn), 5 ca sai tham số, và một lần `et.saveAs` ra `.xlsx` rồi tìm `<conditionalFormatting>` trong
+gói để chắc chắn nó vào file thật chứ không chỉ nằm trong phiên.
+
+**Còn lại**: bản C# (Excel/WPS) đã có lệnh cùng tên và cùng tham số (`Range.FormatConditions`) nhưng
+**chưa chạy thử trên Excel/WPS thật** — máy này chỉ có LibreOffice. Khác biệt có chủ ý: LibreOffice gắn
+style bằng TÊN CELL STYLE nên `styleName` có tác dụng, Excel gắn màu trực tiếp nên `styleName` chỉ có
+tác dụng bên LibreOffice.
 
 ## 2. Chart — ĐÃ TRẢ LỜI XONG (02/10/2026)
 

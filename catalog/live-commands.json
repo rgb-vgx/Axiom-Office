@@ -506,6 +506,38 @@
     ]
   },
   {
+    "name": "et.setConditionalFormat",
+    "kind": "et",
+    "params": [
+      {
+        "name": "range",
+        "hint": null
+      },
+      {
+        "name": "rules",
+        "hint": "array of rule objects"
+      },
+      {
+        "name": "sheet",
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "et.listConditionalFormats",
+    "kind": "et",
+    "params": [
+      {
+        "name": "range",
+        "hint": "chỉ xem một vùng"
+      },
+      {
+        "name": "sheet",
+        "hint": null
+      }
+    ]
+  },
+  {
     "name": "et.addChart",
     "kind": "et",
     "params": [

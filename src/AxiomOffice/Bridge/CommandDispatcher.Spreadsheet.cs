@@ -34,6 +34,15 @@ namespace AxiomOffice.Bridge
                     Opt("title"), Opt("name"), Opt("anchor", "top-left cell, default 'A1'"),
                     Opt("width", "cm, default 12"), Opt("height", "cm, default 7"), Opt("sheet")).ForAgent(),
                 Command("et.listCharts", "et", EtListCharts, "Danh sách biểu đồ trên sheet", Opt("sheet")).ForAgent(),
+                Command("et.setConditionalFormat", "et", EtSetConditionalFormat,
+                    "Đặt định dạng điều kiện cho vùng: `rules` là mảng rule, mỗi rule có operator "
+                    + "(less/lessEqual/greater/greaterEqual/equal/notEqual/between/notBetween/formula), formula1, "
+                    + "formula2 (chỉ between), và bold/italic/fontColor/fillColor. Gọi lại trên cùng vùng thì THAY "
+                    + "rule cũ của vùng đó, nên nhiều rule trên một vùng phải để trong MỘT lần gọi",
+                    Req("range"), Req("rules", "array of rule objects"), Opt("sheet")).ForAgent(),
+                Command("et.listConditionalFormats", "et", EtListConditionalFormats,
+                    "Liệt kê định dạng điều kiện đang có (đọc lại để tự kiểm); bỏ trống `range` thì soi vùng đang dùng",
+                    Opt("range", "chỉ xem một vùng"), Opt("sheet")).ForAgent(),
                 Command("et.undo", "et", EtUndo, "Hoàn tác", Opt("count")).ForAgent(),
                 Command("et.exportPdf", "et", EtExportPdf, "Xuất PDF", Req("path")).ForAgent(),
                 Command("et.save", "et", (host, p) => SaveDocument(host, "et", null), "Lưu").ForAgent(),
@@ -502,6 +511,208 @@ namespace AxiomOffice.Bridge
             dynamic wb = app.ActiveWorkbook;
             wb.ExportAsFixedFormat(0, path);
             return new Dictionary<string, object> { { "exported", path } };
+        }
+
+        // --- Định dạng điều kiện (Excel/WPS dùng Range.FormatConditions) ---------------------------
+        //
+        // Bản LibreOffice phải đi đường vòng qua UNO (xem calc.py: createByRange rồi createEntry);
+        // bên này API phẳng hơn nên gọi thẳng. Tên lệnh/tham số hai bên giống nhau để agent thấy cùng
+        // một hợp đồng, nhưng cách đặt style thì khác: LibreOffice gắn bằng TÊN CELL STYLE, Excel gắn
+        // màu trực tiếp nên `styleName` chỉ có tác dụng bên LibreOffice.
+
+        // XlFormatConditionOperator: xlBetween=1, xlNotBetween=2, xlEqual=3, xlNotEqual=4,
+        // xlGreater=5, xlLess=6, xlGreaterEqual=7, xlLessEqual=8.
+        private static readonly Dictionary<string, int> ConditionalOperators =
+            new Dictionary<string, int>(StringComparer.Ordinal)
+            {
+                { "between", 1 }, { "notbetween", 2 }, { "equal", 3 }, { "notequal", 4 },
+                { "greater", 5 }, { "less", 6 }, { "greaterequal", 7 }, { "lessequal", 8 }
+            };
+
+        private static readonly Dictionary<int, string> ConditionalOperatorNames =
+            new Dictionary<int, string>
+            {
+                { 1, "between" }, { 2, "notBetween" }, { 3, "equal" }, { 4, "notEqual" },
+                { 5, "greater" }, { 6, "less" }, { 7, "greaterEqual" }, { 8, "lessEqual" }
+            };
+
+        private const int XlCellValue = 1;      // XlFormatConditionType
+        private const int XlExpression = 2;
+
+        private static Dictionary<string, object> EtSetConditionalFormat(IAppHost host, Dictionary<string, object> p)
+        {
+            string address = ParamString(p, "range", null);
+            if (string.IsNullOrEmpty(address))
+            {
+                throw new InvalidOperationException("'range' is required: the area the rules apply to, e.g. 'B2:B100'");
+            }
+            List<Dictionary<string, object>> rules = ParamObjects(p, "rules");
+            if (rules == null || rules.Count == 0)
+            {
+                throw new InvalidOperationException("'rules' is required: a list of rules, e.g. "
+                    + "[{\"operator\": \"less\", \"formula1\": \"50\", \"fillColor\": \"#FFCCCC\"}]");
+            }
+            dynamic app = host.Application;
+            dynamic wb = EnsureWorkbook(app);
+            string sheetName = ParamString(p, "sheet", null);
+            dynamic sheet = string.IsNullOrEmpty(sheetName) ? wb.ActiveSheet : wb.Worksheets[sheetName];
+            dynamic range = sheet.Range[address];
+
+            // Kiểm hết rule trước khi ghi: rule thứ ba sai thì hai rule đầu cũng không được vào file.
+            var plan = new List<Dictionary<string, object>>();
+            for (int i = 0; i < rules.Count; i++)
+            {
+                string key = NormalizeOperator(ParamString(rules[i], "operator", "less"));
+                bool isFormula = key == "formula";
+                if (!isFormula && !ConditionalOperators.ContainsKey(key))
+                {
+                    throw new InvalidOperationException(string.Format(
+                        "'rules[{0}].operator' must be one of less/lessEqual/greater/greaterEqual/equal/notEqual/"
+                        + "between/notBetween/formula, got '{1}'", i, key));
+                }
+                string formula1 = ParamString(rules[i], "formula1", null);
+                if (string.IsNullOrEmpty(formula1))
+                {
+                    throw new InvalidOperationException(string.Format(
+                        "'rules[{0}]' needs 'formula1' - the value to compare with, e.g. "
+                        + "{{\"operator\": \"less\", \"formula1\": \"50\"}}", i));
+                }
+                string formula2 = ParamString(rules[i], "formula2", null);
+                if ((key == "between" || key == "notbetween") && string.IsNullOrEmpty(formula2))
+                {
+                    throw new InvalidOperationException(string.Format(
+                        "'rules[{0}]': operator '{1}' needs 'formula2' as well", i, key));
+                }
+                plan.Add(new Dictionary<string, object>
+                {
+                    { "key", key }, { "formula1", formula1 }, { "formula2", formula2 }, { "rule", rules[i] }
+                });
+            }
+
+            range.FormatConditions.Delete();        // thay rule cũ của vùng: gọi lại không chồng lên nhau
+
+            var written = new List<object>();
+            foreach (Dictionary<string, object> item in plan)
+            {
+                string key = Convert.ToString(item["key"]);
+                string formula1 = Convert.ToString(item["formula1"]);
+                string formula2 = Convert.ToString(item["formula2"]);
+                Dictionary<string, object> rule = (Dictionary<string, object>)item["rule"];
+                dynamic condition;
+                if (key == "formula")
+                {
+                    // Công thức trần: Excel nhận kèm dấu =, và không dùng toán tử.
+                    condition = range.FormatConditions.Add(XlExpression, Type.Missing, "=" + formula1.TrimStart('='));
+                }
+                else if (!string.IsNullOrEmpty(formula2))
+                {
+                    condition = range.FormatConditions.Add(XlCellValue, ConditionalOperators[key], formula1, formula2);
+                }
+                else
+                {
+                    condition = range.FormatConditions.Add(XlCellValue, ConditionalOperators[key], formula1);
+                }
+                if (ParamBool(rule, "bold", false))
+                {
+                    condition.Font.Bold = true;
+                }
+                if (ParamBool(rule, "italic", false))
+                {
+                    condition.Font.Italic = true;
+                }
+                int? fontColor = ParseBgrColor(ParamString(rule, "fontColor", null));
+                if (fontColor.HasValue)
+                {
+                    condition.Font.Color = fontColor.Value;
+                }
+                int? fillColor = ParseBgrColor(ParamString(rule, "fillColor", null));
+                if (fillColor.HasValue)
+                {
+                    condition.Interior.Color = fillColor.Value;
+                }
+                written.Add(new Dictionary<string, object>
+                {
+                    { "operator", key }, { "formula1", formula1 },
+                    { "formula2", string.IsNullOrEmpty(formula2) ? null : formula2 }
+                });
+            }
+
+            return Ok(new Dictionary<string, object>
+            {
+                { "sheet", Convert.ToString(sheet.Name) }, { "range", Convert.ToString(range.Address) }, { "rules", written }
+            });
+        }
+
+        private static Dictionary<string, object> EtListConditionalFormats(IAppHost host, Dictionary<string, object> p)
+        {
+            string address = ParamString(p, "range", null);
+            string sheetName = ParamString(p, "sheet", null);
+            dynamic app = host.Application;
+            dynamic wb = EnsureWorkbook(app);
+            dynamic sheet = string.IsNullOrEmpty(sheetName) ? wb.ActiveSheet : wb.Worksheets[sheetName];
+            // Excel không có "mọi định dạng điều kiện của sheet" như LibreOffice: FormatConditions chỉ
+            // đọc được từ một Range. Bỏ trống `range` thì soi vùng đang dùng thật.
+            dynamic scope = string.IsNullOrEmpty(address) ? sheet.UsedRange : sheet.Range[address];
+
+            var items = new List<object>();
+            dynamic conditions = scope.FormatConditions;
+            int count = Convert.ToInt32(conditions.Count);
+            for (int i = 1; i <= count; i++)
+            {
+                dynamic condition = conditions[i];
+                object operatorName = null;
+                object type = null;
+                try
+                {
+                    type = Convert.ToInt32(condition.Type);
+                }
+                catch (Exception)
+                {
+                }
+                try
+                {
+                    int code = Convert.ToInt32(condition.Operator);
+                    operatorName = Convert.ToInt32(type) == XlExpression
+                        ? "formula"
+                        : (ConditionalOperatorNames.ContainsKey(code) ? ConditionalOperatorNames[code] : "unknown(" + code + ")");
+                }
+                catch (Exception)
+                {
+                }
+                items.Add(new Dictionary<string, object>
+                {
+                    { "operator", operatorName },
+                    { "formula1", SafeFormula(condition, "Formula1") },
+                    { "formula2", SafeFormula(condition, "Formula2") },
+                    { "type", type }
+                });
+            }
+            return Ok(new Dictionary<string, object>
+            {
+                { "sheet", Convert.ToString(sheet.Name) },
+                { "range", Convert.ToString(scope.Address) },
+                { "formats", items }
+            });
+        }
+
+        // Công thức của FormatCondition có thể ném COMException (vùng gộp, điều kiện kiểu thanh/màu) -
+        // đọc hỏng một trường không được làm hỏng cả lệnh đọc.
+        private static string SafeFormula(dynamic condition, string name)
+        {
+            try
+            {
+                return Convert.ToString(name == "Formula1" ? condition.Formula1 : condition.Formula2);
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+        // "lessEqual" / "less_equal" / "less equal" / "LESS" -> "lessequal"
+        private static string NormalizeOperator(string value)
+        {
+            return (value ?? "less").Replace("_", "").Replace(" ", "").ToLowerInvariant();
         }
 
         private static Dictionary<string, object> EtUndo(IAppHost host, Dictionary<string, object> p)

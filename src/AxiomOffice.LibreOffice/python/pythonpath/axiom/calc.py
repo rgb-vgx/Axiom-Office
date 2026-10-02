@@ -4,6 +4,8 @@ Khac Excel mot diem: LibreOffice hoan tac duoc bang undo manager nen et.undo la 
 """
 from __future__ import annotations
 
+import hashlib
+
 import uno
 
 from . import documents, values
@@ -523,6 +525,217 @@ def list_charts(env, params):
     return {"sheet": sheet.Name, "charts": items, "shapes": sorted(_shape_names(sheet))}
 
 
+# --- Dinh dang dieu kien -------------------------------------------------------------------------
+#
+# Duong lam duoc la duong VONG, va hai lan do truoc do da ket luan sai la "khong co duong nao" vi chi
+# thao tac tren VAT CHUA (sheet.ConditionalFormats) chu khong hoi doi tuong THEO VUNG:
+#
+#   1. tap vung  = doc.createInstance("com.sun.star.sheet.SheetCellRanges") + addRangeAddress
+#      (ServiceManager tra None; sheet.getCellRangesByName khong co trong pyuno)
+#   2. formats.createByRange(tap vung) -> tra ve SO ID, khong phai doi tuong
+#   3. formats.getConditionalFormats() -> day doi tuong theo vung; moi doi tuong CO createEntry
+#   4. createEntry(Type, Position) -> TAO that, nhung pyuno tra ve None: phai lay lai bang getByIndex
+#
+# Do bang probe that tren LibreOffice 26.8.0.3: tests/bench/probe_cf3.py va probe_cf5.py, ket qua o
+# tests/bench/results/probe-conditional-format-3.txt.
+CF_TYPE_CONDITION = 0      # com.sun.star.sheet.ConditionEntryType.CONDITION (COLORSCALE/DATABAR/... la kieu khac)
+
+# Ten goi gon cho agent -> ten hang so trong com.sun.star.sheet.ConditionOperator.
+CF_OPERATORS = {
+    "equal": "EQUAL", "notequal": "NOT_EQUAL", "greater": "GREATER", "greaterequal": "GREATER_EQUAL",
+    "less": "LESS", "lessequal": "LESS_EQUAL", "between": "BETWEEN", "notbetween": "NOT_BETWEEN",
+    "formula": "FORMULA",
+}
+
+# So nguyen cua tung toan tu. Phai co bang so nay vi thuoc tinh Operator DOC RA la int, con hang so
+# cua module la doi tuong uno.Enum - khong so sanh truc tiep duoc, va uno.Enum(...) tu tao thi bi tu
+# choi khi gan (AttributeError: Operator). So do bang cach gan roi doc lai tren LibreOffice 26.8.0.3
+# (tests/bench/probe_cf5.py); bai test song kiem vong ten -> ghi -> doc -> ten cho MOI toan tu nen
+# neu LibreOffice doi so thi test do ngay, khong am tham sai.
+CF_OPERATOR_VALUES = {
+    "EQUAL": 1, "NOT_EQUAL": 2, "GREATER": 3, "GREATER_EQUAL": 4, "LESS": 5, "LESS_EQUAL": 6,
+    "BETWEEN": 7, "NOT_BETWEEN": 8, "FORMULA": 9,
+}
+# Ten DOC RA phai la cung tu vung voi ten NHAN VAO (camelCase), khong phai ten hang so UNO tho
+# (LESS_EQUAL): neu tra ve ten UNO thi agent phai biet hai cach viet cho cung mot thu. Bai live kiem
+# vong ten -> ghi -> doc -> ten cho MOI toan tu, nen bang nay thieu ten nao la lo ra ngay ("unknown(n)").
+CF_OPERATOR_LABELS = {
+    "EQUAL": "equal", "NOT_EQUAL": "notEqual", "GREATER": "greater", "GREATER_EQUAL": "greaterEqual",
+    "LESS": "less", "LESS_EQUAL": "lessEqual", "BETWEEN": "between", "NOT_BETWEEN": "notBetween",
+    "FORMULA": "formula",
+}
+CF_OPERATOR_NAMES = {CF_OPERATOR_VALUES[uno]: label for uno, label in CF_OPERATOR_LABELS.items()}
+CF_USES_FORMULA2_NAMES = ("between", "notBetween")
+CF_STYLE_PREFIX = "Axiom CF "
+
+
+def _cf_operator_module():
+    """Module hang so ConditionOperator, xin SAN TAT CA ten se dung.
+
+    pyuno sinh module kieu luoi: chi ten nao da duoc yeu cau qua fromlist moi co, getattr cho ten
+    khac nem AttributeError (da mac dung loi nay: dir() chi tra ve dung mot ten).
+    """
+    return __import__("com.sun.star.sheet.ConditionOperator", fromlist=sorted(set(CF_OPERATORS.values())))
+
+
+def _cf_style(doc, rule):
+    """Ten cell style de gan cho mot rule: style co san, hoac style sinh ra tu mau/co chu cua rule.
+
+    LibreOffice gan dinh dang dieu kien bang TEN STYLE chu khong bang mau truc tiep (khac Excel COM).
+    Khong noi gi thi dung style "Good" co san cua Calc.
+    """
+    wanted = values.string(rule, "styleName")
+    styles = doc.StyleFamilies.getByName("CellStyles")
+    available = tuple(styles.getElementNames())
+    if wanted:
+        if wanted not in available:
+            raise values.ParamError("no cell style named '%s' (co san: %s)" % (wanted, ", ".join(available)))
+        return wanted
+
+    spec = {}
+    for key in ("bold", "italic"):
+        if values.has(rule, key):
+            spec[key] = values.boolean(rule, key, False)
+    for key in ("fontColor", "fillColor", "numFmt"):
+        text = values.string(rule, key)
+        if text:
+            spec[key] = text
+    if not spec:
+        return "Good"
+
+    # Ten style sinh ra tu chinh noi dung dinh dang: cung mot kieu thi dung lai style cu, khong de lai
+    # rac trong danh sach style moi lan goi.
+    name = CF_STYLE_PREFIX + hashlib.md5(repr(sorted(spec.items())).encode("utf-8")).hexdigest()[:6]
+    if name in available:
+        return name
+    style = doc.createInstance("com.sun.star.style.CellStyle")
+    if "bold" in spec:
+        style.CharWeight = BOLD if spec["bold"] else NORMAL
+    if "italic" in spec:
+        style.CharPosture = uno.Enum("com.sun.star.awt.FontSlant", "ITALIC" if spec["italic"] else "NONE")
+    if "fontColor" in spec:
+        color = values.color(spec["fontColor"])
+        if color is not None:
+            style.CharColor = color
+    if "fillColor" in spec:
+        color = values.color(spec["fillColor"])
+        if color is not None:
+            style.CellBackColor = color
+    if "numFmt" in spec:
+        style.NumberFormat = _number_format(doc, spec["numFmt"])
+    styles.insertByName(name, style)
+    return name
+
+
+def _cf_plan(doc, rules):
+    """Kiem HET rule truoc khi ghi mot cai nao: rule thu 3 sai thi khong duoc de 2 rule dau da vao file."""
+    plan = []
+    for index, rule in enumerate(rules):
+        if not isinstance(rule, dict):
+            raise values.ParamError("rules[%d] must be an object, got %s" % (index, values.describe(rule)))
+        key = (values.string(rule, "operator", "less") or "less").lower().replace("_", "").replace(" ", "")
+        if key not in CF_OPERATORS:
+            raise values.ParamError("rules[%d].operator must be one of %s, got '%s'"
+                                    % (index, "/".join(sorted(CF_OPERATORS)), key))
+        operator = CF_OPERATORS[key]
+        formula1 = values.string(rule, "formula1")
+        if not formula1:
+            raise values.ParamError("rules[%d] needs 'formula1' - the value to compare with, "
+                                    "e.g. {\"operator\": \"less\", \"formula1\": \"50\"}" % index)
+        formula2 = values.string(rule, "formula2")
+        if operator in ("BETWEEN", "NOT_BETWEEN") and not formula2:
+            raise values.ParamError("rules[%d]: operator '%s' needs 'formula2' as well" % (index, key))
+        if operator == "FORMULA":
+            formula1 = formula1.lstrip("=")      # Calc nhan cong thuc tran, khong co dau =
+        plan.append({"operator": operator, "formula1": formula1, "formula2": formula2,
+                     "styleName": _cf_style(doc, rule), "input": key})
+    return plan
+
+
+def set_conditional_format(env, params):
+    """Dat dinh dang dieu kien cho mot vung. Goi lai tren cung vung thi THAY the rule cu cua vung do.
+
+    Nhieu rule tren cung mot vung thi de chung trong MOT loi goi (`rules`), khong phai nhieu lan goi:
+    moi lan goi la mot lan thay the, nen goi nam lan se chi con rule cuoi cung.
+    """
+    address = values.string(params, "range")
+    if not address:
+        raise values.ParamError("'range' is required: the area the rules apply to, e.g. 'B2:B100'")
+    rules = params.get("rules")
+    # Bridge co the boc mang mot lop ({"items": [...]}, {"value": [...]}); mot rule don le thi cung nhan.
+    if isinstance(rules, dict):
+        for key in ("items", "item", "value"):
+            if key in rules:
+                rules = rules[key]
+                break
+        else:
+            rules = [rules]
+    if not isinstance(rules, list) or not rules:
+        raise values.ParamError("'rules' is required: a list of rules, e.g. "
+                                "[{\"operator\": \"less\", \"formula1\": \"50\", \"styleName\": \"Bad\"}]")
+    doc = env.document
+    sheet = _sheet(doc, params)
+    target = _range(sheet, address)
+    plan = _cf_plan(doc, rules)
+
+    formats = sheet.ConditionalFormats
+    wanted = doc.createInstance("com.sun.star.sheet.SheetCellRanges")
+    wanted.addRangeAddress(target.RangeAddress, False)
+
+    # Vung da co dinh dang dieu kien thi go han di roi lam lai: giu lai se chong len nhau, va lan goi
+    # thu hai cua agent (sau khi doc lai thay sai) se thanh hai bo rule cung song.
+    for item in formats.getConditionalFormats():
+        if item.Range.AbsoluteName == wanted.AbsoluteName:
+            formats.removeByID(item.ID)
+            break
+    formats.createByRange(wanted)                       # -> ID, khong phai doi tuong
+    holder = formats.getConditionalFormats()[-1]
+    module = _cf_operator_module()
+
+    written = []
+    for rule in plan:
+        holder.createEntry(CF_TYPE_CONDITION, holder.Count)     # (Type, Position)
+        entry = holder.getByIndex(holder.Count - 1)             # createEntry tra ve None
+        entry.Operator = getattr(module, rule["operator"])
+        entry.Formula1 = rule["formula1"]
+        if rule["formula2"]:
+            entry.Formula2 = rule["formula2"]
+        entry.StyleName = rule["styleName"]
+        written.append({"operator": rule["input"], "formula1": rule["formula1"],
+                        "formula2": rule["formula2"], "styleName": rule["styleName"]})
+
+    return {"sheet": sheet.Name, "range": wanted.AbsoluteName, "rules": written}
+
+
+def list_conditional_formats(env, params):
+    """Doc lai dinh dang dieu kien dang co - de agent tu kiem, khong phai tin loi goi khong loi.
+
+    `range` (khong bat buoc) de chi xem mot vung; bo trong thi liet ke ca sheet.
+    """
+    sheet = _sheet(env.document, params)
+    address = values.string(params, "range")
+    wanted = None
+    if address:
+        holder = env.document.createInstance("com.sun.star.sheet.SheetCellRanges")
+        holder.addRangeAddress(_range(sheet, address).RangeAddress, False)
+        wanted = holder.AbsoluteName
+    items = []
+    for item in sheet.ConditionalFormats.getConditionalFormats():
+        if wanted is not None and item.Range.AbsoluteName != wanted:
+            continue
+        rules = []
+        for index in range(item.Count):
+            entry = item.getByIndex(index)
+            operator = CF_OPERATOR_NAMES.get(entry.Operator, "unknown(%s)" % entry.Operator)
+            # LibreOffice luon tra Formula2 = "0" cho cac toan tu khong dung no; tra nguyen "0" thi agent
+            # tuong rule co hai nguong. Chi bao khi toan tu that su dung nguong thu hai.
+            formula2 = entry.Formula2 if operator in CF_USES_FORMULA2_NAMES else None
+            rules.append({"operator": operator, "formula1": entry.Formula1, "formula2": formula2,
+                          "styleName": entry.StyleName, "type": int(entry.Type)})
+        items.append({"range": item.Range.AbsoluteName, "rules": rules})
+    return {"sheet": sheet.Name, "formats": items}
+
+
 def undo(env, params):
     return documents.undo(env.document, values.integer(params, "count", 1))
 
@@ -554,6 +767,16 @@ command("et.fillRange", "et", fill_range,
         opt("sheet"), agent=True, undo=True)
 command("et.formatRange", "et", format_range, "Định dạng vùng", req("range"), opt("bold"), opt("italic"), opt("fontSize"),
         opt("fontColor"), opt("fillColor"), opt("numFmt"), opt("horizontal"), opt("wrap"), opt("sheet"), agent=True, undo=True)
+command("et.setConditionalFormat", "et", set_conditional_format,
+        "Đặt định dạng điều kiện cho vùng: `rules` là mảng rule, mỗi rule có operator "
+        "(less/lessEqual/greater/greaterEqual/equal/notEqual/between/notBetween/formula), formula1, "
+        "formula2 (chỉ between), và styleName có sẵn (Good/Bad/Neutral/Warning/Error/...) hoặc "
+        "bold/italic/fontColor/fillColor/numFmt. Gọi lại trên cùng vùng thì THAY rule cũ của vùng đó, "
+        "nên nhiều rule trên một vùng phải để trong MỘT lần gọi",
+        req("range"), req("rules", "array of rule objects"), opt("sheet"), agent=True, undo=True)
+command("et.listConditionalFormats", "et", list_conditional_formats,
+        "Liệt kê định dạng điều kiện đang có (đọc lại để tự kiểm); bỏ trống `range` thì cả sheet",
+        opt("range", "chỉ xem một vùng"), opt("sheet"), agent=True)
 command("et.addChart", "et", add_chart,
         "Chèn biểu đồ từ vùng dữ liệu; `type` column/bar/line/pie/area/scatter, `width`/`height` tính bằng cm",
         req("range", "source data e.g. 'A1:B13'"), opt("type", "column (default)/bar/line/pie/area/scatter"),

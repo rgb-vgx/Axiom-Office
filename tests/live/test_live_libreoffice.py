@@ -24,6 +24,7 @@ import tempfile
 import time
 import urllib.error
 import urllib.request
+import zipfile
 
 # Console Windows mac dinh la cp1252: ten lenh/du lieu trong test co tieng Viet.
 if hasattr(sys.stdout, "reconfigure"):
@@ -319,6 +320,80 @@ def test_calc(b, out):
     clean = {i.get("type") for i in (b.cmd("et.checkRange", {"range": "AA1:AA2", "sheet": "Sheet1"},
                                            record=False) or {}).get("issues", [])}
     check("empty-reference" not in clean, "Calc checkRange KHÔNG báo oan khi công thức trỏ vào ô có nội dung", sorted(clean))
+
+    # Định dạng điều kiện: bốn bài benchmark đều cần (thanh màu theo ngưỡng, tô đỏ chỗ lệch kế hoạch).
+    # Hai lần đo trước kết luận "không có đường nào" vì chỉ thao tác trên vật chứa; đường đúng đi qua
+    # đối tượng THEO VÙNG (createByRange -> getConditionalFormats -> createEntry). Xem
+    # tests/bench/results/probe-conditional-format-3.txt.
+    b.cmd("et.writeRange", {"range": "AB1:AB10", "sheet": "Sheet1",
+                            "values": [[10], [20], [30], [40], [50], [60], [70], [80], [90], [100]]})
+    applied = b.cmd("et.setConditionalFormat", {
+        "sheet": "Sheet1", "range": "AB1:AB10",
+        "rules": [{"operator": "less", "formula1": "50", "styleName": "Bad"},
+                  {"operator": "greaterEqual", "formula1": "90", "styleName": "Good"}]}) or {}
+    check(len(applied.get("rules") or []) == 2, "Calc setConditionalFormat nhận 2 rule", applied)
+
+    listed = b.cmd("et.listConditionalFormats", {"sheet": "Sheet1"}) or {}
+    mine = [item for item in (listed.get("formats") or []) if item.get("range", "").endswith("$AB$1:$AB$10")]
+    check(len(mine) == 1 and len(mine[0].get("rules") or []) == 2,
+          "Calc listConditionalFormats đọc lại đúng 2 rule của vùng", listed)
+    check([rule.get("operator") for rule in (mine[0].get("rules") if mine else [])] == ["less", "greaterEqual"],
+          "Calc listConditionalFormats trả ĐÚNG TÊN toán tử đã ghi", mine)
+
+    # Vòng đủ cho MỌI toán tử: ghi tên -> đọc lại phải ra đúng tên đó. Bảng số int của toán tử trong
+    # calc.py (CF_OPERATOR_VALUES) là thứ duy nhất phải viết cứng; bài này khiến nó không thể lệch âm thầm.
+    for name, formula2 in (("equal", None), ("notEqual", None), ("greater", None), ("greaterEqual", None),
+                           ("less", None), ("lessEqual", None), ("between", "70"), ("notBetween", "70"),
+                           ("formula", None)):
+        rule = {"operator": name, "formula1": "=AB1>50" if name == "formula" else "30"}
+        if formula2:
+            rule["formula2"] = formula2
+        # Công thức trần được nhận kèm dấu = nhưng LibreOffice lưu không có dấu, nên đọc lại là "AB1>50".
+        expected1 = rule["formula1"].lstrip("=") if name == "formula" else rule["formula1"]
+        b.cmd("et.setConditionalFormat", {"sheet": "Sheet1", "range": "AB1:AB10", "rules": [rule]}, record=False)
+        back = ((b.cmd("et.listConditionalFormats", {"sheet": "Sheet1", "range": "AB1:AB10"},
+                       record=False) or {}).get("formats") or [])
+        read = (back[0].get("rules") if back else [{}])[0]
+        check(read.get("operator") == name and read.get("formula1") == expected1,
+              "Calc định dạng điều kiện: %s ghi rồi đọc lại đúng" % name, read)
+        check(read.get("formula2") == formula2,
+              "Calc định dạng điều kiện: %s chỉ trả formula2 khi toán tử dùng nó" % name, read)
+
+    # Gọi lại trên CÙNG vùng là THAY, không phải thêm: nếu cộng dồn thì lần gọi thứ hai của agent (sau khi
+    # đọc lại thấy sai) sẽ để lại hai bộ rule cùng sống.
+    b.cmd("et.setConditionalFormat", {"sheet": "Sheet1", "range": "AB1:AB10",
+                                      "rules": [{"operator": "less", "formula1": "10", "fillColor": "#FFCCCC"}]},
+          record=False)
+    again = b.cmd("et.listConditionalFormats", {"sheet": "Sheet1", "range": "AB1:AB10"}) or {}
+    check(len(again.get("formats") or []) == 1 and len((again["formats"][0].get("rules") or [])) == 1,
+          "Calc setConditionalFormat gọi lại thì THAY rule cũ của vùng", again)
+    made_style = (again["formats"][0]["rules"][0].get("styleName") or "")
+    check(made_style.startswith("Axiom CF "), "Calc setConditionalFormat tự tạo cell style từ fillColor", made_style)
+
+    b.cmd("et.setConditionalFormat", {"sheet": "Sheet1", "range": "AB1:AB10",
+                                      "rules": [{"operator": "quanhQue", "formula1": "1"}]},
+          expect_ok=False, key="et.setConditionalFormat toán tử lạ")
+    b.cmd("et.setConditionalFormat", {"sheet": "Sheet1", "range": "AB1:AB10",
+                                      "rules": [{"operator": "less"}]}, expect_ok=False,
+          key="et.setConditionalFormat thiếu formula1")
+    b.cmd("et.setConditionalFormat", {"sheet": "Sheet1", "range": "AB1:AB10",
+                                      "rules": [{"operator": "between", "formula1": "1"}]}, expect_ok=False,
+          key="et.setConditionalFormat between thiếu formula2")
+    b.cmd("et.setConditionalFormat", {"sheet": "Sheet1", "range": "AB1:AB10",
+                                      "rules": [{"operator": "less", "formula1": "1", "styleName": "Không có"}]},
+          expect_ok=False, key="et.setConditionalFormat style lạ")
+    b.cmd("et.setConditionalFormat", {"sheet": "Sheet1", "range": "AB1:AB10"}, expect_ok=False,
+          key="et.setConditionalFormat thiếu rules")
+
+    # Kiểm cái THẬT SỰ vào file: lưu ra .xlsx rồi tìm <conditionalFormatting> trong gói. Đây là định dạng
+    # KHÁC hẳn ODF, nên nếu cả hai đều có thì không phải trạng thái tạm trong phiên.
+    cf_xlsx = os.path.join(out, "libreoffice-calc-cf.xlsx")
+    b.cmd("et.saveAs", {"path": cf_xlsx})
+    with zipfile.ZipFile(cf_xlsx) as archive:
+        body = "".join(archive.read(name).decode("utf-8", "replace")
+                       for name in archive.namelist() if name.startswith("xl/worksheets/sheet"))
+    check("<conditionalFormatting" in body, "Calc setConditionalFormat vào THẬT trong file .xlsx",
+          "%d ký tự, có thẻ: %s" % (len(body), "<conditionalFormatting" in body))
 
     b.cmd("et.writeRange", {"range": "A7", "values": [["hoàn tác tôi"]]}, key="et.writeRange before undo")
     b.cmd("et.undo", {"count": 1})

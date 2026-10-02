@@ -5,6 +5,35 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — định dạng điều kiện: `et.setConditionalFormat` / `et.listConditionalFormats`
+- Bốn bài benchmark đều cần tô màu theo ngưỡng, và đây là thứ **duy nhất** trong danh sách khoảng cách
+  mà Axiom hoàn toàn không làm được. Hai lần đo trước kết luận "không có đường nào" — kết luận đó **sai**.
+- **Sai ở chỗ đo, không phải ở chỗ API**: hai probe cũ chỉ thao tác trên **vật chứa**
+  (`doc.createInstance`, `ServiceManager`, `uno.createUnoStruct`, `sheet.ConditionalFormats.createInstance()`)
+  và chỉ kiểm "lời gọi có ném lỗi không". Đường đúng đi qua **đối tượng theo vùng**, và có hai cái bẫy im
+  lặng: `createByRange()` trả về **số ID** chứ không phải đối tượng, còn `createEntry()` **tạo thật nhưng
+  pyuno trả về `None`** — phải lấy lại bằng `getByIndex`. Đo được bằng probe chạy thật trên LibreOffice
+  26.8.0.3, kết quả nguyên văn ở `tests/bench/results/probe-conditional-format-3.txt`.
+- **Không phải đi đường vòng qua gói OOXML** (lưu ra file → sửa `xl/worksheets/sheetN.xml` → mở lại) như
+  cách đã quan sát được ở phía Claude Code: lệnh này chạy **trên tài liệu đang mở**.
+- Rule nhận `operator` (less/lessEqual/greater/greaterEqual/equal/notEqual/between/notBetween/formula),
+  `formula1`, `formula2`, và `styleName` có sẵn (Good/Bad/Neutral/Warning/…) hoặc `bold`/`italic`/
+  `fontColor`/`fillColor`/`numFmt` — kiểu sau tự sinh một cell style và **dùng lại** nếu đã có, không để
+  rác lại trong danh sách style. Gọi lại trên cùng một vùng là **THAY** rule cũ của vùng đó.
+- **Kiểm chứng chạy thật** (`tests/live/test_live_libreoffice.py`, phần Calc **137/137**):
+  - vòng `tên → ghi → đọc lại → tên` cho **mọi** toán tử; đây là thứ giữ cho bảng số int trong
+    `calc.py` không thể lệch âm thầm;
+  - gọi lại trên cùng vùng thì còn **đúng một** bộ rule;
+  - 5 ca tham số sai (toán tử lạ, thiếu `formula1`, `between` thiếu `formula2`, style không tồn tại,
+    thiếu `rules`) đều báo lỗi đọc được;
+  - `et.saveAs` ra `.xlsx` rồi tìm `<conditionalFormatting>` trong gói — **định dạng khác hẳn ODF**, nên
+    vào được cả hai nghĩa là nó thật sự vào file, không phải trạng thái tạm trong phiên.
+  - `tests/lo/test_extension.py` 19/19: `catalog/live-commands.json` (62 lệnh) khớp registry và khớp bản C#.
+- Bản C# (Excel/WPS) có lệnh **cùng tên, cùng tham số** (`Range.FormatConditions`) để agent thấy một hợp
+  đồng thống nhất, nhưng **chưa chạy thử trên Excel/WPS thật** — máy này chỉ có LibreOffice. Khác biệt có
+  chủ ý: LibreOffice gắn style bằng **tên cell style** nên `styleName` chỉ có tác dụng bên đó; Excel gắn
+  màu trực tiếp.
+
 ### Added — đọc `.xls` thẳng bằng Go, không cần LibreOffice lẫn Excel
 - Ứng dụng `.xls` (BIFF8) được đọc **trực tiếp**: `internal/cfb` mở thùng Compound File Binary (OLE2) và
   `internal/xlsx/biff.go` đọc bản ghi BIFF8. Trước đây bản Linux phải nhờ
