@@ -272,6 +272,19 @@ def test_calc(b, out):
           key="et.addChart kiểu lạ")
     b.cmd("et.addChart", {"sheet": "Sheet1", "type": "line"}, expect_ok=False, key="et.addChart thiếu range")
 
+    # Tên chart duy nhất theo TÀI LIỆU, không theo sheet. Thêm chart ở sheet khác mà để tự đặt tên thì phải
+    # nhảy qua tên đã dùng - trước đây nó đâm vào "Chart1" rồi ném một lỗi pyuno không đọc được, và vì tên
+    # tự sinh luôn bắt đầu lại từ Chart1 nên MỌI lần thêm chart trên sheet chưa có chart đều hỏng.
+    b.cmd("et.addSheet", {"name": "ChartProbe"})
+    second = b.cmd("et.addChart", {"sheet": "ChartProbe", "range": "A1:C3"}, record=False) or {}
+    check(second.get("chart") and second.get("chart") != chart.get("chart"),
+          "Calc addChart ở sheet khác tự đặt tên chưa dùng (tên chart duy nhất theo tài liệu)", second)
+    clash = b.cmd("et.addChart", {"sheet": "ChartProbe", "range": "A1:C3", "name": chart.get("chart")},
+                  expect_ok=False, record=False)
+    check(isinstance(clash, str) and "already exists" in clash,
+          "Calc addChart tên đã dùng ở sheet khác -> lỗi đọc được, không phải lỗi pyuno", clash)
+    b.cmd("et.activateSheet", {"sheet": "Sheet1"})
+
     # Điền bằng công thức: chi phí token của agent tính theo TỪNG Ô nó viết ra, nên bảng nghìn dòng phải
     # đi bằng một công thức + một lệnh điền, không phải gửi từng ô.
     filled = b.cmd("et.fillRange", {"sheet": "Sheet1", "range": "P1:P20", "formula": "=ROW()*2"}) or {}

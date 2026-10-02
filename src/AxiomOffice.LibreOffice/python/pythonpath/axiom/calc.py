@@ -357,6 +357,56 @@ def format_range(env, params):
     return {"sheet": _active_sheet_name(env, params), "range": address}
 
 
+def _shape_names(sheet) -> set:
+    """Ten moi hinh tren trang ve cua sheet.
+
+    Moi chart la mot hinh dat tren trang ve, nen ten chart phai tranh ca ten hinh - khong chi tranh ten
+    trong tap `sheet.Charts`. Doc loi thi tra ve rong: day chi la buoc kiem tra them.
+    """
+    names = set()
+    try:
+        page = sheet.DrawPage
+        for index in range(page.Count):
+            try:
+                names.add(page.getByIndex(index).Name)
+            except Exception:  # noqa: BLE001
+                pass
+    except Exception:  # noqa: BLE001
+        pass
+    return names
+
+
+def _taken_chart_names(doc) -> set:
+    """Moi ten chart da dung trong CA TAI LIEU, khong chi sheet dang lam.
+
+    LibreOffice dat ten chart duy nhat tren toan tai lieu: dat "Chart1" o sheet A roi dat "Chart1" o sheet
+    B thi lan thu hai nem RuntimeException. Guard cu chi hoi `sheet.Charts.hasByName` - voi sheet chua co
+    chart thi luon tra ve "chua co" - nen no cho qua roi `addNewByName` moi no, va cai no nem ra la mot loi
+    pyuno khong doc duoc ("Couldn't convert <traceback object ...>").
+
+    Do ngay 02/10/2026 tren file Test 4: Statistics giu Chart1..Chart5, nen moi lan them chart MAC DINH
+    tren sheet khac deu hong (ten tu sinh luon bat dau lai tu Chart1) - 11 lan lien tiep trong mot luot
+    chay, va agent khong co thong tin gi de sua.
+
+    Gop ca ten hinh tren trang ve cua moi sheet: chart la mot hinh, hinh do co the con lai sau mot lan
+    tao do dang bi bo quen.
+    """
+    taken = set()
+    sheets = doc.getSheets()
+    try:
+        names = sheets.getElementNames()
+    except Exception:  # noqa: BLE001
+        return taken
+    for sheet_name in names:
+        try:
+            other = sheets.getByName(sheet_name)
+            taken |= set(other.Charts.getElementNames())
+            taken |= _shape_names(other)
+        except Exception:  # noqa: BLE001
+            pass
+    return taken
+
+
 def _diagram(kind: str):
     """Kieu bieu do theo ten nguoi dung go -> service diagram cua UNO."""
     services = {
@@ -392,9 +442,17 @@ def add_chart(env, params):
     rect = uno.createUnoStruct("com.sun.star.awt.Rectangle")
     rect.X, rect.Y, rect.Width, rect.Height = position.X, position.Y, max(1000, width), max(1000, height)
 
-    name = values.string(params, "name") or ("Chart%d" % (sheet.Charts.Count + 1))
-    if sheet.Charts.hasByName(name):
-        raise values.ParamError("a chart named '%s' already exists on sheet '%s'" % (name, sheet.Name))
+    taken = _taken_chart_names(doc)
+    name = values.string(params, "name")
+    if name:
+        if name in taken:
+            raise values.ParamError("a chart named '%s' already exists in this workbook; chart names are "
+                                    "unique per DOCUMENT, not per sheet - pick another name" % name)
+    else:
+        index = 1
+        while ("Chart%d" % index) in taken:
+            index += 1
+        name = "Chart%d" % index
     # Tham so 3 nhan CellRangeAddress; 4/5 bao UNO lay ten cot/dong lam nhan chu giai.
     sheet.Charts.addNewByName(name, rect, (source.RangeAddress,), True, True)
 
@@ -460,7 +518,9 @@ def list_charts(env, params):
         except Exception:  # noqa: BLE001
             pass
         items.append(entry)
-    return {"sheet": sheet.Name, "charts": items}
+    # shapes: moi hinh tren trang ve. Chart la mot hinh, nhung hinh co the con lai sau mot lan tao do
+    # dang bi bo quen - va khi do ten no van chiem cho, khien et.addChart dung ten. Liet ra day de thay.
+    return {"sheet": sheet.Name, "charts": items, "shapes": sorted(_shape_names(sheet))}
 
 
 def undo(env, params):

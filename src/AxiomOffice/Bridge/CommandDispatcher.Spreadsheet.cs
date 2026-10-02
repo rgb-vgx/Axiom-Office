@@ -381,21 +381,41 @@ namespace AxiomOffice.Bridge
             double height = Math.Max(30, ParamDouble(p, "height", 7.0) * 28.3465);
             dynamic anchorCell = sheet.Range[anchor];
 
+            // Tên phải tránh MỌI hình trên sheet, không chỉ hình là chart: một hình tên "Chart3" không phải
+            // chart vẫn chiếm chỗ, mà "ChartObjects().Count + 1" thì có thể sinh đúng cái tên đó.
+            // (Bản LibreOffice phải tránh tên chart của CẢ TÀI LIỆU - tên chart bên đó duy nhất theo tài
+            // liệu chứ không theo sheet, và đó là một lỗi thật đã đo được; xem calc.py _taken_chart_names.)
+            var taken = new HashSet<string>(StringComparer.Ordinal);
+            try
+            {
+                foreach (dynamic existingShape in sheet.Shapes)
+                {
+                    taken.Add(Convert.ToString(existingShape.Name));
+                }
+            }
+            catch (Exception)
+            {
+                // host thiếu Shapes: quay về chỉ kiểm chart
+                foreach (dynamic existing in sheet.ChartObjects())
+                {
+                    taken.Add(Convert.ToString(existing.Name));
+                }
+            }
+
             string name = ParamString(p, "name", null);
             if (string.IsNullOrEmpty(name))
             {
-                name = "Chart" + (Convert.ToInt32(sheet.ChartObjects().Count) + 1);
-            }
-            else
-            {
-                foreach (dynamic existing in sheet.ChartObjects())
+                int index = 1;
+                while (taken.Contains("Chart" + index))
                 {
-                    if (Convert.ToString(existing.Name) == name)
-                    {
-                        throw new InvalidOperationException("a chart named '" + name +
-                            "' already exists on sheet '" + Convert.ToString(sheet.Name) + "'");
-                    }
+                    index++;
                 }
+                name = "Chart" + index;
+            }
+            else if (taken.Contains(name))
+            {
+                throw new InvalidOperationException("a chart named '" + name +
+                    "' already exists on sheet '" + Convert.ToString(sheet.Name) + "'");
             }
 
             dynamic shape = sheet.Shapes.AddChart2(-1, xlType, anchorCell.Left, anchorCell.Top, width, height);

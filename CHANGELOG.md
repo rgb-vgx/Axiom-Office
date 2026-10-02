@@ -5,6 +5,27 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — et.addChart hỏng trên MỌI sheet chưa có biểu đồ (tên chart duy nhất theo tài liệu)
+- **Tên chart trong LibreOffice là duy nhất theo TÀI LIỆU, không theo sheet.** Guard cũ chỉ hỏi
+  `sheet.Charts.hasByName(name)` — mà sheet chưa có chart thì luôn trả về "chưa có" — nên nó cho qua rồi
+  `addNewByName` mới đụng tên và ném ra `RuntimeException: Couldn't convert <traceback object ...>`.
+- Vì tên tự sinh là `"Chart%d" % (Count+1)`, **mọi lần thêm chart trên sheet chưa có chart đều sinh ra
+  `Chart1`** — và nếu `Chart1` đã bị một sheet khác giữ thì hỏng hết.
+- **Đo được**: trên file Test 4, sheet `Sensitivity` có 0 chart và 0 hình, `Statistics` giữ `Chart1..Chart5`.
+  Thử tại chỗ: `Chart2` → hỏng, `Chart5` → hỏng, `Chart6` → được, `Chart20` → được. Trong một lượt chạy
+  thật, `et.addChart` hỏng **11 lần liên tiếp** vì lý do này, và thông báo lỗi không cho agent biết gì để sửa.
+- Nay tên được kiểm trên **cả tài liệu** (`_taken_chart_names`, gồm cả tên hình trên trang vẽ của mọi
+  sheet), và tên tự sinh nhảy qua mọi tên đã dùng. Đặt tên trùng thì báo lỗi đọc được:
+  *"a chart named 'Chart2' already exists in this workbook; chart names are unique per DOCUMENT, not per
+  sheet - pick another name"*.
+- `et.listCharts` trả thêm khoá `shapes`: tên mọi hình trên trang vẽ, để thấy được hình còn sót.
+- Bản C# (Excel/WPS) sửa một chỗ nhỏ tương ứng: tên tự sinh giờ tránh **mọi hình trên sheet**, không chỉ
+  hình là chart (`ChartObjects().Count + 1` có thể sinh đúng tên một hình không phải chart). Ở Excel tên
+  chart là duy nhất **theo sheet**, nên không cần kiểm toàn tài liệu như bản LibreOffice — khác nhau có
+  chủ ý, ghi rõ trong mã.
+- Kiểm chứng: `test_live_libreoffice.py --apps calc` **84/84** (thêm hai mục: sheet khác tự đặt tên chưa
+  dùng, và đặt tên đã dùng phải ra lỗi đọc được chứ không phải lỗi pyuno).
+
 ### Added — et.checkRange báo công thức trỏ vào ô TRỐNG
 - Thêm loại lỗi `empty-reference` cho **cả hai bridge**: một công thức trỏ vào MỘT ô đang trống thì không
   có gì báo lỗi — phép tính coi ô trống là 0 và chạy tiếp. Đây là cách một ô điều khiển "chết" mà không

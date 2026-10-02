@@ -342,8 +342,11 @@ namespace AxiomOffice.Bridge
 
         // Tham chiếu tới MỘT ô trong cú pháp Excel: có thể có tên sheet phía trước (Inputs!B34,
         // 'My Sheet'!$B$34), và có thể có $.
+        // Nhóm có tên của .NET là (?<ten>...), KHÔNG phải (?P<ten>...) như Python/PCRE. Viết sai thì regex
+        // chỉ nổ lúc CHẠY (khởi tạo static), và cả lớp CommandDispatcher không dựng được -> Host.exe chết
+        // ngay khi gọi - biên dịch vẫn xanh.
         private static readonly Regex CellReference = new Regex(
-            @"(?:(?P<sheet>'[^']+'|[A-Za-z_][A-Za-z0-9_ ]*)!)?(?P<abs1>\$?)(?P<col>[A-Za-z]{1,3})(?P<abs2>\$?)(?P<row>\d+)",
+            @"(?:(?<sheet>'[^']+'|[A-Za-z_][A-Za-z0-9_ ]*)!)?(?<abs1>\$?)(?<col>[A-Za-z]{1,3})(?<abs2>\$?)(?<row>\d+)",
             RegexOptions.Compiled);
 
         /// <summary>
