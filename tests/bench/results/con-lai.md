@@ -146,7 +146,7 @@ với ô lỗi nằm trong file** — Test 2 có 8 ô ngay trên sheet `Checks` 
 `#N/A`), Test 3 có 106 ô `#VALUE!` ở `Projects` và `Tasks`. Đây là loại lỗi mà **chính Axiom có lệnh bắt
 được** (`et.checkRange` báo `error-values`), tức đây không phải thiếu công cụ mà là **lượt chạy đã không
 soát trước khi trả bài** — và cả hai lượt đó đều dừng vì hết ngân sách. Đã đưa vào checklist của skill
-`mo-hinh-tai-chinh` ("`et.checkRange`: `issueCount` = 0").
+`mo-hinh-nhieu-sheet` ("`et.checkRange`: `issueCount` = 0").
 
 **Còn lại**: đối chiếu **từng ô** trên các sheet tất định (Inputs, Assumptions) — chỗ đó so được thật vì
 không phụ thuộc ngẫu nhiên.

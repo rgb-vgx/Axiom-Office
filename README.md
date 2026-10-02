@@ -193,7 +193,7 @@ sẵn trong prompt; model tự gọi `load_skill` khi yêu cầu khớp (pane hi
 | `bao-cao-du-lieu` | Excel | bảng số liệu: number format, công thức, hàng tổng |
 | `bao-cao-thang` | PowerPoint | slide báo cáo tháng/quý |
 | `bang-diem` | Excel | bảng điểm, điểm trung bình, xếp loại |
-| `mo-hinh-tai-chinh` | Excel | mô hình nhiều sheet (FP&A): giả định, P&L, kịch bản, độ nhạy, dashboard, sheet kiểm tra |
+| `mo-hinh-nhieu-sheet` | Excel | mô hình nhiều sheet: giả định, dự báo/kịch bản, độ nhạy, dashboard, sheet kiểm tra (tài chính, danh mục dự án, tồn kho) |
 | `van-ban-hanh-chinh` | Word | công văn, quyết định, tờ trình theo NĐ 30/2020 |
 
 `skills/_design/tokens.json` là **token thiết kế dùng chung** (màu theo ngữ nghĩa, thang chữ, number

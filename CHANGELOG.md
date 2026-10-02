@@ -14,7 +14,7 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
   **ra khỏi tay agent với ô lỗi nằm trong file** — 8 ô ngay trên sheet `Checks` (Test 2:
   `#NAME?`/`#DIV/0!`/`#VALUE!`/`#N/A`) và 106 ô `#VALUE!` (Test 3). Đây là loại lỗi mà `et.checkRange`
   bắt được (`error-values`), nên đây là lỗi **quy trình** chứ không phải thiếu công cụ; đã đưa vào
-  checklist của skill `mo-hinh-tai-chinh`.
+  checklist của skill `mo-hinh-nhieu-sheet`.
 - File do thư viện sinh (phía Claude Code) **không có kết quả lưu sẵn**, nên "0 ô lỗi" ở phía đó nghĩa
   là *không đọc được*, không phải *không có* — ghi rõ trong báo cáo để không kết luận oan.
 - **Một lỗi đo của chính tôi, do dữ liệu thật bắt được**: lần chạy đầu chỉ đếm ô công thức khi ô đó có
@@ -63,7 +63,7 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
   → thoát **mã 2** kèm hướng dẫn, không treo; `tests/lo/test_extension.py` (so registry Python với
   `Host.exe commands --json`) 19/19.
 
-### Added — skill `mo-hinh-tai-chinh`: mô hình nhiều sheet (FP&A)
+### Added — skill `mo-hinh-nhieu-sheet`: mô hình nhiều sheet (FP&A)
 - Bộ skill cũ chỉ nói về **trình bày** (bảng điểm, number format, hàng tổng). Đo được: mỗi lượt chạy
   chỉ nạp **một** skill, và với app `et` chỉ có 3 skill được chào — không skill nào nói về **mô hình**.
   Nay có skill thứ tư, và mỗi quy tắc trong đó gắn với một lỗi **đã đo trên chính mô hình do agent
@@ -78,7 +78,7 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
   - Đổi giả định rồi đọc lại là phép thử **duy nhất** phân biệt ô điều khiển sống với ô chết.
   - Điều kiện màu phải do `et.setConditionalFormat` sinh ra, không tô tay (tô tay đứng yên khi dữ liệu
     đổi).
-- `skills/mo-hinh-tai-chinh/SKILL.md`; Core nạp **8 skill, 0 lỗi** (kiểm bằng cách chạy Core trên thư
+- `skills/mo-hinh-nhieu-sheet/SKILL.md`; Core nạp **8 skill, 0 lỗi** (kiểm bằng cách chạy Core trên thư
   mục skill sạch và đọc `core.log`).
 
 ### Added — định dạng điều kiện: `et.setConditionalFormat` / `et.listConditionalFormats`

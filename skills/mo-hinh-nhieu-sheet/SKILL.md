@@ -1,16 +1,17 @@
 ---
-name: mo-hinh-tai-chinh
+name: mo-hinh-nhieu-sheet
 description: >-
-  Dựng mô hình tài chính nhiều sheet trong Excel: sheet dữ liệu thô, làm sạch, giả định (assumption),
-  P&L, dự báo theo kịch bản, phân tích độ nhạy, dashboard KPI, sheet kiểm tra PASS/FAIL. Mọi con số
-  đọc từ ô giả định, mọi sheet đề yêu cầu đều phải được dựng, và mô hình phải được KIỂM bằng cách đổi
-  giả định rồi đọc lại. Dùng khi người dùng muốn "mô hình tài chính", "FP&A", "ngân sách", "dự báo
-  doanh thu", "P&L", "phân tích độ nhạy", "kịch bản base/optimistic/pessimistic", "dashboard KPI nhiều
-  sheet", "mô phỏng Monte Carlo", "kiểm tra bảng tính". Không dùng khi chỉ cần một bảng đơn lẻ.
+  Dựng MÔ HÌNH NHIỀU SHEET trong Excel và tự soát trước khi trả bài: tách sheet dữ liệu thô / giả định /
+  tính toán / dashboard / sheet kiểm tra PASS-FAIL, mọi con số đọc từ ô giả định, mọi sheet đề yêu cầu
+  đều phải được dựng, và phải đổi một giả định rồi đọc lại mới coi là xong. Dùng cho "mô hình tài chính",
+  "FP&A", "ngân sách", "P&L", "dự báo", "phân tích độ nhạy", "kịch bản base/optimistic/pessimistic",
+  "mô phỏng Monte Carlo", "danh mục dự án / project portfolio", "quản lý tiến độ - nguồn lực - chi phí",
+  "quản lý tồn kho / tối ưu đặt hàng", "dashboard KPI", "bảng kiểm tra tài liệu". Không dùng khi chỉ cần
+  một bảng đơn lẻ hoặc chỉ cần làm đẹp một bảng đã có.
 apps: [et]
 ---
 
-# Mô hình tài chính nhiều sheet
+# Mô hình nhiều sheet
 
 Mỗi quy tắc dưới đây là một lỗi **đã đo được** trên chính mô hình do agent dựng, không phải lời khuyên
 chung. Số liệu ở `tests/bench/results/`.
