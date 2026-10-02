@@ -48,6 +48,7 @@ var liveCommands = []liveCommand{
 	{Name: "et.activateSheet", Kind: "et", Params: []liveCommandParam{{Name: "sheet", Hint: ""}}},
 	{Name: "et.readRange", Kind: "et", Params: []liveCommandParam{{Name: "range", Hint: ""}, {Name: "sheet", Hint: ""}}},
 	{Name: "et.writeRange", Kind: "et", Params: []liveCommandParam{{Name: "range", Hint: "top-left cell e.g. 'A1'"}, {Name: "values", Hint: "2D array of rows e.g. [[\"Tên\",\"Điểm\"],[\"An\",9.5]]"}, {Name: "sheet", Hint: ""}}},
+	{Name: "et.importCsv", Kind: "et", Params: []liveCommandParam{{Name: "path", Hint: "e.g. 'D:\\data\\raw.csv'"}, {Name: "range", Hint: "top-left cell; bỏ trống thì tạo sheet mới"}, {Name: "sheet", Hint: ""}, {Name: "delimiter", Hint: "một ký tự, mặc định ','"}, {Name: "encoding", Hint: "mặc định utf-8-sig"}}},
 	{Name: "et.writeRanges", Kind: "et", Params: []liveCommandParam{{Name: "writes", Hint: "array of {range, values, sheet?}"}, {Name: "sheet", Hint: ""}}},
 	{Name: "et.fillRange", Kind: "et", Params: []liveCommandParam{{Name: "range", Hint: "the whole area e.g. 'B2:H1000'"}, {Name: "formula", Hint: "written to the top-left cell first"}, {Name: "sheet", Hint: ""}}},
 	{Name: "et.formatRange", Kind: "et", Params: []liveCommandParam{{Name: "range", Hint: ""}, {Name: "bold", Hint: ""}, {Name: "italic", Hint: ""}, {Name: "fontSize", Hint: ""}, {Name: "fontColor", Hint: ""}, {Name: "fillColor", Hint: ""}, {Name: "numFmt", Hint: ""}, {Name: "horizontal", Hint: ""}, {Name: "wrap", Hint: ""}, {Name: "sheet", Hint: ""}}},

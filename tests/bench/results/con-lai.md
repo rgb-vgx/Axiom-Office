@@ -73,7 +73,7 @@ bài live kiểm đúng tính chất đó). Bằng chứng: `tests/live/test_liv
 lượt model trả lời), **không** hứa nhanh hơn về tính toán — đường tắt tính toán đã bị đo là chậm hơn
 2,3–4,0 lần và đã hoàn tác.
 
-## 4. Dữ liệu thô vẫn phải phát từng giá trị
+## 4. Dữ liệu thô vẫn phải phát từng giá trị — ĐÃ CÓ LỆNH, NHƯNG KHÔNG LẤP ĐƯỢC BÀI (02/10/2026)
 
 `et.fillRange` giải quyết phần công thức (chiếm 37–53% lời gọi ở Test 2/3/4), nhưng dữ liệu giả lập
 (Raw_Data 1.044 dòng × 26 cột ở Test 1, 50.000 SKU ở Test 2) vẫn do model phát ra từng khối giá trị.
@@ -81,8 +81,22 @@ lượt model trả lời), **không** hứa nhanh hơn về tính toán — đ�
 Claude Code đi đường khác hẳn: `gen_data.py` sinh CSV, rồi nạp vào. Bridge chưa có đường nạp từ file
 vào tài liệu đang mở.
 
-**Cần làm**: cân nhắc `et.importCsv {path, range, sheet?}`. Lưu ý đây **mở thêm một bề mặt**: đường dẫn
-file do model chọn, nên cần luật rõ về phạm vi đường dẫn được phép.
+**Đã làm**: `et.importCsv {path, range?, sheet?, delimiter?, encoding?}` cho cả hai bridge, đã vào
+catalog (64 lệnh). Không có `range` thì tạo sheet đặt tên theo tên file (trùng thì thêm số), có `range`
+thì ghi vào ô góc đó; ô trông như số thành số, **ngày để nguyên chuỗi** (không đoán — đoán sai kiểu ngày
+còn tệ hơn để người dùng tự chọn). Bằng chứng: `tests/live/test_live_libreoffice.py` phần Calc
+**162/162**, gồm chữ có dấu, mã dạng chuỗi, ô trống, số âm, và ca `2025-01-15` phải ở lại là CHUỖI.
+
+**Về bề mặt đường dẫn**: không phải bề mặt mới. Bridge **đã có** `et.open`, `et.saveAs`, `et.exportPdf`
+và bộ tool file MCP — đều nhận đường dẫn do model chọn, và model vốn đã đọc được nội dung bất kỳ file
+nào bằng `et.open` + `et.readRange`. Lệnh này gộp việc đó thành một lời gọi, không mở thêm quyền.
+
+**Và nó KHÔNG lấp được khoảng cách token của bài benchmark** — nói rõ để lần sau khỏi tưởng nhầm: dữ liệu
+giả lập (1.044 dòng × 26 cột) không nằm sẵn trong file nào. Claude Code tự **sinh** nó bằng `gen_data.py`
+(agent đó có shell); agent của Axiom không có đường chạy mã, nên vẫn phải phát từng giá trị. Muốn lấp thì
+phải làm một đường **sinh dữ liệu trong tài liệu** (ví dụ `RANDBETWEEN` + `INDEX` từ sheet `Lists`), và
+đường đó có giá riêng: `RANDBETWEEN` là hàm **bay hơi**, mỗi lần tính lại là dữ liệu đổi, mà đề lại yêu cầu
+"preserve the original raw data".
 
 ## 5. Chưa đối chiếu nội dung, mới so được cấu trúc
 

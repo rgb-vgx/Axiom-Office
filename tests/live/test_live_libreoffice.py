@@ -327,6 +327,34 @@ def test_calc(b, out):
           "Calc writeRanges kiểm hết trước khi ghi (vùng đầu không bị ghi khi vùng sau sai)", "")
     b.cmd("et.writeRanges", {"sheet": "Sheet1"}, expect_ok=False, key="et.writeRanges thiếu writes")
 
+    # Nạp dữ liệu thô từ FILE: không có lệnh này thì cách duy nhất là bắt model phát từng giá trị qua
+    # writeRange, tức là trả bằng token cho dữ liệu (1.044 dòng x 26 cột ở Test 1).
+    raw = os.path.join(out, "raw-data.csv")
+    with open(raw, "w", encoding="utf-8", newline="") as handle:
+        handle.write("Vùng,Mã,Số lượng,Đơn giá,Ghi chú\n")
+        handle.write("Bắc,SP-001,12,1500.5,\n")
+        handle.write("Nam,SP-002,0,-2,\n")
+        handle.write("Đông,SP-003,7,2025-01-15,ngày để nguyên chuỗi\n")
+    loaded = b.cmd("et.importCsv", {"path": raw}) or {}
+    check(loaded.get("rows") == 4 and loaded.get("columns") == 5 and loaded.get("sheet") == "raw-data",
+          "Calc importCsv nạp file vào sheet mới đặt tên theo tên file", loaded)
+    grid = (b.cmd("et.readRange", {"range": "A1:E4", "sheet": "raw-data"}, record=False) or {}).get("values") or []
+    check(grid and grid[0][0] == "Vùng" and grid[1][1] == "SP-001",
+          "Calc importCsv giữ được chữ có dấu và mã dạng chuỗi", grid[:2])
+    check(grid[1][2] == 12 and grid[1][3] == 1500.5 and grid[2][3] == -2,
+          "Calc importCsv đọc ô số thành SỐ (không phải chuỗi)", grid[1:3])
+    check(grid[1][4] in (None, ""), "Calc importCsv để ô trống là ô trống", grid[1])
+    check(grid[3][3] == "2025-01-15", "Calc importCsv KHÔNG tự đoán ngày (giữ nguyên chuỗi)", grid[3])
+    # Tên file trùng thì thêm số, không đè lên sheet đang có.
+    again_load = b.cmd("et.importCsv", {"path": raw}) or {}
+    check(again_load.get("sheet") == "raw-data 2", "Calc importCsv tên sheet trùng thì thêm số", again_load)
+    into = b.cmd("et.importCsv", {"path": raw, "sheet": "Sheet1", "range": "AK1"}) or {}
+    check(into.get("sheet") == "Sheet1" and
+          (b.cmd("et.readRange", {"range": "AK1", "sheet": "Sheet1"}, record=False) or {}).get("values", [[None]])[0][0] == "Vùng",
+          "Calc importCsv có `range` thì ghi vào sheet đang có", into)
+    b.cmd("et.importCsv", {"path": os.path.join(out, "khong-co.csv")}, expect_ok=False, key="et.importCsv file thiếu")
+    b.cmd("et.importCsv", {}, expect_ok=False, key="et.importCsv thiếu path")
+
     # Công thức trỏ vào ô TRỐNG: không có gì báo lỗi, phép tính coi ô trống là 0. Đây là cách một ô điều
     # khiển "chết" mà không ai biết (xem tests/bench/results/test4-dung-sai.md).
     b.cmd("et.writeRange", {"range": "Z1:AA2", "sheet": "Sheet1",

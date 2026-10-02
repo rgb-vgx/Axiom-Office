@@ -23,6 +23,10 @@ namespace AxiomOffice.Bridge
                 Command("et.readRange", "et", EtReadRange, "Đọc vùng, ví dụ `A1:C10`", Req("range"), Opt("sheet")).ForAgent(),
                 Command("et.writeRange", "et", EtWriteRange, "Ghi vùng bắt đầu từ ô trên-trái `range`",
                     Req("range", "top-left cell e.g. 'A1'"), Req("values", "2D array of rows e.g. [[\"Tên\",\"Điểm\"],[\"An\",9.5]]"), Opt("sheet")).ForAgent(),
+                Command("et.importCsv", "et", EtImportCsv,
+                    "Nạp một file CSV vào sổ: không có `range` thì tạo sheet mới đặt tên theo tên file, có `range` thì ghi vào ô góc đó",
+                    Req("path", "e.g. 'D:\\data\\raw.csv'"), Opt("range", "top-left cell; bỏ trống thì tạo sheet mới"),
+                    Opt("sheet"), Opt("delimiter", "một ký tự, mặc định ','"), Opt("encoding", "mặc định utf-8-sig")).ForAgent(),
                 Command("et.writeRanges", "et", EtWriteRanges,
                     "Ghi NHIỀU vùng trong MỘT lời gọi: `writes` là mảng {range, values, sheet?}. Dùng khi cần viết nhiều khối trong cùng một phản hồi (bớt vòng qua bridge). Kiểm hết tham số trước khi ghi: một vùng sai thì không vùng nào được ghi",
                     Req("writes", "array of {range, values, sheet?}"), Opt("sheet")).ForAgent(),
@@ -242,6 +246,99 @@ namespace AxiomOffice.Bridge
                 output["formulaErrors"] = errors;
             }
             return output;
+        }
+
+        // Nạp CSV vào sổ: mở file bằng chính Excel (nó phân tích CSV tốt hơn ta tự viết), copy vùng đã
+        // dùng sang đích, rồi đóng file nguồn KHÔNG lưu. Cách này giữ nguyên kiểu số/ngày như Excel đọc.
+        private static Dictionary<string, object> EtImportCsv(IAppHost host, Dictionary<string, object> p)
+        {
+            string path = ParamString(p, "path", null);
+            if (string.IsNullOrEmpty(path))
+            {
+                throw new InvalidOperationException("'path' is required: the .csv file to read");
+            }
+            if (!System.IO.File.Exists(path))
+            {
+                throw new InvalidOperationException(string.Format("no file at '{0}'", path));
+            }
+            dynamic app = host.Application;
+            dynamic wb = EnsureWorkbook(app);
+            string sheetName = ParamString(p, "sheet", null);
+            string address = ParamString(p, "range", null);
+
+            dynamic source = null;
+            try
+            {
+                source = app.Workbooks.Open(path, Type.Missing, true);   // ReadOnly
+                dynamic sourceSheet = source.Worksheets[1];
+                dynamic used = sourceSheet.UsedRange;
+                int rows = Convert.ToInt32(used.Rows.Count);
+                int columns = Convert.ToInt32(used.Columns.Count);
+
+                dynamic sheet;
+                if (!string.IsNullOrEmpty(address))
+                {
+                    sheet = string.IsNullOrEmpty(sheetName) ? wb.ActiveSheet : wb.Worksheets[sheetName];
+                }
+                else
+                {
+                    wb.Worksheets.Add(Type.Missing, wb.Worksheets[wb.Worksheets.Count]);
+                    sheet = wb.Worksheets[wb.Worksheets.Count];
+                    sheet.Name = SheetNameFromPath(path, wb);
+                }
+                dynamic destination = string.IsNullOrEmpty(address) ? sheet.Cells[1, 1] : sheet.Range[address];
+                used.Copy(destination);
+                return new Dictionary<string, object>
+                {
+                    { "path", path }, { "sheet", Convert.ToString(sheet.Name) },
+                    { "rows", rows }, { "columns", columns }, { "cells", rows * columns }
+                };
+            }
+            finally
+            {
+                if (source != null)
+                {
+                    try
+                    {
+                        source.Close(false);
+                    }
+                    catch (Exception)
+                    {
+                    }
+                }
+            }
+        }
+
+        // Tên sheet tối đa 31 ký tự, không được trùng và không được chứa []*?/\:
+        private static string SheetNameFromPath(string path, dynamic workbook)
+        {
+            string name = System.IO.Path.GetFileNameWithoutExtension(path);
+            foreach (char bad in new[] { '[', ']', '*', '?', '/', '\\', ':' })
+            {
+                name = name.Replace(bad, '_');
+            }
+            if (name.Length > 31)
+            {
+                name = name.Substring(0, 31);
+            }
+            if (name.Length == 0)
+            {
+                name = "Import";
+            }
+            var taken = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (dynamic existing in workbook.Worksheets)
+            {
+                taken.Add(Convert.ToString(existing.Name));
+            }
+            string candidate = name;
+            int suffix = 2;
+            while (taken.Contains(candidate))
+            {
+                string tail = " " + suffix;
+                candidate = (name.Length + tail.Length > 31 ? name.Substring(0, 31 - tail.Length) : name) + tail;
+                suffix++;
+            }
+            return candidate;
         }
 
         private static Dictionary<string, object> EtFillRange(IAppHost host, Dictionary<string, object> p)

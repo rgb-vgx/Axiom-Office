@@ -442,6 +442,32 @@
     ]
   },
   {
+    "name": "et.importCsv",
+    "kind": "et",
+    "params": [
+      {
+        "name": "path",
+        "hint": "e.g. 'D:\\data\\raw.csv'"
+      },
+      {
+        "name": "range",
+        "hint": "top-left cell; bỏ trống thì tạo sheet mới"
+      },
+      {
+        "name": "sheet",
+        "hint": null
+      },
+      {
+        "name": "delimiter",
+        "hint": "một ký tự, mặc định ','"
+      },
+      {
+        "name": "encoding",
+        "hint": "mặc định utf-8-sig"
+      }
+    ]
+  },
+  {
     "name": "et.writeRanges",
     "kind": "et",
     "params": [

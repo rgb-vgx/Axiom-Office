@@ -4,7 +4,10 @@ Khac Excel mot diem: LibreOffice hoan tac duoc bang undo manager nen et.undo la 
 """
 from __future__ import annotations
 
+import csv
 import hashlib
+import os
+import re
 
 import uno
 
@@ -335,6 +338,96 @@ def write_ranges(env, params):
     if errors:
         out["formulaErrors"] = errors
     return out
+
+
+CSV_MAX_CELLS = 500000        # tran an toan: file that vai chuc nghin dong la binh thuong, file loi thi khong treo LibreOffice
+_INT_TEXT = re.compile(r"^[+-]?\d{1,15}$")
+_FLOAT_TEXT = re.compile(r"^[+-]?(\d+\.\d*|\.\d+|\d+)([eE][+-]?\d+)?$")
+
+
+def _csv_cell(text: str):
+    """Chuoi CSV -> so khi that su la so, con lai giu nguyen chuoi.
+
+    Doan kieu CHI o muc so/khong-so, va bang khuon dang chu khong bang float() (float() nhan ca 'nan',
+    'inf' — do la chu, khong phai so). Khong doan ngay: '2025-01-15' de nguyen la chuoi, vi doan sai kieu
+    ngay con te hon la de nguoi dung tu chon dinh dang. O trong -> chuoi rong (khong phai None, vi
+    setDataArray voi None lam LibreOffice ghi #N/A vao o).
+    """
+    stripped = text.strip()
+    if not stripped:
+        return ""
+    if _INT_TEXT.match(stripped):
+        return int(stripped)
+    if _FLOAT_TEXT.match(stripped):
+        return float(stripped)
+    return text
+
+
+def import_csv(env, params):
+    """Nạp một file CSV vào sổ đang mở.
+
+    Vì sao cần: dữ liệu thô của người dùng (và của bộ benchmark: 1.044 dòng x 26 cột) nằm trong FILE.
+    Bắt model phát từng giá trị qua `et.writeRange` là trả bằng token cho dữ liệu — không có lệnh này
+    thì đường duy nhất là như vậy.
+
+    Không có `range` thì tạo sheet mới đặt tên theo tên file; có `range` thì ghi vào ô góc đó của
+    sheet chỉ định. Ô được ghi bằng `setDataArray` theo lô (một lời gọi cho cả khối) thay vì từng ô.
+    """
+    path = values.string(params, "path")
+    if not path:
+        raise values.ParamError("'path' is required: the .csv file to read, e.g. 'D:\\\\data\\\\raw.csv'")
+    if not os.path.exists(path):
+        raise values.ParamError("no file at '%s'" % path)
+    delimiter = values.string(params, "delimiter") or ","
+    if len(delimiter) != 1:
+        raise values.ParamError("'delimiter' must be a single character, got '%s'" % delimiter)
+    encoding = values.string(params, "encoding") or "utf-8-sig"
+
+    rows = []
+    try:
+        with open(path, "r", encoding=encoding, errors="replace", newline="") as handle:
+            for index, row in enumerate(csv.reader(handle, delimiter=delimiter)):
+                if index >= CSV_MAX_CELLS:
+                    raise values.ParamError("'%s' has more than %d rows; split it first" % (path, CSV_MAX_CELLS))
+                rows.append(row)
+    except UnicodeError as failure:
+        raise values.ParamError("cannot read '%s' as %s: %s (try encoding='cp1258')" % (path, encoding, failure))
+    if not rows:
+        return {"path": path, "rows": 0, "columns": 0, "sheet": None}
+
+    width = max(len(row) for row in rows)
+    if len(rows) * width > CSV_MAX_CELLS:
+        raise values.ParamError("'%s' has %d cells; the limit is %d" % (path, len(rows) * width, CSV_MAX_CELLS))
+
+    doc = env.document
+    sheets = _ensure_sheet(doc)
+    address = values.string(params, "range")
+    if address:
+        sheet = _sheet(doc, params)
+    else:
+        # Ten sheet toi da 31 ky tu; trung thi them so, khong thi bao loi - nguoi dung chi xin "nap file".
+        base = re.sub(r"[\[\]\*\?/\\:]", "_", os.path.splitext(os.path.basename(path))[0])[:31] or "Import"
+        existing = list(sheets.getElementNames())
+        name = base
+        suffix = 2
+        while name in existing:
+            tail = " %d" % suffix
+            name = base[: 31 - len(tail)] + tail
+            suffix += 1
+        sheets.insertNewByName(name, sheets.Count)
+        sheet = sheets.getByName(name)
+        address = "A1"
+
+    top_left = _range(sheet, address)
+    start_col, start_row = top_left.RangeAddress.StartColumn, top_left.RangeAddress.StartRow
+    target = sheet.getCellRangeByPosition(start_col, start_row, start_col + width - 1,
+                                          start_row + len(rows) - 1)
+    # setDataArray: mot loi goi cho ca khoi. write_range ghi tung o vi `values` cua no co the chua None
+    # (None -> #N/A); o day o trong da thanh chuoi rong nen khong co ca do.
+    block = tuple(tuple(_csv_cell(text) for text in (row + [""] * (width - len(row)))) for row in rows)
+    target.setDataArray(block)
+    return {"path": path, "sheet": sheet.Name, "range": _cell_address(start_col, start_row, 0, 0),
+            "rows": len(rows), "columns": width, "cells": len(rows) * width}
 
 
 def fill_range(env, params):
@@ -810,6 +903,12 @@ command("et.writeRange", "et", write_range,
         "Ghi vùng từ ô góc trên-trái; `values` là mảng 2 chiều. Công thức viết theo cú pháp en-US "
         "(dấu phẩy); nếu máy dùng dấu chấm phẩy thì tự đổi. Công thức còn lỗi trả về ở `formulaErrors`",
         req("range", "top-left cell e.g. 'A1'"), req("values", "2D array of rows e.g. [[\"Tên\",\"Điểm\"],[\"An\",9.5]]"), opt("sheet"),
+        agent=True, undo=True)
+command("et.importCsv", "et", import_csv,
+        "Nạp một file CSV vào sổ: không có `range` thì tạo sheet mới đặt tên theo tên file, có `range` "
+        "thì ghi vào ô góc đó. Ô trông như số thì thành số, còn lại là chuỗi; ngày để nguyên chuỗi",
+        req("path", "e.g. 'D:\\data\\raw.csv'"), opt("range", "top-left cell; bỏ trống thì tạo sheet mới"),
+        opt("sheet"), opt("delimiter", "một ký tự, mặc định ','"), opt("encoding", "mặc định utf-8-sig"),
         agent=True, undo=True)
 command("et.writeRanges", "et", write_ranges,
         "Ghi NHIỀU vùng trong MỘT lời gọi: `writes` là mảng {range, values, sheet?}. Dùng khi cần viết "

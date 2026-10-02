@@ -5,6 +5,21 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — `et.importCsv`: nạp dữ liệu từ file vào sổ đang mở
+- `path` (bắt buộc), `range?`, `sheet?`, `delimiter?`, `encoding?`. Không có `range` thì tạo sheet mới
+  đặt tên theo tên file (trùng thì thêm số), có `range` thì ghi vào ô góc đó của sheet chỉ định.
+- Ô trông như số thì thành **số**, còn lại là chuỗi; **ngày để nguyên chuỗi** — đoán sai kiểu ngày còn
+  tệ hơn để người dùng tự chọn định dạng. Khuôn dạng số được nhận bằng regex chứ không bằng `float()`
+  (`float()` nhận cả `nan`/`inf`, đó là chữ không phải số).
+- Ghi bằng `setDataArray` theo lô (một lời gọi cho cả khối) thay vì từng ô; trần 500.000 ô để một file
+  lỗi không treo LibreOffice.
+- Có ở cả hai bridge, vào `catalog/live-commands.json` (64 lệnh).
+- **Điều nó KHÔNG làm**: không lấp được khoảng cách token của benchmark — dữ liệu giả lập không nằm sẵn
+  trong file nào, mà agent của Axiom không có đường chạy mã để tự sinh (Claude Code có shell và
+  `gen_data.py`). Ghi rõ ở `tests/bench/results/con-lai.md` để lần sau khỏi tưởng nhầm.
+- Kiểm chứng: `tests/live/test_live_libreoffice.py` phần Calc **162/162** (gồm chữ có dấu, mã dạng
+  chuỗi, ô trống, số âm, và ca `2025-01-15` phải ở lại là CHUỖI), `tests/lo/test_extension.py` 19/19.
+
 ### Added — `et.writeRanges`: ghi nhiều vùng trong một lời gọi
 - Đo được ở Test 2/3/4: model hay gọi 5–10 `et.writeRange` liên tiếp trong **cùng một phản hồi**; mỗi
   lời gọi là một vòng qua bridge (HTTP + gate + một lượt model trả lời). `writes` là mảng
