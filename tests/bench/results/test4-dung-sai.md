@@ -149,6 +149,52 @@ khiển **sống** — ngang chất lượng file của Claude Code ở khía c�
 Kết luận có bằng chứng: **một câu trong system prompt không đủ.** Cơ chế bắt lỗi phải chạy **trong lúc
 dựng bài**, không phải chỉ khi model tự tuyên bố xong — vì ở bài lớn nó không bao giờ tuyên bố xong.
 
+## Lượt thứ tư: lần đầu "ALL CHECKS PASS" là SỰ THẬT
+
+Chạy lại Test 4 với `et.checkRange` mới (17:17 → 18:09, 52 phút, ngân sách 1M, trần 1000 vòng):
+**hoàn thành** — 204 vòng, 532 tool call, **`verified=True`** (bước kiểm chứng đã chạy, lần đầu tiên).
+
+```
+Inputs 25 | Assumptions 71/18 | Distributions 48/141 | Simulation 10.001/310.000
+Statistics 97/344 (6 chart) | Sensitivity 24/102 (2 chart) | Dashboard 44/88 (4 chart) | Checks 32/53
+Checks: 21 dinh nghia, 21 PASS, 0 FAIL, "ALL CHECKS PASS"
+```
+
+**Tôi tự kiểm chứng, không tin lời kể:**
+
+| Lời agent nói | Tôi kiểm bằng gì | Kết quả |
+|---|---|---|
+| "Inputs live (… Seed … validated)" | quét công thức: `Inputs.$B$18` được 2 công thức đọc, một trong đó là công thức kiểm tra tính hợp lệ | đúng |
+| "Base values restored exactly (fingerprints match)" | đổi `Inputs!B18` 12.345 → 999: giá trị `Simulation!C2:I2` đổi; trả về thì khớp **chính xác** | đúng |
+| "21/21 checks PASS" | đọc `Checks!A27:B32` trên tài liệu đang mở | đúng |
+
+Và check #20 của nó kiểm **đúng ô**: `=([Inputs.$B$18]>0)*([Inputs.$B$18]=ROUND([Inputs.$B$18];0))` — so với
+lượt hỏng đầu tiên, check #15 kiểm `Inputs.$C$22` là **chữ** `"integer"`. Check #21 còn **đối chiếu
+chéo** `Distributions.$B$24` với `Simulation.$B$2` — đúng loại kiểm tra bắt được lỗi nối dây.
+
+Đây là mức tốt nhất từ trước tới giờ cho Test 4, và là lần đầu tiên ba tầng khớp nhau: **workbook tự báo
+PASS, phép thử độc lập của tôi xác nhận, và ô điều khiển thật sự sống.**
+
+### Nhưng vẫn không được quy cho cơ chế mới
+
+Agent gọi `et.checkRange` **2 lần, vào `Dashboard` và `Checks` — không lần nào vào `Simulation`**, nơi
+có chuyện seed. Nên cảnh báo `empty-reference` chưa có dịp bắn trên đúng sheet. Và lượt `test4verify`
+trước đó cũng đã nối seed đúng dù **không** tới được bước kiểm chứng.
+
+Bảng bốn lượt:
+
+| Lượt | Seed nối đúng? | Kiểm chứng chạy? | checkRange vào Simulation? |
+|---|---|---|---|
+| `test4wide` | KHÔNG | có | (chưa có phép soi) |
+| `test4try` | KHÔNG | không | không |
+| `test4verify` | CÓ | không | không |
+| `test4final` | CÓ | **có** | không |
+
+Hai lượt cuối đúng, hai lượt đầu sai. **Chưa đủ để nói cái gì làm nó đúng** — có thể là dao động, có thể
+là bước kiểm chứng (lượt cuối là lượt duy nhất nó chạy), có thể cả hai. Điều chứng minh được chỉ là:
+**phép soi bắn đúng trên file có lỗi** (`Simulation!B3 -> Inputs!C25 (trống)`), còn việc nó có đổi hành vi
+của agent hay không thì cần một lượt nữa mà agent chịu gọi `checkRange` trên sheet có vấn đề.
+
 ## Còn lại, chưa làm
 
 - **Chưa soát giá trị của Test 2 và Test 3** (Inventory 50.000 SKU, PPM 5.000 task) — mới làm Test 1 và
