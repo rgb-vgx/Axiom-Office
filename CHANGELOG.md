@@ -5,6 +5,24 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — metric A/B trong harness + `PlanRule`: chốt roadmap hiệu năng (bước 0/1)
+- `tests/bench/run_prompt.py` in dòng `METRIC` cuối mỗi lượt chạy, lấy ngay từ sự kiện SSE (không đụng
+  Core): `billable_in`/`billable_out`/`billable` tách riêng (input − cache + output), `cache_hit`,
+  `by_tool` (histogram từng lệnh), `reads`/`dup_reads`/`dup_ratio` (đọc lặp — chỉ là dưới chuẩn vì
+  `paramsPreview` cắt 200 ký tự, dùng để soi không để kết án), `failures`/`repeat_fail_max`,
+  `time_to_first_check_ok`, `wall`. Nhờ vậy mỗi lần chạy A/B đều có số để so mà không mở log SSE đếm tay.
+- `PlanRule` mới trong `core-go/internal/agent/prompt.go` (nối giữa `ReconRule` và `CheckRule`, giữ thứ tự
+  `Build` để tiền tố cache 93–98% còn nguyên): lập kế hoạch **MỘT lần** trước lệnh đầu (sheet → nguồn →
+  `fillRange` → check), chỉ re-plan khi tiền đề sai hoặc check hỏng; **đọc để làm tiếp, không đọc để yên
+  tâm** — vùng hơn vài trăm dòng chỉ đọc mẫu đầu/cuối + kích thước. Số đo buộc quy tắc này: Test 1 đốt
+  18/25 vòng đầu vào thí nghiệm công thức nhỏ; lượt Test 4 rộng gọi `et.readRange` 174 lần.
+- Skill `mo-hinh-nhieu-sheet`: thêm quy tắc 9–10 (plan-then-fill, đọc-làm-tiếp) và 2 gạch checklist,
+  mỗi quy tắc kèm con số đo. Kiểm chứng: Core thật nạp lại thư mục skill của repo —
+  `skills loaded: 8 ok, 0 error(s)`, `GET /v1/skills?app=et` trả về skill này.
+- Hai bước này là phần đầu của **roadmap hiệu năng** — ghi ở `tests/bench/results/con-lai.md` mục 7,
+  gồm thiết kế bước 2 (response-shape) và bước 3 (sinh dữ liệu bằng công thức tất định) + danh sách
+  KHÔNG làm (tăng budget, concurrency bridge, tắt auto-calc, prompt động, LLM planner thứ hai).
+
 ### Added — `tests/bench/compare_values.py`: đối chiếu GIÁ TRỊ, không chỉ cấu trúc
 - Bốn báo cáo trước chỉ so tên sheet / số ô công thức / số chart, mà đề chấm bằng *"kết quả phải đúng về
   dữ liệu, công thức, logic nghiệp vụ"*. Công cụ này đọc **giá trị đã lưu** của cả hai file (`.ods` đổi

@@ -165,3 +165,52 @@ Lý do: kích thước phản hồi của model dao động rất mạnh giữa 
 **Đã sửa**: `run_prompt.py` nay mặc định **1.000.000** (trước 400.000), kèm lý do và số đo ngay trong
 chú thích để lần sau không ai hạ xuống lại. Vẫn truyền được số khác qua tham số thứ 8 khi muốn đo
 "xong trong bao nhiêu token" — tách hai câu hỏi *có xong không* và *tốn bao nhiêu*.
+
+## 7. Roadmap hiệu năng — tư vấn ngoài + chỉnh cho repo (02/10/2026)
+
+Đã xin tư vấn từ AI ngoài về "hướng cải tiến hiệu năng" (toàn văn câu hỏi + trả lời lưu ở ngoài repo —
+hỏi gì thì xem transcript phiên 02/10/2026). AI đề xuất 3 ưu tiên theo thứ tự: (1) plan-then-fill,
+(2) vertical slice + checkpoint, (3) sinh dữ liệu tất định trong bridge. Đánh giá của tôi:
+
+- Thứ tự đúng, danh sách NOT-do đúng hết (nhất là 3 cái repo đã đổ máu: tắt auto-calc chậm 2,3–4×,
+  chạy song song mất tài liệu, phá prompt ổn định mất cache 93–98%).
+- Nhưng bê nguyên thì over-engineering: manifest + state machine Go (`PlannedOperation`,
+  PENDING→VALIDATED) là vội — model flash viết plan JSON dài dễ stale, plan nằm trong context tự
+  thành gánh token. Làm kỷ luật plan bằng chữ (skill + prompt) trước, chưa cần struct Go.
+- Response-shape limit bị AI xếp thấp oan: `turns` trong `model/agent.go` append nguyên xi mọi tool
+  result suốt lượt, Test 4 rộng có 174 `readRange`. Đây mới là món rẻ nhất sau plan.
+- Trước native generator (Python UNO + C# COM, 2 nền tảng) còn một nấc rẻ hơn: sinh dữ liệu bằng
+  công thức tất định (`fillRange` + `ROW()`/`MOD()`/`INDEX`), không sửa bridge nào.
+
+Thứ tự làm đã chỉnh cho repo (rẻ trước, đắt sau; mỗi bước đo A/B rồi mới sang bước sau):
+
+**Bước 0 — metric A/B trong harness (ĐÃ LÀM, 02/10/2026)**: `run_prompt.py` in thêm dòng `METRIC`:
+`billable_in`/`billable_out`/`billable` riêng (input − cache + output), `cache_hit`, `by_tool`
+(histogram từng action), `reads`/`dup_reads`/`dup_ratio` (phát hiện đọc lại vùng chưa đổi —
+paramsPreview bị cắt 200 ký tự nên chỉ là giới hạn dưới, dùng để soi chứ không để kết án),
+`failures`/`repeat_fail_max`, `time_to_first_check_ok`, `wall`. Chỉ đếm từ SSE, không đụng Core.
+Quy ước A/B: cùng model/skill/prompt, chạy tuần tự, mỗi biến thể ≥ 3 lần, báo median + min–max;
+Test 2 iterate ở 1k/10k dòng, chỉ confirm full 50k khi đã xong. Tiêu chí pass: billable ↓, wall ↓,
+coverage + `checkRange` giữ nguyên; cache-hit tụt mạnh → điều tra; nhanh hơn mà lỗi tăng → loại.
+
+**Bước 1 — kỷ luật plan + vertical slice bằng chữ (ĐÃ LÀM, 02/10/2026)**: `PlanRule` mới trong
+`core-go/internal/agent/prompt.go` (plan MỘT lần trước lệnh đầu, chỉ re-plan khi tiền đề sai hoặc
+check hỏng; đọc để làm tiếp chứ không đọc để yên tâm; vùng > vài trăm dòng chỉ đọc mẫu đầu/cuối +
+kích thước) + quy tắc 9–10 và 2 gạch checklist trong `skills/mo-hinh-nhieu-sheet/SKILL.md`.
+Không đụng vòng lặp provider, không đụng bridge, thứ tự `Build` giữ nguyên nên cache còn nguyên.
+A/B đầu tiên nên chạy Test 3 (bài nát nhất: 4/14 sheet, 9 sheet TRỐNG): metric là rounds,
+billable out, số sheet có nội dung, `issueCount`.
+
+**Bước 2 — chặn response phình (CHƯA LÀM)**: cắt `readRange`/`checkRange` trả về ở wrapper Go
+(mẫu giới hạn + `truncated`/`totalRows`/`nextRange), **nhưng luôn trả đủ `issueCount` và tổng lỗi** —
+cắt chi tiết được, giấu số lỗi thì không. Làm ở Go trước (một nền tảng, rẻ), chỉ đụng `calc.py`/
+`gate.py` nếu wrapper không đủ. Đo billable input, số lần đọc lại, coverage có giữ không.
+
+**Bước 3 — sinh dữ liệu bằng công thức tất định (CHƯA LÀM)**: recipe trong skill — seed cố định +
+`MOD(ROW()*…,…)` + `INDEX(Lists)`, recalc ra số y hệt (không bay hơi như `RANDBETWEEN`, giữ được
+"preserve raw data"). Đo 1k → 10k → 50k: output token, giờ sinh/ghi/tính riêng, hash 2 lần chạy có
+khớp không. Chỉ khi cách này không đạt phân phối đề yêu cầu mới prototype native generator bên
+LibreOffice trước, Windows sau.
+
+**Không làm**: tăng budget/round-cap để "xong cho rồi", concurrency bridge, tắt auto-calc (đã đo
+là sai), prompt động mất cache, thêm LLM planner thứ hai.
