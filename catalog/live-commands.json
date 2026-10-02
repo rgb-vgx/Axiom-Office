@@ -442,6 +442,20 @@
     ]
   },
   {
+    "name": "et.writeRanges",
+    "kind": "et",
+    "params": [
+      {
+        "name": "writes",
+        "hint": "array of {range, values, sheet?}"
+      },
+      {
+        "name": "sheet",
+        "hint": null
+      }
+    ]
+  },
+  {
     "name": "et.fillRange",
     "kind": "et",
     "params": [

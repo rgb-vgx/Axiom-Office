@@ -23,6 +23,9 @@ namespace AxiomOffice.Bridge
                 Command("et.readRange", "et", EtReadRange, "Đọc vùng, ví dụ `A1:C10`", Req("range"), Opt("sheet")).ForAgent(),
                 Command("et.writeRange", "et", EtWriteRange, "Ghi vùng bắt đầu từ ô trên-trái `range`",
                     Req("range", "top-left cell e.g. 'A1'"), Req("values", "2D array of rows e.g. [[\"Tên\",\"Điểm\"],[\"An\",9.5]]"), Opt("sheet")).ForAgent(),
+                Command("et.writeRanges", "et", EtWriteRanges,
+                    "Ghi NHIỀU vùng trong MỘT lời gọi: `writes` là mảng {range, values, sheet?}. Dùng khi cần viết nhiều khối trong cùng một phản hồi (bớt vòng qua bridge). Kiểm hết tham số trước khi ghi: một vùng sai thì không vùng nào được ghi",
+                    Req("writes", "array of {range, values, sheet?}"), Opt("sheet")).ForAgent(),
                 Command("et.fillRange", "et", EtFillRange,
                     "Viết MỘT công thức vào ô góc trên-trái của `range` rồi điền ra cả vùng, tham chiếu tương đối tự dịch (dùng cho bảng nghìn dòng: đừng gửi từng ô)",
                     Req("range", "the whole area e.g. 'B2:H1000'"), Opt("formula", "written to the top-left cell first"), Opt("sheet")).ForAgent(),
@@ -170,6 +173,77 @@ namespace AxiomOffice.Bridge
         // Viết MỘT công thức vào ô góc rồi điền ra cả vùng (AutoFill của Excel tự dịch tham chiếu tương
         // đối, và làm được cả khối 2D trong một lần). Chi phí token của agent tính theo TỪNG Ô nó viết
         // ra, nên bảng nghìn dòng phải đi bằng đường này chứ không gửi từng ô.
+        // Ghi NHIỀU vùng trong MỘT lời gọi: model hay gọi 5–10 et.writeRange liên tiếp trong cùng một
+        // phản hồi, mỗi lời gọi là một vòng qua bridge. Gộp lại bớt từng ấy vòng; không đổi cách Excel
+        // tính lại (đo trên LibreOffice: tắt tính tự động rồi tính một lần thì CHẬM hơn 2,3–4,0 lần).
+        private static Dictionary<string, object> EtWriteRanges(IAppHost host, Dictionary<string, object> p)
+        {
+            List<Dictionary<string, object>> writes = ParamObjects(p, "writes");
+            if (writes == null || writes.Count == 0)
+            {
+                throw new InvalidOperationException("'writes' is required: a list of {range, values, sheet?}, "
+                    + "e.g. [{\"range\": \"A1\", \"values\": [[\"Tên\"]]}, {\"range\": \"B2\", \"values\": [[1, 2]]}]");
+            }
+            // Kiểm HẾT trước khi ghi: vùng thứ ba sai thì hai vùng đầu không được vào file.
+            for (int i = 0; i < writes.Count; i++)
+            {
+                if (string.IsNullOrEmpty(ParamString(writes[i], "range", null)))
+                {
+                    throw new InvalidOperationException(string.Format(
+                        "'writes[{0}]' needs 'range' (the top-left cell to write at)", i));
+                }
+                if (ParamMatrix(writes[i], "values", false) == null)
+                {
+                    throw new InvalidOperationException(string.Format("'writes[{0}]' needs 'values'", i));
+                }
+            }
+
+            int written = 0;
+            var sheets = new List<string>();
+            var errors = new List<object>();
+            foreach (Dictionary<string, object> item in writes)
+            {
+                Dictionary<string, object> result = EtWriteRange(host, item);
+                object count;
+                if (result.TryGetValue("written", out count) && count != null)
+                {
+                    written += Convert.ToInt32(count);
+                }
+                object name;
+                if (result.TryGetValue("sheet", out name) && name != null)
+                {
+                    string text = Convert.ToString(name);
+                    if (!sheets.Contains(text))
+                    {
+                        sheets.Add(text);
+                    }
+                }
+                object problems;
+                if (result.TryGetValue("formulaErrors", out problems))
+                {
+                    var list = problems as IEnumerable;
+                    if (list != null)
+                    {
+                        foreach (object problem in list)
+                        {
+                            errors.Add(problem);
+                        }
+                    }
+                }
+            }
+            sheets.Sort(StringComparer.Ordinal);
+
+            var output = new Dictionary<string, object>
+            {
+                { "ranges", writes.Count }, { "written", written }, { "sheets", sheets }
+            };
+            if (errors.Count > 0)
+            {
+                output["formulaErrors"] = errors;
+            }
+            return output;
+        }
+
         private static Dictionary<string, object> EtFillRange(IAppHost host, Dictionary<string, object> p)
         {
             string address = ParamString(p, "range", null);

@@ -306,6 +306,27 @@ def test_calc(b, out):
     check(block == [[23, 24], [24, 25]], "Calc fillRange điền được cả khối 2D", block)
     b.cmd("et.fillRange", {"sheet": "Sheet1", "formula": "=ROW()"}, expect_ok=False, key="et.fillRange thiếu range")
 
+    # Ghi NHIỀU vùng trong MỘT lời gọi: model hay gọi 5–10 et.writeRange liên tiếp trong cùng một phản
+    # hồi, mỗi lời gọi là một vòng qua bridge. Không hứa nhanh hơn về tính toán — tắt tính tự động đã đo
+    # là CHẬM hơn 2,3–4,0 lần (xem write_range trong calc.py).
+    batch = b.cmd("et.writeRanges", {"sheet": "Sheet1", "writes": [
+        {"range": "AD1", "values": [["gộp", 1], ["một", 2]]},
+        {"range": "AF1", "sheet": "ChartProbe", "values": [["khác sheet"]]}]}) or {}
+    check(batch.get("ranges") == 2 and batch.get("written") == 5,
+          "Calc writeRanges ghi 2 vùng bằng MỘT lời gọi", batch)
+    check(batch.get("sheets") == ["ChartProbe", "Sheet1"], "Calc writeRanges trả về cả hai sheet", batch)
+    check((b.cmd("et.readRange", {"range": "AD1:AE2", "sheet": "Sheet1"}, record=False) or {}).get("values", [[None]])[0][0] == "gộp",
+          "Calc writeRanges ghi đúng vùng thứ nhất", "")
+    check((b.cmd("et.readRange", {"range": "AF1", "sheet": "ChartProbe"}, record=False) or {}).get("values", [[None]])[0][0] == "khác sheet",
+          "Calc writeRanges ghi được sang sheet khác trong cùng lời gọi", "")
+    # Kiểm HẾT trước khi ghi: vùng thứ hai sai thì vùng thứ nhất CŨNG không được vào file.
+    b.cmd("et.writeRanges", {"sheet": "Sheet1", "writes": [
+        {"range": "AH1", "values": [["không được ghi"]]}, {"range": "AI1"}]}, expect_ok=False,
+        key="et.writeRanges vùng sau thiếu values")
+    check((b.cmd("et.readRange", {"range": "AH1", "sheet": "Sheet1"}, record=False) or {}).get("values", [[None]])[0][0] is None,
+          "Calc writeRanges kiểm hết trước khi ghi (vùng đầu không bị ghi khi vùng sau sai)", "")
+    b.cmd("et.writeRanges", {"sheet": "Sheet1"}, expect_ok=False, key="et.writeRanges thiếu writes")
+
     # Công thức trỏ vào ô TRỐNG: không có gì báo lỗi, phép tính coi ô trống là 0. Đây là cách một ô điều
     # khiển "chết" mà không ai biết (xem tests/bench/results/test4-dung-sai.md).
     b.cmd("et.writeRange", {"range": "Z1:AA2", "sheet": "Sheet1",

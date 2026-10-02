@@ -5,6 +5,18 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — `et.writeRanges`: ghi nhiều vùng trong một lời gọi
+- Đo được ở Test 2/3/4: model hay gọi 5–10 `et.writeRange` liên tiếp trong **cùng một phản hồi**; mỗi
+  lời gọi là một vòng qua bridge (HTTP + gate + một lượt model trả lời). `writes` là mảng
+  `{range, values, sheet?}`, ghi tuần tự, trả `ranges`/`written`/`sheets` và gom `formulaErrors`.
+- **Kiểm hết tham số trước khi ghi**: vùng thứ ba sai thì hai vùng đầu **không** được vào file — có
+  bài live kiểm đúng tính chất đó, không chỉ kiểm đường thành công.
+- **Không hứa nhanh hơn về tính toán**: đường tắt (tắt tính tự động rồi `calculateAll()` một lần) đã
+  được đo là **chậm hơn 2,3–4,0 lần** và đã hoàn tác; lệnh này chỉ gộp lời gọi.
+- Có ở cả hai bridge, vào `catalog/live-commands.json` (63 lệnh). Kiểm chứng:
+  `tests/live/test_live_libreoffice.py` phần Calc **148/148** (trước 137), `tests/lo/test_extension.py`
+  19/19.
+
 ### Removed — bản MCP server C# (10 tệp, ~5.300 dòng)
 - Xoá hẳn bản cài đặt thứ hai của cùng hợp đồng 50 tool: `McpServer`, `WordFiles`, `ExcelFiles`,
   `PptFiles`, `LiveTools`, `Cells`, `OoxmlPackage`, `XlsxBook`, `XlsxStyles`, `BridgeClient` và hai

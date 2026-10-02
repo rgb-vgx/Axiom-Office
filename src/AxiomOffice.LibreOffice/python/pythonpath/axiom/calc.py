@@ -286,6 +286,57 @@ def write_range(env, params):
     return result
 
 
+def write_ranges(env, params):
+    """Ghi NHIỀU vùng trong MỘT lời gọi: `writes` là mảng `{range, values, sheet?}`.
+
+    Vì sao cần: đo được ở Test 2/3/4, model hay gọi 5–10 `et.writeRange` liên tiếp trong **cùng một
+    phản hồi**. Mỗi lời gọi là một vòng qua bridge (HTTP + gate + một lượt model trả lời), nên gộp lại
+    bớt được từng ấy vòng.
+
+    KHÔNG hứa nhanh hơn về tính toán: tắt tính tự động rồi `calculateAll()` một lần đã được đo là CHẬM
+    hơn 2,3–4,0 lần và đã hoàn tác (xem `write_range` và tests/bench/results/test2-gaps.md). Ở đây chỉ
+    gộp lời gọi, không đụng tới cách LibreOffice tính lại.
+    """
+    writes = params.get("writes")
+    if isinstance(writes, dict):      # bridge có thể bọc một lớp, hoặc nhận một vùng đơn lẻ
+        for key in ("items", "item", "value"):
+            if key in writes:
+                writes = writes[key]
+                break
+        else:
+            writes = [writes]
+    if not isinstance(writes, list) or not writes:
+        raise values.ParamError("'writes' is required: a list of {range, values, sheet?}, e.g. "
+                                "[{\"range\": \"A1\", \"values\": [[\"Tên\"]]}, "
+                                "{\"range\": \"B2\", \"sheet\": \"P&L\", \"values\": [[1, 2]]}]")
+
+    # Kiểm HẾT trước khi ghi: vùng thứ ba sai thì hai vùng đầu không được vào file.
+    for index, item in enumerate(writes):
+        if not isinstance(item, dict):
+            raise values.ParamError("writes[%d] must be an object like {range, values}, got %s"
+                                    % (index, values.describe(item)))
+        if not values.string(item, "range"):
+            raise values.ParamError("writes[%d] needs 'range' (the top-left cell to write at)" % index)
+        values.matrix(item, "values", True)
+
+    written = 0
+    sheets = []
+    errors = []
+    for item in writes:
+        result = write_range(env, item)
+        written += int(result.get("written") or 0)
+        sheets.append(result.get("sheet"))
+        for problem in result.get("formulaErrors") or []:
+            problem = dict(problem)
+            problem["sheet"] = result.get("sheet")
+            errors.append(problem)
+
+    out = {"ranges": len(writes), "written": written, "sheets": sorted({name for name in sheets if name})}
+    if errors:
+        out["formulaErrors"] = errors
+    return out
+
+
 def fill_range(env, params):
     """Viet MOT cong thuc vao o goc roi dien ra ca vung, tham chieu tuong doi tu dich.
 
@@ -760,6 +811,12 @@ command("et.writeRange", "et", write_range,
         "(dấu phẩy); nếu máy dùng dấu chấm phẩy thì tự đổi. Công thức còn lỗi trả về ở `formulaErrors`",
         req("range", "top-left cell e.g. 'A1'"), req("values", "2D array of rows e.g. [[\"Tên\",\"Điểm\"],[\"An\",9.5]]"), opt("sheet"),
         agent=True, undo=True)
+command("et.writeRanges", "et", write_ranges,
+        "Ghi NHIỀU vùng trong MỘT lời gọi: `writes` là mảng {range, values, sheet?}. Dùng khi cần viết "
+        "nhiều khối trong cùng một phản hồi (bớt vòng qua bridge); công thức vẫn theo cú pháp en-US và "
+        "lỗi công thức gom ở `formulaErrors`. Kiểm hết tham số trước khi ghi: một vùng sai thì không "
+        "vùng nào được ghi",
+        req("writes", "array of {range, values, sheet?}"), opt("sheet"), agent=True, undo=True)
 command("et.fillRange", "et", fill_range,
         "Viết MỘT công thức vào ô góc trên-trái của `range` rồi điền ra cả vùng, tham chiếu tương đối tự "
         "dịch (dùng cho bảng nghìn dòng: đừng gửi từng ô)",

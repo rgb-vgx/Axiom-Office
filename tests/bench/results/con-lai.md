@@ -55,7 +55,7 @@ ngân sách 400k gọi nó 0–3 lần; lượt chạy lại Test 4 với ngân 
 **Việc còn lại** (nếu muốn): chạy lại Test 1 và Test 3 với ngân sách rộng để xác nhận chúng cũng tới
 được Dashboard, chứ mới có một bài làm chứng.
 
-## 3. Gom nhiều lần ghi trong một vòng
+## 3. Gom nhiều lần ghi trong một vòng — ĐÃ LÀM XONG (02/10/2026)
 
 Model hay gọi 5–10 `writeRange` liên tiếp trong **cùng một phản hồi**; mỗi lời gọi là một lần
 LibreOffice tính lại cả sổ, và trên sổ 50.000 dòng mỗi lần tính lại mất hàng chục giây.
@@ -64,8 +64,14 @@ LibreOffice tính lại cả sổ, và trên sổ 50.000 dòng mỗi lần tính
 (12,4s → 28,0s; 32,6s → 130,6s). Đã hoàn tác, số đo ghi trong `write_range`. Chi tiết ở
 [test2-gaps.md](test2-gaps.md).
 
-**Cần làm**: một lệnh ghi được **nhiều vùng** trong một lời gọi, ví dụ
-`et.writeRanges {writes: [{range, values, sheet}, ...]}` — một lần tính lại cho cả lô.
+**Đã làm xong**: `et.writeRanges {writes: [{range, values, sheet?}, ...]}` cho cả hai bridge, đã vào
+catalog (63 lệnh). Kiểm hết tham số **trước khi ghi** — một vùng sai thì không vùng nào vào file (có
+bài live kiểm đúng tính chất đó). Bằng chứng: `tests/live/test_live_libreoffice.py` phần Calc
+**148/148**.
+
+**Nói cho đúng điều được lợi**: lệnh này bớt **số vòng qua bridge** (mỗi vòng là HTTP + gate + một
+lượt model trả lời), **không** hứa nhanh hơn về tính toán — đường tắt tính toán đã bị đo là chậm hơn
+2,3–4,0 lần và đã hoàn tác.
 
 ## 4. Dữ liệu thô vẫn phải phát từng giá trị
 
