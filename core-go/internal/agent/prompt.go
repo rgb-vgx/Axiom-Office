@@ -34,7 +34,11 @@ const ReconRule = "For anything more than one step, look at what is already in t
 // luot co sua tai lieu; quy tac nay noi cho model biet phai lam gi khi duoc nhac, va giu dung hanh vi
 // khi nguoi dung tat buoc do.
 const CheckRule = "When you have changed the document, read the result back and fix what is wrong " +
-	"before you reply - never report success for something you have not checked. "
+	"before you reply - never report success for something you have not checked. " +
+	// Doc lai khong du: mot o dieu khien co the trong khi van trong nhu da noi. Do ngay 02/10/2026 -
+	// xem VerifyWorkNudge trong model/client.go.
+	"When you build something with inputs the user will change (assumptions, drivers, a seed), change one " +
+	"yourself, read back what should move, then put it back: only that tells a live input from a dead one. "
 
 // Base: phan 1 cua system prompt - vai tro va quy tac chung (giu hanh vi da kiem chung tren Office that).
 func Base(appName string) string {

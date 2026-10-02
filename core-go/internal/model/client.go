@@ -43,6 +43,13 @@ const (
 		"actions available to you (for example et.readRange or et.checkRange, et.listSheets, writer.getText " +
 		"or writer.checkTables, wpp.listSlides or wpp.checkLayout) and compare what is really there with what " +
 		"the user asked for: values, ranges, cell types, sheet or slide names, headings and formatting. " +
+		// Doc lai chi bat duoc o trong; no KHONG bat duoc mot o dieu khien khong noi vao dau. Do ngay
+		// 02/10/2026: mot workbook 10.000 duong Monte Carlo co o "Seed Value [change to re-run]" o
+		// B22, nhung cong thuc doc C25 (trong) - doi o duoc dan nhan khong lam gi ca, va chinh ban kiem
+		// tra cua no bao PASS vi di so chu "integer" voi so 1. Phai THU moi biet.
+		"For anything with inputs the user is meant to change (assumptions, drivers, settings): change one, " +
+		"read back the cells that are supposed to depend on it, confirm they really move, then put the value " +
+		"back. Reading alone cannot tell a live input from a dead one. " +
 		"Fix anything missing or wrong with more tool calls, then reply with the short summary."
 )
 

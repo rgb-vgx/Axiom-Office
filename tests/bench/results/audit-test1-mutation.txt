@@ -1,0 +1,12 @@
+True mo file
+ban dau                            {'KPI!C4': 60789554.1, 'KPI!C5': 0.1, 'Forecast!B4': 'Base Case', 'Forecast!B7': 4508558.5958, 'PnL!C6': 1974936.0}
+--- doi Assumptions!C5 (Revenue Growth) 0.1 -> 0.2: True
+sau khi doi                        {'KPI!C4': 66315877.2, 'KPI!C5': 0.2, 'Forecast!B4': 'Base Case', 'Forecast!B7': 4918427.559, 'PnL!C6': 1974936.0}
+Traceback (most recent call last):
+  File "C:\Users\ThuyetMT\test\mutate1.py", line 80, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "C:\Users\ThuyetMT\test\mutate1.py", line 58, in main
+    print("    KPI!B4 doi?", grown["KPI!B4"] != base["KPI!B4"])
+                             ~~~~~^^^^^^^^^^
+KeyError: 'KPI!B4'

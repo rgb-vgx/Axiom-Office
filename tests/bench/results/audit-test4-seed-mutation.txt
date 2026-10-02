@@ -1,0 +1,5 @@
+True mo file
+H3 ban dau (seed that = trong, tuc 0): 576820.751433658
+H3 sau khi C25 := 999 : 1750908.845488366 -> DOI
+H3 sau khi B22 := 777 : 1750908.845488366 -> KHONG DOI
+da tra C25 ve trong, B22 ve 20250101; H3 = 576820.7514336582
