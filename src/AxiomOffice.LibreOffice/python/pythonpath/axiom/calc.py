@@ -251,6 +251,11 @@ def write_range(env, params):
 
     # Ghi TUNG O: setDataArray voi phan tu rong (None) lam LibreOffice ghi loi #N/A vao o, con
     # setFormulaArray + setDataArray tren cung vung thi o cong thuc bi ghi de mat cong thuc.
+    #
+    # DUNG tam tat tinh lai tu dong (enableAutomaticCalculation) o day. Da thu ngay 02/10/2026 va DO
+    # duoc la cham hon han: cung mot khoi ghi, ban tat tinh roi calculateAll() mot lan chay 28,0s / 130,6s
+    # so voi 12,4s / 32,6s khi de nguyen (24.008 o va 48.008 o tren so moi). LibreOffice da gop viec tinh
+    # lai lai san, con calculateAll() o cuoi lai keo theo mot luot tinh toan bo tai lieu.
     state: dict = {}
     errors = []
     for r, row in enumerate(rows):

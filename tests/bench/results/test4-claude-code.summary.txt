@@ -1,0 +1,73 @@
+========================================================================
+transcript: C:/Users/ThuyetMT/.claude/projects/C--Users-ThuyetMT-test-bench-test4/51e54f60-89b9-4e4f-b58e-f75f4a9939e8.jsonl
+entries: 403 | luot assistant: 183 | tool call: 78
+tool: Bash=33, Edit=31, Read=8, Write=6
+token: cache_read_input_tokens=19321984, output_tokens=295068, input_tokens=204402, cache_creation_input_tokens=0
+tool tra loi LOI: 3 lan
+file ghi/sua: build_model.py×26, stress_test.py×5, verify.py×2, negative_test.py×2, recalc_util.py×1, repro_test.py×1
+------------------------------------------------------------------------
+Bash (33)
+  … 28 dong dau bo qua (dung --full de xem het)
+   cd "C:/Users/ThuyetMT/test/bench/test4" && rm -rf htmlout && mkdir htmlout && "/c/Program Files/LibreOffice/program/soffice.exe" --headless --noresto…
+   cd "C:/Users/ThuyetMT/test/bench/test4" && python build_model.py && rm -rf finalcheck && mkdir finalcheck && "/c/Program Files/LibreOffice/program/so…
+   cd "C:/Users/ThuyetMT/test/bench/test4" && "/c/Program Files/LibreOffice/program/soffice.exe" --headless --norestore --nolockcheck -env:UserInstallat…
+   cd "C:/Users/ThuyetMT/test/bench/test4" && rm -rf odscheck && mkdir odscheck && "/c/Program Files/LibreOffice/program/soffice.exe" --headless --nores…
+   cd "C:/Users/ThuyetMT/test/bench/test4" && rm -rf t.xlsx trecalc recalc finalcheck odscheck pdfout htmlout _neg _neg_recalc _stress _stress_recalc _r…
+------------------------------------------------------------------------
+Edit (31)
+  … 26 dong dau bo qua (dung --full de xem het)
+   C:\Users\ThuyetMT\test\bench\test4\stress_test.py
+   C:\Users\ThuyetMT\test\bench\test4\stress_test.py
+   C:\Users\ThuyetMT\test\bench\test4\build_model.py
+   C:\Users\ThuyetMT\test\bench\test4\build_model.py
+   C:\Users\ThuyetMT\test\bench\test4\build_model.py
+------------------------------------------------------------------------
+Read (8)
+  … 3 dong dau bo qua (dung --full de xem het)
+   {"file_path": "C:\\Users\\ThuyetMT\\test\\bench\\test4\\pdfout\\MonteCarlo_Risk_Model.pdf", "pages": "8-11"}
+   {"file_path": "C:\\Users\\ThuyetMT\\test\\bench\\test4\\htmlout\\MonteCarlo_Risk_Model_html_d67ea8a.png"}
+   {"file_path": "C:\\Users\\ThuyetMT\\test\\bench\\test4\\htmlout\\MonteCarlo_Risk_Model_html_eb7e8830.png"}
+   {"file_path": "C:\\Users\\ThuyetMT\\test\\bench\\test4\\final_report.txt"}
+   {"file_path": "C:\\Users\\ThuyetMT\\test\\bench\\test4\\ods_report.txt"}
+------------------------------------------------------------------------
+Write (6)
+  … 1 dong dau bo qua (dung --full de xem het)
+   C:\Users\ThuyetMT\test\bench\test4\verify.py
+   C:\Users\ThuyetMT\test\bench\test4\negative_test.py
+   C:\Users\ThuyetMT\test\bench\test4\recalc_util.py
+   C:\Users\ThuyetMT\test\bench\test4\stress_test.py
+   C:\Users\ThuyetMT\test\bench\test4\repro_test.py
+========================================================================
+tra loi cuoi cung:
+Done. The model is built, recalculated in real LibreOffice, and verified.
+
+## Deliverable
+
+`MonteCarlo_Risk_Model.xlsx` (3.8 MB, canonical) plus `MonteCarlo_Risk_Model.ods` (native LibreOffice Calc). 10 sheets: **Inputs, Assumptions, Distributions, Simulation, Statistics, Sensitivity, Dashboard, Checks, StressTest, README**.
+
+**Nothing statistical is hardcoded** — all 340,000 cells are live formulas over a real 10,000-path simulation.
+
+### Design decisions worth knowing
+
+**Reproducibility without `RAND()`.** LibreOffice's `RAND()` can't be seeded, so I implemented a Park-Miller LCG (`x(n+1) = 16807·x(n) mod 2147483647`) in plain `MOD()` formulas, with 8 independent streams from one seed cell. The largest intermediate product is ~3.6e13, well under 2^53, so the arithmetic is *exact* in doubles.
+
+**Closed-form financial model.** Instead of per-year columns, the growing annuity is solved analytically: `AF = ((1+g)^n − 1)/g` and `DF = (1−q^n)/(1−q)` with `q = (1+g)/(1+r)`. Keeps 10,000 rows fast and avoids circular references.
+
+### A bug I found and fixed
+
+My first version used `SUMPRODUCT(--(range<=range))` for the checks. Testing showed LibreOffice applies **implicit intersection**, not array evaluation, inside `SUMPRODUCT` — so C02/C05/C12 were **silently returning wrong values and passing**. I replaced every array formula with scalar per-row audit columns (Simulation U/V, Statistics row 20) aggregated by `SUM()`. I also hardened the status cells with `IFERROR(...,"FAIL")` and changed the banner to require 13 explicit PASSes, because a `#N/A` status was previously invisible to the overall check.
+
+### Verification actually run
+
+| Test | Result |
+|---|---|
+| All 13 checks | PASS |
+| **Negative test** (11 deliberate breakages) | 11 checks correctly flip to FAIL |
+| **Stress: growth mean 7%→3%** | all 16 statistics changed; P(ROI<0) 20.4%→27.6%, P(NPV<0) 37.4%→44.7% |
+| **Stress: +3pp shift** | StressTest sheet: **13 of 13 flagged CHANGED** |
+| **Reproducibility** | two recalcs identical to 10 d.p.; changing seed moves all 9 statistics |
+| Charts | LibreOffice rendered all 4 (histogram + P5/P50/P95 markers confirmed visually) |
+
+The stress results are *identical* for the "+3pp shift" and "mean 7%→10%" routes — the same seed reuses the same variates, so only the assumption changed, not the sampling noise.
+
+Two things to flag: the model is deliberately transparent rather than tax-accurate (no depreciation, tax, working capital or terminal value — add as columns in Simulation), and the squared-correlation sensitivity decomposition on Sensitivity is exact only while drivers stay independent; correlated inputs would need a regression-based measure. Both are noted in the README sheet.
