@@ -1,4 +1,4 @@
-"""Kiểm tra MCP server (axiom-office-mcp / AxiomOffice.Host.exe mcp) qua stdio, KHÔNG cần thư viện ngoài.
+"""Kiểm tra MCP server (`AxiomOffice.Core mcp`, trước đây là AxiomOffice.Host.exe mcp) qua stdio, KHÔNG cần thư viện ngoài.
 
 Bộ này chạy được cả trên Windows lẫn Linux (bộ parity đầy đủ `test_mcp_host.py` cần python-docx/
 openpyxl/python-pptx + package `mcp`): giao thức JSON-RPC, danh sách tool, 20 tool file (docx/xlsx/pptx/
@@ -20,12 +20,13 @@ import threading
 import zipfile
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-# MCP server: Windows la AxiomOffice.Host.exe mcp (net48), Linux la subcommand `mcp` cua Agent Core (Go).
+# MCP server: ca hai nen tang deu la subcommand `mcp` cua Agent Core (Go) - Windows lan Linux chi con MOT
+# ban cai dat. AxiomOffice.Host.exe van goi duoc, nhung no chuyen tiep sang Core chu khong tu lam nua.
 # Duong dan o day chi la phuong an du phong khi khong truyen tham so - CI luon truyen duong dan that.
 CANDIDATES = [
-    os.path.join(ROOT, "src", "AxiomOffice", "bin", "Release", "AxiomOffice.Host.exe"),
     os.path.join(ROOT, "src", "AxiomOffice", "bin", "Release", "AxiomOffice.Core.exe"),
     os.path.join(ROOT, "src", "AxiomOffice", "bin", "Release", "AxiomOffice.Core"),
+    os.path.join(ROOT, "src", "AxiomOffice", "bin", "Release", "AxiomOffice.Host.exe"),
 ]
 
 RESULTS: list[tuple[bool, str, str]] = []
@@ -293,7 +294,11 @@ def main() -> int:
     command = resolve_command(argv)
     args = os.environ.get("AXIOM_MCP_ARGS")
     if args is None:
-        args = "mcp all" if command[-1].lower().endswith("axiomoffice.host.exe") else "all"
+        # Hai duong vao that deu nhan subcommand `mcp ...`: AxiomOffice.Core.exe mcp (Go, ca hai nen tang)
+        # va AxiomOffice.Host.exe mcp (net48, chuyen tiep sang Core). Truoc day chi Host.exe duoc cong
+        # chu "mcp", nen chay thang Core se thanh `Core.exe all` - Core khong hieu, no bind port roi ngoi
+        # mai. Chi ten `axiom-office-mcp` moi la binary tu-than da la MCP server.
+        args = "all" if os.path.basename(command[-1]).lower().startswith("axiom-office-mcp") else "mcp all"
     print("exe:", " ".join(command), "| args:", args)
     out = tempfile.mkdtemp(prefix="axiom-mcp-")
     server = Server(command, args.split())

@@ -11,7 +11,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -40,20 +39,24 @@ func main() {
 	os.Exit(run())
 }
 
-// officeMcpHost: duong dan toi MCP server built-in "office" canh binary Core, dung lam
-// ServerConfig.Command (mcp.LoadConfigs luon them Args ["mcp"]).
-//   - Windows: AxiomOffice.Host.exe (ban C#, net48) - giu nguyen.
-//   - Linux:   chinh binary nay, chay subcommand `mcp` (ban Go).
+// officeMcpHost: duong dan toi MCP server built-in "office", dung lam ServerConfig.Command
+// (mcp.LoadConfigs luon them Args ["mcp"]).
+//
+// Ca hai nen tang deu dung CHINH binary nay, chay subcommand `mcp` - chi con MOT ban MCP server
+// (core-go/internal/mcpserver). Truoc day Windows goi AxiomOffice.Host.exe (ban C#), tuc la cung mot
+// hop dong 50 tool co hai ban cai dat va phai canh nhau khong lech.
+//
+// AxiomOffice.Host.exe van con, nhung cho ba viec khac: cau COM companion, `commands --json`, va
+// `llm-test`; rieng `Host.exe mcp ...` no chuyen tiep sang day (nguoi da cau hinh MCP client tro vao
+// Host.exe khong phai doi gi).
 func officeMcpHost(exe string) string {
-	if runtime.GOOS == "windows" {
-		return filepath.Join(filepath.Dir(exe), "AxiomOffice.Host.exe")
-	}
 	return exe
 }
 
 func run() int {
-	// `AxiomOffice.Core mcp [all|word|excel|ppt] [--list]` - MCP server qua stdio tren Linux
-	// (ban Windows van dung AxiomOffice.Host.exe mcp net48). Phai chan TRUOC mutex mot-phien-ban:
+	// `AxiomOffice.Core mcp [all|word|excel|ppt] [--list]` - MCP server qua stdio, dung chung cho ca hai
+	// nen tang (Windows truoc day goi AxiomOffice.Host.exe mcp net48, xem officeMcpHost). Phai chan TRUOC
+	// mutex mot-phien-ban:
 	// Core sinh tien trinh con nay bang chinh binary cua no, nen no khong duoc di qua nhanh khoa
 	// (khong thi tien trinh con thay mutex da bi giu va thoat ngay).
 	if len(os.Args) > 1 && os.Args[1] == "mcp" {

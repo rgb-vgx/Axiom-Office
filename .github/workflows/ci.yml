@@ -143,10 +143,9 @@ jobs:
           go build -trimpath -ldflags "-s -w" -o "$stage\axiom-core.exe" ./cmd/axiom-core
           Set-Location ..
           Copy-Item -Recurse skills $stage
-          # Server MCP built-in "office" = AxiomOffice.Host.exe canh binary (nhu goi phat hanh).
-          Copy-Item (Join-Path $env:TEMP "axiom-ci\AxiomOffice.Host.exe") $stage
+          # KHONG copy AxiomOffice.Host.exe vao day nua: server MCP built-in "office" bay gio la chinh
+          # binary nay chay subcommand `mcp`. Thieu Host.exe ma e2e van xanh tuc la Core that su tu dung.
           $env:AXIOM_E2E_CORE_EXE = Join-Path $stage "axiom-core.exe"
           python tests/core/test_core_e2e.py
-
-      - name: MCP server ban Windows (AxiomOffice.Host.exe mcp, khong can app)
-        run: python tests/mcp-host/test_mcp_portable.py "$env:TEMP\axiom-ci\AxiomOffice.Host.exe"
+          # MCP server ban Windows (khong can app): cung binary Go, chay thang - khong qua Host.exe.
+          python tests/mcp-host/test_mcp_portable.py "$stage\axiom-core.exe"
