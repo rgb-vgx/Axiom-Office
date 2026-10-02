@@ -76,10 +76,10 @@ def main() -> int:
         "prompt": prompt,
         "office": {"port": int(bridge_port), "pid": int(pid), "app": "et", "family": "libreoffice"},
         "document": {"name": "Untitled 1"},
-        # Ngan sach token ca luot, tinh theo token PHAI TRA THAT (cache khong tinh). De 400k cho de so
-        # giua cac lan chay: cung mot con so, doi cach tinh thi luot chay di duoc bao xa.
-        # maxRounds 100 da la nut that that su o Test 1 (dung sau 315 tool call), nen nang len de bai
-        # khong bi cat vi so vong khi dang con tien.
+        # Ngan sach token ca luot, tinh theo token PHAI TRA THAT (cache khong tinh). Mac dinh 1.000.000
+        # (xem chu thich o tren): de cung mot con so cho de so giua cac lan chay.
+        # maxRounds 300 (Core chan tren o 1000): maxRounds 100 da la nut that that su o Test 1 (dung sau
+        # 315 tool call), nen de bai khong bi cat vi so vong khi dang con tien.
         "options": {"maxRounds": max_rounds, "maxTokens": max_tokens},
     }, token)
     if not created.get("ok"):
