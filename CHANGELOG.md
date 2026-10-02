@@ -5,6 +5,29 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — et.checkRange báo công thức trỏ vào ô TRỐNG
+- Thêm loại lỗi `empty-reference` cho **cả hai bridge**: một công thức trỏ vào MỘT ô đang trống thì không
+  có gì báo lỗi — phép tính coi ô trống là 0 và chạy tiếp. Đây là cách một ô điều khiển "chết" mà không
+  ai biết.
+- **Vì sao**: đo ngày 02/10/2026 trên đề Monte Carlo. Một workbook 10.000 đường, tự dựng sheet `Checks`
+  báo **18/18 PASS**, nhưng ô "Seed Value [change to re-run]" ở `B22` **không công thức nào đọc** — 60.006
+  công thức đọc `C25`, một ô **trống**. Đổi ô được dán nhãn không làm gì cả; đổi `C25` thì mô phỏng đổi
+  (1.750.908 so với 576.821). Chính bản kiểm tra của nó cũng so sai cột (`IF(Inputs.$C$22>=1;…)` với C22
+  là **chữ** "integer").
+- Lần chạy lại sau đó mắc lại đúng lỗi đó ở một dòng khác (`B35` được dán nhãn, công thức đọc `B34` là
+  tiêu đề mục). Nên đây không phải chuyện cá biệt.
+- **Đọc lại không phát hiện được**: `et.readRange` chỉ trả giá trị, mà một ô ghi cứng và một ô công thức
+  ra cùng kết quả trông giống hệt nhau. Phải soi xem công thức trỏ vào đâu — nên phép soi này nằm trong
+  `checkRange`, thứ agent **đã gọi sẵn** (17 lần trong một lượt chạy), tức là nó chạy **trong lúc dựng
+  bài**, không phải chỉ khi model tự tuyên bố xong. Ở bài lớn model không bao giờ tuyên bố xong, nên bước
+  kiểm chứng cuối lượt không bao giờ chạy tới.
+- Bỏ qua vùng (`A1:B2` — cả hai đầu đều là tham chiếu hợp lệ) và tên sheet không tồn tại; giới hạn 4000
+  ô công thức và 60 ô đích để không làm chậm báo cáo. Đo A/B trên sổ 10.007 dòng: **32,4s → 34,6s**
+  (+2,2s; phần chậm còn lại là vòng phân loại sẵn có chứ không phải phép soi mới).
+- Trên file có lỗi thật, nó báo đúng: `Simulation!B3 -> Inputs!C25 (trống)`.
+- Kiểm chứng: `test_live_libreoffice.py` **197/197** trên LibreOffice thật (thêm ba mục: bắt được tham
+  chiếu rỗng, chỉ đúng ô trống chứ không báo ô có nội dung, và chiều chống kêu oan).
+
 ### Added — biểu đồ trên tài liệu đang mở (et.addChart / et.listCharts)
 - Hai lệnh mới cho CẢ HAI bridge (extension LibreOffice và add-in Windows). Bộ benchmark Calc
   (`libre_calc_agent_extreme_benchmark`) yêu cầu "Use charts where appropriate" ở Test 1 và

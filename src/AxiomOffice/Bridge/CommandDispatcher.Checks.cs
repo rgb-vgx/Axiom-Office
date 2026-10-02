@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace AxiomOffice.Bridge
 {
@@ -299,6 +300,27 @@ namespace AxiomOffice.Bridge
             {
             }
 
+            try
+            {
+                var empty = EmptyReferences(wb, sheet, formulas, rows, cols);
+                if (empty.Count > 0)
+                {
+                    issues.Add(new Dictionary<string, object>
+                    {
+                        { "type", "empty-reference" },
+                        { "detail", empty.Count + " công thức trỏ vào một ô đang TRỐNG (ví dụ: " +
+                            string.Join("; ", empty.Take(6)) + "). Ô trống được tính là 0, nên một ô điều khiển bị " +
+                            "trỏ sai chỗ sẽ im lặng chạy bằng 0 - hãy kiểm tra xem có phải công thức đang trỏ vào ô " +
+                            "tiêu đề / ô bên cạnh thay vì ô giá trị không" },
+                        { "examples", empty.Take(6).ToList() }
+                    });
+                }
+            }
+            catch (Exception)
+            {
+                // soát thêm không được làm hỏng cả báo cáo
+            }
+
             return new Dictionary<string, object>
             {
                 { "sheet", Convert.ToString(sheet.Name) },
@@ -311,6 +333,121 @@ namespace AxiomOffice.Bridge
                 { "issueCount", issues.Count },
                 { "issues", issues }
             };
+        }
+
+        // Giới hạn khi soi tham chiếu: bảng 50.000 dòng có thể có hàng trăm nghìn công thức, soi hết thì
+        // chậm mà cái cần thấy chỉ là vài chỗ. Lấy mẫu, và báo cả con số tổng để người đọc biết quy mô.
+        private const int ReferenceScanLimit = 4000;
+        private const int ReferenceLookupLimit = 60;
+
+        // Tham chiếu tới MỘT ô trong cú pháp Excel: có thể có tên sheet phía trước (Inputs!B34,
+        // 'My Sheet'!$B$34), và có thể có $.
+        private static readonly Regex CellReference = new Regex(
+            @"(?:(?P<sheet>'[^']+'|[A-Za-z_][A-Za-z0-9_ ]*)!)?(?P<abs1>\$?)(?P<col>[A-Za-z]{1,3})(?P<abs2>\$?)(?P<row>\d+)",
+            RegexOptions.Compiled);
+
+        /// <summary>
+        /// Ví dụ về công thức trỏ vào MỘT ô đang TRỐNG.
+        ///
+        /// Vì sao cần: một ô điều khiển đặt cạnh nhãn của nó (vd "Random Seed" ở B17) nhưng công thức lỡ
+        /// trỏ vào ô bên cạnh hoặc ô trên (B16/B34) thì không có gì báo lỗi - phép tính coi ô trống là 0 và
+        /// chạy tiếp. Đo ngày 02/10/2026 trên đề Monte Carlo: một workbook 10.000 đường tự báo 18/18 PASS
+        /// trong khi seed thật sự bằng 0, vì 80.008 công thức đọc ô tiêu đề mục thay vì ô giá trị. Đọc lại
+        /// KHÔNG phát hiện được; phải soi xem công thức trỏ vào đâu.
+        /// </summary>
+        private static List<string> EmptyReferences(dynamic wb, dynamic sheet, object[,] formulas, int rows, int cols)
+        {
+            var found = new List<string>();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            int scanned = 0;
+            int lookups = 0;
+            for (int r = 0; r < rows && scanned < ReferenceScanLimit && lookups < ReferenceLookupLimit; r++)
+            {
+                for (int c = 0; c < cols && scanned < ReferenceScanLimit && lookups < ReferenceLookupLimit; c++)
+                {
+                    string formula = formulas[r, c] as string;
+                    if (string.IsNullOrEmpty(formula) || !formula.StartsWith("="))
+                    {
+                        continue;
+                    }
+                    scanned++;
+                    foreach (Match match in CellReference.Matches(formula))
+                    {
+                        int start = match.Index;
+                        int end = match.Index + match.Length;
+                        // A1:B2 - cả hai đầu đều là tham chiếu hợp lệ, không phải trỏ nhầm.
+                        if ((start > 0 && formula[start - 1] == ':') || (end < formula.Length && formula[end] == ':'))
+                        {
+                            continue;
+                        }
+                        dynamic targetSheet = sheet;
+                        string name = match.Groups["sheet"].Success ? match.Groups["sheet"].Value.Trim('\'') : null;
+                        if (!string.IsNullOrEmpty(name))
+                        {
+                            try
+                            {
+                                targetSheet = wb.Worksheets[name];
+                            }
+                            catch (Exception)
+                            {
+                                continue;
+                            }
+                            if (targetSheet == null)
+                            {
+                                continue;
+                            }
+                        }
+                        int column = ColumnIndex(match.Groups["col"].Value);
+                        int row = Convert.ToInt32(match.Groups["row"].Value);
+                        string label = Convert.ToString(targetSheet.Name) + "!" + ColumnName(column) + row;
+                        if (!seen.Add(label))
+                        {
+                            continue;
+                        }
+                        lookups++;
+                        try
+                        {
+                            dynamic target = targetSheet.Cells[row, column];
+                            if (Convert.ToString(target.Formula) != "" || target.Value2 != null)
+                            {
+                                continue;   // có nội dung thì không phải trỏ nhầm
+                            }
+                        }
+                        catch (Exception)
+                        {
+                            continue;
+                        }
+                        found.Add(Convert.ToString(sheet.Name) + "!" + ColumnName(c + 1) + (r + 1) + " -> " + label + " (trống)");
+                        if (found.Count >= 6)
+                        {
+                            return found;
+                        }
+                    }
+                }
+            }
+            return found;
+        }
+
+        private static int ColumnIndex(string letters)
+        {
+            int value = 0;
+            foreach (char ch in letters.ToUpperInvariant())
+            {
+                value = value * 26 + (ch - 'A' + 1);
+            }
+            return value;
+        }
+
+        private static string ColumnName(int column)
+        {
+            string name = "";
+            while (column > 0)
+            {
+                int rem = (column - 1) % 26;
+                name = (char)('A' + rem) + name;
+                column = (column - 1) / 26;
+            }
+            return name;
         }
 
         private static object[,] AsMatrix(object value, int rows, int cols)

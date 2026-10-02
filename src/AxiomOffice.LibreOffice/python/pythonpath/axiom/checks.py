@@ -2,6 +2,8 @@
 "mu", chi doc duoc text, nen sau khi sua no doc lai bang so de tu soat (tran chu, shape chong, o trong...)."""
 from __future__ import annotations
 
+import re
+
 import uno
 
 from . import values
@@ -102,6 +104,72 @@ def _cell_type(cell) -> str:
     return str(getattr(content, "value", content)).upper()
 
 
+# Gioi han khi soi tham chieu: mot bang 50.000 dong co the co hang tram nghin cong thuc, soi het thi cham
+# ma cai can thay chi la vai cho. Lay mau, va bao ca con so tong de nguoi doc biet quy mo.
+REF_SCAN_LIMIT = 4000
+REF_SAMPLE_LIMIT = 40
+
+# Tham chieu toi MOT o: co the co ten sheet phia truoc (Inputs.B34, $'My Sheet'.$B$34), va co the co $.
+_REFERENCE = re.compile(r"(?:(?P<sheet>\$?'[^']+'|\$?[A-Za-z_][A-Za-z0-9_ ]*)\.)?"
+                        r"(?P<abs1>\$?)(?P<col>[A-Z]{1,3})(?P<abs2>\$?)(?P<row>\d+)")
+
+
+def _column_index(letters: str) -> int:
+    value = 0
+    for ch in letters.upper():
+        value = value * 26 + (ord(ch) - ord("A") + 1)
+    return value - 1
+
+
+def _empty_references(doc, sheet, bounds) -> list:
+    """Vi du ve cong thuc tro vao MOT o dang TRONG.
+
+    Vi sao can: mot o dieu khien dat canh nhan cua no (vd "Random Seed" o B17) nhung cong thuc lo tro vao
+    o ben canh hoac o tren (B16/B34) thi khong co gi bao loi - phep tinh coi o trong la 0 va chay tiep.
+    Do ngay 02/10/2026 tren de Monte Carlo: mot workbook 10.000 duong tu bao 18/18 PASS trong khi seed
+    that su bang 0, vi 80.008 cong thuc doc o tieu de muc thay vi o gia tri. Doc lai KHONG phat hien duoc;
+    phai soi xem cong thuc tro vao dau.
+
+    Bo qua vung (A1:B2) vi hai dau cua vung deu la tham chieu hop le, va bo qua ten sheet khong ton tai.
+    """
+    found = []
+    scanned = 0
+    sheets = doc.getSheets()
+    for r in range(bounds.StartRow, bounds.EndRow + 1):
+        for c in range(bounds.StartColumn, bounds.EndColumn + 1):
+            if scanned >= REF_SCAN_LIMIT or len(found) >= REF_SAMPLE_LIMIT:
+                return found
+            formula = _cell(sheet, c, r).getFormula()
+            if not isinstance(formula, str) or not formula.startswith("="):
+                continue
+            scanned += 1
+            for match in _REFERENCE.finditer(formula):
+                start, end = match.span()
+                # A1:B2 - ca hai dau deu la tham chieu hop le, khong phai tro nham.
+                if (start > 0 and formula[start - 1] == ":") or (end < len(formula) and formula[end] == ":"):
+                    continue
+                target_sheet = sheet
+                name = match.group("sheet")
+                if name:
+                    try:
+                        target_sheet = sheets.getByName(name.lstrip("$").strip("'"))
+                    except Exception:  # noqa: BLE001
+                        continue
+                column = _column_index(match.group("col"))
+                row = int(match.group("row")) - 1
+                try:
+                    target = target_sheet.getCellByPosition(column, row)
+                except Exception:  # noqa: BLE001
+                    continue
+                if _cell_type(target) != "EMPTY":
+                    continue
+                found.append("%s!%s%d -> %s!%s%d (trong)" % (
+                    sheet.getName(), column_letter(c + 1), r + 1,
+                    target_sheet.getName(), column_letter(column + 1), row + 1))
+                break
+    return found
+
+
 def range_report(env, params):
     doc = env.document
     from . import calc
@@ -172,6 +240,19 @@ def range_report(env, params):
                 "column %s has decimals shown with the General format: apply numFmt such as \"0.0\" or \"#,##0.00\"" % letter))
         columns.append({"column": letter, "header": header_text or None, "numbers": numbers, "texts": texts,
                         "blanks": blanks, "formulas": formulas, "numberFormat": fmt})
+
+    # Cong thuc tro vao MOT o dang TRONG: khong co gi bao loi, phep tinh coi o trong la 0 va chay tiep.
+    # Day la cach mot o dieu khiển "chet" ma khong ai biet - xem _empty_references.
+    try:
+        empty = _empty_references(doc, sheet, bounds)
+    except Exception:  # noqa: BLE001 - soat them khong duoc lam hong ca bao cao
+        empty = []
+    if empty:
+        issues.append(issue("empty-reference",
+            "%d cong thuc tro vao mot o dang TRONG (vi du: %s). O trong duoc tinh la 0, nen mot o dieu "
+            "khien bi tro sai cho se im lang chay bang 0 - hay kiem tra xem co phai cong thuc dang tro "
+            "vao o tieu de / o ben canh thay vi o gia tri khong" % (len(empty), "; ".join(empty[:6])),
+            examples=empty[:6]))
 
     region_address = ""
     try:

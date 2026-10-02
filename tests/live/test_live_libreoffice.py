@@ -292,6 +292,21 @@ def test_calc(b, out):
     check(block == [[23, 24], [24, 25]], "Calc fillRange điền được cả khối 2D", block)
     b.cmd("et.fillRange", {"sheet": "Sheet1", "formula": "=ROW()"}, expect_ok=False, key="et.fillRange thiếu range")
 
+    # Công thức trỏ vào ô TRỐNG: không có gì báo lỗi, phép tính coi ô trống là 0. Đây là cách một ô điều
+    # khiển "chết" mà không ai biết (xem tests/bench/results/test4-dung-sai.md).
+    b.cmd("et.writeRange", {"range": "Z1:AA2", "sheet": "Sheet1",
+                            "values": [["H1", "H2"], ["=Z50", "=AA1"]]})
+    refs = {i.get("type") for i in (b.cmd("et.checkRange", {"range": "Z1:AA2", "sheet": "Sheet1"}) or {}).get("issues", [])}
+    check("empty-reference" in refs, "Calc checkRange bắt công thức trỏ vào ô trống (=Z50)", sorted(refs))
+    detail = [i for i in (b.cmd("et.checkRange", {"range": "Z1:AA2", "sheet": "Sheet1"}, record=False) or {}).get("issues", [])
+              if i.get("type") == "empty-reference"]
+    check(detail and any("Z50" in str(d) for d in detail[0].get("examples", [])),
+          "Calc empty-reference chỉ đúng ô trống (Z50), không báo ô có nội dung (AA1)", detail)
+    # AA2 = =AA1 mà AA1 có nội dung -> không được báo. Đây là chiều chống kêu oan.
+    clean = {i.get("type") for i in (b.cmd("et.checkRange", {"range": "AA1:AA2", "sheet": "Sheet1"},
+                                           record=False) or {}).get("issues", [])}
+    check("empty-reference" not in clean, "Calc checkRange KHÔNG báo oan khi công thức trỏ vào ô có nội dung", sorted(clean))
+
     b.cmd("et.writeRange", {"range": "A7", "values": [["hoàn tác tôi"]]}, key="et.writeRange before undo")
     b.cmd("et.undo", {"count": 1})
     check((b.cmd("et.readRange", {"range": "A7"}, record=False) or {}).get("values", [[None]])[0][0] is None,
