@@ -15,6 +15,7 @@ import json
 import sys
 import time
 import urllib.request
+from collections import Counter
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -93,6 +94,16 @@ def main() -> int:
         request.add_header("X-Auth-Token", token)
     started = time.time()
     tools = 0
+    # Buoc 0 roadmap hieu nang (02/10/2026): thu thap metric A/B ngay trong harness de moi lan chay
+    # deu so duoc ma khong phai mo log SSE ra dem tay. Chi dem tu su kien SSE, khong doi Core/bridge.
+    by_tool: Counter[str] = Counter()
+    read_keys: list[str] = []       # khoa (action + paramsPreview) cua cac lenh doc de bat doc lap
+    failures = 0                    # tong so tool loi
+    repeat_fail = 0                 # so loi lap lai Y HET lien tiep (cung action + cung loi)
+    repeat_fail_max = 0             # chuoi loi lap lai DAI NHAT trong ca luot
+    last_fail_sig = ""
+    first_check_ok_at: float | None = None  # time-to-first-valid-slice: checkRange ok dau tien
+    rounds_seen = 0
     with open(log_path, "w", encoding="utf-8") as log:
         log.write("run %s\n" % run_id)
         with urllib.request.urlopen(request, timeout=60 * 60) as response:
@@ -112,10 +123,30 @@ def main() -> int:
                 elapsed = time.time() - started
                 if event_type == "tool.finished":
                     tools += 1
+                    action = str(data.get("action") or data.get("tool") or "?")
+                    by_tool[action] += 1
+                    ok = bool(data.get("ok"))
+                    err = str(data.get("error") or "")[:90]
+                    if action in ("et.readRange", "writer.getText", "wpp.listSlides"):
+                        read_keys.append("%s|%s" % (action, data.get("paramsPreview")))
+                    if not ok:
+                        failures += 1
+                        sig = "%s|%s" % (action, err)
+                        repeat_fail = repeat_fail + 1 if sig == last_fail_sig else 1
+                        repeat_fail_max = max(repeat_fail_max, repeat_fail)
+                        last_fail_sig = sig
+                    else:
+                        last_fail_sig = ""
+                        if action == "et.checkRange" and first_check_ok_at is None:
+                            first_check_ok_at = elapsed
                     print("[%6.0fs] %3d %s %s %s" % (
-                        elapsed, tools, "ok " if data.get("ok") else "LOI",
-                        data.get("action") or data.get("tool"), (data.get("error") or "")[:90]), flush=True)
+                        elapsed, tools, "ok " if ok else "LOI", action, err), flush=True)
                 elif event_type == "run.reasoning":
+                    # Vong hien tai (phu du: event ket thuc thieu truong rounds - run.failed/cancelled).
+                    try:
+                        rounds_seen = max(rounds_seen, int(data.get("round") or 0))
+                    except (TypeError, ValueError):
+                        pass
                     print("[%6.0fs] ~~ vong %s: %s" % (
                         elapsed, data.get("round"), (data.get("text") or "")[:180].replace("\n", " ")), flush=True)
                 elif event_type == "run.started":
@@ -126,9 +157,45 @@ def main() -> int:
                         print("reply:", (data.get("reply") or "")[:600], flush=True)
                     else:
                         print("error:", data.get("error"), flush=True)
+                    try:
+                        in_tok = int(data.get("inputTokens") or 0)
+                    except (TypeError, ValueError):
+                        in_tok = 0
+                    try:
+                        out_tok = int(data.get("outputTokens") or 0)
+                    except (TypeError, ValueError):
+                        out_tok = 0
+                    try:
+                        cached = int(data.get("cachedTokens") or 0)
+                    except (TypeError, ValueError):
+                        cached = 0
+                    bill_in = max(in_tok - cached, 0)
+                    bill_total = bill_in + out_tok
+                    hit = (cached / in_tok) if in_tok > 0 else 0.0
+                    # Doc lap: cung mot khoa doc xuat hien > 1 lan (gioi han duoi - paramsPreview bi cat
+                    # o 200 ky tu nen hai vung khac nhau van co the trung khoa; dung de soi, khong de ket an).
+                    dup = 0
+                    if read_keys:
+                        seen: set[str] = set()
+                        for key in read_keys:
+                            if key in seen:
+                                dup += 1
+                            else:
+                                seen.add(key)
+                    dup_ratio = (dup / len(read_keys)) if read_keys else 0.0
                     print("rounds=%s toolCalls=%s in=%s out=%s cached=%s verified=%s" % (
                         data.get("rounds"), tools, data.get("inputTokens"), data.get("outputTokens"),
                         data.get("cachedTokens"), data.get("verified")), flush=True)
+                    print("METRIC billable_in=%d billable_out=%d billable=%d cache_hit=%.3f" % (
+                        bill_in, out_tok, bill_total, hit), flush=True)
+                    print("METRIC by_tool: %s" % (
+                        ", ".join("%s=%d" % item for item in by_tool.most_common())), flush=True)
+                    print("METRIC reads=%d dup_reads=%d dup_ratio=%.3f failures=%d repeat_fail_max=%d" % (
+                        len(read_keys), dup, dup_ratio, failures, repeat_fail_max), flush=True)
+                    if first_check_ok_at is not None:
+                        print("METRIC time_to_first_check_ok=%.0fs" % first_check_ok_at, flush=True)
+                    print("METRIC wall=%.0fs rounds_seen=%s" % (
+                        elapsed, data.get("rounds") or rounds_seen), flush=True)
                     log.flush()
                     break
     if save_path:

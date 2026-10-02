@@ -46,6 +46,12 @@ python tests/bench/run_prompt.py <core_port> <bridge_port> <pid> <prompt_file> <
 
 `run_prompt.py` gửi đề qua đúng `POST /v1/runs` mà pane dùng và ghi lại toàn bộ SSE.
 
+Cuối mỗi lượt, harness in sẵn các dòng `METRIC` để so A/B mà không phải mở log SSE ra đếm tay:
+`billable_in` / `billable_out` / `billable` (input − cache + output), `cache_hit`, `by_tool`
+(histogram từng lệnh), `reads` / `dup_reads` / `dup_ratio` (đọc lặp — chỉ là dưới chuẩn vì
+`paramsPreview` cắt 200 ký tự), `failures` / `repeat_fail_max`, `time_to_first_check_ok`, `wall`.
+Quy ước chạy A/B và thứ tự roadmap: `results/con-lai.md` mục 7.
+
 ## Kiểm chứng file kết quả
 
 Không tin lời kể của agent. Mở file bằng openpyxl/zipfile và đếm.
