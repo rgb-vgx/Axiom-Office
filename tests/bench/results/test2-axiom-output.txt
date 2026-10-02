@@ -1,0 +1,13 @@
+sheets: Raw_SKU_Data | Product_Master | Demand_History | Inventory | Forecast | Safety_Stock | Reorder_Point | EOQ | Risk | Optimization | Dashboard | Checks
+Raw_SKU_Data     loi: 'result'
+Product_Master   loi: 'result'
+Demand_History   rows=6001   cols=8    | [["SKU", "Category", "Month_Index", "Monthly_Demand"], ["SKU-0001", "Apparel", 1.0, 14.0]]
+Inventory        loi: 'result'
+Forecast         loi: 'result'
+Safety_Stock     rows=50001  cols=11   | [["SKU", "Location", "Service_Level", "Z_Score"], ["SKU-0152", "WH-24", 0.95, 1.6449]]
+Reorder_Point    rows=50001  cols=11   | [["SKU", "Location", "Avg_Daily_Demand", "Lead_Time"], ["SKU-0152", "WH-24", 0.0, 0.0]]
+EOQ              rows=50001  cols=11   | [["SKU", "Location", "Annual_Demand", "Order_Cost"], ["SKU-0152", "WH-24", 0.0, 219.0]]
+Risk             loi: 'result'
+Optimization     loi: 'result'
+Dashboard        rows=78     cols=18   | [["INVENTORY OPTIMIZATION DASHBOARD", null, null, null], [null, null, null, null]]
+Checks           rows=26     cols=9    | [["Check_ID", "Check", "Scope", "Value"], ["DQ-01", "Total SKU-location records loaded", "Raw_SKU_Data", 50000

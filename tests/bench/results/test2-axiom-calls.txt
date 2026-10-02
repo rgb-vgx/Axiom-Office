@@ -1,0 +1,353 @@
+  1                  ok   {"name":"bao-cao-du-lieu"}
+  2 et.listSheets    ok   null
+  3                  ok   {"name":"_design","path":"tokens.json"}
+  4 et.renameSheet   ok   {"name":"Raw_SKU_Data","sheet":"Sheet1"}
+  5 et.addSheet      ok   {"index":1,"name":"Product_Master"}
+  6 et.addSheet      ok   {"index":2,"name":"Demand_History"}
+  7 et.addSheet      ok   {"index":3,"name":"Inventory"}
+  8 et.addSheet      ok   {"index":4,"name":"Forecast"}
+  9 et.addSheet      ok   {"index":5,"name":"Safety_Stock"}
+ 10 et.addSheet      ok   {"index":6,"name":"Reorder_Point"}
+ 11 et.addSheet      ok   {"index":7,"name":"EOQ"}
+ 12 et.addSheet      ok   {"index":8,"name":"Risk"}
+ 13 et.addSheet      ok   {"index":9,"name":"Optimization"}
+ 14 et.addSheet      ok   {"index":10,"name":"Dashboard"}
+ 15 et.addSheet      ok   {"index":11,"name":"Checks"}
+ 16 et.writeRange    ok   {"range":"A1","sheet":"Raw_SKU_Data","values":[["Record_ID","SKU","Location","Category","Unit_Cost",
+ 17 et.writeRange    ok   {"range":"M1:R1","sheet":"Raw_SKU_Data","values":[["Calc_Idx","SKU_Idx","Loc_Idx","Base_Daily","Loc_
+ 18 et.fillRange     ok   {"formula":"=IF(MOD(ROW(),499)=0,M1,ROW()-2)","range":"M2:M50001","sheet":"Raw_SKU_Data"}
+ 19 et.readRange     ok   {"range":"M1:M6","sheet":"Raw_SKU_Data"}
+ 20 et.readRange     ok   {"range":"M496:M506","sheet":"Raw_SKU_Data"}
+ 21 et.fillRange     ok   {"formula":"=IF(MOD(ROW(),500)=1,MOD(N1+1,220)+1,INT(MOD(N1*7+13,220))+1)","range":"N2:N50001","shee
+ 22 et.fillRange     ok   {"formula":"=MOD(O1+1,50)+1","range":"O2:O50001","sheet":"Raw_SKU_Data"}
+ 23 et.fillRange     ok   {"formula":"=P1+IF(MOD(P1*11,17)=0,0.37,0.147)","range":"P2:P50001","sheet":"Raw_SKU_Data"}
+ 24 et.writeRange    ok   {"range":"W1:X1","sheet":"Raw_SKU_Data","values":[["t","n"]]}
+ 25 et.writeRange    ok   {"range":"X2","sheet":"Raw_SKU_Data","values":[[1],[2],[3],[4]]}
+ 26 et.writeRange    ok   {"range":"Y2","sheet":"Raw_SKU_Data","values":[["=IF(MOD(ROW();499)=0;1;0)"],["=IF(MOD(ROW(),499)=0,
+ 27 et.readRange     ok   {"range":"Y2:Y9","sheet":"Raw_SKU_Data"}
+ 28 et.writeRange    ok   {"range":"A2","sheet":"Raw_SKU_Data","values":[[1,"=\"SKU-\"&TEXT(N2,\"0000\")","=\"WH-\"&TEXT(O2,\"
+ 29 et.writeRange    ok   {"range":"M2","sheet":"Raw_SKU_Data","values":[[0,1,1,5,1,5,"=IF(MOD(M2,7)=0,0,1)","=IF(MOD(M2,19)=0
+ 30 et.writeRange    ok   {"range":"A2","sheet":"Raw_SKU_Data","values":[["=M2+1","=\"SKU-\"&TEXT(N2,\"0000\")","=\"WH-\"&TEXT
+ 31 et.readRange     ok   {"range":"A2:Q3","sheet":"Raw_SKU_Data"}
+ 32 et.readRange     ok   {"range":"A499:A503","sheet":"Raw_SKU_Data"}
+ 33 et.readRange     ok   {"range":"M500:M503","sheet":"Raw_SKU_Data"}
+ 34 et.fillRange     ok   {"formula":"=IF(MOD(ROW()-2,500)=0,0,M1+1)","range":"M2:M50001","sheet":"Raw_SKU_Data"}
+ 35 et.fillRange     ok   {"formula":"=IF(MOD(ROW()-2,499)>=496,INDIRECT(\"N\"&(ROW()-MOD(ROW()-2,499))),INT(MOD((ROW()-2)*7,2
+ 36 et.fillRange     ok   {"formula":"=IF(MOD(ROW()-2,499)>=496,INDIRECT(\"O\"&(ROW()-MOD(ROW()-2,499))),INT(MOD((ROW()-2)*11,
+ 37 et.fillRange     ok   {"formula":"=ROUND(0.5+MOD(N2*37,970)/100,2)","range":"P2:P50001","sheet":"Raw_SKU_Data"}
+ 38 et.fillRange     ok   {"formula":"=ROUND(1+MOD(O2*13,40)/100,2)","range":"Q2:Q50001","sheet":"Raw_SKU_Data"}
+ 39 et.fillRange     ok   {"formula":"=IF(MOD(ROW()-2,7)=0,0,1)","range":"R2:R50001","sheet":"Raw_SKU_Data"}
+ 40 et.fillRange     ok   {"formula":"=IF(MOD(ROW()-2,19)=0,1,IF(MOD(ROW()-2,31)=0,2,0))","range":"S2:S50001","sheet":"Raw_SKU
+ 41 et.fillRange     ok   {"formula":"=IF(MOD(ROW()-2,41)=0,-1,IF(MOD(ROW()-2,13)=0,0,1))","range":"T2:T50001","sheet":"Raw_SK
+ 42 et.fillRange     ok   {"formula":"=IF(MOD(ROW()-2,29)=0,-1,1)","range":"U2:U50001","sheet":"Raw_SKU_Data"}
+ 43 et.fillRange     ok   {"formula":"=IF(MOD(ROW()-2,51)=0,-1,IF(MOD(ROW()-2,23)=0,2,IF(MOD(ROW()-2,37)<17,3,1)))","range":"V
+ 44 et.fillRange     ok   {"formula":"=ROUND(0.5+MOD(N2*37;970)/100;2)","range":"P2:P50001","sheet":"Raw_SKU_Data"}
+ 45 et.fillRange     ok   {"formula":"=ROUND(1+MOD(O2*13;40)/100;2)","range":"Q2:Q50001","sheet":"Raw_SKU_Data"}
+ 46 et.fillRange     ok   {"formula":"=IF(MOD(ROW()-2;7)=0;0;1)","range":"R2:R50001","sheet":"Raw_SKU_Data"}
+ 47 et.fillRange     ok   {"formula":"=IF(MOD(ROW()-2;29)=0;-1;1)","range":"U2:U50001","sheet":"Raw_SKU_Data"}
+ 48 et.fillRange     ok   {"formula":"=MOD(M2;45)","range":"W2:W50001","sheet":"Raw_SKU_Data"}
+ 49 et.fillRange     ok   {"formula":"=M2+1","range":"A2:A50001","sheet":"Raw_SKU_Data"}
+ 50 et.fillRange     ok   {"formula":"=\"SKU-\"&TEXT(N2;\"0000\")","range":"B2:B50001","sheet":"Raw_SKU_Data"}
+ 51 et.fillRange     ok   {"formula":"=\"WH-\"&TEXT(O2;\"00\")","range":"C2:C50001","sheet":"Raw_SKU_Data"}
+ 52 et.fillRange     ok   {"formula":"=CHOOSE(MOD(N2;6)+1;\"Electronics\";\"Apparel\";\"Grocery\";\"Home\";\"Sports\";\"Toys\"
+ 53 et.fillRange     ok   {"formula":"=IF(V2=-1;-ROUND(0.5+MOD(N2*37;970)/100;2);ROUND(0.5+MOD(N2*37;970)/100;2))","range":"E2
+ 54 et.fillRange     ok   {"formula":"=IF(U2=-1;-ROUND(P2*Q2*W2+MOD(N2*11;120);0);IF(U2=0;0;ROUND(P2*Q2*W2+MOD(N2*11;120);0)))
+ 55 et.fillRange     ok   {"formula":"=IF(S2=0;\"\";IF(T2=1;0;IF(T2=2;ROUND(P2*Q2*6;1);ROUND(P2*Q2*(0.55+MOD(M2*3;95)/100);1))
+ 56 et.fillRange     ok   {"formula":"=IF(S2=0;\"\";ROUND(G2;0))","range":"H2:H50001","sheet":"Raw_SKU_Data"}
+ 57 et.fillRange     ok   {"formula":"=\"SUP-\"&TEXT(MOD(N2;25)+1;\"00\")","range":"I2:I50001","sheet":"Raw_SKU_Data"}
+ 58 et.fillRange     ok   {"formula":"=ROUND(35+MOD(N2*17;240);0)","range":"J2:J50001","sheet":"Raw_SKU_Data"}
+ 59 et.fillRange     ok   {"formula":"=IF(E2<0;-ROUND(ABS(E2)*MOD(18+MOD(N2;12);32)/100;2);ROUND(E2*MOD(18+MOD(N2;12);32)/100;
+ 60 et.fillRange     ok   {"formula":"=IF(S2=0;\"\";0.95)","range":"L2:L50001","sheet":"Raw_SKU_Data"}
+ 61 et.readRange     ok   {"range":"A2:L4","sheet":"Raw_SKU_Data"}
+ 62 et.readRange     ok   {"range":"A499:L502","sheet":"Raw_SKU_Data"}
+ 63 et.readRange     ok   {"range":"A50000:L50001","sheet":"Raw_SKU_Data"}
+ 64 et.fillRange     ok   {"formula":"=IF(OR(MOD(ROW()-2;61)=0;MOD(ROW()-2;83)=0);1;0)","range":"R2:R50001","sheet":"Raw_SKU_D
+ 65 et.fillRange     ok   {"formula":"=IF(OR(MOD(ROW()-2;19)=0;MOD(ROW()-2;31)=0);0;1)","range":"S2:S50001","sheet":"Raw_SKU_D
+ 66 et.fillRange     ok   {"formula":"=IF(MOD(ROW()-2;17)=0;1;IF(MOD(ROW()-2;37)=0;2;IF(MOD(ROW()-2;23)=0;3;0)))","range":"T2:
+ 67 et.fillRange     ok   {"formula":"=IF(OR(MOD(ROW()-2;61)=0;MOD(ROW()-2;83)=0);ROUND(70+MOD(ROW()-2;60);0);1)","range":"W2:
+ 68 et.fillRange     ok   {"formula":"=IF(S2=0;\"\";IF(T2=1;0;IF(T2=2;ROUND(P2*Q2*6;1);ROUND(P2*Q2*(0.55+MOD(M2*3;95)/100);1))
+ 69 et.fillRange     ok   {"formula":"=IF(S2=0;\"\";IF(T2=3;ROUND(75+MOD(M2;45);0);ROUND(2+MOD(M2*3;18);0)))","range":"H2:H500
+ 70 et.fillRange     ok   {"formula":"=IF(T2=1;0;1)","range":"R2:R50001","sheet":"Raw_SKU_Data"}
+ 71 et.readRange     ok   {"range":"A110:L114","sheet":"Raw_SKU_Data"}
+ 72 et.readRange     ok   {"range":"A110:W114","sheet":"Raw_SKU_Data"}
+ 73 et.writeRange    ok   {"range":"M1:X1","sheet":"Raw_SKU_Data","values":[["Calc_Idx","SKU_Idx","Loc_Idx","Base_Daily","Loc_
+ 74 et.fillRange     ok   {"formula":"=IF(OR(MOD(ROW()-2;19)=0;MOD(ROW()-2;31)=0);1;0)","range":"S2:S50001","sheet":"Raw_SKU_D
+ 75 et.fillRange     ok   {"formula":"=IF(S2=1;1;IF(MOD(ROW()-2;37)=0;2;IF(MOD(ROW()-2;23)=0;3;IF(MOD(ROW()-2;22)=0;4;0))))","
+ 76 et.fillRange     ok   {"formula":"=IF(S2=1;1;IF(T2=4;1;0))","range":"R2:R50001","sheet":"Raw_SKU_Data"}
+ 77 et.fillRange     ok   {"formula":"=IF(MOD(ROW()-2;51)=0;-1;IF(MOD(ROW()-2;23)=0;2;1))","range":"V2:V50001","sheet":"Raw_SK
+ 78 et.fillRange     ok   {"formula":"=IF(S2=1;\"\";IF(T2=2;ROUND(P2*Q2*6;1);IF(T2=4;0;ROUND(P2*Q2*(0.55+MOD(M2*3;95)/100);1))
+ 79 et.fillRange     ok   {"formula":"=IF(S2=1;\"\";IF(T2=3;ROUND(75+MOD(M2;45);0);ROUND(2+MOD(M2*3;18);0)))","range":"H2:H500
+ 80 et.fillRange     ok   {"formula":"=IF(S2=1;\"\";0.95)","range":"L2:L50001","sheet":"Raw_SKU_Data"}
+ 81 et.fillRange     ok   {"formula":"=E2*F2","range":"X2:X50001","sheet":"Raw_SKU_Data"}
+ 82 et.fillRange     ok   {"formula":"=IF(COUNTIFS(OFFSET($B$2;MAX(0;ROW()-5);0;4;1);B2;OFFSET($C$2;MAX(0;ROW()-5);0;4;1);C2)>
+ 83 et.writeRange    ok   {"range":"Y1","sheet":"Raw_SKU_Data","values":[[""]]}
+ 84 et.writeRange    ok   {"range":"Y2:Y9","sheet":"Raw_SKU_Data","values":[[""],[""],[""],[""],[""],[""],[""],[""]]}
+ 85 et.writeRange    ok   {"range":"A1","sheet":"Checks","values":[["Check_ID","Check","Scope","Value","Target","Status"]]}
+ 86 et.writeRange    LOI  {"range":"A2","sheet":"Checks","values":[["DQ-01","Total SKU-Location records","Raw_SKU_Data","=COUN
+ 87 et.listSheets    LOI  null
+ 88 et.listSheets    LOI  null
+ 89 et.listSheets    LOI  null
+ 90 et.listSheets    LOI  null
+ 91 et.listSheets    ok   null
+ 92 et.writeRange    LOI  {"range":"M1:Z1","sheet":"Raw_SKU_Data","values":[["Calc_Idx","SKU_Idx","Loc_Idx","Base_Daily","Loc_
+ 93 et.fillRange     ok   {"formula":"=IF(AND(B2=B1;C2=C1);1;0)","range":"W2:W50001","sheet":"Raw_SKU_Data"}
+ 94 et.writeRange    LOI  {"range":"M1:Z1","sheet":"Raw_SKU_Data","values":[["Calc_Idx","SKU_Idx","Loc_Idx","Base_Daily","Loc_
+ 95 et.fillRange     ok   {"formula":"=IF(S2=1;0;IF(T2=3;ROUND(75+MOD(M2;45);0);ROUND(2+MOD(M2*3;18);0)))","range":"H2:H50001"
+ 96 et.writeRange    LOI  {"range":"M1:Z1","sheet":"Raw_SKU_Data","values":[["Calc_Idx","SKU_Idx","Loc_Idx","Base_Daily","Loc_
+ 97 et.writeRange    LOI  {"range":"M1:Z1","sheet":"Raw_SKU_Data","values":[["Calc_Idx","SKU_Idx","Loc_Idx","Base_Daily","Loc_
+ 98 et.listSheets    ok   null
+ 99 et.writeRange    LOI  {"range":"A2","sheet":"Checks","values":[["DQ-01","Total SKU-Location records","Raw_SKU_Data","=COUN
+100 et.listSheets    LOI  null
+101 et.listSheets    LOI  null
+102 et.listSheets    ok   null
+103 et.readRange     ok   {"range":"A1:F11","sheet":"Checks"}
+104 et.writeRange    ok   {"range":"M1:Z1","sheet":"Raw_SKU_Data","values":[["Calc_Idx","SKU_Idx","Loc_Idx","Base_Daily","Loc_
+105 et.fillRange     ok   {"formula":"=IF(S2=1;\"\";IF(T2=2;ROUND(P2*Q2*150;1);IF(T2=4;0;ROUND(P2*Q2*(0.55+MOD(M2*3;95)/100);1
+106 et.fillRange     ok   {"formula":"=IF(G2=\"\";0;G2*G2)","range":"Y2:Y50001","sheet":"Raw_SKU_Data"}
+107 et.fillRange     ok   {"formula":"=IF(G2=\"\";0;G2*365)","range":"Z2:Z50001","sheet":"Raw_SKU_Data"}
+108 et.writeRange    ok   {"range":"E2","sheet":"Checks","values":[[500]]}
+109 et.fillRange     ok   {"formula":"=CHOOSE(COLUMN()-7,$N$2*100+1,$O$2*1000+2)","range":"H2:I4","sheet":"Checks"}
+110 et.readRange     ok   {"range":"H2:I4","sheet":"Checks"}
+111 et.fillRange     ok   {"formula":"=CHOOSE(COLUMN()-7,Raw_SKU_Data.$E2,Raw_SKU_Data.$J2)","range":"H2:I4","sheet":"Checks"}
+112 et.writeRange    ok   {"range":"A1","sheet":"Product_Master","values":[["SKU","Category","Unit_Cost","Supplier","Order_Cos
+113 et.fillRange     ok   {"formula":"=\"SKU-\"&TEXT(ROW()-1;\"0000\")","range":"A2:A221","sheet":"Product_Master"}
+114 et.fillRange     ok   {"formula":"=CHOOSE(MOD(ROW()-1;6)+1;\"Electronics\";\"Apparel\";\"Grocery\";\"Home\";\"Sports\";\"T
+115 et.fillRange     ok   {"formula":"=ROUND(0.5+MOD((ROW()-1)*37;970)/100;2)","range":"C2:C221","sheet":"Product_Master"}
+116 et.fillRange     ok   {"formula":"=\"SUP-\"&TEXT(MOD(ROW()-1;25)+1;\"00\")","range":"D2:D221","sheet":"Product_Master"}
+117 et.fillRange     ok   {"formula":"=ROUND(35+MOD((ROW()-1)*17;240);0)","range":"E2:E221","sheet":"Product_Master"}
+118 et.fillRange     ok   {"formula":"=ROUND(C2*MOD(18+MOD(ROW()-1;12);32)/100;2)","range":"F2:F221","sheet":"Product_Master"}
+119 et.fillRange     ok   {"formula":"=ROUND(5+MOD((ROW()-1)*13;25);0)","range":"G2:G221","sheet":"Product_Master"}
+120 et.fillRange     ok   {"formula":"=0.95","range":"H2:H221","sheet":"Product_Master"}
+121 et.writeRange    LOI  {"range":"A1","sheet":"Dashboard","values":[["INVENTORY OPTIMIZATION DASHBOARD","",""],["","",""],["
+122 et.writeRange    LOI  {"range":"A1","sheet":"Inventory","values":[["Record_ID","SKU","Location","Category","Unit_Cost","Cu
+123 et.listSheets    LOI  null
+124 et.listSheets    ok   null
+125 et.writeRange    LOI  {"range":"A1","sheet":"Dashboard","values":[["INVENTORY OPTIMIZATION DASHBOARD","",""],["","",""],["
+126 et.readRange     ok   {"range":"A1:C10","sheet":"Dashboard"}
+127 et.writeRange    LOI  {"range":"A1","sheet":"Inventory","values":[["Record_ID","SKU","Location","Category","Unit_Cost","Cu
+128 et.readRange     ok   {"range":"A1:R1","sheet":"Inventory"}
+129 et.fillRange     ok   {"formula":"=Raw_SKU_Data.A2","range":"A2:A50001","sheet":"Inventory"}
+130 et.fillRange     ok   {"formula":"=Raw_SKU_Data.B2","range":"B2:B50001","sheet":"Inventory"}
+131 et.fillRange     ok   {"formula":"=Raw_SKU_Data.C2","range":"C2:C50001","sheet":"Inventory"}
+132 et.fillRange     ok   {"formula":"=Raw_SKU_Data.D2","range":"D2:D50001","sheet":"Inventory"}
+133 et.fillRange     ok   {"formula":"=Raw_SKU_Data.E2","range":"E2:E50001","sheet":"Inventory"}
+134 et.fillRange     ok   {"formula":"=Raw_SKU_Data.F2","range":"F2:F50001","sheet":"Inventory"}
+135 et.fillRange     ok   {"formula":"=E2*F2","range":"G2:G50001","sheet":"Inventory"}
+136 et.fillRange     ok   {"formula":"=IF(Raw_SKU_Data.G2=\"\";0;Raw_SKU_Data.G2)","range":"H2:H50001","sheet":"Inventory"}
+137 et.fillRange     ok   {"formula":"=IF(Raw_SKU_Data.H2=\"\";0;Raw_SKU_Data.H2)","range":"I2:I50001","sheet":"Inventory"}
+138 et.fillRange     ok   {"formula":"=H2*Dashboard.$B$7","range":"J2:J50001","sheet":"Inventory"}
+139 et.fillRange     ok   {"formula":"=IF(Raw_SKU_Data.L2=\"\";Dashboard.$B$5;Raw_SKU_Data.L2)","range":"K2:K50001","sheet":"I
+140 et.fillRange     ok   {"formula":"=IFERROR(ROUND(SQRT(MAX(0;Raw_SKU_Data.Y2/Raw_SKU_Data.A2-H2*H2));4);0)","range":"L2:L50
+141 et.fillRange     ok   {"formula":"=IF(OR(J2=0;L2=0);0;ROUND(NORMSINV(K2)*L2*SQRT(I2);2))","range":"M2:M50001","sheet":"Inv
+142 et.fillRange     ok   {"formula":"=ROUND(H2*I2+M2;2)","range":"N2:N50001","sheet":"Inventory"}
+143 et.fillRange     ok   {"formula":"=IFERROR(IF(OR(K2<=0;J2<=0);0;ROUND(SQRT(2*J2*Raw_SKU_Data.J2/K2);0));0)","range":"O2:O5
+144 et.fillRange     ok   {"formula":"=IF(M2=0;0;IF(F2<M2;1;0))","range":"P2:P50001","sheet":"Inventory"}
+145 et.fillRange     ok   {"formula":"=IF(H2=0;999;ROUND(F2/H2;1))","range":"Q2:Q50001","sheet":"Inventory"}
+146 et.fillRange     ok   {"formula":"=IF(N2=0;0;MAX(0;F2-N2))","range":"R2:R50001","sheet":"Inventory"}
+147 et.readRange     ok   {"range":"A2:R5","sheet":"Inventory"}
+148 et.fillRange     ok   {"formula":"=ROUND(H2*(0.15+MOD(A2;60)/100);4)","range":"L2:L50001","sheet":"Inventory"}
+149 et.writeRange    ok   {"range":"S1","sheet":"Inventory","values":[["Demand_CV"]]}
+150 et.fillRange     ok   {"formula":"=IF(H2=0;0;ROUND(L2/H2;3))","range":"S2:S50001","sheet":"Inventory"}
+151 et.readRange     ok   {"range":"A2:S5","sheet":"Inventory"}
+152 et.writeRange    ok   {"range":"A1","sheet":"Reorder_Point","values":[["SKU","Location","Avg_Daily_Demand","Lead_Time","De
+153 et.fillRange     ok   {"formula":"=IF(COLUMN()=3,Inventory.$H2*Inventory.$I2,IF(COLUMN()=4,Inventory.$I2,IF(COLUMN()=5,Inv
+154 et.fillRange     ok   {"formula":"=Inventory.$B2","range":"A2:A50001","sheet":"Reorder_Point"}
+155 et.fillRange     ok   {"formula":"=Inventory.$C2","range":"B2:B50001","sheet":"Reorder_Point"}
+156 et.fillRange     ok   {"formula":"=Inventory.$H2","range":"C2:C50001","sheet":"Reorder_Point"}
+157 et.fillRange     ok   {"formula":"=Inventory.$I2","range":"D2:D50001","sheet":"Reorder_Point"}
+158 et.fillRange     ok   {"formula":"=C2*D2","range":"E2:E50001","sheet":"Reorder_Point"}
+159 et.fillRange     ok   {"formula":"=Inventory.$M2","range":"F2:F50001","sheet":"Reorder_Point"}
+160 et.fillRange     ok   {"formula":"=E2+F2","range":"G2:G50001","sheet":"Reorder_Point"}
+161 et.fillRange     ok   {"formula":"=ROUND(G2,0)","range":"H2:H50001","sheet":"Reorder_Point"}
+162 et.fillRange     ok   {"formula":"=Inventory.$F2","range":"I2:I50001","sheet":"Reorder_Point"}
+163 et.fillRange     ok   {"formula":"=IF(I2<G2,1,0)","range":"J2:J50001","sheet":"Reorder_Point"}
+164 et.fillRange     ok   {"formula":"=IF(ABS(G2-Inventory.$N2)<0.01,\"OK\",\"MISMATCH\")","range":"K2:K50001","sheet":"Reorde
+165 et.writeRange    ok   {"range":"A1","sheet":"EOQ","values":[["SKU","Location","Annual_Demand","Order_Cost","Holding_Cost_P
+166 et.fillRange     ok   {"formula":"=Inventory.$B2","range":"A2:A50001","sheet":"EOQ"}
+167 et.fillRange     ok   {"formula":"=Inventory.$C2","range":"B2:B50001","sheet":"EOQ"}
+168 et.fillRange     ok   {"formula":"=Inventory.$J2","range":"C2:C50001","sheet":"EOQ"}
+169 et.fillRange     ok   {"formula":"=Raw_SKU_Data.$J2","range":"D2:D50001","sheet":"EOQ"}
+170 et.fillRange     ok   {"formula":"=Inventory.$K2","range":"E2:E50001","sheet":"EOQ"}
+171 et.fillRange     ok   {"formula":"=Inventory.$E2","range":"F2:F50001","sheet":"EOQ"}
+172 et.fillRange     ok   {"formula":"=IFERROR(SQRT(2*C2*D2/E2);0)","range":"G2:G50001","sheet":"EOQ"}
+173 et.fillRange     ok   {"formula":"=IFERROR(IF(OR(C2<=0;D2<=0;E2<=0);0;ROUND(G2,0));0)","range":"H2:H50001","sheet":"EOQ"}
+174 et.fillRange     ok   {"formula":"=IF(H2<=0;0;ROUND(C2/H2,2))","range":"I2:I50001","sheet":"EOQ"}
+175 et.fillRange     ok   {"formula":"=IF(OR(C2<=0;D2<=0;E2<=0);\"GUARDED\";\"VALID\")","range":"J2:J50001","sheet":"EOQ"}
+176 et.fillRange     ok   {"formula":"=IF(OR(C2<=0;D2<=0;E2<=0);1;0)","range":"K2:K50001","sheet":"EOQ"}
+177 et.readRange     ok   {"range":"H2:S5","sheet":"Inventory"}
+178 et.readRange     ok   {"range":"A2:K4","sheet":"EOQ"}
+179 et.fillRange     ok   {"formula":"=Raw_SKU_Data.$K2","range":"E2:E50001","sheet":"EOQ"}
+180 et.readRange     ok   {"range":"C2:K4","sheet":"EOQ"}
+181 et.writeRange    ok   {"range":"A1","sheet":"Forecast","values":[["SKU","Location","Avg_Daily_Demand","Demand_Std_Dev","Tr
+182 et.fillRange     ok   {"formula":"=Inventory.$B2","range":"A2:A50001","sheet":"Forecast"}
+183 et.fillRange     ok   {"formula":"=Inventory.$C2","range":"B2:B50001","sheet":"Forecast"}
+184 et.fillRange     ok   {"formula":"=Inventory.$H2","range":"C2:C50001","sheet":"Forecast"}
+185 et.fillRange     ok   {"formula":"=Inventory.$L2","range":"D2:D50001","sheet":"Forecast"}
+186 et.fillRange     ok   {"formula":"=0.95+MOD(ROW()-2;11)/100","range":"E2:E50001","sheet":"Forecast"}
+187 et.fillRange     ok   {"formula":"=ROUND(C2*E2*30;1)","range":"F2:F50001","sheet":"Forecast"}
+188 et.fillRange     ok   {"formula":"=ROUND(C2*Dashboard.$B$7*E2;0)","range":"G2:G50001","sheet":"Forecast"}
+189 et.fillRange     ok   {"formula":"=ROUND(0.8+MOD(ROW()-2;15)/100;2)","range":"H2:H50001","sheet":"Forecast"}
+190 et.writeRange    ok   {"range":"A1","sheet":"Demand_History","values":[["SKU","Category","Month_Index","Monthly_Demand","U
+191 et.fillRange     ok   {"formula":"=INDEX(Product_Master.$A$2:$A$221;MOD(ROW()-2;220)+1)","range":"A2:A6001","sheet":"Deman
+192 et.fillRange     ok   {"formula":"=INDEX(Product_Master.$B$2:$B$221;MOD(ROW()-2;220)+1)","range":"B2:B6001","sheet":"Deman
+193 et.fillRange     ok   {"formula":"=MOD(ROW()-2;12)+1","range":"C2:C6001","sheet":"Demand_History"}
+194 et.fillRange     ok   {"formula":"=ROUND((0.5+MOD(MOD(ROW()-2;220)*37;970)/100)*30*(0.9+MOD(ROW()-2;7)*0.03);0)","range":"
+195 et.fillRange     ok   {"formula":"=INDEX(Product_Master.$C$2:$C$221;MOD(ROW()-2;220)+1)","range":"E2:E6001","sheet":"Deman
+196 et.fillRange     ok   {"formula":"=D2*E2","range":"F2:F6001","sheet":"Demand_History"}
+197 et.fillRange     ok   {"formula":"=IF(D2=0;\"ZERO\";IF(D2>200;\"EXTREME\";\"NORMAL\"))","range":"G2:G6001","sheet":"Demand
+198 et.fillRange     ok   {"formula":"=ROUND(0.05+MOD(ROW()-2;60)/100;3)","range":"H2:H6001","sheet":"Demand_History"}
+199 et.writeRange    ok   {"range":"A1","sheet":"Safety_Stock","values":[["SKU","Location","Service_Level","Z_Score","Sigma_Da
+200 et.fillRange     ok   {"formula":"=Inventory.$B2","range":"A2:A50001","sheet":"Safety_Stock"}
+201 et.fillRange     ok   {"formula":"=Inventory.$C2","range":"B2:B50001","sheet":"Safety_Stock"}
+202 et.fillRange     ok   {"formula":"=Inventory.$K2","range":"C2:C50001","sheet":"Safety_Stock"}
+203 et.fillRange     ok   {"formula":"=IFERROR(ROUND(NORMSINV(C2),4),0)","range":"D2:D50001","sheet":"Safety_Stock"}
+204 et.fillRange     ok   {"formula":"=Inventory.$L2","range":"E2:E50001","sheet":"Safety_Stock"}
+205 et.fillRange     ok   {"formula":"=Inventory.$I2","range":"F2:F50001","sheet":"Safety_Stock"}
+206 et.fillRange     ok   {"formula":"=Inventory.$M2","range":"G2:G50001","sheet":"Safety_Stock"}
+207 et.fillRange     ok   {"formula":"=ROUND(G2,0)","range":"H2:H50001","sheet":"Safety_Stock"}
+208 et.fillRange     ok   {"formula":"=\"Z x sigma x SQRT(LT)\"","range":"I2:I50001","sheet":"Safety_Stock"}
+209                  LOI  
+210 et.fillRange     ok   {"formula":"=ROUND(Inventory.$N2*1.5,0)","range":"K2:K50001","sheet":"Safety_Stock"}
+211 et.fillRange     ok   {"formula":"=ROUND(G2*0.5;0)","range":"J2:J50001","sheet":"Safety_Stock"}
+212 et.fillRange     ok   {"formula":"=ROUND(Inventory.$N2*1.5;0)","range":"K2:K50001","sheet":"Safety_Stock"}
+213 et.writeRange    LOI  {"range":"A1","sheet":"Risk","values":[["SKU","Location","Category","Current_Stock","Reorder_Point",
+214 et.fillRange     ok   {"formula":"=Inventory.$B2","range":"A2:A50001","sheet":"Risk"}
+215 et.fillRange     ok   {"formula":"=Inventory.$C2","range":"B2:B50001","sheet":"Risk"}
+216 et.fillRange     ok   {"formula":"=Inventory.$D2","range":"C2:C50001","sheet":"Risk"}
+217 et.fillRange     ok   {"formula":"=Inventory.$F2","range":"D2:D50001","sheet":"Risk"}
+218 et.fillRange     ok   {"formula":"=Inventory.$N2","range":"E2:E50001","sheet":"Risk"}
+219 et.fillRange     ok   {"formula":"=Inventory.$M2","range":"F2:F50001","sheet":"Risk"}
+220 et.fillRange     ok   {"formula":"=Inventory.$O2","range":"G2:G50001","sheet":"Risk"}
+221 et.fillRange     ok   {"formula":"=Inventory.$Q2","range":"H2:H50001","sheet":"Risk"}
+222 et.fillRange     ok   {"formula":"=Inventory.$S2","range":"I2:I50001","sheet":"Risk"}
+223 et.fillRange     ok   {"formula":"=Inventory.$I2","range":"J2:J50001","sheet":"Risk"}
+224 et.fillRange     ok   {"formula":"=IF(D2<E2,IF(D2<F2,\"HIGH\",\"MEDIUM\"),\"LOW\")","range":"K2:K50001","sheet":"Risk"}
+225 et.fillRange     ok   {"formula":"=IF(OR(D2<=0,G2<=0),\"LOW\",IF(D2>G2*3,\"HIGH\",IF(D2>G2*1.5,\"MEDIUM\",\"LOW\")))","ran
+226 et.fillRange     ok   {"formula":"=IF(J2>45,\"HIGH\",IF(J2>21,\"MEDIUM\",\"LOW\"))","range":"M2:M50001","sheet":"Risk"}
+227 et.fillRange     ok   {"formula":"=IF(I2>0.45,\"HIGH\",IF(I2>0.25,\"MEDIUM\",\"LOW\"))","range":"N2:N50001","sheet":"Risk"
+228 et.fillRange     ok   {"formula":"=IF(K2=\"HIGH\",40,IF(K2=\"MEDIUM\",20,0))+IF(L2=\"HIGH\",25,IF(L2=\"MEDIUM\",12,0))+IF(
+229 et.fillRange     ok   {"formula":"=IF(O2>=60,\"CRITICAL\",IF(O2>=35,\"HIGH\",IF(O2>=15,\"MEDIUM\",\"LOW\")))","range":"P2:
+230 et.fillRange     ok   {"formula":"=TRIM(IF(K2=\"HIGH\",\"STOCKOUT \",IF(K2=\"MEDIUM\",\"STOCKOUT-M \",\"\"))&IF(L2=\"HIGH\
+231 et.writeRange    LOI  {"range":"A1:Q1","sheet":"Risk","values":[["SKU","Location","Category","Current_Stock","Reorder_Poin
+232 et.writeRange    ok   {"range":"A1","sheet":"Optimization","values":[["SKU","Location","Category","Current_Stock","Recomme
+233 et.fillRange     ok   {"formula":"=Inventory.$B2","range":"A2:A50001","sheet":"Optimization"}
+234 et.fillRange     ok   {"formula":"=Inventory.$C2","range":"B2:B50001","sheet":"Optimization"}
+235 et.fillRange     ok   {"formula":"=Inventory.$D2","range":"C2:C50001","sheet":"Optimization"}
+236 et.fillRange     ok   {"formula":"=Inventory.$F2","range":"D2:D50001","sheet":"Optimization"}
+237 et.fillRange     ok   {"formula":"=IF(D2>=Inventory.$N2;0;ROUND(Inventory.$N2-D2+Inventory.$O2;0))","range":"E2:E50001","s
+238 et.fillRange     ok   {"formula":"=Inventory.$N2","range":"F2:F50001","sheet":"Optimization"}
+239 et.fillRange     ok   {"formula":"=Risk.$O2","range":"G2:G50001","sheet":"Optimization"}
+240 et.fillRange     ok   {"formula":"=IF(G2>=60;\"P1 - URGENT\";IF(G2>=35;\"P2 - HIGH\";IF(G2>=15;\"P3 - MEDIUM\";\"P4 - LOW\
+241 et.fillRange     ok   {"formula":"=ROUND(G2*Inventory.$K2/100;2)","range":"I2:I50001","sheet":"Optimization"}
+242 et.fillRange     ok   {"formula":"=IF(AND(D2<Inventory.$N2;Inventory.$O2>0);\"REORDER NOW\";IF(G2>=35;\"EXPEDITE REVIEW\";
+243 et.fillRange     ok   {"formula":"=D2+E2","range":"K2:K50001","sheet":"Optimization"}
+244 et.fillRange     ok   {"formula":"=Risk.$P2","range":"L2:L50001","sheet":"Optimization"}
+245 et.writeRange    LOI  {"range":"A1:Q1","sheet":"Risk","values":[["SKU","Location","Category","Current_Stock","Reorder_Poin
+246 et.writeRange    LOI  {"range":"A1:G11","sheet":"Checks","values":[["Check_ID","Check","Scope","Value","Expected","Status"
+247 et.readRange     LOI  {"range":"A1:C3","sheet":"Risk"}
+248 et.readRange     LOI  {"range":"A1:Q3","sheet":"Risk"}
+249 et.readRange     LOI  {"range":"A1:Q3","sheet":"Risk"}
+250 et.readRange     LOI  {"range":"A1:Q3","sheet":"Risk"}
+251 et.listSheets    ok   null
+252 et.writeRange    LOI  {"range":"A1:Q1","sheet":"Risk","values":[["SKU","Location","Category","Current_Stock","Reorder_Poin
+253 et.listSheets    ok   null
+254 et.fillRange     ok   {"formula":"=IF(MOD(ROW()-2;500)<4;152;INT(MOD((ROW()-2)*7;220))+1)","range":"N2:N50001","sheet":"Ra
+255 et.fillRange     ok   {"formula":"=IF(MOD(ROW()-2;500)<4;24;INT(MOD((ROW()-2)*11;50))+1)","range":"O2:O50001","sheet":"Raw
+256 et.writeRange    ok   {"range":"A1:Q1","sheet":"Risk","values":[["SKU","Location","Category","Current_Stock","Reorder_Poin
+257 et.writeRange    ok   {"range":"A1:G24","sheet":"Checks","values":[["Check_ID","Check","Scope","Value","Expected","Status"
+258 et.readRange     ok   {"range":"A1:G24","sheet":"Checks"}
+259 et.writeRange    ok   {"range":"T1","sheet":"Inventory","values":[["Shortfall_Units"]]}
+260 et.fillRange     ok   {"formula":"=MAX(0;N2-F2)","range":"T2:T50001","sheet":"Inventory"}
+261 et.writeRange    ok   {"range":"A12","sheet":"Dashboard","values":[["KEY PERFORMANCE INDICATORS","",""],["Metric","Value",
+262 et.writeRange    ok   {"range":"A26:D32","sheet":"Dashboard","values":[["RISK CLASS BREAKDOWN","","",""],["Risk_Class","SK
+263 et.writeRange    ok   {"range":"F26:H31","sheet":"Dashboard","values":[["RISK FLAG COUNTS","",""],["Flag","Count","Invento
+264 et.writeRange    ok   {"range":"A34:F46","sheet":"Dashboard","values":[["TOP 10 RISKY SKUs (by risk score)","","","","",""
+265 et.writeRange    ok   {"range":"H34:J42","sheet":"Dashboard","values":[["INVENTORY BY CATEGORY","",""],["Category","SKU_Lo
+266 et.writeRange    ok   {"range":"L34:N46","sheet":"Dashboard","values":[["INVENTORY BY LOCATION (top 10)","",""],["Location
+267 et.writeRange    ok   {"range":"A48:D61","sheet":"Dashboard","values":[["DEMAND TREND - LAST 12 MONTHS","","",""],["Month"
+268 et.writeRange    ok   {"range":"A62:D64","sheet":"Dashboard","values":[["TOTAL","","=SUM(C50:C61)","=SUM(D50:D61)"],["",""
+269 et.writeRange    ok   {"range":"M46","sheet":"Dashboard","values":[["=SUM(M36:M45)"]]}
+270 et.readRange     ok   {"range":"A12:C24","sheet":"Dashboard"}
+271 et.fillRange     ok   {"formula":"=IF(D2<=0;\"LOW\";IF(H2>=999;\"LOW\";IF(H2>90;\"HIGH\";IF(H2>45;\"MEDIUM\";\"LOW\"))))",
+272 et.writeRange    ok   {"range":"C15","sheet":"Dashboard","values":[["of 50,000 SKU-location records"]]}
+273 et.readRange     ok   {"range":"A26:H42","sheet":"Dashboard"}
+274 et.writeRange    ok   {"range":"M1","sheet":"Optimization","values":[["Rank_Key"]]}
+275 et.fillRange     ok   {"formula":"=G2+(ROW()-2)/1000000","range":"M2:M50001","sheet":"Optimization"}
+276 et.fillRange     ok   {"formula":"=IF(I2>0.5,\"HIGH\",IF(I2>0.3,\"MEDIUM\",\"LOW\"))","range":"N2:N50001","sheet":"Risk"}
+277 et.writeRange    ok   {"range":"A34:F46","sheet":"Dashboard","values":[["TOP 10 RISKY SKUs (ranked by risk score)","","","
+278 et.readRange     ok   {"range":"A34:N62","sheet":"Dashboard"}
+279 et.writeRange    ok   {"range":"A36:F46","sheet":"Dashboard","values":[["=ROW()-35","=IFERROR(INDEX(Optimization.$A$2:$A$5
+280 et.readRange     ok   {"range":"A34:F47","sheet":"Dashboard"}
+281 et.readRange     ok   {"range":"A2:L4","sheet":"Optimization"}
+282 et.formatRange   ok   {"bold":true,"fillColor":"#1F4E79","fontColor":"#FFFFFF","horizontal":"center","range":"A1:L1","shee
+283 et.formatRange   ok   {"bold":true,"fillColor":"#1F4E79","fontColor":"#FFFFFF","horizontal":"center","range":"A1:H1","shee
+284 et.formatRange   ok   {"bold":true,"fillColor":"#1F4E79","fontColor":"#FFFFFF","horizontal":"center","range":"A1:H1","shee
+285 et.formatRange   ok   {"bold":true,"fillColor":"#1F4E79","fontColor":"#FFFFFF","horizontal":"center","range":"A1:T1","shee
+286 et.formatRange   ok   {"bold":true,"fillColor":"#1F4E79","fontColor":"#FFFFFF","horizontal":"center","range":"A1:H1","shee
+287 et.formatRange   ok   {"bold":true,"fillColor":"#1F4E79","fontColor":"#FFFFFF","horizontal":"center","range":"A1:K1","shee
+288 et.formatRange   ok   {"bold":true,"fillColor":"#1F4E79","fontColor":"#FFFFFF","horizontal":"center","range":"A1:K1","shee
+289 et.formatRange   ok   {"bold":true,"fillColor":"#1F4E79","fontColor":"#FFFFFF","horizontal":"center","range":"A1:K1","shee
+290 et.formatRange   ok   {"bold":true,"fillColor":"#1F4E79","fontColor":"#FFFFFF","horizontal":"center","range":"A1:Q1","shee
+291 et.formatRange   ok   {"bold":true,"fillColor":"#1F4E79","fontColor":"#FFFFFF","horizontal":"center","range":"A1:M1","shee
+292 et.formatRange   ok   {"bold":true,"fillColor":"#1F4E79","fontColor":"#FFFFFF","horizontal":"center","range":"A1:G1","shee
+293 et.formatRange   ok   {"numFmt":"#,##0.00","range":"E2:E50001","sheet":"Raw_SKU_Data"}
+294 et.formatRange   ok   {"numFmt":"#,##0","range":"F2:F50001","sheet":"Raw_SKU_Data"}
+295 et.formatRange   ok   {"numFmt":"#,##0.0","range":"G2:G50001","sheet":"Raw_SKU_Data"}
+296 et.formatRange   ok   {"numFmt":"#,##0","range":"H2:H50001","sheet":"Raw_SKU_Data"}
+297 et.formatRange   ok   {"numFmt":"#,##0.00","range":"J2:K50001","sheet":"Raw_SKU_Data"}
+298 et.formatRange   ok   {"numFmt":"0.0%","range":"L2:L50001","sheet":"Raw_SKU_Data"}
+299 et.formatRange   ok   {"numFmt":"#,##0.00","range":"E2:E50001","sheet":"Inventory"}
+300 et.formatRange   ok   {"numFmt":"#,##0","range":"F2:G50001","sheet":"Inventory"}
+301 et.formatRange   ok   {"numFmt":"#,##0.0","range":"H2:H50001","sheet":"Inventory"}
+302 et.formatRange   ok   {"numFmt":"#,##0","range":"I2:I50001","sheet":"Inventory"}
+303 et.formatRange   ok   {"numFmt":"#,##0","range":"J2:J50001","sheet":"Inventory"}
+304 et.formatRange   ok   {"numFmt":"0.0%","range":"K2:K50001","sheet":"Inventory"}
+305 et.formatRange   ok   {"numFmt":"#,##0.000","range":"L2:L50001","sheet":"Inventory"}
+306 et.formatRange   ok   {"numFmt":"#,##0.00","range":"M2:O50001","sheet":"Inventory"}
+307 et.formatRange   ok   {"numFmt":"#,##0.0","range":"Q2:R50001","sheet":"Inventory"}
+308 et.formatRange   ok   {"numFmt":"#,##0.000","range":"S2:S50001","sheet":"Inventory"}
+309 et.formatRange   ok   {"bold":true,"fontColor":"#1F4E79","fontSize":14,"range":"A1","sheet":"Dashboard"}
+310 et.formatRange   ok   {"bold":true,"fontColor":"#C55A11","fontSize":12,"range":"A3","sheet":"Dashboard"}
+311 et.formatRange   ok   {"bold":true,"fillColor":"#1F4E79","fontColor":"#FFFFFF","range":"A4:C4","sheet":"Dashboard"}
+312 et.formatRange   ok   {"bold":true,"fillColor":"#FFF2CC","fontSize":12,"numFmt":"0.0%","range":"B5","sheet":"Dashboard"}
+313 et.formatRange   ok   {"numFmt":"0.0000","range":"B6","sheet":"Dashboard"}
+314 et.formatRange   ok   {"numFmt":"#,##0","range":"B7:B8","sheet":"Dashboard"}
+315 et.formatRange   ok   {"numFmt":"0.0%","range":"B9","sheet":"Dashboard"}
+316 et.formatRange   ok   {"bold":true,"fontColor":"#C55A11","fontSize":12,"range":"A12","sheet":"Dashboard"}
+317 et.formatRange   ok   {"bold":true,"fillColor":"#1F4E79","fontColor":"#FFFFFF","range":"A13:C13","sheet":"Dashboard"}
+318 et.formatRange   ok   {"numFmt":"#,##0.00","range":"B14","sheet":"Dashboard"}
+319 et.formatRange   ok   {"numFmt":"#,##0","range":"B15","sheet":"Dashboard"}
+320 et.formatRange   ok   {"numFmt":"#,##0.00","range":"B16:B17","sheet":"Dashboard"}
+321 et.formatRange   ok   {"numFmt":"#,##0","range":"B18:B19","sheet":"Dashboard"}
+322 et.formatRange   ok   {"numFmt":"0.0","range":"B20","sheet":"Dashboard"}
+323 et.formatRange   ok   {"numFmt":"#,##0","range":"B21:B24","sheet":"Dashboard"}
+324 et.formatRange   ok   {"bold":true,"fillColor":"#1F4E79","fontColor":"#FFFFFF","range":"A26:G27","sheet":"Dashboard"}
+325 et.formatRange   ok   {"numFmt":"#,##0","range":"B28:B32","sheet":"Dashboard"}
+326 et.formatRange   ok   {"numFmt":"#,##0.00","range":"C28:C32","sheet":"Dashboard"}
+327 et.formatRange   ok   {"numFmt":"0.0%","range":"D28:D31","sheet":"Dashboard"}
+328 et.formatRange   ok   {"numFmt":"#,##0","range":"G28:G31","sheet":"Dashboard"}
+329 et.formatRange   ok   {"numFmt":"#,##0.00","range":"H28:H31","sheet":"Dashboard"}
+330 et.formatRange   ok   {"bold":true,"fillColor":"#1F4E79","fontColor":"#FFFFFF","range":"A34:F35","sheet":"Dashboard"}
+331 et.formatRange   ok   {"numFmt":"0.0","range":"D36:D45","sheet":"Dashboard"}
+332 et.formatRange   ok   {"bold":true,"fillColor":"#1F4E79","fontColor":"#FFFFFF","range":"H34:J35","sheet":"Dashboard"}
+333 et.formatRange   ok   {"numFmt":"#,##0","range":"I36:I42","sheet":"Dashboard"}
+334 et.formatRange   ok   {"numFmt":"#,##0.00","range":"J36:J42","sheet":"Dashboard"}
+335 et.formatRange   ok   {"bold":true,"fillColor":"#DEEAF6","range":"H42:J42","sheet":"Dashboard"}
+336 et.formatRange   ok   {"bold":true,"fillColor":"#1F4E79","fontColor":"#FFFFFF","range":"L34:N35","sheet":"Dashboard"}
+337 et.formatRange   ok   {"numFmt":"#,##0","range":"M36:M46","sheet":"Dashboard"}
+338 et.formatRange   ok   {"numFmt":"#,##0.00","range":"N36:N46","sheet":"Dashboard"}
+339 et.formatRange   ok   {"bold":true,"fillColor":"#DEEAF6","range":"L46:N46","sheet":"Dashboard"}
+340 et.formatRange   ok   {"bold":true,"fillColor":"#1F4E79","fontColor":"#FFFFFF","range":"A48:D49","sheet":"Dashboard"}
+341 et.formatRange   ok   {"numFmt":"#,##0","range":"B50:B61","sheet":"Dashboard"}
+342 et.formatRange   ok   {"numFmt":"#,##0","range":"C50:C62","sheet":"Dashboard"}
+343 et.formatRange   ok   {"numFmt":"#,##0.00","range":"D50:D62","sheet":"Dashboard"}
+344 et.formatRange   ok   {"bold":true,"fillColor":"#DEEAF6","range":"A62:D62","sheet":"Dashboard"}
+345 et.formatRange   ok   {"bold":true,"fillColor":"#DEEAF6","range":"A26","sheet":"Checks"}
+346 et.formatRange   ok   {"horizontal":"right","range":"D2:D24","sheet":"Checks"}
+347 et.formatRange   ok   {"bold":true,"horizontal":"center","range":"F2:F24","sheet":"Checks"}
+348 et.writeRange    ok   {"range":"Q44","sheet":"Dashboard","values":[["CHART DATA - DEMAND TREND","Demand_Units"],[1,"=C50"]
+349 et.writeRange    ok   {"range":"Q59","sheet":"Dashboard","values":[["CHART DATA - CATEGORY","Inventory_Value"],["=H36","=J
+350 et.writeRange    ok   {"range":"Q68","sheet":"Dashboard","values":[["CHART DATA - LOCATION","Inventory_Value"],["=L36","=N
+351 et.addChart      ok   {"anchor":"A65","height":7.5,"name":"DemandTrend","range":"Q44:R56","sheet":"Dashboard","title":"Dem
+352 et.addChart      ok   {"anchor":"G65","height":7.5,"name":"CategoryValue","range":"Q59:R65","sheet":"Dashboard","title":"I
+353 et.addChart      ok   {"anchor":"M65","height":7.5,"name":"LocationValue","range":"Q68:R78","sheet":"Dashboard","title":"I
