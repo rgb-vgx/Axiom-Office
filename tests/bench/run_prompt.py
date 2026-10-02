@@ -55,8 +55,11 @@ def main() -> int:
         return 2
     core_port, bridge_port, pid, prompt_file, log_path = sys.argv[1:6]
     token = sys.argv[6] if len(sys.argv) > 6 else ""
-    # Tuy chon: <file_luu> - luu tai lieu ra day sau khi luot chay ket thuc.
+    # Tuy chon: <file_luu> <max_tokens>.
+    #   <file_luu>  - luu tai lieu ra day sau khi luot chay ket thuc.
+    #   <max_tokens> - ngan sach token PHAI TRA cho ca luot (mac dinh 400000; Core chan tren o 1.000.000).
     save_path = sys.argv[7] if len(sys.argv) > 7 else ""
+    max_tokens = int(sys.argv[8]) if len(sys.argv) > 8 else 400000
     with open(prompt_file, encoding="utf-8") as handle:
         prompt = handle.read()
 
@@ -69,7 +72,7 @@ def main() -> int:
         # giua cac lan chay: cung mot con so, doi cach tinh thi luot chay di duoc bao xa.
         # maxRounds 100 da la nut that that su o Test 1 (dung sau 315 tool call), nen nang len de bai
         # khong bi cat vi so vong khi dang con tien.
-        "options": {"maxRounds": 300, "maxTokens": 400000},
+        "options": {"maxRounds": 300, "maxTokens": max_tokens},
     }, token)
     if not created.get("ok"):
         print("KHONG TAO DUOC LUOT CHAY:", created)
