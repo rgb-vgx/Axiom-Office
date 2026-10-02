@@ -1,0 +1,139 @@
+DOI CHIEU GIA TRI - Test 1, 2, 3 (02/10/2026)
+Lenh: python tests/bench/compare_values.py <file Axiom .ods> <file Claude Code>
+A = test/bench/result/axiom-testN*.ods | B = test/bench/testN/ (ban Claude Code)
+
+########## test1 ##########
+=== A: axiom-test1wide.xlsx
+sheet                       vung dung  cong thuc         so      chu  chua tinh
+Raw_Data                    A1:AP1007      23128          0       36         12
+Assumptions                    A1:E21          3         30       57          0
+Revenue                        A1:G33         87          0       37          0
+COGS                           A1:F16         65          0       20          0
+PnL                            A1:R16        179         12       30          0
+Budget_vs_Actual               A1:U26        104          0       35          0
+Forecast                       A1:N16        169          0       28          0
+Scenarios                      A1:O19         69          0       33          2
+KPI                            A1:E44         74          6       47          0
+Dashboard                      A1:F96        138          1      110          0
+Checks                         A1:F43        114         37       86          0
+tong cong thuc: 24130 | o loi: 0 | cong thuc CHUA co ket qua luu: 14
+   sheet kiem tra 'Checks': PASS=37 FAIL=0
+
+=== B: Enterprise_FPA_Model.xlsx
+sheet                       vung dung  cong thuc         so      chu  chua tinh
+Raw_Data                     A1:U1066      12780       4196     4266          0
+Assumptions                    A1:F48         13         41       39          0
+Revenue                        A1:O37        307          0       38          0
+COGS                           A1:N29        221          0       25          0
+PnL                           A1:AA23        468          0       22          0
+Budget_vs_Actual               A1:N69        780          0       67          0
+Forecast                       A1:Q23        249          0       37          0
+Scenarios                      A1:F48        162          0       45          0
+KPI                            A1:D70        138          6       65          0
+Dashboard                      A1:H84        127          0       55          0
+Checks                         A1:F66        104         74      133          0
+tong cong thuc: 15349 | o loi: 0 | cong thuc CHUA co ket qua luu: 0
+   sheet kiem tra 'Checks': PASS=40 FAIL=0
+
+GHI CHU: so tung o giua hai ben chi co nghia khi mo hinh tat dinh; voi mo hinh ngau nhien thi
+cai so duoc la o loi / cong thuc / sheet kiem tra cua TUNG ben (in o tren).
+########## test2 ##########
+=== A: axiom-test2wide.xlsx
+sheet                       vung dung  cong thuc         so      chu  chua tinh
+Assumptions                   A1:X503       2504        116      246          0
+Raw_SKU_Data                A1:R52001     399982          0       18      22995
+Product_Master                A1:M401       5200          0       13         12
+Demand_History              A1:M52001     399987          0       12          0
+Inventory                     A1:W401       9200          0       23       1855
+Forecast                     A1:AB401       3612          0        9          0
+Safety_Stock                  A1:N401       4801          0       12        400
+Reorder_Point                 A1:L401       4800          0       12        400
+EOQ                           A1:N401       5600          0       14        400
+Risk                          A1:S401       7600          0       19       1596
+Optimization                  A1:V401       8800          0       22          0
+Dashboard                      A1:T24         73         10       87          0
+Checks                        A1:ZZ20         48          2        6          0
+tong cong thuc: 852207 | o loi: 8 | cong thuc CHUA co ket qua luu: 27658
+   LOI Checks!A2 = #N/A
+   LOI Checks!ZZ4 = #VALUE!
+   LOI Checks!A5 = #DIV/0!
+   LOI Checks!ZZ5 = #N/A
+   LOI Checks!A11 = #NAME?
+   LOI Checks!ZZ11 = #DIV/0!
+   LOI Checks!ZZ12 = #VALUE!
+   LOI Checks!ZZ14 = #DIV/0!
+   sheet kiem tra 'Checks': PASS=0 FAIL=0
+
+=== B: Inventory_Optimization_Workbook.xlsx
+sheet                       vung dung  cong thuc         so      chu  chua tinh
+Raw_SKU_Data                A1:Q50501      47056     232352   117413      19469
+Product_Master               A1:O5001       5000      35000    35015          0
+Demand_History              A1:R50001      66663     266653    66684          0
+Inventory                   A1:N50001     114280     142852   114298          0
+Forecast                    A1:K50001     181814     109086   109100          0
+Safety_Stock                A1:M50001     123072     153840   123088          0
+Reorder_Point               A1:L50001     166660     133329   100011          0
+EOQ                         A1:L50001     133328     133329   133343          0
+Risk                        A1:S50001     189461     147364    63175          0
+Optimization                A1:N50001     199990      85712   114298          0
+Dashboard                     A1:M171        464         25      225          0
+Checks                        A1:F131        188         98      330          0
+tong cong thuc: 1227976 | o loi: 0 | cong thuc CHUA co ket qua luu: 19469
+   sheet kiem tra 'Checks': PASS=79 FAIL=0
+
+GHI CHU: so tung o giua hai ben chi co nghia khi mo hinh tat dinh; voi mo hinh ngau nhien thi
+cai so duoc la o loi / cong thuc / sheet kiem tra cua TUNG ben (in o tren).
+########## test3 ##########
+=== A: axiom-test3.xlsx
+sheet                       vung dung  cong thuc         so      chu  chua tinh
+Projects                     A1:AB101       2800          0       28          0
+Tasks                       A1:AA5001     129999          0       21        385
+Dependencies                 A1:S5101      40800          0       19        200
+Resources                     A1:P515       8004          4       28          0
+Budget                          A1:A1          0          0        0          0
+Actuals                         A1:A1          0          0        0          0
+Schedule                        A1:A1          0          0        0          0
+Critical_Path                   A1:A1          0          0        0          0
+Resource_Load                   A1:A1          0          0        0          0
+Risks                           A1:A1          0          0        0          0
+Portfolio                       A1:A1          0          0        0          0
+Dashboard                       A1:A1          0          0        0          0
+Checks                          A1:A1          0          0        0          0
+Gantt                           A1:A1          0          0        0          0
+tong cong thuc: 181603 | o loi: 106 | cong thuc CHUA co ket qua luu: 585
+   LOI Projects!L12 = #VALUE!
+   LOI Projects!M12 = #VALUE!
+   LOI Projects!N12 = #VALUE!
+   LOI Projects!X12 = #VALUE!
+   LOI Tasks!R502 = #VALUE!
+   LOI Tasks!S502 = #VALUE!
+   LOI Tasks!R503 = #VALUE!
+   LOI Tasks!S503 = #VALUE!
+   LOI Tasks!R504 = #VALUE!
+   LOI Tasks!S504 = #VALUE!
+   sheet kiem tra 'Checks': PASS=0 FAIL=0
+
+=== B: Project_Portfolio_Management.xlsx
+sheet                       vung dung  cong thuc         so      chu  chua tinh
+README                         A1:A49          0          0       41          0
+Dashboard                      A1:P36        180         20       86        180
+Portfolio                    A1:AB117       2814          0       42       2814
+Projects                      A1:Z101       1500        100      826       1500
+Tasks                        A1:V5001      40000      25000    35022      40000
+Dependencies                 A1:Q7651      84117       7647    38254      84117
+Schedule                    A1:AE5001     155000          0       31     155000
+Critical_Path                A1:P5001      80000          0       16      80000
+Resources                     A1:T501       6000       1000     3020       6000
+Resource_Load                 A1:S512       9144          0       28       9144
+Budget                        A1:S101       1700          0      219       1700
+Actuals                      A1:V5001     110000          0       22     110000
+Risks                         A1:P355       2124        708     2848       2124
+Gantt                        A1:ES161       1083        150      164       1083
+Checks                         A1:J58         87         41      308         87
+StressTest                     A1:L84        591         57       64        591
+Lists                          A1:K11          0          0       68          0
+tong cong thuc: 494340 | o loi: 0 | cong thuc CHUA co ket qua luu: 494340
+   sheet kiem tra 'Checks': PASS=0 FAIL=0
+
+GHI CHU: so tung o giua hai ben chi co nghia khi mo hinh tat dinh; voi mo hinh ngau nhien thi
+cai so duoc la o loi / cong thuc / sheet kiem tra cua TUNG ben (in o tren).

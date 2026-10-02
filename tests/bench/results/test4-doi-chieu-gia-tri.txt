@@ -1,0 +1,35 @@
+DOI CHIEU GIA TRI - Test 4 (02/10/2026)
+A = result/axiom-test4final.ods (luot Axiom hoan thanh bai)
+B = test4/MonteCarlo_Risk_Model.xlsx (ban Claude Code)
+Lenh: python tests/bench/compare_values.py <A> <B>
+
+=== A: axiom-test4final.xlsx
+sheet                       vung dung  cong thuc         so      chu  chua tinh
+Inputs                         A1:D25          0         14       59          0
+Assumptions                    A1:O71         18         52      193          0
+Distributions                  A1:I48        141         24       92          0
+Simulation                 A1:AE10001     310000          0       31          0
+Statistics                     A1:N97        344         65       83          0
+Sensitivity                    A1:G24        102          8       26          0
+Dashboard                      A1:J44         88          8       89          0
+Checks                        A1:AB32         53         36       40          0
+tong cong thuc: 310746 | o loi: 0 | cong thuc CHUA co ket qua luu: 0
+   sheet kiem tra 'Checks': PASS=21 FAIL=0
+
+=== B: MonteCarlo_Risk_Model.xlsx
+sheet                       vung dung  cong thuc         so      chu  chua tinh
+Inputs                         A1:D28          0         15       64          0
+Assumptions                    A1:J15         38         13       39         38
+Distributions               A1:Q10003     170000          0       19     170000
+Simulation                  A1:V10003     220000          0       24     220000
+Statistics                    A1:I136        666         90       77        666
+Sensitivity                    A1:J42        142          0       53        142
+Dashboard                      A1:F38         32          0       36         32
+Checks                         A1:K19         31          0       62         31
+StressTest                     A1:E26         40         13       27         40
+README                         A1:B46          0          0       74          0
+tong cong thuc: 390949 | o loi: 0 | cong thuc CHUA co ket qua luu: 390949
+   sheet kiem tra 'Checks': PASS=0 FAIL=0
+
+GHI CHU: so tung o giua hai ben chi co nghia khi mo hinh tat dinh; voi mo hinh ngau nhien thi
+cai so duoc la o loi / cong thuc / sheet kiem tra cua TUNG ben (in o tren).

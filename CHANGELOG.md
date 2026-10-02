@@ -5,6 +5,22 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — `tests/bench/compare_values.py`: đối chiếu GIÁ TRỊ, không chỉ cấu trúc
+- Bốn báo cáo trước chỉ so tên sheet / số ô công thức / số chart, mà đề chấm bằng *"kết quả phải đúng về
+  dữ liệu, công thức, logic nghiệp vụ"*. Công cụ này đọc **giá trị đã lưu** của cả hai file (`.ods` đổi
+  sang `.xlsx` trước để dùng cùng một đường đọc): ô lỗi, công thức chưa có kết quả, và sheet kiểm tra
+  đọc ra bao nhiêu PASS/FAIL.
+- **Kết quả (Test 1–4, số nguyên văn trong `tests/bench/results/`)**: bài Test 2 và Test 3 của Axiom
+  **ra khỏi tay agent với ô lỗi nằm trong file** — 8 ô ngay trên sheet `Checks` (Test 2:
+  `#NAME?`/`#DIV/0!`/`#VALUE!`/`#N/A`) và 106 ô `#VALUE!` (Test 3). Đây là loại lỗi mà `et.checkRange`
+  bắt được (`error-values`), nên đây là lỗi **quy trình** chứ không phải thiếu công cụ; đã đưa vào
+  checklist của skill `mo-hinh-tai-chinh`.
+- File do thư viện sinh (phía Claude Code) **không có kết quả lưu sẵn**, nên "0 ô lỗi" ở phía đó nghĩa
+  là *không đọc được*, không phải *không có* — ghi rõ trong báo cáo để không kết luận oan.
+- **Một lỗi đo của chính tôi, do dữ liệu thật bắt được**: lần chạy đầu chỉ đếm ô công thức khi ô đó có
+  giá trị lưu sẵn, nên báo phía Claude Code "**0 công thức**" trên file có gần 400.000 công thức. Sai ở
+  chỗ đọc, không phải ở file.
+
 ### Added — `et.importCsv`: nạp dữ liệu từ file vào sổ đang mở
 - `path` (bắt buộc), `range?`, `sheet?`, `delimiter?`, `encoding?`. Không có `range` thì tạo sheet mới
   đặt tên theo tên file (trùng thì thêm số), có `range` thì ghi vào ô góc đó của sheet chỉ định.

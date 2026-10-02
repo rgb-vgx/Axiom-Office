@@ -98,13 +98,58 @@ phải làm một đường **sinh dữ liệu trong tài liệu** (ví dụ `RA
 đường đó có giá riêng: `RANDBETWEEN` là hàm **bay hơi**, mỗi lần tính lại là dữ liệu đổi, mà đề lại yêu cầu
 "preserve the original raw data".
 
-## 5. Chưa đối chiếu nội dung, mới so được cấu trúc
+## 5. Chưa đối chiếu nội dung, mới so được cấu trúc — ĐÃ LÀM CHO TEST 4 (02/10/2026)
 
 Cả bốn báo cáo hiện so: tên sheet, số ô công thức, số chart, số khối định dạng điều kiện, thời gian,
 token, số tool call. **Chưa so giá trị**: KPI có đúng không, Checks có PASS/FAIL đúng không, đường găng
 có đúng không, kết quả thống kê Monte Carlo có khớp không.
 
-**Cần làm**: mở song song file của hai bên bằng openpyxl/pandas, đối chiếu từng ô ở các sheet kết quả.
+**Đã làm cho Test 4**: `tests/bench/compare_values.py` đọc **giá trị đã lưu** của cả hai file (`.ods`
+đổi sang `.xlsx` trước để dùng cùng một đường đọc). Kết quả nguyên văn ở
+[test4-doi-chieu-gia-tri.txt](test4-doi-chieu-gia-tri.txt). So **từng ô** giữa hai bên là vô nghĩa ở
+bài này (Monte Carlo khác seed, hai bên còn thiết kế mô hình khác nhau) — nên so cái quyết định file có
+dùng được không:
+
+| | Axiom (`axiom-test4final.ods`) | Claude Code (`MonteCarlo_Risk_Model.xlsx`) |
+|---|---|---|
+| Công thức | 310.746 | 390.949 |
+| Ô lỗi (`#REF!`, `#DIV/0!`, `Err:xxx`…) | **0** | **0** (không đọc được — xem dưới) |
+| Công thức **có kết quả lưu trong file** | **310.746 / 310.746** | **0 / 390.949** |
+| Sheet `Checks` đọc ra | **PASS=21, FAIL=0** | PASS=0, FAIL=0 (chưa có kết quả nào) |
+
+Hai điều đáng chú ý, cả hai đều là **phát hiện mới**:
+
+- File của Claude Code sinh bằng thư viện (openpyxl/xlsxwriter) nên **không có kết quả tính sẵn**: mở
+  bằng Excel/Calc thì máy tự tính ra, nhưng đọc bằng thư viện (không có engine) thì ra rỗng. Hệ quả
+  thật: **sheet `Checks` của nó không chứa một chữ PASS/FAIL nào** — ai chấm bằng cách đọc giá trị sẽ
+  thấy 0/0. File của Axiom thì mang sẵn kết quả (LibreOffice lưu kèm giá trị).
+- Kết luận này chỉ có được sau khi **sửa một lỗi đo của chính tôi**: lần chạy đầu, tôi chỉ đếm ô công
+  thức khi ô đó có giá trị lưu sẵn, nên báo bên B "0 công thức" — nghe như bên B không có công thức
+  nào. Sai ở chỗ đọc, không phải ở file.
+
+**Đã làm nốt cho Test 1–3** (cùng lệnh, kết quả nguyên văn ở
+[test1-3-doi-chieu-gia-tri.txt](test1-3-doi-chieu-gia-tri.txt)):
+
+| Bài | Axiom: công thức / ô lỗi / Checks | Claude Code: công thức / ô lỗi / Checks |
+|---|---|---|
+| Test 1 | 24.130 / **0** / PASS=37 | 15.349 / 0 / PASS=40 |
+| Test 2 | 852.207 / **8** / PASS=0 | 1.227.976 / 0\* / PASS=79 |
+| Test 3 | 181.603 / **106** / PASS=0 | 494.340 / 0\* / PASS=0\* |
+| Test 4 | 310.746 / **0** / PASS=21 | 390.949 / 0\* / PASS=0\* |
+
+\* File của Claude Code sinh bằng thư viện nên **không có kết quả lưu sẵn**: ô lỗi (nếu có) và PASS/FAIL
+chỉ hiện ra sau khi Excel/Calc tính lại. Nói "0 lỗi" ở cột đó là "không đọc được lỗi", không phải "không
+có lỗi".
+
+**Phát hiện mới, và là khoảng cách thật cần xử lý**: bài Test 2 và Test 3 của Axiom **ra khỏi tay agent
+với ô lỗi nằm trong file** — Test 2 có 8 ô ngay trên sheet `Checks` (`#NAME?`, `#DIV/0!`, `#VALUE!`,
+`#N/A`), Test 3 có 106 ô `#VALUE!` ở `Projects` và `Tasks`. Đây là loại lỗi mà **chính Axiom có lệnh bắt
+được** (`et.checkRange` báo `error-values`), tức đây không phải thiếu công cụ mà là **lượt chạy đã không
+soát trước khi trả bài** — và cả hai lượt đó đều dừng vì hết ngân sách. Đã đưa vào checklist của skill
+`mo-hinh-tai-chinh` ("`et.checkRange`: `issueCount` = 0").
+
+**Còn lại**: đối chiếu **từng ô** trên các sheet tất định (Inputs, Assumptions) — chỗ đó so được thật vì
+không phụ thuộc ngẫu nhiên.
 
 ## 6. Ngân sách 400k cắt oan — ĐÃ ĐO ĐƯỢC
 
