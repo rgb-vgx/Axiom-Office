@@ -116,15 +116,13 @@ $stagedDll = Join-Path $stage "AxiomOffice.dll"
 & $csc @commonArgs /target:library "/out:$stagedDll" $addinSources
 if ($LASTEXITCODE -ne 0) { throw "Add-in build failed with exit code $LASTEXITCODE" }
 
-# Companion + MCP server: them thu vien zip/XLinq (doc/ghi OOXML) va template docx/pptx nhung trong exe.
-$templates = Join-Path $hostDir "Mcp\Templates"
+# Companion: chi con `commands --json` va `llm-test`. MCP server da gom ve Core ban Go, nen khong con
+# template docx/pptx nhung trong exe nua (chung chi phuc vu ban MCP C# da bo).
 $hostArgs = @(
     "/r:$fw\System.IO.Compression.dll",
     "/r:$fw\System.IO.Compression.FileSystem.dll",
     "/r:$fw\System.Xml.dll",
-    "/r:$fw\System.Xml.Linq.dll",
-    "/resource:$(Join-Path $templates 'default.docx'),AxiomOffice.Mcp.default.docx",
-    "/resource:$(Join-Path $templates 'default.pptx'),AxiomOffice.Mcp.default.pptx"
+    "/r:$fw\System.Xml.Linq.dll"
 )
 $stagedExe = Join-Path $stage "AxiomOffice.Host.exe"
 & $csc @commonArgs @hostArgs /target:exe "/out:$stagedExe" $hostSources

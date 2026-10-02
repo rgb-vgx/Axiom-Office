@@ -125,9 +125,7 @@ jobs:
                       "/r:$fw\System.Web.Extensions.dll", "/r:$fw\System.Windows.Forms.dll",
                       "/r:$fw\System.Drawing.dll", "/r:$fw\System.Security.dll", "/r:$fw\Microsoft.CSharp.dll")
           $hostOnly = @("/r:$fw\System.IO.Compression.dll", "/r:$fw\System.IO.Compression.FileSystem.dll",
-                        "/r:$fw\System.Xml.dll", "/r:$fw\System.Xml.Linq.dll",
-                        "/resource:src\AxiomOffice.Host\Mcp\Templates\default.docx,AxiomOffice.Mcp.default.docx",
-                        "/resource:src\AxiomOffice.Host\Mcp\Templates\default.pptx,AxiomOffice.Mcp.default.pptx")
+                        "/r:$fw\System.Xml.dll", "/r:$fw\System.Xml.Linq.dll")
           & $csc @common /target:library "/out:$stage\AxiomOffice.dll" $addin
           if ($LASTEXITCODE -ne 0) { throw "add-in build failed" }
           & $csc @common @hostOnly /target:exe "/out:$stage\AxiomOffice.Host.exe" $hosts

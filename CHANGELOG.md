@@ -5,6 +5,21 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Removed — bản MCP server C# (10 tệp, ~5.300 dòng)
+- Xoá hẳn bản cài đặt thứ hai của cùng hợp đồng 50 tool: `McpServer`, `WordFiles`, `ExcelFiles`,
+  `PptFiles`, `LiveTools`, `Cells`, `OoxmlPackage`, `XlsxBook`, `XlsxStyles`, `BridgeClient` và hai
+  template docx/pptx nhúng trong exe (cùng hai cờ `/resource:` ở `build.ps1` và CI).
+- **Lý do**: từ khi Core tự làm MCP server, bản C# **không chạy ở đâu nữa** (Windows chuyển tiếp sang
+  Core), và nó **không được CI kiểm ở đâu cả** — hai bản cùng một hợp đồng mà chỉ một bản có người
+  canh là cách chắc chắn nhất để chúng lệch nhau.
+- **Giữ lại cửa vào cũ**: `AxiomOffice.Host.exe mcp …` vẫn chạy (232 dòng chuyển tiếp byte trong
+  `McpHost.cs`), nên người đã cấu hình MCP client trỏ vào Host.exe **không phải đổi gì**. Gói cài thiếu
+  `AxiomOffice.Core.exe` thì Host.exe báo rõ và thoát mã 2, không còn bản dự phòng để lệch.
+- **Kiểm chứng**: `AxiomOffice.Host.exe` 559.104 → **355.328 byte**; `test_mcp_portable.py` nhắm vào
+  `Host.exe mcp` **61/61** (tức cửa chuyển tiếp còn nguyên); Host.exe đặt một mình trong thư mục trống
+  → thoát **mã 2** kèm hướng dẫn, không treo; `tests/lo/test_extension.py` (so registry Python với
+  `Host.exe commands --json`) 19/19.
+
 ### Added — skill `mo-hinh-tai-chinh`: mô hình nhiều sheet (FP&A)
 - Bộ skill cũ chỉ nói về **trình bày** (bảng điểm, number format, hàng tổng). Đo được: mỗi lượt chạy
   chỉ nạp **một** skill, và với app `et` chỉ có 3 skill được chào — không skill nào nói về **mô hình**.

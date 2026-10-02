@@ -1,68 +1,36 @@
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
-using System.Text;
 using System.Threading;
-using AxiomOffice.Bridge;
 
 namespace AxiomOffice.Host.Mcp
 {
     // AxiomOffice.Host.exe mcp [all|word|excel|ppt] [--list]
-    // Thay 3 server Python (tools/word-mcp, excel-mcp, ppt-mcp) bằng một exe không cần cài gì thêm.
+    //
+    // CHUYỂN TIẾP sang Agent Core (bản Go). MCP server chỉ còn MỘT bản cài đặt là
+    // core-go/internal/mcpserver, dùng chung Windows lẫn Linux.
+    //
+    // Tệp này từng có bản C# đầy đủ làm dự phòng (10 tệp nữa, ~5.570 dòng: McpServer, WordFiles,
+    // ExcelFiles, PptFiles, LiveTools, Cells, OoxmlPackage, XlsxBook, XlsxStyles, BridgeClient +
+    // template docx/pptx nhúng). Đã bỏ, vì: gói cài không kèm Core thì cũng không có backend nào khác
+    // cho add-in, mà bản dự phòng đó lại KHÔNG được CI kiểm ở đâu cả — hai bản cùng một hợp đồng 50
+    // tool mà chỉ một bản có người canh là cách chắc chắn nhất để chúng lệch nhau.
+    //
+    // Người đã cấu hình MCP client trỏ vào Host.exe không phải đổi gì.
     internal static class McpHost
     {
         public static int Run(string[] args)
         {
-            // SHIM: có Agent Core (bản Go) cạnh đây thì chuyển tiếp sang nó, để chỉ còn MỘT bản MCP
-            // (core-go/internal/mcpserver). Người dùng đã cấu hình MCP client trỏ vào Host.exe không phải
-            // đổi gì, và hai bản không còn dịp lệch nhau.
-            //
-            // Gói cài có thể KHÔNG kèm Core (lúc build máy không có Go - scripts/build.ps1 bỏ qua), nên
-            // thiếu Core thì chạy bản C# như cũ: không để ai bị kẹt.
-            // `--in-process` để ép chạy bản C# khi cần so sánh/debug.
             string core = CoreExecutable();
-            bool inProcess = args.Contains("--in-process", StringComparer.Ordinal);
-            if (core != null && !inProcess)
+            if (core == null)
             {
-                return Forward(core, args);
-            }
-
-            string group = args.Skip(1).FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal)) ?? "all";
-            group = group.ToLowerInvariant();
-            List<McpTool> tools = Catalog(group);
-            if (tools == null)
-            {
-                Console.Error.WriteLine("usage: AxiomOffice.Host.exe mcp [all|word|excel|ppt] [--list]");
+                Console.Error.WriteLine(
+                    "AxiomOffice.Core.exe không nằm cạnh AxiomOffice.Host.exe nên không có MCP server để chạy.\n"
+                    + "MCP server là lệnh con `mcp` của Agent Core (Go). Hãy cài lại gói đầy đủ, hoặc trỏ MCP\n"
+                    + "client thẳng vào: AxiomOffice.Core.exe mcp all");
                 return 2;
             }
-            string name = group == "all" ? "office-tools" : group + "-tools";
-            var server = new McpServer(name, tools);
-
-            if (args.Contains("--list"))
-            {
-                foreach (McpTool tool in server.Tools)
-                {
-                    Console.WriteLine(tool.Name);
-                }
-                Console.WriteLine(server.ToolCount + " tools");
-                return 0;
-            }
-
-            // stdout chỉ dành cho JSON-RPC: mọi Console.Write khác đi sang stderr.
-            var output = new StreamWriter(Console.OpenStandardOutput(), new UTF8Encoding(false)) { AutoFlush = false, NewLine = "\n" };
-            var input = new StreamReader(Console.OpenStandardInput(), new UTF8Encoding(false));
-            Console.SetOut(Console.Error);
-            try
-            {
-                return server.Run(input, output);
-            }
-            catch (Exception ex)
-            {
-                Logger.Error("MCP server crashed", ex);
-                return 1;
-            }
+            return Forward(core, args);
         }
 
         // CoreExecutable: AxiomOffice.Core.exe nằm cạnh Host.exe, hoặc null nếu gói cài không kèm.
@@ -87,7 +55,6 @@ namespace AxiomOffice.Host.Mcp
         // Forward: nối thẳng stdin/stdout/stderr sang tiến trình con, theo BYTE, không giải mã rồi mã lại.
         // Giao thức MCP ở đây là JSON theo dòng trên stdout; một lần mã hoá sai là hỏng cả phiên, mà
         // chuyển byte thì không có gì để sai.
-
         private static int Forward(string core, string[] args)
         {
             var start = new ProcessStartInfo(core)
@@ -104,10 +71,6 @@ namespace AxiomOffice.Host.Mcp
             // MCP. (Da mac dung loi nay: shim treo, khong in gi, va bo lai mot tien trinh Core mo côi.)
             foreach (string arg in args)
             {
-                if (arg == "--in-process")
-                {
-                    continue;   // cờ của shim, không phải của Core
-                }
                 start.Arguments += (start.Arguments.Length > 0 ? " " : "") + Quote(arg);
             }
 
@@ -164,69 +127,6 @@ namespace AxiomOffice.Host.Mcp
                 return value;
             }
             return "\"" + value.Replace("\"", "\\\"") + "\"";
-        }
-
-        public static List<McpTool> Catalog(string group)
-        {
-            var tools = new List<McpTool>();
-            switch (group)
-            {
-                case "word":
-                    tools.AddRange(WordFiles.Tools());
-                    tools.AddRange(LiveTools.Word());
-                    break;
-                case "excel":
-                    tools.AddRange(ExcelFiles.Tools());
-                    tools.AddRange(LiveTools.Excel());
-                    break;
-                case "ppt":
-                case "powerpoint":
-                    tools.AddRange(PptFiles.Tools());
-                    tools.AddRange(LiveTools.Ppt());
-                    break;
-                case "all":
-                    tools.AddRange(WordFiles.Tools());
-                    tools.AddRange(LiveTools.Word());
-                    tools.AddRange(ExcelFiles.Tools());
-                    tools.AddRange(LiveTools.Excel());
-                    tools.AddRange(PptFiles.Tools());
-                    tools.AddRange(LiveTools.Ppt());
-                    break;
-                default:
-                    return null;
-            }
-            tools.Add(LiveTools.Sessions());
-            return tools;
-        }
-    }
-
-    // Template docx/pptx nhúng trong exe (lấy từ python-docx / python-pptx, giấy phép MIT).
-    internal static class Templates
-    {
-        public static byte[] Docx
-        {
-            get { return Load("AxiomOffice.Mcp.default.docx"); }
-        }
-
-        public static byte[] Pptx
-        {
-            get { return Load("AxiomOffice.Mcp.default.pptx"); }
-        }
-
-        private static byte[] Load(string name)
-        {
-            using (Stream stream = typeof(Templates).Assembly.GetManifestResourceStream(name))
-            {
-                if (stream == null)
-                {
-                    throw new InvalidOperationException("embedded template missing: " + name + " (rebuild with scripts\\build.ps1)");
-                }
-                using (var memory = new MemoryStream())
-                {
-                    stream.CopyTo(memory);
-                    return memory.ToArray();
-                }
-            }
         }
     }
 }

@@ -9,7 +9,7 @@ Có ba cách dùng, chung một lõi:
 | Cách dùng | Dành cho | Thành phần |
 |---|---|---|
 | **Ask AI** — task pane trong Word/Excel/PowerPoint/WPS | Người dùng cuối | `AxiomOffice.dll` (COM add-in) |
-| **MCP server** — Claude Desktop, Claude Code, agent khác | AI agent bên ngoài | `AxiomOffice.Host.exe mcp` |
+| **MCP server** — Claude Desktop, Claude Code, agent khác | AI agent bên ngoài | `AxiomOffice.Core.exe mcp` (`AxiomOffice.Host.exe mcp` chuyển tiếp) |
 | **HTTP API** trên localhost (`/cmd`, `/events`, ...) | Script, tích hợp riêng | bridge trong add-in |
 
 Không cần quyền admin, không cần Python. Gói cài ~250 KB.
@@ -51,14 +51,14 @@ trên (cùng tên lệnh `writer.*`/`et.*`/`wpp.*`, cùng session registry) — 
    (localhost)     │  bridge · ribbon · task pane · agent │     Word / Excel / PowerPoint
                    └─────────────────────────────────────┘     hoặc WPS Writer / ET / WPP
                                     ▲ HTTP (làn live)
- MCP client ── stdio ──► AxiomOffice.Host.exe mcp
-                                    └── làn file: đọc/ghi .docx .xlsx .pptx .csv trực tiếp (không cần app)
+ MCP client ── stdio ──► AxiomOffice.Core.exe mcp
+                                    └── làn file: đọc/ghi .docx .xlsx .pptx .csv/.xls trực tiếp (không cần app)
 ```
 
 | Thành phần | Vai trò |
 |---|---|
 | `AxiomOffice.dll` | COM add-in (`IDTExtensibility2`) nạp vào Word/Excel/PowerPoint và WPS: mở HTTP bridge trong process của app, thêm tab ribbon **Axiom Office**, task pane Ask AI và AI agent |
-| `AxiomOffice.Host.exe` | `mcp [all\|word\|excel\|ppt]`: MCP server stdio · `wps\|et\|wpp\|word\|excel\|ppt`: companion tự tạo app qua COM automation và mở bridge (khi add-in không nạp được) · `commands`: danh sách lệnh bridge · `llm-test`: thử cấu hình AI |
+| `AxiomOffice.Host.exe` | `mcp [all\|word\|excel\|ppt]`: chuyển tiếp sang `AxiomOffice.Core.exe mcp` (giữ cho cấu hình MCP client đã có) · `wps\|et\|wpp\|word\|excel\|ppt`: companion tự tạo app qua COM automation và mở bridge (khi add-in không nạp được) · `commands`: danh sách lệnh bridge · `llm-test`: thử cấu hình AI |
 | `AxiomOffice.Core.exe` | **Agent Core** viết bằng Go ([core-go/](core-go/README.md), theo [New_arch.md](New_arch.md)): process riêng chạy agent cho mọi app, một bản cho mỗi người dùng, chỉ nghe `127.0.0.1:47840`; add-in khởi động khi cần và tìm qua `%LOCALAPPDATA%\AxiomOffice\core.json`. Hiện có: vòng lặp agent (OpenAI-compatible + Anthropic), hội thoại liên tục theo tài liệu, audit tool call, SSE `/v1/runs/{id}/events`, hủy, trần thời gian/token, **skills** (`load_skill`, `read_skill_file`, `/v1/skills`); memory + xác nhận + MCP client ở các giai đoạn sau |
 
 Mỗi app có port riêng; WPS và Microsoft Office dùng hai dải khác nhau nên chạy song song
@@ -253,13 +253,14 @@ và có menu chuột phải **Sao chép**.
 
 ## MCP server
 
-MCP server chạy trong `AxiomOffice.Host.exe` (đi kèm gói cài, template docx/pptx nhúng sẵn):
+MCP server là **lệnh con `mcp` của Agent Core** (`AxiomOffice.Core.exe mcp`), một bản duy nhất dùng
+chung Windows lẫn Linux:
 
 ```json
 {
   "mcpServers": {
     "office": {
-      "command": "C:\\Tools\\AxiomOffice\\src\\AxiomOffice\\bin\\Release\\AxiomOffice.Host.exe",
+      "command": "C:\\Tools\\AxiomOffice\\src\\AxiomOffice\\bin\\Release\\AxiomOffice.Core.exe",
       "args": ["mcp"]
     }
   }
@@ -267,7 +268,10 @@ MCP server chạy trong `AxiomOffice.Host.exe` (đi kèm gói cài, template doc
 ```
 
 - `mcp` = 50 tool; muốn gọn thì `mcp word` (20), `mcp excel` (16), `mcp ppt` (16).
-  `AxiomOffice.Host.exe mcp --list` in danh sách tool.
+  `AxiomOffice.Core.exe mcp --list` in danh sách tool.
+- `AxiomOffice.Host.exe mcp …` **vẫn chạy được** (người đã cấu hình từ trước không phải đổi gì): nó là
+  cửa chuyển tiếp byte sang `AxiomOffice.Core.exe` nằm cạnh. Gói cài thiếu Core thì Host.exe báo rõ và
+  thoát, chứ không còn bản MCP thứ hai để lệch khỏi bản Go.
 - Giao thức MCP stdio (JSON-RPC 2.0, mỗi message một dòng): `initialize`, `tools/list`,
   `tools/call`, `ping`; protocol 2024-11-05 → 2025-11-25. Log: `MCP tool ... ok in Nms`.
 
