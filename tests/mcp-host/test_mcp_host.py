@@ -1,9 +1,13 @@
-"""Kiểm tra MCP server C# (AxiomOffice.Host.exe mcp) qua MCP client chính thức.
+"""Kiểm tra MCP server qua MCP client chính thức (python-docx/openpyxl/python-pptx + package `mcp`).
+
+Bản chạy mặc định là `AxiomOffice.Host.exe mcp`, nhưng từ khi MCP gom về một bản Go thì Host.exe chỉ
+**chuyển tiếp** sang `AxiomOffice.Core.exe` nằm cạnh — nên mặc định ở đây thực chất kiểm bản Go qua cửa
+chuyển tiếp. Muốn nhắm thẳng vào Core: `AXIOM_MCP_CMD="<đường-dẫn>AxiomOffice.Core.exe mcp all"`.
 
 - Giao thức: initialize / tools/list / tools/call.
-- Parity: so kết quả tool file của bản C# với tools/*-mcp/*/file_tools.py (bản Python cũ)
-  trên cùng file (file do C# tạo, do python-docx/openpyxl/python-pptx tạo, file Office thật).
-- Hợp lệ: đọc lại file C# ghi ra bằng python-docx / openpyxl / python-pptx.
+- Parity: so kết quả tool file với tools/*-mcp/*/file_tools.py (bản Python cũ) trên cùng file
+  (file do MCP tạo, do python-docx/openpyxl/python-pptx tạo, file Office thật).
+- Hợp lệ: đọc lại file MCP ghi ra bằng python-docx / openpyxl / python-pptx.
 
 Chạy (cần 3 venv của tools/*-mcp đã cài requirements):
     tools\\excel-mcp\\.venv\\Scripts\\python.exe tests\\mcp-host\\test_mcp_host.py [thư_mục_output]

@@ -12,9 +12,8 @@ hướng dẫn dùng ở [README.md](README.md); lịch sử thay đổi ở [CH
 |---|---|---|
 | **Add-in COM** (`src/AxiomOffice`, net48) | Word/Excel/PowerPoint + WPS, Windows | Chạy được; đã kiểm chứng trên Office/WPS thật ở các đợt trước. Đợt này **chưa** chạy lại làn `--office` |
 | **Agent Core** (`core-go/`, Go) | Windows + Linux | **Đã thay bản .NET làm bản phát hành** (G1–G10), qua toàn bộ e2e của bản .NET |
-| **MCP server** — Windows (`src/AxiomOffice.Host/Mcp`, net48) | Windows | Giữ nguyên, chạy trong `AxiomOffice.Host.exe mcp`; 61/61 |
-| **MCP server** — Linux (`core-go/internal/mcpserver`, Go) | Linux | **Mới**: subcommand `AxiomOffice.Core mcp`; 61/61 và 103/103, khớp bản C# từng bước |
-| **Extension LibreOffice** (Python UNO) | Linux (LibreOffice) | Chạy được; 159/159 trên LibreOffice thật + wizard 20/20 với Core Go |
+| **MCP server** (`core-go/internal/mcpserver`, Go) | Windows + Linux | **Một bản duy nhất**, chạy bằng `AxiomOffice.Core.exe mcp`; 61/61 trên cả hai nền tảng (và 103/103 ở bộ parity sâu). Bản C# đã xoá; `AxiomOffice.Host.exe mcp` còn 232 dòng **chuyển tiếp byte** sang Core nên cấu hình cũ không phải đổi |
+| **Extension LibreOffice** (Python UNO) | Linux (LibreOffice) | Chạy được; 281/281 trên LibreOffice thật + wizard 20/20 với Core Go |
 | **Wizard thiết lập** | Windows (WinForms) + Linux (awt) | Bản Linux đã chạy thật (20/20); **bản Windows mới chỉ biên dịch sạch, chưa bấm tay trong Office** |
 
 ## 2. Đã làm được
@@ -31,7 +30,7 @@ mutex một-phiên-bản. Nhờ vậy add-in/extension/MCP không phải đổi 
 | G2 | `/v1/runs` + SSE + hủy + xác nhận, orchestrator, bridge client, session registry, `office_action`, policy, audit, hội thoại |
 | G3 | Skills 3 tầng: `load_skill`, `read_skill_file`, `GET /v1/skills`, `POST /v1/skills/reload`, quét lại thư mục |
 | G4 | Memory dài hạn: chống trùng (hash + cosine 0.96), liên kết chuyển đổi, lịch sử, ghim/hạn dùng/xoá mềm, truy hồi bm25 + entity boost + embedding, trích xuất sau mỗi lượt, toàn bộ `/v1/memory`, tool `remember`/`recall` |
-| G5 | MCP client (stdio + Streamable HTTP, server built-in `office` = `AxiomOffice.Host.exe mcp`, xác nhận tool ngoài/ghi đè file), QA thị giác `look_at_document`, `GET /v1/mcp` |
+| G5 | MCP client (stdio + Streamable HTTP, server built-in `office` = `AxiomOffice.Core.exe mcp`, xác nhận tool ngoài/ghi đè file), QA thị giác `look_at_document`, `GET /v1/mcp` |
 | G6 | Đóng gói: `build.ps1` build Core Go thành `AxiomOffice.Core.exe`; `package.sh` đóng gói `core/AxiomOffice.Core`; CI chạy cả hai |
 | G7 | **Vá lỗ hổng**: Core dừng khi đang chạy lượt → hủy lượt trước khi đóng HTTP server (trước đây agent có thể sửa dở tài liệu) |
 | G8 | Phủ codec Anthropic (chạy thật) và embedding (cosine + tìm theo nghĩa) |
@@ -84,7 +83,7 @@ Cả hai đều nằm trong hợp đồng mà bộ parity kiểm tra, nên sửa
 | `go test ./...` (core-go) | 18 gói |
 | `tests/lo` · MCP parity | 106 |
 | `test_mcp_portable.py` — binary Go (`AxiomOffice.Core mcp all`) | **61/61** |
-| `test_mcp_portable.py` — `AxiomOffice.Host.exe mcp all` (Windows, sau khi dọn `#if PORTABLE`) | **61/61** |
+| `test_mcp_portable.py` — `AxiomOffice.Host.exe mcp all` (Windows; nay là cửa CHUYỂN TIẾP sang Core, bản C# đã xoá) | **61/61** |
 | `test_mcp_host.py` — parity sâu với python-docx/openpyxl/python-pptx, binary Go | **103/103** |
 | `oracle_diff.py` — Go ↔ C# trên cùng kịch bản (docx/pptx/excel) | 61/62 (1 khác là câu chữ thông báo `parquet`, cố ý) |
 | `--real-llm` (model thật trong HKCU) | **4/4** — nạp đúng skill (`bao-cao-thang`, `bang-diem`, `van-ban-hanh-chinh`), câu "in đậm" không nạp skill thiết kế |
@@ -140,7 +139,7 @@ cd core-go && go test ./... && go build -o axiom-core.exe ./cmd/axiom-core     #
 AXIOM_E2E_CORE_EXE=<binary> python tests/core/test_core_e2e.py [--only <phần,...>]
 bash scripts/linux/package.sh     # gói Linux (Core Go + .oxt; MCP nằm trong Core)
 
-# MCP server (Linux; trên Windows là AxiomOffice.Host.exe mcp):
+# MCP server (cả hai nền tảng; Host.exe mcp chỉ chuyển tiếp sang Core):
 AXIOM_MCP_ARGS="mcp all" python tests/mcp-host/test_mcp_portable.py <binary>
 python tests/mcp-host/oracle_diff.py    # đối chiếu Go ↔ C# trên cùng kịch bản
 ```
