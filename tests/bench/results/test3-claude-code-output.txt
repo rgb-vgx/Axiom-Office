@@ -1,0 +1,4 @@
+file: Project_Portfolio_Management.xlsx (6.0 MB)
+sheets (17): README | Dashboard | Portfolio | Projects | Tasks | Dependencies | Schedule | Critical_Path | Resources | Resource_Load | Budget | Actuals | Risks | Gantt | Checks | StressTest | Lists
+o cong thuc: 494340 | conditionalFormatting: 15 | dataValidation: 2 | chart: 4
+

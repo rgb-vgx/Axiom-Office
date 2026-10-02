@@ -1,0 +1,81 @@
+========================================================================
+transcript: C:/Users/ThuyetMT/.claude/projects/C--Users-ThuyetMT-test-bench-test3/8ea1bdda-9002-4c99-8bf8-a4cefa7de752.jsonl
+entries: 590 | luot assistant: 267 | tool call: 136
+tool: Edit=63, Bash=43, Read=25, Write=5
+token: cache_read_input_tokens=43548544, output_tokens=536688, input_tokens=256030, cache_creation_input_tokens=0
+tool tra loi LOI: 3 lan
+file ghi/sua: ppm_build.py×41, ppm_data.py×17, verify_ods.py×4, README.md×4, verify_full.py×2
+------------------------------------------------------------------------
+Bash (43)
+  … 38 dong dau bo qua (dung --full de xem het)
+   cd "C:/Users/ThuyetMT/test/bench/test3" && python ppm_build.py 2>&1 | tail -8 && rm -rf out && mkdir out && "/c/Program Files/LibreOffice/program/sof…
+   cd "C:/Users/ThuyetMT/test/bench/test3" && python verify_full.py > verify_full.txt 2>&1 && python -c " t=open('verify_full.txt',encoding='utf-8',erro…
+   cd "C:/Users/ThuyetMT/test/bench/test3" && grep -n "40 \|checks" README.md
+   cd "C:/Users/ThuyetMT/test/bench/test3" && ls -la && echo "--- xlsx recalc-on-load flag:" && python -c " import zipfile,re z=zipfile.ZipFile('Project…
+   cd "C:/Users/ThuyetMT/test/bench/test3" && python -c " import zipfile,re z=zipfile.ZipFile('Project_Portfolio_Management.xlsx') wb=z.read('xl/workboo…
+------------------------------------------------------------------------
+Edit (63)
+  … 58 dong dau bo qua (dung --full de xem het)
+   C:/Users/ThuyetMT/test/bench/test3/ppm_build.py
+   C:/Users/ThuyetMT/test/bench/test3/ppm_build.py
+   C:/Users/ThuyetMT/test/bench/test3/verify_full.py
+   C:/Users/ThuyetMT/test/bench/test3/README.md
+   C:/Users/ThuyetMT/test/bench/test3/README.md
+------------------------------------------------------------------------
+Read (25)
+  … 20 dong dau bo qua (dung --full de xem het)
+   {"file_path": "C:/Users/ThuyetMT/test/bench/test3/html/Project_Portfolio_Management_html_d2028ddf.png"}
+   {"file_path": "C:/Users/ThuyetMT/test/bench/test3/verify_out.txt", "offset": 104, "limit": 40}
+   {"file_path": "C:/Users/ThuyetMT/test/bench/test3/verify_out.txt", "offset": 65, "limit": 32}
+   {"file_path": "C:/Users/ThuyetMT/test/bench/test3/verify_full.txt", "offset": 58, "limit": 14}
+   {"file_path": "C:/Users/ThuyetMT/test/bench/test3/verify_out.txt", "offset": 104, "limit": 20}
+------------------------------------------------------------------------
+Write (5)
+   C:/Users/ThuyetMT/test/bench/test3/ppm_data.py
+   C:/Users/ThuyetMT/test/bench/test3/ppm_build.py
+   C:/Users/ThuyetMT/test/bench/test3/verify_ods.py
+   C:/Users/ThuyetMT/test/bench/test3/verify_full.py
+   C:/Users/ThuyetMT/test/bench/test3/README.md
+========================================================================
+tra loi cuoi cung:
+Done. The workbook is built, recalculated by LibreOffice, and verified by reading the computed values back out of the produced `.ods`.
+
+## Deliverables
+
+```
+Project_Portfolio_Management.ods    ← main deliverable (native Calc, values calculated)
+Project_Portfolio_Management.xlsx   ← same workbook, OOXML
+ppm_data.py / ppm_build.py          ← generator (deterministic, re-runnable)
+verify_ods.py / verify_full.py      ← read computed values back and assert the model is live
+README.md                           ← sheet guide + method notes
+```
+
+**17 sheets**, ~494,000 live formulas, 4 charts. Everything is formula-driven — nothing is a pasted result.
+
+## Data
+100 projects · 5,000 tasks · 500 resources · 7,635 dependencies · 354 risks. Tasks carry all 11 required fields, plus topological Level, hours and earned value. Dependencies support **FS, SS, FF and SF** with lags.
+
+## The one thing worth knowing about the design
+Each task has a topological `Level`, and every active dependency runs strictly **low level → high level**. That makes the network a DAG by construction, so a real forward *and* backward pass (early/late start & finish, total float, critical path) resolves in plain formulas with no circular references and no iteration. `Dependencies!O/P` compute the per-link constraints; `Schedule!J–O` do the passes.
+
+## Stress test — verified from the produced file
+14-day slip on a critical task in `PRJ-0094`:
+
+| Check | Actual | Result |
+|---|---|---|
+| Dependent tasks update | 11 tasks shifted | PASS |
+| Project completion date updates | +14 days | PASS |
+| Schedule variance updates | +14 days | PASS |
+| Dashboard updates | +1 delayed project | PASS |
+| Risk status updates | 4 risks → Worsening | PASS |
+| Critical path identifies the driver | 1 | PASS |
+
+`StressTest!B7` set to `0` returns the whole portfolio to baseline; the baseline is preserved on-sheet, so the comparison is always live.
+
+## Two things to be aware of
+
+**The Checks sheet shows 29 FAILs — that is correct, not breakage.** The dataset deliberately seeds ~25 defective records so the checks can be seen catching real problems. The `Classification` column labels every red row (seeded defect / knock-on / genuine portfolio state / live stress delay), and there are explanatory notes below the table and on the `Dependencies` sheet. `CIR-001` (circular dependencies in the active graph) genuinely passes at 0.
+
+**Cycle detection is exact; per-edge attribution is not.** Because valid edges always go low→high level, any edge with `Pred Level ≥ Succ Level` is a back-edge and therefore proves a cycle. But only the edges that *close* a cycle get flagged — in a 3-node cycle, two edges are back-edges and the third still runs forward and reads `OK`. Detection is sound; the per-row label on that third edge is a limitation. This is documented on the `Dependencies` sheet and in the README.
+
+Recalc takes ~20 s on open (recalc-on-load is enabled); the `.ods` already has cached values so it opens instantly.
