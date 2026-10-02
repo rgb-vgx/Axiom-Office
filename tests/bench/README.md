@@ -48,5 +48,20 @@ python tests/bench/run_prompt.py <core_port> <bridge_port> <pid> <prompt_file> <
 
 ## Kiểm chứng file kết quả
 
-Không tin lời kể của agent. Mở file bằng openpyxl/zipfile và đếm: tên sheet, số ô công thức, số chart
-part, số khối `conditionalFormatting`, số `dataValidation`, ô lỗi.
+Không tin lời kể của agent. Mở file bằng openpyxl/zipfile và đếm.
+
+**Đếm theo TỪNG SHEET, đừng chỉ đếm tổng.** Tổng số công thức là một thước đo tồi: báo cáo Test 3 bản
+đầu ghi "181.603 ô công thức" trong khi con số đó nằm hết trong 4 sheet còn **9 sheet đề yêu cầu trống
+hoàn toàn** (xem `results/test3-gaps.md`, mục Đính chính). Con số tổng che mất đúng thứ cần thấy.
+
+```bash
+python <repo>/tests/bench/ods_summary.py <file.ods>     # dong | cong thuc | o chu | chart, theo tung sheet
+```
+
+Kiểm ba tầng:
+
+1. **Cấu trúc** — `ods_summary.py`: sheet nào có nội dung, sheet nào chỉ có tên.
+2. **Công thức hay số cứng** — `formulas.py` đọc `table:formula` trong gói ODF. Đề liệt "hardcode kết quả"
+   vào lỗi nghiêm trọng, mà đọc **giá trị** thì không phân biệt được.
+3. **Đầu vào còn sống hay đã chết** — **đổi ô rồi đọc lại**. Đọc không bắt được ô điều khiển không nối
+   vào đâu; quét công thức thì thấy (`scan.py` đếm xem có bao nhiêu công thức thật sự đọc ô đó).
