@@ -1,0 +1,4 @@
+file: axiom-test3.ods (1.7 MB)
+sheets (14): Projects | Tasks | Dependencies | Resources | Budget | Actuals | Schedule | Critical_Path | Resource_Load | Risks | Portfolio | Dashboard | Checks | Gantt
+o cong thuc: 181603
+chart: 0 | conditional formatting: 0
