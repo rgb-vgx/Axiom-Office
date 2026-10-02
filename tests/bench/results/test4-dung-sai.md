@@ -95,6 +95,60 @@ sống với đầu vào đã chết.
 Đây là bài học đắt nhất của cả đợt đối chiếu: agent tự kiểm chứng (`verified=true`) vẫn ra một workbook
 18/18 PASS với một ô điều khiển chết, vì bước kiểm chứng chỉ đọc.
 
+## Chạy lại với luật "phải thử": lỗi CŨ, chỗ MỚI
+
+Chạy lại Test 4 (16:00, ngân sách 1M, lưu `result/axiom-test4try.ods`) để xem luật mới có bắt được ô
+điều khiển chết không. **Chưa kết luận được**, vì lượt chạy dừng ở trần 300 vòng ngay giữa lúc dựng bài
+(`run.stopped`, không có `verified`) — **bước kiểm chứng chưa hề chạy**, nên luật mới chưa được dịp làm
+việc.
+
+Nhưng nó cho một dữ liệu mới: Inputs sheet lần này **thẳng cột** (nhãn A, giá trị B, đơn vị C, ghi chú E —
+không còn lệch như lần trước), và vẫn mắc **đúng lỗi cũ ở một dòng khác**:
+
+```
+A34: REPRODUCIBILITY — FIXED RANDOM SEED     (tiêu đề mục, B34 TRỐNG)
+A35: Random Seed   B35: 20250101             (giá trị seed)
+E35: "Change the seed and press F9 / Ctrl+Shift+F9"
+
+quét: Inputs.$B$35 ->     0 công thức
+      Inputs.$B$34 -> 80.008 công thức        <- tiêu đề mục
+      Inputs.$B$36 ->     0 công thức        (Simulation Count = 10.000 cũng không ai đọc)
+```
+
+Lần trước lệch **một cột** (`B22` được dán nhãn, công thức đọc `C25`); lần này lệch **một dòng**
+(`B35` được dán nhãn, công thức đọc `B34`). Cùng một kiểu sai: ô điều khiển đặt cạnh nhãn nhưng công
+thức trỏ vào ô bên cạnh hoặc ô trên. Và vì `B34` chứa **chữ**, phép tính coi nó là 0 — seed lại bằng 0,
+không báo lỗi gì.
+
+Đây là dữ liệu ủng hộ luật "phải thử": đọc lại không phân biệt được `B34` với `B35`, chỉ đổi thử mới
+biết. Nhưng phải chạy một lượt tới được bước kiểm chứng mới nói được luật có bắt hay không — lượt tiếp
+theo đặt trần 1.000 vòng vì lý do đó.
+
+## Ba lần chạy Test 4, và luật "phải thử" chưa được chứng minh
+
+| Lần | Thời điểm | Seed nối đúng? | Đạt bước kiểm chứng? |
+|---|---|---|---|
+| `axiom-test4wide` | 11:57 (TRƯỚC khi thêm luật) | **KHÔNG** — nhãn ở `B22`, công thức đọc `C25` (trống) | có (`verified=true`) |
+| `axiom-test4try` | 15:49 (sau luật) | **KHÔNG** — nhãn ở `B35`, công thức đọc `B34` (tiêu đề mục) | **không** — dừng ở trần 300 vòng |
+| `axiom-test4verify` | 16:19 (sau luật) | **CÓ** — công thức đọc `Inputs.$B$17`, kèm cả công thức kiểm tra seed hợp lệ | **không** — hết ngân sách ở vòng 136 |
+
+Lượt thứ ba kiểm chứng bằng phép thử thật: đổi `Inputs!B17` 20.250.101 → 777 làm market growth của dòng
+8 đi từ `0,003087` sang `-0,026322` và doanh thu từ `64.841.754,59` sang `44.671.196,33`; trả về thì
+khớp lại **chính xác từng chữ số**. Đây là workbook 8/8 sheet, 301.440 ô công thức, có chart, và ô điều
+khiển **sống** — ngang chất lượng file của Claude Code ở khía cạnh này.
+
+**Nhưng không được phép nói luật mới là nguyên nhân.** Hai lý do:
+
+1. **Bước kiểm chứng chưa hề chạy ở cả hai lượt sau.** `Verify` chỉ bật khi model tự quyết là đã xong
+   (không còn tool call). Ở bài này model gọi tool liên tục rồi hết ngân sách/vòng trước khi "xong", nên
+   lời nhắc "phải thử" **chưa bao giờ được gửi**. Thứ duy nhất khác đi là câu trong system prompt
+   (`CheckRule`) — có mặt ở mọi vòng của cả hai lượt.
+2. **Một lượt sai, một lượt đúng — với cùng câu đó trong prompt.** Không thể quy cho luật; đây là dao
+   động giữa các lần chạy. Đúng/sai của ô seed là **chập chờn**, không phải đã sửa.
+
+Kết luận có bằng chứng: **một câu trong system prompt không đủ.** Cơ chế bắt lỗi phải chạy **trong lúc
+dựng bài**, không phải chỉ khi model tự tuyên bố xong — vì ở bài lớn nó không bao giờ tuyên bố xong.
+
 ## Còn lại, chưa làm
 
 - **Chưa soát giá trị của Test 2 và Test 3** (Inventory 50.000 SKU, PPM 5.000 task) — mới làm Test 1 và

@@ -60,6 +60,8 @@ def main() -> int:
     #   <max_tokens> - ngan sach token PHAI TRA cho ca luot (mac dinh 400000; Core chan tren o 1.000.000).
     save_path = sys.argv[7] if len(sys.argv) > 7 else ""
     max_tokens = int(sys.argv[8]) if len(sys.argv) > 8 else 400000
+    # <max_rounds>: tran so vong. Mac dinh 300; Core chan tren o 1000.
+    max_rounds = int(sys.argv[9]) if len(sys.argv) > 9 else 300
     with open(prompt_file, encoding="utf-8") as handle:
         prompt = handle.read()
 
@@ -72,7 +74,7 @@ def main() -> int:
         # giua cac lan chay: cung mot con so, doi cach tinh thi luot chay di duoc bao xa.
         # maxRounds 100 da la nut that that su o Test 1 (dung sau 315 tool call), nen nang len de bai
         # khong bi cat vi so vong khi dang con tien.
-        "options": {"maxRounds": 300, "maxTokens": max_tokens},
+        "options": {"maxRounds": max_rounds, "maxTokens": max_tokens},
     }, token)
     if not created.get("ok"):
         print("KHONG TAO DUOC LUOT CHAY:", created)
