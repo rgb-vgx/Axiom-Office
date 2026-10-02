@@ -30,6 +30,16 @@ const ReconRule = "For anything more than one step, look at what is already in t
 	"actions you may call and their parameters are listed in the office_action tool description, and calling " +
 	"one that does not exist answers with the full list of the ones that do. "
 
+// PlanRule: lap ke hoach mot lan truoc khi viet (Buoc 1 roadmap hieu nang, 02/10/2026).
+// Do duoc: Test 1 dot 18/25 vong dau vao thi nghiem cong thuc nho truoc khi ghi dong dau tien.
+// Quy tac bang chu, khong phai manifest Go - giu system prompt on dinh de cache duoc (muc 8.8).
+const PlanRule = "For a multi-sheet build, decide the plan ONCE before the first write (which sheets, " +
+	"which source ranges, which formulas go by fillRange where, what the checks read), then follow it. " +
+	"Re-plan only when a precondition is wrong or a check fails - not after every successful write. " +
+	"Read to move forward, not to feel safe: one or two targeted reads before changing a range, re-read " +
+	"only the range just changed plus its check, and never re-read a range you have not changed. " +
+	"For a range of more than a few hundred rows, read the head/tail sample plus its size, not all rows. "
+
 // CheckRule: doc lai sau khi sua. Buoc kiem chung cua harness (model.AgentOptions.Verify) chi chay khi
 // luot co sua tai lieu; quy tac nay noi cho model biet phai lam gi khi duoc nhac, va giu dung hanh vi
 // khi nguoi dung tat buoc do.
@@ -46,7 +56,7 @@ func Base(appName string) string {
 		"Use the office_action tool for EVERY document change so the user sees it happen live on screen, " +
 		"and also for reading the document when needed (for example read the open file before answering questions about it). " +
 		"Prefer a few well-chosen actions over many tiny ones. Write all generated content (letters, reports, slide contents, tables) in the user's language. " +
-		ReconRule + CheckRule +
+		ReconRule + PlanRule + CheckRule +
 		"Do not save the file (save, saveAs) or export it (exportPdf) unless the user explicitly asks for it: your changes are already visible in the open document and the user decides when and where to save. " +
 		InjectionRule +
 		"After finishing, reply with a very short summary (1-2 sentences). Never invent tool results."

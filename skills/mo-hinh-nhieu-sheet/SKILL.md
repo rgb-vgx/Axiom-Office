@@ -57,6 +57,20 @@ chung. Số liệu ở `tests/bench/results/`.
    theo công thức** rồi so với giá trị đọc lại (ví dụ `I=H*C`, `J=H-I-D`, `K=J-Investment/duration`).
    Đếm được bao nhiêu sheet/công thức không nói lên mô hình có đúng.
 
+9. **Lập kế hoạch MỘT lần trước khi viết, rồi giữ nguyên khi làm (plan-then-fill).** Đo được:
+   Test 1 đốt 18/25 vòng đầu vào thí nghiệm công thức nhỏ (`DATE`, `EOMONTH`, dấu `,`/`;`) trước
+   khi ghi dòng đầu tiên — tất cả đều có sẵn trong mô tả tool (`test1-gaps.md`). Trước lệnh đầu
+   tiên: liệt kê sheet cần dựng, vùng nguồn, công thức nào đi bằng `fillRange` ở đâu, output nào để
+   pass; viết gọn trong một lượt suy nghĩ rồi làm theo. Chỉ lập lại kế hoạch khi điều kiện đầu vào
+   sai hoặc `checkRange` báo lỗi — không xét lại toàn bộ sau mỗi lần ghi thành công. Tin mô tả
+   `office_action`; gọi nhầm tên lệnh thì đọc danh sách trả về ngay trong lỗi, không thử biến thể.
+
+10. **Đọc để làm tiếp, không đọc để yên tâm.** Đo được: lượt Test 4 rộng gọi `et.readRange` 174 lần
+    — mỗi lần kéo cả bảng về là input phình mà không thêm quyết định mới. Đọc 1–2 vùng mục tiêu
+    trước khi sửa; sau khi sửa chỉ đọc lại vùng vừa sửa + `et.checkRange`; không đọc lại vùng chưa
+    đổi. Vùng lớn (hơn vài trăm dòng) thì đọc mẫu đầu/cuối + đếm kích thước, không kéo hết 50.001
+    dòng về.
+
 ## Checklist trước khi trả lời
 
 - [ ] Danh sách sheet đề yêu cầu ↔ `et.listSheets`: đủ, không sheet nào rỗng.
@@ -65,3 +79,5 @@ chung. Số liệu ở `tests/bench/results/`.
 - [ ] `et.setConditionalFormat` cho các ngưỡng/cảnh báo; không tô tay.
 - [ ] Đã đổi một giả định → ô phụ thuộc đổi thật → trả lại.
 - [ ] Đọc lại vài ô đại diện và tự tính tay một dòng để đối chiếu.
+- [ ] Đã viết plan một lần (sheet → nguồn → fill → check) trước lệnh đầu tiên; không probe quá 2 call.
+- [ ] Không đọc lại vùng chưa đổi; vùng lớn chỉ đọc mẫu đầu/cuối + kích thước.
