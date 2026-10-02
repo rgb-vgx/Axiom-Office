@@ -1,0 +1,16 @@
+et.listSheets    ok   {}
+                 ok   {"name":"bao-cao-du-lieu"}
+                 ok   {"name":"_design","path":"tokens.json"}
+et.renameSheet   ok   {"name":"Projects","sheet":"Sheet1"}
+et.writeRange    ok   {"range":"A1","sheet":"Projects","values":[["Project ID","Project Name","Manager","Start Date","End 
+et.writeRange    ok   {"range":"A2","sheet":"Projects","values":[["PRJ-001","ERP Rollout #01","Nguyen Van An",45305,45485,
+et.readRange     ok   {"range":"A2:K4","sheet":"Projects"}
+et.writeRange    ok   {"range":"A27","sheet":"Projects","values":[["PRJ-026","Cloud Migration #26","Tran Thi Binh",45630,4
+et.writeRange    ok   {"range":"A52","sheet":"Projects","values":[["PRJ-051","ERP Rollout #51","Tran Thi Binh",45955,46135
+et.writeRange    ok   {"range":"A77","sheet":"Projects","values":[["PRJ-076","Cloud Migration #76","Dang Mai Linh",46280,4
+et.writeRange    ok   {"range":"A1","sheet":"Projects","values":[["Project ID","Project Name","Manager","Baseline Start","
+et.fillRange     ok   {"formula":"=IFERROR(MAXIFS(Tasks!$F$2:$F$5001,Tasks!$A$2:$A$5001,$A2),D2)","range":"E2:E101","sheet
+et.fillRange     ok   {"formula":"=SUMIFS(Tasks!$L$2:$L$5001,Tasks!$A$2:$A$5001,$A2)","range":"F2:F101","sheet":"Projects"
+et.fillRange     ok   {"formula":"=SUMIFS(Tasks!$M$2:$M$5001,Tasks!$A$2:$A$5001,$A2)","range":"G2:G101","sheet":"Projects"
+et.fillRange     ok   {"formula":"=IFERROR(SUMPRODUCT((Tasks!$A$2:$A$5001=$A2)*Tasks!$L$2:$L$5001*Tasks!$J$2:$J$5001)/F2,0
+et.addSheet      ok   {"index":1,"name":"Tasks"}

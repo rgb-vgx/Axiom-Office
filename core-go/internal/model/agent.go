@@ -14,10 +14,13 @@ import (
 // viec that (prompt dai + nhieu tool) hay bi "provider returned an empty reply" - do that ngay
 // 01/10/2026 voi ocg/deepseek-v4.1-flash.
 //
-// Nang len 32768 ngay 02/10/2026 sau khi HAI luot chay that cung chet o finish_reason=length: model
-// gom mot bang vai nghin dong vao mot lan goi, phan suy luan cong voi phan tra loi vuot 16384. Model
-// dang dung (ocg/deepseek-v4.1-flash) khai maxOutput 384000, nen 32768 van con rong rai.
-const DefaultMaxResponseTokens = 32768
+// Nang 16384 -> 32768 (02/10/2026) roi 32768 -> 65536 cung ngay, moi lan deu vi mot luot chay that chet
+// o finish_reason=length. Lan thu hai la de Project Portfolio Management (Test 3 cua benchmark): model
+// lap ke hoach 5.000 task x 10 cot cong thuc, va phan SUY LUAN mot minh da an het 32768 token truoc khi
+// kip viet lenh nao. Model dang dung (ocg/deepseek-v4.1-flash) khai maxOutput 384000, nen 65536 van con
+// thua xa; va vi nha cung cap stream ca phan suy luan, watchdog "khong nhan duoc byte nao" van canh duoc
+// mot phan hoi treo that.
+const DefaultMaxResponseTokens = 65536
 
 type AgentOptions struct {
 	MaxRounds         int           // 0 = khong gioi han so vong
