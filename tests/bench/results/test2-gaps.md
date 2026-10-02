@@ -93,11 +93,25 @@ nói ra lợi ích — bảng 50.000 dòng giờ dựng được bằng công th
 2. `et.fillRange` (commit `bd8b94e`) và ngân sách token chỉ tính phần phải trả (commit `f243789`) —
    làm từ Test 1, và chính là thứ cho phép lượt này dựng được 50.000 dòng.
 
+3. **Thử tạm tắt tính lại tự động — ĐO ĐƯỢC LÀ CHẬM HƠN, đã hoàn tác** (commit `da6aaf3` rồi `66de08d`,
+   `f2545de`). Giả thuyết: ghi từng ô mà để chế độ tính tự động thì LibreOffice tính lại cả sổ sau mỗi ô,
+   nên gom lại thành một lần tính ở cuối sẽ nhanh hơn. Đo A/B thật, cùng máy, cùng khối ghi:
+
+   | Khối ghi | Để nguyên | Tắt tính + `calculateAll()` |
+   |---|---|---|
+   | 24.008 ô | **12,4s** | 28,0s |
+   | 48.008 ô | **32,6s** | 130,6s |
+
+   Chậm hơn 2,3 và 4,0 lần. LibreOffice đã gộp việc tính lại sẵn; `calculateAll()` ở cuối kéo theo một
+   lượt tính toàn bộ tài liệu, đắt hơn phần tính tăng dần mà nó thay thế. Đã hoàn tác, và ghi số đo ngay
+   trong `write_range` để lần sau không ai thêm lại.
+
 ## Còn lại, chưa làm
 
-- **Chưa gom các lần ghi trong một vòng** (khoảng cách #2). Model hay gọi 5–10 `writeRange` liên tiếp
-  trong cùng một phản hồi, mỗi lần là một lần tính lại cả sổ. Gộp chúng thành một lệnh ghi nhiều vùng
-  (hoặc tạm tắt tính lại trong lúc ghi, bật lại sau) sẽ cắt cả thời gian lẫn số lần hết giờ.
+- **Gom nhiều lần ghi trong một vòng** (khoảng cách #2). Hướng đúng là một lệnh ghi được NHIỀU vùng
+  (`et.writeRanges {writes: [...]}`) — model hay gọi 5–10 `writeRange` liên tiếp trong cùng một phản hồi,
+  mỗi lần là một lần tính lại cả sổ. Đã thử hướng rẻ hơn (đổi chế độ tính) và đo được là sai, xem mục 3
+  trên. Chưa làm hướng gom lệnh.
 - **Chưa chạy lại Test 2 sau khi nâng trần thời gian** để đo mức cải thiện thật — 27 lời gọi lỗi và 6
   sheet không soát được đều là hệ quả của trần cũ, nhưng đó là suy luận từ nguyên nhân, chưa phải số đo.
 - **Chưa đối chiếu nội dung Dashboard và Checks với Claude Code** (số KPI, số check, PASS/FAIL) — hiện
