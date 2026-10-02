@@ -69,7 +69,37 @@ song và tự mở/đóng instance LibreOffice của nó. Từ đây về sau ha
 Nhưng lượt hỏng đó phơi ra một lỗi thật của vòng lặp agent: model gọi **cùng một lệnh với cùng một lỗi
 90 lần liên tiếp** và đốt hết 1.000.088 token vào đó, không tự biết dừng. Đã sửa (xem #7 bên dưới).
 
-## Khoảng cách
+## Chạy lại với ngân sách rộng: Axiom dựng XONG cả 11 sheet
+
+Ngân sách 400k là con số tôi tự đặt. Chạy lại Test 1 với 1.000.000 (12:27:06 → 13:13:56, 47 phút):
+
+| | Axiom @ 400k | Axiom @ 1M | Claude Code |
+|---|---|---|---|
+| Vòng / tool call | 100 / 315 | **158 / 615** | — / 88 |
+| Sheet có nội dung | 9/11 | **11/11** | 11/11 |
+| Ô công thức | (chưa đo) | **24.130** | 15.349 |
+| Chart | 0 | **5** | 5 |
+| Định dạng điều kiện | 0 | 0 | 16 khối |
+| Bài change test | không | **không** | có |
+| Kết thúc | hết vòng | hết ngân sách (1.176.802 > 1.000.000) | hoàn thành |
+
+Từng sheet trong file lưu (`result/axiom-test1wide.ods`):
+
+```
+Raw_Data        23.128 cong thuc, 1007 dong     KPI              74 cong thuc,  44 dong
+Assumptions          3 cong thuc,   21 dong     Dashboard       138 cong thuc,  96 dong
+Revenue             87 cong thuc,   32 dong     Checks          114 cong thuc,  43 dong
+COGS                65 cong thuc,   16 dong     Budget_vs_Actual 104 cong thuc, 26 dong
+PnL                179 cong thuc,   16 dong     Forecast        169 cong thuc,  16 dong
+                                                Scenarios        69 cong thuc,  19 dong
+```
+
+Điều này lật lại kết luận ở bảng ba lần chạy bên dưới: **Dashboard và Checks trống ở lượt 400k không
+phải vì Axiom không làm được, mà vì hết ngân sách trước khi tới.** Với ngân sách đủ, Axiom dựng cả 11
+sheet, ra 5 chart, và số ô công thức còn nhiều hơn Claude Code (24.130 so với 15.349).
+
+Vẫn còn hai thứ Claude Code làm được mà Axiom chưa: **định dạng điều kiện** (năng lực bridge còn thiếu,
+xem `con-lai.md`) và **bài change test** (lượt rộng vẫn hết ngân sách trước khi tới đó).
 
 ## Ba lần chạy Axiom, cùng một đề
 

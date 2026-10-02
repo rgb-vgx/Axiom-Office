@@ -16,7 +16,7 @@ song song đã làm mất tài liệu giữa lượt (xem `test1-gaps.md`, mục
 
 | Bài | Claude Code | Axiom Core | Báo cáo |
 |---|---|---|---|
-| 1 — FP&A (11 sheet) | 11/11 sheet, 15.349 ô công thức, 5 chart, 16 khối CF, **có bài change test** | 9/11 sheet có nội dung thật; Dashboard và Checks trống | [test1-gaps.md](test1-gaps.md) |
+| 1 — FP&A (11 sheet) | 11/11 sheet, 15.349 ô công thức, 5 chart, 16 khối CF, **có bài change test** | @400k: 9/11 sheet. **@1M: 11/11 sheet, 24.130 ô công thức, 5 chart** — còn thiếu CF và change test | [test1-gaps.md](test1-gaps.md) |
 | 2 — Inventory (50.000 SKU) | 12/12 sheet, 2.156.652 ô công thức, 4 chart, 34 khối CF | 12/12 tên sheet; Demand_History 6.001 dòng, 3 sheet 50.001 dòng, Dashboard 78×18, Checks 26×9 | [test2-gaps.md](test2-gaps.md) |
 | 3 — PPM (5.000 task) | 17 sheet, 494.340 ô công thức, 4 chart, 15 khối CF | 14 sheet (đủ 13/13 tên đề), 181.603 ô công thức, 0 chart | [test3-gaps.md](test3-gaps.md) |
 | 4 — Monte Carlo | 10 sheet, 390.949 ô công thức, 4 chart, 2 khối CF | 8 sheet (đủ 8/8 tên đề), 330.132 ô công thức, 0 chart | [test4-gaps.md](test4-gaps.md) |
@@ -25,9 +25,15 @@ Cả bốn lượt Axiom ở ngân sách 400k đều dừng vì hết ngân sác
 vòng). Không lượt nào dừng vì lỗi bridge.
 
 **Nhưng 400k là con số tôi tự đặt, không phải giới hạn sản phẩm** (`MaxMaxTokens` = 1.000.000). Chạy
-lại Test 4 với ngân sách 1.000.000 thì **Axiom hoàn thành cả bài**: 293 vòng, 656 tool call, 8/8 sheet,
-5 chart, `verified=true`, 24 phút, chỉ tốn **375.806** token phải trả — *ít hơn* 404.021 của lượt bị cắt
-ở 400k. Chi tiết và cách lý giải ở [test4-gaps.md](test4-gaps.md).
+lại hai bài nặng nhất với ngân sách 1.000.000:
+
+- **Test 4 hoàn thành cả bài**: 293 vòng, 656 tool call, 8/8 sheet, 5 chart, `verified=true`, 24 phút,
+  chỉ tốn **375.806** token phải trả — *ít hơn* 404.021 của lượt bị cắt ở 400k.
+- **Test 1 dựng xong cả 11/11 sheet** (24.130 ô công thức, 5 chart, kể cả Dashboard và Checks), nhưng
+  vẫn hết ngân sách ở 1.176.802 nên chưa làm bài change test. Lượt 400k chỉ được 9/11 sheet.
+
+Nói cách khác: **phần lớn "khoảng cách" ở bảng trên là do ngân sách đo, không phải do năng lực.** Chi
+tiết ở [test1-gaps.md](test1-gaps.md) và [test4-gaps.md](test4-gaps.md).
 
 ## Cải tiến đã làm, và đo được gì
 

@@ -1,0 +1,16 @@
+file: axiom-test1wide.ods (0.4 MB)
+sheets (11): Raw_Data | Assumptions | Revenue | COGS | PnL | Budget_vs_Actual | Forecast | Scenarios | KPI | Dashboard | Checks
+o cong thuc: 24130
+chart: 5 | conditional formatting: 0
+
+Raw_Data             formulas=23128   rows=1007
+Assumptions          formulas=3       rows=21
+Revenue              formulas=87      rows=32
+COGS                 formulas=65      rows=16
+PnL                  formulas=179     rows=16
+Budget_vs_Actual     formulas=104     rows=26
+Forecast             formulas=169     rows=16
+Scenarios            formulas=69      rows=19
+KPI                  formulas=74      rows=44
+Dashboard            formulas=138     rows=96
+Checks               formulas=114     rows=43
