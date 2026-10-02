@@ -331,6 +331,46 @@ class SheetTests(unittest.TestCase):
             calc.rename_sheet(book_env(book), {"name": "B"})
 
 
+# ---------------------------------------------------------------- tam tat tinh lai
+
+class CalculationTests(unittest.TestCase):
+    """Ghi tung o ma de che do tinh tu dong thi LibreOffice tinh lai ca so sau moi o (khoi 1000 o =
+    1000 lan tinh lai); tren so 50.000 dong moi lan tinh lai mat hang chuc giay."""
+
+    class Doc:
+        def __init__(self, supported=True):
+            self.supported, self.calls = supported, []
+
+        def enableAutomaticCalculation(self, on):
+            if not self.supported:
+                raise AttributeError("khong ho tro")
+            self.calls.append(("auto", on))
+
+        def calculateAll(self):
+            self.calls.append(("calc", None))
+
+    def test_tat_roi_bat_lai_va_tinh_mot_lan(self):
+        doc = self.Doc()
+        with calc._suspend_calculation(doc):
+            doc.calls.append(("trong", None))
+        self.assertEqual(doc.calls, [("auto", False), ("trong", None), ("auto", True), ("calc", None)],
+                         "phai tinh MOT lan o cuoi, khong phai sau tung o")
+
+    def test_ban_khong_ho_tro_thi_ghi_nhu_cu(self):
+        doc = self.Doc(supported=False)
+        with calc._suspend_calculation(doc):
+            doc.calls.append(("trong", None))
+        self.assertEqual(doc.calls, [("trong", None)], "khong ho tro thi khong lam gi ca")
+
+    def test_co_loi_trong_luc_ghi_van_bat_lai_tinh_toan(self):
+        doc = self.Doc()
+        with self.assertRaises(ValueError):
+            with calc._suspend_calculation(doc):
+                raise ValueError("loi giua chung")
+        self.assertEqual(doc.calls[-2:], [("auto", True), ("calc", None)],
+                         "loi giua chung khong duoc de so o che do khong tinh lai")
+
+
 # ---------------------------------------------------------------- bieu do
 
 class FakeBox:

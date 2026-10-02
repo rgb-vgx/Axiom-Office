@@ -4,6 +4,8 @@ Khac Excel mot diem: LibreOffice hoan tac duoc bang undo manager nen et.undo la 
 """
 from __future__ import annotations
 
+import contextlib
+
 import uno
 
 from . import documents, values
@@ -237,6 +239,33 @@ def _cell_address(start_col: int, start_row: int, c: int, r: int) -> str:
     return "%s%d" % (column_letter(start_col + c + 1), start_row + r + 1)
 
 
+@contextlib.contextmanager
+def _suspend_calculation(doc):
+    """Tat tinh lai tu dong trong luc ghi, bat lai va tinh MOT lan o cuoi.
+
+    Ghi tung o ma de che do tinh tu dong thi LibreOffice tinh lai ca so sau moi o: khoi 1000 o la 1000
+    lan tinh lai. Tren so 50.000 dong (de Inventory Optimization) moi lan tinh lai mat hang chuc giay,
+    nen ghi kieu do het gio 60s cua bridge trong khi cung khoi do dien bang et.fillRange lai xong.
+
+    Doc binh thuong van tra loi duoc, khong can tinh lai.
+    """
+    suspended = False
+    try:
+        doc.enableAutomaticCalculation(False)
+        suspended = True
+    except Exception:  # noqa: BLE001 - ban LibreOffice khong ho tro thi ghi nhu cu
+        pass
+    try:
+        yield
+    finally:
+        if suspended:
+            try:
+                doc.enableAutomaticCalculation(True)
+                doc.calculateAll()      # mot lan, de loi luc tinh (#DIV/0!...) lo ra truoc khi doc
+            except Exception:  # noqa: BLE001
+                pass
+
+
 def write_range(env, params):
     address = values.string(params, "range")
     if not address:
@@ -252,28 +281,36 @@ def write_range(env, params):
     # Ghi TUNG O: setDataArray voi phan tu rong (None) lam LibreOffice ghi loi #N/A vao o, con
     # setFormulaArray + setDataArray tren cung vung thi o cong thuc bi ghi de mat cong thuc.
     state: dict = {}
+    formulas_written: list = []
     errors = []
-    for r, row in enumerate(rows):
-        for c in range(width):
-            value = row[c] if c < len(row) else None
-            cell = target.getCellByPosition(c, r)
-            if value is None:
-                cell.setFormula("")            # xoa o (khong tao o chuoi rong)
-            elif isinstance(value, bool):
-                cell.setFormula("TRUE()" if value else "FALSE()")
-            elif isinstance(value, str):
-                if value.startswith("="):
-                    error, written = _write_formula(cell, value, state)
-                    if error:
-                        errors.append({"cell": _cell_address(start_col, start_row, c, r),
-                                       "formula": written, "error": error, "text": cell.getString()})
+    with _suspend_calculation(doc):
+        for r, row in enumerate(rows):
+            for c in range(width):
+                value = row[c] if c < len(row) else None
+                cell = target.getCellByPosition(c, r)
+                if value is None:
+                    cell.setFormula("")        # xoa o (khong tao o chuoi rong)
+                elif isinstance(value, bool):
+                    cell.setFormula("TRUE()" if value else "FALSE()")
+                elif isinstance(value, str):
+                    if value.startswith("="):
+                        # _write_formula van can doc loi NGAY de biet dau phan cach dung sai (loi cu
+                        # phap 508 la loi luc phan tich, khong can tinh lai). Loi luc TINH thi doc sau
+                        # khi tinh mot lan o cuoi (xem vong lap ben duoi).
+                        _, written = _write_formula(cell, value, state)
+                        formulas_written.append((cell, _cell_address(start_col, start_row, c, r), written))
+                    else:
+                        cell.setString(value)
                 else:
-                    cell.setString(value)
-            else:
-                cell.setValue(float(value))
+                    cell.setValue(float(value))
+
+    # Cong thuc hong thi bao ra day: truoc day ghi xong tra ve {"written": n} nen agent tuong da xong.
+    for cell, address, written in formulas_written:
+        error = _error(cell)
+        if error:
+            errors.append({"cell": address, "formula": written, "error": error, "text": cell.getString()})
 
     result = {"written": len(rows) * width, "sheet": _active_sheet_name(env, params)}
-    # Cong thuc hong thi bao ra day: truoc day ghi xong tra ve {"written": n} nen agent tuong da xong.
     if errors:
         result["formulaErrors"] = errors
     return result
@@ -299,25 +336,30 @@ def fill_range(env, params):
 
     formula = values.string(params, "formula")
     errors = []
-    if formula:
-        corner = target.getCellByPosition(0, 0)
-        if formula.startswith("="):
-            error, written = _write_formula(corner, formula, {})
-            if error:
-                errors.append({"cell": _cell_address(bounds.StartColumn, bounds.StartRow, 0, 0),
-                               "formula": written, "error": error, "text": corner.getString()})
-        else:
-            corner.setString(formula)
+    with _suspend_calculation(doc):
+        corner = None
+        if formula:
+            corner = target.getCellByPosition(0, 0)
+            if formula.startswith("="):
+                _write_formula(corner, formula, {})
+            else:
+                corner.setString(formula)
 
-    # Dien ngang truoc (hang dau), roi dien doc tung cot: Microsoft Excel lam dung thu tu nay, va nho
-    # vay moi cot lay hang dau da dien xong lam nguon.
-    if cols > 1:
-        target.getCellRangeByPosition(0, 0, cols - 1, 0).fillAuto(
-            uno.Enum("com.sun.star.sheet.FillDirection", "TO_RIGHT"), 1)
-    if rows > 1:
-        direction = uno.Enum("com.sun.star.sheet.FillDirection", "TO_BOTTOM")
-        for c in range(cols):
-            target.getCellRangeByPosition(c, 0, c, rows - 1).fillAuto(direction, 1)
+        # Dien ngang truoc (hang dau), roi dien doc tung cot: Microsoft Excel lam dung thu tu nay, va nho
+        # vay moi cot lay hang dau da dien xong lam nguon.
+        if cols > 1:
+            target.getCellRangeByPosition(0, 0, cols - 1, 0).fillAuto(
+                uno.Enum("com.sun.star.sheet.FillDirection", "TO_RIGHT"), 1)
+        if rows > 1:
+            direction = uno.Enum("com.sun.star.sheet.FillDirection", "TO_BOTTOM")
+            for c in range(cols):
+                target.getCellRangeByPosition(c, 0, c, rows - 1).fillAuto(direction, 1)
+
+    if corner is not None:
+        error = _error(corner)
+        if error:
+            errors.append({"cell": _cell_address(bounds.StartColumn, bounds.StartRow, 0, 0),
+                           "formula": corner.getFormula(), "error": error, "text": corner.getString()})
 
     result = {"filled": rows * cols, "range": address, "sheet": sheet.Name,
               "sample": [[target.getCellByPosition(c, r).getFormula()
