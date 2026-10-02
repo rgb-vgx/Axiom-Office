@@ -1,0 +1,4 @@
+file: axiom-test4wide.ods (2.7 MB)
+sheets (8): Inputs | Assumptions | Distributions | Simulation | Statistics | Sensitivity | Dashboard | Checks
+o cong thuc: 150479
+chart (draw:object): 5 | conditional formatting: 0

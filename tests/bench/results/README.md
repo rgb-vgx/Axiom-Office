@@ -21,8 +21,13 @@ song song đã làm mất tài liệu giữa lượt (xem `test1-gaps.md`, mục
 | 3 — PPM (5.000 task) | 17 sheet, 494.340 ô công thức, 4 chart, 15 khối CF | 14 sheet (đủ 13/13 tên đề), 181.603 ô công thức, 0 chart | [test3-gaps.md](test3-gaps.md) |
 | 4 — Monte Carlo | 10 sheet, 390.949 ô công thức, 4 chart, 2 khối CF | 8 sheet (đủ 8/8 tên đề), 330.132 ô công thức, 0 chart | [test4-gaps.md](test4-gaps.md) |
 
-Cả bốn lượt Axiom đều dừng vì **ngân sách token 400k** (trừ Test 1 lượt tốt nhất dừng vì trần 100 vòng).
-Không lượt nào dừng vì lỗi bridge.
+Cả bốn lượt Axiom ở ngân sách 400k đều dừng vì hết ngân sách (Test 1 lượt tốt nhất dừng vì trần 100
+vòng). Không lượt nào dừng vì lỗi bridge.
+
+**Nhưng 400k là con số tôi tự đặt, không phải giới hạn sản phẩm** (`MaxMaxTokens` = 1.000.000). Chạy
+lại Test 4 với ngân sách 1.000.000 thì **Axiom hoàn thành cả bài**: 293 vòng, 656 tool call, 8/8 sheet,
+5 chart, `verified=true`, 24 phút, chỉ tốn **375.806** token phải trả — *ít hơn* 404.021 của lượt bị cắt
+ở 400k. Chi tiết và cách lý giải ở [test4-gaps.md](test4-gaps.md).
 
 ## Cải tiến đã làm, và đo được gì
 

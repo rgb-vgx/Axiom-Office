@@ -35,23 +35,17 @@ Test 1, 34 khối ở Test 2). Đó là hai lần đo độc lập cùng ra mộ
 
 Đường (a) là đường Claude Code chọn và nó đã chạy được thật, nên đây là hướng đáng thử trước.
 
-## 2. Chart có sẵn nhưng không lượt Axiom nào dùng
+## 2. Chart — ĐÃ TRẢ LỜI XONG (02/10/2026)
 
-`et.addChart` / `et.listCharts` đã có cho cả hai bridge và **xanh trên LibreOffice thật**
-(`test_live_libreoffice.py --apps calc` 71/71, gồm cả mục đặt đúng kiểu và đọc lại được kiểu). Nhưng:
+`et.addChart` / `et.listCharts` đã có cho cả hai bridge và xanh trên LibreOffice thật. Bốn lượt Axiom ở
+ngân sách 400k gọi nó 0–3 lần; lượt chạy lại Test 4 với ngân sách 1.000.000 gọi **16 lần** và ra
+**5 chart**, hoàn thành cả bài.
 
-| Bài | Claude Code | Axiom |
-|---|---|---|
-| 1 | 5 chart | 0 (`addChart` không được gọi lần nào) |
-| 2 | 4 chart | 3 lời gọi (ở sát cuối lượt) |
-| 3 | 4 chart | 0 |
-| 4 | 4 chart | 0 |
+**Kết luận**: đây không phải khoảng cách năng lực. Model vẫn luôn được chào `et.addChart`
+(`catalog/live-commands.json` có nó) — chỉ là bốn lượt kia hết ngân sách trước khi tới Dashboard.
 
-**Chưa phân biệt được** hai khả năng: model không biết dùng, hay nó hết ngân sách trước khi tới
-Dashboard. Cả bốn lượt đều dừng vì ngân sách.
-
-**Cần làm**: một lần chạy **không bị cắt** (ngân sách lớn hơn hẳn, hoặc chỉ giao riêng phần Dashboard)
-để trả lời. Nếu ra "không biết dùng" thì sửa mô tả tool hoặc thêm luật vào system prompt.
+**Việc còn lại** (nếu muốn): chạy lại Test 1 và Test 3 với ngân sách rộng để xác nhận chúng cũng tới
+được Dashboard, chứ mới có một bài làm chứng.
 
 ## 3. Gom nhiều lần ghi trong một vòng
 
@@ -84,10 +78,16 @@ có đúng không, kết quả thống kê Monte Carlo có khớp không.
 
 **Cần làm**: mở song song file của hai bên bằng openpyxl/pandas, đối chiếu từng ô ở các sheet kết quả.
 
-## 6. Ngân sách 400k là nút thắt của MỌI lượt
+## 6. Ngân sách 400k cắt oan — ĐÃ ĐO ĐƯỢC
 
-Cả bốn lượt Axiom đều dừng vì ngân sách (Test 1 lượt tốt nhất dừng vì trần 100 vòng). Đây là con số
-tôi tự đặt trong `run_prompt.py`, không phải giới hạn của sản phẩm (`MaxMaxTokens` là 1.000.000).
+Cả bốn lượt Axiom ở 400k đều dừng vì ngân sách. Đó là con số **tôi tự đặt** trong `run_prompt.py`,
+không phải giới hạn sản phẩm (`MaxMaxTokens` là 1.000.000). Chạy lại Test 4 với 1.000.000:
 
-**Cần làm**: chạy lại ít nhất một bài với ngân sách rộng để biết Axiom **có thể** xong hay không, tách
-khỏi câu hỏi "xong trong bao nhiêu token".
+- **Hoàn thành cả bài**: 8/8 sheet, 5 chart, `verified=true`, 24 phút.
+- Tốn **375.806** token phải trả — **ít hơn** 404.021 của lượt bị cắt ở 400k, dù làm 3,7 lần số tool call.
+
+Lý do: kích thước phản hồi của model dao động rất mạnh giữa các lần chạy (lượt bị cắt: 306.816 token ra
+/ 79 vòng; lượt rộng: 141.269 / 293 vòng). Một ngân sách vừa khít sẽ cắt oan những lượt lẽ ra đã xong.
+
+**Cần làm**: đặt lại ngân sách mặc định cho các lần đo tiếp theo (1.000.000, hoặc bỏ hẳn trần khi đo
+"có xong được không"), và tách hai câu hỏi ra: *có xong không* và *xong trong bao nhiêu token*.
