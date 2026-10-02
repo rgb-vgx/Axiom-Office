@@ -9,7 +9,13 @@ phụ thuộc công việc, đường găng, tải nguồn lực, rủi ro, dash
 | Tool call | 136 (Edit 63, Bash 43, Read 25, Write 5) | 287 (264 ok / 23 lỗi) |
 | Token | ra 536.688 / cache đọc 43.548.544 | ra 338.166 / cache đọc 1.615.104; **phải trả 406.385** |
 | Kết thúc | hoàn thành | `token budget exceeded (billable 406385 > 400000)` |
-| Kết quả | 17 sheet, 494.340 ô công thức, 4 chart, 15 khối CF, 2 data validation | **14 sheet, 181.603 ô công thức, 0 chart, 0 CF** |
+| Kết quả | **17/17 sheet đều có nội dung**, 494.340 ô công thức, 4 chart, 15 khối CF, 2 data validation | **4/14 sheet có nội dung**, 181.603 ô công thức, 0 chart, 0 CF |
+
+> **Đính chính (02/10/2026).** Bản đầu của báo cáo này ghi "14 sheet (đủ 13/13 tên đề yêu cầu), 181.603 ô
+> công thức" mà chỉ đếm **tổng** số công thức. Đếm theo từng sheet thì con số đó nằm hết trong 4 sheet
+> đầu; **9 sheet đề yêu cầu — `Budget`, `Actuals`, `Schedule`, `Critical_Path`, `Resource_Load`, `Risks`,
+> `Portfolio`, `Dashboard`, `Checks` — TRỐNG HOÀN TOÀN**, không cả tiêu đề. Tổng số công thức là một
+> thước đo tồi vì nó che mất chuyện đó.
 
 ## Claude Code đã làm gì
 
@@ -26,9 +32,31 @@ Nguồn: `tests/bench/results/test3-axiom-calls.txt`, `test3-axiom-output.txt`,
 log `axiom-test3.log`, file lưu `result/axiom-test3.ods`.
 
 ```
-Projects | Tasks | Dependencies | Resources | Budget | Actuals | Schedule | Critical_Path |
-Resource_Load | Risks | Portfolio | Dashboard | Checks | Gantt     (đủ 13/13 tên đề yêu cầu)
-o cong thuc: 181.603        chart: 0        conditional formatting: 0
+sheet                 dong   cong thuc          sheet              dong  cong thuc
+Projects               101        2.800         Budget                1         0
+Tasks                5.001      129.999         Actuals               1         0
+Dependencies         5.101       40.800         Schedule              1         0
+Resources              515        8.004         Critical_Path         1         0
+Gantt                    1            0         Resource_Load         1         0
+Dashboard                1            0         Risks                 1         0
+Checks                   1            0         Portfolio             1         0
+```
+
+**Axiom dựng xong 4 sheet DỮ LIỆU, còn 9 sheet PHÂN TÍCH mà đề chấm điểm thì trống.** Không phải
+"gần xong": đây là phần lớn giá trị của bài (đường găng, tải nguồn lực, rủi ro, portfolio, dashboard,
+checks) chưa hề được làm.
+
+So sánh từng sheet với Claude Code (`ods_summary.py` trên file của hai bên):
+
+```
+sheet              Axiom     Claude Code          sheet            Axiom   Claude Code
+Projects           2.800          1.500           Schedule             0       155.000
+Tasks            129.999         40.000           Critical_Path        0        80.000
+Dependencies      40.800         84.117           Actuals              0       110.000
+Resources          8.004          6.000           Resource_Load        0         9.144
+Dashboard              0            180 (8 chart) Budget               0         1.700
+Checks                 0             87           Risks                0         2.124
+Portfolio              0          2.814           Gantt                0         1.083
 ```
 
 Đây là **lần chạy lại**: lần đầu (10:24) chết sau **16 tool call** với `finish_reason=length`. Đọc phần
@@ -40,6 +68,7 @@ một mình đã ăn hết trần 32.768 token** trước khi kịp viết lện
 
 | # | Khoảng cách | Bằng chứng | Vì sao |
 |---|---|---|---|
+| 0 | **9/13 sheet đề yêu cầu TRỐNG** | `ods_summary.py` trên `axiom-test3.ods`: Budget, Actuals, Schedule, Critical_Path, Resource_Load, Risks, Portfolio, Dashboard, Checks — mỗi sheet 1 dòng, 0 công thức, 0 ô chữ. Claude Code: cả 17 sheet đều có nội dung | Đây là khoảng cách lớn nhất và trước đây bị **che mất** vì tôi chỉ đếm tổng số công thức. Lượt chạy dừng vì ngân sách khi vừa xong 4 sheet dữ liệu — model làm theo thứ tự, phần phân tích nằm cuối |
 | 1 | **Trần token của MỘT phản hồi quá thấp cho bài suy luận nặng** | Lần đầu: chết ở 16 tool call với `finish_reason=length`; suy luận cuối cùng cho thấy model đang chọn công thức cho 10 cột × 5.000 dòng | Trần 32.768 tính cả phần suy luận. Model khai `maxOutput` 384.000 nên trần của mình thấp hơn cả chục lần so với cái model chịu được |
 | 2 | **Không có chart, không có định dạng điều kiện** | `chart: 0`, `conditional formatting: 0` trong file lưu, trong khi Claude Code có 4 chart và 15 khối CF | `et.addChart` có sẵn và đã kiểm chứng, nhưng model không tới đó; `et.formatRange` không làm được định dạng điều kiện (chưa có lệnh nào làm được) |
 | 3 | **Vẫn dừng vì ngân sách trước khi xong bài** | `billable 406385 > 400000` sau 287 tool call và 42 phút | Bài lớn nhất về số sheet. Claude Code trả bằng số vòng (136 tool call, 536.688 token ra) chứ không phải bằng số lệnh bridge |

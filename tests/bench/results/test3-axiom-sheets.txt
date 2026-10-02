@@ -1,0 +1,15 @@
+sheet                      dong  cong thuc    o chu   chart?
+Projects                    101       2800     2828        0
+Tasks                      5001     129999   130020        0
+Dependencies               5101      40800    40819        0
+Resources                   515       8004     8036        0
+Budget                        1          0        0        0
+Actuals                       1          0        0        0
+Schedule                      1          0        0        0
+Critical_Path                 1          0        0        0
+Resource_Load                 1          0        0        0
+Risks                         1          0        0        0
+Portfolio                     1          0        0        0
+Dashboard                     1          0        0        0
+Checks                        1          0        0        0
+Gantt                         1          0        0        0

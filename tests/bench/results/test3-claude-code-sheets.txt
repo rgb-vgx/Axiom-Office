@@ -1,0 +1,18 @@
+sheet                      dong  cong thuc    o chu   chart?
+README                       49          0       41        0
+Dashboard                    58        180      286        8
+Portfolio                   117       2814     2856        0
+Projects                    101       1500     2626        0
+Tasks                      5001      40000   105054        0
+Dependencies               7651      84117   130017        0
+Schedule                   5001     155000   155031        0
+Critical_Path              5001      80000    80016        0
+Resources                   501       6000    10020        0
+Resource_Load               512       9144     9190        0
+Budget                      101       1700     1919        0
+Actuals                    5001     110000   110022        0
+Risks                       355       2124     5601        0
+Gantt                       161       1083     1397        0
+Checks                       58         87      436        0
+StressTest                   84        591      713        0
+Lists                        11          0       68        0
