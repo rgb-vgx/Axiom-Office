@@ -5,6 +5,34 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — đọc `.xls` thẳng bằng Go, không cần LibreOffice lẫn Excel
+- Ứng dụng `.xls` (BIFF8) được đọc **trực tiếp**: `internal/cfb` mở thùng Compound File Binary (OLE2) và
+  `internal/xlsx/biff.go` đọc bản ghi BIFF8. Trước đây bản Linux phải nhờ
+  `soffice --convert-to xlsx`, còn bản Windows đọc qua COM Excel/WPS — cả hai đều buộc người dùng cài
+  thêm một thứ mà họ có thể không có.
+- **Vì sao đáng làm**: sau khi MCP gom về một bản Go, người dùng Windows **có Office/WPS mà không có
+  LibreOffice** là **đa số**, và chính họ sẽ mất `.xls`. Không còn ai để nương vào.
+- Đọc thẳng cũng khớp với cách repo này vốn làm: chỉ **2 phụ thuộc trực tiếp** (`x/sys`,
+  `modernc.org/sqlite` — bản pure-Go thay vì CGO) và cả engine OOXML đều tự viết. Không thêm thư viện nào.
+- Giá trị trả về **khớp đúng** hai đường cũ: ô có định dạng ngày ra chuỗi ISO kèm giờ
+  (`sheet.SerialToIso`, cùng hằng số với đường `.xlsx`), số nguyên ra `int64`, còn lại `float64`.
+- Chỉ BIFF8 (Excel 97-2003). Gặp `.xls` cũ hơn thì nhờ LibreOffice nếu máy có, không thì báo rõ cả hai
+  đường đã thử — không đoán bừa.
+- **Kiểm chứng**:
+  - `internal/cfb`: đối chiếu **từng byte** với một bản tự lần chuỗi viết trong test, trên **cả hai**
+    đường chứa stream — mini stream (`sample.xls`, stream 2.281 byte) và sector thường (`large.xls`,
+    72.272 byte). Cắt file ở mọi kích thước để chắc không panic/treo.
+  - `internal/xlsx`: **đối chiếu hai đường đọc độc lập** — cùng một bảng ở hai định dạng
+    (`sample.xlsx` gốc và `sample.xls` do LibreOffice đổi ra), đọc bằng reader OOXML và reader BIFF rồi
+    so từng ô.
+  - **`TestReadXLSWithoutLibreOffice`**: đặt `AXIOM_SOFFICE=none` để coi như máy không có LibreOffice rồi
+    đọc `.xls` — đúng ca người dùng gặp, và là ca mà trước đây không đọc được.
+  - `test_mcp_portable.py` nay chạy được mục `.xls` **cả khi máy không có LibreOffice** (dùng file mẫu
+    đã commit thay vì tự sinh); trước đây nó **tự bỏ qua**, tức là đúng ca hỏng lại không ai kiểm.
+- Hai lỗi tự gây ra, đều âm thầm, đều do test bắt: hàm nhận diện chữ ký CFB so sánh little-endian với
+  hằng số viết theo thứ tự byte (mọi file `.xls` bị từ chối); và tên sheet/định dạng đọc `cch` theo
+  **byte** trong khi chuỗi UTF-16 chiếm gấp đôi (tên "Trống" ra "Tr", ngày ra số thay vì chuỗi ISO).
+
 ### Changed — `AxiomOffice.Host.exe mcp` chuyển tiếp sang Agent Core (bản Go)
 - Bước đầu để chỉ còn **một** bản MCP server. Trên Windows, MCP server nay là
   `AxiomOffice.Core.exe mcp …`; `AxiomOffice.Host.exe mcp …` **giữ nguyên giao diện** nhưng chuyển tiếp
@@ -19,10 +47,9 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
   `Host.exe` chết ngay khi gọi — biên dịch vẫn xanh.
 - Bản Go **đã chạy được MCP trên Windows**: `test_mcp_portable.py` **70/70** nhắm vào
   `AxiomOffice.Core.exe` (đo trước khi đổi, không phải suy đoán).
-- **Còn nợ một thứ**: đọc `.xls`. Bản C# dùng COM (Excel/WPS), bản Go dùng `soffice` — đây là chỗ dùng
-  COM **duy nhất** của bản C#. Trên Windows, người dùng có Office mà không có LibreOffice sẽ mất `.xls`
-  (mọi định dạng khác là OOXML, đọc trực tiếp, không cần gì thêm). Chưa xử lý; nếu làm thì sẽ ghi rõ
-  trong README trước.
+- **Nợ `.xls` đã trả** (xem mục "đọc `.xls` thẳng bằng Go" ở trên): bản Go nay đọc BIFF8 trực tiếp, nên
+  chỗ dùng COM **duy nhất** của bản C# chỉ còn chạy khi gói cài không kèm Core. Với bước này, bỏ hẳn
+  `Mcp/` khỏi bản C# (bước 4 của kế hoạch) không còn làm mất tính năng nào.
 - `AxiomOffice.Host.exe` **vẫn còn** ba vai trò khác: cầu COM companion (`… wps|et|wpp|word|excel|ppt`),
   `commands --json` (bài parity đang dùng), và `llm-test`.
 

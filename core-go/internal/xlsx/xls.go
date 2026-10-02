@@ -10,16 +10,44 @@ import (
 	"strings"
 	"time"
 
+	"axiomoffice/core/internal/cfb"
 	"axiomoffice/core/internal/filesafe"
 	"axiomoffice/core/internal/ooxml"
 )
 
-// ReadXLS doc file .xls (BIFF cu) bang cach nho LibreOffice doi sang .xlsx roi doc nhu file thuong
-// (LibreOffice_arch.md muc 11). May khong co LibreOffice thi bao ro.
+// ReadXLS doc file .xls (BIFF8) THANG, khong can cai them gi.
+//
+// Truoc day phai nho LibreOffice doi sang .xlsx, tuc la may nguoi dung phai co LibreOffice - trong khi
+// ban Windows thi dung COM Excel/WPS. Doc thang thi khong can ca hai.
+//
+// Con duong LibreOffice van giu lam du phong cho thu ma reader truc tiep khong doc duoc: BIFF5/BIFF2
+// (Excel 5 tro ve truoc) va thung CFB hong. May nao co LibreOffice thi van doc duoc chung.
+//
 // allSheets=false thi chi doc sheet chi dinh (rong = sheet dau tien cua workbook).
 func ReadXLS(path, target string, allSheets bool) ([]*Grid, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var direct error
+	if cfb.IsCFB(data) {
+		var grids []*Grid
+		grids, direct = ReadBIFF(data, target, allSheets)
+		if direct == nil {
+			return grids, nil
+		}
+	}
+	return readViaLibreOffice(path, target, allSheets, direct)
+}
+
+// readViaLibreOffice: nho soffice doi sang .xlsx roi doc nhu file thuong (LibreOffice_arch.md muc 11).
+// direct la loi cua duong doc thang (neu co) - bao ca hai de nguoi doc biet vi sao.
+func readViaLibreOffice(path, target string, allSheets bool, direct error) ([]*Grid, error) {
 	converted, directory, err := convertToXLSX(path)
 	if err != nil {
+		if direct != nil {
+			return nil, fmt.Errorf("%v; %w", direct, err)
+		}
 		return nil, err
 	}
 	defer os.RemoveAll(directory)
@@ -110,10 +138,22 @@ func fileURI(path string) string {
 	return "file://" + slashed
 }
 
+// NoSoffice: gia tri cua AXIOM_SOFFICE de coi nhu may KHONG co LibreOffice.
+//
+// Can co vi day la mot tinh huong that (may Windows chi co Office/WPS) ma kho tai hien: dat duong dan
+// sai thi FindSoffice van tim thay LibreOffice o cac duong quen thuoc. Co loi nay thi bai test chay
+// duoc dung cai nguoi dung gap, thay vi chi chay duoc o noi co LibreOffice.
+const NoSoffice = "none"
+
 // FindSoffice tim LibreOffice: bien AXIOM_SOFFICE, cac duong dan quen thuoc, roi den PATH.
 func FindSoffice() string {
-	if configured := os.Getenv("AXIOM_SOFFICE"); configured != "" && filesafe.Exists(configured) {
-		return configured
+	if configured := os.Getenv("AXIOM_SOFFICE"); configured != "" {
+		if configured == NoSoffice {
+			return ""
+		}
+		if filesafe.Exists(configured) {
+			return configured
+		}
 	}
 	known := []string{
 		"/usr/bin/soffice", "/usr/lib/libreoffice/program/soffice", "/snap/bin/libreoffice",

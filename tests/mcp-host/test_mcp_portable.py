@@ -260,19 +260,26 @@ def test_live(server: Server, out: str, require: bool) -> None:
 
 
 def test_xls(server: Server, out: str) -> None:
-    """.xls: trên Linux đọc qua LibreOffice (chuyển sang xlsx), Windows đọc qua COM Excel/WPS."""
+    """.xls doc thang (BIFF8), khong can LibreOffice cung khong can Excel/WPS.
+
+    File mau: uu tien tu doi chinh file .xlsx vua tao (co soffice thi lam duoc), khong thi dung file mau
+    da commit. Truoc day bai nay TU BO QUA khi may khong co LibreOffice - tuc la dung cai truong hop
+    nguoi dung gap (Windows chi co Office/WPS) lai khong ai kiem.
+    """
     soffice = find_soffice()
     source = os.path.join(out, "mcp_portable.xlsx")
     target = os.path.join(out, "mcp_portable.xls")
-    if soffice is None or not os.path.exists(source):
-        check(True, ".xls: bo qua (khong co LibreOffice de tao file mau)", "")
-        return
-    subprocess.run([soffice, "-env:UserInstallation=file:///" + out.replace(os.sep, "/") + "/lo-xls",
-                    "--headless", "--norestore", "--convert-to", "xls", "--outdir", out, source],
-                   capture_output=True, timeout=240)
+    if soffice is not None and os.path.exists(source):
+        subprocess.run([soffice, "-env:UserInstallation=file:///" + out.replace(os.sep, "/") + "/lo-xls",
+                        "--headless", "--norestore", "--convert-to", "xls", "--outdir", out, source],
+                       capture_output=True, timeout=240)
     if not os.path.exists(target):
-        check(True, ".xls: bo qua (soffice khong tao duoc .xls mau)", "")
-        return
+        fixture = os.path.join(ROOT, "tests", "mcp-host", "fixtures", "sample.xls")
+        if not os.path.exists(fixture):
+            check(True, ".xls: bo qua (khong co LibreOffice va khong co file mau)", "")
+            return
+        target = fixture
+        print("     .xls: dung file mau da commit (may khong co LibreOffice)")
     profile = server.ok("excel_profile", path=target)
     check(profile.get("format") == "xls" and len(profile.get("sheets", [])) >= 1, "excel_profile doc .xls", json.dumps(profile, ensure_ascii=False)[:300])
     read = server.ok("excel_read", path=target, cell_range="A1:C3")

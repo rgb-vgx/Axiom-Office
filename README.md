@@ -285,8 +285,10 @@ Office, `wps`/`et`/`wpp` cho WPS, hoặc `port` lấy từ `office_sessions`).
 
 **Làn file** đọc/ghi thẳng OOXML (ZipArchive + XML, không thư viện ngoài), không cần app mở.
 Khi sửa file chỉ phần XML liên quan được ghi lại, nên **chart, ảnh, pivot, macro của file gốc
-được giữ nguyên**; mọi lần ghi dùng file tạm rồi thay thế (atomic). `.xls` (BIFF) chỉ đọc, qua
-Excel hoặc WPS Spreadsheets cài trên máy. Không có truy vấn SQL (`excel_query` của bản Python cũ).
+được giữ nguyên**; mọi lần ghi dùng file tạm rồi thay thế (atomic). `.xls` (BIFF8) **chỉ đọc**, và đọc
+**thẳng** — không cần Excel, WPS hay LibreOffice trên máy (`internal/cfb` mở thùng OLE2, `biff.go` đọc
+bản ghi BIFF8). Chỉ còn dùng COM Excel/WPS ở bản C# khi gói cài **không kèm** Agent Core. Không có truy
+vấn SQL (`excel_query` của bản Python cũ).
 
 ### Trên Linux (`AxiomOffice.Core mcp`)
 
@@ -310,9 +312,11 @@ tool và cùng hợp đồng với `AxiomOffice.Host.exe mcp`**:
 - `office_sessions` đọc session ở `$XDG_RUNTIME_DIR/axiom-office/sessions`, còn token và port
   (`PortLibreOffice`, mặc định 47851) lấy từ `~/.config/axiom-office/config.json` — **cùng chỗ** với
   Agent Core và extension, nên tool live nói chuyện được với LibreOffice đang mở ngay khi cài xong.
-- `.xls` trên Linux đọc bằng cách nhờ `soffice --headless --convert-to xlsx` (**profile riêng**, không
-  đụng phiên LibreOffice đang mở) rồi đọc như file xlsx thường; máy không có LibreOffice thì báo rõ
-  (đặt `AXIOM_SOFFICE` nếu `soffice` không nằm trong PATH).
+- `.xls` đọc thẳng bằng Go (BIFF8 trong thùng CFB), không cần cài thêm gì. Chỉ khi gặp `.xls` **cũ hơn
+  BIFF8** (Excel 5 trở về trước) hoặc thùng hồng thì mới nhờ `soffice --headless --convert-to xlsx`
+  (**profile riêng**, không đụng phiên LibreOffice đang mở); máy không có LibreOffice thì báo rõ cả hai
+  đường đã thử (đặt `AXIOM_SOFFICE` nếu `soffice` không nằm trong PATH, hoặc `AXIOM_SOFFICE=none` để
+  coi như máy không có LibreOffice).
 - Khác bản Windows: không có lệnh `commands` (`AxiomOffice.Host.exe commands --json|--markdown` sinh bảng
   README) — danh sách lệnh cho mô tả tool `*_command` nằm ở nguồn chung `catalog/live-commands.json`,
   sinh bằng `scripts/generate_mcp_commands.py` (nhúng vào Go qua `internal/mcpserver/livecommands_gen.go`)
