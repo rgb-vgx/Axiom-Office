@@ -1,0 +1,30 @@
+LAN THU 3 - dinh dang dieu kien: CO duong lam duoc (02/10/2026)
+LibreOffice 26.8.0.3 (Windows), chay tay: tests/bench/probe_cf3.py
+Lenh: "C:\Program Files\LibreOffice\program\python.exe" tests/bench/probe_cf3.py
+
+OK   tao duoc tap vung qua doc.createInstance
+     SheetCellRanges ty le: <class 'pyuno'>
+OK   createByRange tra ve ID (khong phai doi tuong)
+     gia tri=1
+OK   getConditionalFormats() tra ve day doi tuong theo vung
+     type=<class 'tuple'> len=1
+OK   doi tuong theo vung CO createEntry
+     ['Count', 'ElementType', 'ID', 'ImplementationId', 'PropertySetInfo', 'Range', 'Types', 'addPropertyChangeListener', 'addVetoableChangeListener', 'createEntry', 'getByIndex', 'getCount', 'getElementType', 'getImplementationId', 'getPropertySetInfo', 'getPropertyValue', 'getTypes', 'hasElements', 'queryAdapter', 'queryInterface', 'removeByIndex', 'removePropertyChangeListener', 'removeVetoableChangeListener', 'setPropertyValue']
+OK   createEntry(0, CONDITION) TAO entry that (Count tang)
+     truoc=0 sau=1 (gia tri tra ve cua pyuno la None)
+OK   getByIndex(0) tra ve entry that
+     type=<class 'pyuno'>
+     entry methods: ['Formula1', 'Formula2', 'ImplementationId', 'Operator', 'PropertySetInfo', 'StyleName', 'Type', 'Types', 'addPropertyChangeListener', 'addVetoableChangeListener', 'getImplementationId', 'getPropertySetInfo', 'getPropertyValue', 'getType', 'getTypes', 'queryAdapter', 'queryInterface', 'removePropertyChangeListener', 'removeVetoableChangeListener', 'setPropertyValue']
+     entry: Operator=3 Formula1=50 StyleName=Good
+OK   entry nam trong day cua vung
+     Count=1
+OK   file .ods luu ra CO dinh dang dieu kien
+     <style:map>=1 | table:condition=0 | apply-style-name=1
+     file kiem chung: C:\Users\ThuyetMT\AppData\Local\Temp\lo-cf3-out-jk4_5fln\probe.ods
+OK   doc lai tu tai lieu dang mo
+     Count=1
+OK   xuat sang .xlsx cung co dinh dang dieu kien
+     <conditionalFormatting>=1 | <dxf>=1
+     file kiem chung .xlsx: C:\Users\ThuyetMT\AppData\Local\Temp\lo-cf3-out-jk4_5fln\probe.xlsx
+
+10 ok, 0 failed

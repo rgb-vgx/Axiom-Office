@@ -3,37 +3,36 @@
 Ghi lại để lần sau tiếp, xếp theo mức chặn việc. Mỗi mục nói rõ **đã đo được gì** và **cần làm gì**,
 để không phải dò lại từ đầu.
 
-## 1. Định dạng điều kiện — bridge không có đường nào làm được
+## 1. Định dạng điều kiện — ĐÃ TÌM RA ĐƯỜNG, probe cũ kết luận SAI (02/10/2026)
 
-Đây là khoảng cách năng lực chung của cả bốn bài.
+**Kết luận cũ** ("không có đường nào tạo được entry") là **sai**, và sai ở chỗ đo: hai probe cũ chỉ
+thử tạo entry từ `doc.createInstance`, `ServiceManager`, `uno.createUnoStruct`, và
+`sheet.ConditionalFormats.createInstance()` — tức là từ **vật chứa**, chưa bao giờ hỏi **đối tượng
+theo vùng**. Chúng cũng chỉ kiểm "lời gọi có ném lỗi không", chứ không kiểm cái thật sự vào file.
 
-**Đã đo** (probe UNO riêng, `test/probe_cf.py` và `test/probe_cf2.py`, 02/10/2026):
+**Đã chạy được thật** — `tests/bench/probe_cf3.py`, LibreOffice 26.8.0.3, kết quả nguyên văn ở
+[probe-conditional-format-3.txt](probe-conditional-format-3.txt) (10/10 OK):
 
-- `range.ConditionalFormat` và `sheet.ConditionalFormats` **đều tồn tại**.
-- `sheet.ConditionalFormats` có `createByRange(RangeAddress)`, `removeByID`, `getConditionalFormats`.
-- `range.ConditionalFormat` là `XSheetConditionalEntries` với `addNew`, `getByIndex`, `clear`.
-- Tạo đối tượng entry thì **không có đường nào chạy**:
-  - `doc.createInstance("com.sun.star.sheet.TableConditionalEntry")` → trả `None`.
-  - `ctx.ServiceManager.createInstanceWithContext(...)` → trả `None`.
-  - `uno.createUnoStruct("com.sun.star.sheet.TableConditionalEntry")` → tạo được, nhưng `addNew((entry,))`
-    ném `RuntimeException: Couldn't convert ... 'getTypes'`.
-  - `sheet.ConditionalFormats.createInstance()` → `AttributeError` (không có hàm này).
-  - Liệt kê service có chữ "Conditional" → **rỗng**.
-- Kết quả trong file lưu: `<style:map>=0 | table:condition=0`.
+1. `doc.createInstance("com.sun.star.sheet.SheetCellRanges")` + `addRangeAddress` → tập vùng.
+   (`ServiceManager` trả `None`; `sheet.getCellRangesByName` **không có** trong pyuno;
+   `sheet.Ranges`/`getRanges()` chỉ là tuple Python.)
+2. `formats.createByRange(tập vùng)` → **trả về số ID**, không phải đối tượng. Đây là chỗ dễ tưởng
+   "hỏng" nhất.
+3. `formats.getConditionalFormats()` → dãy đối tượng theo vùng. Mỗi đối tượng **chính là dãy entry**
+   (`getByIndex`/`getCount`/`removeByIndex`) và có `createEntry(nIndex, nType)`.
+4. `createEntry(0, CONDITION)` **tạo entry thật** (Count 0 → 1) nhưng **pyuno trả về `None`** — phải
+   lấy lại bằng `getByIndex(0)`. Đây là lý do thứ hai khiến probe cũ tưởng không làm được.
+5. Đặt `Operator`/`Formula1`/`StyleName` trên entry đó.
 
-**Khớp với Claude Code**: nó ghi trong báo cáo của mình rằng bản LibreOffice này từ chối
-`XSheetConditionalEntries.addNew`, và nó **viết lại gói OOXML** của file .xlsx để gắn CF (16 khối ở
-Test 1, 34 khối ở Test 2). Đó là hai lần đo độc lập cùng ra một kết luận.
+**Kiểm chứng bằng hai định dạng độc lập** (không tin vào việc API không ném lỗi):
+lưu ra `.ods` → `<style:map>=1`, `apply-style-name=1` (probe cũ đo được `0`);
+xuất sang `.xlsx` → `<conditionalFormatting>=1`, `<dxf>=1`.
 
-**Cần làm**: chọn một trong hai đường **trước khi viết code**:
-- (a) Đi đường OOXML: ghi thẳng `<conditionalFormatting>` vào part `xl/worksheets/sheetN.xml` của gói
-  (giống Claude Code). Dùng được engine OOXML đã có trong `core-go/internal/ooxml` — nhưng bridge
-  extension đang chạy trong LibreOffice trên **tài liệu đang mở**, không phải trên file; phải
-  `et.saveAs` ra file rồi sửa gói rồi mở lại, tức là đổi hẳn luồng làm việc.
-- (b) Dùng **dispatch** (`com.sun.star.frame.DispatchHelper` với URL `.uno:ConditionalFormatDialog`),
-  nhưng đường này mở hộp thoại — không hợp với agent.
+**Hệ quả**: không cần đi đường OOXML (saveAs → sửa gói → mở lại) như Claude Code. Làm được ngay
+**trên tài liệu đang mở**.
 
-Đường (a) là đường Claude Code chọn và nó đã chạy được thật, nên đây là hướng đáng thử trước.
+**Cần làm**: đưa vào bridge thành `et.setConditionalFormat` / `et.listConditionalFormats` (và bản C#
+cho Excel/WPS nếu muốn parity), thêm vào `catalog/live-commands.json` để model thấy.
 
 ## 2. Chart — ĐÃ TRẢ LỜI XONG (02/10/2026)
 
