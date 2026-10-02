@@ -5,6 +5,24 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — skill `mo-hinh-tai-chinh`: mô hình nhiều sheet (FP&A)
+- Bộ skill cũ chỉ nói về **trình bày** (bảng điểm, number format, hàng tổng). Đo được: mỗi lượt chạy
+  chỉ nạp **một** skill, và với app `et` chỉ có 3 skill được chào — không skill nào nói về **mô hình**.
+  Nay có skill thứ tư, và mỗi quy tắc trong đó gắn với một lỗi **đã đo trên chính mô hình do agent
+  dựng**, không phải lời khuyên chung:
+  - **9/13 sheet đề yêu cầu TRỐNG HOÀN TOÀN** trong một lượt Test 3 (làm hết sheet dữ liệu rồi hết ngân
+    sách trước khi tới phần phân tích) → dựng xong một nhánh dọc trước khi nhân ra.
+  - **60.006 công thức đọc một ô trống** (`Inputs.C25`) trong khi ô seed được dán nhãn "Seed Value" ở
+    `B22` **không công thức nào đọc** → ô giả định phải có giá trị trước, và `et.checkRange` phải sạch
+    `empty-reference`.
+  - Một check so ô chứa **chữ** `"integer"` với một con số nên **PASS oan** → check phải so giá trị ô
+    điều khiển.
+  - Đổi giả định rồi đọc lại là phép thử **duy nhất** phân biệt ô điều khiển sống với ô chết.
+  - Điều kiện màu phải do `et.setConditionalFormat` sinh ra, không tô tay (tô tay đứng yên khi dữ liệu
+    đổi).
+- `skills/mo-hinh-tai-chinh/SKILL.md`; Core nạp **8 skill, 0 lỗi** (kiểm bằng cách chạy Core trên thư
+  mục skill sạch và đọc `core.log`).
+
 ### Added — định dạng điều kiện: `et.setConditionalFormat` / `et.listConditionalFormats`
 - Bốn bài benchmark đều cần tô màu theo ngưỡng, và đây là thứ **duy nhất** trong danh sách khoảng cách
   mà Axiom hoàn toàn không làm được. Hai lần đo trước kết luận "không có đường nào" — kết luận đó **sai**.
