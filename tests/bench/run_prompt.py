@@ -48,7 +48,9 @@ def main() -> int:
         "document": {"name": "Untitled 1"},
         # Ngan sach token ca luot, tinh theo token PHAI TRA THAT (cache khong tinh). De 400k cho de so
         # giua cac lan chay: cung mot con so, doi cach tinh thi luot chay di duoc bao xa.
-        "options": {"maxRounds": 100, "maxTokens": 400000},
+        # maxRounds 100 da la nut that that su o Test 1 (dung sau 315 tool call), nen nang len de bai
+        # khong bi cat vi so vong khi dang con tien.
+        "options": {"maxRounds": 300, "maxTokens": 400000},
     }, token)
     if not created.get("ok"):
         print("KHONG TAO DUOC LUOT CHAY:", created)

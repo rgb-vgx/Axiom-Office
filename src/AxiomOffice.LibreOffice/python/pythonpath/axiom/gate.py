@@ -28,7 +28,15 @@ class _Callback(unohelper.Base, XCallback):
 
 
 class UnoGate:
-    def __init__(self, ctx, timeout: float = 60.0):
+    # 300s, khong phai 60s: mot lenh ghi vao bang lon lam LibreOffice tinh lai CA so (SumProduct tren
+    # 50.000 dong x 10 cong thuc mat hang phut). Do ngay 02/10/2026 tren de Inventory Optimization: lenh
+    # bi cat o 60s voi "Busy: LibreOffice did not answer within 60s", va moi lan thu lai deu hong vi so
+    # van dang tinh.
+    #
+    # Ba tang phai xep dung thu tu, ben goi luon cho lau hon gioi han cua chinh bridge, khong thi thong
+    # bao ro rang cua bridge bi thay bang mot loi het gio mo ho:
+    #   gate nay 300s  <  Core DefaultCommandTimeout  <  MCP live commandTimeout
+    def __init__(self, ctx, timeout: float = 300.0):
         self.ctx = ctx
         self.timeout = timeout
         self._lock = threading.Lock()

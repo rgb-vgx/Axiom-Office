@@ -16,8 +16,14 @@ import (
 )
 
 const (
-	// DefaultCommandTimeout: wpp.exportPdf / writer.exportPdf co the lau.
-	DefaultCommandTimeout = 90 * time.Second
+	// DefaultCommandTimeout: wpp.exportPdf / writer.exportPdf co the lau, va mot lenh ghi vao bang lon
+	// lam LibreOffice tinh lai CA so (SumProduct tren 50.000 dong x 10 cong thuc mat hang phut).
+	//
+	// Phai lon hon gioi han cua chinh bridge, khong thi ben goi cat truoc va thong bao ro rang cua
+	// bridge ("Busy: LibreOffice did not answer within Ns") bi thay bang mot loi het gio mo ho:
+	//   gate cua extension LibreOffice 300s (axiom/gate.py)  <  330s nay  =  MCP live commandTimeout
+	// Do ngay 02/10/2026 tren de Inventory Optimization: ban dau la 90s, va 60s o phia extension.
+	DefaultCommandTimeout = 330 * time.Second
 	HealthTimeout         = 5 * time.Second
 	commandsTimeout       = 15 * time.Second
 	catalogTTL            = 5 * time.Minute
