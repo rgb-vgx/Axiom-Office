@@ -50,8 +50,8 @@ chung. Số liệu ở `tests/bench/results/`.
    trên cùng một vùng thì để trong **một** lần gọi; gọi lại trên cùng vùng là **thay** rule cũ.
 
 7. **Bảng lớn đi bằng công thức + điền**: `et.fillRange` viết một công thức vào ô góc rồi điền ra cả
-   vùng (tham chiếu tương đối tự dịch) — đừng gửi từng ô. Dữ liệu thô gửi **một lần** bằng mảng hai
-   chiều đầy đủ.
+   vùng (tham chiếu tương đối tự dịch) — đừng gửi từng ô. Dữ liệu thô có sẵn (người dùng đưa, vài
+   trăm dòng) gửi **một lần** bằng mảng hai chiều đầy đủ; dữ liệu **giả lập** lớn thì theo quy tắc 11.
 
 8. **Tự kiểm bằng số, không bằng cấu trúc.** Sau khi dựng, chọn một dòng đại diện và **tự tính tay
    theo công thức** rồi so với giá trị đọc lại (ví dụ `I=H*C`, `J=H-I-D`, `K=J-Investment/duration`).
@@ -71,6 +71,21 @@ chung. Số liệu ở `tests/bench/results/`.
     đổi. Vùng lớn (hơn vài trăm dòng) thì đọc mẫu đầu/cuối + đếm kích thước, không kéo hết 50.001
     dòng về.
 
+11. **Dữ liệu giả lập lớn sinh bằng công thức tất định, mỗi cột một `et.fillRange`.** Đề đòi hàng
+    nghìn dòng dữ liệu mà không có file nguồn thì **đừng phát từng giá trị** (đo được: đó là chỗ đốt
+    token lớn nhất ở bài 50.000 SKU) và **đừng dùng `RAND`/`RANDBETWEEN`** (bay hơi — dữ liệu đổi mỗi
+    lần tính lại, vi phạm "giữ nguyên dữ liệu thô"). Đọc công thức đã kiểm trước khi dựng:
+    `read_skill_file {name: "mo-hinh-nhieu-sheet", path: "references/du-lieu-gia-lap.md"}` — có sẵn
+    cách tạo ô thiếu, bản ghi trùng, giá trị 0/cực đại/âm theo tỷ lệ cố định. Đo được: 11 cột × 50.000
+    dòng trong 9,7 giây. Salt phải lấy từ bảng trong file đó — salt nhỏ liền nhau làm cột này thành
+    bản sao lệch dòng của cột kia.
+
+12. **Dashboard có biểu đồ, không chỉ có số.** Đo được (A/B Test 3, 03/10/2026): cùng đề có
+    "dashboard" và "visual Gantt-style schedule", 3/6 lượt trả bài với Dashboard toàn ô số, 0 biểu đồ.
+    KPI vẫn là công thức; thêm ít nhất một `et.addChart` đọc từ vùng KPI/tổng hợp, và đề nói "visual"
+    / "Gantt" thì dựng phần hình (biểu đồ thanh theo ngày bắt đầu–thời lượng, hoặc ô tô màu bằng
+    `et.setConditionalFormat` theo ngày) — không thay bằng một bảng ngày tháng.
+
 ## Checklist trước khi trả lời
 
 - [ ] Danh sách sheet đề yêu cầu ↔ `et.listSheets`: đủ, không sheet nào rỗng.
@@ -81,3 +96,5 @@ chung. Số liệu ở `tests/bench/results/`.
 - [ ] Đọc lại vài ô đại diện và tự tính tay một dòng để đối chiếu.
 - [ ] Đã viết plan một lần (sheet → nguồn → fill → check) trước lệnh đầu tiên; không probe quá 2 call.
 - [ ] Không đọc lại vùng chưa đổi; vùng lớn chỉ đọc mẫu đầu/cuối + kích thước.
+- [ ] Dữ liệu giả lập lớn: công thức tất định từ `references/du-lieu-gia-lap.md`, không RAND, không phát tay.
+- [ ] Dashboard có ít nhất một biểu đồ; đề có "visual"/"Gantt" thì có phần hình.
