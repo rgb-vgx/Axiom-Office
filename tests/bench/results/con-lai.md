@@ -320,3 +320,14 @@ trong SKILL.md phải trỏ tới file có thật.
 **Chưa đo**: model có thật sự theo quy tắc 11 khi làm Test 2 không, và token/wall giảm bao nhiêu — cần
 proxy LLM. A/B mở rộng n=5 cũng dừng: variant4 chết HTTP 429 `FreeUsageLimitError` (đã loại, ghi
 `ab/infra-failures.log`), sau đó proxy `localhost:20128` tắt hẳn.
+
+### Lỗi tham số của agent — soi từ log A/B, đã sửa (04/10/2026, `c204fc5`)
+
+Quét 3.328 tool call của 8 lượt A/B Test 3: phần lớn lỗi agent là `'range' is required` / `'writes' is
+required` **trong khi model đã gửi tham số đó** — thông báo lỗi đánh lừa nên model gửi lại y hệt:
+- 10 lần `et.formatRange` gửi `cell_range` (tên tham số của tool file MCP `excel_*` mà agent cũng thấy)
+  → nay quy về `range` khi lệnh có tham số `range` và model chưa gửi tên đúng.
+- 10 lần `params` là **chuỗi** JSON hỏng (công thức có `\"` lồng, xuống dòng thô…) → trước đây bị bỏ
+  im thành `nil`. Nay lấy object đầu tiên nếu chỉ có rác phía sau; còn hỏng thì trả
+  `params ... is not valid JSON (... near: ...)` và không gọi bridge.
+Chưa đo lại được trên LLM (proxy 429); kỳ vọng: hết chuỗi lặp lỗi kiểu base3 (8 lần liền).
