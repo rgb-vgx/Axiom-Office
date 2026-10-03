@@ -1,6 +1,7 @@
 # Tình trạng dự án Axiom Office
 
-Cập nhật: **01/10/2026** · nhánh `main` · cây làm việc sạch · **chưa push remote**
+Cập nhật: **03/10/2026** · nhánh `main` · cây làm việc sạch · **7 commit chưa push remote**
+(chỉ commit, không push — theo yêu cầu của bạn)
 
 Tài liệu này là ảnh chụp nhanh "đã làm được gì / chưa làm được gì". Chi tiết thiết kế nằm ở
 [New_arch.md](New_arch.md) (Core + add-in) và [LibreOffice_arch.md](LibreOffice_arch.md) (LibreOffice);
@@ -157,3 +158,26 @@ Các phần e2e chạy riêng được: `fake_bridge`, `guards`, `skills`, `memo
    (xem ghi chú máy kiểm chứng) và đặt `AXIOM_MCP_NO_CATALOG=1`.
 5. `src/AxiomOffice.Core/` và `src/WpsAiBridge.Native/` chỉ còn là thư mục build cũ (không được git
    theo dõi) — xoá được nếu muốn cây làm việc gọn.
+
+## 7. Đối chiếu benchmark & lộ trình hiệu năng (02–03/10/2026)
+
+Bộ đề 4 bài LibreOffice Calc so với Claude Code nằm ở `tests/bench/` (README cách chạy, số liệu ở
+`results/`). Lộ trình hiệu năng theo tư vấn ngoài: **Bước 0/1/2 ĐÃ LÀM, Bước 3 còn lại**
+(`results/con-lai.md` mục 7):
+
+| Bước | Nội dung | Trạng thái |
+|---|---|---|
+| 0 | Dòng `METRIC` trong `run_prompt.py` (billable, by_tool, dup_reads, wall…) | ✅ |
+| 1 | `PlanRule` trong prompt.go + skill quy tắc 9–10 | ✅ **đã A/B, giữ PlanRule** |
+| 2 | Cắt response `readRange`/`checkRange` ở wrapper Go (`truncate.go`) | ✅ code + 9 unit test (`4f666ea`); còn smoke test live khi bench rảnh |
+| 3 | Sinh dữ liệu bằng công thức tất định (`fillRange` + `ROW()`/`MOD()`/`INDEX`) | ⬜ |
+
+**Kết quả A/B Test 3 đợt mimo (n=3/cặp, model `oc/mimo-v2.6-flash-free`, 03/10/2026)**:
+6/6 lượt `completed + verified=True`, 13/13 sheet bắt buộc — variant **rẻ hơn 3/3 (median
+−11,4% billable, −24,2% tool call)**, wall median −9,9%, điểm yếu: chart (control 3/3 lượt vs
+variant 1/3). Chi tiết + caveat: `results/con-lai.md` mục 7; hạ tầng A/B + driver + 9 bài học
+vận hành ngoài repo: `C:\Users\ThuyetMT\test\bench\ab\README.md`.
+
+Cảnh báo vận hành đã ghi nhận: model free có lượt `provider returned an empty reply` (tính là lỗi
+hạ tầng, loại khỏi số liệu); **không sửa script khi nó đang chạy** (bash đọc lệch offset → mất log);
+LO thật là process `soffice.bin`.
