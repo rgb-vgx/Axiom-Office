@@ -162,15 +162,15 @@ Các phần e2e chạy riêng được: `fake_bridge`, `guards`, `skills`, `memo
 ## 7. Đối chiếu benchmark & lộ trình hiệu năng (02–03/10/2026)
 
 Bộ đề 4 bài LibreOffice Calc so với Claude Code nằm ở `tests/bench/` (README cách chạy, số liệu ở
-`results/`). Lộ trình hiệu năng theo tư vấn ngoài: **Bước 0/1/2 ĐÃ LÀM, Bước 3 còn lại**
+`results/`). Lộ trình hiệu năng theo tư vấn ngoài: **Bước 0–3 ĐÃ LÀM** (Bước 3 chưa đo với LLM)
 (`results/con-lai.md` mục 7):
 
 | Bước | Nội dung | Trạng thái |
 |---|---|---|
 | 0 | Dòng `METRIC` trong `run_prompt.py` (billable, by_tool, dup_reads, wall…) | ✅ |
 | 1 | `PlanRule` trong prompt.go + skill quy tắc 9–10 | ✅ **đã A/B, giữ PlanRule** |
-| 2 | Cắt response `readRange`/`checkRange` ở wrapper Go (`truncate.go`) | ✅ code + 9 unit test (`4f666ea`); còn smoke test live khi bench rảnh |
-| 3 | Sinh dữ liệu bằng công thức tất định (`fillRange` + `ROW()`/`MOD()`/`INDEX`) | ⬜ |
+| 2 | Cắt response `readRange`/`checkRange` ở wrapper Go (`truncate.go`) + tail + contract | ✅ unit + **live 10/10** trên LO (50k dòng: 1 MB → 2,8 KB) |
+| 3 | Sinh dữ liệu bằng công thức tất định (skill quy tắc 11 + `references/du-lieu-gia-lap.md`) | ✅ đo trên LO (11 cột × 50k dòng 9,7 s); chưa A/B với LLM |
 
 **Kết quả A/B Test 3 đợt mimo (n=3/cặp, model `oc/mimo-v2.6-flash-free`, 03/10/2026)**:
 6/6 lượt `completed + verified=True`, 13/13 sheet bắt buộc — variant **rẻ hơn 3/3 (median

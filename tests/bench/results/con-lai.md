@@ -206,7 +206,7 @@ billable out, số sheet có nội dung, `issueCount`.
 cắt chi tiết được, giấu số lỗi thì không. Làm ở Go trước (một nền tảng, rẻ), chỉ đụng `calc.py`/
 `gate.py` nếu wrapper không đủ. Đo billable input, số lần đọc lại, coverage có giữ không.
 
-**Bước 3 — sinh dữ liệu bằng công thức tất định (CHƯA LÀM)**: recipe trong skill — seed cố định +
+**Bước 3 — sinh dữ liệu bằng công thức tất định (ĐÃ LÀM phần skill + đo trên LO, 04/10/2026 — chưa A/B với LLM)**: recipe trong skill — seed cố định +
 `MOD(ROW()*…,…)` + `INDEX(Lists)`, recalc ra số y hệt (không bay hơi như `RANDBETWEEN`, giữ được
 "preserve raw data"). Đo 1k → 10k → 50k: output token, giờ sinh/ghi/tính riêng, hash 2 lần chạy có
 khớp không. Chỉ khi cách này không đạt phân phối đề yêu cầu mới prototype native generator bên
@@ -296,3 +296,27 @@ Caveat ghi rõ: đang đo **gói prompt+skill gộp** (PlanRule + quy tắc 9–
 driver, không sửa script giữa chừng — bài học #9); hoặc (b) coi đây là đủ để **giữ PlanRule và
 sang Bước 2** (cắt response `readRange` ở wrapper Go), kèm 1 hành động nhỏ: bổ sung checklist
 "Dashboard có chart/Gantt" vào skill để xử lý điểm yếu chart.
+
+### Bước 2 + Bước 3 — đã làm khi proxy LLM tắt (04/10/2026 rạng sáng)
+
+**Bước 2 (cắt response, `core-go/internal/tools/truncate.go`)**: `readRange` giữ 200 dòng đầu (≤ 6.000
+ô) + `tailValues` 10 dòng cuối + `truncated/totalRows/totalCols/nextRange`; `checkRange` giữ nguyên
+`issueCount`, cắt list ở 100 + `issuesOmitted`; lỗi trả nguyên văn; mô tả tool có `TruncationContract`
+(mẫu bị cắt không chứng minh gì về phần còn lại). Tail + contract theo review của ChatGPT. Smoke test
+live trên LibreOffice thật (`truncate_live_test.go`, tag `live`) **10/10**: đọc 50.001 dòng
+**1.000.101 byte → 2.836 byte** vào history (~350×). Còn lại: mục hành vi (anomaly chỉ ở đuôi → agent
+không được kết luận "sạch") cần LLM.
+
+**Bước 3 (`skills/mo-hinh-nhieu-sheet/references/du-lieu-gia-lap.md` + quy tắc 11)**: hàm băm nguyên
+`f(x)=x(2x+1) mod 2^22` hai vòng (ChatGPT đề xuất), u=(f+0,5)/2^22, salt = k×100003. Đo trên LO thật
+từng ứng viên (50.000 dòng × 4 cột): χ² 10 bin < 16,9, CORREL < 0,006, tự tương quan < 0,005, điền lại
+y hệt. **Hai bẫy chỉ đo mới thấy**: salt liền nhau 1,2,3 → CORREL ≈ 0 nhưng **49.999/50.000 ô** là bản sao
+lệch dòng; cách vá bằng khối 65536·k → CORREL 0,166 (tệ hơn). Sheet `Raw_SKU_Data` đủ 11 cột × 50.000
+dòng của Test 2: **9,7 giây**, 0 ô lỗi, tỷ lệ thật thiếu 1.014/1.056 (đích ~1.000), trùng 508 (~500),
+demand 0 2.496 (~2.500), tồn âm 244 (~250), lead ≥ 60 1.548 (~1.500). Thêm quy tắc 12 (Dashboard có
+biểu đồ) từ điểm yếu chart của A/B. Test cố định `repo_skills_test.go`: mọi `read_skill_file` nhắc
+trong SKILL.md phải trỏ tới file có thật.
+
+**Chưa đo**: model có thật sự theo quy tắc 11 khi làm Test 2 không, và token/wall giảm bao nhiêu — cần
+proxy LLM. A/B mở rộng n=5 cũng dừng: variant4 chết HTTP 429 `FreeUsageLimitError` (đã loại, ghi
+`ab/infra-failures.log`), sau đó proxy `localhost:20128` tắt hẳn.
