@@ -128,7 +128,13 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 		return Result{JSON: ErrorJSON(message), Action: action}
 	}
 
-	params := NormalizeParams(arguments["params"])
+	params, problem := normalizeParamsChecked(arguments["params"])
+	if problem != "" {
+		// Bao DUNG loi o day: truoc 04/10 params hong bi bo im thanh nil, bridge bao "'range' is
+		// required" trong khi model DA gui range -> model gui lai y het (variant1 lap 5 lan).
+		return Result{JSON: ErrorJSON(problem), Action: action}
+	}
+	params = aliasParams(t.allowed[action], params)
 
 	// Policy xac nhan (muc 8.6): hoi nguoi dung truoc lenh rui ro.
 	decision := policy.Evaluate(ctx, action, params, run.Prompt, func(inner context.Context) *int {
@@ -173,6 +179,72 @@ func CanonicalAction(action string, allowed []string) string {
 		}
 	}
 	return action
+}
+
+// normalizeParamsChecked: nhu NormalizeParams nhung chuoi JSON hong thi tra loi ro rang thay vi nil.
+// Chuoi co rac phia sau object (model viet them "}" hoac giai thich) thi lay object DAU TIEN.
+func normalizeParamsChecked(value any) (map[string]any, string) {
+	text, isString := value.(string)
+	if !isString {
+		return NormalizeParams(value), ""
+	}
+	trimmed := strings.TrimSpace(text)
+	if trimmed == "" || trimmed == "null" {
+		return nil, ""
+	}
+	decoder := json.NewDecoder(strings.NewReader(trimmed))
+	var parsed map[string]any
+	err := decoder.Decode(&parsed)
+	if err == nil && parsed != nil {
+		return parsed, ""
+	}
+	detail := "params is not a JSON object"
+	if err != nil {
+		detail = err.Error()
+		if offset := decoder.InputOffset(); offset > 0 {
+			start := max(0, int(offset)-40)
+			end := min(len(trimmed), int(offset)+20)
+			detail += " near: " + trimmed[start:end]
+		}
+	}
+	return nil, "params was sent as a string that is not valid JSON (" + detail + "). Send params as a " +
+		"JSON object, not a string; inside formulas escape double quotes once (\\\"), and do not put raw " +
+		"line breaks inside strings."
+}
+
+// paramAliases: ten tham so model hay dung nham -> ten that. Do duoc 03/10/2026: 10 lan et.formatRange
+// gui `cell_range` (ten cua tool file MCP excel_* ma agent cung nhin thay) -> "'range' is required".
+// Chi doi khi lenh THAT SU co tham so dich va model chua gui ten dung.
+var paramAliases = map[string][]string{
+	"range": {"cell_range", "cellRange"},
+}
+
+func aliasParams(command office.Command, params map[string]any) map[string]any {
+	if params == nil {
+		return nil
+	}
+	for target, aliases := range paramAliases {
+		if _, present := params[target]; present || !commandHasParam(command, target) {
+			continue
+		}
+		for _, alias := range aliases {
+			if value, ok := params[alias]; ok {
+				params[target] = value
+				delete(params, alias)
+				break
+			}
+		}
+	}
+	return params
+}
+
+func commandHasParam(command office.Command, name string) bool {
+	for _, param := range command.Params {
+		if param.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 // NormalizeParams: model doi khi gui params la chuoi JSON ("{\"rows\":3}") thay vi object.
