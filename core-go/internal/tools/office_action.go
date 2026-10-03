@@ -62,11 +62,20 @@ func signature(command office.Command) string {
 
 func (t *OfficeActionTool) Name() string { return "office_action" }
 
+// TruncationContract: noi RO truong hop response bi cat de model khong tu ket luan "het roi" tu
+// mau dau (tu van ChatGPT 04/10: khong duoc ky vong model tu suy ra wrapper da bien doi response).
+// Chi noi contract + hanh vi, khong noi implementation (wrapper cat o layer nao la chuyen cua Go).
+const TruncationContract = "Large reads may come back truncated: truncated=true means values/formulas " +
+	"hold only a sample (head plus tailValues/tailFormulas of the end), totalRows/totalCols give the " +
+	"real size, and nextRange is the part not returned (reads stay capped, so read it in bounded " +
+	"chunks). A truncated sample never proves anything about the rest of the range - before concluding " +
+	"the whole range is clean, uniform, or complete, read the omitted part or use et.checkRange. "
+
 func (t *OfficeActionTool) Description() string {
 	return "Read and modify the LIVE document that is currently open in the office application. " +
 		"Call this for every document change the user asks for so it happens immediately on screen. " +
 		"Array params such as values must be real JSON arrays of rows, not objects. " +
-		UndoRule + " " + ChunkRule +
+		UndoRule + " " + ChunkRule + TruncationContract +
 		"Available actions (with params): " + t.signatures
 }
 

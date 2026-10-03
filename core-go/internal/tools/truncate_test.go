@@ -59,6 +59,19 @@ func TestTruncateReadRangeCatDau(t *testing.T) {
 	if res["nextRange"] != "A201:C5000" {
 		t.Fatalf("nextRange = %v, muon A201:C5000", res["nextRange"])
 	}
+	// tail: 10 dong cuoi (dong 4991..5000) - matrix(5000,3) dong r co gia tri r*3
+	tail, ok := res["tailValues"].([]any)
+	if !ok || len(tail) != TailRows {
+		t.Fatalf("tailValues = %v, muon %d dong", res["tailValues"], TailRows)
+	}
+	// doc qua JSON nen so la float64
+	if first, _ := tail[0].([]any); first[0] != float64(4990*3) {
+		t.Fatalf("tail bat tai dong sai: %v (mong 14970)", first[0])
+	}
+	// invariant: payload qua lai phai bi chan - 5000 dong goc x hang MB, phan hoi moi phai nho
+	if len(raw) > 40_000 {
+		t.Fatalf("payload sau cat van lon: %d bytes", len(raw))
+	}
 }
 
 func TestTruncateReadRangeFormulasVaCellBudget(t *testing.T) {
@@ -215,5 +228,28 @@ func TestInvokeLenhLoiKhongBiCat(t *testing.T) {
 		map[string]any{"action": "et.readRange", "params": map[string]any{"range": "A1"}}, run)
 	if result.OK || !strings.Contains(result.JSON, "no active spreadsheet") {
 		t.Fatalf("loi phai tra nguyen van: %s", result.JSON)
+	}
+}
+
+// Vung 205 dong: head 200 + tail 5 dong con lai (201..205) - khong trung, khong thieu.
+func TestTruncateTailKhongTrungDau(t *testing.T) {
+	result := map[string]any{"range": "A1:A205", "values": matrix(205, 1)}
+	TruncateBridgeResult("et.readRange", result, "")
+	tail := result["tailValues"].([]any)
+	if len(tail) != 5 {
+		t.Fatalf("tail = %d dong, muon 5 (201..205)", len(tail))
+	}
+	if first, _ := tail[0].([]any); first[0] != 200 {
+		t.Fatalf("tail bat dau tai dong %v, muon dong 201 (chi so 200)", first[0])
+	}
+}
+
+// Formulas cung co tailFormulas doi xung.
+func TestTruncateTailFormulas(t *testing.T) {
+	result := map[string]any{"range": "A1:A3000", "formulas": matrix(3000, 1)}
+	TruncateBridgeResult("et.readRange", result, "")
+	tail, ok := result["tailFormulas"].([]any)
+	if !ok || len(tail) != TailRows {
+		t.Fatalf("tailFormulas thieu/sai: %v", result["tailFormulas"])
 	}
 }

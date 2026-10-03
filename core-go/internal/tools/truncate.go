@@ -28,6 +28,10 @@ const (
 	// CheckIssuesCap: checkRange cung cap issue cho vung ban qua day. issueCount trong payload
 	// da la so that (extension dem truoc) nen cat list van giu du so loi.
 	CheckIssuesCap = 100
+	// TailRows: mau DUOI cung kem voi mau dau (tu van ChatGPT 04/10: chi dau thi model co the ket
+	// luan "toan bo vung sach" tu mau dau - dau va cuoi KHONG nhat thiet giong nhau: loi o cuoi
+	// bang, append day cuoi, cong thuc cuoi lech...). Tail la SENTINEL, khong thay the nextRange.
+	TailRows = 10
 )
 
 // TruncateBridgeResult: cat payload cua MOT so lenh doc sau khi bridge tra ve.
@@ -91,6 +95,11 @@ func truncateReadRange(result map[string]any) bool {
 	result["totalRows"] = totalRows
 	if cols > 0 {
 		result["totalCols"] = cols
+	}
+	// Mau duoi: lay TailRows dong CUOI cua vung da doc (khong bi trung mau dau - neu vung qua ngan
+	// thi tail bat dau tu dong sau mau dau). Ten khoa doi xung: values -> tailValues.
+	if tailStart := maxInt(head, totalRows-TailRows); tailStart < totalRows {
+		result["tail"+strings.ToUpper(key[:1])+key[1:]] = matrix[tailStart:]
 	}
 	// nextRange: doc tiep tu dong head+1 den pham vi THAT cua du lieu da doc.
 	// Kieu dia chi goc lay trong result["range"] (extension echo lai tham so da gui).
@@ -158,6 +167,13 @@ func parseCell(ref string) (col, row int, ok bool) {
 		return 0, 0, false
 	}
 	return col - 1, row, true
+}
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 // colName: cot 0-based -> ten cot ("0" -> "A").
