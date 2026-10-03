@@ -155,7 +155,14 @@ Remove-Item -LiteralPath $stage -Recurse -Force
 
 # Skill dung san (New_arch.md muc 8.4): chep canh exe de Core doc duoc luc chay.
 if (Test-Path -LiteralPath $skillsDir) {
-    Copy-Item -LiteralPath $skillsDir -Destination (Join-Path $out "skills") -Recurse -Force
+    # Xoa ban cu TRUOC khi chep: Copy-Item mot thu muc vao dich DA TON TAI se chep long vao trong
+    # (skills\skills) chu khong lam moi - do duoc 04/10/2026: 4/8 skill canh Core release cu hon repo
+    # (ca thay doi tu 02/10), va package.ps1 dong goi luon ca ban cu lan thu muc long.
+    $skillsOut = Join-Path $out "skills"
+    if (Test-Path -LiteralPath $skillsOut) {
+        Remove-Item -LiteralPath $skillsOut -Recurse -Force
+    }
+    Copy-Item -LiteralPath $skillsDir -Destination $skillsOut -Recurse -Force
     Write-Output "Copied skills: $(Join-Path $out 'skills')"
 }
 
