@@ -137,8 +137,14 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 	}
 
 	result := run.Bridge.Command(ctx, run.Office.Port, action, params)
+	// Buoc 2 roadmap: cat response doc lon TRUOC khi vao turns (chi thanh cong moi cat;
+	// loi van tra nguyen van de model doc thong diep loi day du) - xem truncate.go.
+	raw := result.RawJSON
+	if result.OK {
+		raw = TruncateBridgeResult(action, result.Result, raw)
+	}
 	// Lenh that bai thi tai lieu khong doi -> khong tinh la da sua.
-	return Result{JSON: result.RawJSON, OK: result.OK, Action: action,
+	return Result{JSON: raw, OK: result.OK, Action: action,
 		Mutating: result.OK && ChangesDocument(action)}
 }
 
