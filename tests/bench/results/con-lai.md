@@ -258,3 +258,41 @@ của proxy — probe qua `POST /v1/llm/test` trước mỗi lượt). Cùng đ�
 4. **Giữ contract bridge cũ cho A/B prompt/skill**: stash file extension trước khi LO khởi động, pop
    ngay sau — bộ lệnh trong bộ nhớ LO là bản cũ, đĩa trở lại bản mới.
 5. Trước mỗi lượt: probe model qua `POST /v1/llm/test` (model free đổi vận cả ngày).
+
+### Kết quả A/B Test 3 — đợt mimo, pilot n=3/cặp (03/10/2026 tối)
+
+Điều kiện: model `oc/mimo-v2.6-flash-free` (user chọn), đề `test3.txt`, 1.000.000 token / 300 vòng,
+CONTROL `da699e1` vs VARIANT `4169475` (PlanRule + skill 9–10 — khác đúng 2 file), thứ tự trong
+cặp random **C V | V C | C V** (tư vấn ChatGPT: đừng cố định ABAB). Hạ tầng + driver + bài học
+vận hành: `C:\Users\ThuyetMT\test\bench\ab\README.md`; báo cáo máy: `ab\report-pilot.md`
+(paired-delta, độ sâu từng sheet, phân loại lỗi agent/infra).
+
+| Cặp | Wall C → V | Billable C → V | Sheet | Chart C → V | Lỗi C → V |
+|---|---|---|---|---|---|
+| 1 | 84,1′ → 57,6′ (**−31,5%**) | 798.002 → 570.077 (**−28,6%**) | 13/13 = 13/13 | 4 → 0 | 3 → 5 |
+| 2 | 76,9′ → 77,5′ (+0,8%) | 774.133 → 686.052 (**−11,4%**) | 13/13 = 13/13 | 2 → 0 | 1 → 3 |
+| 3 | 99,9′ → 90,0′ (**−9,9%**) | 829.643 → 748.317 (**−9,8%**) | 13/13 = 13/13 | 6 → 6 | 8 → 0 |
+
+**Cả 6 lượt `run.completed` + `verified=True`** — primary endpoint "chất lượng @ 1M" bằng nhau
+trọn vẹn (13/13 sheet bắt buộc ×6), nên tác dụng PlanRule nổi lên ở **chi phí**:
+
+- **Billable:variant rẻ hơn cả 3 cặp** — paired-delta median **−11,4%** (−28,6 / −11,4 / −9,8).
+- **Tool call: −24,2% median** (534→382, 466→353, 489→420) — đọc/ghi lại ít hơn đúng như mục 10.
+- **Wall: nhanh 2/3 cặp, median −9,9%** (cặp 2 hòa).
+- Công thức tổng: median −7,6% (cặp 3 variant thấp hơn rõ: 261k vs 405k) — depth không bắt buộc
+  nhưng nên theo dõi.
+- **Chart là điểm yếu duy nhất**: control có chart 3/3 lượt (4/2/6), variant 1/3 (0/0/6). Đề không
+  yêu cầu chart bắt buộc cho Dashboard, nhưng "GANTT visual" nên có biến thể hình.
+- Lỗi agent: tổng 12 (C) vs 8 (V); không có lượt nào lỗi hạ tầng (1 lượt `empty reply` đã bị loại
+  trước khi chạy — ghi `ab/infra-failures.log`, không tính vào bảng).
+
+**Kết luận pilot (chưa chốt)**: hướng nhất quán 3/3 ở chi phí, chất lượng mốc bằng nhau — PlanRule
+**đáng giữ**. Nhưng n=3 theo tư vấn ngoài chỉ là pilot (nên 5–10 cặp), và đây chỉ là lượt 1 của
+đợt mimo (lượt n=1 hôm qua chạy `muse-spark` không trộn vào được). Còn nhiễu: wall cặp 1 lẹ tới
+31,5% rồi cặp 2 bằng nhau — chưa đủ để chốt "nhanh hơn", nhưng "rẻ hơn" thì cả 3/3 cùng hướng.
+Caveat ghi rõ: đang đo **gói prompt+skill gộp** (PlanRule + quy tắc 9–10), không tách được từng phần.
+
+**Đề xuất bước tiếp**: (a) chạy thêm 2–4 cặp nữa nếu muốn chốt chắc (mỗi cặp ~2,5–3 giờ, cùng
+driver, không sửa script giữa chừng — bài học #9); hoặc (b) coi đây là đủ để **giữ PlanRule và
+sang Bước 2** (cắt response `readRange` ở wrapper Go), kèm 1 hành động nhỏ: bổ sung checklist
+"Dashboard có chart/Gantt" vào skill để xử lý điểm yếu chart.
