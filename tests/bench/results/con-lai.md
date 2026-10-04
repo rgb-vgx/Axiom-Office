@@ -331,3 +331,32 @@ required` **trong khi model đã gửi tham số đó** — thông báo lỗi đ
   im thành `nil`. Nay lấy object đầu tiên nếu chỉ có rác phía sau; còn hỏng thì trả
   `params ... is not valid JSON (... near: ...)` và không gọi bridge.
 Chưa đo lại được trên LLM (proxy 429); kỳ vọng: hết chuỗi lặp lỗi kiểu base3 (8 lần liền).
+
+### Test 2 với bản HEAD (`1e267b4`, Bước 2 + Bước 3) — model `oc/mimo-v2.6-flash-free` (04/10/2026)
+
+Một lượt, 1M/300 vòng. Bằng chứng: `C:\Users\ThuyetMT\test\bench\axiom-test2h-head1.{out,log}` +
+`result\axiom-test2h-head1.ods`.
+
+| | Lần đo cũ (02/10, deepseek, trước Bước 2/3) | HEAD (04/10, mimo) |
+|---|---|---|
+| Kết thúc | hết ngân sách | **`completed`, `verified=True`**, 76,8′, billable 654.771 |
+| Phủ dòng của sheet phân tích | **400 / 52.001** | **50.001 / 50.001** ở cả 7 sheet phân tích |
+| Checks | chỗ thử hàm, PASS=0 FAIL=0 | **37 kiểm tra công thức, 37 PASS** |
+| Biểu đồ Dashboard | — | 4 (`et.addChart`) |
+| Lỗi tool | — | 3, không lặp (`repeat_fail_max=1`) |
+
+- **Quy tắc 11 có tác dụng**: lệnh thứ 3 là `read_skill_file references/du-lieu-gia-lap.md`; dữ liệu 50.000
+  dòng sinh bằng 130 `fillRange` công thức tất định, model còn tự biến tấu đúng (10 location chung một
+  SKU dùng chung u để thuộc tính sản phẩm nhất quán). Tỷ lệ thật: trùng 0,91%, thiếu 2,85%, demand 0 =
+  2.589, cực đại 0,40%, tồn âm 486.
+- **Bước 2**: tổng kết quả tool vào ngữ cảnh cả lượt 162.754 byte, lần lớn nhất 9.465 byte.
+- **Lỗi params mới (`c204fc5`) phát huy**: một lần `writeRanges` chuỗi JSON hỏng nhận "not valid JSON
+  (unexpected EOF)" và model không gửi lại y hệt.
+- **Kiểm độc lập**: đổi `Dashboard!B4` 0,95→0,99 → Z 1,645→2,326, Safety Stock dòng đầu 7,44→10,53
+  (tính tay `Z·σ·√LT` khớp cả hai), trả lại 0,95.
+- **Chưa phải A/B sạch**: lần cũ khác model. Bước nhảy phủ dòng 400→50.001 gắn trực tiếp với việc sinh
+  dữ liệu bằng công thức (quan sát được trong log), nhưng muốn có số về token/wall phải chạy baseline
+  `run-variant` (4169475) trên Test 2 với mimo.
+- Ứng viên tối ưu cho model yếu thấy trong lượt này: model mất ~4 lệnh dò cú pháp tham chiếu sheet
+  (`Sheet1.A1` vs `Sheet1!A1`) — mô tả tool/bridge chưa nói; lượt suy nghĩ đầu ~18 phút; `et.deleteSheet`
+  không có (lần 2).
