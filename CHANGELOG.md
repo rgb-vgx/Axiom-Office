@@ -5,6 +5,31 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed — đọc vùng lớn được phân trang (agent của Core + MCP server)
+- `et.readRange` vượt 200 dòng / 6.000 ô trả mẫu đầu + `tailValues` (10 dòng cuối) + `truncated`,
+  `totalRows`, `totalCols`, `nextRange`; `et.checkRange` giữ nguyên `issueCount`, cắt danh sách ở 100
+  (`issuesOmitted`). Không bao giờ cắt im lặng. Đo trên LibreOffice thật: đọc 50.001 dòng
+  **1.000.101 → ~3.000 byte**. Thuật toán dùng chung ở `core-go/internal/office/truncate.go`.
+- MCP: áp cho `wps_live_read_range` và `wps_live_command`; `wps_live_read_range` thêm tham số tuỳ chọn
+  `max_cells` (tối đa 20.000) cho client cần nhiều hơn mỗi lần, kết quả bị cắt kèm `hint`. Thông lệ của
+  các server Excel MCP (vd excel-mcp-server 4.000 ô/lần). Không gợi ý `et.saveAs` ra CSV để lấy toàn bộ:
+  lệnh đó lưu đè tài liệu đang mở thành file CSV một sheet.
+- SSE `tool.finished` có thêm `resultBytes` (kích thước kết quả đã vào ngữ cảnh model);
+  `tests/bench/run_prompt.py` in dòng `METRIC result_bytes`.
+
+### Fixed — lỗi tham số làm agent lặp lại cùng một lời gọi hỏng
+- `cell_range` (tên tham số của tool file MCP mà agent cũng thấy) được quy về `range`.
+- `params` gửi dạng chuỗi JSON hỏng trước đây bị bỏ im thành rỗng → bridge báo "'range' is required"
+  dù model đã gửi `range`. Nay báo đúng "not valid JSON" kèm vị trí, không gọi bridge.
+- `scripts/build.ps1` chép skills lồng vào `skills\skills` thay vì làm mới, nên skill cạnh Core release
+  đứng yên ở bản cũ (đo được 4/8 skill cũ) và `package.ps1` đóng gói cả bản cũ lẫn thư mục lồng.
+
+### Added — skill `mo-hinh-nhieu-sheet`: dữ liệu giả lập tất định, Dashboard có biểu đồ
+- Quy tắc 11 + `references/du-lieu-gia-lap.md`: sinh dữ liệu giả lập lớn bằng công thức số nguyên chỉ
+  phụ thuộc `ROW()` (mỗi cột một `et.fillRange`), không `RAND`, không phát tay. Đo trên LibreOffice:
+  11 cột × 50.000 dòng trong 9,7 giây, tỷ lệ thiếu/trùng/0/âm đúng đích, tính lại ra y hệt.
+- Quy tắc 12: Dashboard phải có ít nhất một biểu đồ.
+
 ### Added — `et.sheetInfo` + `et.readRange {formulas}`: hai lệnh VERIFY mà agent đang thiếu
 - **Đọc được công thức**: `et.readRange {formulas: true}` trả mảng `formulas` — ô có công thức → chuỗi
   bắt đầu `=`, ô không có công thức → `null`. Vì sao cần: `values` **không phân biệt** số gõ tay với kết

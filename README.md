@@ -288,6 +288,13 @@ chung Windows lẫn Linux:
 **Làn live** gửi lệnh tới bridge trong app đang mở (tham số `app`: `word`/`excel`/`ppt` cho
 Office, `wps`/`et`/`wpp` cho WPS, hoặc `port` lấy từ `office_sessions`).
 
+**Đọc vùng lớn được phân trang**: `et.readRange` (qua `wps_live_read_range` hoặc `wps_live_command`)
+trả tối đa 200 dòng / 6.000 ô mỗi lần. Khi bị cắt, kết quả có `truncated: true`, `values` là các dòng
+đầu, `tailValues` là các dòng cuối, `totalRows`/`totalCols` là kích thước thật và `nextRange` là phần
+chưa trả — đọc tiếp theo từng khúc. Cần nhiều hơn mỗi lần thì truyền `max_cells` (tối đa 20.000) cho
+`wps_live_read_range`. `et.checkRange` giữ nguyên `issueCount`, chỉ cắt danh sách chi tiết ở 100 mục
+(`issuesOmitted`). Lý do: đọc 50.001 dòng là ~1 MB đổ thẳng vào ngữ cảnh của client.
+
 **Làn file** đọc/ghi thẳng OOXML (ZipArchive + XML, không thư viện ngoài), không cần app mở.
 Khi sửa file chỉ phần XML liên quan được ghi lại, nên **chart, ảnh, pivot, macro của file gốc
 được giữ nguyên**; mọi lần ghi dùng file tạm rồi thay thế (atomic). `.xls` (BIFF8) **chỉ đọc**, và đọc
