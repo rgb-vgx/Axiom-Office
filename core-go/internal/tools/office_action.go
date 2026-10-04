@@ -30,6 +30,13 @@ const (
 	ChunkRule = "Build up large sheets in chunks (a few hundred rows per call, continuing from the next " +
 		"row): every argument of one call has to fit in a single reply, so one gigantic values array makes " +
 		"the reply run out of tokens before it is finished. "
+
+	// SheetRefRule: MOT cu phap cho moi app. Do 04/10/2026: luot Test 2 (mimo) mat ~4 lenh do xem
+	// `Sheet1.A1` hay `Sheet1!A1`; LibreOffice tra #NAME? cho `!` - nay bridge LibreOffice tu doi `!`
+	// sang `.`, Excel/WPS von dung `!`, nen noi thang mot kieu cho model khoi do.
+	SheetRefRule = "In formulas, reference another sheet as Sheet1!A1 or 'My Sheet'!A1:B5 - this works in " +
+		"every app (LibreOffice converts it), so do not test other syntaxes. Formulas use English function " +
+		"names and commas between arguments. "
 )
 
 func NewOfficeActionTool(catalog *office.CommandCatalog, appKind string) *OfficeActionTool {
@@ -75,7 +82,7 @@ func (t *OfficeActionTool) Description() string {
 	return "Read and modify the LIVE document that is currently open in the office application. " +
 		"Call this for every document change the user asks for so it happens immediately on screen. " +
 		"Array params such as values must be real JSON arrays of rows, not objects. " +
-		UndoRule + " " + ChunkRule + TruncationContract +
+		UndoRule + " " + ChunkRule + SheetRefRule + TruncationContract +
 		"Available actions (with params): " + t.signatures
 }
 

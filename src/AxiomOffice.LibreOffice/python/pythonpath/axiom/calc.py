@@ -275,6 +275,45 @@ def _with_separator(formula: str, target: str):
     return "".join(chars) if changed else None
 
 
+_CELL_LIKE = re.compile(r"^\$?[A-Za-z]{1,3}\$?\d+$")
+_SHEET_TOKEN = re.compile(r"[^\W\d][\w]*$|\d[\w]*[^\W\d][\w]*$")
+
+
+def _calc_sheet_refs(formula: str):
+    """Doi tham chieu sheet kieu Excel (`Sheet1!A1`, `'My Data'!A1`) sang kieu Calc (`Sheet1.A1`).
+    None neu khong co gi phai doi.
+
+    Do duoc 04/10/2026: qua setFormula, LibreOffice tra #NAME? (525) cho MOI tham chieu kieu Excel -
+    ca `Sheet!A1`, `'My Data'!A1` lan `Sheet!B1:Sheet!B3`. Model (nhat la model free yeu) hoc chu yeu
+    tren cu phap Excel nen viet `!` truoc roi phai do: luot Test 2 mat ~4 lenh thu cu phap, 7 luot
+    Test 3 co it nhat 64 tham chieu `!`. Doi o bridge thi agent viet kieu nao cung chay.
+
+    Bo qua phan trong chuoi "...". Khong dong vao `!` dung sau mot dia chi o (`A1:B5!B2:C6` la toan tu
+    giao vung cua Calc): ten sheet trong giong dia chi o thi Excel cung bat phai dat trong nhay don.
+    """
+    out, changed, in_string, i = [], False, False, 0
+    while i < len(formula):
+        ch = formula[i]
+        if ch == '"':
+            in_string = not in_string
+        elif not in_string and ch == "!":
+            before = "".join(out)
+            if before.endswith("'"):                # 'Ten co dau cach'!A1
+                out.append(".")
+                changed = True
+                i += 1
+                continue
+            match = _SHEET_TOKEN.search(before)
+            if match and not _CELL_LIKE.match(match.group(0)):
+                out.append(".")
+                changed = True
+                i += 1
+                continue
+        out.append(ch)
+        i += 1
+    return "".join(out) if changed else None
+
+
 def _write_formula(cell, formula: str, state: dict):
     """Ghi cong thuc, tu sua dau phan cach tham so khi LibreOffice khong doc duoc. -> (loi, da ghi).
 
@@ -287,6 +326,7 @@ def _write_formula(cell, formula: str, state: dict):
     cach da dung roi, doi sang kieu kia chi lam cong thuc hong them. Do mot lan roi nho vao `state`
     de khong phai thu lai tung o trong cung mot lan ghi.
     """
+    formula = _calc_sheet_refs(formula) or formula
     known = state.get("separator")
     if known:
         formula = _with_separator(formula, known) or formula

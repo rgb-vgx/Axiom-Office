@@ -320,6 +320,18 @@ def test_calc(b, out):
     check(block == [[23, 24], [24, 25]], "Calc fillRange điền được cả khối 2D", block)
     b.cmd("et.fillRange", {"sheet": "Sheet1", "formula": "=ROW()"}, expect_ok=False, key="et.fillRange thiếu range")
 
+    # Tham chiếu sheet kiểu Excel: LibreOffice trả #NAME? cho `Sheet1!A1` qua setFormula, mà model (nhất
+    # là model free) viết kiểu Excel trước rồi phải dò. Bridge tự đổi `!` -> `.` (đo 04/10/2026).
+    refs = b.cmd("et.writeRange", {"sheet": "Sheet1", "range": "Y1", "values": [
+        ["=Sheet1!R1"], ["=SUM(Sheet1!R1:R3)"], ["='Sheet1'!R2*10"], ['="a!b"&Sheet1!R3'], ["=SUM(R1:R3!R2:R2)"]]},
+        key="et.writeRange tham chiếu kiểu Excel") or {}
+    check(not refs.get("formulaErrors"), "Calc nhận tham chiếu sheet kiểu Excel (Sheet1!A1) không lỗi", refs)
+    b.cmd("et.fillRange", {"sheet": "Sheet1", "range": "Z1:Z3", "formula": "=Sheet1!R1*3"},
+          key="et.fillRange tham chiếu kiểu Excel")
+    got = (b.cmd("et.readRange", {"range": "Y1:Z5", "sheet": "Sheet1"}, record=False) or {}).get("values") or []
+    check([row[0] for row in got] == [1, 6, 20, "a!b3", 2] and [row[1] for row in got[:3]] == [3, 6, 9],
+          "Calc tham chiếu kiểu Excel tính đúng; chuỗi \"a!b\" và toán tử giao vùng giữ nguyên", got)
+
     # Ghi NHIỀU vùng trong MỘT lời gọi: model hay gọi 5–10 et.writeRange liên tiếp trong cùng một phản
     # hồi, mỗi lời gọi là một vòng qua bridge. Không hứa nhanh hơn về tính toán — tắt tính tự động đã đo
     # là CHẬM hơn 2,3–4,0 lần (xem write_range trong calc.py).

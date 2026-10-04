@@ -17,6 +17,15 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 - SSE `tool.finished` có thêm `resultBytes` (kích thước kết quả đã vào ngữ cảnh model);
   `tests/bench/run_prompt.py` in dòng `METRIC result_bytes`.
 
+### Fixed — LibreOffice nhận tham chiếu sheet kiểu Excel (`Sheet1!A1`)
+- Qua `setFormula`, LibreOffice trả `#NAME?` cho mọi tham chiếu kiểu Excel (`Sheet1!A1`, `'My Data'!A1`,
+  `Sheet1!B1:Sheet1!B3`), trong khi model, nhất là model free, viết kiểu Excel trước rồi phải dò (lượt
+  Test 2 trên mimo mất ~4 lệnh thử cú pháp). Bridge LibreOffice nay tự đổi `!` → `.` ở mọi đường ghi
+  công thức (`writeRange`, `writeRanges`, `fillRange`); không đụng chuỗi `"..."` và toán tử giao vùng
+  `A1:B5!B2:C6`. Mô tả `office_action` nói một cú pháp cho mọi app: `Sheet1!A1`.
+- Vá luôn công thức `INDEX(Lists!$A$2:…)` trong `references/du-lieu-gia-lap.md`, vốn ra `#NAME?` trên
+  LibreOffice trước bản sửa này.
+
 ### Fixed — lỗi tham số làm agent lặp lại cùng một lời gọi hỏng
 - `cell_range` (tên tham số của tool file MCP mà agent cũng thấy) được quy về `range`.
 - `params` gửi dạng chuỗi JSON hỏng trước đây bị bỏ im thành rỗng → bridge báo "'range' is required"

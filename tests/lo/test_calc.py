@@ -155,6 +155,41 @@ class SeparatorTests(unittest.TestCase):
                          '=IF(A1;"nói ""vâng, thưa""";"khác")')
 
 
+# ---------------------------------------------------------------- tham chieu sheet kieu Excel
+
+class SheetRefTests(unittest.TestCase):
+    """Do 04/10/2026: LibreOffice tra #NAME? cho moi `Sheet!A1` qua setFormula; model viet kieu Excel."""
+
+    def test_doi_tham_chieu_don_va_vung(self):
+        self.assertEqual(calc._calc_sheet_refs("=Raw_SKU_Data!A2"), "=Raw_SKU_Data.A2")
+        self.assertEqual(calc._calc_sheet_refs("=SUM(Data!B1:B3)"), "=SUM(Data.B1:B3)")
+        self.assertEqual(calc._calc_sheet_refs("=SUM(Data!B1:Data!B3)"), "=SUM(Data.B1:Data.B3)")
+        self.assertEqual(calc._calc_sheet_refs("=VLOOKUP(A2,Product_Master!$A$2:$D$5001,3,0)"),
+                         "=VLOOKUP(A2,Product_Master.$A$2:$D$5001,3,0)")
+
+    def test_ten_sheet_trong_nhay_don_va_co_dau(self):
+        self.assertEqual(calc._calc_sheet_refs("='My Data'!A1"), "='My Data'.A1")
+        self.assertEqual(calc._calc_sheet_refs("=Tồn_kho!C5*2"), "=Tồn_kho.C5*2")
+        self.assertEqual(calc._calc_sheet_refs("='Bảng ''A'''!A1"), "='Bảng ''A'''.A1")
+
+    def test_khong_dong_vao_chuoi_va_cu_phap_calc(self):
+        self.assertEqual(calc._calc_sheet_refs('="a!b"&Data!B1'), '="a!b"&Data.B1')
+        self.assertIsNone(calc._calc_sheet_refs('="Xin chào!"'))
+        self.assertIsNone(calc._calc_sheet_refs("=Data.A1+$Data.B2"))
+        self.assertIsNone(calc._calc_sheet_refs("=SUM(A1:B3)"))
+
+    def test_khong_dong_vao_toan_tu_giao_vung(self):
+        # `!` sau mot dia chi o la toan tu giao vung cua Calc, khong phai ten sheet
+        self.assertIsNone(calc._calc_sheet_refs("=SUM(A1:B5!B2:C6)"))
+        self.assertIsNone(calc._calc_sheet_refs("=SUM($A$1:$B$5!B2:C6)"))
+
+    def test_ghi_qua_write_formula_da_doi(self):
+        cell = FakeCell()
+        error, written = calc._write_formula(cell, "=Data!A1*2", {})
+        self.assertEqual((error, written), (0, "=Data.A1*2"))
+        self.assertEqual(cell.writes, ["=Data.A1*2"])
+
+
 # ---------------------------------------------------------------- ghi cong thuc
 
 class WriteFormulaTests(unittest.TestCase):

@@ -26,7 +26,7 @@ chung. Số liệu ở `tests/bench/results/`.
 
 2. **Ô giả định phải có GIÁ TRỊ trước khi công thức đọc nó.** Công thức trỏ vào ô trống **không báo
    lỗi** — Calc coi ô trống là 0, nên mô hình vẫn ra số và không ai biết nó đang chạy bằng 0. Đo được:
-   một workbook có **60.006 công thức** đọc `Inputs.C25` trống, trong khi ô seed được dán nhãn
+   một workbook có **60.006 công thức** đọc `Inputs!C25` trống, trong khi ô seed được dán nhãn
    "Seed Value" nằm ở `B22` và **không công thức nào đọc** (`test4-dung-sai.md`). Ghi giả định bằng
    một `et.writeRange` có cả giá trị, rồi `et.checkRange` — `empty-reference` phải bằng 0 trước khi
    coi là xong.
