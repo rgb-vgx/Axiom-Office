@@ -103,6 +103,10 @@ def main() -> int:
     repeat_fail_max = 0             # chuoi loi lap lai DAI NHAT trong ca luot
     last_fail_sig = ""
     first_check_ok_at: float | None = None  # time-to-first-valid-slice: checkRange ok dau tien
+    # Byte ket qua DA VAO ngu canh model (resultBytes, Core tu 04/10/2026) - binary cu khong co truong nay.
+    result_bytes: Counter[str] = Counter()
+    result_max = 0
+    result_max_tool = ""
     rounds_seen = 0
     with open(log_path, "w", encoding="utf-8") as log:
         log.write("run %s\n" % run_id)
@@ -127,6 +131,11 @@ def main() -> int:
                     by_tool[action] += 1
                     ok = bool(data.get("ok"))
                     err = str(data.get("error") or "")[:90]
+                    size = data.get("resultBytes")
+                    if isinstance(size, int):
+                        result_bytes[action] += size
+                        if size > result_max:
+                            result_max, result_max_tool = size, action
                     if action in ("et.readRange", "writer.getText", "wpp.listSlides"):
                         read_keys.append("%s|%s" % (action, data.get("paramsPreview")))
                     if not ok:
@@ -192,6 +201,10 @@ def main() -> int:
                         ", ".join("%s=%d" % item for item in by_tool.most_common())), flush=True)
                     print("METRIC reads=%d dup_reads=%d dup_ratio=%.3f failures=%d repeat_fail_max=%d" % (
                         len(read_keys), dup, dup_ratio, failures, repeat_fail_max), flush=True)
+                    if result_bytes:
+                        print("METRIC result_bytes=%d max=%d(%s) top: %s" % (
+                            sum(result_bytes.values()), result_max, result_max_tool,
+                            ", ".join("%s=%d" % item for item in result_bytes.most_common(5))), flush=True)
                     if first_check_ok_at is not None:
                         print("METRIC time_to_first_check_ok=%.0fs" % first_check_ok_at, flush=True)
                     print("METRIC wall=%.0fs rounds_seen=%s" % (

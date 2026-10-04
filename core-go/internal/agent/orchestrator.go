@@ -271,6 +271,9 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 				"callId": result.CallID, "tool": result.Name, "action": info.action,
 				"paramsPreview": model.Truncate(info.params, 200), "ok": result.OK, "error": errorJSON,
 				"ms": result.Ms, "resultPreview": model.Truncate(result.ResultJSON, 150),
+				// resultBytes: kich thuoc ket qua DA VAO ngu canh model (sau khi cat) - de soi tool nao hay
+				// tra qua lon (thong le: ghi kich thuoc tung lan goi tool, canh bao khi p95 vuot nguong).
+				"resultBytes": len(result.ResultJSON),
 			})
 			o.Runs.AddToolCall(run.ID, len(run.Transcript), result.Name, optional(info.action), optional(info.params),
 				result.OK, optional(errorText), result.Ms)

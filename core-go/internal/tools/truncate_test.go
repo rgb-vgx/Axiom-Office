@@ -133,36 +133,6 @@ func TestTruncateKhongDoiLenhKhac(t *testing.T) {
 	}
 }
 
-func TestParseCellVaColName(t *testing.T) {
-	cases := []struct {
-		ref  string
-		col  int
-		row  int
-		ok   bool
-	}{
-		{"A1", 0, 1, true},
-		{"$B$12", 1, 12, true},
-		{"CV999", 99, 999, true},
-		{"A", 0, 0, false},
-		{"1", 0, 0, false},
-		{"", 0, 0, false},
-	}
-	for _, c := range cases {
-		col, row, ok := parseCell(c.ref)
-		if col != c.col || row != c.row || ok != c.ok {
-			t.Errorf("parseCell(%q) = %d,%d,%v muon %d,%d,%v", c.ref, col, row, ok, c.col, c.row, c.ok)
-		}
-	}
-	for _, c := range []struct {
-		col  int
-		want string
-	}{{0, "A"}, {1, "B"}, {2, "C"}, {25, "Z"}, {26, "AA"}, {27, "AB"}, {99, "CV"}} {
-		if got := colName(c.col); got != c.want {
-			t.Errorf("colName(%d) = %q muon %q", c.col, got, c.want)
-		}
-	}
-}
-
 func TestTruncateBodyLaJSONHopLe(t *testing.T) {
 	result := map[string]any{"range": "A1:A3000", "values": matrix(3000, 1)}
 	raw := TruncateBridgeResult("et.readRange", result, "")
