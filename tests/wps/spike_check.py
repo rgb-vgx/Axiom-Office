@@ -15,7 +15,11 @@ Hop dong voi phan can lam:
 
 Gia tri cua undoRecord la gi cung DAT: muc dich spike la BIET, khong phai bat buoc phai co.
 
-    python3 tests/wps/spike_check.py [--timeout 120] [--keep]
+Hai muc (`--stage`):
+- load: chi can add-in tu nap va POST bao cao co loaded=true (buoc 1: cai + nap duoc).
+- full (mac dinh): them wpsVersion va undoRecord nhu tren.
+
+    python3 tests/wps/spike_check.py [--stage load|full] [--timeout 120] [--keep]
 """
 from __future__ import annotations
 
@@ -34,7 +38,7 @@ import time
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 INSTALLER = os.path.join(ROOT, "scripts", "wps", "install_jsaddon.py")
 REPORT_FILE = os.path.join(ROOT, "tests", "wps", "out", "spike-report.json")
-REQUIRED = ("loaded", "wpsVersion", "undoRecord")
+REQUIRED = {"load": ("loaded",), "full": ("loaded", "wpsVersion", "undoRecord")}
 
 reports: list = []
 
@@ -84,6 +88,7 @@ def fail(message: str) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--stage", choices=("load", "full"), default="full", help="muc kiem (xem docstring)")
     parser.add_argument("--timeout", type=int, default=120, help="giay cho bao cao tu add-in")
     parser.add_argument("--keep", action="store_true", help="giu HOME tam de xem lai")
     args = parser.parse_args()
@@ -149,11 +154,14 @@ def main() -> int:
         return fail("khong nhan duoc bao cao nao tu add-in trong %ds (add-in khong nap, hoac khong goi duoc %s)"
                     % (args.timeout, url))
     body = posts[0]["body"] if isinstance(posts[0]["body"], dict) else {}
-    missing = [key for key in REQUIRED if key not in body]
+    missing = [key for key in REQUIRED[args.stage] if key not in body]
     if missing:
         return fail("bao cao thieu truong %s: %s" % (", ".join(missing), json.dumps(body, ensure_ascii=False)[:500]))
     if body.get("loaded") is not True:
         return fail("loaded phai la true: %r" % body.get("loaded"))
+    if args.stage == "load":
+        print("PASS add-in tu nap trong WPS va gui duoc bao cao; Origin=%r" % posts[0]["origin"])
+        return 0
     if not isinstance(body.get("undoRecord"), bool):
         return fail("undoRecord phai la true/false: %r" % body.get("undoRecord"))
     if not str(body.get("wpsVersion") or "").strip():
