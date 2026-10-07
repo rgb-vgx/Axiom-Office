@@ -15,3 +15,5 @@ __pycache__/
 tests/ui/out/
 # Worktree tam cua subagent Claude Code
 .claude/worktrees/
+# Bao cao spike WPS (tests/wps/spike_check.py)
+tests/wps/out/
