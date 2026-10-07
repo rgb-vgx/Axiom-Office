@@ -37,7 +37,8 @@ import time
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 INSTALLER = os.path.join(ROOT, "scripts", "wps", "install_jsaddon.py")
-REPORT_FILE = os.path.join(ROOT, "tests", "wps", "out", "spike-report.json")
+OUT_DIR = os.path.join(ROOT, "tests", "wps", "out")
+REPORT_FILE = os.path.join(OUT_DIR, "spike-report.json")
 REQUIRED = {"load": ("loaded",), "full": ("loaded", "wpsVersion", "undoRecord")}
 
 reports: list = []
@@ -90,7 +91,8 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--stage", choices=("load", "full"), default="full", help="muc kiem (xem docstring)")
     parser.add_argument("--timeout", type=int, default=120, help="giay cho bao cao tu add-in")
-    parser.add_argument("--keep", action="store_true", help="giu HOME tam de xem lai")
+    parser.add_argument("--keep", action="store_true",
+                        help="giu HOME tam (dat trong tests/wps/out/, trong repo) de xem lai sau khi chay")
     args = parser.parse_args()
 
     if not os.path.exists(INSTALLER):
@@ -107,7 +109,10 @@ def main() -> int:
     threading.Thread(target=server.serve_forever, daemon=True).start()
     url = "http://127.0.0.1:%d/report" % server.server_address[1]
 
-    home = tempfile.mkdtemp(prefix="axiom-wps-spike-")
+    # --keep: HOME tam nam TRONG repo (tests/wps/out/, gitignore) de xem duoc ma khong ra ngoai thu muc lam viec.
+    if args.keep:
+        os.makedirs(OUT_DIR, exist_ok=True)
+    home = tempfile.mkdtemp(prefix="home-" if args.keep else "axiom-wps-spike-", dir=OUT_DIR if args.keep else None)
     env = {key: value for key, value in os.environ.items() if not key.startswith("XDG_")}
     env["HOME"] = home
     process = None
