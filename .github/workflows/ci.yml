@@ -112,8 +112,12 @@ jobs:
         shell: pwsh
         run: |
           # build.ps1 cua project tat app dang giu DLL; runner sach nen chi can phan build.
-          $csc = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin\Roslyn\csc.exe"
-          if (-not (Test-Path $csc)) { throw "khong thay csc cua VS 2022 Build Tools" }
+          # csc Roslyn cua ban Visual Studio / Build Tools moi nhat tren runner (image windows-latest doi ban VS
+          # nen khong co dinh duong dan 2022\BuildTools).
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $csc = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -find "MSBuild\**\Bin\Roslyn\csc.exe" | Select-Object -First 1
+          if (-not $csc -or -not (Test-Path $csc)) { throw "khong thay csc (Roslyn) cua Visual Studio / Build Tools" }
+          Write-Host "csc: $csc"
           $fw = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319"
           $stage = Join-Path $env:TEMP "axiom-ci"
           New-Item -ItemType Directory -Force -Path $stage | Out-Null

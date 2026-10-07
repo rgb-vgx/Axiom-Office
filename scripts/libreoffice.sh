@@ -23,8 +23,15 @@ assert_closed() {
 }
 
 check_python_uno() {
-    # Extension la component Python: can loader Python cua LibreOffice (goi python3-uno tren Debian/Ubuntu).
-    if ! python3 -c 'import uno' >/dev/null 2>&1; then
+    # Extension la component Python: can loader Python cua CHINH LibreOffice (pythonloader.py canh soffice: goi
+    # python3-uno tren Debian/Ubuntu, co san trong ban TDF). Khong chi dung `python3 -c 'import uno'`: python3 dau
+    # PATH co the khong phai Python he thong (venv, actions/setup-python) du LibreOffice van nap duoc extension.
+    local soffice
+    soffice="$(command -v soffice 2>/dev/null || true)"
+    if [ -n "$soffice" ] && [ -f "$(dirname "$(readlink -f "$soffice")")/pythonloader.py" ]; then
+        return 0
+    fi
+    if ! python3 -c 'import uno' >/dev/null 2>&1 && ! /usr/bin/python3 -c 'import uno' >/dev/null 2>&1; then
         echo "Thieu Python UNO cua LibreOffice. Cai: sudo apt install python3-uno (Debian/Ubuntu) hoac" \
              "sudo dnf install libreoffice-pyuno (Fedora)." >&2
         exit 1

@@ -19,6 +19,9 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 - `tests/core/test_core_e2e.py` không còn đòi `DOTNET_ROOT` (di sản Core .NET; CI không còn cài .NET từ khi MCP
   chuyển sang Go nên e2e dừng ngay khi khởi động)
 - `SafetyTests` (cứu hộ `closeAll`) chạy được trên Windows: patch `config.data_dir` thay vì `XDG_DATA_HOME`
+- `scripts/libreoffice.sh` nhận Python UNO qua `pythonloader.py` cạnh `soffice` (rồi mới thử `import uno`):
+  `python3` đầu PATH (venv, `actions/setup-python` trên CI) không có `uno` dù LibreOffice vẫn nạp được extension
+- CI Windows tìm `csc` Roslyn bằng `vswhere` thay vì cố định `VS 2022\BuildTools` (image `windows-latest` đã đổi)
 
 ### Fixed — An toàn khi người và AI cùng sửa tài liệu (LibreOffice + Core)
 - **Hoàn tác không còn xoá chỉnh sửa của người dùng** (LibreOffice): `writer.undo`/`et.undo`/`wpp.undo` chỉ gỡ
