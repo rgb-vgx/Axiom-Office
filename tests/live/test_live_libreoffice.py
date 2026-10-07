@@ -208,6 +208,15 @@ def test_writer(b, out, png, run_ai):
     check(reopened and reopened.get("opened") and reopened.get("name") == "libreoffice-writer.docx", "Writer mở file đã lưu", reopened)
     b.cmd("app.info", key="app.info (có tài liệu)")
     b.cmd("writer.closeAll")
+    # closeAll goi duoc tu /cmd khong qua policy: tai lieu chua luu phai duoc chep ban cuu ho truoc khi dong.
+    b.cmd("writer.newDocument", record=False)
+    b.cmd("writer.typeText", {"text": "Việc đang làm dở, chưa lưu"}, record=False)
+    closed = b.cmd("writer.closeAll", record=False) or {}
+    rescued = (closed.get("rescued") or [None])[0]
+    check(closed.get("closed") == 1 and rescued and os.path.getsize(rescued) > 0,
+          "Writer closeAll chép bản cứu hộ cho tài liệu chưa lưu trước khi đóng", closed)
+    if rescued and os.path.exists(rescued):
+        os.remove(rescued)
     if run_ai:
         b.cmd("writer.newDocument", record=False)
         b.ask("Thêm một dòng 'Kiểm tra ai.ask' vào cuối tài liệu", "activeDocument")

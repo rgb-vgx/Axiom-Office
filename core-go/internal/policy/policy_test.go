@@ -62,6 +62,43 @@ func TestUserIntentToSaveSkipsQuestion(t *testing.T) {
 	}
 }
 
+// Doan nham "co y dinh luu" = bo qua buoc hoi: phu dinh va tu ghep khong duoc tinh la y dinh luu/xuat.
+func TestNegationAndCompoundWordsAreNotSaveIntent(t *testing.T) {
+	for _, prompt := range []string{
+		"Đừng lưu file, chỉ sửa bảng",
+		"Không cần xuất PDF",
+		"chua luu vội",
+		"Làm nổi bật chỗ xuất hiện lỗi",
+		"Tô màu cột lưu lượng",
+		"Thêm mục Lưu ý ở cuối",
+		"Viết đoạn đề xuất ngân sách",
+		"Bảng sản xuất tháng 9",
+		"Số liệu xuất khẩu và xuất nhập kho",
+		"tong hop luu luong nuoc",
+		"Do not save it, just fix the table",
+		"don't export anything",
+	} {
+		if PromptAsksToSave(prompt) {
+			t.Errorf("%q khong duoc coi la y dinh luu/xuat", prompt)
+		}
+		if decision := evaluate("writer.save", nil, prompt, nil); !decision.NeedsConfirmation {
+			t.Errorf("writer.save + %q: phai hoi, nhan duoc %+v", prompt, decision)
+		}
+	}
+
+	for _, prompt := range []string{
+		"Đừng đổi nội dung, lưu lại giúp mình",
+		"Sửa bảng rồi xuất file PDF",
+		"Ghi vào file bang-diem.xlsx",
+		"Không đổi màu; save as bao-cao.docx",
+		"lưu trữ bản này thành file mới",
+	} {
+		if !PromptAsksToSave(prompt) {
+			t.Errorf("%q phai duoc coi la co y dinh luu/xuat", prompt)
+		}
+	}
+}
+
 func TestOverwriteExistingFileAsksEvenWithIntent(t *testing.T) {
 	existing := filepath.Join(t.TempDir(), "da-co.docx")
 	if err := os.WriteFile(existing, []byte("x"), 0o644); err != nil {

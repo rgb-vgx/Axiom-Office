@@ -178,6 +178,125 @@ class CatalogTests(unittest.TestCase):
                              [(p["name"], p["required"]) for p in theirs["params"]], name)
 
 
+class FakeUndoManager:
+    """Ngan xep undo: phan tu cuoi la buoc tren cung (getCurrentUndoActionTitle)."""
+
+    def __init__(self, titles):
+        self.titles = list(titles)
+
+    def isUndoPossible(self):
+        return bool(self.titles)
+
+    def getCurrentUndoActionTitle(self):
+        return self.titles[-1]
+
+    def undo(self):
+        self.titles.pop()
+
+
+class FakeDocument:
+    def __init__(self, title, modified, store_fails=False):
+        self.title, self.modified, self.store_fails = title, modified, store_fails
+        self.closed, self.stored = False, []
+
+    def supportsService(self, name):
+        return name == "com.sun.star.text.TextDocument"
+
+    def getTitle(self):
+        return self.title
+
+    def isModified(self):
+        return self.modified
+
+    def setModified(self, value):
+        self.modified = value
+
+    def storeToURL(self, url, args):
+        if self.store_fails:
+            raise RuntimeError("disk full")
+        self.stored.append(url)
+        with open(url, "w") as handle:  # to_url duoc thay bang ham dong nhat trong test
+            handle.write("x")
+
+    def close(self, deliver):
+        self.closed = True
+
+
+class SafetyTests(unittest.TestCase):
+    """Bridge goi duoc tu /cmd ma khong qua policy cua Core: khong duoc xoa viec cua nguoi dung."""
+
+    def setUp(self):
+        from axiom import documents  # noqa: PLC0415
+
+        self.documents = documents
+
+    def test_undo_only_removes_ai_steps(self):
+        manager = FakeUndoManager(["Gõ: chào", "AI: writer.typeText", "AI: writer.insertTable"])
+        result = self.documents.undo(types.SimpleNamespace(getUndoManager=lambda: manager), 3)
+        self.assertEqual(result, {"undone": 2, "stoppedAt": "Gõ: chào"})
+        self.assertEqual(manager.titles, ["Gõ: chào"])
+
+    def test_undo_stops_when_user_edited_after_ai(self):
+        manager = FakeUndoManager(["AI: writer.typeText", "Gõ: sửa tay"])
+        result = self.documents.undo(types.SimpleNamespace(getUndoManager=lambda: manager), 1)
+        self.assertEqual(result, {"undone": 0, "stoppedAt": "Gõ: sửa tay"})
+        self.assertEqual(len(manager.titles), 2, "chinh sua cua nguoi dung phai con nguyen")
+
+    def test_undo_all_ai_steps_has_no_stop_marker(self):
+        manager = FakeUndoManager(["AI: et.writeRange"])
+        result = self.documents.undo(types.SimpleNamespace(getUndoManager=lambda: manager), 5)
+        self.assertEqual(result, {"undone": 1})
+
+    def test_close_all_rescues_unsaved_documents(self):
+        import tempfile  # noqa: PLC0415
+
+        with tempfile.TemporaryDirectory() as data:
+            os.environ["XDG_DATA_HOME"] = data
+            try:
+                clean = FakeDocument("da-luu.odt", modified=False)
+                dirty = FakeDocument("Báo cáo/tháng 9.docx", modified=True)
+                broken = FakeDocument("hong.odt", modified=True, store_fails=True)
+                self._with_components([clean, dirty, broken])
+                result = self.documents.close_all(None, "wps")
+            finally:
+                del os.environ["XDG_DATA_HOME"]
+                self._restore()
+
+            self.assertEqual(result["closed"], 2)
+            self.assertTrue(clean.closed and not clean.stored, "tai lieu da luu: dong, khong chep")
+            self.assertTrue(dirty.closed and len(dirty.stored) == 1, "tai lieu chua luu: chep ban cuu ho roi dong")
+            rescued = result["rescued"]
+            self.assertEqual(len(rescued), 1)
+            self.assertTrue(rescued[0].startswith(os.path.join(data, "axiom-office", "rescued")), rescued)
+            self.assertTrue(rescued[0].endswith(".odt") and "/" not in os.path.basename(rescued[0]), rescued)
+            self.assertTrue(os.path.exists(rescued[0]))
+            self.assertFalse(broken.closed, "khong chep duoc ban cuu ho thi giu tai lieu mo")
+            self.assertTrue(broken.modified)
+
+    def _with_components(self, components):
+        class Enumeration:
+            def __init__(self, items):
+                self.items = list(items)
+
+            def hasMoreElements(self):
+                return bool(self.items)
+
+            def nextElement(self):
+                return self.items.pop(0)
+
+        desktop = types.SimpleNamespace(
+            getComponents=lambda: types.SimpleNamespace(createEnumeration=lambda: Enumeration(components)))
+        # Module uno gia cua test khac (test_calc/test_chat, nap truoc khi chay discover) la module rong:
+        # khong de close_all cham toi uno o day.
+        self._saved = (self.documents.desktop, self.documents.to_url, self.documents.props)
+        self.documents.desktop = lambda ctx: desktop
+        self.documents.to_url = lambda path: path
+        self.documents.props = lambda **values: values
+
+    def _restore(self):
+        self.documents.desktop, self.documents.to_url, self.documents.props = self._saved
+
+
 if __name__ == "__main__":
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")

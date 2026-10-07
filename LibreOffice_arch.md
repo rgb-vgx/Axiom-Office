@@ -207,7 +207,7 @@ Mỗi handler chạy trong `UnoGate` và trong một undo context:
 | `writer.insertPageBreak` | `BreakType = PAGE_BEFORE` trên đoạn mới | |
 | `writer.insertImage` | `GraphicObject` + `GraphicURL`/`Graphic` từ `GraphicProvider` | |
 | `writer.insertHyperlink` | `HyperLinkURL` trên range | |
-| `writer.undo` | `undoManager.undo()` × `count` | |
+| `writer.undo` | `undoManager.undo()` × `count`, **chỉ bước có tiêu đề `AI: …`** | Gặp bước của người dùng (`getCurrentUndoActionTitle()` không bắt đầu bằng `AI: `) thì dừng và trả `stoppedAt` — hoàn tác qua bridge không bao giờ xoá chỉnh sửa của người |
 | `writer.save` / `saveAs` / `exportPdf` | `store()` / `storeAsURL(url, FilterName="MS Word 2007 XML" hoặc "writer8")` / `storeToURL(FilterName="writer_pdf_Export")` | Giữ định dạng file gốc khi `save` |
 | `writer.checkTables` | duyệt `getTextTables()`, ô trống, ô tiêu đề dài | Cùng quy tắc với bản Windows |
 
@@ -219,7 +219,7 @@ Mỗi handler chạy trong `UnoGate` và trong một undo context:
 | `et.readRange` | `sheet.getCellRangeByName(addr).getDataArray()` | Ô trống → `null`, số → số |
 | `et.writeRange` | `getCellRangeByPosition(...)`; chuỗi bắt đầu `=` dùng `setFormulaArray`, còn lại `setDataArray` | Giá trị bọc `{"item":…}` gỡ bằng **cùng thuật toán** với `CommandDispatcher.Params` (port sang Python, có test bảng giá trị chung) |
 | `et.formatRange` | `CharWeight`, `CharColor`, `CellBackColor`, `HoriJustify`, `IsTextWrapped`; `NumberFormat` qua `doc.getNumberFormats().queryKey/addNew(fmt, Locale("en","US",""), False)` | Format code theo locale en-US để `"#,##0.00"` hiểu như Excel |
-| `et.undo` | `undoManager.undo()` | **Hoàn tác được** (Excel qua COM thì không) |
+| `et.undo` | `undoManager.undo()`, chỉ bước `AI: …` như `writer.undo` | **Hoàn tác được** (Excel qua COM thì không) |
 | `et.save` / `saveAs` / `exportPdf` | `"Calc MS Excel 2007 XML"` / `"calc8"` / `"calc_pdf_Export"` | |
 | `et.checkRange` | vùng dùng: `sheet.createCursor().gotoStartOfUsedArea/gotoEndOfUsedArea`; vùng liền kề: `createCursorByRange(A1).collapseToCurrentRegion()` | `outside-table` = vùng dùng > vùng liền kề |
 
@@ -247,6 +247,7 @@ khớp với cách model và skill đang viết.
 | `ui.askpane` | Mở sidebar deck Axiom Office (`.uno:SidebarDeck.AxiomOfficeDeck`) |
 | `app.screenshot` | Xuất trang/slide hiện tại ra PNG: `storeToURL` với filter `writer_png_Export` / `calc_png_Export` / `impress_png_Export` (`PixelWidth` theo `maxWidth`) vào file tạm → base64 → xoá file |
 | `ai.ask` | Chuyển sang Core (`interactive=false`) |
+| `*.closeAll` (chỉ làn LibreOffice, không `ForAgent`) | Đóng mọi tài liệu cùng loại, không lưu vào file gốc. Tài liệu còn thay đổi chưa lưu được `storeToURL` (ODF) vào `$XDG_DATA_HOME/axiom-office/rescued/` trước khi đóng, trả `rescued: [đường dẫn]`; không chép được thì **giữ tài liệu mở**. Lệnh gọi được từ `/cmd` mà không qua policy xác nhận của Core nên không được làm mất việc của người dùng |
 
 ## 8. Luồng và "ComGate" trên UNO
 
@@ -324,6 +325,8 @@ Sidebar deck **"Axiom Office"** (hiện với Writer, Calc, Impress), panel dự
 - **Thẻ xác nhận**: hộp thoại `MessageBox` Có/Không (không chặn thread SSE — mở trên main thread qua
   AsyncCallback, trả lời bằng `POST /v1/runs/{id}/confirm`).
 - **Hoàn tác lượt này**: có cho cả Writer, **Calc và Impress** (UNO hoàn tác được) — `*.undo {count: N}`.
+  Chỉ gỡ bước `AI: …`: người dùng đã sửa tài liệu sau lượt AI thì dừng lại và báo dùng Ctrl+Z nếu muốn
+  hoàn tác thêm.
 - **Thiết lập…** (menu, link header pane, hoặc tự mở một lần khi chưa có cấu hình): wizard 5 bước trong
   `axiom/setupwizard.py` + `axiom/setup.py` — kiểm tra máy (nút **Sửa**), chọn nơi cung cấp AI với danh sách
   model tải từ `GET /v1/llm/models`, thử kết nối qua `POST /v1/llm/test` (lỗi tiếng Việt từ `Setup/LlmErrors.cs`),

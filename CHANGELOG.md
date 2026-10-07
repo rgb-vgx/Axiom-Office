@@ -5,6 +5,23 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — An toàn khi người và AI cùng sửa tài liệu (LibreOffice + Core)
+- **Hoàn tác không còn xoá chỉnh sửa của người dùng** (LibreOffice): `writer.undo`/`et.undo`/`wpp.undo` chỉ gỡ
+  bước có tiêu đề `AI: …` (undo context do bridge tạo); gặp bước của người dùng thì dừng và trả `stoppedAt`.
+  Trước đây "Hoàn tác lượt này" undo đúng N bước nên nếu người dùng gõ thêm sau lượt AI, thao tác của họ bị gỡ
+  trước. Pane báo "đã hoàn tác x/N … dùng Ctrl+Z nếu muốn hoàn tác thêm"
+- **`*.closeAll` không còn vứt việc chưa lưu** (LibreOffice): lệnh gọi được thẳng từ `/cmd` (script, MCP làn
+  live) mà không qua policy của Core. Tài liệu còn thay đổi được chép bản ODF vào
+  `$XDG_DATA_HOME/axiom-office/rescued/` trước khi đóng (`rescued` trong kết quả); không chép được thì giữ
+  tài liệu mở
+- **Policy nhận đúng ý định lưu/xuất** (Core Go): thay regex từ khoá bằng tách mệnh đề + từ. Câu phủ định
+  ("Đừng lưu file", "không cần xuất PDF", "do not save") và từ ghép ("lưu lượng", "lưu ý", "xuất hiện",
+  "đề xuất", "sản xuất", "xuất khẩu") không còn được coi là người dùng muốn lưu — trước đây các câu này làm
+  Core **bỏ qua** thẻ xác nhận khi model tự gọi `save`/`saveAs`/`exportPdf`
+- Test: `SafetyTests` trong `tests/lo/test_extension.py`, `TestNegationAndCompoundWordsAreNotSaveIntent`
+  (`core-go/internal/policy`), ca cứu hộ `closeAll` trong `tests/live/test_live_libreoffice.py` (163/163 trên
+  LibreOffice 24.2 thật)
+
 ### Changed — đọc vùng lớn được phân trang (agent của Core + MCP server)
 - `et.readRange` vượt 200 dòng / 6.000 ô trả mẫu đầu + `tailValues` (10 dòng cuối) + `truncated`,
   `totalRows`, `totalCols`, `nextRange`; `et.checkRange` giữ nguyên `issueCount`, cắt danh sách ở 100

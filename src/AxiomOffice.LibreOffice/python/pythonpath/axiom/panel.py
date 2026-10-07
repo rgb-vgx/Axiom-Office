@@ -434,9 +434,15 @@ class PaneUI:
         action = PREFIX.get(self.kind, self.kind) + ".undo"
         result = bridge.run_on_main(self.ctx, self.gate, self.kind, action, {"count": count})
         if result.get("ok"):
-            undone = (result.get("result") or {}).get("undone", 0)
+            outcome = result.get("result") or {}
+            undone = outcome.get("undone", 0)
             self.session.clear_edits()
-            self.session.note("Đã hoàn tác %d thao tác của lượt vừa rồi." % undone)
+            if outcome.get("stoppedAt") is not None and undone < count:
+                # Undo chi go buoc "AI: ..." (documents.undo): nguoi dung da sua sau luot AI thi dung lai.
+                self.session.note("Đã hoàn tác %d/%d thao tác của AI rồi dừng lại vì bạn đã sửa tài liệu sau lượt "
+                                  "này. Dùng Ctrl+Z nếu muốn hoàn tác thêm." % (undone, count))
+            else:
+                self.session.note("Đã hoàn tác %d thao tác của lượt vừa rồi." % undone)
         else:
             self.session.note("Không hoàn tác được: %s" % result.get("error"))
 

@@ -133,9 +133,16 @@ def open_document(ctx, kind: str, path: str | None):
     return result
 
 
+RESCUE_FORMATS = {"wps": (".odt", "writer8"), "et": (".ods", "calc8"), "wpp": (".odp", "impress8")}
+
+
 def close_all(ctx, kind: str) -> dict:
-    """Dong moi tai lieu cung loai, KHONG luu (lenh cho test, khong ForAgent)."""
+    """Dong moi tai lieu cung loai, KHONG luu vao file goc (lenh cho test/agent ngoai, khong ForAgent).
+
+    Tai lieu con thay doi chua luu duoc chep mot ban cuu ho vao <data>/rescued truoc khi dong: lenh nay goi
+    duoc tu /cmd ma khong qua policy xac nhan, nen khong duoc de nguoi dung mat viec dang lam."""
     closed = 0
+    rescued = []
     enumeration = desktop(ctx).getComponents().createEnumeration()
     targets = []
     while enumeration.hasMoreElements():
@@ -144,12 +151,50 @@ def close_all(ctx, kind: str) -> dict:
             targets.append(component)
     for doc in targets:
         try:
+            if doc.isModified():
+                path = rescue_copy(doc, kind)
+                if path is None:
+                    continue  # khong chep duoc ban cuu ho -> giu tai lieu mo, khong vut thay doi
+                rescued.append(path)
             doc.setModified(False)
             doc.close(True)
             closed += 1
         except Exception:  # noqa: BLE001
             pass
-    return {"closed": closed}
+    result = {"closed": closed}
+    if rescued:
+        result["rescued"] = rescued
+    return result
+
+
+def rescue_copy(document, kind: str) -> str | None:
+    """Chep tai lieu (storeToURL: khong doi URL/trang thai cua tai lieu) vao <data>/rescued; loi -> None."""
+    import os
+    import re
+    import time
+
+    from . import config, log
+
+    extension, filter_name = RESCUE_FORMATS[kind]
+    try:
+        title = os.path.splitext(document.getTitle() or "")[0]
+    except Exception:  # noqa: BLE001
+        title = ""
+    title = re.sub(r"[^\w.-]+", "_", title, flags=re.UNICODE).strip("._") or NAMES[kind]
+    folder = os.path.join(config.data_dir(), "rescued")
+    try:
+        os.makedirs(folder, mode=0o700, exist_ok=True)
+        path = os.path.join(folder, "%s-%s%s" % (time.strftime("%Y%m%d-%H%M%S"), title[:60], extension))
+        suffix = 1
+        while os.path.exists(path):
+            suffix += 1
+            path = os.path.join(folder, "%s-%s-%d%s" % (time.strftime("%Y%m%d-%H%M%S"), title[:60], suffix, extension))
+        document.storeToURL(to_url(path), props(FilterName=filter_name, Overwrite=False))
+    except Exception as exc:  # noqa: BLE001
+        log.error("closeAll: cannot rescue '%s' (%s), leaving it open" % (title, exc))
+        return None
+    log.info("closeAll: rescued unsaved '%s' to %s" % (title, path))
+    return path
 
 
 def save(document, kind: str, path: str | None) -> dict:
@@ -179,15 +224,30 @@ def export_pdf(document, kind: str, path: str) -> dict:
     return {"exported": path}
 
 
+AI_UNDO_PREFIX = "AI: "
+
+
 def undo(document, count: int) -> dict:
+    """Hoan tac toi da `count` buoc, CHI cac buoc cua AI (undo context "AI: ..." do undo_step tao).
+
+    Gap buoc khong phai cua AI (nguoi dung go/sua sau luot AI) thi dung: hoan tac qua bridge khong bao gio xoa
+    chinh sua cua nguoi. Nguoi dung van tu Ctrl+Z duoc nhu thuong."""
     manager = document.getUndoManager()
     undone = 0
+    stopped = None
     for _ in range(max(1, count)):
         if not manager.isUndoPossible():
             break
+        title = str(manager.getCurrentUndoActionTitle() or "")
+        if not title.startswith(AI_UNDO_PREFIX):
+            stopped = title
+            break
         manager.undo()
         undone += 1
-    return {"undone": undone}
+    result = {"undone": undone}
+    if stopped is not None:
+        result["stoppedAt"] = stopped
+    return result
 
 
 def prop(name: str, value):
