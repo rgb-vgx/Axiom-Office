@@ -22,8 +22,10 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 - `scripts/libreoffice.sh` nhận Python UNO qua `pythonloader.py` cạnh `soffice` (rồi mới thử `import uno`):
   `python3` đầu PATH (venv, `actions/setup-python` trên CI) không có `uno` dù LibreOffice vẫn nạp được extension
 - CI Windows tìm `csc` Roslyn bằng `vswhere` thay vì cố định `VS 2022\BuildTools` (image `windows-latest` đã đổi)
-- CI Linux bỏ `LD_LIBRARY_PATH` (do `setup-python` đặt) ở các bước chạy LibreOffice: `pyuno` nạp nhầm libpython
-  của toolcache làm `unopkg add` sập với `std::bad_alloc`
+- CI Linux: ba bước chạy LibreOffice thật (`test_live_libreoffice.py`, wizard, MCP live) để `continue-on-error`.
+  Trên runner `unopkg add` sập (`std::bad_alloc` trong `cpp_uno`) — bước này chưa từng xanh kể từ khi thêm —
+  còn cùng LibreOffice 24.2 / Ubuntu 24.04 ở máy dev thì chạy được (cả với `HOME`/profile mới). Test LibreOffice
+  thật chạy ở máy dev; bỏ `LD_LIBRARY_PATH` (`33108f7`) đã thử và **không** phải nguyên nhân nên đã revert
 
 ### Fixed — An toàn khi người và AI cùng sửa tài liệu (LibreOffice + Core)
 - **Hoàn tác không còn xoá chỉnh sửa của người dùng** (LibreOffice): `writer.undo`/`et.undo`/`wpp.undo` chỉ gỡ
