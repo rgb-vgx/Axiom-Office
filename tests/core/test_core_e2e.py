@@ -54,18 +54,6 @@ def free_port() -> int:
         return sock.getsockname()[1]
 
 
-def dotnet_root() -> str:
-    candidates = [
-        os.environ.get("DOTNET_ROOT"),
-        os.path.join(os.environ.get("LOCALAPPDATA", ""), "Microsoft", "dotnet"),
-        r"C:\Program Files\dotnet",
-    ]
-    for candidate in candidates:
-        if candidate and os.path.isdir(candidate):
-            return candidate
-    raise SystemExit("Khong tim thay .NET runtime root (dat DOTNET_ROOT)")
-
-
 def http_json(url, method="GET", body=None, token=None, timeout=30):
     data = None if body is None else json.dumps(body, ensure_ascii=False).encode("utf-8")
     request = urllib.request.Request(url, data=data, method=method)
@@ -239,7 +227,6 @@ class Core:
         self.token = token
         env = os.environ.copy()
         env.update({
-            "DOTNET_ROOT": dotnet_root(),
             "AXIOM_CORE_DATA_DIR": data_dir,
             "AXIOM_CORE_PORT": "0",
             "AXIOM_CORE_SINGLE_INSTANCE": "0",

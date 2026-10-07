@@ -250,8 +250,12 @@ class SafetyTests(unittest.TestCase):
     def test_close_all_rescues_unsaved_documents(self):
         import tempfile  # noqa: PLC0415
 
+        from axiom import config  # noqa: PLC0415
+
         with tempfile.TemporaryDirectory() as data:
-            os.environ["XDG_DATA_HOME"] = data
+            # Patch data_dir (khong dung XDG_DATA_HOME: tren Windows data_dir la %LOCALAPPDATA%\AxiomOffice).
+            saved_data_dir = config.data_dir
+            config.data_dir = lambda: os.path.join(data, "axiom-office")
             try:
                 clean = FakeDocument("da-luu.odt", modified=False)
                 dirty = FakeDocument("Báo cáo/tháng 9.docx", modified=True)
@@ -259,7 +263,7 @@ class SafetyTests(unittest.TestCase):
                 self._with_components([clean, dirty, broken])
                 result = self.documents.close_all(None, "wps")
             finally:
-                del os.environ["XDG_DATA_HOME"]
+                config.data_dir = saved_data_dir
                 self._restore()
 
             self.assertEqual(result["closed"], 2)
@@ -269,6 +273,7 @@ class SafetyTests(unittest.TestCase):
             self.assertEqual(len(rescued), 1)
             self.assertTrue(rescued[0].startswith(os.path.join(data, "axiom-office", "rescued")), rescued)
             self.assertTrue(rescued[0].endswith(".odt") and "/" not in os.path.basename(rescued[0]), rescued)
+            self.assertIn("Báo_cáo_tháng_9", os.path.basename(rescued[0]), "giu ten tieng Viet, thay '/' va dau cach")
             self.assertTrue(os.path.exists(rescued[0]))
             self.assertFalse(broken.closed, "khong chep duoc ban cuu ho thi giu tai lieu mo")
             self.assertTrue(broken.modified)

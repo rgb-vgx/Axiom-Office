@@ -16,6 +16,9 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 - Bỏ `scripts/generate_templates.py` và bước CI của nó: nguồn `src/AxiomOffice.Host/Mcp/Templates/` đã xoá cùng
   MCP server C# (`dcf76fb`), nên `--check` luôn lỗi. `core-go/internal/templates/` nay là bản duy nhất; khôi
   phục `NOTICE.md` (giấy phép MIT của python-docx/python-pptx) cạnh hai template
+- `tests/core/test_core_e2e.py` không còn đòi `DOTNET_ROOT` (di sản Core .NET; CI không còn cài .NET từ khi MCP
+  chuyển sang Go nên e2e dừng ngay khi khởi động)
+- `SafetyTests` (cứu hộ `closeAll`) chạy được trên Windows: patch `config.data_dir` thay vì `XDG_DATA_HOME`
 
 ### Fixed — An toàn khi người và AI cùng sửa tài liệu (LibreOffice + Core)
 - **Hoàn tác không còn xoá chỉnh sửa của người dùng** (LibreOffice): `writer.undo`/`et.undo`/`wpp.undo` chỉ gỡ
