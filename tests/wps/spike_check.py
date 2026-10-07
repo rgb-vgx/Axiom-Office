@@ -6,7 +6,8 @@ Hop dong voi phan can lam:
 - `scripts/wps/install_jsaddon.py --home <HOME> --report-url <URL>` cai add-in trong `src/AxiomOffice.WPS/`
   vao WPS cua HOME do (`<HOME>/.local/share/Kingsoft/wps/jsaddons/...`). Duoc ghi them cau hinh WPS can thiet
   trong CHINH HOME do (HOME ma test dua la thu muc tam), khong bao gio dung toi HOME that.
-- Khi WPS Writer mo (duoi Xvfb, HOME tam), add-in TU NAP va POST mot JSON toi <URL> voi it nhat:
+- Khi WPS Writer mo mot tai lieu (duoi Xvfb, HOME tam; test mo blank.docx - o trang chu WPS khong nap ribbon
+  add-in), add-in TU NAP va POST mot JSON toi <URL> voi it nhat:
     loaded      true
     wpsVersion  chuoi phien ban WPS (Application.Version hoac tuong duong)
     undoRecord  true/false: Application.UndoRecord (gom nhieu thao tac thanh 1 buoc Undo) co dung duoc khong
@@ -37,6 +38,8 @@ import time
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 INSTALLER = os.path.join(ROOT, "scripts", "wps", "install_jsaddon.py")
+BLANK_DOCX = os.path.join(ROOT, "core-go", "internal", "templates", "default.docx")
+OEM_INI = "/opt/kingsoft/wps-office/office6/cfgs/oem.ini"
 OUT_DIR = os.path.join(ROOT, "tests", "wps", "out")
 REPORT_FILE = os.path.join(OUT_DIR, "spike-report.json")
 REQUIRED = {"load": ("loaded",), "full": ("loaded", "wpsVersion", "undoRecord")}
@@ -101,6 +104,16 @@ def main() -> int:
     xvfb = shutil.which("xvfb-run")
     if not wps or not xvfb:
         return fail("can wps (WPS Office for Linux) va xvfb-run tren may (wps=%s, xvfb-run=%s)" % (wps, xvfb))
+    # JS add-in chi chay khi oem.ini HE THONG bat JsApiPlugin (file cua root; xem REFERENCE.md) - thieu thi WPS bo
+    # qua moi add-in, cho 120s cung vo ich.
+    try:
+        with open(OEM_INI, encoding="utf-8", errors="replace") as handle:
+            oem = handle.read()
+    except OSError:
+        oem = ""
+    if "JsApiPlugin=true" not in oem.replace(" ", ""):
+        return fail("%s chua bat JsApiPlugin=true (can sudo, xem tests/wps/REFERENCE.md) - WPS se bo qua add-in"
+                    % OEM_INI)
     if wps_running():
         return fail("WPS dang chay cho nguoi dung nay (pid %s) - dong WPS roi chay lai, tranh WPS moi chuyen "
                     "lenh sang ban dang mo" % " ".join(wps_running()))
@@ -126,12 +139,19 @@ def main() -> int:
         if not os.path.isdir(jsaddons) or not os.listdir(jsaddons):
             return fail("install_jsaddon.py khong ghi gi vao %s" % jsaddons)
 
-        process = subprocess.Popen([xvfb, "-a", "-s", "-screen 0 1280x900x24", wps], env=env, cwd=home,
+        # Phai mo mot tai lieu: o trang chu (wps khong tham so) WPS khong tao ribbon nen add-in khong bao gio nap.
+        document = os.path.join(home, "blank.docx")
+        shutil.copyfile(BLANK_DOCX, document)
+        process = subprocess.Popen([xvfb, "-a", "-s", "-screen 0 1280x900x24", wps, document], env=env, cwd=home,
                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        # Cho toi khi co mot bao cao DU truong cua muc dang kiem (add-in co the gui ban som chi co loaded truoc).
+        def complete_report() -> bool:
+            return any(isinstance(item.get("body"), dict)
+                       and all(key in item["body"] for key in REQUIRED[args.stage]) for item in reports)
+
         deadline = time.time() + args.timeout
-        while time.time() < deadline and not any("body" in item for item in reports):
+        while time.time() < deadline and not complete_report():
             time.sleep(1.0)
-        time.sleep(3.0)  # add-in co the gui them bao cao ngay sau bao cao dau
     finally:
         if process is not None:
             try:
@@ -158,7 +178,12 @@ def main() -> int:
     if not posts:
         return fail("khong nhan duoc bao cao nao tu add-in trong %ds (add-in khong nap, hoac khong goi duoc %s)"
                     % (args.timeout, url))
-    body = posts[0]["body"] if isinstance(posts[0]["body"], dict) else {}
+    # Add-in co the gui nhieu bao cao (vd mot ban som chi co loaded, mot ban day du sau): lay ban dau tien du truong.
+    complete = [item for item in posts if isinstance(item["body"], dict)
+                and all(key in item["body"] for key in REQUIRED[args.stage])]
+    chosen = complete[0] if complete else posts[0]
+    body = chosen["body"] if isinstance(chosen["body"], dict) else {}
+    posts = [chosen]
     missing = [key for key in REQUIRED[args.stage] if key not in body]
     if missing:
         return fail("bao cao thieu truong %s: %s" % (", ".join(missing), json.dumps(body, ensure_ascii=False)[:500]))
