@@ -851,7 +851,6 @@ scripts/                      build, install, uninstall, legacy (gỡ bản WpsA
   libreoffice.sh              Linux: đóng gói/cài/gỡ .oxt bằng unopkg của người dùng
   package_oxt.py              đóng gói .oxt (Windows + Linux)
   generate_mcp_commands.py    sinh catalog/live-commands.json + livecommands_gen.go (từ registry extension)
-  generate_templates.py       đồng bộ template docx/pptx cho bản Go (go:embed không đọc được ngoài module)
   linux/install.sh            cài cho người dùng cuối Linux: Core (kèm MCP) vào ~/.local/share, .oxt, config.json,
                               --systemd (unit axiom-office-core.service), in cấu hình MCP
   linux/package.sh            tarball linux-x64/arm64: Core (kèm MCP, binary Go) + skills/ + .oxt + install.sh

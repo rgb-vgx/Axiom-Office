@@ -94,7 +94,7 @@ AXIOM_E2E_CORE_EXE=/duong/dan/axiom-core python tests/core/test_core_e2e.py --on
 | `internal/docx`, `internal/pptx` | `WordFiles.cs` (phần nội dung), `PptFiles.cs` |
 | `internal/filesafe` | `FileSafety` (lưu file kiểu atomic) |
 | `internal/textutil` | đếm/cắt chuỗi theo đơn vị UTF-16 cho khớp `String.Length` của C# |
-| `internal/templates` | `Templates.Docx`/`Templates.Pptx` (bản sao template, sinh bởi `scripts/generate_templates.py`) |
+| `internal/templates` | `Templates.Docx`/`Templates.Pptx` (template python-docx/python-pptx, MIT — xem `NOTICE.md` cạnh đó) |
 
 `prompts/extract.txt` (prompt của bộ trích xuất memory) là **nguồn duy nhất** trong repo, nhúng vào binary
 bằng `go:embed`.

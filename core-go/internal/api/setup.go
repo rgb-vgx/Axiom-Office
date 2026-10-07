@@ -224,6 +224,8 @@ func currentJSON(cfg config.Config) map[string]any {
 		"memoryEnabled":     cfg.MemoryEnabled,
 		"memoryAutoExtract": cfg.MemoryAutoExtract,
 		"visualQaEnabled":   cfg.VisualQaEnabled,
+		"verifyWorkEnabled": cfg.VerifyWorkEnabled,
+		"llmShowReasoning":  cfg.LlmShowReasoning,
 		"tokenSet":          cfg.Token != "",
 		"configured":        cfg.LlmEndpoint != "" && cfg.LlmModel != "",
 	}

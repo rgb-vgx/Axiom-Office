@@ -5,6 +5,18 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — CI Linux đỏ ở bước "File sinh không được lệch nguồn"
+- `catalog/setup.json` thiếu hai tính năng **Tự kiểm chứng sau khi sửa** (`VerifyWorkEnabled`) và **Hiện phần
+  AI đang suy nghĩ** (`LlmShowReasoning`) — từ `ddf1c31` chúng chỉ được thêm tay vào `SetupCatalog.cs`, nên
+  `generate_setup_catalog.py --check` báo lệch và wizard LibreOffice không có hai ô này. Đã thêm vào nguồn,
+  sinh lại `setup_catalog.py` + `catalog_gen.go` (`SetupCatalog.cs` khớp sẵn); `GET /v1/setup` trả thêm
+  `current.verifyWorkEnabled` / `current.llmShowReasoning` để wizard hiện đúng giá trị đang dùng
+- Wizard LibreOffice, bước Tính năng: 5 mục với khoảng cách cũ (78px) tràn xuống hàng nút — mục "Cho AI xem
+  ảnh trang tài liệu" mất ô tick. Thu còn 58px/mục (soi bằng ảnh chụp thật dưới Xvfb)
+- Bỏ `scripts/generate_templates.py` và bước CI của nó: nguồn `src/AxiomOffice.Host/Mcp/Templates/` đã xoá cùng
+  MCP server C# (`dcf76fb`), nên `--check` luôn lỗi. `core-go/internal/templates/` nay là bản duy nhất; khôi
+  phục `NOTICE.md` (giấy phép MIT của python-docx/python-pptx) cạnh hai template
+
 ### Fixed — An toàn khi người và AI cùng sửa tài liệu (LibreOffice + Core)
 - **Hoàn tác không còn xoá chỉnh sửa của người dùng** (LibreOffice): `writer.undo`/`et.undo`/`wpp.undo` chỉ gỡ
   bước có tiêu đề `AI: …` (undo context do bridge tạo); gặp bước của người dùng thì dừng và trả `stoppedAt`.

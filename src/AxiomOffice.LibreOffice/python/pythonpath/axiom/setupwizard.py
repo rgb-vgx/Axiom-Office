@@ -259,7 +259,9 @@ class Wizard:
                        Border=0, NoLabel=True, BackgroundColor=theme.PANE_BG, TextColor=theme.TEXT_MUTED,
                        font=(theme.FONT, theme.SIZE_CAPTION))
             self.feature_boxes[feature["key"]] = check
-            y += 78
+            # 58 = o tick 20 + mo ta 34 + khoang cach 4: du cho 5 tinh nang trong CONTENT_H truoc dong trang thai
+            # (78 cu chi vua 3 muc; muc thu 5 bi day xuong de len hang nut).
+            y += 58
         advanced = link(self.surface, "Tuỳ chọn nâng cao (cổng Agent Core, hạn giờ, đường dẫn Core)…",
                         self._open_advanced, color=theme.ACCENT_FG)
         box.add(advanced, 0, y + 6)

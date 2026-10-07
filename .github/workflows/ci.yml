@@ -31,7 +31,6 @@ jobs:
         run: |
           python3 scripts/generate_setup_catalog.py --check
           python3 scripts/generate_mcp_commands.py --check
-          python3 scripts/generate_templates.py --check
 
       - name: Agent Core ban Go (go test + build + e2e day du)
         run: |
