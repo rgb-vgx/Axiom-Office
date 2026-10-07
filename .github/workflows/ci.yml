@@ -58,12 +58,16 @@ jobs:
 
       - name: Cai extension + test moi lenh bridge tren LibreOffice that
         run: |
+          # setup-python dat LD_LIBRARY_PATH vao libpython cua toolcache: pyuno cua LibreOffice (build cho
+          # Python he thong) nap nham -> unopkg/soffice sap (std::bad_alloc trong cpp_uno). Bo di cho LibreOffice.
+          unset LD_LIBRARY_PATH
           bash scripts/libreoffice.sh install
           bash scripts/libreoffice.sh status
           python3 tests/live/test_live_libreoffice.py
 
       - name: Wizard thiet lap (dialog that, profile rieng, LLM gia - qua Xvfb)
         run: |
+          unset LD_LIBRARY_PATH   # xem buoc "Cai extension" ben tren
           sudo apt-get install -y --no-install-recommends xdotool
           xvfb-run -a python3 tests/live/test_setup_wizard.py
 
@@ -71,6 +75,7 @@ jobs:
         env:
           AXIOM_MCP_ARGS: mcp all
         run: |
+          unset LD_LIBRARY_PATH   # xem buoc "Cai extension" ben tren
           setsid soffice --headless --calc --norestore >/tmp/soffice.out 2>&1 </dev/null &
           for _ in $(seq 40); do curl -s --max-time 1 http://127.0.0.1:47852/health >/dev/null && break; sleep 1; done
           python3 tests/mcp-host/test_mcp_portable.py "$RUNNER_TEMP/gocore/axiom-core" --live
