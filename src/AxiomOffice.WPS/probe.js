@@ -110,8 +110,10 @@
           report.errors.push("undoRecord: Application.UndoRecord is not available");
           return;
         }
-        var hasMethods = typeof ur.StartCustomRecord === "function" &&
-          typeof ur.EndCustomRecord === "function";
+        // Doi tuong native cua WPS co the khong bao typeof "function" cho method: ghi lai typeof that, va cu co
+        // thuoc tinh la thu goi (loi da duoc try/catch ghi vao errors) de khong bao sai undoRecord=false.
+        report.undoRecordTypes = { start: typeof ur.StartCustomRecord, end: typeof ur.EndCustomRecord };
+        var hasMethods = isPresent(ur.StartCustomRecord) && isPresent(ur.EndCustomRecord);
         report.undoRecordMethods = hasMethods;
         if (!hasDocument) {
           // No document open: only report whether the API surface exists (undoRecord stays false).
