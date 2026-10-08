@@ -89,3 +89,36 @@ boolean).
   cai dat rieng, ngoai trinh cai user-level.
 - `UndoRecord` dung duoc: mot tac vu AI co the gom thanh mot buoc Undo nhu
   Word (`StartCustomRecord`/`EndCustomRecord`).
+
+## Huong B: Agent Core phuc vu add-in qua HTTP (spike 09/10/2026)
+
+Thu bang mot server tam dong vai Core (cung file `src/AxiomOffice.WPS/`, `config.js` sinh dong), HOME tam,
+`publish.xml`:
+
+    <jspluginonline name="axiomoffice" type="wps" url="http://127.0.0.1:PORT/wps/" debug=""
+                    enable="enable_dev" install="null" customDomain=""/>
+
+| Kiem tra | Ket qua |
+|---|---|
+| WPS nap add-in tu HTTP | **Co** - lan luot GET `ribbon.xml`, `index.html`, `config.js`, `probe.js`, `main.js` duoi `/wps/`; khong can `JSPluginsServer` trong `oem.ini` |
+| Duong dan con (`/wps/`) | Chay duoc - add-in nam canh `/v1/...` cua Core |
+| `Origin` cua request | `http://127.0.0.1:PORT` = **cung origin voi server** |
+| `fetch` POST `application/json` | Chay, **khong co preflight**, doc duoc response |
+| `UndoRecord`, `wpsVersion` | Nhu ban `file://` (`true`, `12.0`) |
+| Server khong chay khi mo WPS | WPS bo qua **im lang** (khong hop thoai loi), khong co tab add-in |
+
+Chua kiem: hanh vi khi tat `JsApiPlugin` (gan nhu chac van can, nhu moi JS add-in); WPS co nap lai add-in khi
+server len sau hay khong (hien tai: phai mo lai WPS).
+
+### He qua: chon huong B cho bridge WPS
+
+- **Guard cua Core chi can mot ngoai le hep va co nguyen tac**: chap nhan `Origin` bang **chinh origin cua Core**
+  (trang do Core phuc vu), thay vi mo cho `file://` (moi file cuc bo deu co origin nay). Giu nguyen
+  `Content-Type: application/json`.
+- **Token khong duoc dua qua `<script>`**: trang web bat ky co the nhung `<script src="http://127.0.0.1:47840/wps/config.js">`
+  (the script khong bi same-origin chan) va doc bien toan cuc. Lay token bang `fetch` mot endpoint JSON: trang
+  khac origin khong doc duoc (SOP) va request co `Origin` la bi guard chan.
+- **Core phai chay truoc khi mo WPS** -> dung unit `systemd --user` da co (bat khi dang nhap); trinh cai WPS
+  chi ghi `publish.xml` (khong chep file add-in) - add-in cap nhat cung Core.
+- Van can buoc admin mot lan: `JsApiPlugin=true` trong `oem.ini`.
+
