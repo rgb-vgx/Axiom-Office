@@ -30,6 +30,7 @@ import (
 	"axiomoffice/core/internal/office"
 	"axiomoffice/core/internal/skills"
 	"axiomoffice/core/internal/store"
+	"axiomoffice/core/internal/wpsbridge"
 )
 
 // version gan luc build: go build -ldflags "-X main.version=1.2.3" (build.ps1 dung chung so voi add-in).
@@ -143,6 +144,9 @@ func run() int {
 
 	server := &http.Server{ReadHeaderTimeout: 10 * time.Second}
 	var stopOnce sync.Once
+	// Bridge WPS (docs/wps-bridge.md muc 2): kenh add-in tren Core API + listener rieng + file session.
+	exeDir := filepath.Dir(exe)
+	wps := wpsbridge.New(wpsbridge.ResolveOptions(os.Getenv, exeDir, sessionDir(cfg), cfg.Token, version, port))
 	stop := func() {
 		stopOnce.Do(func() {
 			// Huy cac luot dang chay TRUOC khi dung HTTP server: pane nhan run.cancelled thay vi treo, va
@@ -150,6 +154,8 @@ func run() int {
 			if cancelled := manager.CancelRunning(); cancelled > 0 {
 				corelog.Info("shutdown: cancelled %d running run(s)", cancelled)
 			}
+			// Xoa file session WPS khi Core dung (ke ca SIGTERM va POST /v1/admin/shutdown).
+			wps.Stop()
 			go func() {
 				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer cancel()
@@ -177,7 +183,10 @@ func run() int {
 		MCP:    mcpClient,
 
 		Stop: stop,
+		WPS:  wps,
 	}, mux)
+
+	wps.Start()
 
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
@@ -194,6 +203,8 @@ func run() int {
 		port, os.Getpid(), version, api.Protocol, paths.Root, stores.Status(cfg.MemoryEnabled))
 
 	serveErr := server.Serve(listener)
+	// Dam bao file session WPS duoc xoa ca khi Serve ket thuc ma stop() chua chay.
+	wps.Stop()
 	// Cho cac luot vua bi huy dung han (toi da 2s) de khong cat giua mot tool call dang sua tai lieu.
 	manager.CancelRunning()
 	deadline := time.Now().Add(2 * time.Second)

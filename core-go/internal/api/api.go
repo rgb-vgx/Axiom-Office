@@ -16,6 +16,7 @@ import (
 	"axiomoffice/core/internal/memory"
 	"axiomoffice/core/internal/skills"
 	"axiomoffice/core/internal/store"
+	"axiomoffice/core/internal/wpsbridge"
 )
 
 // Protocol tang khi doi hop dong Core API.
@@ -60,6 +61,9 @@ type Deps struct {
 
 	// Stop dung Core (POST /v1/admin/shutdown).
 	Stop func()
+
+	// WPS: bridge cho JS add-in WPS (docs/wps-bridge.md muc 2). nil = tat (cho test cu).
+	WPS *wpsbridge.Bridge
 }
 
 // Live tra ve cau hinh hien tai, khong phai anh chup luc khoi dong.
@@ -73,6 +77,7 @@ func (d *Deps) Live() config.Config {
 // Handler dung mux + guard cho toan bo Core API.
 func Handler(deps *Deps, mux *http.ServeMux) http.Handler {
 	mapCore(mux, deps)
+	mapWPS(mux, deps)
 	mapSetup(mux, deps)
 	mapRuns(mux, deps)
 	if deps.Skills != nil {
@@ -84,7 +89,16 @@ func Handler(deps *Deps, mux *http.ServeMux) http.Handler {
 	if deps.MCP != nil {
 		mapMCP(mux, deps)
 	}
-	return guard(deps.Config.Token, mux)
+	// Ngoai le Origin chi cho /wps/v1/* va /wps/addin/* (xac thuc rieng trong wpsbridge); moi
+	// endpoint khac giu guard cu (bat ky Origin nao cung 403).
+	guarded := guard(deps.Config.Token, mux)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if isWPSPath(r.URL.Path) {
+			mux.ServeHTTP(w, r)
+			return
+		}
+		guarded.ServeHTTP(w, r)
+	})
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {
