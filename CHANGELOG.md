@@ -5,6 +5,19 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Spike JS add-in cho WPS Office for Linux
+- `src/AxiomOffice.WPS/` (`ribbon.xml`, `index.html`, `main.js`, `probe.js`) + `scripts/wps/install_jsaddon.py`:
+  add-in tối thiểu tự nạp khi WPS Writer mở tài liệu và gửi một báo cáo môi trường (chưa nối với Agent Core).
+  Trình cài chỉ ghi trong `--home` (`jsaddons/axiomoffice_0.1.0/`, `publish.xml`, `config.js`, `Office.conf`)
+- Đo trên WPS 11.1.0.11723 (API `12.0`): add-in chạy từ `file://` trong CEF Chrome 87, có
+  `fetch`/XHR/WebSocket, **`Application.UndoRecord` dùng được** (mỗi thao tác AI = 1 bước Undo như Word),
+  `Origin` của request là `file://`
+- Điều kiện nạp: `JsApiPlugin=true` trong `/opt/kingsoft/wps-office/office6/cfgs/oem.ini` (file của root —
+  **cần admin một lần mỗi máy**), mở một tài liệu (trang chủ không nạp ribbon), có `index.html`, đăng ký
+  `<jsplugin>` offline trong `publish.xml`. Chi tiết: `docs/wps-spike.md`, `tests/wps/REFERENCE.md`
+- Test: `tests/wps/test_install_jsaddon.py` + `tests/wps/test_probe.mjs` (CI Linux);
+  `tests/wps/spike_check.py [--stage load|full]` chạy WPS thật dưới Xvfb (chỉ ở máy dev)
+
 ### Fixed — CI Linux đỏ ở bước "File sinh không được lệch nguồn"
 - `catalog/setup.json` thiếu hai tính năng **Tự kiểm chứng sau khi sửa** (`VerifyWorkEnabled`) và **Hiện phần
   AI đang suy nghĩ** (`LlmShowReasoning`) — từ `ddf1c31` chúng chỉ được thêm tay vào `SetupCatalog.cs`, nên

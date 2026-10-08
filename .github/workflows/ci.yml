@@ -22,6 +22,12 @@ jobs:
       - name: Unit test extension LibreOffice (khong can LibreOffice)
         run: python3 -m unittest discover -s tests/lo -v
 
+      # spike_check.py can WPS that + Xvfb + oem.ini bat JsApiPlugin: chi chay o may dev.
+      - name: Unit test add-in WPS (trinh cai + probe, khong can WPS)
+        run: |
+          python3 tests/wps/test_install_jsaddon.py
+          node --test tests/wps/test_probe.mjs
+
       - uses: actions/setup-go@v5
         with:
           go-version-file: core-go/go.mod
