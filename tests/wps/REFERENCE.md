@@ -12,7 +12,7 @@ Add-in **nạp được và gửi được báo cáo** khi có đủ 4 điều k
    sudo trên Linux), kèm `JsApiShowWebDebugger=true`. Trên máy dev đã bật (bản sao lưu `oem.ini.axiom-bak`).
    Trình cài add-in **không** được sửa file này — đó là bước admin riêng.
 2. **Mở một tài liệu.** `wps` không tham số dừng ở trang chủ: không có ribbon nên add-in không bao giờ nạp.
-   `spike_check.py` mở `blank.docx` (chép từ `core-go/internal/templates/default.docx`).
+   test chạy thật (`tests/wps/test_wps_bridge_live.py`) mở `blank.docx` (chép từ `core-go/internal/templates/default.docx`).
 3. **Có `index.html` trong thư mục add-in** nạp các script (`<script src="main.js">`). WPS mở `index.html` này
    (`location.href = file:///<HOME>/.local/share/Kingsoft/wps/jsaddons/NAME_VERSION/index.html`); không có nó
    thì `ribbon.xml` vẫn được đọc nhưng `onLoad="ribbon.OnAddinLoad"` báo `ReferenceError: ribbon is not defined`
