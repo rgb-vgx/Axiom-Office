@@ -107,35 +107,61 @@ func asOverwriteMatrix(value any) [][]any {
 	return matrix
 }
 
-// readOverwriteCell: doc mot o qua bridge (et.readRange {range, sheet}). Doc loi -> khong
-// chan (ok=false). Co "sheet" thi gui kem, khong thi doc sheet dang active (khong gui sheet).
-// Doc theo tung o de lenh dau tien giu nguyen range goc agent gui (e2e test_core_e2e doi
-// bridge.commands[0].params.range == "A1" cho writeRange {range "A1"}).
-func readOverwriteCell(ctx context.Context, run *RunContext, sheet, cell string) (any, string, bool) {
-	// Huy giua chung thi dung doc tiep (tranh lenh read roi xuong bridge sau diem dung).
-	if ctx != nil && ctx.Err() != nil {
-		return nil, sheet, false
+// overwriteAreaRange: vung dich "trai-tren:phai-duoi" (mot o thi chi mot dia chi).
+func overwriteAreaRange(c1, r1, c2, r2 int) string {
+	top := overwriteCellAddr(c1, r1)
+	bottom := overwriteCellAddr(c2, r2)
+	if top == bottom {
+		return top
 	}
-	readParams := map[string]any{"range": cell}
-	if sheet != "" {
-		readParams["sheet"] = sheet
-	}
-	result := run.Bridge.Command(ctx, run.Office.Port, "et.readRange", readParams)
-	if !result.OK || result.Result == nil {
-		return nil, sheet, false
-	}
+	return top + ":" + bottom
+}
+
+// readOverwriteArea: doc CA vung dich trong MOT lan et.readRange {range, sheet} roi so
+// sanh trong bo nho (thay cho doc tung o: bang 1.000 x 10 truoc day ton 10.000 vong
+// bridge). Co "sheet" thi gui kem, khong thi doc sheet dang active (khong gui sheet).
+// Doc loi trang dau -> khong chan (ok=false). Vung lon bi bridge cat (result
+// "truncated": true, "values" = cac dong dau, "nextRange" = phan con lai) thi doc tiep
+// theo "nextRange" toi da 10 lan nua; van cat thi phan chua doc (tooLarge=true) de ben
+// goi coi nhu dang co du lieu va hoi tham trong.
+func readOverwriteArea(ctx context.Context, run *RunContext, sheet, area string) ([][]any, string, bool, bool) {
 	resolved := sheet
-	if name, _ := result.Result["sheet"].(string); strings.TrimSpace(name) != "" {
-		resolved = strings.TrimSpace(name)
-	}
-	var old any
-	for _, line := range asOverwriteMatrix(result.Result["values"]) {
-		if len(line) > 0 {
-			old = line[0]
-			break
+	var all [][]any
+	current := area
+	for attempt := 0; attempt <= 10; attempt++ {
+		// Huy giua chung thi dung doc tiep (tranh lenh read roi xuong bridge sau diem dung).
+		if ctx != nil && ctx.Err() != nil {
+			if len(all) == 0 {
+				return nil, resolved, false, false
+			}
+			return all, resolved, true, true
 		}
+		readParams := map[string]any{"range": current}
+		if sheet != "" {
+			readParams["sheet"] = sheet
+		}
+		result := run.Bridge.Command(ctx, run.Office.Port, "et.readRange", readParams)
+		if !result.OK || result.Result == nil {
+			if len(all) == 0 {
+				return nil, resolved, false, false
+			}
+			return all, resolved, true, true
+		}
+		if name, _ := result.Result["sheet"].(string); strings.TrimSpace(name) != "" {
+			resolved = strings.TrimSpace(name)
+		}
+		all = append(all, asOverwriteMatrix(result.Result["values"])...)
+		truncated, _ := result.Result["truncated"].(bool)
+		if !truncated {
+			return all, resolved, true, false
+		}
+		next, _ := result.Result["nextRange"].(string)
+		if attempt >= 10 || strings.TrimSpace(next) == "" {
+			return all, resolved, true, true
+		}
+		current = strings.TrimSpace(next)
 	}
-	return old, resolved, true
+	return all, resolved, true, true
 }
 
 // isEmptyOverwriteCell: o trong = null hoac chuoi rong.
@@ -294,16 +320,18 @@ func filterOverwriteCells(run *RunContext, cells []overwriteCell) []overwriteCel
 }
 
 // collectWriteRangeOverwrites: writeRange = o goc trai-tren cua "range" mo rong theo ma tran "values".
-func collectWriteRangeOverwrites(ctx context.Context, run *RunContext, params map[string]any, topSheet string) []overwriteCell {
+// Doc mot lan ca vung dich roi so tung o trong bo nho. Tra kem tooLarge khi vung bi cat
+// ma doc tiep van khong het (phan chua doc de ben goi coi nhu dang co du lieu).
+func collectWriteRangeOverwrites(ctx context.Context, run *RunContext, params map[string]any, topSheet string) ([]overwriteCell, bool) {
 	rangeText := overwriteStringParam(params, "range")
 	matrix := asOverwriteMatrix(params["values"])
 	if rangeText == "" || len(matrix) == 0 {
-		return nil
+		return nil, false
 	}
 	parts := strings.Split(rangeText, ":")
 	originCol, originRow, ok := parseOverwriteCell(parts[0])
 	if !ok {
-		return nil
+		return nil, false
 	}
 	sheet := overwriteStringParam(params, "sheet")
 	if sheet == "" {
@@ -311,61 +339,103 @@ func collectWriteRangeOverwrites(ctx context.Context, run *RunContext, params ma
 	}
 	// Sheet da xu ly xong trong luot nay (do luot tao hoac da dong y) thi khong can doc.
 	if sheet != "" && (run.CreatedSheets[sheet] || run.OverwriteApproved[sheet]) {
-		return nil
+		return nil, false
+	}
+	cols := 0
+	for _, line := range matrix {
+		if len(line) > cols {
+			cols = len(line)
+		}
+	}
+	if cols == 0 {
+		return nil, false
+	}
+	area := overwriteAreaRange(originCol, originRow, originCol+cols-1, originRow+len(matrix)-1)
+	oldMatrix, resolved, ok, tooLarge := readOverwriteArea(ctx, run, sheet, area)
+	if !ok {
+		return nil, false
 	}
 	var cells []overwriteCell
 	for r, line := range matrix {
 		for c, newValue := range line {
 			cell := overwriteCellAddr(originCol+c, originRow+r)
-			oldValue, resolved, ok := readOverwriteCell(ctx, run, sheet, cell)
-			if !ok {
+			target := effectiveOverwriteSheet(sheet, resolved)
+			if r >= len(oldMatrix) {
+				// Dong chua doc duoc (vung bi cat): coi nhu dang co du lieu, hoi tham trong.
+				if !tooLarge {
+					continue
+				}
+				cells = append(cells, overwriteCell{sheet: target,
+					cell: cell, old: "?", new: newValue})
 				continue
+			}
+			var oldValue any
+			if c < len(oldMatrix[r]) {
+				oldValue = oldMatrix[r][c]
 			}
 			if isEmptyOverwriteCell(oldValue) || !overwriteValuesDiffer(oldValue, newValue) {
 				continue
 			}
-			cells = append(cells, overwriteCell{sheet: effectiveOverwriteSheet(sheet, resolved),
+			cells = append(cells, overwriteCell{sheet: target,
 				cell: cell, old: oldValue, new: newValue})
 		}
 	}
-	return cells
+	return cells, tooLarge
 }
 
 // collectFillRangeOverwrites: fillRange = chep cong thuc cho CA vung "range" (moi o nhan formula).
-func collectFillRangeOverwrites(ctx context.Context, run *RunContext, params map[string]any) []overwriteCell {
+// Doc mot lan ca vung roi so trong bo nho; vung bi cat ma khong doc het thi phan con lai
+// coi nhu dang co du lieu (tooLarge=true).
+func collectFillRangeOverwrites(ctx context.Context, run *RunContext, params map[string]any) ([]overwriteCell, bool) {
 	rangeText := overwriteStringParam(params, "range")
 	if rangeText == "" {
-		return nil
+		return nil, false
 	}
 	formula, present := params["formula"]
 	if !present || formula == nil {
-		return nil
+		return nil, false
 	}
 	c1, r1, c2, r2, ok := parseOverwriteRange(rangeText)
 	if !ok {
-		return nil
+		return nil, false
 	}
 	sheet := overwriteStringParam(params, "sheet")
 	// Sheet da xu ly xong trong luot nay (do luot tao hoac da dong y) thi khong can doc.
 	if sheet != "" && (run.CreatedSheets[sheet] || run.OverwriteApproved[sheet]) {
-		return nil
+		return nil, false
+	}
+	area := overwriteAreaRange(c1, r1, c2, r2)
+	oldMatrix, resolved, ok, tooLarge := readOverwriteArea(ctx, run, sheet, area)
+	if !ok {
+		return nil, false
 	}
 	var cells []overwriteCell
 	for row := r1; row <= r2; row++ {
 		for col := c1; col <= c2; col++ {
 			cell := overwriteCellAddr(col, row)
-			oldValue, resolved, ok := readOverwriteCell(ctx, run, sheet, cell)
-			if !ok {
+			target := effectiveOverwriteSheet(sheet, resolved)
+			index := row - r1
+			if index >= len(oldMatrix) {
+				// Dong chua doc duoc (vung bi cat): coi nhu dang co du lieu, hoi tham trong.
+				if !tooLarge {
+					continue
+				}
+				cells = append(cells, overwriteCell{sheet: target,
+					cell: cell, old: "?", new: formula})
 				continue
+			}
+			var oldValue any
+			if offset := col - c1; offset < len(oldMatrix[index]) {
+				oldValue = oldMatrix[index][offset]
 			}
 			if isEmptyOverwriteCell(oldValue) || !overwriteValuesDiffer(oldValue, formula) {
 				continue
 			}
-			cells = append(cells, overwriteCell{sheet: effectiveOverwriteSheet(sheet, resolved),
+			cells = append(cells, overwriteCell{sheet: target,
 				cell: cell, old: oldValue, new: formula})
 		}
 	}
-	return cells
+	return cells, tooLarge
 }
 
 // buildOverwriteReason: ly do hoi tieng Viet - ten sheet, tong so o, toi da ~10 vi du, duoi 1200 ky tu.
@@ -425,9 +495,11 @@ func checkOverwriteGuard(ctx context.Context, run *RunContext, action string, pa
 	}
 	ensureOverwriteMaps(run)
 	var cells []overwriteCell
+	tooLarge := false
 	switch action {
 	case "et.writeRange":
-		cells = collectWriteRangeOverwrites(ctx, run, params, "")
+		found, large := collectWriteRangeOverwrites(ctx, run, params, "")
+		cells, tooLarge = found, large
 	case "et.writeRanges":
 		topSheet := overwriteStringParam(params, "sheet")
 		writes, _ := params["writes"].([]any)
@@ -436,10 +508,13 @@ func checkOverwriteGuard(ctx context.Context, run *RunContext, action string, pa
 			if !ok {
 				continue
 			}
-			cells = append(cells, collectWriteRangeOverwrites(ctx, run, entry, topSheet)...)
+			found, large := collectWriteRangeOverwrites(ctx, run, entry, topSheet)
+			cells = append(cells, found...)
+			tooLarge = tooLarge || large
 		}
 	case "et.fillRange":
-		cells = collectFillRangeOverwrites(ctx, run, params)
+		found, large := collectFillRangeOverwrites(ctx, run, params)
+		cells, tooLarge = found, large
 	default:
 		return "", nil
 	}
@@ -455,5 +530,23 @@ func checkOverwriteGuard(ctx context.Context, run *RunContext, action string, pa
 			sheets = append(sheets, cell.sheet)
 		}
 	}
-	return buildOverwriteReason(cells), sheets
+	reason := buildOverwriteReason(cells)
+	if tooLarge {
+		reason = withTooLargeOverwriteNote(reason)
+	}
+	return reason, sheets
+}
+
+// withTooLargeOverwriteNote: them cau canh bao khi vung dich bi cat ma khong doc het
+// duoc (phan chua doc da duoc coi nhu dang co du lieu). Giu tong ly do duoi 1200 ky tu.
+func withTooLargeOverwriteNote(reason string) string {
+	note := " (vùng ghi quá lớn nên chỉ kiểm tra được một phần, phần còn lại chưa đọc hết được coi như đang có dữ liệu - too large to read fully)"
+	if len([]rune(reason+note)) <= 1200 {
+		return reason + note
+	}
+	keep := 1200 - len([]rune(note))
+	if keep < 0 {
+		keep = 0
+	}
+	return string([]rune(reason)[:keep]) + note
 }
