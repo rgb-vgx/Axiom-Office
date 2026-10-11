@@ -18,6 +18,9 @@ Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho th
   formulas:true`. Trước đây agent ghi tạm `ADT!V40` (+1.000.000) và `ADT!S3` rồi ghi lại
 - **`et.checkRange` hết báo `empty-reference` giả** (LibreOffice): bỏ qua nội dung chuỗi trong công thức
   (`"01B1*"` bị đọc thành ô `B1`) và tên hàm có số (`LOG10`, `ATAN2`)
+- **`et.checkRange` bớt cảnh báo giả** (LibreOffice): phân loại ô theo giá trị thật (kết quả công thức `0.0%`,
+  `#,##0`, ngày là số, không còn bị đếm là chữ), nhận dòng tiêu đề (chỉ ô đầu có chữ) và lấy dòng sau làm header
+  (trả thêm `title`), `numberFormat` lấy từ dòng dữ liệu đầu. Trước đây bảng chi phí trên Dashboard bị báo 5 lỗi giả
 - Memory: `AddBatch` thử lại khi SQLite báo `SQLITE_BUSY` (ghi qua API và trích xuất nền cùng lúc) — nguyên
   nhân kiểm tra e2e "khôi phục memory đã xoá" chập chờn
 - Viết bởi aidev (TASK-000097, -098, -100, -101) theo spec viết trước; e2e Core 169/169
