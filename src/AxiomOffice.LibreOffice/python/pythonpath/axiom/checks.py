@@ -104,6 +104,23 @@ def _cell_type(cell) -> str:
     return str(getattr(content, "value", content)).upper()
 
 
+def _formula_result_type(cell):
+    """Ket qua cong thuc (log 11/10/2026): 1 = so, 2 = chuoi, 4 = loi; khong doc duoc thi None."""
+    try:
+        value = getattr(cell, "FormulaResultType2", None)
+        if value is not None:
+            return int(getattr(value, "value", value))
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        value = cell.getPropertyValue("FormulaResultType2")
+        if value is not None:
+            return int(getattr(value, "value", value))
+    except Exception:  # noqa: BLE001
+        pass
+    return None
+
+
 # Gioi han khi soi tham chieu: mot bang 50.000 dong co the co hang tram nghin cong thuc, soi het thi cham
 # ma cai can thay chi la vai cho. Lay mau, va bao ca con so tong de nguoi doc biet quy mo.
 REF_SCAN_LIMIT = 4000
@@ -201,21 +218,50 @@ def range_report(env, params):
     rows = bounds.EndRow - bounds.StartRow + 1
     cols = bounds.EndColumn - bounds.StartColumn + 1
 
+    # Nhan dong tieu de (log 11/10/2026): dong dau chi co dung mot o co chu (dang TEXT) va dong ke
+    # tiep co chu o it nhat mot nua so cot thi dong dau la tieu de, dong ke tiep moi la header.
+    title = None
+    header_row = bounds.StartRow
+    if rows >= 2 and cols >= 2:
+        first_filled = []
+        for c in range(bounds.StartColumn, bounds.EndColumn + 1):
+            cell = _cell(sheet, c, bounds.StartRow)
+            text = _cell_text(cell.getString())
+            if text:
+                first_filled.append((c, text, _cell_type(cell)))
+        if len(first_filled) == 1 and first_filled[0][2] == "TEXT":
+            second_texts = 0
+            for c in range(bounds.StartColumn, bounds.EndColumn + 1):
+                cell = _cell(sheet, c, bounds.StartRow + 1)
+                text = _cell_text(cell.getString())
+                if not text:
+                    continue
+                content = _cell_type(cell)
+                if content == "TEXT":
+                    second_texts += 1
+                elif content == "FORMULA" and _formula_result_type(cell) == 2:
+                    second_texts += 1
+                elif content not in ("EMPTY", "VALUE", "FORMULA"):
+                    second_texts += 1
+            if second_texts * 2 >= cols:
+                title = first_filled[0][1]
+                header_row = bounds.StartRow + 1
+    data_start = header_row + 1
+
     columns, issues = [], []
     for c in range(bounds.StartColumn, bounds.EndColumn + 1):
         letter = column_letter(c + 1)
-        header = _cell(sheet, c, bounds.StartRow)
+        header = _cell(sheet, c, header_row)
         header_text = _cell_text(header.getString())
         numbers = texts = blanks = numeric_texts = errors = formulas = fractional = 0
         error_names = []
-        for r in range(bounds.StartRow + 1, bounds.EndRow + 1):
+        for r in range(data_start, bounds.EndRow + 1):
             cell = _cell(sheet, c, r)
             content = _cell_type(cell)
             formula = cell.getFormula()
             if isinstance(formula, str) and formula.startswith("="):
                 formulas += 1
             text = _cell_text(cell.getString())
-            number = _parse_number(text)
             if content == "EMPTY" or not text:
                 blanks += 1
             elif _is_error(cell, text):
@@ -224,15 +270,62 @@ def range_report(env, params):
             elif content == "TEXT":
                 # So nam trong o dang chu: Excel/Calc khong tinh vao cong thuc -> canh bao.
                 texts += 1
-                if number is not None:
+                if _parse_number(text) is not None:
                     numeric_texts += 1
-            elif number is None:
-                texts += 1  # VALUE/FORMULA tra ve chuoi
-            else:
+            elif content == "VALUE":
+                # Phan loai theo gia tri that (log 11/10/2026): o VALUE la so du hien thi "26/03/2026".
                 numbers += 1
-                if abs(number - round(number)) > 1e-9:
+                try:
+                    value = float(cell.getValue())
+                except Exception:  # noqa: BLE001
+                    value = _parse_number(text)
+                if value is not None and abs(value - round(value)) > 1e-9:
                     fractional += 1
-        key = _cell(sheet, c, min(bounds.StartRow + 1, bounds.EndRow)).getPropertyValue("NumberFormat")
+            elif content == "FORMULA":
+                # Phan loai theo kieu ket qua that (log 11/10/2026): 1 = so, 2 = chuoi, 4 = loi.
+                result = _formula_result_type(cell)
+                if result == 4:
+                    errors += 1
+                    error_names.append(_error_name(cell, text))
+                elif result == 1:
+                    numbers += 1
+                    try:
+                        value = float(cell.getValue())
+                    except Exception:  # noqa: BLE001
+                        value = _parse_number(text)
+                    if value is not None and abs(value - round(value)) > 1e-9:
+                        fractional += 1
+                elif result == 2:
+                    texts += 1
+                    if _parse_number(text) is not None:
+                        numeric_texts += 1
+                else:
+                    number = _parse_number(text)
+                    if number is None:
+                        texts += 1  # FORMULA tra ve chuoi khi khong doc duoc kieu ket qua
+                    else:
+                        numbers += 1
+                        try:
+                            value = float(cell.getValue())
+                        except Exception:  # noqa: BLE001
+                            value = number
+                        if value is not None and abs(value - round(value)) > 1e-9:
+                            fractional += 1
+            else:
+                number = _parse_number(text)
+                if number is None:
+                    texts += 1
+                else:
+                    numbers += 1
+                    try:
+                        value = float(cell.getValue())
+                    except Exception:  # noqa: BLE001
+                        value = number
+                    if value is not None and abs(value - round(value)) > 1e-9:
+                        fractional += 1
+        # numberFormat lay tu dong du lieu dau (log 11/10/2026), khong lay o dong header.
+        fmt_row = data_start if data_start <= bounds.EndRow else header_row
+        key = _cell(sheet, c, fmt_row).getPropertyValue("NumberFormat")
         fmt = _format_string(doc, key)
         data_cells = numbers + texts + errors
         if not header_text and data_cells > 0:
@@ -281,7 +374,7 @@ def range_report(env, params):
         pass
 
     return {"sheet": sheet.getName(), "range": address(bounds), "usedRange": address(used_bounds), "table": region_address,
-            "rows": rows, "cols": cols, "columns": columns, "issueCount": len(issues), "issues": issues}
+            "rows": rows, "cols": cols, "title": title, "columns": columns, "issueCount": len(issues), "issues": issues}
 
 
 ERROR_TEXT = ("#DIV/0!", "#REF!", "#NAME?", "#NUM!", "#NULL!", "#VALUE!", "#N/A", "#ERR:")
