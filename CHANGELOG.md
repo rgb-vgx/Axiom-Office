@@ -5,6 +5,23 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — An toàn dữ liệu khi agent làm việc trên sheet có sẵn (log Calc thật 11/10/2026)
+Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho thấy ba vấn đề:
+- **Hỏi trước khi ghi đè dữ liệu cũ** (Core): `et.writeRange`/`et.writeRanges`/`et.fillRange` vào sheet có
+  trước lượt chạy mà đè ô không rỗng (giá trị khác) thì hiện thẻ xác nhận nêu sheet, số ô và ví dụ
+  `Q4 '15.553,8' → 15553.8`. Đồng ý một lần thì cả lượt không hỏi lại trên sheet đó; sheet do lượt tạo
+  (`et.addSheet`), ô trống, cùng giá trị thì không hỏi; `ai.ask` (không tương tác) thì từ chối. Core đọc mỗi
+  vùng đích bằng một `et.readRange` (vùng lớn đọc tiếp theo `nextRange`, tối đa 10 trang). Trước đây agent đổi
+  25 ô số/ngày lưu dạng chữ trên sheet gốc mà không hỏi
+- **Không còn "đổi thử rồi đặt lại" trên dữ liệu người dùng** (prompt `CheckRule` + `VerifyWorkNudge`): chỉ được
+  thử với ô đầu vào do chính lượt tạo; kiểm công thức có nối vào dữ liệu sẵn có bằng `et.readRange
+  formulas:true`. Trước đây agent ghi tạm `ADT!V40` (+1.000.000) và `ADT!S3` rồi ghi lại
+- **`et.checkRange` hết báo `empty-reference` giả** (LibreOffice): bỏ qua nội dung chuỗi trong công thức
+  (`"01B1*"` bị đọc thành ô `B1`) và tên hàm có số (`LOG10`, `ATAN2`)
+- Memory: `AddBatch` thử lại khi SQLite báo `SQLITE_BUSY` (ghi qua API và trích xuất nền cùng lúc) — nguyên
+  nhân kiểm tra e2e "khôi phục memory đã xoá" chập chờn
+- Viết bởi aidev (TASK-000097, -098, -100, -101) theo spec viết trước; e2e Core 169/169
+
 ### Added — Spike JS add-in cho WPS Office for Linux
 - `src/AxiomOffice.WPS/` (`ribbon.xml`, `index.html`, `main.js`, `probe.js`) + `scripts/wps/install_jsaddon.py`:
   add-in tối thiểu tự nạp khi WPS Writer mở tài liệu và gửi một báo cáo môi trường (chưa nối với Agent Core).
