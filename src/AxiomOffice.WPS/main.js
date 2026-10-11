@@ -19,14 +19,19 @@
 
   function paneUrl() {
     try {
+      var kind = "wps";
+      try { kind = currentAppKind() || "wps"; } catch (eK) { kind = "wps"; }
       var href = "";
       try { href = (window.location && window.location.href) || ""; } catch (e) { href = ""; }
-      var idx = String(href).lastIndexOf("/");
+      var clean = String(href).split("#")[0].split("?")[0];
+      var idx = clean.lastIndexOf("/");
       if (idx >= 0) {
-        return String(href).substring(0, idx + 1) + "pane.html";
+        return clean.substring(0, idx + 1) + "pane.html?app=" + kind;
       }
     } catch (e2) {}
-    return "pane.html";
+    var fallback = "wps";
+    try { fallback = currentAppKind() || "wps"; } catch (e3) { fallback = "wps"; }
+    return "pane.html?app=" + fallback;
   }
 
   function openPane() {

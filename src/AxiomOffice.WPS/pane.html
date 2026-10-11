@@ -1,48 +1,470 @@
 <!DOCTYPE html>
-<html>
+<html lang="vi">
 <head>
 <meta charset="utf-8">
 <title>Axiom Ask AI</title>
 <script src="pane-core.js"></script>
 <style>
-body { font-family: sans-serif; font-size: 13px; margin: 0; padding: 0; }
-#app { display: flex; flex-direction: column; height: 100vh; }
-#toolbar { padding: 8px; border-bottom: 1px solid #ccc; display: flex; align-items: center; }
-#title { font-weight: bold; flex: 1; }
-#messages { flex: 1; overflow-y: auto; padding: 8px; }
-.msg { margin: 4px 0; padding: 6px 8px; border-radius: 4px; white-space: pre-wrap; word-wrap: break-word; }
-.msg-user { background: #e8f0fe; text-align: right; }
-.msg-assistant { background: #f1f3f4; }
-.msg-error { background: #fce8e6; color: #a50e0e; }
-#steps { padding: 4px 8px; color: #555; font-size: 12px; min-height: 1em; }
-#confirm { margin: 4px 8px; padding: 8px; border: 1px solid #f9ab00; border-radius: 4px; background: #fef7e0; }
-#composer { padding: 8px; border-top: 1px solid #ccc; }
-#input { width: 100%; box-sizing: border-box; resize: vertical; }
-#composer .row { margin-top: 4px; }
+:root{
+  --axiom-pane-bg:#ffffff;
+  --axiom-divider:#e5e7eb;
+  --axiom-text-primary:#111827;
+  --axiom-text-secondary:#4b5563;
+  --axiom-text-muted:#6b7280;
+  --axiom-ai-bg:#f9fafb;
+  --axiom-ai-border:#e5e7eb;
+  --axiom-user-bg:#e0e7ff;
+  --axiom-user-fg:#1e1b4b;
+  --axiom-accent:#6366f1;
+  --axiom-accent-fg:#4f46e5;
+  --axiom-action-bg:#4f46e5;
+  --axiom-action-hover:#4338ca;
+  --axiom-on-action:#ffffff;
+  --axiom-disabled-bg:#f3f4f6;
+  --axiom-disabled-fg:#9ca3af;
+  --axiom-input-border:#8c93a0;
+  --axiom-focus:#4f46e5;
+  --axiom-chip-border:#c7d2fe;
+  --axiom-chip-hover:#eef2ff;
+  --axiom-chip-fg:#4338ca;
+  --axiom-danger:#dc2626;
+  --axiom-danger-fg:#b91c1c;
+  --axiom-danger-bg:#fef2f2;
+  --axiom-danger-border:#fecaca;
+  --axiom-success:#047857;
+  --axiom-pad-x:12px;
+  --axiom-gap-message:12px;
+  --axiom-gap-before-tools:8px;
+  --axiom-gap-tool-line:2px;
+  --axiom-gap-chip:6px;
+  --axiom-radius-bubble:10px;
+  --axiom-radius-control:8px;
+  --axiom-radius-composer:10px;
+  --axiom-bubble-pad-x:12px;
+  --axiom-bubble-pad-y:8px;
+  --axiom-bubble-max-user:80%;
+  --axiom-bubble-max-ai:92%;
+  --axiom-header-h:48px;
+  --axiom-footer-h:28px;
+  --axiom-composer-h:98px;
+  --axiom-send-w:64px;
+  --axiom-send-h:30px;
+  --axiom-chip-h:32px;
+  --axiom-tool-row-h:20px;
+  --axiom-icon:12px;
+  --axiom-scroll-w:12px;
+  --axiom-size-title:10pt;
+  --axiom-size-empty-title:11pt;
+  --axiom-size-body:9.5pt;
+  --axiom-size-small:9pt;
+  --axiom-size-tool:8.5pt;
+  --axiom-size-tool-id:8pt;
+  --axiom-size-caption:8.25pt;
+}
+html,
+body {
+  height: 100%;
+}
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--axiom-pane-bg);
+  color: var(--axiom-text-primary);
+  font-family: system-ui,"Segoe UI","Noto Sans",sans-serif;
+  font-size: var(--axiom-size-body);
+}
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--axiom-pane-bg);
+}
+#paneHeader {
+  height: var(--axiom-header-h);
+  min-height: var(--axiom-header-h);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--axiom-pad-x);
+  background: var(--axiom-pane-bg);
+  border-bottom: 1px solid var(--axiom-divider);
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  min-width: 8px;
+  border-radius: 50%;
+  background: var(--axiom-accent);
+}
+.dotSmall {
+  width: 6px;
+  height: 6px;
+  min-width: 6px;
+}
+.headText {
+  display: flex;
+  flex-direction: column;
+  margin-left: var(--axiom-gap-chip);
+  flex: 1;
+  min-width: 0;
+}
+#paneTitle {
+  font-size: var(--axiom-size-title);
+  font-weight: 600;
+  color: var(--axiom-text-primary);
+}
+#paneSubtitle {
+  font-size: var(--axiom-size-caption);
+  color: var(--axiom-text-muted);
+}
+.link {
+  background: transparent;
+  border: none;
+  padding: 2px 4px;
+  color: var(--axiom-accent-fg);
+  font-family: system-ui,"Segoe UI","Noto Sans",sans-serif;
+  font-size: var(--axiom-size-caption);
+  cursor: pointer;
+  transition: color 200ms ease, background-color 200ms ease;
+}
+.link:hover {
+  color: var(--axiom-action-hover);
+  text-decoration: underline;
+}
+.link:active {
+  opacity: 0.75;
+}
+#chat {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--axiom-gap-message) var(--axiom-pad-x);
+  background: var(--axiom-pane-bg);
+}
+#chat::-webkit-scrollbar {
+  width: var(--axiom-scroll-w);
+}
+.bubble {
+  padding: var(--axiom-bubble-pad-y) var(--axiom-bubble-pad-x);
+  border-radius: var(--axiom-radius-bubble);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  margin-bottom: var(--axiom-gap-message);
+  transition: background-color 200ms ease, border-color 200ms ease;
+}
+.bubbleUser {
+  margin-left: auto;
+  max-width: var(--axiom-bubble-max-user);
+  background: var(--axiom-user-bg);
+  color: var(--axiom-user-fg);
+}
+.bubbleAi {
+  margin-right: auto;
+  max-width: var(--axiom-bubble-max-ai);
+  background: var(--axiom-ai-bg);
+  border: 1px solid var(--axiom-ai-border);
+  color: var(--axiom-text-primary);
+}
+.toolWrap {
+  margin-top: var(--axiom-gap-before-tools);
+}
+.toolRow {
+  display: flex;
+  align-items: center;
+  min-height: var(--axiom-tool-row-h);
+  margin-bottom: var(--axiom-gap-tool-line);
+}
+.toolIcon {
+  width: var(--axiom-icon);
+  height: var(--axiom-icon);
+  min-width: var(--axiom-icon);
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--axiom-size-tool-id);
+  margin-right: var(--axiom-gap-chip);
+}
+.iconOk {
+  background: var(--axiom-success);
+  color: var(--axiom-on-action);
+}
+.iconErr {
+  background: var(--axiom-danger);
+  color: var(--axiom-on-action);
+}
+.iconRun {
+  background: transparent;
+  border: 2px solid var(--axiom-text-muted);
+  color: transparent;
+}
+.toolLabel {
+  font-size: var(--axiom-size-tool);
+  color: var(--axiom-text-secondary);
+}
+.toolLabelErr {
+  color: var(--axiom-danger-fg);
+}
+.toolCode {
+  font-family: "Consolas","DejaVu Sans Mono",monospace;
+  font-size: var(--axiom-size-tool-id);
+  color: var(--axiom-text-muted);
+  margin-left: var(--axiom-gap-chip);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.typingDots {
+  display: inline-flex;
+  gap: var(--axiom-gap-chip);
+}
+.tdot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--axiom-accent);
+  animation: axiomBlink 1s ease-in-out infinite;
+}
+.tdot2 {
+  animation-delay: 200ms;
+}
+.tdot3 {
+  animation-delay: 400ms;
+}
+@keyframes axiomBlink {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tdot {
+    animation: none;
+  }
+}
+.emptyTitle {
+  font-size: var(--axiom-size-empty-title);
+  font-weight: 600;
+  color: var(--axiom-text-primary);
+  margin: 4px 0;
+}
+.emptyDesc {
+  font-size: var(--axiom-size-body);
+  color: var(--axiom-text-secondary);
+  margin: 0 0 var(--axiom-gap-message) 0;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+.suggestLabel {
+  font-size: var(--axiom-size-caption);
+  font-weight: 600;
+  color: var(--axiom-text-muted);
+  margin: 0 0 var(--axiom-gap-chip) 0;
+}
+.chip {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: var(--axiom-chip-h);
+  margin-bottom: var(--axiom-gap-chip);
+  padding: 4px var(--axiom-pad-x);
+  text-align: left;
+  background: var(--axiom-pane-bg);
+  border: 1px solid var(--axiom-chip-border);
+  border-radius: var(--axiom-radius-control);
+  color: var(--axiom-chip-fg);
+  font-family: system-ui,"Segoe UI","Noto Sans",sans-serif;
+  font-size: var(--axiom-size-body);
+  cursor: pointer;
+  transition: background-color 200ms ease, border-color 200ms ease;
+}
+.chip:hover {
+  background: var(--axiom-chip-hover);
+}
+.chip:active {
+  opacity: 0.8;
+}
+.errCard {
+  background: var(--axiom-danger-bg);
+  border: 1px solid var(--axiom-danger-border);
+  border-left: 3px solid var(--axiom-danger);
+  border-radius: var(--axiom-radius-control);
+  padding: var(--axiom-bubble-pad-y) var(--axiom-bubble-pad-x);
+  margin-bottom: var(--axiom-gap-message);
+}
+.errTitle {
+  color: var(--axiom-danger-fg);
+  font-weight: 600;
+  font-size: var(--axiom-size-small);
+  margin-bottom: var(--axiom-gap-tool-line);
+}
+.errBody {
+  color: var(--axiom-text-primary);
+  font-size: var(--axiom-size-small);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+.confirmCard {
+  background: var(--axiom-chip-hover);
+  border: 1px solid var(--axiom-chip-border);
+  border-left: 3px solid var(--axiom-accent);
+  border-radius: var(--axiom-radius-control);
+  padding: var(--axiom-bubble-pad-y) var(--axiom-bubble-pad-x);
+  margin-bottom: var(--axiom-gap-message);
+}
+.confirmReason {
+  color: var(--axiom-text-primary);
+  font-size: var(--axiom-size-small);
+  margin: 0 0 var(--axiom-gap-chip) 0;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+#confirmTitle {
+  color: var(--axiom-accent-fg);
+  font-weight: 600;
+  font-size: var(--axiom-size-small);
+  margin-bottom: var(--axiom-gap-chip);
+}
+.btnRow {
+  display: flex;
+  gap: var(--axiom-gap-chip);
+}
+.btnPrimary {
+  background: var(--axiom-action-bg);
+  color: var(--axiom-on-action);
+  border: none;
+  border-radius: var(--axiom-radius-control);
+  font-family: system-ui,"Segoe UI","Noto Sans",sans-serif;
+  font-size: var(--axiom-size-small);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 200ms ease, color 200ms ease;
+}
+.btnPrimary:hover {
+  background: var(--axiom-action-hover);
+}
+.btnPrimary:active {
+  opacity: 0.85;
+}
+.btnSecondary {
+  background: var(--axiom-pane-bg);
+  color: var(--axiom-chip-fg);
+  border: 1px solid var(--axiom-chip-border);
+  border-radius: var(--axiom-radius-control);
+  font-family: system-ui,"Segoe UI","Noto Sans",sans-serif;
+  font-size: var(--axiom-size-small);
+  font-weight: 600;
+  padding: 4px var(--axiom-pad-x);
+  cursor: pointer;
+  transition: background-color 200ms ease, border-color 200ms ease;
+}
+.btnSecondary:hover {
+  background: var(--axiom-chip-hover);
+}
+.btnSecondary:active {
+  opacity: 0.85;
+}
+#composer {
+  padding: 0 var(--axiom-pad-x) var(--axiom-gap-chip) var(--axiom-pad-x);
+  background: var(--axiom-pane-bg);
+}
+#composerBox {
+  border: 1px solid var(--axiom-input-border);
+  border-radius: var(--axiom-radius-composer);
+  background: var(--axiom-pane-bg);
+  min-height: var(--axiom-composer-h);
+  padding: 8px var(--axiom-pad-x);
+  box-sizing: border-box;
+  transition: border-color 200ms ease;
+}
+#composerBox:focus-within {
+  border-color: var(--axiom-focus);
+}
+#input {
+  width: 100%;
+  box-sizing: border-box;
+  border: none;
+  outline: none;
+  background: transparent;
+  resize: none;
+  font-family: system-ui,"Segoe UI","Noto Sans",sans-serif;
+  font-size: var(--axiom-size-body);
+  color: var(--axiom-text-primary);
+}
+.composerFoot {
+  display: flex;
+  align-items: center;
+  margin-top: var(--axiom-gap-chip);
+}
+#composerHint {
+  flex: 1;
+  font-size: var(--axiom-size-caption);
+  color: var(--axiom-text-muted);
+}
+#sendBtn {
+  width: var(--axiom-send-w);
+  height: var(--axiom-send-h);
+}
+#paneFooter {
+  height: var(--axiom-footer-h);
+  min-height: var(--axiom-footer-h);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--axiom-pad-x);
+  background: var(--axiom-pane-bg);
+  border-top: 1px solid var(--axiom-divider);
+}
+#statusText {
+  font-size: var(--axiom-size-caption);
+  color: var(--axiom-text-muted);
+  flex: 1;
+  margin-left: var(--axiom-gap-chip);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#stopBtn {
+  margin-left: auto;
+}
+button:focus,
+.chip:focus,
+#input:focus {
+  outline: 2px solid var(--axiom-focus);
+  outline-offset: 1px;
+}
+.btnPrimary:disabled,
+.btnSecondary:disabled,
+.chip:disabled,
+.link:disabled {
+  background: var(--axiom-disabled-bg);
+  color: var(--axiom-disabled-fg);
+  border-color: var(--axiom-disabled-bg);
+  cursor: default;
+  text-decoration: none;
+}
 </style>
 </head>
 <body>
 <div id="app">
-  <div id="toolbar">
-    <span id="title">Axiom Ask AI</span>
-    <button id="newBtn" type="button">H&#7897;i tho&#7841;i m&#7899;i</button>
-  </div>
-  <div id="messages"></div>
-  <div id="steps"></div>
-  <div id="confirm" style="display:none;">
-    <div id="confirmText"></div>
-    <div class="row">
-      <button id="approveBtn" type="button">&#272;&#7891;ng &yacute;</button>
-      <button id="denyBtn" type="button">T&#7915; ch&#7889;i</button>
+  <header id="paneHeader">
+    <span id="accentDot" class="dot" aria-hidden="true"></span>
+    <div class="headText">
+      <span id="paneTitle"></span>
+      <span id="paneSubtitle"></span>
     </div>
-  </div>
+    <button id="newBtn" class="link" type="button" data-act="new">Trò chuyện mới</button>
+  </header>
+  <main id="chat" role="log" aria-live="polite" aria-label="Hội thoại"></main>
   <div id="composer">
-    <textarea id="input" rows="3" placeholder="Nh&#7853;p c&acirc;u h&#7887;i..."></textarea>
-    <div class="row">
-      <button id="sendBtn" type="button">G&#7917;i</button>
-      <button id="stopBtn" type="button" style="display:none;">D&#7915;ng</button>
+    <div id="composerBox">
+      <textarea id="input" rows="2" aria-label="Yêu cầu cho AI" placeholder="Nhập yêu cầu cho tài liệu này…"></textarea>
+      <div class="composerFoot">
+        <span id="composerHint" class="hint">Enter để gửi · Shift+Enter xuống dòng</span>
+        <button id="sendBtn" class="btnPrimary" type="button" data-act="send">Gửi</button>
+      </div>
     </div>
   </div>
+  <footer id="paneFooter">
+    <span id="busyDot" class="dot dotSmall" aria-hidden="true" hidden></span>
+    <span id="statusText" class="caption">Sẵn sàng</span>
+    <button id="stopBtn" class="link" type="button" data-act="stop" hidden>Dừng</button>
+  </footer>
 </div>
 <script>
 (function () {
@@ -52,6 +474,14 @@ body { font-family: sans-serif; font-size: 13px; margin: 0; padding: 0; }
     try { return document.getElementById(id); } catch (e) { return null; }
   }
 
+  var KIND = "wps";
+  try {
+    var search = "";
+    try { search = window.location ? window.location.search : ""; } catch (e0) { search = ""; }
+    var m = /[?&]app=(wps|et|wpp)(?:&|$)/.exec(search || "");
+    if (m) { KIND = m[1]; }
+  } catch (e) { KIND = "wps"; }
+
   function baseUrl() {
     var base = "../v1/";
     try {
@@ -59,11 +489,12 @@ body { font-family: sans-serif; font-size: 13px; margin: 0; padding: 0; }
       try { href = (window.location && window.location.href) || ""; } catch (e) { href = ""; }
       if (href) {
         try {
+          var clean = String(href).split(String.fromCharCode(35))[0].split("?")[0];
           if (typeof URL === "function") {
-            base = new URL("../v1/", href).href;
+            base = new URL("../v1/", clean || href).href;
           } else {
-            var idx = String(href).lastIndexOf("/");
-            var dir = idx >= 0 ? String(href).substring(0, idx + 1) : "";
+            var idx = String(clean).lastIndexOf("/");
+            var dir = idx >= 0 ? String(clean).substring(0, idx + 1) : "";
             var trimmed = dir.charAt(dir.length - 1) === "/" ? dir.substring(0, dir.length - 1) : dir;
             var j = trimmed.lastIndexOf("/");
             base = (j >= 0 ? trimmed.substring(0, j + 1) : dir) + "v1/";
@@ -85,75 +516,292 @@ body { font-family: sans-serif; font-size: 13px; margin: 0; padding: 0; }
       base: baseUrl(),
       onChange: render
     });
-  } catch (e) {
+  } catch (e5) {
     ctl = null;
+  }
+
+  function appName() {
+    try {
+      if (AxiomPaneCore.APP_NAMES && AxiomPaneCore.APP_NAMES[KIND]) { return AxiomPaneCore.APP_NAMES[KIND]; }
+    } catch (e) {}
+    return KIND;
+  }
+
+  function updateHint() {
+    try {
+      var hint = $("composerHint");
+      if (!hint) { return; }
+      var full = "Enter để gửi · Shift+Enter xuống dòng";
+      var short = "Enter để gửi";
+      var w = 0;
+      try {
+        var box = $("composerBox");
+        if (box && box.offsetWidth) { w = box.offsetWidth; }
+        else if (window.innerWidth) { w = window.innerWidth; }
+      } catch (e) { w = 0; }
+      var text = (w >= 340 || w <= 0) ? full : short;
+      while (hint.firstChild) { hint.removeChild(hint.firstChild); }
+      hint.appendChild(document.createTextNode(text));
+    } catch (e2) {}
+  }
+
+  function updateSendDisabled(state) {
+    try {
+      var sendBtn = $("sendBtn");
+      if (!sendBtn) { return; }
+      var empty = true;
+      try {
+        var input = $("input");
+        var v = input ? input.value : "";
+        empty = !String(v).replace(/^\s+|\s+$/g, "");
+      } catch (e) { empty = true; }
+      sendBtn.disabled = !!state.running || empty;
+    } catch (e2) {}
+  }
+
+  function addText(el, text) {
+    try { el.appendChild(document.createTextNode(String(text === undefined || text === null ? "" : text))); } catch (e) {}
+  }
+
+  function makeBubble(kind) {
+    var div = document.createElement("div");
+    try { div.className = "bubble " + kind; } catch (e) {}
+    return div;
+  }
+
+  function makeToolRow(step, running) {
+    var row = document.createElement("div");
+    try { row.className = "toolRow"; } catch (e) {}
+    var icon = document.createElement("span");
+    var action = "";
+    try { action = String((step && step.action) || ""); } catch (e2) {}
+    var failed = false;
+    try { failed = !running && step && !step.ok; } catch (e3) {}
+    var label = "";
+    try { label = AxiomPaneCore.labelFor(action); } catch (e4) { label = action; }
+    try {
+      if (step && step.ok) {
+        icon.className = "toolIcon iconOk";
+        icon.appendChild(document.createTextNode("✓"));
+      } else if (failed) {
+        icon.className = "toolIcon iconErr";
+        icon.appendChild(document.createTextNode("✕"));
+      } else {
+        icon.className = "toolIcon iconRun";
+        icon.appendChild(document.createTextNode("…"));
+      }
+    } catch (e5) {}
+    row.appendChild(icon);
+    var lab = document.createElement("span");
+    try { lab.className = failed ? "toolLabel toolLabelErr" : "toolLabel"; } catch (e6) {}
+    addText(lab, label);
+    row.appendChild(lab);
+    var code = document.createElement("span");
+    try { code.className = "toolCode"; } catch (e7) {}
+    addText(code, action);
+    row.appendChild(code);
+    return row;
+  }
+
+  function makeErrorCard(text) {
+    var card = document.createElement("div");
+    try { card.className = "errCard"; } catch (e) {}
+    try { card.setAttribute("role", "alert"); } catch (e2) {}
+    var title = document.createElement("div");
+    try { title.className = "errTitle"; } catch (e3) {}
+    addText(title, "Có lỗi xảy ra");
+    card.appendChild(title);
+    var body = document.createElement("div");
+    try { body.className = "errBody"; } catch (e4) {}
+    addText(body, text);
+    card.appendChild(body);
+    return card;
+  }
+
+  function makeConfirmCard(confirmation) {
+    var card = document.createElement("div");
+    try { card.className = "confirmCard"; } catch (e) {}
+    var label = "";
+    try { label = AxiomPaneCore.labelFor(confirmation ? confirmation.action : ""); } catch (e2) {}
+    var title = document.createElement("div");
+    try { title.id = "confirmTitle"; } catch (e3) {}
+    addText(title, "Cần bạn xác nhận: " + label);
+    card.appendChild(title);
+    var reason = document.createElement("p");
+    try { reason.className = "confirmReason"; } catch (e4) {}
+    var rtext = "";
+    try { rtext = String((confirmation && confirmation.reason) || ""); } catch (e5) {}
+    addText(reason, rtext);
+    card.appendChild(reason);
+    var row = document.createElement("div");
+    try { row.className = "btnRow"; } catch (e6) {}
+    var ok = document.createElement("button");
+    try {
+      ok.type = "button";
+      ok.className = "btnPrimary";
+      ok.setAttribute("data-act", "approve");
+    } catch (e7) {}
+    addText(ok, "Đồng ý");
+    row.appendChild(ok);
+    var no = document.createElement("button");
+    try {
+      no.type = "button";
+      no.className = "btnSecondary";
+      no.setAttribute("data-act", "deny");
+    } catch (e8) {}
+    addText(no, "Từ chối");
+    row.appendChild(no);
+    card.appendChild(row);
+    return card;
+  }
+
+  function makeEmpty() {
+    var frag = document.createDocumentFragment();
+    var info = null;
+    try { info = AxiomPaneCore.emptyState(KIND); } catch (e) { info = null; }
+    if (!info) { return frag; }
+    var title = document.createElement("div");
+    try { title.id = "emptyTitle"; title.className = "emptyTitle"; } catch (e2) {}
+    addText(title, info.title);
+    frag.appendChild(title);
+    var desc = document.createElement("p");
+    try { desc.className = "emptyDesc"; } catch (e3) {}
+    addText(desc, info.description);
+    frag.appendChild(desc);
+    var lab = document.createElement("p");
+    try { lab.className = "suggestLabel"; } catch (e4) {}
+    addText(lab, "GỢI Ý");
+    frag.appendChild(lab);
+    var sugg = info.suggestions || [];
+    for (var i = 0; i < sugg.length; i++) {
+      var chip = document.createElement("button");
+      var text = "";
+      try { text = String(sugg[i]); } catch (e5) {}
+      try {
+        chip.type = "button";
+        chip.className = "chip";
+        chip.setAttribute("data-act", "suggestion");
+        chip.setAttribute("data-value", text);
+      } catch (e6) {}
+      addText(chip, text);
+      frag.appendChild(chip);
+    }
+    return frag;
   }
 
   function render(state) {
     try {
       if (!state) { return; }
-      var box = $("messages");
-      if (box) {
-        while (box.firstChild) { box.removeChild(box.firstChild); }
+      var chat = $("chat");
+      if (chat) {
+        while (chat.firstChild) { chat.removeChild(chat.firstChild); }
         var msgs = state.messages || [];
-        for (var i = 0; i < msgs.length; i++) {
-          var m = msgs[i] || {};
-          var div = document.createElement("div");
-          var role = "assistant";
-          try { role = String(m.role || "assistant"); } catch (e) {}
-          div.className = "msg msg-" + role;
-          try {
-            div.appendChild(document.createTextNode(String(m.text === undefined || m.text === null ? "" : m.text)));
-          } catch (e2) {}
-          box.appendChild(div);
-        }
-        try { box.scrollTop = box.scrollHeight; } catch (e3) {}
-      }
-      var stepsEl = $("steps");
-      if (stepsEl) {
-        while (stepsEl.firstChild) { stepsEl.removeChild(stepsEl.firstChild); }
         var steps = state.steps || [];
-        if (steps.length > 0) {
-          var parts = [];
-          for (var k = 0; k < steps.length; k++) {
-            var s = steps[k] || {};
-            var label = "";
-            try { label = String(s.action || "tool"); } catch (e4) {}
-            try { label += s.ok ? " \u2713" : " \u2026"; } catch (e5) {}
-            parts.push(label);
-          }
-          var prefix = state.running ? "\u0110ang ch\u1EA1y: " : "\u0110\u00E3 ch\u1EA1y: ";
-          stepsEl.appendChild(document.createTextNode(prefix + parts.join(", ")));
-        }
-      }
-      var card = $("confirm");
-      if (card) {
-        if (state.confirmation) {
-          var c = state.confirmation;
-          var txt = "";
-          try {
-            txt = "AI mu\u1ED1n th\u1EF1c hi\u1EC7n \"" + String(c.action || "") + "\"";
-            if (c.reason) { txt += ": " + String(c.reason); }
-          } catch (e6) {}
-          var ct = $("confirmText");
-          if (ct) {
-            while (ct.firstChild) { ct.removeChild(ct.firstChild); }
-            ct.appendChild(document.createTextNode(txt));
-          }
-          card.style.display = "";
+        var running = !!state.running;
+        var confirmation = state.confirmation || null;
+        if (msgs.length === 0 && steps.length === 0 && !running && !confirmation) {
+          chat.appendChild(makeEmpty());
         } else {
-          card.style.display = "none";
+          var lastUser = -1;
+          var i;
+          for (i = 0; i < msgs.length; i++) {
+            var r = "assistant";
+            try { r = String((msgs[i] && msgs[i].role) || "assistant"); } catch (e) {}
+            if (r === "user") { lastUser = i; }
+          }
+          for (i = 0; i < msgs.length; i++) {
+            var msg = msgs[i] || {};
+            var role = "assistant";
+            try { role = String(msg.role || "assistant"); } catch (e2) {}
+            var text = "";
+            try { text = String(msg.text === undefined || msg.text === null ? "" : msg.text); } catch (e3) {}
+            if (role === "user") {
+              var ub = makeBubble("bubbleUser");
+              addText(ub, text);
+              chat.appendChild(ub);
+            } else if (role === "error") {
+              chat.appendChild(makeErrorCard(text));
+            } else {
+              var ab = makeBubble("bubbleAi");
+              var plain = text;
+              try { plain = AxiomPaneCore.plainReply(text); } catch (e4) {}
+              addText(ab, plain);
+              chat.appendChild(ab);
+            }
+            if (i === lastUser && steps.length > 0) {
+              var wrap = document.createElement("div");
+              try { wrap.className = "toolWrap"; } catch (e5) {}
+              for (var k = 0; k < steps.length; k++) {
+                wrap.appendChild(makeToolRow(steps[k] || {}, running));
+              }
+              chat.appendChild(wrap);
+            }
+          }
+          if (lastUser < 0 && steps.length > 0) {
+            var top = document.createElement("div");
+            try { top.className = "toolWrap"; } catch (e6) {}
+            for (var k2 = 0; k2 < steps.length; k2++) {
+              top.appendChild(makeToolRow(steps[k2] || {}, running));
+            }
+            chat.insertBefore(top, chat.firstChild);
+          }
+          if (running) {
+            var tb = makeBubble("bubbleAi");
+            var dots = document.createElement("span");
+            try { dots.className = "typingDots"; } catch (e7) {}
+            var d1 = document.createElement("span");
+            try { d1.className = "tdot"; } catch (e8) {}
+            dots.appendChild(d1);
+            var d2 = document.createElement("span");
+            try { d2.className = "tdot tdot2"; } catch (e9) {}
+            dots.appendChild(d2);
+            var d3 = document.createElement("span");
+            try { d3.className = "tdot tdot3"; } catch (e10) {}
+            dots.appendChild(d3);
+            tb.appendChild(dots);
+            chat.appendChild(tb);
+          }
+          if (confirmation) {
+            chat.appendChild(makeConfirmCard(confirmation));
+          }
         }
+        try { chat.scrollTop = chat.scrollHeight; } catch (e11) {}
+      }
+      var title = $("paneTitle");
+      if (title) {
+        while (title.firstChild) { title.removeChild(title.firstChild); }
+        title.appendChild(document.createTextNode(appName()));
+      }
+      var sub = $("paneSubtitle");
+      if (sub) {
+        while (sub.firstChild) { sub.removeChild(sub.firstChild); }
+        sub.appendChild(document.createTextNode("Axiom Office"));
+      }
+      var status = $("statusText");
+      if (status) {
+        while (status.firstChild) { status.removeChild(status.firstChild); }
+        var stext = "Sẵn sàng";
+        if (state.confirmation) { stext = "Đang chờ bạn xác nhận…"; }
+        else if (state.running) { stext = "Đang chạy…"; }
+        status.appendChild(document.createTextNode(stext));
+      }
+      var busy = $("busyDot");
+      if (busy) {
+        try {
+          if (state.running) { busy.removeAttribute("hidden"); }
+          else { busy.setAttribute("hidden", "hidden"); }
+        } catch (e12) {}
       }
       var stopBtn = $("stopBtn");
       if (stopBtn) {
-        try { stopBtn.style.display = state.running ? "" : "none"; } catch (e7) {}
+        try {
+          if (state.running) { stopBtn.removeAttribute("hidden"); }
+          else { stopBtn.setAttribute("hidden", "hidden"); }
+        } catch (e13) {}
       }
-      var sendBtn = $("sendBtn");
-      if (sendBtn) {
-        try { sendBtn.disabled = !!state.running; } catch (e8) {}
-      }
-    } catch (e9) {}
+      updateHint();
+      updateSendDisabled(state);
+    } catch (e14) {}
   }
 
   function doSend() {
@@ -172,16 +820,67 @@ body { font-family: sans-serif; font-size: 13px; margin: 0; padding: 0; }
       if (r && typeof r.then === "function") {
         try { r.then(null, function () {}); } catch (e4) {}
       }
-    } catch (e5) {}
+      try { render(ctl.getState ? ctl.getState() : null); } catch (e5) {}
+      updateSendDisabled({ running: true });
+    } catch (e6) {}
+  }
+
+  function actOf(el) {
+    try {
+      var app = $("app");
+      while (el && el !== app) {
+        try {
+          if (el.getAttribute) {
+            var act = el.getAttribute("data-act");
+            if (act) { return { act: act, value: el.getAttribute("data-value") || "" }; }
+          }
+        } catch (e) {}
+        el = el.parentNode;
+      }
+    } catch (e2) {}
+    return null;
   }
 
   try {
-    var sendBtn2 = $("sendBtn");
-    if (sendBtn2) {
-      if (sendBtn2.addEventListener) {
-        sendBtn2.addEventListener("click", doSend);
+    var app = $("app");
+    if (app) {
+      var onClick = function (ev) {
+        try {
+          ev = ev || window.event;
+          var t = null;
+          try { t = ev.target || ev.srcElement; } catch (e) { t = null; }
+          var found = actOf(t);
+          if (!found) { return; }
+          if (found.act === "new") {
+            try { if (ctl) { ctl.newConversation(); } } catch (e2) {}
+          } else if (found.act === "send") {
+            doSend();
+          } else if (found.act === "stop") {
+            try { if (ctl) { ctl.stop(); } } catch (e3) {}
+          } else if (found.act === "approve") {
+            try { if (ctl) { ctl.confirm(true); } } catch (e4) {}
+          } else if (found.act === "deny") {
+            try { if (ctl) { ctl.confirm(false); } } catch (e5) {}
+          } else if (found.act === "suggestion") {
+            try {
+              var input = $("input");
+              if (input) {
+                input.value = found.value;
+                try { updateSendDisabled({ running: false }); } catch (e6) {}
+                try { input.focus(); } catch (e7) {}
+                try {
+                  var len = String(input.value).length;
+                  if (input.setSelectionRange) { input.setSelectionRange(len, len); }
+                } catch (e8) {}
+              }
+            } catch (e9) {}
+          }
+        } catch (e10) {}
+      };
+      if (app.addEventListener) {
+        app.addEventListener("click", onClick);
       } else {
-        sendBtn2.onclick = doSend;
+        app.onclick = onClick;
       }
     }
     var input2 = $("input");
@@ -199,58 +898,28 @@ body { font-family: sans-serif; font-size: 13px; margin: 0; padding: 0; }
         } catch (e2) {}
         return true;
       };
+      var onInput = function () {
+        try {
+          var s = null;
+          try { s = ctl ? ctl.getState() : null; } catch (e) { s = null; }
+          updateSendDisabled(s || { running: false });
+        } catch (e2) {}
+      };
       if (input2.addEventListener) {
         input2.addEventListener("keydown", onKey);
+        input2.addEventListener("input", onInput);
       } else {
         input2.onkeydown = onKey;
+        input2.oninput = onInput;
       }
     }
-    var stopBtn2 = $("stopBtn");
-    if (stopBtn2) {
-      var onStop = function () {
-        try { if (ctl) { ctl.stop(); } } catch (e) {}
-      };
-      if (stopBtn2.addEventListener) {
-        stopBtn2.addEventListener("click", onStop);
-      } else {
-        stopBtn2.onclick = onStop;
+    try {
+      if (window.addEventListener) {
+        window.addEventListener("resize", updateHint);
       }
-    }
-    var newBtn = $("newBtn");
-    if (newBtn) {
-      var onNew = function () {
-        try { if (ctl) { ctl.newConversation(); } } catch (e) {}
-      };
-      if (newBtn.addEventListener) {
-        newBtn.addEventListener("click", onNew);
-      } else {
-        newBtn.onclick = onNew;
-      }
-    }
-    var approveBtn = $("approveBtn");
-    if (approveBtn) {
-      var onApprove = function () {
-        try { if (ctl) { ctl.confirm(true); } } catch (e) {}
-      };
-      if (approveBtn.addEventListener) {
-        approveBtn.addEventListener("click", onApprove);
-      } else {
-        approveBtn.onclick = onApprove;
-      }
-    }
-    var denyBtn = $("denyBtn");
-    if (denyBtn) {
-      var onDeny = function () {
-        try { if (ctl) { ctl.confirm(false); } } catch (e) {}
-      };
-      if (denyBtn.addEventListener) {
-        denyBtn.addEventListener("click", onDeny);
-      } else {
-        denyBtn.onclick = onDeny;
-      }
-    }
+    } catch (e11) {}
     render({ messages: [], running: false, steps: [], confirmation: null, conversationId: null });
-  } catch (e) {}
+  } catch (e12) {}
 })();
 </script>
 </body>

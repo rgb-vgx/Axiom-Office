@@ -482,7 +482,111 @@
     };
   }
 
-  var api = { create: create };
+  // ---- He thiet ke pane LibreOffice (axiom.theme): du lieu + nhan lenh (ES5) ----
+  var ACTION_LABELS = {
+    "writer.getText": "Đọc nội dung tài liệu",
+    "writer.selection": "Đọc vùng chọn",
+    "writer.newDocument": "Tạo tài liệu mới",
+    "writer.open": "Mở tài liệu",
+    "writer.typeText": "Gõ văn bản",
+    "writer.appendText": "Viết thêm nội dung",
+    "writer.replaceAll": "Thay thế văn bản",
+    "writer.insertStyledText": "Chèn đoạn văn",
+    "writer.formatSelection": "Định dạng vùng chọn",
+    "writer.setParagraphAlignment": "Căn lề đoạn văn",
+    "writer.insertTable": "Chèn bảng",
+    "writer.insertPageBreak": "Ngắt trang",
+    "writer.insertImage": "Chèn ảnh",
+    "writer.insertHyperlink": "Chèn liên kết",
+    "writer.heading": "Thêm tiêu đề",
+    "writer.closeAll": "Đóng tài liệu",
+    "writer.formatTable": "Định dạng bảng",
+    "writer.checkTables": "Kiểm tra bảng",
+    "et.listSheets": "Đọc danh sách sheet",
+    "et.newWorkbook": "Tạo bảng tính mới",
+    "et.open": "Mở bảng tính",
+    "et.readRange": "Đọc vùng dữ liệu",
+    "et.writeRange": "Ghi dữ liệu vào ô",
+    "et.formatRange": "Định dạng ô",
+    "et.activateSheet": "Chuyển sheet",
+    "et.checkRange": "Kiểm tra bảng dữ liệu",
+    "wpp.listSlides": "Đọc danh sách slide",
+    "wpp.newPresentation": "Tạo bản trình chiếu mới",
+    "wpp.open": "Mở bản trình chiếu",
+    "wpp.addSlide": "Thêm slide",
+    "wpp.addTextBox": "Thêm hộp văn bản",
+    "wpp.addText": "Thêm chữ vào slide",
+    "wpp.addImage": "Chèn ảnh vào slide",
+    "wpp.addTable": "Thêm bảng vào slide",
+    "wpp.setNotes": "Ghi chú thuyết trình",
+    "wpp.deleteSlide": "Xoá slide",
+    "wpp.checkLayout": "Kiểm tra bố cục slide"
+  };
+  var SUFFIX_LABELS = {
+    "save": "Lưu tệp",
+    "saveAs": "Lưu tệp",
+    "exportPdf": "Xuất PDF",
+    "undo": "Hoàn tác thao tác trước"
+  };
+  var TOOL_LABELS = {
+    "load_skill": "Dùng kỹ năng",
+    "read_skill_file": "Đọc tài liệu kỹ năng",
+    "remember": "Ghi nhớ",
+    "recall": "Tra ghi nhớ",
+    "look_at_document": "Xem ảnh tài liệu"
+  };
+  var NOUNS = {
+    "wps": "văn bản",
+    "et": "bảng tính",
+    "wpp": "bản trình chiếu"
+  };
+  var APP_NAMES = {
+    "wps": "Writer",
+    "et": "Calc",
+    "wpp": "Impress"
+  };
+  var SUGGESTIONS = {
+    "wps": ["Soạn đơn xin việc vị trí kế toán", "Tóm tắt tài liệu này thành 5 ý", "Chèn bảng lịch họp tuần 3 cột"],
+    "et": ["Tạo bảng điểm 5 học sinh, có cột trung bình", "Thêm cột Tổng có công thức cho bảng này", "Tô đậm và kẻ khung dòng tiêu đề"],
+    "wpp": ["Tạo 5 slide giới thiệu công ty", "Thêm slide kế hoạch quý 4", "Viết ghi chú thuyết trình cho từng slide"]
+  };
+
+  function labelFor(action) {
+    try {
+      if (!action) { return "Thao tác trên tài liệu"; }
+      var key = String(action);
+      if (ACTION_LABELS.hasOwnProperty(key)) { return ACTION_LABELS[key]; }
+      if (TOOL_LABELS.hasOwnProperty(key)) { return TOOL_LABELS[key]; }
+      var suffix = key;
+      try { suffix = key.split('.').slice(-1)[0]; } catch (e) { suffix = key; }
+      if (key.indexOf('.') >= 0 && SUFFIX_LABELS.hasOwnProperty(suffix)) { return SUFFIX_LABELS[suffix]; }
+      if (key.indexOf('.') >= 0) { return "Thao tác trên tài liệu"; }
+      return key;
+    } catch (e2) { return "Thao tác trên tài liệu"; }
+  }
+
+  function emptyState(kind) {
+    try {
+      var noun = NOUNS.hasOwnProperty(kind) ? NOUNS[kind] : "tài liệu";
+      var sugg = SUGGESTIONS.hasOwnProperty(kind) ? SUGGESTIONS[kind] : SUGGESTIONS["wps"];
+      return {
+        title: "Bạn muốn làm gì với " + noun + " này?",
+        description: "Tôi đọc và chỉnh sửa trực tiếp tài liệu đang mở. Thay đổi hiện ngay trên trang khi tôi làm.",
+        suggestions: sugg.slice ? sugg.slice(0) : sugg
+      };
+    } catch (e) { return { title: "", description: "", suggestions: [] }; }
+  }
+
+  function plainReply(text) {
+    try {
+      return String(text === undefined || text === null ? "" : text)
+        .split("**").join("").split("\u0060").join("")
+        .replace(/^\s+|\s+$/g, "");
+    } catch (e) { return ""; }
+  }
+
+
+  var api = { create: create, ACTION_LABELS: ACTION_LABELS, SUFFIX_LABELS: SUFFIX_LABELS, TOOL_LABELS: TOOL_LABELS, NOUNS: NOUNS, APP_NAMES: APP_NAMES, SUGGESTIONS: SUGGESTIONS, labelFor: labelFor, emptyState: emptyState, plainReply: plainReply };
   try {
     if (root) { root.AxiomPaneCore = api; }
   } catch (e) {}
