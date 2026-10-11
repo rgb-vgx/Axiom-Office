@@ -54,6 +54,11 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 - `tests/wps/test_addin_fake.mjs` (mới, 4 test) ghim lại từng hành vi trên, để một sửa đổi "cho thân thiện" sau
   này bị bắt ngay; spec `et.importCsv` viết lại đòi đọc bằng `ReadFile`, cắt BOM của `utf-8-sig` và **từ chối
   encoding không phải UTF-8 trước khi ghi gì** (hai spec này đỏ trước bản vá, đúng như mong đợi)
+- **Bản vá** (`cmdEtImportCsv`, aidev TASK-000121): đọc bằng `FileSystem.ReadFile` trong try/catch (thiếu file ->
+  `no file at '<path>'` như cũ), `encoding` mặc định `utf-8-sig` và chỉ nhận các cách viết UTF-8
+  (`utf-8`/`utf8`/`utf-8-sig`/`utf8-sig`, chuẩn hoá `_` -> `-`, không phân biệt hoa/thường); encoding khác bị từ
+  chối **trước khi ghi** kèm lý do (`ReadFile` của WPS không có tham số charset); chỉ bản `-sig` mới cắt BOM.
+  Test add-in: 76 xanh
 - `docs/wps-bridge.md` mục 6 ghi thêm hai điểm đo được: sandbox của `readFileString`/`writeFileString`, và việc
   ET **ép kiểu khi ghi `Value2`** (chuỗi trông-như-số thành số) nên `numbers-as-text` chỉ còn đúng với ô có sẵn
   text trong file — fake không mô phỏng việc ép kiểu này
