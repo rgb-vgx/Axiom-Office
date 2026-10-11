@@ -556,6 +556,8 @@
   }
 
   function cmdAppInfo(app) {
+    var kind = "wps";
+    try { kind = appKind(app); } catch (eK) { kind = "wps"; }
     var name = "", version = "", document = null;
     try { name = strProp(app, "Name"); } catch (e) { name = ""; }
     try { version = strProp(app, "Version"); } catch (e2) { version = ""; }
@@ -567,15 +569,21 @@
       } catch (e4) {}
     }
     try {
-      var doc = app.ActiveDocument;
+      var doc = null;
+      try {
+        if (kind === "et") { doc = app.ActiveWorkbook; }
+        else if (kind === "wpp") { doc = app.ActivePresentation; }
+        else { doc = app.ActiveDocument; }
+      } catch (eD) { doc = null; }
       if (doc !== undefined && doc !== null) {
         var dname = "", dfull = "";
         try { dname = strProp(doc, "Name"); } catch (e5) {}
         try { dfull = strProp(doc, "FullName"); } catch (e6) {}
-        document = { name: dname, fullName: dfull };
+        if (dname === "" && dfull === "") { document = null; }
+        else { document = { name: dname, fullName: dfull }; }
       }
     } catch (e7) { document = null; }
-    return { app: "wps", name: name, version: version, document: document };
+    return { app: kind, name: name, version: version, document: document };
   }
 
   function cmdGetText(app, params) {
@@ -1071,10 +1079,70 @@
     return out;
   }
 
+  // appKind(app): "et" (Spreadsheets) | "wpp" (Presentation) | "wps" (Writer, mac dinh).
+  // Cung mot add-in nap trong ca ba app (publish.xml type="wps,et,wpp") nen phai doc
+  // app.Name dang chay. KHONG BAO GIO throw: app la/thieu Name/Name khong phai string
+  // hay doc Name loi deu tra "wps".
+  function appKind(app) {
+    try {
+      if (app === undefined || app === null) { return "wps"; }
+      var name = app.Name;
+      if (typeof name === "function") {
+        try { name = name.call(app); } catch (e) { return "wps"; }
+      }
+      if (typeof name !== "string") { return "wps"; }
+      if (/spreadsheet/i.test(name)) { return "et"; }
+      if (/presentation|slide/i.test(name)) { return "wpp"; }
+      return "wps";
+    } catch (e2) {
+      return "wps";
+    }
+  }
+
+  // catalogFor(kind): chi entry dung chung moi app (kind null/""/undefined) hoac kind === tham so.
+  // catalog() giu nguyen: tra day du registry (khong loc).
+  function catalogFor(kind) {
+    var out = [];
+    for (var i = 0; i < CATALOG.length; i++) {
+      var c = CATALOG[i];
+      if (c.kind === null || c.kind === "" || c.kind === undefined || c.kind === kind) {
+        var params = [];
+        for (var j = 0; j < c.params.length; j++) {
+          params.push({ name: c.params[j].name, required: c.params[j].required, hint: c.params[j].hint });
+        }
+        out.push({ name: c.name, kind: c.kind, agent: c.agent, summary: c.summary, params: params });
+      }
+    }
+    return out;
+  }
+
+  function catalogEntry(action) {
+    for (var i = 0; i < CATALOG.length; i++) {
+      if (CATALOG[i].name === action) { return CATALOG[i]; }
+    }
+    return null;
+  }
+
+  function appDisplayName(app, fallback) {
+    try {
+      var name = strProp(app, "Name");
+      if (name) { return name; }
+    } catch (e) {}
+    return fallback;
+  }
+
   function execute(app, action, params) {
     try {
       if (app === undefined || app === null) {
-        return { ok: false, error: "no Application object (open a document in WPS Writer first)" };
+        return { ok: false, error: "no Application object (open a document in WPS first)" };
+      }
+      var kind = "wps";
+      try { kind = appKind(app); } catch (eK) { kind = "wps"; }
+      var entry = catalogEntry(action);
+      if (entry !== null && entry.kind !== null && entry.kind !== "" && entry.kind !== undefined &&
+          entry.kind !== kind) {
+        var running = appDisplayName(app, kind);
+        return { ok: false, error: "\"" + action + "\" cannot run in \"" + running + "\" (this command needs the other WPS application)" };
       }
       var handler = HANDLERS[action];
       if (!handler) {
@@ -1119,7 +1187,7 @@
     }
   }
 
-  var api = { catalog: catalog, execute: execute };
+  var api = { catalog: catalog, catalogFor: catalogFor, appKind: appKind, execute: execute };
   try {
     if (root) { root.AxiomCommands = api; }
   } catch (e) {}

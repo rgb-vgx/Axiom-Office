@@ -55,7 +55,7 @@ func mapWPSRuns(mux *http.ServeMux, deps *Deps) {
 			return
 		}
 		if !deps.WPS.Connected() {
-			Error(w, http.StatusConflict, "WPS add-in is not connected: open a document in WPS Writer to connect the add-in")
+			Error(w, http.StatusConflict, "WPS add-in is not connected: open a document in WPS to connect the add-in")
 			return
 		}
 		body, parsed := readJSON(r)
