@@ -124,6 +124,17 @@ Cùng giao thức và cùng guard với bridge LibreOffice (`Origin` → 403, to
   còn lại (`offslide`, `small-font`, `overlap`, `dense`) giữ nguyên ngưỡng của LibreOffice.
 - Object model ET/WPP khác Writer ở vài chỗ (`Cells.Item(r,c)`, `UsedRange.Address()` là hàm, màu BGR, chỉ số
   1-based, `Application.Documents` không có) — bảng đầy đủ ở `tests/wps/REFERENCE.md`.
+- **`FileSystem.readFileString`/`writeFileString` bị sandbox** (đo 11/10/2026): mọi đường dẫn có `/` hoặc `\` đều
+  ném `path cannot contains "/" or "\"`, tên file trần trả `null`, và chúng không đọc/ghi được file nào — dù tài
+  liệu WPS mô tả chúng như API đọc file. Đọc file thật phải bằng **`FileSystem.ReadFile`** (UTF-8, ném
+  `"Wrong path!"` khi thiếu file, cắt ở byte NUL đầu tiên); ghi byte bằng `writeAsBinaryString`. Đây là lớp lỗi
+  mà fake "thân thiện" che mất: `et.importCsv` đã đọc bằng `readFileString` nên **không bao giờ chạy được trên WPS
+  thật** trong khi 71 test node vẫn xanh. Bảng API đầy đủ ở `tests/wps/REFERENCE.md`,
+  `tests/wps/test_addin_fake.mjs` ghim lại từng hành vi.
+- **ET ép kiểu khi ghi `Value2`**: gán chuỗi trông-như-số (`"42"`) hay trông-như-ngày (`"01/01"`) thì WPS tự ép
+  thành số/ngày — đường ghi **không** tạo được "số dạng text". `numbers-as-text` chỉ còn đúng với ô đã có sẵn
+  text trong file. Fake **không** mô phỏng việc ép kiểu này (ghi chú ở `setCellScalar` trong `addin_fake.mjs`),
+  nên spec chỉ khẳng định `numbers-as-text` trên ô gieo sẵn.
 
 ## 7. Pane Ask AI trong WPS
 Pane là một trang khác của add-in (`/wps/addin/pane.html`), mở bằng nút trên ribbon qua
@@ -142,4 +153,3 @@ Pane là một trang khác của add-in (`/wps/addin/pane.html`), mở bằng n�
 Trình duyệt **không gửi `Origin` cho GET cùng origin** (`EventSource` của pane → 401, phát hiện 11/10/2026). Với
 **GET** trên `/wps/v1/*`, Core chấp nhận thêm khi không có `Origin` mà có `Sec-Fetch-Site: same-origin` (header trình
 duyệt tự đặt, trang khác không giả được; CEF Chrome 87 có gửi). POST vẫn cần `Origin`; `/v1/*` không đổi.
-

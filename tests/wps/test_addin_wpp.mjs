@@ -271,7 +271,7 @@ test("wpp.exportPdf: API goc khong ghi file -> tu dung PDF that", () => {
   const out = run(ctx, app, "wpp.exportPdf", { path: "/tmp/wpp-ra.pdf" });
   assert.equal(out.exported, "/tmp/wpp-ra.pdf");
   assert.equal(app.FileSystem.existsSync("/tmp/wpp-ra.pdf"), true, "phai ghi file that (WPS bao xong ma khong ghi)");
-  const pdf = app.FileSystem.readFileString("/tmp/wpp-ra.pdf");
+  const pdf = app.FileSystem.ReadFile("/tmp/wpp-ra.pdf");
   assert.equal(pdf.slice(0, 5), "%PDF-", "phai la PDF that");
   assert.ok(pdf.indexOf("%%EOF") > 0, "PDF phai co %%EOF");
   assert.ok(pdf.length > 300, "PDF rong qua thi khong phai PDF that: " + pdf.length);

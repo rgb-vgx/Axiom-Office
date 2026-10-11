@@ -41,6 +41,23 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
   `addin_fake.mjs` — proxy "nghiêm": chạm thành viên chưa mô phỏng là lỗi, nên spec không cho phép gọi API mà
   WPS thật không có. Test add-in: 71 xanh
 
+### Fixed — Add-in WPS: đọc file bằng `FileSystem.ReadFile`, không phải `readFileString` (spec viết trước)
+- **`et.importCsv` không bao giờ chạy được trên WPS thật**: nó đọc file bằng `FileSystem.readFileString`, nhưng
+  API này bị sandbox (đo 11/10/2026): mọi đường dẫn có `/` hoặc `\` đều ném `path cannot contains "/" or "\"`,
+  tên file trần trả `null` — nó không đọc được file nào cả. Lệnh luôn kết thúc bằng `no file at '<path>'`.
+  71 test node vẫn xanh vì fake mô phỏng `readFileString` như API đọc file bình thường: **fake thân thiện hơn
+  WPS thật thì che mất lỗi của add-in**
+- Fake (`tests/wps/addin_fake.mjs`) nay giữ **byte** đúng như đo được: `ReadFile` (UTF-8, ném `"Wrong path!"`,
+  cắt ở byte NUL đầu tiên), hai API sandbox ở trên, `readAsBinaryString` làm hỏng byte `>= 0x80` thành `0xFF00|b`,
+  `writeAsBinaryString` ghi byte nguyên vẹn, `Exists`/`existsSync` nhận đường dẫn tuyệt đối. Bảng API đầy đủ ở
+  `tests/wps/REFERENCE.md` mục "`Application.FileSystem`"
+- `tests/wps/test_addin_fake.mjs` (mới, 4 test) ghim lại từng hành vi trên, để một sửa đổi "cho thân thiện" sau
+  này bị bắt ngay; spec `et.importCsv` viết lại đòi đọc bằng `ReadFile`, cắt BOM của `utf-8-sig` và **từ chối
+  encoding không phải UTF-8 trước khi ghi gì** (hai spec này đỏ trước bản vá, đúng như mong đợi)
+- `docs/wps-bridge.md` mục 6 ghi thêm hai điểm đo được: sandbox của `readFileString`/`writeFileString`, và việc
+  ET **ép kiểu khi ghi `Value2`** (chuỗi trông-như-số thành số) nên `numbers-as-text` chỉ còn đúng với ô có sẵn
+  text trong file — fake không mô phỏng việc ép kiểu này
+
 ### Fixed — An toàn dữ liệu khi agent làm việc trên sheet có sẵn (log Calc thật 11/10/2026)
 Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho thấy ba vấn đề:
 - **Hỏi trước khi ghi đè dữ liệu cũ** (Core): `et.writeRange`/`et.writeRanges`/`et.fillRange` vào sheet có

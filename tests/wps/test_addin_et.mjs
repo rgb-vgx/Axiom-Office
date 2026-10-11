@@ -44,6 +44,13 @@
 //   `outside-table`; sau loai issue con lai thi ban WPS lam duoc.
 // - `closeAll`: khong co ban cuu ho rieng cua LibreOffice, nhung add-in tu SaveAs mot ban cuu ho vao
 //   <tmpdir>/rescued truoc khi dong so chua luu (WPS SaveAs ghi file that).
+// - `importCsv`: WPS chi doc duoc file qua `FileSystem.ReadFile` (UTF-8; `readFileString`/`writeFileString` bi
+//   sandbox - nem voi moi duong dan co dau phan cach). Nen `encoding` chi nhan cac cach viet UTF-8
+//   (mac dinh "utf-8-sig"; chuan hoa "_" -> "-", khong phan biet hoa/thuong), giao thuc khac bi tu choi ro rang
+//   thay vi am tham tra ve chuoi hong; BOM dau file bi cat. Chi tiet: docs/wps-bridge.md muc 6, REFERENCE.md.
+// - Ghi o: ET EP KIEU chuoi trong nhu so / nhu ngay khi gan vao `Value2` ("42" -> 42, "01/01" -> ngay), khac
+//   LibreOffice (giu nguyen chuoi). Fake CHUA mo phong viec ep kieu nay (xem ghi chu o setCellScalar trong
+//   addin_fake.mjs): spec o day kiem hanh vi cua add-in, khong kiem lai luat ep kieu cua WPS.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
@@ -187,7 +194,7 @@ test("et.addSheet / et.renameSheet / et.activateSheet", () => {
   assertFails(ctx, app, "et.activateSheet", {}, /'sheet' is required/);
 });
 
-test("et.importCsv: khong co range thi tao sheet theo ten file", () => {
+test("et.importCsv: doc file bang FileSystem.ReadFile (readFileString cua WPS bi sandbox)", () => {
   const ctx = loadAddin();
   const app = makeEtApp({ files: { "/tmp/ban-hang.csv": "Ten,So\nAn,42\nBinh,7\n" } });
   const imported = run(ctx, app, "et.importCsv", { path: "/tmp/ban-hang.csv" });
@@ -200,6 +207,11 @@ test("et.importCsv: khong co range thi tao sheet theo ten file", () => {
   assert.deepEqual(run(ctx, app, "et.readRange", { range: "A1:B3", sheet: "ban-hang" }).values,
     [["Ten", "So"], ["An", 42], ["Binh", 7]], "o trong nhu so thi thanh so");
   assert.ok(run(ctx, app, "et.listSheets").sheets.includes("ban-hang"));
+  const calls = callsOf(app);
+  assert.ok(calls.indexOf("FileSystem.ReadFile(/tmp/ban-hang.csv)") >= 0,
+    "phai doc bang ReadFile: " + calls.join(" | "));
+  assert.ok(!calls.some((line) => line.indexOf("readFileString") >= 0),
+    "readFileString cua WPS bi sandbox, khong doc duoc duong dan nao: " + calls.join(" | "));
 
   // Co range: ghi vao o goc do cua sheet chi dinh, khong tao sheet moi.
   const app2 = makeEtApp({ sheets: [{ name: "Sheet1" }], files: { "/tmp/x.csv": "a;b\n1;2\n" } });
@@ -212,6 +224,30 @@ test("et.importCsv: khong co range thi tao sheet theo ten file", () => {
   assertFails(ctx, app, "et.importCsv", {}, /'path' is required/);
   assertFails(ctx, app, "et.importCsv", { path: "/tmp/khong-co.csv" }, /no file at/);
   assertFails(ctx, app, "et.importCsv", { path: "/tmp/ban-hang.csv", delimiter: ";;" }, /single character/);
+});
+
+test("et.importCsv: cat BOM cua utf-8-sig, tu choi encoding khong phai UTF-8", () => {
+  const ctx = loadAddin();
+  // ReadFile tra ve nguyen noi dung file ke ca BOM (xem makeFileSystem), nen add-in phai tu cat theo utf-8-sig:
+  // khong cat thi o dau tien thanh "﻿Ten" - sai ten cot va sai moi so sanh sau do.
+  const app = makeEtApp({ files: { "/tmp/bom.csv": "﻿Ten,So\nAn,42\n" } });
+  const out = run(ctx, app, "et.importCsv", { path: "/tmp/bom.csv" });
+  assert.equal(out.rows, 2);
+  assert.deepEqual(run(ctx, app, "et.readRange", { range: "A1:B2", sheet: "bom" }).values,
+    [["Ten", "So"], ["An", 42]], "BOM khong duoc dinh vao o dau tien");
+
+  // WPS khong co API doc theo charset (ReadFile nhan dung mot tham so) nen encoding khac UTF-8 phai bi tu choi
+  // ro rang, khong duoc am tham tra ve chuoi hong.
+  const before = run(ctx, app, "et.listSheets").sheets.slice();
+  assertFails(ctx, app, "et.importCsv", { path: "/tmp/bom.csv", encoding: "cp1258" }, /utf-8/i);
+  assert.deepEqual(run(ctx, app, "et.listSheets").sheets, before, "tu choi truoc khi ghi: khong tao sheet nao");
+
+  // Cac cach viet UTF-8 khac van chay (LibreOffice nhan qua Python, o day chuan hoa "_" -> "-", khong phan biet hoa/thuong).
+  const ok = makeEtApp({ files: { "/tmp/u.csv": "Ten,So\nAn,1\n" } });
+  for (const encoding of ["utf-8-sig", "UTF-8", "utf8", "utf_8_sig"]) {
+    assert.equal(run(ctx, ok, "et.importCsv", { path: "/tmp/u.csv", range: "A1", encoding: encoding }).rows, 2,
+      "encoding '" + encoding + "' phai chay");
+  }
 });
 
 test("et.writeRanges: gop nhieu vung, kiem HET truoc khi ghi", () => {
@@ -404,7 +440,7 @@ test("et.exportPdf: API goc khong ghi file -> tu dung PDF that", () => {
   const out = run(ctx, app, "et.exportPdf", { path: "/tmp/et-ra.pdf" });
   assert.equal(out.exported, "/tmp/et-ra.pdf");
   assert.equal(app.FileSystem.existsSync("/tmp/et-ra.pdf"), true, "phai ghi file that (WPS bao xong ma khong ghi)");
-  const pdf = app.FileSystem.readFileString("/tmp/et-ra.pdf");
+  const pdf = app.FileSystem.ReadFile("/tmp/et-ra.pdf");
   assert.equal(pdf.slice(0, 5), "%PDF-", "phai la PDF that");
   assert.ok(pdf.indexOf("%%EOF") > 0, "PDF phai co %%EOF");
   assert.ok(pdf.length > 300, "PDF rong qua thi khong phai PDF that: " + pdf.length);

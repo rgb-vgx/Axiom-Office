@@ -12,6 +12,8 @@
 // - Thuoc tinh KHONG duoc mo phong -> nem Error("fake chua mo phong: <duong dan>"),
 //   khong bao gio tra undefined im lang (tru danh sach ngoai le o ALWAYS_UNDEFINED).
 // - Count/length tra so that; collection .Item(n) ngoai pham vi -> Error("index out of range").
+// - FileSystem giu BYTE nhu file that (ghi chu day du o makeFileSystem): chi `ReadFile` doc duoc duong dan,
+//   `readFileString`/`writeFileString` bi sandbox, `readAsBinaryString` lam hong byte >= 0x80.
 // - Moi thu deterministic: khong Date.now, khong random, khong I/O mang.
 //
 // ESM hien dai (chay node --test), khong phu thuoc thu vien ngoai.
@@ -248,6 +250,10 @@ function translateFormula(formula, dRow, dCol) {
   });
 }
 
+// LUU Y (lech da do, chua mo phong): WPS ET EP KIEU chuoi trong nhu so / nhu ngay khi gan vao `Value2`
+// ("42" -> 42, "01/01" -> ngay kieu d-mmm; do tren WPS that 11/10/2026). Fake giu nguyen chuoi, nen mot lenh
+// GHI chuoi trong nhu so se ra ket qua khac WPS that. Duong DOC thi dung: mot o da co chu trong file (seed o
+// day, hoac file nguoi dung mo) van la chu that. Xem docs/wps-bridge.md muc 6.
 function setCellScalar(sheet, r, c, value) {
   const key = cellKey(r, c);
   if (value === null || value === undefined || value === "") {
@@ -1008,33 +1014,93 @@ function makeWorkbooksCollection(state) {
 // FileSystem / CommandBars / WorksheetFunction
 // ---------------------------------------------------------------------------------------------
 
+// Do tren WPS that 11/10/2026 (tests/wps/REFERENCE.md, muc "FileSystem"):
+// - `readFileString`/`writeFileString` BI NHOT trong sandbox: nem `path cannot contains "/" or "\"` voi MOI
+//   duong dan co dau phan cach (ke ca duong dan tuyet doi), tra `null` voi ten file tran, va nem `参数太多.`
+//   khi thua tham so. Chung KHONG doc duoc file cua nguoi dung.
+// - `ReadFile(path)` moi la API doc that: giai ma UTF-8, thieu file -> nem `"Wrong path!"`.
+// - `readAsBinaryString` lam hong moi byte >= 0x80 (thanh `0xFF00 | b`); `writeAsBinaryString` ghi byte nguyen ven.
+// Nen file trong fake giu BYTE nhu file that tren dia:
+//   files: { "/tmp/a.csv": "Ten,So\n" }         -> ma hoa UTF-8
+//   files: { "/tmp/a.bin": [0x41, 0xC3, 0xAA] } -> dung byte do (file khong phai UTF-8)
+
+const UTF8_ENCODER = new TextEncoder();
+// ignoreBOM: ReadFile tra ve nguyen noi dung byte cua file, ke ca BOM (chua do duoc truong hop BOM tren WPS that;
+// chon huong "giu BOM" vi do la huong kho hon cho add-in - no phai tu cat theo `utf-8-sig`).
+const UTF8_DECODER = new TextDecoder("utf-8", { ignoreBOM: true });
+
+function fileBytes(value) {
+  if (Array.isArray(value)) return Array.prototype.map.call(value, (b) => Number(b) & 0xFF);
+  return Array.from(UTF8_ENCODER.encode(String(value)));
+}
+
+// "binary string" cua WPS: moi ky tu la mot byte. Ghi thi lay byte thap (& 0xFF) - nho vay chuoi doc ra tu
+// readAsBinaryString (da bi doi thanh 0xFF00|b) van ghi lai duoc dung byte goc.
+function binaryStringBytes(data) {
+  const s = String(data);
+  const out = [];
+  for (let i = 0; i < s.length; i++) out.push(s.charCodeAt(i) & 0xFF);
+  return out;
+}
+
+// ReadFile giai ma UTF-8 va DUNG lai o byte NUL dau tien (do tren WPS: byte [.., 0x00, 0xFF] -> chuoi 4 ky tu).
+function readFileText(bytes) {
+  const nul = bytes.indexOf(0);
+  return UTF8_DECODER.decode(Uint8Array.from(nul >= 0 ? bytes.slice(0, nul) : bytes));
+}
+
+function filesWithBytes(files) {
+  const out = {};
+  for (const [path, value] of Object.entries(files || {})) {
+    out[path] = fileBytes(value);
+  }
+  return out;
+}
+
+const SANDBOXED_PATH = /[\\/]/;
+
 function makeFileSystem(state) {
   const prefix = "FileSystem";
+  const known = (p) => Object.prototype.hasOwnProperty.call(state.files, p);
+  // Hai API sandbox: ten file tran -> null (khong nem), duong dan -> nem, va khong doc/ghi gi.
+  // maxArgs: so tham so hop le cua API do (writeFileString nhan 2: duong dan + noi dung).
+  const sandboxed = (name, args, maxArgs) => {
+    push(state, prefix + "." + name + "(" + fmtArgs(args) + ")");
+    if (args.length > maxArgs) throw new Error("参数太多.");
+    if (SANDBOXED_PATH.test(String(args[0]))) throw new Error('path cannot contains "/" or "\\"');
+    return null;
+  };
   return strict(prefix, {
     state,
     props: {},
     methods: {
-      existsSync: (p) => {
-        push(state, prefix + ".existsSync(" + fmt(p) + ")");
-        return Object.prototype.hasOwnProperty.call(state.files, p);
+      Exists: (...args) => {
+        push(state, prefix + ".Exists(" + fmtArgs(args) + ")");
+        return known(String(args[0]));
       },
-      readFileString: (p) => {
-        push(state, prefix + ".readFileString(" + fmt(p) + ")");
-        if (!Object.prototype.hasOwnProperty.call(state.files, p)) throw new Error("file not found: " + p);
-        return String(state.files[p]);
+      existsSync: (...args) => {
+        push(state, prefix + ".existsSync(" + fmtArgs(args) + ")");
+        return known(String(args[0]));
       },
-      readAsBinaryString: (p) => {
-        push(state, prefix + ".readAsBinaryString(" + fmt(p) + ")");
-        if (!Object.prototype.hasOwnProperty.call(state.files, p)) throw new Error("file not found: " + p);
-        return String(state.files[p]);
+      ReadFile: (...args) => {
+        push(state, prefix + ".ReadFile(" + fmtArgs(args) + ")");
+        if (args.length > 1) throw new Error("参数太多.");
+        const p = String(args[0]);
+        if (!known(p)) throw new Error('"Wrong path!"');
+        return readFileText(state.files[p]);
       },
-      writeAsBinaryString: (p, data) => {
-        state.files[p] = String(data);
-        push(state, prefix + ".writeAsBinaryString(" + fmt(p) + ")");
+      readFileString: (...args) => sandboxed("readFileString", args, 1),
+      writeFileString: (...args) => sandboxed("writeFileString", args, 2),
+      readAsBinaryString: (...args) => {
+        push(state, prefix + ".readAsBinaryString(" + fmtArgs(args) + ")");
+        if (args.length > 1) throw new Error("参数太多.");
+        const p = String(args[0]);
+        if (!known(p)) return null;
+        return state.files[p].map((b) => String.fromCharCode(b < 0x80 ? b : 0xFF00 | b)).join("");
       },
-      writeFileString: (p, text) => {
-        state.files[p] = String(text);
-        push(state, prefix + ".writeFileString(" + fmt(p) + ")");
+      writeAsBinaryString: (...args) => {
+        push(state, prefix + ".writeAsBinaryString(" + fmtArgs(args) + ")");
+        state.files[String(args[0])] = binaryStringBytes(args[1]);
       },
       tmpdir: () => {
         push(state, prefix + ".tmpdir()");
@@ -1153,7 +1219,7 @@ export function makeEtApp(options = {}) {
   const state = {
     app: "et",
     calls: [],
-    files: options.files || {},
+    files: filesWithBytes(options.files),
     workbooks: [],
     activeWorkbookIndex: 0,
     workbookSeq: 0,
@@ -1731,7 +1797,7 @@ export function makeWppApp(options = {}) {
   const state = {
     app: "wpp",
     calls: [],
-    files: options.files || {},
+    files: filesWithBytes(options.files),
     images: options.images || {},
     presentations: [],
     activePresentationIndex: 0,

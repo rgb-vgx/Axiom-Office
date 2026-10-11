@@ -105,7 +105,37 @@ app nào đang chạy (`Application.Name`) và chỉ khai báo lệnh của app 
 | Lưu | `Presentation.Save()`, `Presentation.SaveAs(path)` **ghi file thật** (`.pptx` 48 KB) | |
 | Sổ mới/mở | `Presentations.Add()`, `Presentations.Open(path)`; `Application.ActivePresentation` | `Application.Documents` không có |
 
-## Từ `strings` trên thư viện của WPS
+### `Application.FileSystem`: đọc/ghi file (đo 11/10/2026, byte đã biết)
+
+Probe 2 (`/tmp/wps-probe-fs`): ghi file bằng byte biết trước rồi gọi từng API, in ra mã ký tự.
+Bộ byte dùng để đo: `41 C3 AA 0A E2 82 AC 00 FF` (`'A'`, `ê` UTF-8, LF, `€` UTF-8, NUL, FF).
+
+| API | Hành vi đo được |
+|---|---|
+| `ReadFile(path)` | **Đọc thật**, giải mã UTF-8. Thiếu file → **nem** `Error: "Wrong path!"`. Thừa tham số → `Error: 参数太多.` |
+| `readFileString(path)` | **Sandbox**: đường dẫn có `/` hoặc `\` → nem `Error: path cannot contains "/" or "\"`; **tên file trần → `null`**; thừa tham số → `参数太多.` |
+| `writeFileString(path, data)` | Cùng sandbox: đường dẫn đầy đủ → nem; **không ghi được file nào** |
+| `readAsBinaryString(path)` | Mỗi byte `b >= 0x80` → mã ký tự `0xFF00 \| b` (hỏng dữ liệu); byte `< 0x80` giữ nguyên; thiếu file → `null` (không nem) |
+| `writeAsBinaryString(path, data)` | **Ghi byte nguyên vẹn**: PDF 1811 byte ghi ra đọc lại đúng `%PDF-1.4` … `%%EOF` |
+| `Exists(path)` / `existsSync(path)` | Trả `bool`, **cả hai đều nhận đường dẫn tuyệt đối** |
+| `tmpdir()` | `"/tmp"` |
+
+Hệ quả cho add-in: **`ReadFile` là API đọc duy nhất dùng được**; `readFileString`/`writeFileString` là bẫy
+(chúng *trông* như API đọc file trong tài liệu WPS nhưng thực chất bị sandbox). Ghi file thì dùng
+`writeAsBinaryString` (byte), đọc lại để kiểm bằng `ReadFile`/`Exists`.
+
+`ReadFile` **cắt ở byte NUL đầu tiên**: bộ byte trên cho ra `"Aê\n€"` — mọi thứ từ NUL trở đi mất, kể cả `FF`.
+Chưa đo được hành vi với BOM: fake (`tests/wps/addin_fake.mjs`) chọn hướng **giữ BOM** (đường khó hơn cho
+add-in, tức nó phải tự cắt theo `utf-8-sig`).
+
+### ET ép kiểu khi ghi vào `Value2` (đo 11/10/2026)
+
+Gán chuỗi trông-như-số (`"42"`) hoặc trông-như-ngày (`"01/01"`) vào `Range.Value2` thì **WPS ET tự ép**:
+ô thành số / thành ngày (`d-mmm`). Tức là **đường ghi không tạo được "số dạng text"**.
+
+`numbers-as-text` vẫn có thật khi **file đã chứa sẵn** text trong ô trông-như-số (ô gieo từ trước) — đó là
+đường đọc. Fake **không** mô phỏng việc ép kiểu này (xem ghi chú ở `setCellScalar`), nên spec chỉ được khẳng
+định `numbers-as-text` trên ô gieo sẵn, không khẳng định qua đường ghi.
 
 - `office6/addons/jsapi/libjsapisubserver.so` chứa:
   `/wps/jsaddons/publish.xml`, `jsplugins`, `jsplugin`, `jspluginonline`, `online`, `name`, `version`,
