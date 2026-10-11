@@ -171,8 +171,11 @@ class FakeBridge:
         self.server.shutdown()
         self.server.server_close()
 
-    def actions(self) -> list[str]:
-        return [item.get("action") for item in self.commands]
+    def actions(self, include_reads: bool = False) -> list[str]:
+        """Lenh da xuong bridge. Mac dinh bo et.readRange: tu 11/10/2026 Core tu doc o dich truoc khi ghi
+        (hoi truoc khi ghi de o co du lieu - core-go/internal/tools/overwrite_test.go)."""
+        return [item.get("action") for item in self.commands
+                if include_reads or item.get("action") != "et.readRange"]
 
 
 class FakeLlm:
