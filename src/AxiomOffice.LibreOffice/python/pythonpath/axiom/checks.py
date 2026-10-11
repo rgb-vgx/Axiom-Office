@@ -110,8 +110,11 @@ REF_SCAN_LIMIT = 4000
 REF_SAMPLE_LIMIT = 40
 
 # Tham chieu toi MOT o: co the co ten sheet phia truoc (Inputs.B34, $'My Sheet'.$B$34), va co the co $.
-_REFERENCE = re.compile(r"(?:(?P<sheet>\$?'[^']+'|\$?[A-Za-z_][A-Za-z0-9_ ]*)\.)?"
-                        r"(?P<abs1>\$?)(?P<col>[A-Z]{1,3})(?P<abs2>\$?)(?P<row>\d+)")
+# Log 11/10/2026: "=SUMIFS(...;\"01B1*\")" bao gia B1 va LOG10/ATAN2 bi doc thanh o, nen chi nhan o ranh gioi tu.
+_REFERENCE = re.compile(r"(?<![A-Za-z0-9_])(?:(?P<sheet>\$?'[^']+'|\$?[A-Za-z_][A-Za-z0-9_ ]*)\.)?"
+                        r"(?P<abs1>\$?)(?P<col>[A-Z]{1,3})(?P<abs2>\$?)(?P<row>\d+)(?![A-Za-z0-9_(])")
+# Chuoi LibreOffice: "..." voi "" la dau nhay kep thoat, can che truoc khi soi tham chieu.
+_STRING_LITERAL = re.compile(r'"(?:[^"]|"")*"')
 
 
 def _column_index(letters: str) -> int:
@@ -143,10 +146,18 @@ def _empty_references(doc, sheet, bounds) -> list:
             if not isinstance(formula, str) or not formula.startswith("="):
                 continue
             scanned += 1
-            for match in _REFERENCE.finditer(formula):
+            # Bo qua noi dung trong chuoi "..." (ghi de bang khoang trang de giu vi tri), tranh doc "B1"
+            # trong "01B1*" thanh tham chieu; log 11/10/2026.
+            cleaned = _STRING_LITERAL.sub(lambda m: " " * len(m.group(0)), formula)
+            for match in _REFERENCE.finditer(cleaned):
                 start, end = match.span()
                 # A1:B2 - ca hai dau deu la tham chieu hop le, khong phai tro nham.
-                if (start > 0 and formula[start - 1] == ":") or (end < len(formula) and formula[end] == ":"):
+                if (start > 0 and cleaned[start - 1] == ":") or (end < len(cleaned) and cleaned[end] == ":"):
+                    continue
+                # Ranh gioi tu: khong dinh lien chu/so/_ phia truoc, khong phai ten ham truoc "(".
+                if start > 0 and (cleaned[start - 1].isalnum() or cleaned[start - 1] == "_"):
+                    continue
+                if end < len(cleaned) and (cleaned[end] == "(" or cleaned[end].isalnum() or cleaned[end] == "_"):
                     continue
                 target_sheet = sheet
                 name = match.group("sheet")
