@@ -143,6 +143,20 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 	}
 	params = aliasParams(t.allowed[action], params)
 
+	// Guard chong ghi de (log 11/10/2026): lenh ghi o vao sheet co tu truoc ma dung vao o
+	// khong rong voi gia tri moi khac gia tri cu thi hoi nguoi dung truoc - xem overwrite.go.
+	if reason, sheets := checkOverwriteGuard(ctx, run, action, params); reason != "" {
+		preview := model.Truncate(model.MarshalRelaxed(params), 200)
+		if preview == "null" {
+			preview = "{}"
+		}
+		approved, err := run.ConfirmOrDecline(action, reason, preview)
+		if err != nil || !approved {
+			return Result{JSON: ErrorJSON("user declined: " + reason), Action: action}
+		}
+		rememberOverwriteApproval(run, sheets)
+	}
+
 	// Policy xac nhan (muc 8.6): hoi nguoi dung truoc lenh rui ro.
 	decision := policy.Evaluate(ctx, action, params, run.Prompt, func(inner context.Context) *int {
 		return policy.WordLength(inner, run.Bridge, run.Office.Port)
@@ -159,6 +173,10 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 	}
 
 	result := run.Bridge.Command(ctx, run.Office.Port, action, params)
+	// Sheet vua tao thanh cong trong luot nay thi lenh ghi sau len do khong can hoi ghi de.
+	if result.OK && action == "et.addSheet" {
+		rememberCreatedSheet(run, params)
+	}
 	// Buoc 2 roadmap: cat response doc lon TRUOC khi vao turns (chi thanh cong moi cat;
 	// loi van tra nguyen van de model doc thong diep loi day du) - xem truncate.go.
 	raw := result.RawJSON

@@ -54,6 +54,12 @@ type RunContext struct {
 	// Confirm hoi nguoi dung truoc lenh rui ro (confirm.required -> POST /v1/runs/{id}/confirm).
 	// nil = khong co ai de hoi (ai.ask cua agent ben ngoai) -> coi nhu tu choi.
 	Confirm func(action, reason, paramsPreview string) (bool, error)
+	// CreatedSheets: ten sheet da tao thanh cong trong luot nay (et.addSheet) - ghi de len
+	// sheet do luot tao thi khong hoi. Log 11/10/2026: agent ghi de 25 o du lieu goc ma khong hoi.
+	CreatedSheets map[string]bool
+	// OverwriteApproved: sheet da duoc nguoi dung dong y ghi de trong luot nay - da dong y mot
+	// lan thi cac lenh sau tren cung sheet trong cung luot khong hoi lai.
+	OverwriteApproved map[string]bool
 }
 
 func (c *RunContext) ConfirmOrDecline(action, reason, paramsPreview string) (bool, error) {
