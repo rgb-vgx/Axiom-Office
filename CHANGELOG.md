@@ -15,6 +15,9 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
   `ReplaceAll` (trước đó lặp vô hạn khi chuỗi thay chứa chuỗi tìm)
 - **Trình cài** `scripts/wps/install_jsaddon.py --home H --core-url URL [--test-profile]`: đăng ký
   `<jspluginonline>` trỏ tới Core, gỡ bản offline của spike; `Office.conf` chỉ đụng khi `--test-profile`
+- **Gói Linux + install.sh**: tarball mang `core/wps-addin/` và `wps/install_jsaddon.py`; `install.sh` thấy WPS thì
+  đăng ký add-in trỏ tới Core, chỉ in lệnh `sudo` bật `JsApiPlugin` khi `oem.ini` chưa bật, nhắc `--systemd`;
+  thêm `--no-wps`, `--uninstall` gỡ đăng ký (TASK-000105)
 - Test: `tests/wps/test_wps_bridge_e2e.py` (Core, 35), `test_addin.mjs` (Node, 7), `test_wps_bridge_live.py`
   (WPS thật dưới Xvfb, 24 - chạy ở máy dev). Viết bởi aidev TASK-000094/095/103/104 theo spec viết trước
 

@@ -1,7 +1,7 @@
 # Bridge WPS Office for Linux (JS add-in do Agent Core phục vụ)
 
 Trạng thái: **đã chạy trên WPS thật** (11/10/2026): Core (T1), trình cài `--core-url` (T2a), add-in 16 lệnh đợt 1
-(T2b, T2c). Còn lại: đóng gói/cài cho người dùng (T3), pane Ask AI trong WPS, lệnh Spreadsheets/Presentation. Cơ sở thực nghiệm: [wps-spike.md](wps-spike.md)
+(T2b, T2c). Đóng gói + `install.sh` (T3) xong. Còn lại: pane Ask AI trong WPS, lệnh Spreadsheets/Presentation. Cơ sở thực nghiệm: [wps-spike.md](wps-spike.md)
 (hướng B) và [tests/wps/REFERENCE.md](../tests/wps/REFERENCE.md).
 
 ## 1. Bài toán
