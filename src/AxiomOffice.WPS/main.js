@@ -15,6 +15,42 @@
   var RETRY_MS = 2000;
 
   var running = false;
+  var taskPane = null;
+
+  function paneUrl() {
+    try {
+      var href = "";
+      try { href = (window.location && window.location.href) || ""; } catch (e) { href = ""; }
+      var idx = String(href).lastIndexOf("/");
+      if (idx >= 0) {
+        return String(href).substring(0, idx + 1) + "pane.html";
+      }
+    } catch (e2) {}
+    return "pane.html";
+  }
+
+  function openPane() {
+    try {
+      var app = getApp();
+      if (!app) { return false; }
+      if (taskPane) {
+        try { taskPane.Visible = true; } catch (e) {}
+        return true;
+      }
+      var pane = null;
+      try {
+        pane = app.CreateTaskPane(paneUrl());
+      } catch (e2) {
+        return false;
+      }
+      if (!pane) { return false; }
+      taskPane = pane;
+      try { taskPane.Visible = true; } catch (e3) {}
+      return true;
+    } catch (e4) {
+      return false;
+    }
+  }
 
   function getApp() {
     try {
@@ -231,8 +267,17 @@
     return true;
   }
 
-  function OnAction() {
-    try { start(); } catch (e) {}
+  function OnAction(control) {
+    try {
+      var id = "";
+      try { id = (control && control.Id) || ""; } catch (e) { id = ""; }
+      if (id === "axiomAskAI") {
+        openPane();
+        try { start(); } catch (e2) {}
+        return;
+      }
+      start();
+    } catch (e3) {}
   }
 
   try {

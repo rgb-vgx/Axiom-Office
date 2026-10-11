@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Axiom Ask AI</title>
+<script src="pane-core.js"></script>
+<style>
+body { font-family: sans-serif; font-size: 13px; margin: 0; padding: 0; }
+#app { display: flex; flex-direction: column; height: 100vh; }
+#toolbar { padding: 8px; border-bottom: 1px solid #ccc; display: flex; align-items: center; }
+#title { font-weight: bold; flex: 1; }
+#messages { flex: 1; overflow-y: auto; padding: 8px; }
+.msg { margin: 4px 0; padding: 6px 8px; border-radius: 4px; white-space: pre-wrap; word-wrap: break-word; }
+.msg-user { background: #e8f0fe; text-align: right; }
+.msg-assistant { background: #f1f3f4; }
+.msg-error { background: #fce8e6; color: #a50e0e; }
+#steps { padding: 4px 8px; color: #555; font-size: 12px; min-height: 1em; }
+#confirm { margin: 4px 8px; padding: 8px; border: 1px solid #f9ab00; border-radius: 4px; background: #fef7e0; }
+#composer { padding: 8px; border-top: 1px solid #ccc; }
+#input { width: 100%; box-sizing: border-box; resize: vertical; }
+#composer .row { margin-top: 4px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="toolbar">
+    <span id="title">Axiom Ask AI</span>
+    <button id="newBtn" type="button">H&#7897;i tho&#7841;i m&#7899;i</button>
+  </div>
+  <div id="messages"></div>
+  <div id="steps"></div>
+  <div id="confirm" style="display:none;">
+    <div id="confirmText"></div>
+    <div class="row">
+      <button id="approveBtn" type="button">&#272;&#7891;ng &yacute;</button>
+      <button id="denyBtn" type="button">T&#7915; ch&#7889;i</button>
+    </div>
+  </div>
+  <div id="composer">
+    <textarea id="input" rows="3" placeholder="Nh&#7853;p c&acirc;u h&#7887;i..."></textarea>
+    <div class="row">
+      <button id="sendBtn" type="button">G&#7917;i</button>
+      <button id="stopBtn" type="button" style="display:none;">D&#7915;ng</button>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  "use strict";
+
+  function $(id) {
+    try { return document.getElementById(id); } catch (e) { return null; }
+  }
+
+  function baseUrl() {
+    var base = "../v1/";
+    try {
+      var href = "";
+      try { href = (window.location && window.location.href) || ""; } catch (e) { href = ""; }
+      if (href) {
+        try {
+          if (typeof URL === "function") {
+            base = new URL("../v1/", href).href;
+          } else {
+            var idx = String(href).lastIndexOf("/");
+            var dir = idx >= 0 ? String(href).substring(0, idx + 1) : "";
+            var trimmed = dir.charAt(dir.length - 1) === "/" ? dir.substring(0, dir.length - 1) : dir;
+            var j = trimmed.lastIndexOf("/");
+            base = (j >= 0 ? trimmed.substring(0, j + 1) : dir) + "v1/";
+          }
+        } catch (e2) {}
+      }
+    } catch (e3) {}
+    try {
+      if (base.charAt(base.length - 1) !== "/") { base = base + "/"; }
+    } catch (e4) {}
+    return base;
+  }
+
+  var ctl = null;
+  try {
+    ctl = AxiomPaneCore.create({
+      fetch: window.fetch,
+      EventSource: window.EventSource,
+      base: baseUrl(),
+      onChange: render
+    });
+  } catch (e) {
+    ctl = null;
+  }
+
+  function render(state) {
+    try {
+      if (!state) { return; }
+      var box = $("messages");
+      if (box) {
+        while (box.firstChild) { box.removeChild(box.firstChild); }
+        var msgs = state.messages || [];
+        for (var i = 0; i < msgs.length; i++) {
+          var m = msgs[i] || {};
+          var div = document.createElement("div");
+          var role = "assistant";
+          try { role = String(m.role || "assistant"); } catch (e) {}
+          div.className = "msg msg-" + role;
+          try {
+            div.appendChild(document.createTextNode(String(m.text === undefined || m.text === null ? "" : m.text)));
+          } catch (e2) {}
+          box.appendChild(div);
+        }
+        try { box.scrollTop = box.scrollHeight; } catch (e3) {}
+      }
+      var stepsEl = $("steps");
+      if (stepsEl) {
+        while (stepsEl.firstChild) { stepsEl.removeChild(stepsEl.firstChild); }
+        var steps = state.steps || [];
+        if (steps.length > 0) {
+          var parts = [];
+          for (var k = 0; k < steps.length; k++) {
+            var s = steps[k] || {};
+            var label = "";
+            try { label = String(s.action || "tool"); } catch (e4) {}
+            try { label += s.ok ? " \u2713" : " \u2026"; } catch (e5) {}
+            parts.push(label);
+          }
+          var prefix = state.running ? "\u0110ang ch\u1EA1y: " : "\u0110\u00E3 ch\u1EA1y: ";
+          stepsEl.appendChild(document.createTextNode(prefix + parts.join(", ")));
+        }
+      }
+      var card = $("confirm");
+      if (card) {
+        if (state.confirmation) {
+          var c = state.confirmation;
+          var txt = "";
+          try {
+            txt = "AI mu\u1ED1n th\u1EF1c hi\u1EC7n \"" + String(c.action || "") + "\"";
+            if (c.reason) { txt += ": " + String(c.reason); }
+          } catch (e6) {}
+          var ct = $("confirmText");
+          if (ct) {
+            while (ct.firstChild) { ct.removeChild(ct.firstChild); }
+            ct.appendChild(document.createTextNode(txt));
+          }
+          card.style.display = "";
+        } else {
+          card.style.display = "none";
+        }
+      }
+      var stopBtn = $("stopBtn");
+      if (stopBtn) {
+        try { stopBtn.style.display = state.running ? "" : "none"; } catch (e7) {}
+      }
+      var sendBtn = $("sendBtn");
+      if (sendBtn) {
+        try { sendBtn.disabled = !!state.running; } catch (e8) {}
+      }
+    } catch (e9) {}
+  }
+
+  function doSend() {
+    try {
+      if (!ctl) { return; }
+      var input = $("input");
+      if (!input) { return; }
+      var value = "";
+      try { value = input.value; } catch (e) { value = ""; }
+      if (!value || !value.replace(/^\s+|\s+$/g, "")) { return; }
+      var r = null;
+      try { r = ctl.send(value); } catch (e2) { r = false; }
+      if (r !== false) {
+        try { input.value = ""; } catch (e3) {}
+      }
+      if (r && typeof r.then === "function") {
+        try { r.then(null, function () {}); } catch (e4) {}
+      }
+    } catch (e5) {}
+  }
+
+  try {
+    var sendBtn2 = $("sendBtn");
+    if (sendBtn2) {
+      if (sendBtn2.addEventListener) {
+        sendBtn2.addEventListener("click", doSend);
+      } else {
+        sendBtn2.onclick = doSend;
+      }
+    }
+    var input2 = $("input");
+    if (input2) {
+      var onKey = function (ev) {
+        try {
+          ev = ev || window.event;
+          var code = ev.keyCode || ev.which;
+          if (code === 13 && !ev.shiftKey) {
+            if (ev.preventDefault) { ev.preventDefault(); }
+            try { ev.returnValue = false; } catch (e) {}
+            doSend();
+            return false;
+          }
+        } catch (e2) {}
+        return true;
+      };
+      if (input2.addEventListener) {
+        input2.addEventListener("keydown", onKey);
+      } else {
+        input2.onkeydown = onKey;
+      }
+    }
+    var stopBtn2 = $("stopBtn");
+    if (stopBtn2) {
+      var onStop = function () {
+        try { if (ctl) { ctl.stop(); } } catch (e) {}
+      };
+      if (stopBtn2.addEventListener) {
+        stopBtn2.addEventListener("click", onStop);
+      } else {
+        stopBtn2.onclick = onStop;
+      }
+    }
+    var newBtn = $("newBtn");
+    if (newBtn) {
+      var onNew = function () {
+        try { if (ctl) { ctl.newConversation(); } } catch (e) {}
+      };
+      if (newBtn.addEventListener) {
+        newBtn.addEventListener("click", onNew);
+      } else {
+        newBtn.onclick = onNew;
+      }
+    }
+    var approveBtn = $("approveBtn");
+    if (approveBtn) {
+      var onApprove = function () {
+        try { if (ctl) { ctl.confirm(true); } } catch (e) {}
+      };
+      if (approveBtn.addEventListener) {
+        approveBtn.addEventListener("click", onApprove);
+      } else {
+        approveBtn.onclick = onApprove;
+      }
+    }
+    var denyBtn = $("denyBtn");
+    if (denyBtn) {
+      var onDeny = function () {
+        try { if (ctl) { ctl.confirm(false); } } catch (e) {}
+      };
+      if (denyBtn.addEventListener) {
+        denyBtn.addEventListener("click", onDeny);
+      } else {
+        denyBtn.onclick = onDeny;
+      }
+    }
+    render({ messages: [], running: false, steps: [], confirmation: null, conversationId: null });
+  } catch (e) {}
+})();
+</script>
+</body>
+</html>

@@ -5,6 +5,7 @@
       <tab id="axiomTab" label="Axiom Office">
         <group id="axiomGroup" label="Axiom">
           <button id="axiomReportBtn" label="Axiom" onAction="ribbon.OnAction"/>
+          <button id="axiomAskAI" label="Ask AI" onAction="ribbon.OnAction"/>
         </group>
       </tab>
     </tabs>
