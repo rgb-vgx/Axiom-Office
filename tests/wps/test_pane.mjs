@@ -17,7 +17,8 @@
 //   confirm.resolved -> confirmation = null; run.completed -> message assistant = reply, running = false, dong
 //   EventSource; run.failed|run.cancelled|run.stopped|run.timedout -> message "error", running = false.
 // - ribbon.xml co nut id="axiomAskAI" (label chua "Ask AI", onAction="ribbon.OnAction"); main.js: OnAction voi
-//   control.Id == "axiomAskAI" goi Application.CreateTaskPane(<url tuyet doi .../wps/addin/pane.html>) roi
+//   control.Id == "axiomAskAI" goi Application.CreateTaskPane(<url tuyet doi .../wps/addin/pane.html?app=<kind>>,
+//   kind = app dang chay de pane goi y dung loai tai lieu - xem test_pane_theme.mjs) roi
 //   Visible = true; bam lan nua thi dung lai pane cu (khong tao them), Visible = true.
 // - pane.html nap pane-core.js.
 import { test } from "node:test";
@@ -158,7 +159,8 @@ test("ribbon co nut Ask AI; bam mo task pane pane.html va dung lai lan sau", () 
   });
   ctx.ribbon.OnAction({ Id: "axiomAskAI" });
   assert.equal(created.length, 1, "phai goi Application.CreateTaskPane");
-  assert.equal(created[0].url, "http://127.0.0.1:47840/wps/addin/pane.html");
+  // Application gia khong co Name -> appKind mac dinh "wps" (xem AxiomCommands.appKind).
+  assert.equal(created[0].url, "http://127.0.0.1:47840/wps/addin/pane.html?app=wps");
   assert.equal(created[0].Visible, true);
   created[0].Visible = false;
   ctx.ribbon.OnAction({ Id: "axiomAskAI" });
