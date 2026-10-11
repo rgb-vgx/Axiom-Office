@@ -6,7 +6,8 @@
 // Hop dong:
 // - src/AxiomOffice.WPS/commands.js dinh nghia global AxiomCommands:
 //     catalog()                      -> [{name, kind, agent, summary, params:[{name, required, hint}]}]
-//     catalogFor(kind)               -> lenh dung cho mot app: kind === "" hoac kind === tham so
+//     catalogFor(kind)               -> lenh dung cho mot app: kind rong (null/"" theo registry LibreOffice)
+//                                       hoac kind === tham so
 //     appKind(app)                   -> "wps" | "et" | "wpp" theo app.Name dang chay
 //     execute(app, action, params)   -> {ok:true, result} | {ok:false, error}; KHONG BAO GIO throw;
 //                                       lenh sua tai lieu chay trong app.UndoRecord.StartCustomRecord("AI: <action>")
@@ -37,6 +38,12 @@ const READ_ONLY = ["app.info", "writer.getText", "writer.selection"];
 
 function catalogMap(ctx) {
   return new Map(addinCatalog(ctx).map((c) => [c.name, c]));
+}
+
+// `kind` rong = lenh dung chung moi app. Registry LibreOffice dung `null` cho nam lenh nay
+// (app.info, ai.ask, ui.askpane, ui.setup, app.screenshot), nen phai chap nhan ca null lan "".
+function sharedKind(kind) {
+  return kind === "" || kind === null || kind === undefined;
 }
 
 test("commands.js dinh nghia AxiomCommands voi catalog + execute", () => {
@@ -215,11 +222,11 @@ test("catalogFor(kind): chi tra lenh dung app do; catalog() van la registry day 
     assert.ok(names.length > 0, kind + ": catalogFor phai co lenh");
     for (const name of names) {
       const entry = full.find((c) => c.name === name);
-      assert.ok(entry.kind === "" || entry.kind === kind,
+      assert.ok(sharedKind(entry.kind) || entry.kind === kind,
         kind + ": catalogFor tra lenh " + name + " (kind=" + entry.kind + ")");
     }
     for (const entry of full) {
-      if (entry.kind === "" || entry.kind === kind) {
+      if (sharedKind(entry.kind) || entry.kind === kind) {
         assert.ok(names.includes(entry.name), kind + ": catalogFor thieu " + entry.name);
       }
     }

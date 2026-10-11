@@ -65,7 +65,7 @@ Cùng giao thức và cùng guard với bridge LibreOffice (`Origin` → 403, to
   nhiều `type` là cách duy nhất WPS nạp add-in trong cả Writer, Spreadsheets và Presentation).
 - Biết app đang chạy: `AxiomCommands.appKind(app)` đọc `app.Name` (`/spreadsheet/i` → `"et"`,
   `/presentation|slide/i` → `"wpp"`, còn lại và tên lạ → `"wps"`). `catalogFor(kind)` lọc registry theo app
-  (`kind === ""` dùng chung mọi app); `catalog()` vẫn trả registry đầy đủ. Lệnh của app khác bị `execute()` từ
+  (`kind` rỗng — `null` theo registry LibreOffice, ví dụ `app.info` — dùng chung mọi app); `catalog()` vẫn trả registry đầy đủ. Lệnh của app khác bị `execute()` từ
   chối (`{ok:false, error}` nêu tên lệnh và tên app) — không chạy nhầm object model.
 - Vòng lặp: poll → thực thi từng job → gửi result → poll tiếp; lỗi mạng thì chờ 2 giây rồi thử lại. Body poll có
   `app` = app đang chạy, `commands` = catalog **đã lọc theo app đó**, `document` = tài liệu đang mở.
