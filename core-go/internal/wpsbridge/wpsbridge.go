@@ -221,6 +221,7 @@ type Bridge struct {
 	mu           sync.Mutex
 	lastPoll     time.Time
 	everPoll     bool
+	app          string
 	document     map[string]any
 	commands     []any
 	addinVersion string
@@ -233,6 +234,7 @@ type Bridge struct {
 	sessionPath  string
 	lastWrite    time.Time
 	lastDocKey   string
+	lastAppKey   string
 	wroteSession bool
 
 	bridgeListener net.Listener
@@ -257,6 +259,7 @@ func New(opts Options) *Bridge {
 	}
 	return &Bridge{
 		opts:        opts,
+		app:         "wps",
 		waiting:     map[string]*Job{},
 		sessionPath: filepath.Join(opts.SessionDir, strconv.Itoa(os.Getpid())+"-wps.json"),
 		started:     time.Now().UTC(),
@@ -383,6 +386,16 @@ func (b *Bridge) Complete(id string, reply map[string]any) bool {
 	return true
 }
 
+// bridgeApp tra ve app cua phien theo poll cua add-in ("wps" khi chua biet).
+func (b *Bridge) bridgeApp() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.app == "" {
+		return "wps"
+	}
+	return b.app
+}
+
 // recordPoll luu heartbeat + catalog + tai lieu tu body poll.
 func (b *Bridge) recordPoll(body map[string]any) {
 	b.mu.Lock()
@@ -390,6 +403,13 @@ func (b *Bridge) recordPoll(body map[string]any) {
 	now := time.Now()
 	b.lastPoll = now
 	b.everPoll = true
+	// App do add-in bao: chi nhan "wps" | "et" | "wpp"; thieu hoac la thi giu app dang biet.
+	if raw, ok := body["app"].(string); ok {
+		switch raw {
+		case "wps", "et", "wpp":
+			b.app = raw
+		}
+	}
 	if doc, ok := body["document"].(map[string]any); ok {
 		next := map[string]any{}
 		for key, value := range doc {
@@ -719,7 +739,7 @@ func (b *Bridge) serveBridgeHealth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeOK(w, map[string]any{
-		"app": "wps", "family": "wps-linux", "pid": os.Getpid(),
+		"app": b.bridgeApp(), "family": "wps-linux", "pid": os.Getpid(),
 		"port": b.ActualBridgePort(), "version": b.bridgeVersion(), "connected": b.Connected(),
 	})
 }
@@ -762,7 +782,7 @@ func (b *Bridge) serveBridgeSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeOK(w, map[string]any{
-		"app": "wps", "family": "wps-linux", "port": b.ActualBridgePort(), "pid": os.Getpid(),
+		"app": b.bridgeApp(), "family": "wps-linux", "port": b.ActualBridgePort(), "pid": os.Getpid(),
 		"document": doc,
 	})
 }
@@ -790,7 +810,7 @@ func (b *Bridge) serveBridgeCmd(w http.ResponseWriter, r *http.Request) {
 		params = raw
 	}
 	if !b.Connected() {
-		writeErr(w, http.StatusOK, "WPS add-in is not connected: open a document in WPS Writer to connect the add-in")
+		writeErr(w, http.StatusOK, "WPS add-in is not connected: open a document in WPS to connect the add-in")
 		return
 	}
 	reply, _ := b.Enqueue(action, params)
@@ -816,7 +836,11 @@ func (b *Bridge) maybeWriteSession(force bool) {
 	}
 	b.mu.Lock()
 	key := docKey(b.document)
-	need := force || !b.wroteSession || key != b.lastDocKey
+	app := b.app
+	if app == "" {
+		app = "wps"
+	}
+	need := force || !b.wroteSession || key != b.lastDocKey || app != b.lastAppKey
 	b.mu.Unlock()
 	if need {
 		b.writeSession()
@@ -835,8 +859,12 @@ func (b *Bridge) writeSession() {
 		port = b.opts.BridgePort
 	}
 	now := time.Now().UTC()
+	app := b.app
+	if app == "" {
+		app = "wps"
+	}
 	payload := map[string]any{
-		"pid": os.Getpid(), "app": "wps", "family": "wps-linux", "port": port,
+		"pid": os.Getpid(), "app": app, "family": "wps-linux", "port": port,
 		"host": "wps-jsaddon", "version": b.bridgeVersion(),
 		"started":       b.started.Format("2006-01-02T15:04:05.000Z"),
 		"lastSeen":      now.Format("2006-01-02T15:04:05.000Z"),
@@ -871,6 +899,7 @@ func (b *Bridge) writeSession() {
 	b.mu.Lock()
 	b.lastWrite = time.Now()
 	b.lastDocKey = key
+	b.lastAppKey = app
 	b.wroteSession = true
 	b.mu.Unlock()
 }

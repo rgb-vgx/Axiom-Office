@@ -62,13 +62,42 @@
     }
   }
 
+  function currentAppKind() {
+    try {
+      var app = getApp();
+      try {
+        if (window.AxiomCommands && typeof window.AxiomCommands.appKind === "function") {
+          return window.AxiomCommands.appKind(app);
+        }
+      } catch (e) {}
+      try {
+        if (typeof AxiomCommands !== "undefined" && AxiomCommands &&
+            typeof AxiomCommands.appKind === "function") {
+          return AxiomCommands.appKind(app);
+        }
+      } catch (e2) {}
+    } catch (e3) {}
+    return "wps";
+  }
+
   function getCommands() {
     try {
+      var kind = "wps";
+      try { kind = currentAppKind(); } catch (eK) { kind = "wps"; }
+      if (window.AxiomCommands && typeof window.AxiomCommands.catalogFor === "function") {
+        return window.AxiomCommands.catalogFor(kind);
+      }
       if (window.AxiomCommands && typeof window.AxiomCommands.catalog === "function") {
         return window.AxiomCommands.catalog();
       }
     } catch (e) {}
     try {
+      var kind2 = "wps";
+      try { kind2 = currentAppKind(); } catch (eK2) { kind2 = "wps"; }
+      if (typeof AxiomCommands !== "undefined" && AxiomCommands &&
+          typeof AxiomCommands.catalogFor === "function") {
+        return AxiomCommands.catalogFor(kind2);
+      }
       if (typeof AxiomCommands !== "undefined" && AxiomCommands &&
           typeof AxiomCommands.catalog === "function") {
         return AxiomCommands.catalog();
@@ -81,7 +110,14 @@
     try {
       var app = getApp();
       if (!app) { return null; }
-      var doc = app.ActiveDocument;
+      var kind = "wps";
+      try { kind = currentAppKind(); } catch (eK) { kind = "wps"; }
+      var doc = null;
+      try {
+        if (kind === "et") { doc = app.ActiveWorkbook; }
+        else if (kind === "wpp") { doc = app.ActivePresentation; }
+        else { doc = app.ActiveDocument; }
+      } catch (eD) { return null; }
       if (doc === undefined || doc === null) { return null; }
       var name = "", fullName = "";
       try {
@@ -216,7 +252,7 @@
     try {
       body = {
         client: CLIENT,
-        app: "wps",
+        app: currentAppKind(),
         version: VERSION,
         document: currentDocument(),
         commands: getCommands()
