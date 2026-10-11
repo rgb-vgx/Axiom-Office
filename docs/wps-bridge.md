@@ -54,8 +54,8 @@ Cùng giao thức và cùng guard với bridge LibreOffice (`Origin` → 403, to
   in WPS to connect the add-in"}` (không nêu tên app cụ thể — cả ba app dùng chung một add-in);
   đã kết nối: đưa vào hàng đợi, chờ kết quả tối đa `AXIOM_WPS_CMD_WAIT_SECONDS` giây (mặc định 300), trả **nguyên**
   `{ok, result|error}` của add-in. Hai câu lỗi hết giờ phân biệt rõ (mục 6): lệnh **chưa giao được** cho add-in thì
-  `...disconnected before the command was sent (WPS closed?) - safe to retry`; lệnh **đã chạy** mà không có kết quả
-  thì `...did not answer within Ns; the command may have been applied - check the document before retrying`.
+  `...disconnected before the command was sent (WPS closed?) - it was not sent, safe to retry`; lệnh **đã chạy** mà
+  không có kết quả thì `...did not answer within Ns; the command may have been applied - check the document before retrying`.
 - **File session** `<thư mục session>/<pid Core>-wps.json` (cùng trường với LibreOffice: `pid, app,
   family:"wps-linux", port, host:"wps-jsaddon", version, started, lastSeen, lastSeenEpoch, document,
   documentPath`) — có khi add-in đã kết nối (ghi lại mỗi lần poll đổi tài liệu và mỗi 25 giây), **xoá** khi mất

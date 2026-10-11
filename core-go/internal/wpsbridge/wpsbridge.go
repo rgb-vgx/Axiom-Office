@@ -42,6 +42,7 @@ type Options struct {
 	BridgePort        int
 	PollSeconds       int
 	DisconnectSeconds int
+	CmdWaitSeconds    int
 	SessionDir        string
 	Token             string
 	Version           string
@@ -59,6 +60,7 @@ func ResolveOptions(getenv func(string) string, exeDir, sessionDir, token, versi
 		BridgePort:        intEnv(getenv, "AXIOM_WPS_BRIDGE_PORT", DefaultBridgePort),
 		PollSeconds:       intEnv(getenv, "AXIOM_WPS_POLL_SECONDS", DefaultPollSeconds),
 		DisconnectSeconds: intEnv(getenv, "AXIOM_WPS_DISCONNECT_SECONDS", DefaultDisconnectSeconds),
+		CmdWaitSeconds:    intEnv(getenv, "AXIOM_WPS_CMD_WAIT_SECONDS", CmdWaitSeconds),
 		SessionDir:        sessionDir,
 		Token:             token,
 		Version:           version,
@@ -212,6 +214,8 @@ type Job struct {
 	Action string
 	Params map[string]any
 	wait   chan map[string]any
+	// sentAt la luc job duoc giao cho add-in (takeJobs dat); zero nghia la chua giao.
+	sentAt time.Time
 }
 
 // Bridge giu trang thai kenh add-in: hang doi lenh, catalog, tai lieu va file session.
@@ -257,6 +261,9 @@ func New(opts Options) *Bridge {
 	if opts.BridgePort <= 0 {
 		opts.BridgePort = DefaultBridgePort
 	}
+	if opts.CmdWaitSeconds <= 0 {
+		opts.CmdWaitSeconds = CmdWaitSeconds
+	}
 	return &Bridge{
 		opts:        opts,
 		app:         "wps",
@@ -281,10 +288,33 @@ func (b *Bridge) corePort() int {
 	return b.opts.CorePort
 }
 
-// Connected cho biet co poll trong DisconnectSeconds giay gan nhat.
+// busyLocked tra ve true khi dang co job da giao cho add-in ma chua qua CmdWaitSeconds.
+// Add-in chay don luong nen luc chay lenh dai no khong poll: coi nhu van ket noi.
+// Chi goi khi dang giu b.mu; het han thi duong het gio cua Enqueue goi forget nen tu het.
+func (b *Bridge) busyLocked(now time.Time) bool {
+	wait := b.opts.CmdWaitSeconds
+	if wait <= 0 {
+		wait = CmdWaitSeconds
+	}
+	limit := time.Duration(wait) * time.Second
+	for _, job := range b.waiting {
+		if job.sentAt.IsZero() {
+			continue
+		}
+		if now.Sub(job.sentAt) < limit {
+			return true
+		}
+	}
+	return false
+}
+
+// Connected cho biet co poll trong DisconnectSeconds giay gan nhat, hoac dang co lenh chay.
 func (b *Bridge) Connected() bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	if b.busyLocked(time.Now()) {
+		return true
+	}
 	if !b.everPoll {
 		return false
 	}
@@ -295,7 +325,8 @@ func (b *Bridge) Connected() bool {
 func (b *Bridge) Snapshot() (map[string]any, []any, string, bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	connected := b.everPoll && time.Since(b.lastPoll) <= time.Duration(b.opts.DisconnectSeconds)*time.Second
+	now := time.Now()
+	connected := b.busyLocked(now) || (b.everPoll && now.Sub(b.lastPoll) <= time.Duration(b.opts.DisconnectSeconds)*time.Second)
 	doc := map[string]any{}
 	for key, value := range b.document {
 		doc[key] = value
@@ -312,7 +343,7 @@ func (b *Bridge) newJobID() string {
 	return fmt.Sprintf("wps-%d-%d-%s", os.Getpid(), seq, hex.EncodeToString(random[:]))
 }
 
-// Enqueue dua lenh vao hang doi va cho ket qua toi da 300 giay.
+// Enqueue dua lenh vao hang doi va cho ket qua toi da CmdWaitSeconds giay (theo cau hinh).
 func (b *Bridge) Enqueue(action string, params map[string]any) (map[string]any, bool) {
 	if !b.Connected() {
 		return nil, false
@@ -321,10 +352,16 @@ func (b *Bridge) Enqueue(action string, params map[string]any) (map[string]any, 
 	b.mu.Lock()
 	b.queue = append(b.queue, job)
 	b.waiting[job.ID] = job
+	cmdWait := b.opts.CmdWaitSeconds
 	b.mu.Unlock()
+	if cmdWait <= 0 {
+		cmdWait = CmdWaitSeconds
+	}
 
-	// Add-in mat ket noi giua chung (nguoi dung dong WPS) thi bao loi ngay, khong treo toi 300 giay.
-	timeout := time.NewTimer(CmdWaitSeconds * time.Second)
+	// Add-in mat ket noi giua chung (nguoi dung dong WPS) thi bao loi ngay, khong treo toi CmdWaitSeconds.
+	// Lenh da giao cho add-in (dang chay) thi bo qua luat disconnect: add-in don luong khong the vua
+	// chay vua poll, chi het gio theo CmdWaitSeconds.
+	timeout := time.NewTimer(time.Duration(cmdWait) * time.Second)
 	defer timeout.Stop()
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
@@ -334,11 +371,17 @@ func (b *Bridge) Enqueue(action string, params map[string]any) (map[string]any, 
 			return reply, true
 		case <-timeout.C:
 			b.forget(job)
-			return map[string]any{"ok": false, "error": "WPS add-in did not answer within 300s"}, true
+			return map[string]any{"ok": false, "error": fmt.Sprintf("WPS add-in did not answer within %ds; the command may have been applied - check the document before retrying", cmdWait)}, true
 		case <-ticker.C:
+			b.mu.Lock()
+			sent := !job.sentAt.IsZero()
+			b.mu.Unlock()
+			if sent {
+				continue
+			}
 			if !b.Connected() {
 				b.forget(job)
-				return map[string]any{"ok": false, "error": "WPS add-in disconnected before answering (WPS closed?)"}, true
+				return map[string]any{"ok": false, "error": "WPS add-in disconnected before the command was sent (WPS closed?) - it was not sent, safe to retry"}, true
 			}
 		case <-b.stopCh:
 			return map[string]any{"ok": false, "error": "Core is stopping"}, true
@@ -359,12 +402,16 @@ func (b *Bridge) forget(job *Job) {
 	}
 }
 
-// takeJobs lay toan bo job dang doi cho mot poll.
+// takeJobs lay toan bo job dang doi cho mot poll, danh dau gio giao de biet lenh dang chay.
 func (b *Bridge) takeJobs() []*Job {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	jobs := b.queue
 	b.queue = nil
+	now := time.Now()
+	for _, job := range jobs {
+		job.sentAt = now
+	}
 	return jobs
 }
 
