@@ -1,5 +1,8 @@
 // Spec T2 (docs/wps-bridge.md muc 3): registry lenh + vong poll cua JS add-in WPS, khong can WPS.
 // Spec T6 (docs/wps-bridge.md muc 5): add-in nhan biet app dang chay (Writer/Spreadsheets/Presentation).
+// Spec registry ⊆ handler: moi lenh trong registry LibreOffice (nguon sinh tool cho agent) phai co
+// handler trong add-in, hoac nam trong CHUA_CO_HANDLER kem ly do - de lenh registry khong am tham
+// thanh "unknown action" khi may dang chay WPS.
 //
 //   node --test tests/wps/test_addin.mjs
 //
@@ -21,7 +24,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { addinCatalog, assertMetadata, loadAddin, mockApp, run, throwing } from "./addin_harness.mjs";
+import { addinCatalog, assertMetadata, loadAddin, loCatalog, mockApp, run, throwing } from "./addin_harness.mjs";
 
 
 // Lenh dot 1 (docs/wps-bridge.md muc 5, T2): add-in phai co, metadata giong het registry LibreOffice.
@@ -234,6 +237,51 @@ test("catalogFor(kind): chi tra lenh dung app do; catalog() van la registry day 
   }
   assert.ok(!ctx.AxiomCommands.catalogFor("et").some((c) => c.name === "writer.getText"),
     "app Spreadsheets khong duoc khai bao lenh writer.*");
+});
+
+// Lenh co trong registry LibreOffice (nguon sinh tool cho agent o Core: scripts/generate_mcp_commands.py)
+// ma add-in CHUA co handler. `execute` tra "unknown action: <lenh>" cho nhung lenh nay, nen neu Core gui
+// xuong WPS thi agent nhan loi that bai kho hieu thay vi lam duoc viec.
+//
+// Danh sach nay chi duoc PHEP ngan di: moi lenh o day ma sau nay co handler thi test ben duoi bat phai bo ra.
+const CHUA_CO_HANDLER = {
+  // Bon lenh kind rong (agent=false): khong phai lenh cua app van phong - Core/pane/MCP xu ly, add-in
+  // khong bao gio nhan. Chung nam trong registry vi registry dung chung cho moi nen tang.
+  "ai.ask": "Core xu ly (khong phai lenh cua app van phong)",
+  "ui.askpane": "Core/pane xu ly",
+  "ui.setup": "Core/pane xu ly",
+  "app.screenshot": "Core chup cua so (phan visual), add-in khong nhan lenh nay",
+  // Bay lenh writer.* (docs/wps-bridge.md muc 3): backlog - chua viet handler cho WPS.
+  "writer.newDocument": "chua co handler trong add-in",
+  "writer.open": "chua co handler trong add-in",
+  "writer.closeAll": "chua co handler trong add-in",
+  "writer.formatTable": "chua co handler trong add-in (agent=true: tool nay se loi khi may dang la WPS)",
+  "writer.insertImage": "chua co handler trong add-in (agent=true)",
+  "writer.insertHyperlink": "chua co handler trong add-in (agent=true)",
+  "writer.checkTables": "chua co handler trong add-in (agent=true)",
+};
+
+test("registry LibreOffice: moi lenh deu co handler, hoac nam trong danh sach chua lam (co ly do)", () => {
+  const ctx = loadAddin();
+  const apps = { wps: writerApp(), et: etApp(), wpp: wppApp() };
+  assert.ok(loCatalog().length >= addinCatalog(ctx).length,
+    "registry LibreOffice la nguon: add-in khong duoc khai bao nhieu lenh hon");
+  for (const entry of loCatalog()) {
+    // Lenh kind rong chay duoc o moi app; lenh cua app nao thi phai goi bang app do, khong thi
+    // execute() tra loi "cannot run in ..." chu khong phai "unknown action:".
+    const kind = sharedKind(entry.kind) ? "wps" : entry.kind;
+    assert.ok(apps[kind], entry.name + ": kind la " + entry.kind);
+    const reply = ctx.AxiomCommands.execute(apps[kind], entry.name, {});
+    const coHandler = reply.ok === true || String(reply.error) !== "unknown action: " + entry.name;
+    if (coHandler) {
+      assert.ok(!CHUA_CO_HANDLER[entry.name],
+        entry.name + " da co handler (" + JSON.stringify(reply).slice(0, 120) + ") - bo khoi CHUA_CO_HANDLER");
+    } else {
+      assert.ok(CHUA_CO_HANDLER[entry.name],
+        entry.name + ": registry LibreOffice co lenh nay nhung add-in khong co handler - "
+        + "viet handler, hoac ghi vao CHUA_CO_HANDLER kem ly do");
+    }
+  }
 });
 
 test("execute: lenh cua app khac bi tu choi, khong chay nham", () => {

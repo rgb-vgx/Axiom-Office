@@ -81,7 +81,9 @@ Cùng giao thức và cùng guard với bridge LibreOffice (`Origin` → 403, to
   ⇒ mỗi lệnh AI = một bước Undo. Lỗi handler → `{ok:false, error}`, không bao giờ làm treo vòng lặp.
 - **54 lệnh** trong `commands.js`: `app.info` + 15 `writer.*` + 23 `et.*` + 15 `wpp.*` (metadata của cả 54 lấy từ
   registry LibreOffice). Chỉ 15 lệnh `writer.*` mở `UndoRecord` — ET/WPP không có nó (mục 6). Lệnh chưa có
-  handler trả `unknown action: <lệnh>`.
+  handler trả `unknown action: <lệnh>`; `tests/wps/test_addin.mjs` ghim danh sách 11 lệnh registry chưa có
+  handler (mục 6) và **bắt bỏ tên khỏi danh sách ngay khi viết handler**, để lệnh registry không âm thầm rơi
+  vào `unknown action` khi máy đang chạy WPS.
 
 ## 4. Cài đặt
 - Bước admin một lần mỗi máy: `JsApiPlugin=true` trong `/opt/kingsoft/wps-office/office6/cfgs/oem.ini`.
@@ -136,6 +138,13 @@ Cùng giao thức và cùng guard với bridge LibreOffice (`Origin` → 403, to
   `may have been applied`); hết giờ này thì job được bỏ nên vòng session mới xoá file session.
 - Object model ET/WPP khác Writer ở vài chỗ (`Cells.Item(r,c)`, `UsedRange.Address()` là hàm, màu BGR, chỉ số
   1-based, `Application.Documents` không có) — bảng đầy đủ ở `tests/wps/REFERENCE.md`.
+- **11 lệnh trong registry chưa có handler ở add-in WPS** (11/10/2026): bốn lệnh `kind` rỗng — `ai.ask`,
+  `ui.askpane`, `ui.setup`, `app.screenshot` — **không phải** lệnh của app văn phòng (Core/pane/MCP xử lý), add-in
+  không bao giờ nhận. Bảy lệnh `writer.*` còn lại (`newDocument`, `open`, `closeAll`, `formatTable`,
+  `insertImage`, `insertHyperlink`, `checkTables`) là khoảng trống thật: máy đang chạy WPS mà agent gọi chúng thì
+  add-in trả `unknown action: writer.<lệnh>`. Bốn trong bảy lệnh đó (`formatTable`, `insertImage`,
+  `insertHyperlink`, `checkTables`) có `agent=true`, tức Core vẫn đưa chúng cho agent như tool —
+  `tests/wps/test_addin.mjs` ghim đúng danh sách này và bắt bỏ tên ra ngay khi viết handler.
 - **`FileSystem.readFileString`/`writeFileString` bị sandbox** (đo 11/10/2026): mọi đường dẫn có `/` hoặc `\` đều
   ném `path cannot contains "/" or "\"`, tên file trần trả `null`, và chúng không đọc/ghi được file nào — dù tài
   liệu WPS mô tả chúng như API đọc file. Đọc file thật phải bằng **`FileSystem.ReadFile`** (UTF-8, ném
