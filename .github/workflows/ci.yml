@@ -63,8 +63,11 @@ jobs:
           soffice --version
 
       # install.sh tu choi chay khi thieu Python UNO (no dung unopkg that), nen buoc nay phai sau buoc cai tren.
+      # `python3-uno` cua apt thuoc python HE THONG (/usr/bin/python3): actions/setup-python dat mot ban 3.12 khac
+      # len truoc trong PATH, ban do khong thay /usr/lib/python3/dist-packages nen `python3 -c 'import uno'` that
+      # bai (lan chay 38155510443). Chay bang python he thong - dung nhu may dev, noi moi thu deu la python he thong.
       - name: Trinh cai Linux (install.sh, HOME tam + unopkg gia)
-        run: python3 tests/linux/test_install_sh.py
+        run: PATH=/usr/bin:$PATH python3 tests/linux/test_install_sh.py
 
       - name: Cai extension + test moi lenh bridge tren LibreOffice that
         # Chua chay duoc tren runner: `unopkg add` sap (std::bad_alloc trong cpp_uno) ngay ca voi profile moi, trong
