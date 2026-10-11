@@ -44,6 +44,14 @@ find "$STAGE/core/skills" -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/n
 echo "== Extension LibreOffice"
 "$PYTHON" "$ROOT/scripts/package_oxt.py" --out "$STAGE" >/dev/null
 
+# Add-in WPS: Core phuc vu truc tiep tu <thu muc binary>/wps-addin (mac dinh cua AXIOM_WPS_ADDIN_DIR).
+echo "== Add-in WPS"
+mkdir -p "$STAGE/core/wps-addin"
+cp -a "$ROOT/src/AxiomOffice.WPS/." "$STAGE/core/wps-addin/"
+# Trinh cai add-in WPS: install.sh goi khi thay WPS tren may.
+mkdir -p "$STAGE/wps"
+cp -a "$ROOT/scripts/wps/install_jsaddon.py" "$STAGE/wps/install_jsaddon.py"
+
 cp "$ROOT/scripts/linux/install.sh" "$STAGE/install.sh"
 cp "$ROOT/scripts/linux/axiom-office-core.service.in" "$STAGE/axiom-office-core.service.in"
 chmod +x "$STAGE/install.sh"
@@ -61,6 +69,14 @@ Dung: mo Writer/Calc/Impress -> menu Axiom Office > Ask AI (pane nam trong sideb
 MCP cho Claude Code/Desktop: dung chinh core/AxiomOffice.Core voi tham so "mcp all"; install.sh in san
 doan cau hinh mcpServers khi cai xong.
 Go:  ./install.sh --uninstall [--purge]
+
+WPS Office (tuy chon): add-in WPS nam san trong core/wps-addin, do Core phuc vu
+(khong can chep tay). install.sh tu dang ky add-in khi thay WPS.
+Buoc admin mot lan tren moi may (bat JS add-in cua WPS):
+    sudo cp -n /opt/kingsoft/wps-office/office6/cfgs/oem.ini /opt/kingsoft/wps-office/office6/cfgs/oem.ini.bak
+    sudo sed -i '/^\[Support\]/a JsApiPlugin=true' /opt/kingsoft/wps-office/office6/cfgs/oem.ini
+(khi oem.ini chua co dong JsApiPlugin=true duoi muc [Support]).
+Mo WPS sau khi Core da chay: ./install.sh --systemd de Core chay thuong truc.
 
 Vi tri: Core + MCP ~/.local/share/axiom-office/core,
         cau hinh ~/.config/axiom-office/config.json, log ~/.local/share/axiom-office/bridge.log

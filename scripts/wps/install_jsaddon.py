@@ -100,6 +100,25 @@ def update_publish_xml(jsaddons: str, core_url: str) -> str:
     return path
 
 
+def remove_publish_entries(jsaddons: str) -> str | None:
+    """Go moi dang ky axiomoffice (online va offline) khoi publish.xml, giu add-in khac."""
+    path = os.path.join(jsaddons, "publish.xml")
+    if not os.path.isfile(path):
+        return None
+    with open(path, encoding="utf-8", errors="replace") as handle:
+        text = handle.read()
+    for tag in ("jspluginonline", "jsplugin"):
+        text = re.sub(
+            r'<%s\b(?=[^>]*\bname\s*=\s*["\']axiomoffice["\'])[^>]*>.*?</%s\s*>' % (tag, tag),
+            "", text, flags=re.DOTALL)
+        text = re.sub(
+            r'<%s\b(?=[^>]*\bname\s*=\s*["\']axiomoffice["\'])[^>]*/?>' % tag,
+            "", text)
+    with open(path, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(text)
+    return path
+
+
 def update_office_conf(home: str) -> str:
     """Ghi cac khoa can thiet vao muc [6.0] cua Office.conf, giu cac dong khac."""
     path = os.path.join(home, ".config", "Kingsoft", "Office.conf")
@@ -160,9 +179,12 @@ def update_office_conf(home: str) -> str:
 def main(argv: list | None = None) -> int:
     parser = argparse.ArgumentParser(description="Cai Axiom Office JS add-in cho WPS (ban online do Core phuc vu).")
     parser.add_argument("--home", required=True, help="HOME dich (chi ghi trong nay)")
-    parser.add_argument("--core-url", required=True, help="URL goc cua Agent Core (vi du http://127.0.0.1:47840)")
+    parser.add_argument("--core-url", required=False, default=None,
+                        help="URL goc cua Agent Core (vi du http://127.0.0.1:47840)")
     parser.add_argument("--test-profile", action="store_true",
                         help="ghi cac khoa Office.conf can thiet cho profile thu nghiem")
+    parser.add_argument("--uninstall", action="store_true",
+                        help="go dang ky axiomoffice khoi publish.xml (khong dung Office.conf)")
     args = parser.parse_args(argv)
 
     home = args.home
@@ -171,6 +193,17 @@ def main(argv: list | None = None) -> int:
         return 1
 
     jsaddons = os.path.join(home, ".local", "share", "Kingsoft", "wps", "jsaddons")
+    if args.uninstall:
+        remove_old_offline_dirs(jsaddons)
+        publish = remove_publish_entries(jsaddons)
+        if publish is None:
+            print("khong co publish.xml, khong co gi de go")
+        else:
+            print("da go dang ky axiomoffice; publish.xml: %s" % publish)
+        return 0
+
+    if not args.core_url:
+        parser.error("--core-url la bat buoc khi cai (khong dung --uninstall)")
     remove_old_offline_dirs(jsaddons)
     publish = update_publish_xml(jsaddons, args.core_url)
     if args.test_profile:

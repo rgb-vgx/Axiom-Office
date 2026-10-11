@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Cai Axiom Office cho LibreOffice tren Linux (LibreOffice_arch.md giai doan L3) - khong can root.
 #
-#   ./install.sh [--endpoint URL] [--model NAME] [--api-key KEY|-] [--systemd]   cai / nang cap
-#                 (--api-key - = doc khoa tu stdin; --systemd = bat Core chay thuong truc bang systemd --user)
+#   ./install.sh [--endpoint URL] [--model NAME] [--api-key KEY|-] [--systemd] [--no-wps]   cai / nang cap
+#                 (--api-key - = doc khoa tu stdin; --systemd = bat Core chay thuong truc bang systemd --user;
+#                  --no-wps = khong dang ky add-in WPS du may co WPS)
 #   ./install.sh --uninstall [--purge]                                           go (--purge xoa ca cau hinh, du lieu)
 #
 # Chay tu thu muc giai nen cua axiom-office-linux-x64-<ver>.tar.gz (co core/ va *.oxt canh script):
@@ -10,6 +11,8 @@
 #   - extension -> unopkg cua nguoi dung
 #   - cau hinh  -> ~/.config/axiom-office/config.json (quyen 0600; giu khoa cu, chi ghi khoa duoc truyen)
 #   - MCP       -> ~/.local/share/axiom-office/mcp (in san doan cau hinh cho Claude Code/Desktop)
+#   - WPS       -> co /opt/kingsoft/wps-office thi dang ky add-in (Core phuc vu) vao publish.xml cua nguoi dung;
+#                  in huong dan sudo neu oem.ini chua bat JsApiPlugin (khong tu chay sudo)
 # Khong bao gio tat LibreOffice cua nguoi dung: dang chay thi dung lai va nhac dong.
 set -euo pipefail
 
@@ -24,8 +27,10 @@ EXTENSION_ID="org.axiomoffice.bridge"
 UNIT_NAME="axiom-office-core.service"
 UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 UNOPKG="${UNOPKG:-$(command -v unopkg || echo /usr/lib/libreoffice/program/unopkg)}"
+# Thu muc cai WPS (test doi bang AXIOM_WPS_ROOT); khong ton tai = khong co WPS.
+WPS_ROOT="${AXIOM_WPS_ROOT:-/opt/kingsoft/wps-office}"
 
-ENDPOINT="" MODEL="" API_KEY="" UNINSTALL=0 PURGE=0 SYSTEMD=0
+ENDPOINT="" MODEL="" API_KEY="" UNINSTALL=0 PURGE=0 SYSTEMD=0 NOWPS=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --endpoint) ENDPOINT="$2"; shift 2 ;;
@@ -34,7 +39,8 @@ while [ $# -gt 0 ]; do
         --systemd) SYSTEMD=1; shift ;;
         --uninstall) UNINSTALL=1; shift ;;
         --purge) PURGE=1; shift ;;
-        -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
+        --no-wps) NOWPS=1; shift ;;
+        -h|--help) awk 'NR > 1 && /^#/ { print; next } NR > 1 { exit }' "$0"; exit 0 ;;
         *) echo "Tham so la: $1 (xem --help)" >&2; exit 2 ;;
     esac
 done
@@ -44,6 +50,8 @@ if [ "$API_KEY" = "-" ]; then IFS= read -r API_KEY || true; fi
 die() { echo "Loi: $*" >&2; exit 1; }
 
 assert_libreoffice_closed() {
+    # Test bo qua kiem tra nay bang AXIOM_INSTALL_SKIP_LO_CHECK=1.
+    [ "${AXIOM_INSTALL_SKIP_LO_CHECK:-0}" = "1" ] && return 0
     if pgrep -u "$(id -u)" -f '[s]office\.bin' >/dev/null 2>&1; then
         die "LibreOffice dang chay - dong tat ca cua so LibreOffice roi chay lai (script khong tu tat)."
     fi
@@ -115,6 +123,41 @@ disable_systemd() {
     fi
 }
 
+core_port() {
+    # Cong Core trong cau hinh vua ghi (CorePort), mac dinh 47840.
+    AXIOM_CFG="$CONFIG_DIR/config.json" python3 -c \
+        'import json, os; print(json.load(open(os.environ["AXIOM_CFG"])).get("CorePort", 47840) or 47840)' \
+        2>/dev/null || echo 47840
+}
+
+register_wps_addin() {
+    # Dang ky add-in WPS khi may co WPS (khong bao gio dung Office.conf cua nguoi dung).
+    [ "$NOWPS" = 1 ] && return 0
+    [ -d "$WPS_ROOT" ] || return 0
+    [ -f "$HERE/wps/install_jsaddon.py" ] || { echo "  (bo qua WPS: khong co wps/install_jsaddon.py)"; return 0; }
+    PORT="$(core_port)"
+    case "$PORT" in ''|*[!0-9]*) PORT=47840 ;; esac
+    echo "WPS: dang ky add-in (Core http://127.0.0.1:$PORT)"
+    python3 "$HERE/wps/install_jsaddon.py" --home "$HOME" --core-url "http://127.0.0.1:$PORT"
+    OEM="$WPS_ROOT/office6/cfgs/oem.ini"
+    if ! grep -q '^[[:space:]]*JsApiPlugin[[:space:]]*=[[:space:]]*true' "$OEM" 2>/dev/null; then
+        echo "  WPS can bat JS add-in mot lan (quyen admin, JsApiPlugin=true trong $OEM):"
+        echo "    sudo cp -n \"$OEM\" \"$OEM.bak\""
+        echo "    sudo sed -i '/^\\[Support\\]/a JsApiPlugin=true' \"$OEM\""
+    fi
+    if [ "$SYSTEMD" != 1 ]; then
+        echo "  WPS: mo WPS sau khi Core da chay (neu khong add-in bi bo qua); nen chay ./install.sh --systemd"
+    fi
+}
+
+unregister_wps_addin() {
+    # Go dang ky add-in WPS (giu add-in khac); chi khi co trinh cai trong goi.
+    [ "$NOWPS" = 1 ] && return 0
+    [ -f "$HERE/wps/install_jsaddon.py" ] || return 0
+    python3 "$HERE/wps/install_jsaddon.py" --home "$HOME" --uninstall 2>/dev/null || true
+    echo "Da go dang ky add-in WPS (giu add-in khac)"
+}
+
 install() {
     local oxt
     oxt="$(ls "$HERE"/AxiomOffice-LibreOffice-*.oxt 2>/dev/null | sort | tail -1)"
@@ -147,6 +190,8 @@ install() {
 
     enable_systemd
 
+    register_wps_addin
+
     echo
     echo "Xong. Mo LibreOffice Writer/Calc/Impress: menu Axiom Office > Ask AI (hoac sidebar)."
     if [ "$SYSTEMD" != 1 ] && systemd_available; then
@@ -171,6 +216,7 @@ uninstall() {
     assert_libreoffice_closed
     disable_systemd
     stop_core
+    unregister_wps_addin
     "$UNOPKG" remove "$EXTENSION_ID" 2>/dev/null && echo "Da go extension $EXTENSION_ID" || echo "(extension chua cai)"
     rm -rf "$CORE_DIR" "$MCP_DIR"
     echo "Da xoa $CORE_DIR va $MCP_DIR"
