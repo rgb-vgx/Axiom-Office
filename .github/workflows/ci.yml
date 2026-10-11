@@ -26,7 +26,6 @@ jobs:
       - name: Unit test add-in WPS (trinh cai + registry/vong poll + probe, khong can WPS)
         run: |
           python3 tests/wps/test_install_jsaddon.py
-          python3 tests/linux/test_install_sh.py
           node --test tests/wps/test_addin_fake.mjs tests/wps/test_addin.mjs tests/wps/test_addin_et.mjs tests/wps/test_addin_wpp.mjs tests/wps/test_probe.mjs tests/wps/test_pane.mjs
 
       - uses: actions/setup-go@v5
@@ -62,6 +61,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libreoffice python3-uno xvfb
           soffice --version
+
+      # install.sh tu choi chay khi thieu Python UNO (no dung unopkg that), nen buoc nay phai sau buoc cai tren.
+      - name: Trinh cai Linux (install.sh, HOME tam + unopkg gia)
+        run: python3 tests/linux/test_install_sh.py
 
       - name: Cai extension + test moi lenh bridge tren LibreOffice that
         # Chua chay duoc tren runner: `unopkg add` sap (std::bad_alloc trong cpp_uno) ngay ca voi profile moi, trong
