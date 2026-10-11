@@ -438,7 +438,8 @@ test("et.save / et.saveAs / et.closeAll", () => {
   assert.equal(closed.rescued.length, 1);
   assert.match(closed.rescued[0], /rescued/);
   const log = callsOf(app);
-  assert.ok(log.some((line) => line.indexOf("SaveAs(") === 0 && line.indexOf("rescued") > 0),
+  // ET ghi nhat ky co tien to "Workbook." (ban WPP ghi tran "SaveAs(...)"), nen khop ca hai dang.
+  assert.ok(log.some((line) => /(^|\.)SaveAs\(/.test(line) && line.indexOf("rescued") > 0),
     "phai SaveAs ban cuu ho truoc khi Close: " + log.slice(-6).join(" | "));
 });
 

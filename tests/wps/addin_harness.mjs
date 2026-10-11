@@ -135,10 +135,13 @@ export function assertFails(ctx, app, action, params, pattern) {
 }
 
 // Chay mot lenh va doi ok:true; tra ve result.
+// Ket qua di qua JSON: dung nhu duong HTTP toi Core (add-in gui result bang JSON) va cat khoi vm
+// realm - object dung trong vm co prototype khac nen deepStrictEqual cua assert/strict bao sai du
+// cung du lieu. Nho vay handler khong phai biet gi ve realm cua test.
 export function run(ctx, app, action, params = {}) {
   const reply = ctx.AxiomCommands.execute(app, action, params);
   assert.equal(reply.ok, true, action + " phai thanh cong: " + JSON.stringify(reply));
-  return reply.result;
+  return reply.result === undefined ? undefined : JSON.parse(JSON.stringify(reply.result));
 }
 
 // Vi mot so lenh chi ap dung cho mot component: kiem add-in tu choi lenh cua component khac.
