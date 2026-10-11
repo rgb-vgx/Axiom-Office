@@ -1523,16 +1523,24 @@
     var delim = paramString(params, "delimiter", ",");
     if (delim === null || delim === undefined || delim === "") { delim = ","; }
     if (delim.length !== 1) { throw new Error("'delimiter' must be a single character, got '" + delim + "'"); }
+    var encoding = paramString(params, "encoding", null);
+    if (encoding === null || encoding === undefined || String(encoding).trim() === "") { encoding = "utf-8-sig"; }
+    // Chuan hoa encoding de nhan cac cach viet khac nhau, WPS chi giai ma UTF-8.
+    var normEnc = String(encoding).trim().toLowerCase().replace(/_/g, "-");
+    if (normEnc !== "utf-8" && normEnc !== "utf8" && normEnc !== "utf-8-sig" && normEnc !== "utf8-sig") {
+      throw new Error("cannot read '" + path + "' as " + encoding + ": WPS only decodes UTF-8 (FileSystem.ReadFile takes no charset argument) - use encoding='utf-8-sig' or 'utf-8'");
+    }
     var fs = app.FileSystem;
     var text;
     try {
-      text = fs.readFileString(path);
-      if (typeof text === "function") { text = text.call(fs, path); }
+      text = fs.ReadFile(path);
     } catch (e) {
       throw new Error("no file at '" + path + "'");
     }
     if (text === undefined || text === null) { throw new Error("no file at '" + path + "'"); }
     text = String(text);
+    // Chi ban -sig moi cat BOM dau chuoi, ban utf-8 thuong giu nguyen nhu Python.
+    if ((normEnc === "utf-8-sig" || normEnc === "utf8-sig") && text.charAt(0) === "\uFEFF") { text = text.substring(1); }
     var lines = text.split("\r\n").join("\n").split("\r").join("\n").split("\n");
     if (lines.length > 0 && lines[lines.length - 1] === "") { lines.pop(); }
     var rows = [];
