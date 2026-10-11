@@ -37,6 +37,10 @@ Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho th
 - **`et.checkRange` bớt cảnh báo giả** (LibreOffice): phân loại ô theo giá trị thật (kết quả công thức `0.0%`,
   `#,##0`, ngày là số, không còn bị đếm là chữ), nhận dòng tiêu đề (chỉ ô đầu có chữ) và lấy dòng sau làm header
   (trả thêm `title`), `numberFormat` lấy từ dòng dữ liệu đầu. Trước đây bảng chi phí trên Dashboard bị báo 5 lỗi giả
+- **SQLite không còn mất ghi trong im lặng** (Core): transaction ghi lấy khoá ngay (`_txlock=immediate`), mở qua
+  `BeginWrite` (thử lại khi `SQLITE_BUSY`, tối đa ~15s), và mọi lệnh ghi lỗi đều rollback + báo thất bại. Trước đây
+  transaction đọc-rồi-ghi gặp `SQLITE_BUSY` ngay trong WAL, lỗi `tx.Exec` bị bỏ qua nên vd khôi phục memory báo
+  thành công mà không ghi (tái hiện 29/30 khi ghi đồng thời) - nguyên nhân gốc của e2e memory chập chờn
 - Memory: `AddBatch` thử lại khi SQLite báo `SQLITE_BUSY` (ghi qua API và trích xuất nền cùng lúc) — nguyên
   nhân kiểm tra e2e "khôi phục memory đã xoá" chập chờn
 - Viết bởi aidev (TASK-000097, -098, -100, -101) theo spec viết trước; e2e Core 169/169

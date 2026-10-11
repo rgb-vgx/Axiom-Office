@@ -206,7 +206,7 @@ func (s *Store) addBatchOnce(items []NewMemory, actor, runID string, vectors map
 			existing = findNearDuplicate(tx, raw.Scope, scopeKey, vector)
 		}
 		if existing != nil {
-			// Lennh ghi loi -> bao SKIPPED chu khong bao DUPLICATE khi chua ghi (xem concurrency_test.go);
+			// Lenh ghi loi -> bao SKIPPED chu khong bao DUPLICATE khi chua ghi (xem concurrency_test.go);
 			// BUSY giua lo -> rollback (defer) roi bao thu lai nhu INSERT.
 			if _, err := tx.Exec("UPDATE memories SET hits = hits + 1, last_used_at = ? WHERE id = ?", Now(), existing.ID); err != nil {
 				if isBusyError(err) {
@@ -423,7 +423,7 @@ func (s *Store) TouchHits(ids []string) {
 	defer func() { _ = tx.Rollback() }()
 	now := Now()
 	for _, id := range list {
-		// Lennh ghi loi -> rollback (defer), khong commit nua voi (xem concurrency_test.go).
+		// Lenh ghi loi -> rollback (defer), khong commit nua voi (xem concurrency_test.go).
 		if _, err := tx.Exec("UPDATE memories SET hits = hits + 1, last_used_at = ? WHERE id = ?", now, id); err != nil {
 			return
 		}
@@ -523,7 +523,7 @@ func (s *Store) Delete(id, reason string) bool {
 	if item == nil || item.DeletedAt != nil {
 		return false
 	}
-	// Lennh ghi loi -> rollback (defer) va bao that bai, khong bao true khi chua ghi (xem concurrency_test.go).
+	// Lenh ghi loi -> rollback (defer) va bao that bai, khong bao true khi chua ghi (xem concurrency_test.go).
 	now := Now()
 	if _, err := tx.Exec("UPDATE memories SET deleted_at = ?, updated_at = ? WHERE id = ?", now, now, id); err != nil {
 		return false
@@ -547,7 +547,7 @@ func (s *Store) Restore(id string) bool {
 	if item == nil || item.DeletedAt == nil {
 		return false
 	}
-	// Lennh ghi loi -> rollback (defer) va bao that bai, khong bao true khi chua ghi (xem concurrency_test.go).
+	// Lenh ghi loi -> rollback (defer) va bao that bai, khong bao true khi chua ghi (xem concurrency_test.go).
 	if _, err := tx.Exec("UPDATE memories SET deleted_at = NULL, updated_at = ? WHERE id = ?", Now(), id); err != nil {
 		return false
 	}
