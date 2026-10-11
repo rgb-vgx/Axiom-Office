@@ -2245,6 +2245,392 @@
       title: title, columns: columns, issueCount: issues.length, issues: issues };
   }
 
+  // ---- WPP (Presentation): khong co UndoRecord, khong lenh nao mo UndoRecord.
+  function wppPres(app) {
+    var p = app.ActivePresentation;
+    if (p === undefined || p === null) {
+      throw new Error("no active presentation (open one in WPS Presentation first)");
+    }
+    return p;
+  }
+
+  function wppDocInfo(pres) {
+    var name = pres.Name;
+    if (typeof name === "function") { name = name.call(pres); }
+    var full = pres.FullName;
+    if (typeof full === "function") { full = full.call(pres); }
+    var saved = pres.Saved;
+    if (typeof saved === "function") { saved = saved.call(pres); }
+    return { name: String(name), fullName: String(full), saved: !!saved };
+  }
+
+  function wppNumber(params, name, dflt) {
+    if (!hasParam(params, name)) { return dflt; }
+    var v = unwrapScalar(params[name]);
+    var n = (typeof v === "number") ? v : Number(typeof v === "string" ? v.trim() : v);
+    if (typeof n !== "number" || isNaN(n) || !isFinite(n)) {
+      throw new Error("'" + name + "' must be a number, got " + describeValue(params[name]));
+    }
+    return n;
+  }
+
+  // Slide can thao tac: bo trong hoac ngoai khoang = slide CUOI (giong _page LibreOffice).
+  function wppSlide(app, params) {
+    var pres = wppPres(app);
+    var count = Number(pres.Slides.Count);
+    if (!(count > 0)) {
+      throw new Error("presentation has no slides; call wpp.addSlide first");
+    }
+    var index = count;
+    if (hasParam(params, "slide")) { index = paramInt(params, "slide", count); }
+    if (!(index >= 1 && index <= count)) { index = count; }
+    return { pres: pres, slide: pres.Slides.Item(index), index: index, count: count };
+  }
+
+  function wppShapeText(shape) {
+    try {
+      return String(shape.TextFrame.TextRange.Text || "");
+    } catch (e) { return ""; }
+  }
+
+  function cmdWppNewPresentation(app) {
+    app.Presentations.Add();
+    var info = wppDocInfo(app.ActivePresentation);
+    return { name: info.name, fullName: info.fullName, saved: info.saved, opened: true };
+  }
+
+  function cmdWppOpen(app, params) {
+    var path = paramString(params, "path", null);
+    if (!path) { throw new Error("'path' is required"); }
+    app.Presentations.Open(path);
+    var info = wppDocInfo(app.ActivePresentation);
+    return { name: info.name, fullName: info.fullName, saved: info.saved, opened: true };
+  }
+
+  function cmdWppListSlides(app) {
+    var pres = wppPres(app);
+    var count = Number(pres.Slides.Count);
+    var slides = [], i, j;
+    for (i = 1; i <= count; i++) {
+      var slide = pres.Slides.Item(i);
+      var layout = slide.Layout;
+      if (typeof layout === "function") { layout = layout.call(slide); }
+      var texts = [];
+      var n = Number(slide.Shapes.Count);
+      for (j = 1; j <= n; j++) {
+        var t = wppShapeText(slide.Shapes.Item(j));
+        if (t) { texts.push(t); }
+      }
+      slides.push({ index: i, layout: Number(layout), shapeTexts: texts });
+    }
+    var pname = pres.Name;
+    if (typeof pname === "function") { pname = pname.call(pres); }
+    return { presentation: String(pname), slideCount: count, slides: slides };
+  }
+
+  function cmdWppAddTable(app, params) {
+    var valueRows = paramMatrix(params, "values", false);
+    var rows = paramInt(params, "rows", 0);
+    var cols = paramInt(params, "cols", 0);
+    if (valueRows !== null && valueRows.length > 0) {
+      var maxCols = 0, i;
+      for (i = 0; i < valueRows.length; i++) {
+        if (valueRows[i].length > maxCols) { maxCols = valueRows[i].length; }
+      }
+      if (valueRows.length > rows) { rows = valueRows.length; }
+      if (maxCols > cols) { cols = maxCols; }
+    }
+    if (!(rows > 0) || !(cols > 0)) {
+      throw new Error("'rows' and 'cols' are required (or pass 'values' as a 2D array to size the table)");
+    }
+    var left = wppNumber(params, "left", 60);
+    var top = wppNumber(params, "top", 120);
+    var width = wppNumber(params, "width", 600);
+    var height = wppNumber(params, "height", 200);
+    var r = wppSlide(app, params);
+    var shape = r.slide.Shapes.AddTable(rows, cols, left, top, width, height);
+    var filled = 0, rr, cc;
+    if (valueRows !== null) {
+      for (rr = 0; rr < valueRows.length && rr < rows; rr++) {
+        for (cc = 0; cc < valueRows[rr].length && cc < cols; cc++) {
+          shape.Table.Cell(rr + 1, cc + 1).Shape.TextFrame.TextRange.Text = cellText(valueRows[rr][cc]);
+          filled++;
+        }
+      }
+    }
+    var nm = shape.Name;
+    if (typeof nm === "function") { nm = nm.call(shape); }
+    return { slide: r.index, rows: rows, cols: cols, filled: filled, shape: String(nm) };
+  }
+
+  function cmdWppSetNotes(app, params) {
+    var text = paramString(params, "text", "");
+    if (text === null || text === undefined) { text = ""; }
+    var r = wppSlide(app, params);
+    r.slide.NotesPage.Shapes.Placeholders.Item(2).TextFrame.TextRange.Text = text;
+    return { slide: r.index, notes: text.length };
+  }
+
+  function wppSlideTexts(pres) {
+    var lines = [], i, j;
+    var count = Number(pres.Slides.Count);
+    for (i = 1; i <= count; i++) {
+      var slide = pres.Slides.Item(i);
+      var n = Number(slide.Shapes.Count);
+      for (j = 1; j <= n; j++) {
+        var t = wppShapeText(slide.Shapes.Item(j));
+        if (t) { lines.push(t); }
+      }
+      lines.push("");
+    }
+    return lines.join("\n");
+  }
+
+  function cmdWppExportPdf(app, params) {
+    var path = paramString(params, "path", null);
+    if (!path) { throw new Error("'path' is required"); }
+    var pres = wppPres(app);
+    try { pres.ExportAsFixedFormat(path, 32); } catch (e0) {}
+    var fs = app.FileSystem;
+    if (fsExists(fs, path)) { return { exported: path }; }
+    var text = "";
+    try { text = wppSlideTexts(pres); } catch (e1) {}
+    etPdfWrite(fs, path, buildPdf(text));
+    if (!fsExists(fs, path)) { throw new Error("could not write PDF to '" + path + "'"); }
+    return { exported: path };
+  }
+
+  function cmdWppSave(app) {
+    var pres = wppPres(app);
+    var p = pres.Path;
+    if (typeof p === "function") { p = p.call(pres); }
+    if (!p) { throw new Error("the document has never been saved - use saveAs with a 'path'"); }
+    pres.Save();
+    var info = wppDocInfo(pres);
+    return { saved: true, fullName: info.fullName };
+  }
+
+  function cmdWppSaveAs(app, params) {
+    var path = paramString(params, "path", null);
+    if (!path) { throw new Error("'path' is required"); }
+    var pres = wppPres(app);
+    pres.SaveAs(path);
+    var info = wppDocInfo(pres);
+    var fullName = info.fullName || path;
+    return { saved: true, fullName: fullName };
+  }
+
+  function cmdWppCloseAll(app) {
+    var col = app.Presentations;
+    var n = Number(col.Count);
+    var items = [], i;
+    for (i = 1; i <= n; i++) { items.push(col.Item(i)); }
+    var tmp = "/tmp";
+    try {
+      var fs = app.FileSystem;
+      var t = fs.tmpdir();
+      if (typeof t === "function") { t = t.call(fs); }
+      if (t) { tmp = String(t); }
+    } catch (e) {}
+    var rescued = [], closed = 0;
+    for (i = 0; i < items.length; i++) {
+      var pres = items[i];
+      var saved = pres.Saved;
+      if (typeof saved === "function") { saved = saved.call(pres); }
+      if (!saved) {
+        var nm = pres.Name;
+        if (typeof nm === "function") { nm = nm.call(pres); }
+        nm = String(nm) || "presentation.pptx";
+        var rp = tmp + "/rescued/" + nm;
+        try { pres.SaveAs(rp); rescued.push(rp); } catch (e2) {}
+      }
+      try { pres.Close(false); closed++; } catch (e3) {}
+    }
+    return { closed: closed, rescued: rescued };
+  }
+
+  // Soat bo cuc: khong bao `overflow` (WPS khong do duoc chieu cao chu that).
+  function cmdWppCheckLayout(app, params) {
+    var pres = wppPres(app);
+    var count = Number(pres.Slides.Count);
+    var only = 0;
+    if (hasParam(params, "slide")) { only = paramInt(params, "slide", 0); }
+    if (only < 0 || only > count) {
+      throw new Error("'slide' must be between 1 and " + count + ", got " + only);
+    }
+    var slideWidth = Number(pres.PageSetup.SlideWidth);
+    var slideHeight = Number(pres.PageSetup.SlideHeight);
+    var start = only ? only : 1, end = only ? only : count;
+    var slides = [], issueCount = 0, i, j, k, m;
+    for (i = start; i <= end; i++) {
+      var slide = pres.Slides.Item(i);
+      var n = Number(slide.Shapes.Count);
+      var boxes = [];
+      for (j = 1; j <= n; j++) {
+        var shape = slide.Shapes.Item(j);
+        var nm = shape.Name;
+        if (typeof nm === "function") { nm = nm.call(shape); }
+        var t = wppShapeText(shape);
+        var size = 0;
+        if (t) {
+          try { size = Number(shape.TextFrame.TextRange.Font.Size) || 0; } catch (e) { size = 0; }
+        }
+        boxes.push({ name: String(nm), left: Number(shape.Left), top: Number(shape.Top),
+          width: Number(shape.Width), height: Number(shape.Height), chars: t.length, minFont: size });
+      }
+      var issues = [], total = 0;
+      for (j = 0; j < boxes.length; j++) {
+        var b = boxes[j];
+        total += b.chars;
+        if (b.left < -2 || b.top < -2 ||
+            b.left + b.width > slideWidth + 2 || b.top + b.height > slideHeight + 2) {
+          issues.push({ type: "offslide",
+            detail: "'" + b.name + "' goes outside the slide (" + Math.round(slideWidth) + "x" + Math.round(slideHeight) + "pt)",
+            shapes: [b.name] });
+        }
+        if (b.chars && b.minFont > 0 && b.minFont < 12) {
+          issues.push({ type: "small-font",
+            detail: "'" + b.name + "' uses " + b.minFont + "pt text; keep body text at 12pt or more",
+            shapes: [b.name] });
+        }
+      }
+      var area = slideWidth * slideHeight;
+      var content = [];
+      for (j = 0; j < boxes.length; j++) {
+        if (boxes[j].width * boxes[j].height < area * 0.9) { content.push(boxes[j]); }
+      }
+      for (j = 0; j < content.length; j++) {
+        for (k = j + 1; k < content.length; k++) {
+          var a = content[j], c = content[k];
+          var w = Math.min(a.left + a.width, c.left + c.width) - Math.max(a.left, c.left);
+          var h = Math.min(a.top + a.height, c.top + c.height) - Math.max(a.top, c.top);
+          var over = (w > 0 && h > 0) ? w * h : 0;
+          var smaller = Math.min(a.width * a.height, c.width * c.height);
+          if (smaller > 0 && over > smaller * 0.1) {
+            issues.push({ type: "overlap",
+              detail: "'" + a.name + "' and '" + c.name + "' overlap (" + Math.round(100 * over / smaller) + "% of the smaller shape)",
+              shapes: [a.name, c.name] });
+          }
+        }
+      }
+      if (total > 600) {
+        issues.push({ type: "dense",
+          detail: "the slide has " + total + " characters; keep one message per slide and move details to notes (wpp.setNotes)" });
+      }
+      issueCount += issues.length;
+      var shapesOut = [];
+      for (m = 0; m < boxes.length; m++) {
+        shapesOut.push({ name: boxes[m].name, left: boxes[m].left, top: boxes[m].top,
+          width: boxes[m].width, height: boxes[m].height, chars: boxes[m].chars });
+      }
+      slides.push({ index: i, shapes: shapesOut, issues: issues });
+    }
+    return { slideWidth: slideWidth, slideHeight: slideHeight, issueCount: issueCount, slides: slides };
+  }
+
+  function cmdWppDeleteSlide(app, params) {
+    var r = wppSlide(app, params);
+    r.slide.Delete();
+    return { deleted: r.index, slideCount: Number(r.pres.Slides.Count) };
+  }
+
+  function wppAlignNum(raw) {
+    var name = (raw === undefined || raw === null) ? "left" : String(raw).trim().toLowerCase();
+    if (name === "left") { return 1; }
+    if (name === "center" || name === "centre") { return 2; }
+    if (name === "right") { return 3; }
+    throw new Error("'align' must be left/center/right, got '" + String(raw) + "'");
+  }
+
+  function cmdWppAddText(app, params) {
+    var text = paramString(params, "text", "");
+    if (text === null || text === undefined) { text = ""; }
+    // Kiem align TRUOC khi tao shape: sai thi khong de lai textbox rac.
+    var align = 1, wantAlign = false;
+    if (hasParam(params, "align")) {
+      align = wppAlignNum(params.align);
+      wantAlign = true;
+    }
+    var left = wppNumber(params, "left", 60);
+    var top = wppNumber(params, "top", 60);
+    var width = wppNumber(params, "width", 540);
+    var height = wppNumber(params, "height", 120);
+    var r = wppSlide(app, params);
+    var shape = r.slide.Shapes.AddTextbox(1, left, top, width, height);
+    shape.TextFrame.TextRange.Text = text;
+    if (hasParam(params, "fontSize")) { shape.TextFrame.TextRange.Font.Size = wppNumber(params, "fontSize", 18); }
+    if (hasParam(params, "bold")) { shape.TextFrame.TextRange.Font.Bold = paramBool(params, "bold", false) ? -1 : 0; }
+    if (hasParam(params, "color")) {
+      var bgr = parseBgrColor(paramString(params, "color", null));
+      if (bgr !== null) { shape.TextFrame.TextRange.Font.Color.RGB = bgr; }
+    }
+    if (wantAlign) { shape.TextFrame.TextRange.ParagraphFormat.Alignment = align; }
+    var nm = shape.Name;
+    if (typeof nm === "function") { nm = nm.call(shape); }
+    return { slide: r.index, shape: String(nm) };
+  }
+
+  function cmdWppAddTextBox(app, params) {
+    var text = paramString(params, "text", "");
+    if (text === null || text === undefined) { text = ""; }
+    var left = wppNumber(params, "left", 60);
+    var top = wppNumber(params, "top", 60);
+    var width = wppNumber(params, "width", 540);
+    var height = wppNumber(params, "height", 120);
+    var r = wppSlide(app, params);
+    var shape = r.slide.Shapes.AddTextbox(1, left, top, width, height);
+    shape.TextFrame.TextRange.Text = text;
+    var nm = shape.Name;
+    if (typeof nm === "function") { nm = nm.call(shape); }
+    return { slide: r.index, shape: String(nm) };
+  }
+
+  function cmdWppAddImage(app, params) {
+    var path = paramString(params, "path", null);
+    if (!path) { throw new Error("'path' is required"); }
+    var left = wppNumber(params, "left", 60);
+    var top = wppNumber(params, "top", 60);
+    var r = wppSlide(app, params);
+    var fs = app.FileSystem;
+    if (!fsExists(fs, path)) { throw new Error("image file not found: '" + path + "'"); }
+    var shape;
+    try {
+      shape = r.slide.Shapes.AddPicture(path, 0, 0, left, top, -1, -1);
+    } catch (e) {
+      throw new Error("image file not found: '" + path + "'");
+    }
+    // Giu ty le goc khi chi cho mot chieu (doc kich thuoc goc tu shape vua chen).
+    var origW = Number(shape.Width), origH = Number(shape.Height);
+    if (hasParam(params, "width") && hasParam(params, "height")) {
+      shape.Width = wppNumber(params, "width", origW);
+      shape.Height = wppNumber(params, "height", origH);
+    } else if (hasParam(params, "width")) {
+      var w = wppNumber(params, "width", origW);
+      shape.Width = w;
+      if (origW && origH) { shape.Height = origH * w / origW; }
+    } else if (hasParam(params, "height")) {
+      var h = wppNumber(params, "height", origH);
+      shape.Height = h;
+      if (origW && origH) { shape.Width = origW * h / origH; }
+    }
+    var nm = shape.Name;
+    if (typeof nm === "function") { nm = nm.call(shape); }
+    return { slide: r.index, shape: String(nm) };
+  }
+
+  var WPP_LAYOUTS = { 1: true, 2: true, 11: true, 12: true };
+
+  function cmdWppAddSlide(app, params) {
+    var layout = paramInt(params, "layout", 12);
+    if (!WPP_LAYOUTS[layout]) {
+      throw new Error("'layout' must be one of 1, 2, 11, 12, got " + layout);
+    }
+    var pres = wppPres(app);
+    var count = Number(pres.Slides.Count);
+    pres.Slides.Add(count + 1, layout);
+    return { slide: count + 1, layout: layout };
+  }
+
   var HANDLERS = {
     "app.info": cmdAppInfo,
     "writer.getText": cmdGetText,
@@ -2284,7 +2670,22 @@
     "et.save": cmdEtSave,
     "et.saveAs": cmdEtSaveAs,
     "et.closeAll": cmdEtCloseAll,
-    "et.checkRange": cmdEtCheckRange
+    "et.checkRange": cmdEtCheckRange,
+    "wpp.newPresentation": cmdWppNewPresentation,
+    "wpp.open": cmdWppOpen,
+    "wpp.listSlides": cmdWppListSlides,
+    "wpp.addSlide": cmdWppAddSlide,
+    "wpp.addText": cmdWppAddText,
+    "wpp.addTextBox": cmdWppAddTextBox,
+    "wpp.addImage": cmdWppAddImage,
+    "wpp.addTable": cmdWppAddTable,
+    "wpp.setNotes": cmdWppSetNotes,
+    "wpp.deleteSlide": cmdWppDeleteSlide,
+    "wpp.exportPdf": cmdWppExportPdf,
+    "wpp.save": cmdWppSave,
+    "wpp.saveAs": cmdWppSaveAs,
+    "wpp.closeAll": cmdWppCloseAll,
+    "wpp.checkLayout": cmdWppCheckLayout
   };
 
   function catalog() {
