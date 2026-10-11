@@ -4,8 +4,9 @@
 
 - Chi ghi trong --home (HOME that cua tien trinh khong bao gio bi dung toi).
 - <HOME>/.local/share/Kingsoft/wps/jsaddons/publish.xml co DUNG MOT
-  <jspluginonline name="axiomoffice" type="wps" url="<core-url>/wps/addin/" .../>, giu dang ky cua add-in khac,
+  <jspluginonline name="axiomoffice" type="wps,et,wpp" url="<core-url>/wps/addin/" .../>, giu dang ky cua add-in khac,
   go dang ky offline cu (<jsplugin name="axiomoffice">) va thu muc add-in offline cu (axiomoffice_*).
+  Mot entry duy nhat phuc vu ca ba app cua WPS: Writer (wps), Spreadsheets (et), Presentation (wpp).
 - Khong chep file add-in (Core phuc vu chung).
 - Office.conf chi duoc ghi khi co --test-profile.
 - --home H --uninstall: go dang ky axiomoffice khoi publish.xml (giu add-in khac).
@@ -72,7 +73,11 @@ class InstallerTests(unittest.TestCase):
         entries = self.online_entries()
         self.assertEqual(len(entries), 1, read(self.publish))
         self.assertIn('name="axiomoffice"', entries[0])
-        self.assertIn('type="wps"', entries[0])
+        # Mot entry phuc vu ca ba app: thieu mot app la add-in khong nap o app do.
+        match = re.search(r'type="([^"]*)"', entries[0])
+        self.assertIsNotNone(match, entries[0])
+        self.assertEqual({part.strip() for part in match.group(1).split(",")},
+                         {"wps", "et", "wpp"}, entries[0])
         self.assertIn('url="http://127.0.0.1:47840/wps/addin/"', entries[0])
         self.assertEqual(files_under(self.sentinel), [], "trinh cai ghi ra ngoai --home")
         outside = [p for p in files_under(self.tmp.name) if not p.startswith(self.home + os.sep)]
