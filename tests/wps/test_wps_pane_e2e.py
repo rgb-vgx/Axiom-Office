@@ -189,6 +189,22 @@ def main() -> int:
         check("bao-cao-tuan.docx" in json.dumps(first, ensure_ascii=False),
               "prompt co ten tai lieu tu lan poll cua add-in", "")
 
+        # ---- trinh duyet KHONG gui Origin cho GET cung origin (EventSource cua pane trong WPS, thu 11/10/2026: 401).
+        # Pane la trang cua Core nen trinh duyet gui "Sec-Fetch-Site: same-origin" (header trang khac khong gia duoc).
+        # Chi GET duoc noi long; POST van can Origin (trinh duyet luon gui Origin cho POST).
+        same = {"Sec-Fetch-Site": "same-origin"}
+        events = sse(core.base + "/wps/v1/runs/%s/events" % run_id, same)
+        check(any(e == "run.completed" for e, _ in events), "pane SSE khong Origin + Sec-Fetch-Site: same-origin -> doc duoc",
+              [e for e, _ in events][:5])
+        status, _, _ = base.request(core.base + "/wps/v1/runs/%s" % run_id, headers=same)
+        check(status == 200, "GET /wps/v1/runs/{id} voi Sec-Fetch-Site: same-origin -> 200", status)
+        status, _, _ = base.request(core.base + "/wps/v1/runs/%s" % run_id, headers={"Sec-Fetch-Site": "cross-site"})
+        check(status in (401, 403), "GET voi Sec-Fetch-Site: cross-site (khong token) -> bi chan", status)
+        status, _, _ = base.request(core.base + "/wps/v1/runs", "POST", {"prompt": "x"}, same)
+        check(status in (401, 403), "POST khong Origin chi co Sec-Fetch-Site -> van bi chan", status)
+        status, _, _ = base.request(core.base + "/v1/skills", headers=same)
+        check(status in (401, 403), "Sec-Fetch-Site khong mo khoa /v1/* (guard cu)", status)
+
         # ---- luot 2: huy
         status, _, text = base.request(core.base + "/wps/v1/runs", "POST",
                                        {"prompt": "Làm việc lâu", "conversationId": conversation}, own)

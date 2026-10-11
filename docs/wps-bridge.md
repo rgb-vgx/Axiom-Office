@@ -98,3 +98,7 @@ Pane là một trang khác của add-in (`/wps/addin/pane.html`), mở bằng n�
 
 `/v1/runs` giữ guard cũ (mọi `Origin` → 403). Spec: `tests/wps/test_wps_pane_e2e.py` (T4a, phía Core).
 
+Trình duyệt **không gửi `Origin` cho GET cùng origin** (`EventSource` của pane → 401, phát hiện 11/10/2026). Với
+**GET** trên `/wps/v1/*`, Core chấp nhận thêm khi không có `Origin` mà có `Sec-Fetch-Site: same-origin` (header trình
+duyệt tự đặt, trang khác không giả được; CEF Chrome 87 có gửi). POST vẫn cần `Origin`; `/v1/*` không đổi.
+
