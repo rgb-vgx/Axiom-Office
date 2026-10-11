@@ -1,8 +1,8 @@
 # Bridge WPS Office for Linux (JS add-in do Agent Core phục vụ)
 
 Trạng thái: **đã chạy trên WPS thật** (11/10/2026): Core (T1), trình cài `--core-url` (T2a), add-in 16 lệnh đợt 1
-(T2b, T2c). Đóng gói + `install.sh` (T3) xong, đăng ký cả ba app (T5) xong. Spec T6–T8 đã viết (đang đỏ, chờ
-triển khai): nhận biết app + `et.*`/`wpp.*`. Còn lại: pane Ask AI trong WPS. Cơ sở thực nghiệm:
+(T2b, T2c). Đóng gói + `install.sh` (T3) xong, đăng ký cả ba app (T5) xong, nhận biết app + đủ 38 lệnh
+`et.*`/`wpp.*` (T6–T8) xong. Còn lại: pane Ask AI trong WPS. Cơ sở thực nghiệm:
 [wps-spike.md](wps-spike.md) (hướng B) và [tests/wps/REFERENCE.md](../tests/wps/REFERENCE.md).
 
 ## 1. Bài toán
@@ -74,6 +74,9 @@ Cùng giao thức và cùng guard với bridge LibreOffice (`Origin` → 403, to
   (giống VBA/COM — viết theo handler C# trong `src/AxiomOffice/Bridge/CommandDispatcher.Writer.cs`).
   Lệnh sửa tài liệu chạy trong `Application.UndoRecord.StartCustomRecord("AI: <lệnh>")`/`EndCustomRecord()`
   ⇒ mỗi lệnh AI = một bước Undo. Lỗi handler → `{ok:false, error}`, không bao giờ làm treo vòng lặp.
+- **54 lệnh** trong `commands.js`: `app.info` + 15 `writer.*` + 23 `et.*` + 15 `wpp.*` (metadata của cả 54 lấy từ
+  registry LibreOffice). Chỉ 15 lệnh `writer.*` mở `UndoRecord` — ET/WPP không có nó (mục 6). Lệnh chưa có
+  handler trả `unknown action: <lệnh>`.
 
 ## 4. Cài đặt
 - Bước admin một lần mỗi máy: `JsApiPlugin=true` trong `/opt/kingsoft/wps-office/office6/cfgs/oem.ini`.

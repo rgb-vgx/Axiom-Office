@@ -18,7 +18,7 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 - **Gói Linux + install.sh**: tarball mang `core/wps-addin/` và `wps/install_jsaddon.py`; `install.sh` thấy WPS thì
   đăng ký add-in trỏ tới Core, chỉ in lệnh `sudo` bật `JsApiPlugin` khi `oem.ini` chưa bật, nhắc `--systemd`;
   thêm `--no-wps`, `--uninstall` gỡ đăng ký (TASK-000105)
-- Test: `tests/wps/test_wps_bridge_e2e.py` (Core, 35), `test_addin.mjs` (Node, 7), `test_wps_bridge_live.py`
+- Test: `tests/wps/test_wps_bridge_e2e.py` (Core, 35), `test_addin.mjs` (Node, 13), `test_wps_bridge_live.py`
   (WPS thật dưới Xvfb, 24 - chạy ở máy dev). Viết bởi aidev TASK-000094/095/103/104 theo spec viết trước
 - **Một add-in cho cả ba app WPS**: `publish.xml` đăng ký một entry `type="wps,et,wpp"` thay vì chỉ Writer
   (đo trên WPS thật: ba entry riêng chỉ app khớp entry đầu nạp được) — `install_jsaddon.py` và `install.sh` cũng
@@ -26,13 +26,20 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 - `tests/wps/REFERENCE.md` thêm kết quả đo object model WPS thật: biến thể `publish.xml` cho ba app, khác biệt
   ET/WPP (`.Cells.Item(r,c)`, `.UsedRange.Address()` là hàm, màu BGR, chỉ số 1-based), và hai thứ **không** có —
   `UndoRecord` (nên `et.undo` phải tự khôi phục) và xuất PDF ghi file
-- **Spec viết trước cho T6–T8** (đang đỏ, chờ aidev): `tests/wps/test_addin.mjs` (add-in tự nhận app đang chạy —
-  `appKind`/`catalogFor`, từ chối lệnh của app khác, `app.info` theo component, poll báo `app`),
-  `core-go/internal/wpsbridge/wpsbridge_test.go` (Core ghi `app` theo poll thay vì hard-code `"wps"`, để
-  `office_action.go` không lọc bỏ im lặng `et.*`/`wpp.*`), `tests/wps/test_addin_et.mjs` (23 lệnh `et.*`) và
-  `tests/wps/test_addin_wpp.mjs` (15 lệnh `wpp.*`); dùng chung `addin_harness.mjs` và object model giả
-  `addin_fake.mjs`. Registry add-in đã khai báo metadata của cả 38 lệnh `et.*`/`wpp.*`
-  (nguồn: `tests/wps/lo_catalog.py`); handler của chúng thêm ở T7/T8
+- **Add-in nhận biết app đang chạy**: `AxiomCommands.appKind(app)` đọc `Application.Name`, `catalogFor(kind)` chỉ
+  khai báo lệnh của app đó (`kind` rỗng = dùng chung mọi app), `execute()` từ chối lệnh của app khác, `app.info`
+  trả app + tài liệu theo component, body poll báo `app` đang chạy; **Core ghi `app` theo lần poll gần nhất**
+  thay vì hard-code `"wps"`, nên `tools/office_action.go` không lọc bỏ im lặng mọi lệnh `et.*`/`wpp.*`
+  (TASK-000115)
+- **38 lệnh `et.*`/`wpp.*`**: 23 lệnh Spreadsheets (TASK-000118) và 15 lệnh Presentation (TASK-000119) — metadata
+  giống hệt registry LibreOffice (nguồn `tests/wps/lo_catalog.py`), tham số/kết quả/thông điệp lỗi theo bản
+  LibreOffice, trừ những chỗ object model WPS khác (mục 6 của docs/wps-bridge.md: `et.undo` tự khôi phục,
+  `exportPdf` tự dựng PDF, `checkRange` không có `table`, `wpp.checkLayout` không có `overflow`…)
+- **Spec cho T6–T8** (viết trước, nay đã xanh): `tests/wps/test_addin.mjs` (appKind/catalogFor/cổng chặn lệnh),
+  `test_addin_et.mjs` (21), `test_addin_wpp.mjs` (15), `core-go/internal/wpsbridge/wpsbridge_test.go`; dùng chung
+  `addin_harness.mjs` (kết quả chuẩn hoá qua JSON đúng như đường HTTP tới Core) và object model giả
+  `addin_fake.mjs` — proxy "nghiêm": chạm thành viên chưa mô phỏng là lỗi, nên spec không cho phép gọi API mà
+  WPS thật không có. Test add-in: 71 xanh
 
 ### Fixed — An toàn dữ liệu khi agent làm việc trên sheet có sẵn (log Calc thật 11/10/2026)
 Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho thấy ba vấn đề:
