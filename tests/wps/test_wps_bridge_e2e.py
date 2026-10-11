@@ -73,7 +73,8 @@ def core_exe(work: str) -> str:
 
 
 class Core:
-    def __init__(self, exe: str, work: str, token: str, bridge_port: int, addin_dir: str, session_dir: str):
+    def __init__(self, exe: str, work: str, token: str, bridge_port: int, addin_dir: str, session_dir: str,
+                 extra_env: dict | None = None):
         self.data_dir = os.path.join(work, "core")
         os.makedirs(self.data_dir, exist_ok=True)
         env = {k: v for k, v in os.environ.items() if not k.startswith("AXIOM_")}
@@ -90,6 +91,7 @@ class Core:
             "AXIOM_WPS_POLL_SECONDS": "2",
             "AXIOM_WPS_DISCONNECT_SECONDS": "4",
         })
+        env.update(extra_env or {})
         self.log_path = os.path.join(work, "core.out")
         self.log = open(self.log_path, "w", encoding="utf-8")
         self.process = subprocess.Popen([exe], env=env, cwd=self.data_dir, stdout=self.log, stderr=subprocess.STDOUT)

@@ -83,3 +83,18 @@ Cùng giao thức và cùng guard với bridge LibreOffice (`Origin` → 403, to
   Mỗi lệnh AI vẫn là đúng một bước Undo (UndoRecord).
 - Add-in chỉ nạp khi Core đã chạy lúc mở WPS (Core tắt thì WPS bỏ qua add-in im lặng) và khi `JsApiPlugin=true`.
 - Đợt 1 chỉ có `app.info` + 15 lệnh `writer.*`; Spreadsheets (`et.*`) và Presentation (`wpp.*`) chưa có.
+
+## 7. Pane Ask AI trong WPS
+Pane là một trang khác của add-in (`/wps/addin/pane.html`), mở bằng nút trên ribbon qua
+`Application.CreateTaskPane(url)`. Cùng origin với Core nên **không có token**: dùng kênh add-in với cùng xác thực
+(`Origin` = origin của Core, hoặc token khi không có `Origin`):
+
+| Endpoint | Tương đương | Ghi chú |
+|---|---|---|
+| `POST /wps/v1/runs {prompt, conversationId?, options?}` | `POST /v1/runs` | Core tự gắn `office` = bridge WPS, `document` = lần poll gần nhất; add-in chưa kết nối → **409** |
+| `GET /wps/v1/runs/{id}` | `GET /v1/runs/{id}` | |
+| `GET /wps/v1/runs/{id}/events` | SSE `/v1/runs/{id}/events` | `EventSource` cùng origin |
+| `POST /wps/v1/runs/{id}/cancel` · `/confirm` | như `/v1/runs/...` | nút Dừng, thẻ xác nhận |
+
+`/v1/runs` giữ guard cũ (mọi `Origin` → 403). Spec: `tests/wps/test_wps_pane_e2e.py` (T4a, phía Core).
+
