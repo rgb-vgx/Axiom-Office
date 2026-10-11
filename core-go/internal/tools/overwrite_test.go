@@ -273,3 +273,66 @@ func TestReasonIsCappedForLargeOverwrites(t *testing.T) {
 		t.Fatalf("60 o: ly do neu tong so 60 va duoc rut gon (<1200 ky tu): %d ky tu %q", len(log[0].reason), log)
 	}
 }
+
+// Hieu nang (review 11/10/2026): ban dau guard doc TUNG O qua bridge - ghi bang 1.000 dong x 10 cot la
+// 10.000 lan goi bridge. Phai doc ca vung dich trong MOT lan et.readRange moi vung (moi muc writes).
+func TestOverwriteGuardReadsEachTargetAreaOnce(t *testing.T) {
+	book := newBook()
+	server, port := book.serve(t)
+	defer server.Close()
+	yes := true
+	var log []asked
+	run := overwriteRun(port, server, &yes, &log)
+	tool := NewOfficeActionTool(calcCatalog(), "et")
+
+	values := []any{}
+	for row := 0; row < 500; row++ {
+		values = append(values, []any{row, row, row, row})
+	}
+	invoke(tool, run, "et.writeRange", map[string]any{"range": "AA1", "sheet": "ADT", "values": values})
+	if book.reads > 1 {
+		t.Fatalf("ghi 2.000 o (500x4) phai doc vung dich 1 lan, doc %d lan", book.reads)
+	}
+
+	book.reads = 0
+	invoke(tool, run, "et.writeRanges", map[string]any{"sheet": "ADT", "writes": []any{
+		map[string]any{"range": "AF1", "values": values},
+		map[string]any{"range": "AK1", "values": values},
+	}})
+	if book.reads > 2 {
+		t.Fatalf("writeRanges 2 vung phai doc toi da 2 lan, doc %d lan", book.reads)
+	}
+
+	book.reads = 0
+	invoke(tool, run, "et.fillRange", map[string]any{"range": "AP1:AS500", "sheet": "ADT", "formula": "=1"})
+	if book.reads > 1 {
+		t.Fatalf("fillRange 2.000 o phai doc 1 lan, doc %d lan", book.reads)
+	}
+}
+
+// Da dong y ghi de tren sheet, hoac sheet do luot tao: khong can doc gi nua (khong ton vong bridge).
+func TestNoReadsForApprovedOrOwnSheets(t *testing.T) {
+	book := newBook()
+	server, port := book.serve(t)
+	defer server.Close()
+	yes := true
+	var log []asked
+	run := overwriteRun(port, server, &yes, &log)
+	tool := NewOfficeActionTool(calcCatalog(), "et")
+
+	invoke(tool, run, "et.writeRange", map[string]any{"range": "Q4", "sheet": "ADT", "values": []any{[]any{1}}})
+	if len(log) != 1 {
+		t.Fatalf("lan dau phai hoi: %v", log)
+	}
+	book.reads = 0
+	invoke(tool, run, "et.writeRange", map[string]any{"range": "I4", "sheet": "ADT", "values": []any{[]any{2}}})
+	if book.reads != 0 {
+		t.Fatalf("sheet ADT da duoc dong y trong luot: khong doc nua, doc %d lan", book.reads)
+	}
+	invoke(tool, run, "et.addSheet", map[string]any{"name": "Dashboard"})
+	book.reads = 0
+	invoke(tool, run, "et.writeRange", map[string]any{"range": "A1", "sheet": "Dashboard", "values": []any{[]any{"x"}}})
+	if book.reads != 0 {
+		t.Fatalf("sheet do luot tao: khong doc, doc %d lan", book.reads)
+	}
+}

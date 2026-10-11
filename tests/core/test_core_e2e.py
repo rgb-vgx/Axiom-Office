@@ -356,7 +356,8 @@ def test_fake_bridge(core: Core, bridge: FakeBridge, llm: FakeLlm, document_path
           events[2][1]["data"])
 
     check(bridge.actions() == ["et.writeRange"], "bridge nhan dung lenh", bridge.actions())
-    check(bridge.commands[0].get("params", {}).get("range") == "A1", "tham so nguyen van xuong bridge", bridge.commands[0])
+    sent = [item for item in bridge.commands if item.get("action") != "et.readRange"]   # bo lenh doc Core tu goi
+    check(sent and sent[0].get("params", {}).get("range") == "A1", "tham so nguyen van xuong bridge", sent[:1])
 
     run = core.get_run(run_id)
     check(run["status"] == "completed" and run["reply"] == "Da ghi xong bang diem", "GET /v1/runs/{id} co ket qua", run)
