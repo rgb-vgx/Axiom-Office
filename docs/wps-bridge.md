@@ -1,6 +1,7 @@
 # Bridge WPS Office for Linux (JS add-in do Agent Core phục vụ)
 
-Trạng thái: **thiết kế, đang triển khai** (09/10/2026). Cơ sở thực nghiệm: [wps-spike.md](wps-spike.md)
+Trạng thái: **đã chạy trên WPS thật** (11/10/2026): Core (T1), trình cài `--core-url` (T2a), add-in 16 lệnh đợt 1
+(T2b, T2c). Còn lại: đóng gói/cài cho người dùng (T3), pane Ask AI trong WPS, lệnh Spreadsheets/Presentation. Cơ sở thực nghiệm: [wps-spike.md](wps-spike.md)
 (hướng B) và [tests/wps/REFERENCE.md](../tests/wps/REFERENCE.md).
 
 ## 1. Bài toán
@@ -75,3 +76,10 @@ Cùng giao thức và cùng guard với bridge LibreOffice (`Origin` → 403, to
 | T1 | Core: 2.1–2.3 | `tests/wps/test_wps_bridge_e2e.py` (Core thật + add-in giả bằng HTTP) |
 | T2 | Add-in: vòng poll + registry + handler `writer.*` | test Node với object model giả + đối chiếu registry LibreOffice |
 | T3 | Trình cài `--core-url`, gói Linux, test chạy WPS thật | `tests/wps/test_wps_bridge_live.py` |
+
+## 6. Giới hạn đã biết
+- `writer.undo {count}` gỡ N bước Undo gần nhất của tài liệu, **không phân biệt bước của AI hay của người**:
+  object model WPS không cho đọc tên các bước Undo như LibreOffice (bản LibreOffice chỉ gỡ bước `AI: …`).
+  Mỗi lệnh AI vẫn là đúng một bước Undo (UndoRecord).
+- Add-in chỉ nạp khi Core đã chạy lúc mở WPS (Core tắt thì WPS bỏ qua add-in im lặng) và khi `JsApiPlugin=true`.
+- Đợt 1 chỉ có `app.info` + 15 lệnh `writer.*`; Spreadsheets (`et.*`) và Presentation (`wpp.*`) chưa có.

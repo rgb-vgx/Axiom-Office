@@ -5,6 +5,19 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — WPS Office for Linux: Agent Core làm bridge cho JS add-in (docs/wps-bridge.md)
+- **Core** phục vụ add-in ở `/wps/addin/`, kênh long-poll `/wps/v1/poll|result` chỉ nhận `Origin` của chính Core,
+  và một **bridge WPS** trên cổng 47861 nói đúng giao thức bridge (`/health`, `/commands`, `/session`, `/cmd`) kèm
+  file session `<pid Core>-wps.json` - agent, MCP làn live và script dùng WPS như mọi bridge khác. `/cmd` báo lỗi
+  ngay khi add-in mất kết nối
+- **Add-in** (`src/AxiomOffice.WPS/`): `app.info` + 15 lệnh `writer.*` (metadata giống hệt registry LibreOffice),
+  mỗi lệnh sửa tài liệu = một bước Undo (`UndoRecord "AI: <lệnh>"`); `writer.replaceAll` thay bằng một lần
+  `ReplaceAll` (trước đó lặp vô hạn khi chuỗi thay chứa chuỗi tìm)
+- **Trình cài** `scripts/wps/install_jsaddon.py --home H --core-url URL [--test-profile]`: đăng ký
+  `<jspluginonline>` trỏ tới Core, gỡ bản offline của spike; `Office.conf` chỉ đụng khi `--test-profile`
+- Test: `tests/wps/test_wps_bridge_e2e.py` (Core, 35), `test_addin.mjs` (Node, 7), `test_wps_bridge_live.py`
+  (WPS thật dưới Xvfb, 24 - chạy ở máy dev). Viết bởi aidev TASK-000094/095/103/104 theo spec viết trước
+
 ### Fixed — An toàn dữ liệu khi agent làm việc trên sheet có sẵn (log Calc thật 11/10/2026)
 Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho thấy ba vấn đề:
 - **Hỏi trước khi ghi đè dữ liệu cũ** (Core): `et.writeRange`/`et.writeRanges`/`et.fillRange` vào sheet có
