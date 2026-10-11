@@ -1047,6 +1047,1204 @@
     return { exported: path };
   }
 
+  // ---- ET (Spreadsheets): undo tu quan ly trong phien add-in (ET khong co UndoRecord).
+  var etUndoStack = [];
+  var etCondStore = {};
+
+  function etColToNum(letters) {
+    var n = 0, i;
+    var s = String(letters).toUpperCase();
+    for (i = 0; i < s.length; i++) { n = n * 26 + (s.charCodeAt(i) - 64); }
+    return n;
+  }
+
+  function etNumToCol(n) {
+    var s = "", x = n;
+    while (x > 0) {
+      var r = (x - 1) % 26;
+      s = String.fromCharCode(65 + r) + s;
+      x = Math.floor((x - 1) / 26);
+    }
+    return s;
+  }
+
+  function etNormAddr(addr) {
+    return String(addr).replace(/\$/g, "").trim().toUpperCase();
+  }
+
+  function etParseAddr(addr) {
+    var s = etNormAddr(addr);
+    var m = s.match(/^([A-Z]+)(\d+)(?::([A-Z]+)(\d+))?$/);
+    if (!m) { throw new Error("'range' must be a valid address like 'A1:C10', got '" + addr + "'"); }
+    var c1 = etColToNum(m[1]), r1 = parseInt(m[2], 10);
+    var c2 = m[3] ? etColToNum(m[3]) : c1, r2 = m[4] ? parseInt(m[4], 10) : r1;
+    if (r1 < 1 || c1 < 1 || r2 < 1 || c2 < 1) {
+      throw new Error("'range' must be a valid address like 'A1:C10', got '" + addr + "'");
+    }
+    return { r1: Math.min(r1, r2), c1: Math.min(c1, c2), r2: Math.max(r1, r2), c2: Math.max(c1, c2) };
+  }
+
+  function etAddrStr(r1, c1, r2, c2) {
+    var a = etNumToCol(c1) + r1;
+    if (r2 === r1 && c2 === c1) { return a; }
+    return a + ":" + etNumToCol(c2) + r2;
+  }
+
+  function etTopLeft(addr) {
+    var s = etNormAddr(addr);
+    var parts = s.split(":");
+    return parts[0];
+  }
+
+  function etWb(app) {
+    var wb = app.ActiveWorkbook;
+    if (wb === undefined || wb === null) { throw new Error("no active workbook (open one in WPS Spreadsheets first)"); }
+    return wb;
+  }
+
+  function etSheetNames(wb) {
+    var names = [];
+    var col = wb.Worksheets;
+    var n = col.Count;
+    if (typeof n === "function") { n = n.call(col); }
+    n = Number(n);
+    for (var i = 1; i <= n; i++) {
+      var ws = col.Item(i);
+      var nm = ws.Name;
+      if (typeof nm === "function") { nm = nm.call(ws); }
+      names.push(String(nm));
+    }
+    return names;
+  }
+
+  function etFindSheet(wb, name) {
+    var col = wb.Worksheets;
+    var n = Number(col.Count);
+    for (var i = 1; i <= n; i++) {
+      var ws = col.Item(i);
+      var nm = ws.Name;
+      if (typeof nm === "function") { nm = nm.call(ws); }
+      if (String(nm) === String(name)) { return ws; }
+    }
+    return null;
+  }
+
+  function etResolveSheet(app, params) {
+    var wb = etWb(app);
+    var want = paramString(params, "sheet", null);
+    if (want) {
+      var names = etSheetNames(wb);
+      var found = etFindSheet(wb, want);
+      if (!found) { throw new Error("no sheet named '" + want + "' (sheets: " + names.join(", ") + ")"); }
+      return { wb: wb, ws: found, name: want };
+    }
+    var active = app.ActiveSheet;
+    if (active === undefined || active === null) { throw new Error("no active sheet (open one in WPS Spreadsheets first)"); }
+    var aname = active.Name;
+    if (typeof aname === "function") { aname = aname.call(active); }
+    return { wb: wb, ws: active, name: String(aname) };
+  }
+
+  function etRangeAddrOf(ws) {
+    var ur = ws.UsedRange;
+    var fn = ur.Address;
+    var abs = (typeof fn === "function") ? fn.call(ur) : fn;
+    return etNormAddr(String(abs));
+  }
+
+  function etStrictMatrix(raw) {
+    var data = raw;
+    if (typeof data === "string") {
+      var t = data.replace(/^\s+/, "");
+      if (t.charAt(0) === "[" || t.charAt(0) === "{") {
+        try { data = JSON.parse(data); } catch (e) {}
+      } else {
+        throw new Error(matrixHelp("values", describeValue(data)));
+      }
+    }
+    data = decodeArrays(data);
+    if (!Array.isArray(data)) { throw new Error(matrixHelp("values", describeValue(data))); }
+    if (data.length === 0) { throw new Error(matrixHelp("values", "an empty array")); }
+    var i;
+    for (i = 0; i < data.length; i++) {
+      if (!Array.isArray(data[i])) { throw new Error(matrixHelp("values", "an array")); }
+    }
+    var rows = [];
+    for (var r = 0; r < data.length; r++) {
+      var row = [];
+      for (var c = 0; c < data[r].length; c++) {
+        var cell = data[r][c];
+        while (Array.isArray(cell) && cell.length === 1) { cell = cell[0]; }
+        if (Array.isArray(cell) || (cell !== null && typeof cell === "object")) {
+          throw new Error(matrixHelp("values", "a nested array/object at row " + (r + 1) + ", column " + (c + 1)));
+        }
+        row.push(cell);
+      }
+      rows.push(row);
+    }
+    return rows;
+  }
+
+  function etSnapshotCells(ws, r0, c0, rows) {
+    var snaps = [];
+    var r, c;
+    for (r = 0; r < rows.length; r++) {
+      for (c = 0; c < rows[r].length; c++) {
+        var rr = r0 + r, cc = c0 + c;
+        var cell = ws.Cells.Item(rr, cc);
+        var v = cell.Value2;
+        if (typeof v === "function") { v = v.call(cell); }
+        var f = cell.Formula;
+        if (typeof f === "function") { f = f.call(cell); }
+        if (Array.isArray(v)) { v = null; }
+        if (Array.isArray(f)) { f = null; }
+        snaps.push({ r: rr, c: cc, v: (v === undefined ? null : v), f: (f === undefined ? null : f) });
+      }
+    }
+    return snaps;
+  }
+
+  function etRestoreCells(ws, snaps) {
+    var i;
+    for (i = 0; i < snaps.length; i++) {
+      var s = snaps[i];
+      var cell = ws.Cells.Item(s.r, s.c);
+      if (s.f !== null && s.f !== undefined && typeof s.f === "string" && s.f.charAt(0) === "=") {
+        cell.Formula = s.f;
+      } else if (s.v === null || s.v === undefined || s.v === "") {
+        cell.Value2 = null;
+      } else {
+        cell.Value2 = s.v;
+      }
+    }
+  }
+
+  function etPushCells(sheetName, addrStr, snaps) {
+    etUndoStack.push({ kind: "cells", sheet: sheetName, range: addrStr, snaps: snaps });
+  }
+
+  function etActiveSheetName(app) {
+    var s = app.ActiveSheet;
+    var n = s.Name;
+    if (typeof n === "function") { n = n.call(s); }
+    return String(n);
+  }
+
+  function etDocInfo(wb) {
+    var name = wb.Name;
+    if (typeof name === "function") { name = name.call(wb); }
+    var full = wb.FullName;
+    if (typeof full === "function") { full = full.call(wb); }
+    var saved = wb.Saved;
+    if (typeof saved === "function") { saved = saved.call(wb); }
+    return { name: String(name), fullName: String(full), saved: !!saved };
+  }
+
+  function cmdEtNewWorkbook(app) {
+    var wb = app.Workbooks.Add();
+    var active = app.ActiveWorkbook;
+    var info = etDocInfo(active);
+    return { name: info.name, fullName: info.fullName, saved: info.saved, opened: true };
+  }
+
+  function cmdEtOpen(app, params) {
+    var path = paramString(params, "path", null);
+    if (!path) { throw new Error("'path' is required"); }
+    app.Workbooks.Open(path);
+    var active = app.ActiveWorkbook;
+    var info = etDocInfo(active);
+    return { name: info.name, fullName: info.fullName, saved: info.saved, opened: true };
+  }
+
+  function cmdEtListSheets(app) {
+    var wb = etWb(app);
+    var info = etDocInfo(wb);
+    return { workbook: info.name, activeSheet: etActiveSheetName(app), sheets: etSheetNames(wb) };
+  }
+
+  function etIsEmptySheet(ws) {
+    var addr = etRangeAddrOf(ws);
+    var box;
+    try { box = etParseAddr(addr); } catch (e) { return true; }
+    if (box.r1 !== box.r2 || box.c1 !== box.c2) { return false; }
+    var cell = ws.Cells.Item(box.r1, box.c1);
+    var v = cell.Value2;
+    if (typeof v === "function") { v = v.call(cell); }
+    var f = cell.Formula;
+    if (typeof f === "function") { f = f.call(cell); }
+    var t = cell.Text;
+    if (typeof t === "function") { t = t.call(cell); }
+    if (f !== null && f !== undefined && typeof f === "string" && f !== "") { return false; }
+    if (v !== null && v !== undefined && v !== "") { return false; }
+    if (t !== null && t !== undefined && String(t) !== "") { return false; }
+    return true;
+  }
+
+  function cmdEtSheetInfo(app) {
+    var wb = etWb(app);
+    var active = etActiveSheetName(app);
+    var names = etSheetNames(wb);
+    var out = [];
+    var i;
+    for (i = 0; i < names.length; i++) {
+      var ws = etFindSheet(wb, names[i]);
+      var empty = etIsEmptySheet(ws);
+      if (empty) {
+        out.push({ name: names[i], usedRange: null, rows: 0, cols: 0, empty: true });
+      } else {
+        var addr = etRangeAddrOf(ws);
+        var box = etParseAddr(addr);
+        out.push({ name: names[i], usedRange: etAddrStr(box.r1, box.c1, box.r2, box.c2),
+          rows: box.r2 - box.r1 + 1, cols: box.c2 - box.c1 + 1, empty: false });
+      }
+    }
+    return { activeSheet: active, sheets: out };
+  }
+
+  function cmdEtAddSheet(app, params) {
+    var wb = etWb(app);
+    var existing = etSheetNames(wb);
+    var name = paramString(params, "name", null);
+    if (!name) {
+      var idx = 1;
+      while (existing.indexOf("Sheet" + idx) >= 0) { idx++; }
+      name = "Sheet" + idx;
+    }
+    if (existing.indexOf(name) >= 0) {
+      throw new Error("a sheet named '" + name + "' already exists (sheets: " + existing.join(", ") + ")");
+    }
+    var col = wb.Worksheets;
+    var count = Number(col.Count);
+    var ws;
+    if (hasParam(params, "index")) {
+      var pos = paramInt(params, "index", count);
+      if (isNaN(pos)) { pos = count; }
+      pos = Math.max(0, Math.min(pos, count));
+      if (pos >= count) {
+        ws = col.Add();
+      } else {
+        ws = col.Add(pos + 1);
+      }
+    } else {
+      ws = col.Add();
+    }
+    ws.Name = name;
+    try { ws.Activate(); } catch (e) {}
+    etUndoStack.push({ kind: "addSheet", sheet: name });
+    return { sheet: name, sheets: etSheetNames(wb) };
+  }
+
+  function cmdEtRenameSheet(app, params) {
+    var old = paramString(params, "sheet", null);
+    if (!old) { throw new Error("'sheet' is required"); }
+    var name = paramString(params, "name", null);
+    if (!name) { throw new Error("'name' is required"); }
+    var wb = etWb(app);
+    var existing = etSheetNames(wb);
+    if (existing.indexOf(old) < 0) {
+      throw new Error("no sheet named '" + old + "' (sheets: " + existing.join(", ") + ")");
+    }
+    if (name !== old && existing.indexOf(name) >= 0) {
+      throw new Error("a sheet named '" + name + "' already exists (sheets: " + existing.join(", ") + ")");
+    }
+    var ws = etFindSheet(wb, old);
+    ws.Name = name;
+    return { sheet: name, sheets: etSheetNames(wb) };
+  }
+
+  function cmdEtActivateSheet(app, params) {
+    var want = paramString(params, "sheet", null);
+    if (!want) { throw new Error("'sheet' is required"); }
+    var wb = etWb(app);
+    var names = etSheetNames(wb);
+    if (names.indexOf(want) < 0) {
+      throw new Error("no sheet named '" + want + "' (sheets: " + names.join(", ") + ")");
+    }
+    var ws = etFindSheet(wb, want);
+    ws.Activate();
+    return { active: want };
+  }
+
+  function etWrapSingle(v) { return [[(v === undefined ? null : v)]]; }
+
+  function cmdEtReadRange(app, params) {
+    var addr = paramString(params, "range", "A1") || "A1";
+    var box = etParseAddr(addr);
+    var r = etResolveSheet(app, params);
+    var rng = r.ws.Range(etAddrStr(box.r1, box.c1, box.r2, box.c2));
+    var wantFormulas = paramBool(params, "formulas", false);
+    if (wantFormulas) {
+      var f = rng.Formula;
+      if (typeof f === "function") { f = f.call(rng); }
+      var fm;
+      if (box.r1 === box.r2 && box.c1 === box.c2) { fm = etWrapSingle(f); }
+      else {
+        fm = f;
+        if (!Array.isArray(fm)) { fm = etWrapSingle(fm); }
+      }
+      var fo = [];
+      var i, j;
+      for (i = 0; i < fm.length; i++) {
+        var row = [];
+        var src = Array.isArray(fm[i]) ? fm[i] : [fm[i]];
+        for (j = 0; j < src.length; j++) {
+          var cell = src[j];
+          row.push((typeof cell === "string" && cell.charAt(0) === "=") ? cell : null);
+        }
+        fo.push(row);
+      }
+      return { sheet: r.name, range: etAddrStr(box.r1, box.c1, box.r2, box.c2), formulas: fo };
+    }
+    var v = rng.Value2;
+    if (typeof v === "function") { v = v.call(rng); }
+    var vals;
+    if (box.r1 === box.r2 && box.c1 === box.c2) { vals = etWrapSingle(v); }
+    else {
+      vals = v;
+      if (!Array.isArray(vals)) { vals = etWrapSingle(vals); }
+    }
+    var out = [];
+    var a, b;
+    for (a = 0; a < vals.length; a++) {
+      var line = [];
+      var srow = Array.isArray(vals[a]) ? vals[a] : [vals[a]];
+      for (b = 0; b < srow.length; b++) {
+        var cv = srow[b];
+        line.push((cv === undefined ? null : cv));
+      }
+      out.push(line);
+    }
+    return { sheet: r.name, range: etAddrStr(box.r1, box.c1, box.r2, box.c2), values: out };
+  }
+
+  function etDoWriteCells(ws, sheetName, topAddr, rows) {
+    var top = etParseAddr(topAddr);
+    var r0 = top.r1, c0 = top.c1;
+    var width = 1, i;
+    for (i = 0; i < rows.length; i++) {
+      if (rows[i].length > width) { width = rows[i].length; }
+    }
+    var norm = [];
+    for (i = 0; i < rows.length; i++) {
+      var line = [];
+      var k;
+      for (k = 0; k < width; k++) {
+        line.push(k < rows[i].length ? rows[i][k] : null);
+      }
+      norm.push(line);
+    }
+    var snaps = etSnapshotCells(ws, r0, c0, norm);
+    var addrStr = etAddrStr(r0, c0, r0 + norm.length - 1, c0 + width - 1);
+    var rng = ws.Range(addrStr);
+    rng.Value2 = norm;
+    etPushCells(sheetName, addrStr, snaps);
+    return { written: norm.length * width, range: addrStr };
+  }
+
+  function cmdEtWriteRange(app, params) {
+    var addr = paramString(params, "range", null);
+    if (!addr) { throw new Error("'range' is required: the top-left cell to write at, e.g. 'A1'"); }
+    if (params.values === undefined || params.values === null) {
+      throw new Error(matrixHelp("values", "missing"));
+    }
+    var rows = etStrictMatrix(params.values);
+    var top = etTopLeft(addr);
+    etParseAddr(top);
+    var r = etResolveSheet(app, params);
+    var res = etDoWriteCells(r.ws, r.name, top, rows);
+    return { written: res.written, sheet: r.name };
+  }
+
+  function cmdEtWriteRanges(app, params) {
+    var writes = params.writes;
+    if (writes !== null && typeof writes === "object" && !Array.isArray(writes)) {
+      var inner = null, kk;
+      var keys = ["items", "item", "value"];
+      for (kk = 0; kk < keys.length; kk++) {
+        if (writes[keys[kk]] !== undefined) { inner = writes[keys[kk]]; break; }
+      }
+      writes = (inner !== null) ? inner : [writes];
+    }
+    if (!Array.isArray(writes) || writes.length === 0) {
+      throw new Error("'writes' is required: a list of {range, values, sheet?}, e.g. " +
+        "[{\"range\": \"A1\", \"values\": [[\"Tên\"]]}, {\"range\": \"B2\", \"sheet\": \"P&L\", \"values\": [[1, 2]]}]");
+    }
+    var i;
+    var plans = [];
+    for (i = 0; i < writes.length; i++) {
+      var item = writes[i];
+      if (item === null || typeof item !== "object" || Array.isArray(item)) {
+        throw new Error("writes[" + i + "] must be an object like {range, values}, got " + describeValue(item));
+      }
+      var rg = (item.range !== undefined && item.range !== null) ? String(item.range) : "";
+      if (!rg) { throw new Error("writes[" + i + "] needs 'range' (the top-left cell to write at)"); }
+      if (item.values === undefined || item.values === null) {
+        throw new Error("writes[" + i + "] needs 'values' (a JSON 2D array, e.g. [[\"Tên\"]])");
+      }
+      var rows = etStrictMatrix(item.values);
+      var top = etTopLeft(rg);
+      etParseAddr(top);
+      plans.push({ index: i, range: rg, top: top, rows: rows, sheet: (item.sheet !== undefined && item.sheet !== null) ? String(item.sheet) : null });
+    }
+    var written = 0;
+    var sheets = [];
+    var dflt = paramString(params, "sheet", null);
+    for (i = 0; i < plans.length; i++) {
+      var p = plans[i];
+      var px = { sheet: p.sheet || dflt };
+      if (!px.sheet) { px = {}; }
+      var rr = etResolveSheet(app, px.sheet ? px : {});
+      // item co sheet rieng thi uu tien item
+      if (p.sheet) { rr = etResolveSheet(app, { sheet: p.sheet }); }
+      var out = etDoWriteCells(rr.ws, rr.name, p.top, p.rows);
+      written += out.written;
+      if (sheets.indexOf(rr.name) < 0) { sheets.push(rr.name); }
+    }
+    sheets.sort();
+    return { ranges: plans.length, written: written, sheets: sheets };
+  }
+
+  function etCsvCell(text) {
+    var s = String(text);
+    var stripped = s.trim();
+    if (stripped === "") { return ""; }
+    if (/^[+-]?\d{1,15}$/.test(stripped)) {
+      var iv = parseInt(stripped, 10);
+      if (String(iv) === stripped || String(iv) === stripped.replace(/^\+/, "")) { return iv; }
+      return iv;
+    }
+    if (/^[+-]?(\d+\.\d*|\.\d+|\d+)([eE][+-]?\d+)?$/.test(stripped)) { return parseFloat(stripped); }
+    return s;
+  }
+
+  function cmdEtImportCsv(app, params) {
+    var path = paramString(params, "path", null);
+    if (!path) { throw new Error("'path' is required: the .csv file to read, e.g. 'D:\\data\\raw.csv'"); }
+    var delim = paramString(params, "delimiter", ",");
+    if (delim === null || delim === undefined || delim === "") { delim = ","; }
+    if (delim.length !== 1) { throw new Error("'delimiter' must be a single character, got '" + delim + "'"); }
+    var fs = app.FileSystem;
+    var text;
+    try {
+      text = fs.readFileString(path);
+      if (typeof text === "function") { text = text.call(fs, path); }
+    } catch (e) {
+      throw new Error("no file at '" + path + "'");
+    }
+    if (text === undefined || text === null) { throw new Error("no file at '" + path + "'"); }
+    text = String(text);
+    var lines = text.split("\r\n").join("\n").split("\r").join("\n").split("\n");
+    if (lines.length > 0 && lines[lines.length - 1] === "") { lines.pop(); }
+    var rows = [];
+    var li, parts, q;
+    for (li = 0; li < lines.length; li++) {
+      if (lines[li] === "" && rows.length === 0 && lines.length === 1) { continue; }
+      parts = lines[li].split(delim);
+      var conv = [];
+      for (q = 0; q < parts.length; q++) { conv.push(etCsvCell(parts[q])); }
+      rows.push(conv);
+    }
+    if (rows.length === 0) { return { path: path, rows: 0, columns: 0, sheet: null }; }
+    var width = 1, w;
+    for (w = 0; w < rows.length; w++) { if (rows[w].length > width) { width = rows[w].length; } }
+    for (w = 0; w < rows.length; w++) {
+      while (rows[w].length < width) { rows[w].push(""); }
+    }
+    var wb = etWb(app);
+    var addr = paramString(params, "range", null);
+    var sheetName, ws;
+    var topAddr;
+    if (addr) {
+      var rs = etResolveSheet(app, params);
+      ws = rs.ws; sheetName = rs.name;
+      topAddr = etTopLeft(addr);
+      etParseAddr(topAddr);
+    } else {
+      var base = path.split("/").pop().split("\\").pop();
+      var dot = base.lastIndexOf(".");
+      if (dot > 0) { base = base.substring(0, dot); }
+      base = base.replace(/[\[\]\*\?\/\\:]/g, "_").substring(0, 31) || "Import";
+      var existing = etSheetNames(wb);
+      var nm = base, suffix = 2;
+      while (existing.indexOf(nm) >= 0) {
+        var tail = " " + suffix;
+        nm = base.substring(0, 31 - tail.length) + tail;
+        suffix++;
+      }
+      ws = wb.Worksheets.Add();
+      ws.Name = nm;
+      sheetName = nm;
+      topAddr = "A1";
+    }
+    var res = etDoWriteCells(ws, sheetName, topAddr, rows);
+    void res;
+    return { path: path, sheet: sheetName, range: topAddr, rows: rows.length, columns: width, cells: rows.length * width };
+  }
+
+  function cmdEtFillRange(app, params) {
+    var addr = paramString(params, "range", null);
+    if (!addr) { throw new Error("'range' is required: the whole area to fill, e.g. 'B2:H1000'"); }
+    var box = etParseAddr(etNormAddr(addr));
+    var r = etResolveSheet(app, params);
+    var formula = paramString(params, "formula", null);
+    var addrStr = etAddrStr(box.r1, box.c1, box.r2, box.c2);
+    var rows = box.r2 - box.r1 + 1, cols = box.c2 - box.c1 + 1;
+    var snaps = [];
+    var rr, cc;
+    for (rr = box.r1; rr <= box.r2; rr++) {
+      for (cc = box.c1; cc <= box.c2; cc++) {
+        var cell0 = r.ws.Cells.Item(rr, cc);
+        var v0 = cell0.Value2;
+        if (typeof v0 === "function") { v0 = v0.call(cell0); }
+        var f0 = cell0.Formula;
+        if (typeof f0 === "function") { f0 = f0.call(cell0); }
+        snaps.push({ r: rr, c: cc, v: (v0 === undefined ? null : v0), f: (f0 === undefined ? null : f0) });
+      }
+    }
+    if (formula) {
+      var rng = r.ws.Range(addrStr);
+      rng.Formula = formula;
+    }
+    etUndoStack.push({ kind: "cells", sheet: r.name, range: addrStr, snaps: snaps });
+    var got = r.ws.Range(addrStr).Formula;
+    if (typeof got === "function") { got = got.call(r.ws.Range(addrStr)); }
+    var mat = got;
+    if (!Array.isArray(mat)) { mat = [[mat]]; }
+    var sample = [];
+    var sr, sc;
+    for (sr = 0; sr < Math.min(rows, 3); sr++) {
+      var line = [];
+      var srow = Array.isArray(mat[sr]) ? mat[sr] : [mat[sr]];
+      for (sc = 0; sc < Math.min(cols, 3); sc++) {
+        line.push(sc < srow.length ? (srow[sc] === undefined ? null : srow[sc]) : null);
+      }
+      sample.push(line);
+    }
+    return { filled: rows * cols, range: addrStr, sheet: r.name, sample: sample };
+  }
+
+  function etHAlign(val) {
+    var key = String(val).trim().toLowerCase();
+    if (key === "left") { return -4131; }
+    if (key === "center" || key === "centre") { return -4108; }
+    if (key === "right") { return -4152; }
+    if (key === "justify" || key === "justified" || key === "block") { return -4130; }
+    throw new Error("'horizontal' must be left/center/right, got '" + val + "'");
+  }
+
+  function cmdEtFormatRange(app, params) {
+    var addr = paramString(params, "range", null);
+    if (!addr) { throw new Error("'range' is required"); }
+    var box = etParseAddr(etNormAddr(addr));
+    var r = etResolveSheet(app, params);
+    var addrStr = etAddrStr(box.r1, box.c1, box.r2, box.c2);
+    var rng = r.ws.Range(addrStr);
+    if (hasParam(params, "bold")) { rng.Font.Bold = paramBool(params, "bold", false); }
+    if (hasParam(params, "italic")) { rng.Font.Italic = paramBool(params, "italic", false); }
+    if (hasParam(params, "fontSize")) {
+      var sv = params.fontSize;
+      if (sv !== null && typeof sv === "object" && !Array.isArray(sv)) { sv = unwrapScalar(sv); }
+      if (Array.isArray(sv) && sv.length === 1) { sv = sv[0]; }
+      var num = Number(sv);
+      if (isNaN(num) || !isFinite(num)) { throw new Error("'fontSize' must be a number, got " + describeValue(params.fontSize)); }
+      rng.Font.Size = num;
+    }
+    if (hasParam(params, "fontColor")) {
+      var fc = parseBgrColor(paramString(params, "fontColor", null));
+      if (fc !== null) { rng.Font.Color = fc; }
+    }
+    if (hasParam(params, "fillColor")) {
+      var bc = parseBgrColor(paramString(params, "fillColor", null));
+      if (bc !== null) { rng.Interior.Color = bc; }
+    }
+    if (hasParam(params, "numFmt")) { rng.NumberFormat = paramString(params, "numFmt", "General") || "General"; }
+    if (hasParam(params, "horizontal")) { rng.HorizontalAlignment = etHAlign(paramString(params, "horizontal", "left")); }
+    if (hasParam(params, "wrap")) { rng.WrapText = paramBool(params, "wrap", false); }
+    return { sheet: r.name, range: addrStr };
+  }
+
+  var ET_CF_OPS = {
+    "between": 1, "notbetween": 2, "equal": 3, "notequal": 4,
+    "greater": 5, "less": 6, "greaterequal": 7, "lessequal": 8
+  };
+  var ET_CF_BACK = { 1: "between", 2: "notBetween", 3: "equal", 4: "notEqual", 5: "greater", 6: "less", 7: "greaterEqual", 8: "lessEqual" };
+
+  function etCfKey(op) {
+    return String(op).toLowerCase().replace(/_/g, "").replace(/ /g, "");
+  }
+
+  function etCfPlan(rules) {
+    var plan = [], i;
+    for (i = 0; i < rules.length; i++) {
+      var rule = rules[i];
+      if (rule === null || typeof rule !== "object" || Array.isArray(rule)) {
+        throw new Error("rules[" + i + "] must be an object, got " + describeValue(rule));
+      }
+      var key = hasParam(rule, "operator") ? etCfKey(paramString(rule, "operator", "less")) : "less";
+      if (key === "formula") {
+        var ff = paramString(rule, "formula1", null);
+        if (!ff) { throw new Error("rules[" + i + "] needs 'formula1' - the value to compare with, e.g. {\"operator\": \"less\", \"formula1\": \"50\"}"); }
+        if (hasParam(rule, "styleName")) { throw new Error("rules[" + i + "] 'styleName' is not supported on WPS (ET has no named cell styles; use bold/italic/fontColor/fillColor)"); }
+        plan.push({ input: "formula", opNum: null, type: 2, formula1: ff, formula2: null, rule: rule });
+        continue;
+      }
+      if (!ET_CF_OPS[key]) {
+        throw new Error("rules[" + i + "].operator must be one of between/equal/formula/greater/greaterEqual/less/lessEqual/notBetween/notEqual, got '" + paramString(rule, "operator", "") + "'");
+      }
+      var f1 = paramString(rule, "formula1", null);
+      if (!f1) {
+        throw new Error("rules[" + i + "] needs 'formula1' - the value to compare with, e.g. {\"operator\": \"less\", \"formula1\": \"50\"}");
+      }
+      var f2 = paramString(rule, "formula2", null);
+      if ((key === "between" || key === "notbetween") && !f2) {
+        throw new Error("rules[" + i + "]: operator '" + key + "' needs 'formula2' as well");
+      }
+      if (hasParam(rule, "styleName")) {
+        throw new Error("rules[" + i + "] 'styleName' is not supported on WPS (ET has no named cell styles; use bold/italic/fontColor/fillColor)");
+      }
+      plan.push({ input: key, opNum: ET_CF_OPS[key], type: 1, formula1: f1, formula2: f2, rule: rule });
+    }
+    return plan;
+  }
+
+  function cmdEtSetCondFormat(app, params) {
+    var addr = paramString(params, "range", null);
+    if (!addr) { throw new Error("'range' is required: the area the rules apply to, e.g. 'B2:B100'"); }
+    var raw = params.rules;
+    if (raw !== null && typeof raw === "object" && !Array.isArray(raw)) {
+      var k, inner = null;
+      var ks = ["items", "item", "value"];
+      for (k = 0; k < ks.length; k++) {
+        if (raw[ks[k]] !== undefined) { inner = raw[ks[k]]; break; }
+      }
+      raw = (inner !== null) ? inner : [raw];
+    }
+    if (!Array.isArray(raw) || raw.length === 0) {
+      throw new Error("'rules' is required: a list of rules, e.g. [{\"operator\": \"less\", \"formula1\": \"50\", \"styleName\": \"Bad\"}]");
+    }
+    var plan = etCfPlan(raw);
+    var box = etParseAddr(etNormAddr(addr));
+    var r = etResolveSheet(app, params);
+    var addrStr = etAddrStr(box.r1, box.c1, box.r2, box.c2);
+    var rng = r.ws.Range(addrStr);
+    try { rng.FormatConditions.Delete(); } catch (e) {}
+    var written = [], i;
+    for (i = 0; i < plan.length; i++) {
+      var p = plan[i];
+      var fc;
+      if (p.type === 2) {
+        fc = rng.FormatConditions.Add(2, null, p.formula1);
+      } else if (p.formula2) {
+        fc = rng.FormatConditions.Add(1, p.opNum, p.formula1, p.formula2);
+      } else {
+        fc = rng.FormatConditions.Add(1, p.opNum, p.formula1);
+      }
+      var rule = p.rule;
+      if (hasParam(rule, "fillColor")) {
+        var col = parseBgrColor(paramString(rule, "fillColor", null));
+        if (col !== null) { fc.Interior.Color = col; }
+      }
+      if (hasParam(rule, "fontColor")) {
+        var fcol = parseBgrColor(paramString(rule, "fontColor", null));
+        if (fcol !== null) { fc.Font.Color = fcol; }
+      }
+      if (hasParam(rule, "bold")) { fc.Font.Bold = paramBool(rule, "bold", false); }
+      if (hasParam(rule, "italic")) { fc.Font.Italic = paramBool(rule, "italic", false); }
+      written.push({ operator: p.input, formula1: p.formula1, formula2: p.formula2 || null });
+    }
+    if (!etCondStore[r.name]) { etCondStore[r.name] = []; }
+    var bucket = etCondStore[r.name];
+    var bi;
+    for (bi = bucket.length - 1; bi >= 0; bi--) {
+      if (bucket[bi].range === addrStr) { bucket.splice(bi, 1); }
+    }
+    bucket.push({ range: addrStr, rules: written });
+    return { sheet: r.name, range: addrStr, rules: written };
+  }
+
+  function cmdEtListCondFormats(app, params) {
+    var r = etResolveSheet(app, params);
+    var bucket = etCondStore[r.name] || [];
+    var addr = paramString(params, "range", null);
+    if (addr) {
+      var box = etParseAddr(etNormAddr(addr));
+      var want = etAddrStr(box.r1, box.c1, box.r2, box.c2);
+      var found = [];
+      var i;
+      for (i = 0; i < bucket.length; i++) {
+        if (bucket[i].range === want) { found.push(bucket[i]); }
+      }
+      if (found.length > 0) { return { sheet: r.name, formats: found }; }
+      // Doc that tu API khi store khong co (sheet mo tu file ngoai)
+      var rng = r.ws.Range(want);
+      var fcCol = rng.FormatConditions;
+      var n = Number(fcCol.Count);
+      var rules = [];
+      for (i = 1; i <= n; i++) {
+        var fc = fcCol.Item(i);
+        var op = fc.Operator;
+        if (typeof op === "function") { op = op.call(fc); }
+        var f1 = fc.Formula1;
+        if (typeof f1 === "function") { f1 = f1.call(fc); }
+        var f2 = fc.Formula2;
+        if (typeof f2 === "function") { f2 = f2.call(fc); }
+        var key = ET_CF_BACK[Number(op)] || "less";
+        var isBetween = (key === "between" || key === "notBetween");
+        rules.push({ operator: key, formula1: (f1 === undefined || f1 === null) ? null : String(f1), formula2: isBetween ? String(f2) : null });
+      }
+      return { sheet: r.name, formats: [{ range: want, rules: rules }] };
+    }
+    if (bucket.length > 0) { return { sheet: r.name, formats: bucket.slice() }; }
+    // Khong co range: quet vung dung that, gop cac dinh dang thay tren tung o
+    var seen = {}, out = [];
+    try {
+      var used = etRangeAddrOf(r.ws);
+      var ub = etParseAddr(used);
+      var empty = etIsEmptySheet(r.ws);
+      if (!empty) {
+        var rr, cc;
+        for (rr = ub.r1; rr <= ub.r2; rr++) {
+          for (cc = ub.c1; cc <= ub.c2; cc++) {
+            var one = r.ws.Range(etAddrStr(rr, cc, rr, cc));
+            var col2 = one.FormatConditions;
+            var cnt = Number(col2.Count);
+            var k;
+            for (k = 1; k <= cnt; k++) {
+              var f = col2.Item(k);
+              var t = f.Type;
+              if (typeof t === "function") { t = t.call(f); }
+              var o = f.Operator;
+              if (typeof o === "function") { o = o.call(f); }
+              var a1 = f.Formula1;
+              if (typeof a1 === "function") { a1 = a1.call(f); }
+              var a2 = f.Formula2;
+              if (typeof a2 === "function") { a2 = a2.call(f); }
+              var lab = (Number(t) === 2) ? "formula" : (ET_CF_BACK[Number(o)] || "less");
+              var isB = (lab === "between" || lab === "notBetween");
+              var sig = lab + "|" + String(a1) + "|" + (isB ? String(a2) : "");
+              if (!seen[sig]) {
+                seen[sig] = { range: etAddrStr(rr, cc, rr, cc), rules: [{ operator: lab, formula1: String(a1), formula2: isB ? String(a2) : null }] };
+                out.push(seen[sig]);
+              }
+            }
+          }
+        }
+      }
+    } catch (e2) {}
+    if (out.length > 0) { return { sheet: r.name, formats: out }; }
+    // Cuoi cung: doc ca sheet qua UsedRange (truong hop store trong nhung API co)
+    return { sheet: r.name, formats: [] };
+  }
+
+  var ET_CHART_TYPES = { "column": 51, "bar": 57, "line": 4, "pie": 5, "area": 1, "scatter": -4169 };
+  var ET_CHART_BACK = { 51: "column", 57: "bar", 4: "line", 5: "pie", 1: "area", "-4169": "scatter" };
+
+  function cmdEtAddChart(app, params) {
+    var addr = paramString(params, "range", null);
+    if (!addr) { throw new Error("'range' is required"); }
+    var box = etParseAddr(etNormAddr(addr));
+    var kind = (paramString(params, "type", "column") || "column").toLowerCase();
+    if (!ET_CHART_TYPES[kind]) {
+      throw new Error("'type' must be one of area/bar/column/line/pie/scatter, got '" + paramString(params, "type", "") + "'");
+    }
+    var r = etResolveSheet(app, params);
+    var addrStr = etAddrStr(box.r1, box.c1, box.r2, box.c2);
+    var anchor = paramString(params, "anchor", "A1") || "A1";
+    var ab = etParseAddr(etNormAddr(anchor));
+    var anchorStr = etAddrStr(ab.r1, ab.c1, ab.r1, ab.c1);
+    var w = params.width !== undefined && params.width !== null ? Number(unwrapScalar(params.width)) : 12;
+    var h = params.height !== undefined && params.height !== null ? Number(unwrapScalar(params.height)) : 7;
+    if (isNaN(w)) { w = 12; }
+    if (isNaN(h)) { h = 7; }
+    var ptsW = w * 28.3465, ptsH = h * 28.3465;
+    var cell = r.ws.Range(anchorStr);
+    var left = cell.Left, top = cell.Top;
+    if (typeof left === "function") { left = left.call(cell); }
+    if (typeof top === "function") { top = top.call(cell); }
+    var objs = r.ws.ChartObjects();
+    var obj = objs.Add(Number(left), Number(top), ptsW, ptsH);
+    var chart = obj.Chart;
+    try { chart.SetSourceData(r.ws.Range(addrStr)); } catch (e) {}
+    chart.ChartType = ET_CHART_TYPES[kind];
+    var title = paramString(params, "title", null);
+    var titleApplied = false;
+    if (title) {
+      try {
+        chart.HasTitle = true;
+        chart.ChartTitle.Text = title;
+        titleApplied = true;
+      } catch (e2) { titleApplied = false; }
+    }
+    var nm = obj.Name;
+    if (typeof nm === "function") { nm = nm.call(obj); }
+    var actual = ET_CHART_BACK[Number(chart.ChartType)] || kind;
+    if (typeof actual === "string") {
+      var chk = obj.Chart.ChartType;
+      if (typeof chk === "function") { chk = chk.call(obj.Chart); }
+      actual = ET_CHART_BACK[Number(chk)] || kind;
+    }
+    return { chart: String(nm), sheet: r.name, type: kind, diagram: actual, typeApplied: (actual === kind), titleApplied: titleApplied, range: addrStr, anchor: anchorStr };
+  }
+
+  function cmdEtListCharts(app, params) {
+    var r = etResolveSheet(app, params);
+    var objs = r.ws.ChartObjects();
+    var n = Number(objs.Count);
+    var charts = [], i;
+    for (i = 1; i <= n; i++) {
+      var o = objs.Item(i);
+      var nm = o.Name;
+      if (typeof nm === "function") { nm = nm.call(o); }
+      var ct = o.Chart.ChartType;
+      if (typeof ct === "function") { ct = ct.call(o.Chart); }
+      charts.push({ name: String(nm), diagram: ET_CHART_BACK[Number(ct)] || "" });
+    }
+    var shapes = [];
+    try {
+      var sh = r.ws.Shapes;
+      var cnt = Number(sh.Count);
+      for (i = 1; i <= cnt; i++) {
+        var s = sh.Item(i);
+        var label = null;
+        try { label = s.Name; if (typeof label === "function") { label = label.call(s); } } catch (e) {}
+        shapes.push(label === undefined || label === null ? "" : String(label));
+      }
+    } catch (e2) {}
+    return { sheet: r.name, charts: charts, shapes: shapes };
+  }
+
+  function cmdEtUndo(app, params) {
+    var count = paramInt(params, "count", 1);
+    if (isNaN(count)) { count = 1; }
+    count = Math.max(1, count);
+    var restored = [], undone = 0, k;
+    for (k = 0; k < count; k++) {
+      if (etUndoStack.length === 0) { break; }
+      var entry = etUndoStack.pop();
+      if (entry.kind === "addSheet") {
+        try {
+          var wb = etWb(app);
+          var ws = etFindSheet(wb, entry.sheet);
+          if (ws) { ws.Delete(); }
+        } catch (e) {}
+        // Xoa ca ghi nhan dinh dang co dieu kien cua sheet do
+        try { delete etCondStore[entry.sheet]; } catch (e2) {}
+        restored.push({ sheet: entry.sheet, deleted: true });
+        undone++;
+      } else {
+        try {
+          var wb2 = etWb(app);
+          var ws2 = etFindSheet(wb2, entry.sheet);
+          if (!ws2) {
+            // Sheet bi doi ten/xoa: thu sheet dang active
+            ws2 = app.ActiveSheet;
+          }
+          etRestoreCells(ws2, entry.snaps);
+          var cells = entry.snaps.length;
+          restored.push({ sheet: entry.sheet, range: entry.range, cells: cells });
+          undone++;
+        } catch (e3) {}
+      }
+    }
+    return { undone: undone, restored: restored };
+  }
+
+  function etPdfWrite(fs, path, pdf) {
+    var codes = [];
+    for (var i = 0; i < pdf.length; i++) { codes.push(pdf.charCodeAt(i) & 0xFF); }
+    var data = "";
+    try {
+      var parts = [];
+      for (var q = 0; q < codes.length; q += 4096) {
+        parts.push(String.fromCharCode.apply(null, codes.slice(q, q + 4096)));
+      }
+      data = parts.join("");
+    } catch (e) {
+      data = "";
+      for (var m = 0; m < pdf.length; m++) { data += String.fromCharCode(pdf.charCodeAt(m) & 0xFF); }
+    }
+    fs.writeAsBinaryString(path, data);
+  }
+
+  function cmdEtExportPdf(app, params) {
+    var path = paramString(params, "path", null);
+    if (!path) { throw new Error("'path' is required"); }
+    var wb = etWb(app);
+    try { wb.ExportAsFixedFormat(path, 17); } catch (e0) {}
+    try { wb.ExportAsFixedFormat(0, path); } catch (e1) {}
+    var fs = app.FileSystem;
+    if (fsExists(fs, path)) { return { exported: path }; }
+    var text = "";
+    try {
+      var names = etSheetNames(wb);
+      var lines = [], si, rr, cc;
+      for (si = 0; si < names.length; si++) {
+        var ws = etFindSheet(wb, names[si]);
+        if (etIsEmptySheet(ws)) { continue; }
+        var addr = etRangeAddrOf(ws);
+        var box = etParseAddr(addr);
+        for (rr = box.r1; rr <= box.r2; rr++) {
+          var rowVals = [];
+          for (cc = box.c1; cc <= box.c2; cc++) {
+            var cell = ws.Cells.Item(rr, cc);
+            var t = cell.Text;
+            if (typeof t === "function") { t = t.call(cell); }
+            rowVals.push(t === undefined || t === null ? "" : String(t));
+          }
+          lines.push(rowVals.join("\t"));
+        }
+        lines.push("");
+      }
+      text = lines.join("\n");
+    } catch (e2) {}
+    var pdf = buildPdf(text);
+    etPdfWrite(fs, path, pdf);
+    if (!fsExists(fs, path)) { throw new Error("could not write PDF to '" + path + "'"); }
+    return { exported: path };
+  }
+
+  function cmdEtSave(app) {
+    var wb = etWb(app);
+    var p = wb.Path;
+    if (typeof p === "function") { p = p.call(wb); }
+    if (!p) { throw new Error("the document has never been saved - use saveAs with a 'path'"); }
+    wb.Save();
+    var info = etDocInfo(wb);
+    return { saved: true, fullName: info.fullName };
+  }
+
+  function cmdEtSaveAs(app, params) {
+    var path = paramString(params, "path", null);
+    if (!path) { throw new Error("'path' is required"); }
+    var wb = etWb(app);
+    wb.SaveAs(path);
+    var info = etDocInfo(wb);
+    return { saved: true, fullName: info.fullName };
+  }
+
+  function cmdEtCloseAll(app) {
+    var wbs = app.Workbooks;
+    var n = Number(wbs.Count);
+    var items = [], i;
+    for (i = 1; i <= n; i++) { items.push(wbs.Item(i)); }
+    var tmp = "/tmp";
+    try {
+      var fs = app.FileSystem;
+      var t = fs.tmpdir();
+      if (typeof t === "function") { t = t.call(fs); }
+      if (t) { tmp = String(t); }
+    } catch (e) {}
+    var rescued = [], closed = 0;
+    for (i = 0; i < items.length; i++) {
+      var wb = items[i];
+      var saved = wb.Saved;
+      if (typeof saved === "function") { saved = saved.call(wb); }
+      if (!saved) {
+        var nm = wb.Name;
+        if (typeof nm === "function") { nm = nm.call(wb); }
+        nm = String(nm) || "workbook.xlsx";
+        var rp = tmp + "/rescued/" + nm;
+        try { wb.SaveAs(rp); rescued.push(rp); } catch (e2) {}
+      }
+      try { wb.Close(false); closed++; } catch (e3) {}
+    }
+    return { closed: closed, rescued: rescued };
+  }
+
+  var ET_ERR_TEXT = ["#DIV/0!", "#REF!", "#NAME?", "#NUM!", "#NULL!", "#VALUE!", "#N/A", "#ERR:", "Err:"];
+
+  function etStartsError(text) {
+    var i;
+    for (i = 0; i < ET_ERR_TEXT.length; i++) {
+      if (text.indexOf(ET_ERR_TEXT[i]) === 0) { return true; }
+    }
+    return false;
+  }
+
+  function etParseNum(text) {
+    var c = String(text).replace(/\xa0/g, "").split(" ").join("").split(",").join("");
+    if (c === "") { return null; }
+    var n = Number(c);
+    if (isNaN(n) || !isFinite(n)) { return null; }
+    return n;
+  }
+
+  function etReadCell(ws, r, c) {
+    var cell = ws.Cells.Item(r, c);
+    var v = cell.Value2;
+    if (typeof v === "function") { v = v.call(cell); }
+    var f = cell.Formula;
+    if (typeof f === "function") { f = f.call(cell); }
+    var t = cell.Text;
+    if (typeof t === "function") { t = t.call(cell); }
+    var nf = cell.NumberFormat;
+    if (typeof nf === "function") { nf = nf.call(cell); }
+    if (Array.isArray(v)) { v = null; }
+    if (Array.isArray(f)) { f = null; }
+    return { v: (v === undefined ? null : v), f: (f === undefined ? null : f),
+      t: (t === undefined || t === null ? "" : String(t)),
+      nf: (nf === undefined || nf === null ? "General" : String(nf)) };
+  }
+
+  function cmdEtCheckRange(app, params) {
+    var r = etResolveSheet(app, params);
+    var ws = r.ws;
+    var usedAddr = etRangeAddrOf(ws);
+    var usedBox = etParseAddr(usedAddr);
+    var reqRaw = paramString(params, "range", null);
+    var box = reqRaw ? etParseAddr(etNormAddr(reqRaw)) : usedBox;
+    var rows = box.r2 - box.r1 + 1, cols = box.c2 - box.c1 + 1;
+    var rangeStr = etAddrStr(box.r1, box.c1, box.r2, box.c2);
+    var usedStr = etAddrStr(usedBox.r1, usedBox.c1, usedBox.r2, usedBox.c2);
+    // Doc toan bo vung vao cache
+    var cache = {}, rr, cc;
+    for (rr = box.r1; rr <= box.r2; rr++) {
+      for (cc = box.c1; cc <= box.c2; cc++) {
+        cache[rr + "," + cc] = etReadCell(ws, rr, cc);
+      }
+    }
+    function at(rr2, cc2) { return cache[rr2 + "," + cc2]; }
+    // Nhan dong tieu de
+    var title = null, headerRow = box.r1;
+    if (rows >= 2 && cols >= 2) {
+      var filled = [];
+      for (cc = box.c1; cc <= box.c2; cc++) {
+        var h0 = at(box.r1, cc);
+        var tx0 = h0.t.replace(/^\s+|\s+$/g, "");
+        if (tx0 !== "") { filled.push({ c: cc, text: tx0, v: h0.v, f: h0.f }); }
+      }
+      if (filled.length === 1 && typeof filled[0].v === "string" && !filled[0].f) {
+        var secondTexts = 0;
+        for (cc = box.c1; cc <= box.c2; cc++) {
+          var h1 = at(box.r1 + 1, cc);
+          var tx1 = h1.t.replace(/^\s+|\s+$/g, "");
+          if (tx1 === "") { continue; }
+          if (typeof h1.v === "string" && !h1.f) { secondTexts++; }
+          else if (h1.f && typeof h1.v === "string") { secondTexts++; }
+          else if (h1.v !== null && h1.v !== undefined && h1.v !== "" && typeof h1.v !== "number") { secondTexts++; }
+        }
+        if (secondTexts * 2 >= cols) {
+          title = filled[0].text;
+          headerRow = box.r1 + 1;
+        }
+      }
+    }
+    var dataStart = headerRow + 1;
+    var columns = [], issues = [];
+    for (cc = box.c1; cc <= box.c2; cc++) {
+      var letter = etNumToCol(cc);
+      var hc = at(headerRow, cc);
+      var headerText = hc.t.replace(/^\s+|\s+$/g, "");
+      var numbers = 0, texts = 0, blanks = 0, numerics = 0, errors = 0, formulas = 0, fractional = 0;
+      var errNames = [];
+      for (rr = dataStart; rr <= box.r2; rr++) {
+        var info = at(rr, cc);
+        var isF = (typeof info.f === "string" && info.f.charAt(0) === "=");
+        if (isF) { formulas++; }
+        var txt = info.t.replace(/^\s+|\s+$/g, "");
+        if (!isF && (info.v === null || info.v === undefined || info.v === "") && txt === "") {
+          blanks++;
+        } else if (isF && (info.v === null || info.v === undefined)) {
+          errors++;
+          errNames.push(info.t || "error");
+        } else if ((info.v === null || info.v === undefined) && etStartsError(info.t)) {
+          errors++;
+          errNames.push(info.t);
+        } else if (typeof info.v === "string") {
+          texts++;
+          if (etParseNum(txt) !== null) { numerics++; }
+        } else if (typeof info.v === "number") {
+          numbers++;
+          if (Math.abs(info.v - Math.round(info.v)) > 1e-9) { fractional++; }
+        } else if (typeof info.v === "boolean") {
+          texts++;
+        } else if (isF && typeof info.v === "number") {
+          numbers++;
+        } else if (info.v === null || info.v === undefined) {
+          if (txt === "") { blanks++; }
+          else {
+            texts++;
+            if (etParseNum(txt) !== null) { numerics++; }
+          }
+        } else {
+          var pn = etParseNum(txt);
+          if (pn === null) { texts++; }
+          else {
+            numbers++;
+            if (Math.abs(pn - Math.round(pn)) > 1e-9) { fractional++; }
+          }
+        }
+      }
+      var fmtRow = (dataStart <= box.r2) ? dataStart : headerRow;
+      var fmt = at(fmtRow, cc).nf || "General";
+      var dataCells = numbers + texts + errors;
+      if (!headerText && dataCells > 0) {
+        issues.push({ type: "empty-header", detail: "column " + letter + " has data but no header in the first row" });
+      }
+      if (numerics > 0 && numbers + numerics >= texts) {
+        issues.push({ type: "numbers-as-text", detail: "column " + letter + " has " + numerics + " number(s) stored as text: write them as JSON numbers" });
+      } else if (numbers > 0 && texts > 0) {
+        issues.push({ type: "mixed-types", detail: "column " + letter + " mixes " + numbers + " number(s) and " + texts + " text value(s)" });
+      }
+      if (errors > 0) {
+        var uniq = {}, ul = [], ei;
+        for (ei = 0; ei < errNames.length; ei++) {
+          if (!uniq[errNames[ei]]) { uniq[errNames[ei]] = true; ul.push(errNames[ei]); }
+        }
+        ul.sort();
+        issues.push({ type: "error-values", detail: "column " + letter + " has " + errors + " error value(s): " + ul.join(", ") });
+      }
+      if (fractional > 0 && (!fmt || String(fmt).toLowerCase() === "general")) {
+        issues.push({ type: "no-number-format", detail: "column " + letter + " has decimals shown with the General format: apply numFmt such as \"0.0\" or \"#,##0.00\"" });
+      }
+      columns.push({ column: letter, header: headerText || null, numbers: numbers, texts: texts,
+        blanks: blanks, formulas: formulas, numberFormat: fmt });
+    }
+    // Cong thuc tro vao o trong
+    var emptyRefs = [], scanned = 0;
+    for (rr = box.r1; rr <= box.r2 && emptyRefs.length < 40 && scanned < 4000; rr++) {
+      for (cc = box.c1; cc <= box.c2 && emptyRefs.length < 40 && scanned < 4000; cc++) {
+        var fi = at(rr, cc);
+        if (!(typeof fi.f === "string" && fi.f.charAt(0) === "=")) { continue; }
+        scanned++;
+        var cleaned = String(fi.f).replace(/"(?:[^"]|"")*"/g, function (m) {
+          var s = "";
+          for (var z = 0; z < m.length; z++) { s += " "; }
+          return s;
+        });
+        var re = /(\$?)([A-Za-z]{1,3})(\$?)(\d+)/g;
+        var m2, hit = null;
+        while ((m2 = re.exec(cleaned)) !== null) {
+          var si = m2.index, ei2 = si + m2[0].length;
+          if (si > 0 && (cleaned.charAt(si - 1) === ":")) { continue; }
+          if (ei2 < cleaned.length && (cleaned.charAt(ei2) === ":")) { continue; }
+          if (si > 0 && /[A-Za-z0-9_]/.test(cleaned.charAt(si - 1))) { continue; }
+          if (ei2 < cleaned.length && /[A-Za-z0-9_(]/.test(cleaned.charAt(ei2))) { continue; }
+          var tc = etColToNum(m2[2]), trr = parseInt(m2[4], 10);
+          if (!(tc >= 1 && trr >= 1)) { continue; }
+          var tgt;
+          var key2 = trr + "," + tc;
+          if (cache[key2] !== undefined) { tgt = cache[key2]; }
+          else {
+            try { tgt = etReadCell(ws, trr, tc); } catch (e4) { continue; }
+          }
+          var tempty = (!tgt.f && (tgt.v === null || tgt.v === undefined || tgt.v === "") && tgt.t === "");
+          if (tempty) {
+            hit = r.name + "!" + etNumToCol(cc) + rr + " -> " + r.name + "!" + etNumToCol(tc) + trr + " (trong)";
+            break;
+          }
+        }
+        if (hit) { emptyRefs.push(hit); }
+      }
+    }
+    if (emptyRefs.length > 0) {
+      var show = emptyRefs.slice(0, 6).join("; ");
+      issues.push({ type: "empty-reference", detail: emptyRefs.length + " cong thuc tro vao mot o dang TRONG (vi du: " + show + "). O trong duoc tinh la 0, nen mot o dieu khien bi tro sai cho se im lang chay bang 0 - hay kiem tra xem co phai cong thuc dang tro vao o tieu de / o ben canh thay vi o gia tri khong", examples: emptyRefs.slice(0, 6) });
+    }
+    return { sheet: r.name, range: rangeStr, usedRange: usedStr, table: "", rows: rows, cols: cols,
+      title: title, columns: columns, issueCount: issues.length, issues: issues };
+  }
+
   var HANDLERS = {
     "app.info": cmdAppInfo,
     "writer.getText": cmdGetText,
@@ -1063,7 +2261,30 @@
     "writer.undo": cmdUndo,
     "writer.save": cmdSave,
     "writer.saveAs": cmdSaveAs,
-    "writer.exportPdf": cmdExportPdf
+    "writer.exportPdf": cmdExportPdf,
+    "et.newWorkbook": cmdEtNewWorkbook,
+    "et.open": cmdEtOpen,
+    "et.listSheets": cmdEtListSheets,
+    "et.sheetInfo": cmdEtSheetInfo,
+    "et.addSheet": cmdEtAddSheet,
+    "et.renameSheet": cmdEtRenameSheet,
+    "et.activateSheet": cmdEtActivateSheet,
+    "et.readRange": cmdEtReadRange,
+    "et.writeRange": cmdEtWriteRange,
+    "et.writeRanges": cmdEtWriteRanges,
+    "et.importCsv": cmdEtImportCsv,
+    "et.fillRange": cmdEtFillRange,
+    "et.formatRange": cmdEtFormatRange,
+    "et.setConditionalFormat": cmdEtSetCondFormat,
+    "et.listConditionalFormats": cmdEtListCondFormats,
+    "et.addChart": cmdEtAddChart,
+    "et.listCharts": cmdEtListCharts,
+    "et.undo": cmdEtUndo,
+    "et.exportPdf": cmdEtExportPdf,
+    "et.save": cmdEtSave,
+    "et.saveAs": cmdEtSaveAs,
+    "et.closeAll": cmdEtCloseAll,
+    "et.checkRange": cmdEtCheckRange
   };
 
   function catalog() {
