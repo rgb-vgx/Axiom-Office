@@ -40,8 +40,12 @@ function theme() {
 function paneHtml() {
   return fs.readFileSync(PANE, "utf8");
 }
-function slug(name) {
-  return "--axiom-" + name.toLowerCase().replace(/_/g, "-");
+// Ten token trong khoi :root (khong tien to - dung de tra trong rootVars) va ten custom property day du.
+function token(name) {
+  return name.toLowerCase().replace(/_/g, "-");
+}
+function cssVar(name) {
+  return "--axiom-" + token(name);
 }
 // Noi dung khoi :root (bo chu thich) -> { "pane-bg": "#ffffff", ... } theo ten khong co tien to.
 function rootVars(html) {
@@ -75,10 +79,10 @@ test("pane.html: MOI mau cua theme.py co mat, dung gia tri", () => {
   const { vars } = rootVars(paneHtml());
   const missing = [];
   for (const [name, hex] of Object.entries(t.colors)) {
-    const key = slug(name).slice(2);
-    if (!vars[key]) { missing.push(slug(name)); continue; }
+    const key = token(name);
+    if (!vars[key]) { missing.push(cssVar(name)); continue; }
     assert.equal(vars[key].toUpperCase(), hex,
-      slug(name) + " sai mau: theme.py " + hex + ", pane.html " + vars[key]);
+      cssVar(name) + " sai mau: theme.py " + hex + ", pane.html " + vars[key]);
   }
   assert.deepEqual(missing, [], "pane.html thieu token mau cua theme.py");
   assert.ok(Object.keys(t.colors).length >= 20, "theme.py phai co it nhat 20 mau (doc qua theme_dump.py)");
@@ -100,6 +104,9 @@ test("pane.html: khong co mau nao ngoai theme.py, va khong token nao chet", () =
   assert.deepEqual(shortHex, [], "pane.html dung mau viet ngan: " + shortHex.join(", "));
   const unused = Object.keys(vars).filter((key) => !html.includes("var(--axiom-" + key + ")"));
   assert.deepEqual(unused, [], "token khai bao ma khong dung - bo ra hoac dung that: " + unused.join(", "));
+  // Ten token khong duoc lap tien to lan hai (--axiom-axiom-...): do la cach lach luat chu khong phai thiet ke.
+  const doubled = Object.keys(vars).filter((key) => key.indexOf("axiom-") === 0);
+  assert.deepEqual(doubled, [], "ten token bi lap tien to (--axiom-axiom-...): " + doubled.join(", "));
 });
 
 // ---------------------------------------------------------------- so do + co chu
@@ -108,22 +115,22 @@ test("pane.html: so do va co chu khop theme.py", () => {
   const t = theme();
   const { vars } = rootVars(paneHtml());
   for (const [name, value] of Object.entries(t.metrics)) {
-    const key = slug(name).slice(2);
-    assert.ok(vars[key], "pane.html thieu " + slug(name) + " (theme.py " + name + " = " + value + ")");
+    const key = token(name);
+    assert.ok(vars[key], "pane.html thieu " + cssVar(name) + " (theme.py " + name + " = " + value + ")");
     if (value > 0 && value < 1) {
       assert.equal(vars[key], Math.round(value * 100) + "%",
-        slug(name) + " la ti le " + value + " -> phai la " + Math.round(value * 100) + "%");
+        cssVar(name) + " la ti le " + value + " -> phai la " + Math.round(value * 100) + "%");
     } else {
-      assert.equal(vars[key], value + "px", slug(name) + " phai la " + value + "px (theme.py " + name + ")");
+      assert.equal(vars[key], value + "px", cssVar(name) + " phai la " + value + "px (theme.py " + name + ")");
     }
   }
   const sizes = ["SIZE_TITLE", "SIZE_EMPTY_TITLE", "SIZE_BODY", "SIZE_SMALL", "SIZE_TOOL", "SIZE_TOOL_ID",
     "SIZE_CAPTION"];
   for (const name of sizes) {
-    const key = slug(name).slice(2);
-    assert.ok(vars[key], "pane.html thieu " + slug(name));
-    assert.equal(parseFloat(vars[key]), t.sizes[name], slug(name) + ": co chu");
-    assert.match(vars[key], /pt$/, slug(name) + " phai tinh bang pt nhu theme.py (diem), khong phai px");
+    const key = token(name);
+    assert.ok(vars[key], "pane.html thieu " + cssVar(name));
+    assert.equal(parseFloat(vars[key]), t.sizes[name], cssVar(name) + ": co chu");
+    assert.match(vars[key], /pt$/, cssVar(name) + " phai tinh bang pt nhu theme.py (diem), khong phai px");
   }
 });
 
