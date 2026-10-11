@@ -554,6 +554,27 @@
     return { inserted: true };
   }
 
+  function countOccurrences(haystack, needle) {
+    if (needle === undefined || needle === null) { return 0; }
+    var h = String(haystack === undefined || haystack === null ? "" : haystack);
+    var n = String(needle);
+    // Cung lop tuong duong voi toWordFindText: \r\n, \n, \r deu thanh ^p trong Find,
+    // nen chuan hoa ve \n truoc khi dem (MatchCase=false -> so sanh thuong).
+    h = h.split("\r\n").join("\n").split("\r").join("\n");
+    n = n.split("\r\n").join("\n").split("\r").join("\n");
+    h = h.toLowerCase();
+    n = n.toLowerCase();
+    if (n === "") { return 0; }
+    var c = 0, pos = 0, idx;
+    while (true) {
+      idx = h.indexOf(n, pos);
+      if (idx < 0) { break; }
+      c++;
+      pos = idx + n.length;
+    }
+    return c;
+  }
+
   function cmdReplaceAll(app, params) {
     var find = paramString(params, "find", null);
     var replace = paramString(params, "replace", "");
@@ -563,22 +584,26 @@
     var content = doc.Content;
     var findText = toWordFindText(find);
     var replaceText = toWordFindText(replace);
+    // Dem truoc khi thay (khong tim lai chuoi vua thay) roi thay mot lan duy nhat.
     var count = 0;
-    var guard = 0;
-    while (guard < 100000) {
-      guard++;
-      var one;
-      try {
-        one = content.Find.Execute(findText, false, false, false, false, false, true, 1, false, replaceText, 1);
-      } catch (e) { throw e; }
-      var done = false;
-      try { done = !!one; } catch (e2) { done = false; }
-      // Mock tra false nguyen thuy; COM tra true/false.
-      if (one === 0 || one === false || one === "false") { done = false; }
-      else if (one === true || one === 1 || one === -1) { done = true; }
-      if (!done) { break; }
-      count++;
-    }
+    try {
+      var docText = "";
+      try { docText = strProp(content, "Text"); } catch (e) { docText = ""; }
+      if (docText === "") {
+        try {
+          var raw = content.Text;
+          if (typeof raw === "function") { raw = raw.call(content); }
+          if (raw !== undefined && raw !== null) {
+            var s = String(raw);
+            if (s !== "[object Object]") { docText = s; }
+          }
+        } catch (e2) {}
+      }
+      count = countOccurrences(docText, find);
+    } catch (e3) { count = 0; }
+    try {
+      content.Find.Execute(findText, false, false, false, false, false, true, 0, false, replaceText, 2);
+    } catch (e4) { throw e4; }
     return { replaced: count > 0, count: count };
   }
 
