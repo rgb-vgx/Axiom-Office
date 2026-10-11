@@ -136,6 +136,14 @@ def main() -> int:
         now = text_now()
         check(reply.get("ok") is True and "Dòng đã thay" in now and "Dòng AI hai" not in now,
               "writer.replaceAll", (reply, now[-200:]))
+        # Chuoi thay chua chinh chuoi tim (review T2b 11/10/2026): vong Find.Execute(Wrap=continue, ReplaceOne)
+        # tim lai tu dau tai lieu nen thay mai toi tran vong lap -> treo + nhan ban van ban.
+        started = time.time()
+        reply = cmd("writer.replaceAll", {"find": "Dòng đã thay", "replace": "Dòng đã thay (lần 2)"}, timeout=60)
+        now = text_now()
+        check(reply.get("ok") is True and (reply.get("result") or {}).get("count") == 1
+              and now.count("Dòng đã thay (lần 2)") == 1 and "(lần 2) (lần 2)" not in now and time.time() - started < 20,
+              "writer.replaceAll khi chuoi thay chua chuoi tim: thay dung 1 lan, khong lap", (reply, now[-200:]))
         reply = cmd("writer.insertTable", {"values": [["A1", "B1"], ["A2", "B2"]]})
         check(reply.get("ok") is True and "B2" in text_now(), "writer.insertTable (values 2x2)", reply)
         reply = cmd("writer.selection")
