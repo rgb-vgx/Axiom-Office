@@ -8,6 +8,7 @@
   go dang ky offline cu (<jsplugin name="axiomoffice">) va thu muc add-in offline cu (axiomoffice_*).
 - Khong chep file add-in (Core phuc vu chung).
 - Office.conf chi duoc ghi khi co --test-profile.
+- --home H --uninstall: go dang ky axiomoffice khoi publish.xml (giu add-in khac).
 
     python3 tests/wps/test_install_jsaddon.py
 """
@@ -112,6 +113,20 @@ class InstallerTests(unittest.TestCase):
         self.assertIn("common\\AcceptedEULA=true", text)
         self.assertIn("AppComponentMode=prome_independ", text)
 
+    def test_uninstall_removes_only_our_registration(self):
+        self.install("http://127.0.0.1:47840")
+        text = read(self.publish).replace("</jsplugins>", OTHER + "\n</jsplugins>")
+        with open(self.publish, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        env = {key: value for key, value in os.environ.items() if not key.startswith("XDG_")}
+        env["HOME"] = self.sentinel
+        result = subprocess.run([sys.executable, INSTALLER, "--home", self.home, "--uninstall"],
+                                capture_output=True, text=True, timeout=60, env=env, cwd=self.tmp.name)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        text = read(self.publish)
+        self.assertEqual(self.online_entries(), [], "--uninstall go dang ky axiomoffice")
+        self.assertIn(OTHER, text, "giu add-in khac")
+        self.assertEqual(files_under(self.sentinel), [])
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
