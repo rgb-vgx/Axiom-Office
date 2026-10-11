@@ -126,16 +126,39 @@ type dbHandle interface {
 	QueryRow(query string, args ...any) *sql.Row
 }
 
+// isBusyError: SQLite bao khoa ban (doi tuong ghi khac giu qua busy_timeout).
+func isBusyError(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "SQLITE_BUSY")
+}
+
 // AddBatch: ghi mot lo fact trong MOT transaction (muc 8.5.6) - bo trung hash trong lo va trong cung
 // (scope, scope_key), gan-trung bang cosine >= 0.96 neu co vector, link chi toi memory ton tai, ghi history ADD.
+//
+// Ghi nen (API) va trich xuat nen (sau run) chay song song tren cung file nen INSERT co the gap khoa
+// ban du busy_timeout 5s (log e2e: "database is locked (5) (SQLITE_BUSY)"). Chua commit thi rollback
+// sach nen thu lai toi da 4 lan thay vi tra SKIPPED ngay - duong thanh cong khong doi gi.
 func (s *Store) AddBatch(items []NewMemory, actor, runID string, vectors map[int][]float32, embeddingModel string) []OpResult {
+	var results []OpResult
+	for attempt := 0; attempt < 4; attempt++ {
+		var busy bool
+		results, busy = s.addBatchOnce(items, actor, runID, vectors, embeddingModel)
+		if !busy || attempt == 3 {
+			return results
+		}
+		time.Sleep(time.Duration(attempt+1) * time.Second)
+	}
+	return results
+}
+
+// addBatchOnce: mot lan thu ghi lo (xem AddBatch) - tra ket qua + co gap khoa ban ma chua commit.
+func (s *Store) addBatchOnce(items []NewMemory, actor, runID string, vectors map[int][]float32, embeddingModel string) ([]OpResult, bool) {
 	results := make([]OpResult, 0, len(items))
 	tx, err := s.db.SQL().Begin()
 	if err != nil {
 		for _, item := range items {
 			results = append(results, OpResult{Event: "SKIPPED", Text: item.Text, Reason: "database: " + err.Error()})
 		}
-		return results
+		return results, isBusyError(err)
 	}
 	defer func() { _ = tx.Rollback() }()
 
@@ -197,6 +220,14 @@ func (s *Store) AddBatch(items []NewMemory, actor, runID string, vectors map[int
 			id, raw.Scope, nullText(scopeKey), text, hash, nullText(raw.Category), entitiesJSON(raw.Entities),
 			nullText(expires), actor, confidence, now, now, nullText(runID))
 		if err != nil {
+			if isBusyError(err) {
+				// Khoa ban giua lo: bo cac fact chua xu ly, rollback (defer) roi bao thu lai.
+				results = append(results, OpResult{Event: "SKIPPED", Text: text, Reason: err.Error()})
+				for _, rest := range items[index+1:] {
+					results = append(results, OpResult{Event: "SKIPPED", Text: rest.Text, Reason: err.Error()})
+				}
+				return results, true
+			}
 			results = append(results, OpResult{Event: "SKIPPED", Text: text, Reason: err.Error()})
 			continue
 		}
@@ -225,8 +256,10 @@ func (s *Store) AddBatch(items []NewMemory, actor, runID string, vectors map[int
 		for i := range results {
 			results[i] = OpResult{Event: "SKIPPED", Text: results[i].Text, Reason: "commit: " + err.Error()}
 		}
+		// Da thu commit (trang thai chua ro) thi khong thu lai.
+		return results, false
 	}
-	return results
+	return results, false
 }
 
 func (s *Store) Get(id string) *Item { return getItem(s.db.SQL(), id) }
