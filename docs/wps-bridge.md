@@ -2,7 +2,7 @@
 
 Trạng thái: **đã chạy trên WPS thật** (11/10/2026): Core (T1), trình cài `--core-url` (T2a), add-in 16 lệnh đợt 1
 (T2b, T2c). Đóng gói + `install.sh` (T3) xong, đăng ký cả ba app (T5) xong, nhận biết app + đủ 38 lệnh
-`et.*`/`wpp.*` (T6–T8) xong. Còn lại: pane Ask AI trong WPS. Cơ sở thực nghiệm:
+`et.*`/`wpp.*` (T6–T8) xong, pane Ask AI trong WPS (T4) xong. Còn lại: 7 lệnh `writer.*` còn thiếu. Cơ sở thực nghiệm:
 [wps-spike.md](wps-spike.md) (hướng B) và [tests/wps/REFERENCE.md](../tests/wps/REFERENCE.md).
 
 ## 1. Bài toán
@@ -100,7 +100,7 @@ Cùng giao thức và cùng guard với bridge LibreOffice (`Origin` → 403, to
 | T1 | Core: 2.1–2.3 | `tests/wps/test_wps_bridge_e2e.py` (Core thật + add-in giả bằng HTTP) |
 | T2 | Add-in: vòng poll + registry + handler `writer.*` | test Node với object model giả + đối chiếu registry LibreOffice |
 | T3 | Trình cài `--core-url`, gói Linux, test chạy WPS thật | `tests/wps/test_wps_bridge_live.py` |
-| T4 | Pane Ask AI trong WPS (mục 7) | `tests/wps/test_wps_pane_e2e.py` (Core) + `test_pane.mjs` (add-in) |
+| T4 | Pane Ask AI trong WPS (mục 7) | `tests/wps/test_wps_pane_e2e.py` (Core) + `test_pane.mjs`, `test_pane_theme.mjs` (add-in) |
 | T5 | Đăng ký một entry `type="wps,et,wpp"` cho cả ba app | `tests/wps/test_install_jsaddon.py` |
 | T6 | Add-in nhận biết app đang chạy (`appKind`/`catalogFor`, từ chối lệnh app khác) + Core ghi `app` theo poll | `tests/wps/test_addin.mjs`, `core-go/internal/wpsbridge/wpsbridge_test.go` |
 | T7 | Add-in: 23 lệnh `et.*` (Spreadsheets) | `tests/wps/test_addin_et.mjs` (+ `addin_fake.mjs`) |
@@ -174,3 +174,34 @@ Pane là một trang khác của add-in (`/wps/addin/pane.html`), mở bằng n�
 Trình duyệt **không gửi `Origin` cho GET cùng origin** (`EventSource` của pane → 401, phát hiện 11/10/2026). Với
 **GET** trên `/wps/v1/*`, Core chấp nhận thêm khi không có `Origin` mà có `Sec-Fetch-Site: same-origin` (header trình
 duyệt tự đặt, trang khác không giả được; CEF Chrome 87 có gửi). POST vẫn cần `Origin`; `/v1/*` không đổi.
+
+### 7.1 Giao diện dùng chung hệ thiết kế với pane LibreOffice
+
+Hai pane phải trông như **một sản phẩm**. `axiom/theme.py` (bản LibreOffice của `PaneTheme`,
+`src/AxiomOffice/Ai/PaneControls.cs`) là **nguồn duy nhất** cho màu, cỡ chữ và khoảng cách — chính nó tự khai
+"cùng màu, cỡ chữ, khoảng cách với pane của MS Office/WPS" — nên pane WPS không tự nghĩ ra bảng màu riêng (bản cũ
+dùng màu Google Material: `#e8f0fe`, `#f1f3f4`, `#f9ab00`…).
+
+- `pane.html` khai mọi token của `theme.py` trong một khối `:root` (`--axiom-<tên hằng viết thường>`) rồi dùng qua
+  `var()`. Không còn mã màu `#rrggbb` nào ngoài khối đó, và không token nào khai mà không dùng. Cỡ chữ để bằng `pt`
+  (theme.py tính bằng điểm; CSS `pt` = 96/72px nên ra đúng số pixel như bản LibreOffice, không cần bảng đổi).
+- `pane-core.js` mang phần **dữ liệu** của hệ thiết kế (`ACTION_LABELS`, `SUFFIX_LABELS`, `TOOL_LABELS`, `NOUNS`,
+  `APP_NAMES`, `SUGGESTIONS`, `labelFor`, `emptyState`, `plainReply`) chép từ `theme.py`, nên nhãn lệnh, gợi ý và
+  màn hình trống đọc ra giống hệt bản LibreOffice mà vẫn test được khi không có DOM.
+- `tests/wps/test_pane_theme.mjs` (9 test) đối chiếu **trực tiếp** với `theme.py` qua `tests/wps/theme_dump.py`
+  (không chép tay giá trị nào vào test), nên spec không lệch khỏi nguồn được.
+
+Pane biết mình đang ở app nào qua query string: `main.js:paneUrl()` thêm `?app=<wps|et|wpp>`
+(`currentAppKind()`), pane đọc lại và mặc định `"wps"` nếu thiếu — nhờ đó tiêu đề và gợi ý đúng loại tài liệu
+(Writer/Calc/Impress). `CleanAddinRel` đã cắt `?query`/`#fragment` trước khi resolve nên Core không phải đổi gì.
+
+**Khác bản LibreOffice có chủ ý** — pane WPS chưa có route cho mấy việc này, nên không bày ra nút chết:
+
+| Bản LibreOffice | Pane WPS | Vì sao |
+|---|---|---|
+| Header có thêm liên kết `Ghi nhớ`, `Thiết lập` | chỉ `Trò chuyện mới` | `/wps/v1/*` chưa có route memory/setup |
+| Footer có `Hoàn tác lượt này` | chỉ `Dừng` | chưa có route hoàn tác lượt |
+| Phụ đề hiện tên model (hoặc `Agent Core`) | phụ đề `Axiom Office` | pane không được cấp thông tin model |
+
+Màu, cỡ chữ, khoảng cách thì khớp từng token; phần **nhìn thấy thật** (font hệ thống, scrollbar của CEF, độ nét
+của chữ) chỉ kiểm chứng được khi mở pane trong WPS — spec chốt token, không chốt pixel.
