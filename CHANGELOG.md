@@ -41,6 +41,18 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
   `addin_fake.mjs` — proxy "nghiêm": chạm thành viên chưa mô phỏng là lỗi, nên spec không cho phép gọi API mà
   WPS thật không có. Test add-in: 71 xanh
 
+### Fixed — Bridge WPS: lệnh đang chạy không còn bị cắt vì luật ngắt 45 giây (spec viết trước)
+- Add-in WPS chạy **đơn luồng**: trong lúc thực thi một lệnh dài (`et.importCsv` file lớn, `et.formatRange` cả
+  bảng, `exportPdf`) nó không poll. Luật `AXIOM_WPS_DISCONNECT_SECONDS` (45 giây) vì thế cắt ngang lệnh đang chạy:
+  `Enqueue` bỏ job, **kết quả bị vứt đi**, vòng session xoá luôn file session — trong khi lệnh **có thể đã ghi vào
+  tài liệu**. Agent nhận "mất kết nối" rồi thử lại => ghi hai lần (chưa có test nào phủ)
+- Nay "đang chạy" được tính là còn kết nối (`Connected()`/`Snapshot()`): lệnh đã giao cho add-in mà chưa có kết quả
+  thì không bị luật ngắt cắt; chỉ lệnh **chưa giao** mới bị bỏ khi mất kết nối, và câu lỗi nói rõ
+  `...before the command was sent (WPS closed?) - safe to retry` để agent biết thử lại là an toàn. Lệnh đã giao mà
+  không có kết quả hết giờ theo `AXIOM_WPS_CMD_WAIT_SECONDS` (mặc định 300, trước là hằng số) với câu lỗi
+  `...did not answer within Ns; the command may have been applied - check the document before retrying`
+- `docs/wps-bridge.md` mục 2.2/2.3/6: định nghĩa "đã kết nối", hai câu lỗi hết giờ, và biến môi trường mới
+
 ### Fixed — Add-in WPS: đọc file bằng `FileSystem.ReadFile`, không phải `readFileString` (spec viết trước)
 - **`et.importCsv` không bao giờ chạy được trên WPS thật**: nó đọc file bằng `FileSystem.readFileString`, nhưng
   API này bị sandbox (đo 11/10/2026): mọi đường dẫn có `/` hoặc `\` đều ném `path cannot contains "/" or "\"`,

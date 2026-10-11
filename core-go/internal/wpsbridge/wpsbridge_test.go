@@ -177,7 +177,9 @@ func TestServeAddin(t *testing.T) {
 	}
 }
 
-// Add-in ngung poll (nguoi dung dong WPS) khi /cmd dang cho: bao loi ngay khi mat ket noi, khong treo 300s.
+// Add-in ngung poll (nguoi dung dong WPS) khi /cmd dang cho, va lenh CHUA duoc giao cho add-in: bao loi
+// ngay khi mat ket noi, khong treo 300s. Cau loi phai noi ro lenh chua gui duoc, de agent biet thu lai
+// la an toan (khac han truong hop lenh da chay - xem TestEnqueueInFlightTimeoutWarnsBeforeRetrying).
 func TestEnqueueFailsFastWhenAddinDisconnects(t *testing.T) {
 	bridge := testBridge(t, nil) // DisconnectSeconds: 2
 	bridge.recordPoll(map[string]any{})
@@ -187,12 +189,102 @@ func TestEnqueueFailsFastWhenAddinDisconnects(t *testing.T) {
 	if !ok || reply["ok"] != false || !strings.Contains(reply["error"].(string), "disconnected") {
 		t.Fatalf("mat ket noi -> ok:false 'disconnected', duoc %v %v", ok, reply)
 	}
+	message, _ := reply["error"].(string)
+	if !strings.Contains(message, "was not sent") || !strings.Contains(message, "safe to retry") {
+		t.Fatalf("lenh chua gui duoc thi phai noi ro de agent yen tam thu lai, duoc %q", message)
+	}
 	if waited > 5*time.Second {
 		t.Fatalf("phai bao loi trong vai giay sau khi mat ket noi, cho %v", waited)
 	}
 	if len(bridge.waiting) != 0 || len(bridge.queue) != 0 {
 		t.Fatalf("job phai bi bo khoi hang doi: waiting=%d queue=%d", len(bridge.waiting), len(bridge.queue))
 	}
+}
+
+// Lenh DA giao cho add-in ma chua co ket qua = add-in DANG chay lenh do. Add-in chay don luong nen no
+// khong poll trong luc chay, vi vay khong duoc ap dung luat DisconnectSeconds cho no: lenh dai
+// (et.importCsv file lon, et.formatRange ca bang, exportPdf) ma bi cat giua chung thi ket qua bi bo -
+// trong khi lenh co the da ghi vao tai lieu - va agent nhan "mat ket noi" roi thu lai => ghi hai lan.
+func TestEnqueueKeepsWaitingWhileCommandIsInFlight(t *testing.T) {
+	b := testBridge(t, func(o *Options) { o.DisconnectSeconds = 1; o.CmdWaitSeconds = 5 })
+	b.recordPoll(map[string]any{})
+	replyCh := make(chan map[string]any, 1)
+	go func() {
+		reply, _ := b.Enqueue("et.importCsv", map[string]any{"path": "/tmp/ban-hang.csv"})
+		replyCh <- reply
+	}()
+	jobs := takeJobsWithin(t, b, 3*time.Second)
+	if len(jobs) != 1 {
+		t.Fatalf("khong lay duoc job: %+v", jobs)
+	}
+	// Add-in dang chay lenh: khong poll nua, qua ca DisconnectSeconds (1s).
+	time.Sleep(1500 * time.Millisecond)
+	if !b.Connected() {
+		t.Fatal("dang chay lenh thi phai coi la con ket noi (add-in khong the vua chay vua poll)")
+	}
+	if !b.Complete(jobs[0].ID, map[string]any{"ok": true, "result": map[string]any{"rows": 1000}}) {
+		t.Fatal("Complete phai true: job van dang cho, chua bi bo")
+	}
+	select {
+	case reply := <-replyCh:
+		if reply["ok"] != true {
+			t.Fatalf("ket qua cua lenh dai phai toi duoc nguoi goi, duoc %v", reply)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("Enqueue khong nhan duoc ket qua cua lenh dai")
+	}
+}
+
+// Lenh dang chay ma qua CmdWaitSeconds khong co ket qua: het gio that, va cau loi phai canh bao lenh
+// CO THE da duoc ghi de agent kiem tra truoc khi thu lai - khac han "chua gui duoc".
+func TestEnqueueInFlightTimeoutWarnsBeforeRetrying(t *testing.T) {
+	b := testBridge(t, func(o *Options) { o.DisconnectSeconds = 1; o.CmdWaitSeconds = 2 })
+	b.recordPoll(map[string]any{})
+	started := time.Now()
+	replyCh := make(chan map[string]any, 1)
+	go func() {
+		reply, _ := b.Enqueue("et.formatRange", map[string]any{})
+		replyCh <- reply
+	}()
+	if jobs := takeJobsWithin(t, b, 3*time.Second); len(jobs) != 1 {
+		t.Fatalf("khong lay duoc job: %+v", jobs)
+	}
+	var reply map[string]any
+	select {
+	case reply = <-replyCh:
+	case <-time.After(10 * time.Second):
+		t.Fatal("Enqueue phai het gio theo CmdWaitSeconds, khong duoc treo mai")
+	}
+	if waited := time.Since(started); waited < 1500*time.Millisecond {
+		t.Fatalf("dang chay lenh thi khong duoc cat som theo DisconnectSeconds (1s), chi cho %v", waited)
+	}
+	message, _ := reply["error"].(string)
+	if reply["ok"] != false || !strings.Contains(message, "did not answer") {
+		t.Fatalf("het gio khi dang chay -> ok:false 'did not answer', duoc %v", reply)
+	}
+	if !strings.Contains(message, "may have been applied") {
+		t.Fatalf("phai canh bao lenh co the da duoc ghi (dung thu lai mu), duoc %q", message)
+	}
+	if strings.Contains(message, "was not sent") {
+		t.Fatalf("lenh DA gui cho add-in thi khong duoc bao la chua gui: %q", message)
+	}
+	// Job da bi bo thi khong con "dang chay": vong session moi don duoc file session.
+	if b.Connected() {
+		t.Fatal("het gio roi thi khong con lenh nao dang chay")
+	}
+}
+
+// takeJobsWithin cho job dau tien duoc dua cho add-in trong han cho truoc.
+func takeJobsWithin(t *testing.T, b *Bridge, limit time.Duration) []*Job {
+	t.Helper()
+	deadline := time.Now().Add(limit)
+	for time.Now().Before(deadline) {
+		if jobs := b.takeJobs(); len(jobs) > 0 {
+			return jobs
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	return nil
 }
 
 // T6 (docs/wps-bridge.md muc 5): WPS nap CUNG mot add-in trong ca ba app (publish.xml type="wps,et,wpp"),

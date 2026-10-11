@@ -40,7 +40,9 @@ WPS Writer ── JS add-in (nạp từ http://127.0.0.1:47840/wps/addin/) ◀�
   (`jobs` rỗng khi hết giờ). Mỗi lần poll = một heartbeat; `commands` và `document` lần mới nhất được ghi nhớ.
 - `POST /wps/v1/result` — body `{id, ok:true, result}` hoặc `{id, ok:false, error}` → `{"ok":true}`;
   `id` không tồn tại/đã xong → `{"ok":false,"error":...}` (HTTP 200).
-- **Đã kết nối** = có poll trong `AXIOM_WPS_DISCONNECT_SECONDS` giây gần nhất (mặc định 45).
+- **Đã kết nối** = có poll trong `AXIOM_WPS_DISCONNECT_SECONDS` giây gần nhất (mặc định 45), **hoặc** đang có
+  lệnh đã giao cho add-in mà chưa có kết quả. Vế thứ hai cần thiết vì add-in chạy đơn luồng: trong lúc chạy một
+  lệnh dài nó không poll, nên nếu chỉ tính poll thì lệnh đang chạy bị coi là mất kết nối (mục 6).
 
 ### 2.3 Bridge WPS — cổng riêng `AXIOM_WPS_BRIDGE_PORT` (mặc định 47861)
 Cùng giao thức và cùng guard với bridge LibreOffice (`Origin` → 403, token → 401 trừ `/health`, body JSON → 415):
@@ -50,7 +52,10 @@ Cùng giao thức và cùng guard với bridge LibreOffice (`Origin` → 403, to
 - `GET /session` → `{app, family, port, pid, document}`.
 - `POST /cmd {action, params}` → chưa kết nối: `{"ok":false,"error":"WPS add-in is not connected: open a document
   in WPS to connect the add-in"}` (không nêu tên app cụ thể — cả ba app dùng chung một add-in);
-  đã kết nối: đưa vào hàng đợi, chờ kết quả tối đa 300 giây, trả **nguyên** `{ok, result|error}` của add-in.
+  đã kết nối: đưa vào hàng đợi, chờ kết quả tối đa `AXIOM_WPS_CMD_WAIT_SECONDS` giây (mặc định 300), trả **nguyên**
+  `{ok, result|error}` của add-in. Hai câu lỗi hết giờ phân biệt rõ (mục 6): lệnh **chưa giao được** cho add-in thì
+  `...disconnected before the command was sent (WPS closed?) - safe to retry`; lệnh **đã chạy** mà không có kết quả
+  thì `...did not answer within Ns; the command may have been applied - check the document before retrying`.
 - **File session** `<thư mục session>/<pid Core>-wps.json` (cùng trường với LibreOffice: `pid, app,
   family:"wps-linux", port, host:"wps-jsaddon", version, started, lastSeen, lastSeenEpoch, document,
   documentPath`) — có khi add-in đã kết nối (ghi lại mỗi lần poll đổi tài liệu và mỗi 25 giây), **xoá** khi mất
@@ -122,6 +127,13 @@ Cùng giao thức và cùng guard với bridge LibreOffice (`Origin` → 403, to
   **cuối** của `NotesPage` (trang ghi chú đo được có 2 placeholder: 1 = số trang, 2 = ghi chú).
 - `wpp.checkLayout` **không** báo `overflow` (cần chiều cao chữ thật, object model WPS không đo được); bốn loại
   còn lại (`offslide`, `small-font`, `overlap`, `dense`) giữ nguyên ngưỡng của LibreOffice.
+- **Lệnh đang chạy không bị coi là mất kết nối** (vá 11/10/2026): add-in chạy **đơn luồng**, nên trong lúc thực thi
+  một lệnh dài (`et.importCsv` file lớn, `et.formatRange` cả bảng, `exportPdf`) nó **không poll**. Nếu vẫn áp dụng
+  luật `AXIOM_WPS_DISCONNECT_SECONDS` (45 giây) thì lệnh bị cắt giữa chừng: kết quả bị bỏ, file session bị xoá,
+  trong khi lệnh **có thể đã ghi vào tài liệu** — agent nhận "mất kết nối" rồi thử lại và ghi hai lần. Nay "đang
+  chạy" được tính là còn kết nối; chỉ lệnh **chưa giao** cho add-in mới bị bỏ khi mất kết nối, và câu lỗi nói rõ
+  `safe to retry`. Lệnh đã giao mà không có kết quả vẫn hết giờ theo `AXIOM_WPS_CMD_WAIT_SECONDS` (với câu lỗi
+  `may have been applied`); hết giờ này thì job được bỏ nên vòng session mới xoá file session.
 - Object model ET/WPP khác Writer ở vài chỗ (`Cells.Item(r,c)`, `UsedRange.Address()` là hàm, màu BGR, chỉ số
   1-based, `Application.Documents` không có) — bảng đầy đủ ở `tests/wps/REFERENCE.md`.
 - **`FileSystem.readFileString`/`writeFileString` bị sandbox** (đo 11/10/2026): mọi đường dẫn có `/` hoặc `\` đều
