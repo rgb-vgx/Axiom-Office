@@ -1,12 +1,13 @@
-"""Spec: et.checkRange khong bao "empty-reference" gia (axiom.checks._empty_references) - khong can LibreOffice.
+"""Spec: writer.checkTables bo qua "empty-cells" cho BANG DAN TRANG (khong can LibreOffice).
 
-Log 11/10/2026 (dashboard tren sheet ADT that): cong thuc
-    =SUMIFS(ADT.$S$2:$S$65;ADT.$F$2:$F$65;"Duong khong";ADT.$J$2:$J$65;"01B1*")
-bi bao "Dashboard!B50 -> Dashboard!B1 (trong)" vi regex doc chu "B1" BEN TRONG chuoi "01B1*". Cung mot loai
-loi: ten ham co so (LOG10, ATAN2, ...) bi doc thanh o LOG10 / TAN2. Agent mat them vong de "chung minh"
-canh bao la gia. Phai: bo qua noi dung trong chuoi "...", va chi nhan tham chieu dung o ranh gioi tu
-(khong dinh lien chu/so phia truoc, khong phai ten ham ngay truoc dau "(").
-Nhung tham chieu that toi o trong (cung sheet hay sheet khac) van phai duoc bao.
+Log 11/10/2026 (review 8 skill): van-ban-hanh-chinh dung bang KHONG KE KHUNG lam bo cuc (phan dau, phan
+cuoi), trong do o trong la CO Y - khoang trong ky, o cho dien. the-thuc-van-ban lai bao "sua empty-cells
+(dien hoac ghi —)", va hai skill nay von duoc thiet ke de dung chung. Model lam dung huong dan se nhet "—"
+vao cho ky, tuc la pha dung the thuc van ban.
+
+Nen: formatTable {borders:false} danh DAU bang (writer.LAYOUT_TABLE_NAME), checkTables doc tem do roi bo qua
+empty-cells. Khong doan theo net ke duoc, vi bang DU LIEU chua dinh dang cung khong co net ke nao - do la
+chinh truong hop hai live test dang kiem (chen bang tran roi doi checkTables bat empty-cells).
 
     python3 tests/lo/test_checks.py
 """
@@ -20,13 +21,15 @@ import unittest
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 PYTHONPATH = os.path.join(ROOT, "src", "AxiomOffice.LibreOffice", "python", "pythonpath")
 if "uno" not in sys.modules:
-    sys.modules["uno"] = types.ModuleType("uno")
+    UNO = types.ModuleType("uno")
+    UNO.createUnoStruct = lambda _name: types.SimpleNamespace()
+    sys.modules["uno"] = UNO
 sys.path.insert(0, PYTHONPATH)
 
 from axiom import commands  # noqa: E402
 
 commands.load_all()
-from axiom import checks  # noqa: E402
+from axiom import checks, writer  # noqa: E402
 
 
 def col_row(address: str):
@@ -114,6 +117,144 @@ class EmptyReferenceTests(unittest.TestCase):
         found = scan('=IF(A2="01B1*";B16;0)')
         self.assertEqual(len(found), 1, found)
         self.assertIn("Dashboard!B16", found[0])
+
+
+# ---------------------------------------------------------------- bang dan trang
+#
+# FakeTable mo phong dung phan ma writer/checks dung: getRows/getColumns/getCellByPosition, TableBorder2
+# (cho _set_borders) va Name. Dat ten giong LibreOffice that: ten da co chu bang khac thi nem loi
+# (unotbl.cxx:2971 - do tren LO that 11/10/2026), ten dang co san thi dat lai cung nem loi.
+
+class FakeTable:
+    def __init__(self, values, name="Table1", taken=()):
+        self.values = values
+        self.taken = set(taken)
+        self.name_sets = 0
+        self.TableBorder2 = types.SimpleNamespace()
+        self._name = name
+
+    @property
+    def Name(self):
+        return self._name
+
+    @Name.setter
+    def Name(self, value):
+        self.name_sets += 1
+        if value in self.taken or value == self._name:
+            raise RuntimeError("name already in use")
+        self._name = value
+
+    def getRows(self):
+        return types.SimpleNamespace(getCount=lambda: len(self.values))
+
+    def getColumns(self):
+        return types.SimpleNamespace(getCount=lambda: len(self.values[0]))
+
+    def getCellByPosition(self, c, r):
+        return types.SimpleNamespace(getString=lambda: self.values[r][c])
+
+
+def run_check_tables(tables):
+    env = types.SimpleNamespace(document=types.SimpleNamespace())
+    original = writer.tables_in_order
+    writer.tables_in_order = lambda _doc: tables
+    try:
+        return checks.writer_check_tables(env, {})
+    finally:
+        writer.tables_in_order = original
+
+
+def issue_types(result, index=None):
+    return {i["type"] for i in result["issues"] if index is None or i.get("table") == index}
+
+
+# Bang phan cuoi van ban hanh chinh: khoang trong ky nam trong dong CO chu ("- Nhu tren;").
+LAYOUT_VALUES = [["Nơi nhận:", "TM. ỦY BAN NHÂN DÂN"], ["- Như trên;", ""], ["- Lưu: VT", "Nguyễn Văn A"]]
+# Bang QA cua live test: chu lot vao o tieu de + o trong cuoi bang.
+DATA_VALUES = [["Lịch họp áp dụng cho toàn bộ phòng ban - thời gian có thể điều chỉnh.Thứ", "Giờ", "Nội dung"],
+               ["Hai", "8h", ""]]
+
+
+class LayoutTableTests(unittest.TestCase):
+    def test_borderless_data_table_is_still_reported(self):
+        """Bang du lieu chua dinh dang KHONG co net ke nao -> van phai bat empty-cells (live test doi vay)."""
+        result = run_check_tables([FakeTable(DATA_VALUES)])
+        self.assertFalse(result["tables"][0]["layout"])
+        self.assertIn("empty-cells", issue_types(result, 1))
+        self.assertIn("long-header-cell", issue_types(result, 1))
+
+    def test_marked_layout_table_is_exempt_from_empty_cells(self):
+        result = run_check_tables([FakeTable(LAYOUT_VALUES, name="AxiomLayout")])
+        self.assertTrue(result["tables"][0]["layout"], "tem phai duoc nhan ra")
+        self.assertNotIn("empty-cells", issue_types(result, 1))
+        self.assertEqual(result["issueCount"], 0, result["issues"])
+        # O trong van hien trong report de agent thay, chi la khong thanh issue.
+        self.assertEqual(result["tables"][0]["emptyCells"], 1)
+
+    def test_long_header_cell_still_reported_on_layout_table(self):
+        """Chu lot vao o tieu de la loi that voi moi bang - van-ban-hanh-chinh van doi soat no.
+
+        Bang phai >= 3 cot: nguong la 3 x trung vi(do dai o tieu de), ma voi 2 cot thi trung vi chinh la o
+        dai hon nen nguong do khong bao gio voi toi (xem docs/skills-review.md). O dai o day la chu that,
+        khong phai khoang trang: _cell_text cat khoang trang hai dau truoc khi do.
+        """
+        table = FakeTable([["Lịch họp áp dụng cho toàn bộ phòng ban - thời gian có thể điều chỉnh.Thứ", "Giờ", "Nội dung"],
+                           ["- Như trên;", "x", ""]], name="AxiomLayout")
+        result = run_check_tables([table])
+        self.assertIn("long-header-cell", issue_types(result, 1))
+        self.assertNotIn("empty-cells", issue_types(result, 1), "bang dan trang van duoc mien empty-cells")
+
+    def test_mark_is_per_table(self):
+        result = run_check_tables([FakeTable(LAYOUT_VALUES, name="AxiomLayout"), FakeTable(DATA_VALUES, name="Table2")])
+        self.assertTrue(result["tables"][0]["layout"])
+        self.assertFalse(result["tables"][1]["layout"])
+        self.assertNotIn("empty-cells", issue_types(result, 1))
+        self.assertIn("empty-cells", issue_types(result, 2))
+
+    def test_borders_false_marks_the_table_and_drops_the_borders(self):
+        """Duong that: formatTable {borders:false} -> _set_borders -> dat tem ma checkTables doc."""
+        table = FakeTable(LAYOUT_VALUES, name="Table2")
+        writer._set_borders(table, False)
+        self.assertEqual(table.TableBorder2.TopLine.LineWidth, 0, "bo khung that su")
+        self.assertTrue(writer.is_layout_table(table), table.Name)
+        result = run_check_tables([table])
+        self.assertNotIn("empty-cells", issue_types(result, 1))
+
+    def test_borders_true_removes_the_mark_again(self):
+        table = FakeTable(LAYOUT_VALUES, name="Table1")
+        writer._set_borders(table, False)
+        self.assertTrue(writer.is_layout_table(table))
+        writer._set_borders(table, True)
+        self.assertFalse(writer.is_layout_table(table), table.Name)
+        result = run_check_tables([table])
+        self.assertIn("empty-cells", issue_types(result, 1))
+
+    def test_rename_avoids_a_taken_name(self):
+        table = FakeTable(LAYOUT_VALUES, name="Table1", taken=[writer.LAYOUT_TABLE_NAME])
+        self.assertTrue(writer._mark_layout(table, True))
+        self.assertNotEqual(table.Name, writer.LAYOUT_TABLE_NAME, "trung ten thi phai lui ve ten khac")
+        self.assertTrue(writer.is_layout_table(table), table.Name)
+
+    def test_rename_gives_up_without_raising(self):
+        """Het cach dat ten thi formatTable khong duoc do: chi la mat tem, phan con lai van chay."""
+        taken = [writer.LAYOUT_TABLE_NAME] + ["%s-%d" % (writer.LAYOUT_TABLE_NAME, n) for n in range(1, 60)]
+        table = FakeTable(LAYOUT_VALUES, name="Table1", taken=taken)
+        self.assertFalse(writer._mark_layout(table, True))
+        self.assertEqual(table.Name, "Table1")
+
+    def test_marking_again_does_not_touch_the_name(self):
+        """Goi lai formatTable {borders:false} lan hai khong duoc dat ten lai (LO nem loi khi dat lai dung
+        ten dang co - do tren LO that 11/10/2026)."""
+        table = FakeTable(LAYOUT_VALUES, name="AxiomLayout")
+        table.name_sets = 0
+        self.assertTrue(writer._mark_layout(table, True))
+        self.assertEqual(table.name_sets, 0, "khong duoc dat ten lai khi da co tem")
+
+    def test_removing_the_mark_does_not_leave_a_marker_name(self):
+        table = FakeTable(LAYOUT_VALUES, name="AxiomLayout")
+        self.assertTrue(writer._mark_layout(table, False))
+        self.assertFalse(writer.is_layout_table(table))
+        self.assertFalse(table.Name.startswith(writer.LAYOUT_TABLE_NAME), table.Name)
 
 
 if __name__ == "__main__":

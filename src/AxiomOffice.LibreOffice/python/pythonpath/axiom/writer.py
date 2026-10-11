@@ -11,6 +11,19 @@ PARAGRAPH_BREAK = 0          # com.sun.star.text.ControlCharacter.PARAGRAPH_BREA
 BOLD, NORMAL = 150.0, 100.0  # com.sun.star.awt.FontWeight
 ALIGN = {"left": "LEFT", "center": "CENTER", "centre": "CENTER", "right": "RIGHT", "justify": "BLOCK", "justified": "BLOCK", "block": "BLOCK"}
 
+# Tem "bang dan trang" cho checks.py (log 11/10/2026): van ban hanh chinh dung bang KHONG KE KHUNG lam bo cuc
+# (phần đầu, phần cuối), trong đó ô trống là CỐ Ý (khoảng trống ký, ô chờ điền). checks.py báo "empty-cells"
+# cho chúng thì agent đi "sửa" bằng cách điền "—" vào chỗ ký - tức là phá đúng thể thức văn bản.
+#
+# Không đoán theo nét kẻ được, vì hai chiều đều sai:
+#   - bảng DỮ LIỆU chưa định dạng cũng không có nét kẻ nào (live test chèn bảng trần rồi đòi checkTables bắt
+#     empty-cells), nên "không nét kẻ" KHÔNG suy ra được "bảng dàn trang";
+#   - bảng dàn trang có kẻ khung (biểu mẫu điền) thì vẫn là bảng dàn trang.
+# Nên dấu hiệu duy nhất đáng tin là tem do chính formatTable {borders:false} đặt. Tem nằm ở tên bảng nên
+# theo .odt sang lần mở sau (đã đo: đặt Name -> lưu -> mở lại, tên còn nguyên).
+LAYOUT_TABLE_NAME = "AxiomLayout"   # tên bảng dàn trang do Axiom đặt
+DATA_TABLE_NAME = "AxiomTable"      # tên trả lại khi bảng được kẻ khung trở lại
+
 # Style bang cua Word -> autoformat co san cua LibreOffice (gan dung mau; khong co thi bao skipped).
 WORD_TABLE_STYLES = {
     "accent 1": "Box List Blue", "accent 5": "Box List Blue", "accent 2": "Box List Red",
@@ -327,6 +340,48 @@ def _border_line(width: int, color: int):
     return line
 
 
+def _rename_table(table, base: str) -> bool:
+    """Dat ten bang theo `base`, them '-2', '-3'... khi trung ten. Tra False neu het cach.
+
+    Ten bang Writer khong duoc chua dau cach hay dau cham (loi unotbl.cxx:2958 - dau cham danh rieng cho
+    tham chieu <TenBang.A1>) va khong duoc trung bang khac (2971), nen phai thu lan luot.
+    """
+    for attempt in range(1, 51):
+        try:
+            table.Name = base if attempt == 1 else "%s-%d" % (base, attempt)
+            return True
+        except Exception:  # noqa: BLE001 - trung ten thi thu ten ke tiep
+            continue
+    return False
+
+
+def _mark_layout(table, layout: bool) -> bool:
+    """Danh dau / bo danh dau bang dan trang bang ten bang. Khong bao gio nem loi: day chi la tem cho
+    checks.py, khong duoc lam hong lenh formatTable dang chay."""
+    try:
+        current = table.Name or ""
+    except Exception:  # noqa: BLE001
+        return False
+    if layout:
+        return True if current.startswith(LAYOUT_TABLE_NAME) else _rename_table(table, LAYOUT_TABLE_NAME)
+    return _rename_table(table, DATA_TABLE_NAME) if current.startswith(LAYOUT_TABLE_NAME) else True
+
+
+def is_layout_table(table) -> bool:
+    """Bang dan trang (do formatTable {borders:false} danh dau) - xem LAYOUT_TABLE_NAME."""
+    try:
+        return (table.Name or "").startswith(LAYOUT_TABLE_NAME)
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _require_layout_mark(table):
+    """Xac nhan tem da dat sau khi bo khung. Dat tem that bai thi checkTables se bao "empty-cells" nham cho
+    bang dan trang - phai hien ra o `skipped` chu khong im lang (xem LAYOUT_TABLE_NAME)."""
+    if not is_layout_table(table):
+        raise ValueError("could not mark the table as a layout table (its name may be taken)")
+
+
 def _set_borders(table, enabled: bool, color: int = 0):
     border = table.TableBorder2
     line = _border_line(18 if enabled else 0, color)
@@ -334,6 +389,8 @@ def _set_borders(table, enabled: bool, color: int = 0):
         setattr(border, side, line)
         setattr(border, "Is%sValid" % side, True)
     table.TableBorder2 = border
+    # Ke khung = bảng dữ liệu, bỏ khung = bảng dàn trang: kèm luôn tem cho checks.py (xem LAYOUT_TABLE_NAME).
+    _mark_layout(table, not enabled)
 
 
 def format_table(env, params):
@@ -378,6 +435,9 @@ def format_table(env, params):
     if values.has(params, "borders"):
         enabled = values.boolean(params, "borders", True)
         step("borders", lambda: _set_borders(table, enabled))
+        if not enabled:
+            # Doc lai ten bang de XAC NHAN tem bang dan trang da dat that (xem LAYOUT_TABLE_NAME).
+            step("layout-table", lambda: _require_layout_mark(table))
     border_color = values.color(values.string(params, "borderColor"))
     if border_color is not None:
         step("borderColor", lambda: _set_borders(table, True, border_color))

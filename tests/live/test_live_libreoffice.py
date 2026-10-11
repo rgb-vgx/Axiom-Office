@@ -164,11 +164,28 @@ def test_writer(b, out, png, run_ai):
                    key="writer.formatTable last table")
     check(styled and "headerFill" in styled.get("applied", []) and "bandFill" in styled.get("applied", []),
           "Writer formatTable định dạng bảng có sẵn", styled)
+    # Ke khung lai = bang DU LIEU: tem bang dan trang phai duoc bo, empty-cells phai bao lai.
+    rebordered = b.cmd("writer.checkTables", record=False) or {}
+    back = next((t for t in rebordered.get("tables", []) if (t.get("header") or [""])[0].startswith("Lịch họp")), None)
+    check(back is not None and back.get("layout") is False and "empty-cells" in
+          {i.get("type") for i in rebordered.get("issues", []) if i.get("table") == back.get("index")},
+          "Writer kẻ khung lại thì bảng thôi là bảng dàn trang", rebordered)
     unsupported = b.cmd("writer.formatTable", {"autoFit": "content"}, key="writer.formatTable autoFit content")
     check(unsupported and any("autoFit" in item for item in unsupported.get("skipped", [])),
           "Writer formatTable báo phần host không hỗ trợ trong 'skipped' (autoFit content)", unsupported)
     borderless = b.cmd("writer.formatTable", {"borders": False}, key="writer.formatTable borders false")
     check(borderless and "borders" in borderless.get("applied", []), "Writer formatTable bỏ viền bảng", borderless)
+    # Bo khung = bang DAN TRANG: phai danh dau duoc, de checkTables thoi bao empty-cells (log 11/10/2026 -
+    # the-thuc-van-ban bao dien "—" vao o trong cua bang dan trang NĐ30, tuc la pha dung the thuc).
+    check(borderless and "layout-table" in borderless.get("applied", []),
+          "Writer formatTable borders:false đánh dấu bảng dàn trang (tên bảng đặt được)", borderless)
+    layout_qa = b.cmd("writer.checkTables", key="writer.checkTables after borders false") or {}
+    qa_row = next((t for t in layout_qa.get("tables", []) if (t.get("header") or [""])[0].startswith("Lịch họp")), None)
+    qa_issues = {i.get("type") for i in layout_qa.get("issues", []) if qa_row and i.get("table") == qa_row.get("index")}
+    check(qa_row is not None and qa_row.get("layout") is True, "Writer checkTables thấy bảng dàn trang qua cờ layout", layout_qa)
+    check(qa_row is not None and "empty-cells" not in qa_issues, "Writer checkTables KHÔNG báo empty-cells cho bảng dàn trang", layout_qa)
+    check(qa_row is not None and "long-header-cell" in qa_issues,
+          "Writer checkTables vẫn báo long-header-cell cho bảng dàn trang (chữ lọt ô tiêu đề)", layout_qa)
     bad = b.cmd("writer.formatTable", {"table": 99}, expect_ok=False, key="writer.formatTable bad index")
     check("'table' must be between 1 and" in (bad or ""), "Writer formatTable báo chỉ số bảng sai", bad)
     b.cmd("writer.insertTable", {}, expect_ok=False, key="writer.insertTable missing")

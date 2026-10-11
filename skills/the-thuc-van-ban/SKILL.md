@@ -30,6 +30,13 @@ apps: [wps]
 - [ ] Đọc tài liệu hiện có (`writer.getText`).
 - [ ] Dựng khung: tiêu đề văn bản → các heading → nội dung.
 - [ ] Điền nội dung; bảng dùng mảng 2 chiều, không gõ bảng bằng dấu tab.
-- [ ] **Soát**: `writer.checkTables` → sửa `empty-cells` (điền hoặc ghi "—") và `long-header-cell`
-      (đoạn văn bị lọt vào ô tiêu đề: sửa lại ô đó bằng `writer.replaceAll`). Đọc lại `writer.getText`
-      để chắc thứ tự mục đúng.
+- [ ] **Soát**: `writer.checkTables` → đọc `tables[].layout` để biết bảng nào là bảng dàn trang, rồi:
+  - `empty-cells` trong bảng **dữ liệu**: điền cho đủ, hoặc ghi "—" nếu cố ý để trống.
+  - Bảng có `layout: true` (bảng bạn đã gọi `formatTable {borders:false}`): ô trống ở đó là **cố ý**
+    (khoảng trống ký, ô chờ điền) — **không điền gì vào**, điền vào là sai thể thức.
+  - `long-header-cell` (đoạn văn lọt vào ô tiêu đề): nếu bảng do **chính lượt này** bạn chèn và sau đó
+    chưa làm gì khác thì `writer.undo` lùi về trước `writer.insertTable` rồi chèn lại bằng `values`
+    đúng. Bảng có sẵn trong tài liệu, hoặc đã làm việc khác sau đó, thì **báo người dùng**, đừng tự vá.
+    **Không** dùng `writer.replaceAll` để vá một ô: nó thay **mọi** lần xuất hiện trong cả tài liệu và
+    không phân biệt hoa/thường.
+- [ ] Đọc lại `writer.getText` để chắc thứ tự mục đúng.

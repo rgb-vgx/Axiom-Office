@@ -39,6 +39,7 @@ def address(bounds) -> str:
 
 # ---------------------------------------------------------------- Writer
 
+
 def _cell_text(raw: str) -> str:
     return (raw or "").replace("\r", "").replace("\x07", "").strip()
 
@@ -63,7 +64,12 @@ def writer_check_tables(env, params):
                     empty += 1
                 if r == 0:
                     header.append(text)
-        if empty:
+        # Bang dan trang (do formatTable {borders:false} danh dau - xem writer.LAYOUT_TABLE_NAME): o trong
+        # la CO Y (khoang trong ky, o cho dien) nen KHONG bao "empty-cells"; so lieu van de trong report de
+        # agent thay. "long-header-cell" thi bao cho moi bang: no bat chu lot vao o tieu de, ma voi bang dan
+        # trang thi do cung la loi that (van-ban-hanh-chinh van doi soat no).
+        layout = writer.is_layout_table(table)
+        if empty and not layout:
             issues.append(issue("empty-cells", "table %d has %d empty cell(s)" % (index, empty), table=index))
         lengths = sorted(len(h) for h in header)
         if len(header) > 1:
@@ -73,7 +79,8 @@ def writer_check_tables(env, params):
                     issues.append(issue("long-header-cell",
                         "table %d has a header cell with %d characters ('%s'): text that should be outside the table may have been typed into it"
                         % (index, len(text), text[:40]), table=index))
-        report.append({"index": index, "rows": rows, "cols": cols, "emptyCells": empty, "header": header})
+        report.append({"index": index, "rows": rows, "cols": cols, "emptyCells": empty, "header": header,
+                       "layout": layout})
     return {"tableCount": len(tables), "tables": report, "issueCount": len(issues), "issues": issues}
 
 
@@ -367,9 +374,15 @@ def range_report(env, params):
         used_cells = (used_bounds.EndRow - used_bounds.StartRow + 1) * (used_bounds.EndColumn - used_bounds.StartColumn + 1)
         region_cells = (region_bounds.EndRow - region_bounds.StartRow + 1) * (region_bounds.EndColumn - region_bounds.StartColumn + 1)
         if not requested and used_cells > region_cells:
+            # Cau chu phai noi ro HAI kha nang: noi dung ngoai vung bang co the la du lieu NGUOI DUNG da co
+            # (bang thu hai, ghi chu ben canh), khong chi la gia tri ghi lac. Loi dan cu "check for stray
+            # values" bi doc thanh "xoa cac o do" va skill bao-cao-du-lieu noi thang ra dieu do - log
+            # 11/10/2026. Muon soat rieng bang vua dung thi truyen 'range'.
             issues.append(issue("outside-table",
-                "the sheet has content outside the table %s (used range %s): check for stray values written to the wrong cells"
-                % (region_address, address(used_bounds))))
+                "the sheet has content outside the table %s (used range %s): this may be data the user "
+                "already had (a second table, notes beside the table) or values written to the wrong "
+                "cells - do NOT clear a cell that already had data before this turn; to check only the "
+                "table you just built, call et.checkRange with 'range'" % (region_address, address(used_bounds))))
     except Exception:  # noqa: BLE001
         pass
 
@@ -543,10 +556,12 @@ def layout_report(env, params):
 
 
 command("writer.checkTables", "wps", writer_check_tables,
-        "Soát các bảng (chỉ đọc): số dòng/cột, ô trống, ô tiêu đề lẫn đoạn văn", agent=True)
+        "Soát các bảng (chỉ đọc): số dòng/cột, ô trống, ô tiêu đề lẫn đoạn văn. Bảng dàn trang — bảng đã gọi "
+        "writer.formatTable với borders:false — được đánh dấu layout và KHÔNG báo empty-cells (ô trống ở đó "
+        "là cố ý: khoảng trống ký, ô chờ điền)", agent=True)
 command("et.checkRange", "et", range_report,
-        "Soát bảng dữ liệu (chỉ đọc): tiêu đề trống, kiểu lẫn lộn, số dạng chữ, number format, dữ liệu lạc ngoài bảng",
-        opt("range", "default: the used range"), opt("sheet"), agent=True)
+        "Soát bảng dữ liệu (chỉ đọc): tiêu đề trống, kiểu lẫn lộn, số dạng chữ, number format, dữ liệu lạc ngoài bảng "
+        "(chỉ khi không truyền range)", opt("range", "default: the used range"), opt("sheet"), agent=True)
 command("wpp.checkLayout", "wpp", layout_report,
         "Soát bố cục slide (chỉ đọc): chữ tràn khung, shape ra ngoài slide, shape chồng nhau, chữ quá nhỏ",
         opt("slide", "slide number; default: every slide"), agent=True)

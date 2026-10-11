@@ -224,11 +224,28 @@ def test_writer(b, out, png, run_ai):
     check({"long-header-cell", "empty-cells"} <= table_kinds, "Word checkTables bắt ô tiêu đề lẫn đoạn văn + ô trống", tables_qa)
     borderless = b.cmd("writer.formatTable", {"borders": False}, key="writer.formatTable borders false")
     check(borderless and "borders" in borderless.get("applied", []), "Word formatTable bỏ viền bảng", borderless)
+    # Bo khung = bang DAN TRANG: phai danh dau duoc, de checkTables thoi bao empty-cells (log 11/10/2026 -
+    # the-thuc-van-ban bao dien "—" vao o trong cua bang dan trang NĐ30, tuc la pha dung the thuc).
+    check(borderless and "layout-table" in borderless.get("applied", []),
+          "Word formatTable borders:false đánh dấu bảng dàn trang (tên bảng đặt được)", borderless)
+    layout_qa = b.cmd("writer.checkTables", key="writer.checkTables after borders false") or {}
+    qa_row = next((t for t in layout_qa.get("tables", []) if (t.get("header") or [""])[0].startswith("Lịch họp")), None)
+    qa_issues = {i.get("type") for i in layout_qa.get("issues", []) if qa_row and i.get("table") == qa_row.get("index")}
+    check(qa_row is not None and qa_row.get("layout") is True, "Word checkTables thấy bảng dàn trang qua cờ layout", layout_qa)
+    check(qa_row is not None and "empty-cells" not in qa_issues, "Word checkTables KHÔNG báo empty-cells cho bảng dàn trang", layout_qa)
+    check(qa_row is not None and "long-header-cell" in qa_issues,
+          "Word checkTables vẫn báo long-header-cell cho bảng dàn trang (chữ lọt ô tiêu đề)", layout_qa)
     styled = b.cmd("writer.formatTable", {"font": "Calibri", "size": "12", "headerFill": "1F4E79", "headerColor": "#FFFFFF",
                                           "bandFill": "#DEEAF6", "borderColor": "#8EAADB", "alignment": "center", "autoFit": "window"},
                    key="writer.formatTable last table")
     check(styled and not styled.get("skipped") and "headerFill" in styled.get("applied", []) and "bandFill" in styled.get("applied", []),
           "Word formatTable định dạng bảng có sẵn (không bỏ qua phần nào)", styled)
+    # Ke khung lai = bang DU LIEU: tem bang dan trang phai duoc bo, empty-cells phai bao lai.
+    rebordered = b.cmd("writer.checkTables", record=False) or {}
+    back = next((t for t in rebordered.get("tables", []) if (t.get("header") or [""])[0].startswith("Lịch họp")), None)
+    check(back is not None and back.get("layout") is False and "empty-cells" in
+          {i.get("type") for i in rebordered.get("issues", []) if i.get("table") == back.get("index")},
+          "Word kẻ khung lại thì bảng thôi là bảng dàn trang", rebordered)
     first = b.cmd("writer.formatTable", {"table": 1, "style": "Grid Table 4 - Accent 1"}, key="writer.formatTable by index")
     check(first and first.get("table") == 1 and first.get("applied") == ["style"], "Word formatTable theo chỉ số bảng", first)
     bad = b.cmd("writer.formatTable", {"table": 99}, expect_ok=False, key="writer.formatTable bad index")

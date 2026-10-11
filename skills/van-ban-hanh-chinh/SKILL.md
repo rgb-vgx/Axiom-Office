@@ -41,5 +41,7 @@ bịa**.
 - [ ] Đọc thể thức `references/the-thuc.md`.
 - [ ] `writer.getText` — tài liệu trống hay đã có nội dung.
 - [ ] Dựng phần đầu → tên loại/trích yếu → nội dung → phần cuối.
-- [ ] **Soát**: `writer.checkTables` (2 bảng dàn trang không được có `long-header-cell` do gõ lọt chữ),
-      `writer.getText` đọc lại đủ các thành phần theo đúng thứ tự.
+- [ ] **Soát**: `writer.checkTables` → hai bảng dàn trang phải có `layout: true` (nhờ `borders: false`), và
+      không được có `long-header-cell` do gõ lọt chữ. `layout: true` nghĩa là ô trống trong đó là cố ý —
+      **không điền gì vào** (khoảng trống ký, ô chờ điền). `writer.getText` đọc lại đủ các thành phần theo
+      đúng thứ tự.

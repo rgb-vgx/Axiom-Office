@@ -5,6 +5,53 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — Skill dựng sẵn: ba chỗ dạy agent phá tài liệu người dùng (review 11/10/2026)
+- **`the-thuc-van-ban` bảo sửa một ô bằng `writer.replaceAll`**: `replaceAll` tạo `ReplaceDescriptor` rồi gọi
+  `document.replaceAll(...)` — **toàn tài liệu**, không nhắm được bảng/ô, và đặt `SearchCaseSensitive = False`.
+  Với văn bản hành chính (tên cơ quan, quốc hiệu, chức vụ lặp nhiều nơi) model làm đúng theo skill sẽ thay **mọi**
+  lần xuất hiện, không phân biệt hoa/thường. Nay skill nói: bảng do **chính lượt này** chèn thì `writer.undo` lùi
+  về trước `writer.insertTable` rồi chèn lại bằng `values` đúng; bảng có sẵn hoặc đã làm việc khác sau đó thì
+  **báo người dùng**, và nói thẳng **không** dùng `writer.replaceAll` để vá một ô
+- **`bao-cao-du-lieu` bảo xoá `outside-table` bằng cách ghi `""`**: `outside-table` bắn khi vùng dùng của sheet
+  vượt ra ngoài vùng bảng — mà ô đó rất thường là **dữ liệu người dùng đã có sẵn** cạnh bảng. Câu "xoá bằng cách
+  ghi `""`" mâu thuẫn trực tiếp với `CheckRule` của system prompt ("Never change a cell holding data the user
+  already had") và dạy agent tối ưu `issueCount` thay vì làm đúng việc. Nay skill nói chỉ xoá ô **chính lượt này**
+  đã ghi nhầm, không chắc thì báo người dùng, và muốn soát đúng bảng vừa dựng thì truyền `range` (đã kiểm trong
+  `checks.py`: `outside-table` chỉ bắn khi **không** truyền `range`). Bỏ luôn yêu cầu tuyệt đối "lặp đến khi
+  `issueCount` = 0"
+- **Hai skill dùng chung nhau chống nhau về `empty-cells`**: `van-ban-hanh-chinh` dựng hai bảng **không kẻ khung**
+  làm bố cục (phần đầu, phần cuối), trong đó ô trống là **cố ý** — khoảng trống ký, ô chờ điền — mà
+  `the-thuc-van-ban` lại bảo "sửa `empty-cells` (điền hoặc ghi `—`)". Model làm xong văn bản NĐ30 sẽ nhét `—` vào
+  chỗ ký. Nay `formatTable {borders:false}` **đánh dấu bảng dàn trang** vào tên bảng
+  (`writer.LAYOUT_TABLE_NAME`), `writer.checkTables` đọc tem đó, trả `layout` cho từng bảng và **không** báo
+  `empty-cells` cho bảng dàn trang (số ô trống vẫn hiện trong report để agent thấy). Kẻ khung lại thì tem được bỏ
+- **Vì sao đánh dấu chứ không đoán theo nét kẻ** (đo trên LibreOffice thật 11/10/2026): "không có nét kẻ" **không**
+  suy ra được "bảng dàn trang" — bảng **dữ liệu** chưa định dạng cũng không có nét kẻ nào (đúng trường hợp hai live
+  test đang kiểm: chèn bảng trần rồi đòi `checkTables` bắt `empty-cells`), còn bảng dàn trang kiểu biểu mẫu thì
+  **có** kẻ khung; đoán theo "ô trống mà cả dòng/cột đều trống" cũng trượt, vì khoảng trống ký của NĐ30 nằm trong
+  dòng **có** chữ ("- Như trên;"). Tem nằm ở tên bảng nên theo `.odt` sang lần mở sau (đã đo: đặt `Name` → lưu →
+  mở lại, tên còn nguyên); tên bảng Writer **không được chứa dấu cách hay dấu chấm** (`unotbl.cxx:2958` — dấu chấm
+  dành riêng cho tham chiếu `<TênBảng.A1>`) và **không được trùng** (`:2971`), nên `_rename_table` thử lần lượt và
+  `formatTable` ghi `layout-table` vào `applied` để tem đặt hụt **hiện ra ở `skipped`** chứ không im lặng
+- `long-header-cell` **vẫn báo cho mọi bảng** kể cả bảng dàn trang: nó bắt chữ lọt vào ô tiêu đề, và với bảng dàn
+  trang thì đó cũng là lỗi thật (`van-ban-hanh-chinh` vẫn đòi soát nó). Ba checklist skill (`the-thuc-van-ban`,
+  `bao-cao-du-lieu`, `van-ban-hanh-chinh`) viết lại theo hành vi mới
+- `UndoRule` (`core-go/internal/tools/office_action.go`) thêm ngoại lệ: được `undo` thứ **chính lượt này** vừa làm
+  khi không có cách sửa tại chỗ (không có lệnh sửa một ô), để prompt không mâu thuẫn với skill vừa sửa và không dồn
+  agent sang `writer.replaceAll`; ngoại lệ **không** áp cho nội dung có trước lượt này
+- Test: `tests/lo/test_checks.py` thêm 10 test (bảng dàn trang được miễn `empty-cells`, bảng dữ liệu trần **vẫn**
+  bị báo, tem theo từng bảng, đặt tên tránh trùng, hết cách đặt tên thì `formatTable` không đổ, gỡ tem khi kẻ khung
+  lại) — `python3 tests/lo/test_checks.py` 16 xanh; hai live test thêm 5 điểm kiểm (`layout-table` trong `applied`,
+  `layout: true`, hết `empty-cells`, `long-header-cell` vẫn còn, và kẻ khung lại thì tem mất). Đo đầu-cuối trên
+  LibreOffice thật (profile tạm, chạy thẳng handler): 12/12 điểm xanh, gồm cả vòng lưu/mở lại `.odt`
+
+### Added — `docs/skills-review.md`: review 8 skill dựng sẵn + khoảng trống so với việc văn phòng
+- Kiểm kê từng skill (app, vai trò, lệnh dùng — 23/23 lệnh nhắc trong skill đều có thật trong registry), 3 lỗi P0
+  ở trên, 6 điểm P1 (lệch token ở `bo-cuc.md`, hai skill lệch nhau về số lần gọi `checkLayout`, `description` hứa
+  "độ rộng bảng" mà không lệnh nào làm được…), **trần công cụ** theo từng app, 7 loại việc chưa skill nào phủ, và
+  roadmap P0–P4. Kết luận: bộ skill **đủ để chứng minh cơ chế nạp 3 tầng**, **chưa đủ** cho nhân viên văn phòng —
+  nhưng nút thắt là trần `office_action` và việc thiếu eval, không phải số lượng skill
+
 ### Added — WPS Office for Linux: Agent Core làm bridge cho JS add-in (docs/wps-bridge.md)
 - **Core** phục vụ add-in ở `/wps/addin/`, kênh long-poll `/wps/v1/poll|result` chỉ nhận `Origin` của chính Core,
   và một **bridge WPS** trên cổng 47861 nói đúng giao thức bridge (`/health`, `/commands`, `/session`, `/cmd`) kèm

@@ -21,8 +21,15 @@ type OfficeActionTool struct {
 
 const (
 	// UndoRule: khong co lenh dinh dang bang, model undo 2 lan (xoa bang + ghi chu) roi dung lai tu dau.
+	// Luot 11/10/2026: them ngoai le cho "lam lai chinh viec vua lam" - co lenh khong co cach sua tai cho
+	// (khong co writer.setCell), nen cam undo tuyet doi se khoa luon duong sua sai cua chinh luot nay va
+	// day model sang writer.replaceAll - lenh thay MOI lan xuat hien trong ca tai lieu. Ngoai le nay chi mo
+	// cho thao tac CUA CHINH LUOT NAY, khong mo cho tai lieu co san cua nguoi dung.
 	UndoRule = "Change existing content in place (e.g. writer.formatTable to restyle a table); " +
-		"never use undo to start over - only undo when the user asks."
+		"never use undo to start over - only undo when the user asks. " +
+		"Exception: undo is allowed to take back something YOU did in this same turn when there is no way " +
+		"to correct it in place (e.g. undo the table you just inserted, then insert it again with the right " +
+		"values). It never applies to content that was in the document before this turn."
 
 	// ChunkRule: tham so cua MOT lan goi phai nam gon trong MOT phan hoi cua model. Bang vai nghin dong
 	// gui trong mot lan thi chinh phan tra loi do het ngan sach token truoc khi viet xong - do duoc ngay

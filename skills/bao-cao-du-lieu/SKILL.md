@@ -36,6 +36,9 @@ apps: [et]
 - [ ] Ghi bảng bằng một lệnh `et.writeRange` (tiêu đề + dữ liệu + công thức).
 - [ ] `formulaErrors` trong kết quả `et.writeRange` phải rỗng; còn thì sửa công thức và ghi lại.
 - [ ] Định dạng: tiêu đề, number format, hàng tổng.
-- [ ] **Soát**: `et.checkRange` → sửa mọi `issues`: `outside-table` (dữ liệu ghi lạc ô — xoá bằng cách ghi
-      `""` vào đúng các ô đó), `numbers-as-text`, `mixed-types`, `no-number-format`, `empty-header`,
-      `error-values`. Lặp đến khi `issueCount` = 0.
+- [ ] **Soát**: `et.checkRange` → sửa `numbers-as-text`, `mixed-types`, `no-number-format`, `empty-header`,
+      `error-values`. Lặp đến khi hết các loại đó.
+- [ ] Riêng `outside-table` (sheet đã có nội dung ngoài vùng bảng): **không phải lỗi luôn**. Nếu sheet có
+      sẵn dữ liệu khác cạnh bảng thì đó là bảng/dữ liệu của người dùng — **không xoá**. Chỉ xoá ô mà
+      **chính lượt này** bạn đã ghi nhầm; không chắc thì báo người dùng. Muốn chỉ soát đúng bảng bạn vừa
+      dựng thì gọi `et.checkRange {range}`.
