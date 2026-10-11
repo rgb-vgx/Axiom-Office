@@ -21,6 +21,7 @@ const (
 // Endpoint cua luot chay va hoi thoai (New_arch.md muc 7.3, 7.4):
 // POST /v1/runs, GET /v1/runs/{id}, GET /v1/runs/{id}/events (SSE), POST /v1/runs/{id}/cancel,
 // POST /v1/runs/{id}/confirm, GET /v1/audit, GET/DELETE /v1/conversations...
+// Cac ham serve* dung chung cho /v1/runs va kenh add-in /wps/v1/runs (docs/wps-bridge.md muc 7).
 func mapRuns(mux *http.ServeMux, deps *Deps) {
 	mux.HandleFunc("POST /v1/runs", func(w http.ResponseWriter, r *http.Request) {
 		if !deps.Stores.Available {
@@ -41,70 +42,24 @@ func mapRuns(mux *http.ServeMux, deps *Deps) {
 			return
 		}
 
-		run, startError := deps.Manager.TryStart(request.Port)
-		if run == nil {
-			if startError == "" {
-				startError = "cannot start run"
-			}
-			Error(w, http.StatusConflict, startError)
-			return
-		}
-		go deps.Orchestrator.Execute(run.Context(), run, request)
-
-		// Hoi thoai duoc tao ngay dau luot chay: cho toi da 10s de tra ve conversationId nhu tai lieu.
-		deadline := time.Now().Add(conversationWaitLimit)
-		for run.ConversationID == "" && run.Status == agent.StatusRunning && time.Now().Before(deadline) {
-			time.Sleep(25 * time.Millisecond)
-		}
-		OK(w, map[string]any{
-			"runId": run.ID, "conversationId": nilIfEmpty(run.ConversationID), "status": run.Status,
-		})
+		serveStartRun(w, deps, request)
 	})
 
 	mux.HandleFunc("GET /v1/runs/{runId}", func(w http.ResponseWriter, r *http.Request) {
-		run := deps.Manager.Get(r.PathValue("runId"))
-		if run == nil {
-			Error(w, http.StatusNotFound, "unknown run: "+r.PathValue("runId"))
-			return
-		}
-		OK(w, run.JSON())
+		serveGetRun(w, deps, r.PathValue("runId"))
 	})
 
 	mux.HandleFunc("POST /v1/runs/{runId}/cancel", func(w http.ResponseWriter, r *http.Request) {
-		run := deps.Manager.Get(r.PathValue("runId"))
-		if run == nil {
-			Error(w, http.StatusNotFound, "unknown run: "+r.PathValue("runId"))
-			return
-		}
-		if !deps.Manager.Cancel(run.ID) {
-			Error(w, http.StatusConflict, "run is not running (status "+run.Status+")")
-			return
-		}
-		OK(w, map[string]any{"cancelled": true, "status": run.Status})
+		serveCancelRun(w, deps, r.PathValue("runId"))
 	})
 
 	// Tra loi yeu cau xac nhan cua policy (muc 7.3, 8.6): {"confirmationId", "approved": true|false}.
 	mux.HandleFunc("POST /v1/runs/{runId}/confirm", func(w http.ResponseWriter, r *http.Request) {
-		run := deps.Manager.Get(r.PathValue("runId"))
-		if run == nil {
-			Error(w, http.StatusNotFound, "unknown run: "+r.PathValue("runId"))
-			return
-		}
 		body, parsed := readJSON(r)
 		if !parsed {
 			body = nil
 		}
-		id, hasID := body["confirmationId"].(string)
-		approved, hasApproved := body["approved"].(bool)
-		if !hasID || !hasApproved || strings.TrimSpace(id) == "" {
-			Error(w, http.StatusBadRequest, "'confirmationId' and 'approved' (true|false) are required")
-			return
-		}
-		if !run.Confirmations.Resolve(id, approved) {
-			Error(w, http.StatusNotFound, "no pending confirmation: "+id)
-			return
-		}
-		OK(w, map[string]any{"confirmationId": id, "approved": approved})
+		serveConfirmRun(w, deps, r.PathValue("runId"), body)
 	})
 
 	mux.HandleFunc("GET /v1/audit", func(w http.ResponseWriter, r *http.Request) {
@@ -125,12 +80,7 @@ func mapRuns(mux *http.ServeMux, deps *Deps) {
 	})
 
 	mux.HandleFunc("GET /v1/runs/{runId}/events", func(w http.ResponseWriter, r *http.Request) {
-		run := deps.Manager.Get(r.PathValue("runId"))
-		if run == nil {
-			Error(w, http.StatusNotFound, "unknown run: "+r.PathValue("runId"))
-			return
-		}
-		streamEvents(w, r, run)
+		serveRunEvents(w, r, deps, r.PathValue("runId"))
 	})
 
 	mux.HandleFunc("GET /v1/conversations", func(w http.ResponseWriter, r *http.Request) {
@@ -173,6 +123,82 @@ func mapRuns(mux *http.ServeMux, deps *Deps) {
 		}
 		OK(w, map[string]any{"deleted": id})
 	})
+}
+
+// serveStartRun: khoi dong luot chay tu Request da parse (dung chung cho /v1/runs va /wps/v1/runs).
+func serveStartRun(w http.ResponseWriter, deps *Deps, request *agent.Request) {
+	run, startError := deps.Manager.TryStart(request.Port)
+	if run == nil {
+		if startError == "" {
+			startError = "cannot start run"
+		}
+		Error(w, http.StatusConflict, startError)
+		return
+	}
+	go deps.Orchestrator.Execute(run.Context(), run, request)
+
+	// Hoi thoai duoc tao ngay dau luot chay: cho toi da 10s de tra ve conversationId nhu tai lieu.
+	deadline := time.Now().Add(conversationWaitLimit)
+	for run.ConversationID == "" && run.Status == agent.StatusRunning && time.Now().Before(deadline) {
+		time.Sleep(25 * time.Millisecond)
+	}
+	OK(w, map[string]any{
+		"runId": run.ID, "conversationId": nilIfEmpty(run.ConversationID), "status": run.Status,
+	})
+}
+
+// serveGetRun: trang thai mot luot chay (dung chung cho /v1/runs/{id} va /wps/v1/runs/{id}).
+func serveGetRun(w http.ResponseWriter, deps *Deps, runID string) {
+	run := deps.Manager.Get(runID)
+	if run == nil {
+		Error(w, http.StatusNotFound, "unknown run: "+runID)
+		return
+	}
+	OK(w, run.JSON())
+}
+
+// serveCancelRun: huy luot dang chay (dung chung cho /v1 va /wps).
+func serveCancelRun(w http.ResponseWriter, deps *Deps, runID string) {
+	run := deps.Manager.Get(runID)
+	if run == nil {
+		Error(w, http.StatusNotFound, "unknown run: "+runID)
+		return
+	}
+	if !deps.Manager.Cancel(run.ID) {
+		Error(w, http.StatusConflict, "run is not running (status "+run.Status+")")
+		return
+	}
+	OK(w, map[string]any{"cancelled": true, "status": run.Status})
+}
+
+// serveConfirmRun: tra loi yeu cau xac nhan cua policy (dung chung cho /v1 va /wps).
+func serveConfirmRun(w http.ResponseWriter, deps *Deps, runID string, body map[string]any) {
+	run := deps.Manager.Get(runID)
+	if run == nil {
+		Error(w, http.StatusNotFound, "unknown run: "+runID)
+		return
+	}
+	id, hasID := body["confirmationId"].(string)
+	approved, hasApproved := body["approved"].(bool)
+	if !hasID || !hasApproved || strings.TrimSpace(id) == "" {
+		Error(w, http.StatusBadRequest, "'confirmationId' and 'approved' (true|false) are required")
+		return
+	}
+	if !run.Confirmations.Resolve(id, approved) {
+		Error(w, http.StatusNotFound, "no pending confirmation: "+id)
+		return
+	}
+	OK(w, map[string]any{"confirmationId": id, "approved": approved})
+}
+
+// serveRunEvents: SSE cua mot luot chay (dung chung cho /v1 va /wps).
+func serveRunEvents(w http.ResponseWriter, r *http.Request, deps *Deps, runID string) {
+	run := deps.Manager.Get(runID)
+	if run == nil {
+		Error(w, http.StatusNotFound, "unknown run: "+runID)
+		return
+	}
+	streamEvents(w, r, run)
 }
 
 // streamEvents: SSE - phat lai su kien cu (neu client ket noi lai voi ?after=) roi tiep tuc nghe.
