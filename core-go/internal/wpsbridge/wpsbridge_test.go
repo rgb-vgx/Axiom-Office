@@ -26,20 +26,42 @@ func testBridge(t *testing.T, mutate func(*Options)) *Bridge {
 // thi doi token.
 func TestDecideWPSAuth(t *testing.T) {
 	own := OwnOrigin(47840)
-	if code, ok := DecideWPSAuth(own, "", "tok", 47840); !ok || code != 0 {
+	if code, ok := DecideWPSAuth(own, "", "tok", 47840, "POST", ""); !ok || code != 0 {
 		t.Fatalf("own origin -> qua, duoc (%d, %v)", code, ok)
 	}
-	if code, ok := DecideWPSAuth("http://evil.example", "", "tok", 47840); ok || code != 403 {
+	if code, ok := DecideWPSAuth("http://evil.example", "", "tok", 47840, "POST", ""); ok || code != 403 {
 		t.Fatalf("origin la -> 403, duoc (%d, %v)", code, ok)
 	}
-	if code, ok := DecideWPSAuth("", "tok", "tok", 47840); !ok || code != 0 {
+	if code, ok := DecideWPSAuth("", "tok", "tok", 47840, "POST", ""); !ok || code != 0 {
 		t.Fatalf("khong origin + dung token -> qua, duoc (%d, %v)", code, ok)
 	}
-	if code, ok := DecideWPSAuth("", "sai", "tok", 47840); ok || code != 401 {
+	if code, ok := DecideWPSAuth("", "sai", "tok", 47840, "POST", ""); ok || code != 401 {
 		t.Fatalf("khong origin + sai token -> 401, duoc (%d, %v)", code, ok)
 	}
-	if code, ok := DecideWPSAuth("", "", "tok", 47840); ok || code != 401 {
+	if code, ok := DecideWPSAuth("", "", "tok", 47840, "POST", ""); ok || code != 401 {
 		t.Fatalf("khong origin + thieu token -> 401, duoc (%d, %v)", code, ok)
+	}
+}
+
+// Trinh duyet khong gui Origin cho GET cung origin nen EventSource cua pane bi 401 (11/10/2026):
+// GET/HEAD khong Origin ma co Sec-Fetch-Site: same-origin thi cho qua; POST van doi token.
+func TestDecideWPSAuthSecFetchSite(t *testing.T) {
+	if code, ok := DecideWPSAuth("", "", "tok", 47840, "GET", "same-origin"); !ok || code != 0 {
+		t.Fatalf("GET khong origin + same-origin -> qua, duoc (%d, %v)", code, ok)
+	}
+	if code, ok := DecideWPSAuth("", "", "tok", 47840, "HEAD", "same-origin"); !ok || code != 0 {
+		t.Fatalf("HEAD khong origin + same-origin -> qua, duoc (%d, %v)", code, ok)
+	}
+	if code, ok := DecideWPSAuth("", "", "tok", 47840, "POST", "same-origin"); ok || code != 401 {
+		t.Fatalf("POST khong origin chi co same-origin -> 401, duoc (%d, %v)", code, ok)
+	}
+	for _, value := range []string{"cross-site", "same-site", "none", ""} {
+		if code, ok := DecideWPSAuth("", "", "tok", 47840, "GET", value); ok || code != 401 {
+			t.Fatalf("GET khong origin + Sec-Fetch-Site %q -> 401, duoc (%d, %v)", value, code, ok)
+		}
+	}
+	if code, ok := DecideWPSAuth("http://evil.example", "", "tok", 47840, "GET", "same-origin"); ok || code != 403 {
+		t.Fatalf("Origin la du co same-origin van 403, duoc (%d, %v)", code, ok)
 	}
 }
 

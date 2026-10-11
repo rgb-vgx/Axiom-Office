@@ -87,14 +87,20 @@ func OwnOrigin(corePort int) string {
 }
 
 // DecideWPSAuth quyet dinh xac thuc cho kenh /wps/v1/*: Origin dung bang origin cua Core thi cho qua
-// khong can token; khong Origin thi doi token; Origin khac thi 403.
+// khong can token; khong Origin thi doi token; Origin khac thi 403. Trinh duyet khong gui Origin
+// cho GET cung origin nen EventSource cua pane bi 401 (11/10/2026): voi GET/HEAD khong Origin ma co
+// Sec-Fetch-Site: same-origin thi cho qua (header do trinh duyet tu dat, trang khac khong gia duoc).
 // Tra ve (0, true) khi cho qua, nguoc lai (ma loi, false).
-func DecideWPSAuth(origin, tokenHeader, token string, corePort int) (int, bool) {
+func DecideWPSAuth(origin, tokenHeader, token string, corePort int, method, secFetchSite string) (int, bool) {
 	if origin != "" {
 		if origin == OwnOrigin(corePort) {
 			return 0, true
 		}
 		return http.StatusForbidden, false
+	}
+	// GET/HEAD cung origin khong co Origin nhung co Sec-Fetch-Site: same-origin thi cho qua.
+	if (method == http.MethodGet || method == http.MethodHead) && secFetchSite == "same-origin" {
+		return 0, true
 	}
 	if token != "" && tokenHeader != token {
 		return http.StatusUnauthorized, false
@@ -443,7 +449,7 @@ func (b *Bridge) ServeAddin(w http.ResponseWriter, r *http.Request) {
 
 // checkWPSAuth ap dung DecideWPSAuth + doi body JSON cho /wps/v1/*.
 func (b *Bridge) checkWPSAuth(w http.ResponseWriter, r *http.Request) bool {
-	if code, ok := DecideWPSAuth(r.Header.Get("Origin"), r.Header.Get("X-Auth-Token"), b.opts.Token, b.corePort()); !ok {
+	if code, ok := DecideWPSAuth(r.Header.Get("Origin"), r.Header.Get("X-Auth-Token"), b.opts.Token, b.corePort(), r.Method, r.Header.Get("Sec-Fetch-Site")); !ok {
 		if code == http.StatusForbidden {
 			writeErr(w, code, "requests with an Origin header are not allowed")
 		} else {

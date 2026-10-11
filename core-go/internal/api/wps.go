@@ -121,8 +121,10 @@ func mapWPSRuns(mux *http.ServeMux, deps *Deps) {
 
 // checkWPSRunAuth: xac thuc kenh add-in cho /wps/v1/runs (giong wpsbridge.checkWPSAuth: Origin dung
 // bang origin cua Core thi qua, Origin la -> 403, khong Origin thi doi token -> 401, body JSON -> 415).
+// Trinh duyet khong gui Origin cho GET cung origin nen EventSource cua pane bi 401 (11/10/2026):
+// GET/HEAD khong Origin ma co Sec-Fetch-Site: same-origin thi cho qua; POST van doi token.
 func checkWPSRunAuth(w http.ResponseWriter, r *http.Request, deps *Deps) bool {
-	if code, ok := wpsbridge.DecideWPSAuth(r.Header.Get("Origin"), r.Header.Get("X-Auth-Token"), deps.Config.Token, deps.Runtime.Port); !ok {
+	if code, ok := wpsbridge.DecideWPSAuth(r.Header.Get("Origin"), r.Header.Get("X-Auth-Token"), deps.Config.Token, deps.Runtime.Port, r.Method, r.Header.Get("Sec-Fetch-Site")); !ok {
 		if code == http.StatusForbidden {
 			Error(w, code, "requests with an Origin header are not allowed")
 		} else {
