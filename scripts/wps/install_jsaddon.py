@@ -5,7 +5,7 @@ Chi ghi trong HOME duoc chi dinh qua --home (khong bao gio dung ~ hay $HOME
 cua nguoi dung that):
 
 - dang ky add-in online trong <home>/.local/share/Kingsoft/wps/jsaddons/publish.xml
-  <jspluginonline name="axiomoffice" type="wps" url="<core-url>/wps/addin/" .../>
+  <jspluginonline name="axiomoffice" type="wps,et,wpp" url="<core-url>/wps/addin/" .../>
   (giu cac add-in khac, go dang ky cu cua axiomoffice, cai lai thi thay URL cu);
 - xoa thu muc add-in offline cu <jsaddons>/axiomoffice_* (Core phuc vu file add-in,
   trinh cai khong chep file add-in);
@@ -40,7 +40,7 @@ SECTION = "[6.0]"
 def build_entry(core_url: str) -> str:
     base = core_url.rstrip("/")
     return (
-        '<jspluginonline name="axiomoffice" type="wps" url="%s/wps/addin/"'
+        '<jspluginonline name="axiomoffice" type="wps,et,wpp" url="%s/wps/addin/"'
         ' debug="" enable="enable_dev" install="null" customDomain=""/>'
         % base
     )
