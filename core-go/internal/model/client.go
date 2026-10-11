@@ -39,6 +39,8 @@ const (
 
 	// VerifyWorkNudge: cau nhac khi luot da sua tai lieu (AgentOptions.Verify). YEU CAU DOC LAI bang
 	// lenh that, khong phai tu hoi lai suy nghi - model tu danh gia bang tri nho thi luon thay dung.
+	// Gioi han 11/10/2026 (log sheet ADT cua nguoi dung): chi thu doi-dat-lai voi o do luot nay tao,
+	// khong bao gio ghi vao o nguoi dung da co du lieu truoc luot.
 	VerifyWorkNudge = "Before you finish: check the work you just did. Read the document back with the " +
 		"actions available to you (for example et.readRange or et.checkRange, et.listSheets, writer.getText " +
 		"or writer.checkTables, wpp.listSlides or wpp.checkLayout) and compare what is really there with what " +
@@ -47,9 +49,12 @@ const (
 		// 02/10/2026: mot workbook 10.000 duong Monte Carlo co o "Seed Value [change to re-run]" o
 		// B22, nhung cong thuc doc C25 (trong) - doi o duoc dan nhan khong lam gi ca, va chinh ban kiem
 		// tra cua no bao PASS vi di so chu "integer" voi so 1. Phai THU moi biet.
-		"For anything with inputs the user is meant to change (assumptions, drivers, settings): change one, " +
+		"For anything with inputs the user is meant to change that you created in this turn " +
+		"(assumptions, drivers, settings): you may change one you created in this turn, " +
 		"read back the cells that are supposed to depend on it, confirm they really move, then put the value " +
-		"back. Reading alone cannot tell a live input from a dead one. " +
+		"back. Never change a cell holding data the user already had, not even temporarily; to check that " +
+		"formulas really depend on existing data, read the formulas back (et.readRange with formulas:true) " +
+		"instead of changing values. Reading alone cannot tell a live input from a dead one. " +
 		"Fix anything missing or wrong with more tool calls, then reply with the short summary."
 )
 

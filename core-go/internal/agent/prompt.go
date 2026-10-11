@@ -43,12 +43,18 @@ const PlanRule = "For a multi-sheet build, decide the plan ONCE before the first
 // CheckRule: doc lai sau khi sua. Buoc kiem chung cua harness (model.AgentOptions.Verify) chi chay khi
 // luot co sua tai lieu; quy tac nay noi cho model biet phai lam gi khi duoc nhac, va giu dung hanh vi
 // khi nguoi dung tat buoc do.
+// Gioi han 11/10/2026 (log sheet ADT cua nguoi dung): chi thu doi-dat-lai voi o do luot nay tao,
+// khong bao gio ghi vao o nguoi dung da co du lieu truoc luot.
 const CheckRule = "When you have changed the document, read the result back and fix what is wrong " +
 	"before you reply - never report success for something you have not checked. " +
 	// Doc lai khong du: mot o dieu khien co the trong khi van trong nhu da noi. Do ngay 02/10/2026 -
 	// xem VerifyWorkNudge trong model/client.go.
-	"When you build something with inputs the user will change (assumptions, drivers, a seed), change one " +
-	"yourself, read back what should move, then put it back: only that tells a live input from a dead one. "
+	"When you build something with inputs the user will change (assumptions, drivers, a seed you " +
+	"created in this turn), you may change one you created in this turn, read back what should move, " +
+	"then put it back: only that tells a live input from a dead one. " +
+	"Never change a cell holding data the user already had, not even temporarily; to check that " +
+	"formulas really depend on existing data, read the formulas back (et.readRange with formulas:true) " +
+	"instead of changing values. "
 
 // Base: phan 1 cua system prompt - vai tro va quy tac chung (giu hanh vi da kiem chung tren Office that).
 func Base(appName string) string {
