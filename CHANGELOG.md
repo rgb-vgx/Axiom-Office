@@ -31,7 +31,8 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
   `core-go/internal/wpsbridge/wpsbridge_test.go` (Core ghi `app` theo poll thay vì hard-code `"wps"`, để
   `office_action.go` không lọc bỏ im lặng `et.*`/`wpp.*`), `tests/wps/test_addin_et.mjs` (23 lệnh `et.*`) và
   `tests/wps/test_addin_wpp.mjs` (15 lệnh `wpp.*`); dùng chung `addin_harness.mjs` và object model giả
-  `addin_fake.mjs`
+  `addin_fake.mjs`. Registry add-in đã khai báo metadata của cả 38 lệnh `et.*`/`wpp.*`
+  (nguồn: `tests/wps/lo_catalog.py`); handler của chúng thêm ở T7/T8
 
 ### Fixed — An toàn dữ liệu khi agent làm việc trên sheet có sẵn (log Calc thật 11/10/2026)
 Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho thấy ba vấn đề:
