@@ -1,28 +1,27 @@
 // Spec T2 (docs/wps-bridge.md muc 3): registry lenh + vong poll cua JS add-in WPS, khong can WPS.
+// Spec T6 (docs/wps-bridge.md muc 5): add-in nhan biet app dang chay (Writer/Spreadsheets/Presentation).
 //
 //   node --test tests/wps/test_addin.mjs
 //
 // Hop dong:
 // - src/AxiomOffice.WPS/commands.js dinh nghia global AxiomCommands:
 //     catalog()                      -> [{name, kind, agent, summary, params:[{name, required, hint}]}]
+//     catalogFor(kind)               -> lenh dung cho mot app: kind === "" hoac kind === tham so
+//     appKind(app)                   -> "wps" | "et" | "wpp" theo app.Name dang chay
 //     execute(app, action, params)   -> {ok:true, result} | {ok:false, error}; KHONG BAO GIO throw;
 //                                       lenh sua tai lieu chay trong app.UndoRecord.StartCustomRecord("AI: <action>")
-//                                       ... EndCustomRecord() (End luon duoc goi neu Start da goi).
+//                                       ... EndCustomRecord() (End luon duoc goi neu Start da goi);
+//                                       lenh cua app khac bi tu choi (khong chay nham trong app sai).
 // - src/AxiomOffice.WPS/main.js dinh nghia window.ribbon.OnAddinLoad (tra true, goi AxiomBridge.start())
 //   va global AxiomBridge { start(), stop() }: vong long-poll bang fetch POST JSON toi URL ket thuc bang
-//   "/wps/v1/poll" (body co app:"wps", commands = AxiomCommands.catalog(), document), thuc thi tung job bang
-//   AxiomCommands.execute(window.Application, ...) roi POST {id, ok, result|error} toi URL ket thuc bang
-//   "/wps/v1/result".
+//   "/wps/v1/poll" (body co app = app dang chay, commands = catalog da loc theo app do, document),
+//   thuc thi tung job bang AxiomCommands.execute(window.Application, ...) roi POST {id, ok, result|error}
+//   toi URL ket thuc bang "/wps/v1/result".
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
-import fs from "node:fs";
-import path from "node:path";
-import vm from "node:vm";
-import { fileURLToPath } from "node:url";
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-const ADDIN = path.join(ROOT, "src", "AxiomOffice.WPS");
+import { addinCatalog, assertMetadata, loadAddin, mockApp, run, throwing } from "./addin_harness.mjs";
+
 
 // Lenh dot 1 (docs/wps-bridge.md muc 5, T2): add-in phai co, metadata giong het registry LibreOffice.
 const REQUIRED = [
@@ -36,72 +35,8 @@ const MUTATING = ["writer.typeText", "writer.appendText", "writer.insertStyledTe
   "writer.replaceAll"];
 const READ_ONLY = ["app.info", "writer.getText", "writer.selection"];
 
-function loadAddin(extra = {}) {
-  const context = { console, setTimeout, clearTimeout, setInterval, clearInterval, Promise, JSON, ...extra };
-  context.window = context;
-  context.globalThis = context;
-  vm.createContext(context);
-  for (const file of ["probe.js", "commands.js", "main.js"]) {
-    const full = path.join(ADDIN, file);
-    if (fs.existsSync(full)) {
-      vm.runInContext(fs.readFileSync(full, "utf8"), context, { filename: file });
-    }
-  }
-  return context;
-}
-
-// Object model WPS gia: moi thuoc tinh/ham deu ton tai va tra lai mot mock (khong rang buoc cach goi API),
-// tru UndoRecord (ghi nhan), cac override, Count/length = 0, Found = false va moi ham *.Execute() tra false.
-function mockApp(log, overrides = {}) {
-  function deep(name) {
-    const target = function () {};
-    return new Proxy(target, {
-      get(_t, prop) {
-        if (prop === Symbol.toPrimitive) return () => "";
-        if (prop === "toString" || prop === "valueOf") return () => "";
-        if (prop === "then") return undefined;
-        if (prop === "length" || prop === "Count") return 0;
-        if (prop === "Found") return false;   // vong `while (Find.Found)` phai dung
-        if (typeof prop === "symbol") return undefined;
-        const key = name + "." + prop;
-        if (Object.prototype.hasOwnProperty.call(overrides, key)) {
-          const value = overrides[key];
-          return typeof value === "function" && value.getter ? value() : value;
-        }
-        return deep(key);
-      },
-      apply() {
-        log.push("call:" + name);
-        if (name.endsWith(".Execute")) return false;   // vong `while (Find.Execute(...))` phai dung
-        return deep(name + "()");
-      },
-      set() { return true; },
-    });
-  }
-  const undo = {
-    StartCustomRecord(title) { log.push("start:" + title); },
-    EndCustomRecord() { log.push("end"); },
-  };
-  return new Proxy({}, {
-    get(_t, prop) {
-      if (prop === "UndoRecord") return undo;
-      if (typeof prop === "symbol") return undefined;
-      const key = "app." + prop;
-      if (Object.prototype.hasOwnProperty.call(overrides, key)) {
-        const value = overrides[key];
-        if (typeof value === "function" && value.getter) return value();
-        return value;
-      }
-      return deep(key);
-    },
-    set() { return true; },
-  });
-}
-
-function throwing(message) {
-  const getter = () => { throw new Error(message); };
-  getter.getter = true;
-  return getter;
+function catalogMap(ctx) {
+  return new Map(addinCatalog(ctx).map((c) => [c.name, c]));
 }
 
 test("commands.js dinh nghia AxiomCommands voi catalog + execute", () => {
@@ -112,24 +47,8 @@ test("commands.js dinh nghia AxiomCommands voi catalog + execute", () => {
 });
 
 test("registry add-in co du lenh dot 1 va metadata giong het registry LibreOffice", () => {
-  const lo = JSON.parse(execFileSync("python3", [path.join(ROOT, "tests", "wps", "lo_catalog.py")], { encoding: "utf8" }));
-  const byName = new Map(lo.map((c) => [c.name, c]));
   const ctx = loadAddin();
-  const mine = new Map(JSON.parse(JSON.stringify(ctx.AxiomCommands.catalog())).map((c) => [c.name, c]));
-  for (const name of REQUIRED) {
-    assert.ok(mine.has(name), "add-in thieu lenh " + name);
-    const theirs = byName.get(name);
-    const ours = mine.get(name);
-    assert.equal(ours.kind, theirs.kind, name + ": kind");
-    assert.equal(ours.agent, theirs.agent, name + ": agent");
-    assert.equal(ours.summary, theirs.summary, name + ": summary");
-    assert.deepEqual(ours.params.map((p) => [p.name, p.required, p.hint === undefined ? null : p.hint]),
-      theirs.params.map((p) => [p.name, p.required, p.hint]), name + ": params");
-  }
-  for (const [name, ours] of mine) {
-    assert.ok(byName.has(name), "lenh " + name + " khong co trong registry LibreOffice (ten lenh phai dung chung)");
-    assert.equal(ours.kind, byName.get(name).kind, name + ": kind");
-  }
+  assertMetadata(REQUIRED, addinCatalog(ctx));
 });
 
 test("lenh sua tai lieu: dung 1 buoc UndoRecord 'AI: <lenh>' (Start roi End)", () => {
@@ -242,3 +161,148 @@ test("main.js: ribbon.OnAddinLoad tra true va bat vong poll; job -> result dung 
   await new Promise((resolve) => setTimeout(resolve, 300));
   assert.ok(polls.length <= after + 1, "stop() phai dung vong poll");
 });
+
+// ---- T6: add-in nhan biet app dang chay (docs/wps-bridge.md muc 5) ----
+//
+// WPS nap cung mot add-in trong ca ba app (publish.xml: type="wps,et,wpp"). Ten app that do duoc:
+// "WPS Writer" (Writer), "WPS Spreadsheets" (ET), "WPS Presentation" (WPP).
+
+function etApp(overrides = {}) {
+  return Object.assign({
+    Name: "WPS Spreadsheets", Version: "12.0", Build: "probe",
+    ActiveWorkbook: { Name: "ban-hang.xlsx", FullName: "/tmp/ban-hang.xlsx" },
+    ActiveSheet: { Name: "Sheet1" },
+  }, overrides);
+}
+
+function wppApp(overrides = {}) {
+  return Object.assign({
+    Name: "WPS Presentation", Version: "12.0", Build: "probe",
+    ActivePresentation: { Name: "bao-cao.pptx", FullName: "/tmp/bao-cao.pptx" },
+  }, overrides);
+}
+
+function writerApp(overrides = {}) {
+  return Object.assign({
+    Name: "WPS Writer", Version: "12.0", Build: "probe",
+    ActiveDocument: { Name: "hop-dong.docx", FullName: "/tmp/hop-dong.docx" },
+  }, overrides);
+}
+
+test("appKind: doc dung app dang chay tu Application.Name", () => {
+  const ctx = loadAddin();
+  assert.equal(typeof ctx.AxiomCommands.appKind, "function", "thieu AxiomCommands.appKind");
+  const kindOf = ctx.AxiomCommands.appKind;
+  assert.equal(kindOf(etApp()), "et");
+  assert.equal(kindOf(wppApp()), "wpp");
+  assert.equal(kindOf(writerApp()), "wps");
+  // Ten la (WPS Office, ban cu) hoac khong doc duoc -> coi la Writer (app kind "wps" la mac dinh).
+  assert.equal(kindOf({ Name: "WPS Office" }), "wps");
+  assert.equal(kindOf({}), "wps");
+  assert.equal(kindOf(null), "wps");
+  assert.equal(kindOf(undefined), "wps");
+});
+
+test("catalogFor(kind): chi tra lenh dung app do; catalog() van la registry day du", () => {
+  const ctx = loadAddin();
+  assert.equal(typeof ctx.AxiomCommands.catalogFor, "function", "thieu AxiomCommands.catalogFor");
+  const full = addinCatalog(ctx);
+  assert.ok(full.some((c) => c.name === "writer.getText") && full.some((c) => c.name === "et.listSheets"),
+    "catalog() phai giu day du moi lenh (metadata dung chung)");
+  assert.deepEqual(addinCatalog(ctx).length, full.length, "catalog() khong duoc loc theo app");
+  for (const kind of ["wps", "et", "wpp"]) {
+    const names = ctx.AxiomCommands.catalogFor(kind).map((c) => c.name);
+    assert.ok(names.length > 0, kind + ": catalogFor phai co lenh");
+    for (const name of names) {
+      const entry = full.find((c) => c.name === name);
+      assert.ok(entry.kind === "" || entry.kind === kind,
+        kind + ": catalogFor tra lenh " + name + " (kind=" + entry.kind + ")");
+    }
+    for (const entry of full) {
+      if (entry.kind === "" || entry.kind === kind) {
+        assert.ok(names.includes(entry.name), kind + ": catalogFor thieu " + entry.name);
+      }
+    }
+    assert.ok(names.includes("app.info"), kind + ": app.info co kind rong nen phai co o moi app");
+  }
+  assert.ok(!ctx.AxiomCommands.catalogFor("et").some((c) => c.name === "writer.getText"),
+    "app Spreadsheets khong duoc khai bao lenh writer.*");
+});
+
+test("execute: lenh cua app khac bi tu choi, khong chay nham", () => {
+  const ctx = loadAddin();
+  const reply = ctx.AxiomCommands.execute(etApp(), "writer.getText", {});
+  assert.equal(reply.ok, false, "writer.getText khong duoc chay trong Spreadsheets");
+  assert.match(String(reply.error), /writer\.getText/);
+  assert.match(String(reply.error), /Spreadsheets/);
+  const reply2 = ctx.AxiomCommands.execute(writerApp(), "et.listSheets", {});
+  assert.equal(reply2.ok, false, "et.listSheets khong duoc chay trong Writer");
+  assert.match(String(reply2.error), /Writer/);
+  // Lenh kind rong (app.info) chay duoc o moi app.
+  for (const app of [etApp(), wppApp(), writerApp()]) {
+    assert.equal(ctx.AxiomCommands.execute(app, "app.info", {}).ok, true, "app.info phai chay duoc o moi app");
+  }
+});
+
+test("app.info: tra ve app dang chay va tai lieu dang mo", () => {
+  const ctx = loadAddin();
+  const et = run(ctx, etApp(), "app.info");
+  assert.equal(et.app, "et", "app.info trong Spreadsheets: " + JSON.stringify(et));
+  assert.equal(et.document.name, "ban-hang.xlsx");
+  assert.equal(et.document.fullName, "/tmp/ban-hang.xlsx");
+  const wpp = run(ctx, wppApp(), "app.info");
+  assert.equal(wpp.app, "wpp");
+  assert.equal(wpp.document.name, "bao-cao.pptx");
+  const wps = run(ctx, writerApp(), "app.info");
+  assert.equal(wps.app, "wps");
+  assert.equal(wps.document.name, "hop-dong.docx");
+  // Chua mo tai lieu: van tra loi, document = null.
+  const empty = run(ctx, { Name: "WPS Spreadsheets", Version: "12.0" }, "app.info");
+  assert.equal(empty.app, "et");
+  assert.equal(empty.document, null);
+});
+
+test("thieu Application: thong diep loi noi ve WPS noi chung, khong chi Writer", () => {
+  const ctx = loadAddin();
+  const noApp = ctx.AxiomCommands.execute(null, "et.listSheets", {});
+  assert.equal(noApp.ok, false);
+  assert.doesNotMatch(String(noApp.error), /Writer/, "thong diep khong duoc chi noi ve Writer: " + noApp.error);
+  assert.match(String(noApp.error), /WPS/);
+});
+
+test("main.js: poll bao dung app dang chay + catalog da loc theo app do", async () => {
+  for (const [app, kind, expected, absent] of [
+    [etApp(), "et", "et.listSheets", "writer.getText"],
+    [wppApp(), "wpp", "wpp.listSlides", "writer.getText"],
+    [writerApp(), "wps", "writer.getText", "et.listSheets"],
+  ]) {
+    const polls = [];
+    const fetch = (url, options = {}) => {
+      if (String(url).endsWith("/wps/v1/poll")) {
+        polls.push(JSON.parse(options.body));
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ ok: true, result: { jobs: [] } }) });
+      }
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ ok: true }) });
+    };
+    const ctx = loadAddin({ fetch, Application: app, location: { href: "http://127.0.0.1:47840/wps/addin/index.html" } });
+    try {
+      ctx.ribbon.OnAddinLoad({});
+      const deadline = Date.now() + 2000;
+      while (polls.length < 1 && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+    } finally {
+      ctx.AxiomBridge.stop();
+    }
+    assert.ok(polls.length >= 1, kind + ": phai poll");
+    const body = polls[0];
+    assert.equal(body.app, kind, kind + ": poll phai bao app dang chay");
+    const names = body.commands.map((c) => c.name);
+    assert.ok(names.includes(expected), kind + ": poll thieu " + expected);
+    assert.ok(!names.includes(absent), kind + ": poll khong duoc khai bao " + absent + " (cua app khac)");
+    assert.equal(body.document.name, app.ActiveDocument ? app.ActiveDocument.Name
+      : (app.ActiveWorkbook ? app.ActiveWorkbook.Name : app.ActivePresentation.Name),
+    kind + ": poll phai bao tai lieu dang mo");
+  }
+});
+

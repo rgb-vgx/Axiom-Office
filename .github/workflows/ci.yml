@@ -27,7 +27,7 @@ jobs:
         run: |
           python3 tests/wps/test_install_jsaddon.py
           python3 tests/linux/test_install_sh.py
-          node --test tests/wps/test_addin.mjs tests/wps/test_probe.mjs tests/wps/test_pane.mjs
+          node --test tests/wps/test_addin.mjs tests/wps/test_addin_et.mjs tests/wps/test_addin_wpp.mjs tests/wps/test_probe.mjs tests/wps/test_pane.mjs
 
       - uses: actions/setup-go@v5
         with:

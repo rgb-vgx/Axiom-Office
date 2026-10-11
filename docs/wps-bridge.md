@@ -1,8 +1,9 @@
 # Bridge WPS Office for Linux (JS add-in do Agent Core phục vụ)
 
 Trạng thái: **đã chạy trên WPS thật** (11/10/2026): Core (T1), trình cài `--core-url` (T2a), add-in 16 lệnh đợt 1
-(T2b, T2c). Đóng gói + `install.sh` (T3) xong. Còn lại: pane Ask AI trong WPS, lệnh Spreadsheets/Presentation. Cơ sở thực nghiệm: [wps-spike.md](wps-spike.md)
-(hướng B) và [tests/wps/REFERENCE.md](../tests/wps/REFERENCE.md).
+(T2b, T2c). Đóng gói + `install.sh` (T3) xong, đăng ký cả ba app (T5) xong. Spec T6–T8 đã viết (đang đỏ, chờ
+triển khai): nhận biết app + `et.*`/`wpp.*`. Còn lại: pane Ask AI trong WPS. Cơ sở thực nghiệm:
+[wps-spike.md](wps-spike.md) (hướng B) và [tests/wps/REFERENCE.md](../tests/wps/REFERENCE.md).
 
 ## 1. Bài toán
 
@@ -43,20 +44,31 @@ WPS Writer ── JS add-in (nạp từ http://127.0.0.1:47840/wps/addin/) ◀�
 
 ### 2.3 Bridge WPS — cổng riêng `AXIOM_WPS_BRIDGE_PORT` (mặc định 47861)
 Cùng giao thức và cùng guard với bridge LibreOffice (`Origin` → 403, token → 401 trừ `/health`, body JSON → 415):
-- `GET /health` → `{app:"wps", family:"wps-linux", pid:<pid Core>, port, version, connected}`.
+- `GET /health` → `{app, family:"wps-linux", pid:<pid Core>, port, version, connected}`. `app` là app mà add-in
+  báo trong lần poll gần nhất: `"wps"` (Writer, mặc định khi chưa poll lần nào) `| "et" | "wpp"`.
 - `GET /commands` → `{version, commands}` = catalog add-in gửi lần poll gần nhất (chưa từng kết nối → `ok:false`).
 - `GET /session` → `{app, family, port, pid, document}`.
-- `POST /cmd {action, params}` → chưa kết nối: `{"ok":false,"error":"WPS add-in is not connected: open a document in WPS Writer ..."}`;
+- `POST /cmd {action, params}` → chưa kết nối: `{"ok":false,"error":"WPS add-in is not connected: open a document
+  in WPS to connect the add-in"}` (không nêu tên app cụ thể — cả ba app dùng chung một add-in);
   đã kết nối: đưa vào hàng đợi, chờ kết quả tối đa 300 giây, trả **nguyên** `{ok, result|error}` của add-in.
-- **File session** `<thư mục session>/<pid Core>-wps.json` (cùng trường với LibreOffice: `pid, app:"wps",
+- **File session** `<thư mục session>/<pid Core>-wps.json` (cùng trường với LibreOffice: `pid, app,
   family:"wps-linux", port, host:"wps-jsaddon", version, started, lastSeen, lastSeenEpoch, document,
   documentPath`) — có khi add-in đã kết nối (ghi lại mỗi lần poll đổi tài liệu và mỗi 25 giây), **xoá** khi mất
   kết nối và khi Core dừng. Nhờ vậy `office_sessions`, agent và pane tìm thấy WPS như mọi bridge khác.
+- Core lọc lệnh gửi agent theo `session.app` (`tools/office_action.go`: lệnh `kind` khác rỗng phải khớp app).
+  Vì vậy `app` **phải** theo add-in, hard-code `"wps"` sẽ bỏ im lặng mọi lệnh `et.*`/`wpp.*`.
 
 ## 3. Phía add-in (`src/AxiomOffice.WPS/`, ES5 — CEF Chrome 87)
 - Nạp từ `http://127.0.0.1:47840/wps/addin/` (`<jspluginonline>` trong `publish.xml`), nên gọi `/wps/v1/*`
   bằng URL tương đối, cùng origin, `fetch`/XHR `application/json` không preflight.
-- Vòng lặp: poll → thực thi từng job → gửi result → poll tiếp; lỗi mạng thì chờ 2 giây rồi thử lại.
+- **Một add-in cho cả ba app**: `publish.xml` khai `type="wps,et,wpp"` (xem `tests/wps/REFERENCE.md` — một entry
+  nhiều `type` là cách duy nhất WPS nạp add-in trong cả Writer, Spreadsheets và Presentation).
+- Biết app đang chạy: `AxiomCommands.appKind(app)` đọc `app.Name` (`/spreadsheet/i` → `"et"`,
+  `/presentation|slide/i` → `"wpp"`, còn lại và tên lạ → `"wps"`). `catalogFor(kind)` lọc registry theo app
+  (`kind === ""` dùng chung mọi app); `catalog()` vẫn trả registry đầy đủ. Lệnh của app khác bị `execute()` từ
+  chối (`{ok:false, error}` nêu tên lệnh và tên app) — không chạy nhầm object model.
+- Vòng lặp: poll → thực thi từng job → gửi result → poll tiếp; lỗi mạng thì chờ 2 giây rồi thử lại. Body poll có
+  `app` = app đang chạy, `commands` = catalog **đã lọc theo app đó**, `document` = tài liệu đang mở.
 - **Registry lệnh** (`commands.js`): mỗi lệnh có metadata *giống hệt* registry của extension LibreOffice cho
   cùng tên (`name, kind, agent, summary, params[{name, required, hint}]`) và một handler gọi object model WPS
   (giống VBA/COM — viết theo handler C# trong `src/AxiomOffice/Bridge/CommandDispatcher.Writer.cs`).
@@ -66,9 +78,11 @@ Cùng giao thức và cùng guard với bridge LibreOffice (`Origin` → 403, to
 ## 4. Cài đặt
 - Bước admin một lần mỗi máy: `JsApiPlugin=true` trong `/opt/kingsoft/wps-office/office6/cfgs/oem.ini`.
 - `scripts/wps/install_jsaddon.py --home <HOME> --core-url http://127.0.0.1:47840` chỉ ghi `publish.xml`
-  (`<jspluginonline name="axiomoffice" type="wps" url="<core-url>/wps/addin/" .../>`). Khoá `Office.conf`
+  (`<jspluginonline name="axiomoffice" type="wps,et,wpp" url="<core-url>/wps/addin/" .../>` — một entry cho cả
+  ba app). Khoá `Office.conf`
   (bỏ EULA, mở thẳng Writer) **chỉ** ghi khi có `--test-profile` — không đổi giao diện WPS của người dùng thật.
 - Core phải chạy trước khi mở WPS (unit `systemd --user` đã có); Core tắt thì WPS bỏ qua add-in im lặng.
+- Đã đăng ký xong mà WPS đang mở thì **phải mở lại WPS** mới thấy add-in (WPS đọc `publish.xml` lúc khởi động).
 
 ## 5. Triển khai theo task
 | Task | Phạm vi | Spec |
@@ -76,13 +90,37 @@ Cùng giao thức và cùng guard với bridge LibreOffice (`Origin` → 403, to
 | T1 | Core: 2.1–2.3 | `tests/wps/test_wps_bridge_e2e.py` (Core thật + add-in giả bằng HTTP) |
 | T2 | Add-in: vòng poll + registry + handler `writer.*` | test Node với object model giả + đối chiếu registry LibreOffice |
 | T3 | Trình cài `--core-url`, gói Linux, test chạy WPS thật | `tests/wps/test_wps_bridge_live.py` |
+| T4 | Pane Ask AI trong WPS (mục 7) | `tests/wps/test_wps_pane_e2e.py` (Core) + `test_pane.mjs` (add-in) |
+| T5 | Đăng ký một entry `type="wps,et,wpp"` cho cả ba app | `tests/wps/test_install_jsaddon.py` |
+| T6 | Add-in nhận biết app đang chạy (`appKind`/`catalogFor`, từ chối lệnh app khác) + Core ghi `app` theo poll | `tests/wps/test_addin.mjs`, `core-go/internal/wpsbridge/wpsbridge_test.go` |
+| T7 | Add-in: 23 lệnh `et.*` (Spreadsheets) | `tests/wps/test_addin_et.mjs` (+ `addin_fake.mjs`) |
+| T8 | Add-in: 15 lệnh `wpp.*` (Presentation) | `tests/wps/test_addin_wpp.mjs` (+ `addin_fake.mjs`) |
 
 ## 6. Giới hạn đã biết
+- Add-in chỉ nạp khi Core đã chạy lúc mở WPS (Core tắt thì WPS bỏ qua add-in im lặng) và khi `JsApiPlugin=true`;
+  đăng ký add-in xong phải mở lại WPS.
+- **Một add-in chỉ nói chuyện với một app tại một thời điểm**: bridge WPS có một hàng đợi và một file session, và
+  `app` của phiên là app poll gần nhất. Mở Writer và Spreadsheets cùng lúc thì chỉ app nào vừa poll được phục vụ.
 - `writer.undo {count}` gỡ N bước Undo gần nhất của tài liệu, **không phân biệt bước của AI hay của người**:
   object model WPS không cho đọc tên các bước Undo như LibreOffice (bản LibreOffice chỉ gỡ bước `AI: …`).
   Mỗi lệnh AI vẫn là đúng một bước Undo (UndoRecord).
-- Add-in chỉ nạp khi Core đã chạy lúc mở WPS (Core tắt thì WPS bỏ qua add-in im lặng) và khi `JsApiPlugin=true`.
-- Đợt 1 chỉ có `app.info` + 15 lệnh `writer.*`; Spreadsheets (`et.*`) và Presentation (`wpp.*`) chưa có.
+- **ET/WPP không có `UndoRecord`** (`Application.UndoRecord` là `undefined`, `Application.Undo()` không đổi gì —
+  đo trên WPS thật 11/10/2026). Nên `et.undo` không dùng undo của WPS: add-in **tự chụp giá trị ô
+  trước khi ghi** (và ghi nhận sheet do lượt tạo) rồi khôi phục — khác LibreOffice (chỉ gỡ bước `AI: …`), và chỉ
+  hoàn tác được các lệnh **trong cùng phiên add-in**. Registry **không có** `wpp.undo` (bản LibreOffice cũng vậy),
+  và không lệnh `et.*`/`wpp.*` nào mở `UndoRecord`.
+- **ET/WPP không xuất được PDF bằng API gốc**: `ExportAsFixedFormat`/`SaveAs(.pdf)` trả về bình thường nhưng
+  không ghi file nào. `et.exportPdf`/`wpp.exportPdf` thử API gốc, kiểm bằng `FileSystem.existsSync`, không có thì
+  tự dựng PDF (như LibreOffice). PDF này là bản tối giản: có chữ, không giữ định dạng/biểu đồ.
+- `et.save`/`wpp.save` từ chối khi tài liệu **chưa lưu lần nào** (`Path` rỗng) bằng đúng câu của LibreOffice
+  ("the document has never been saved - use saveAs with a 'path'"): `Save()` của WPS sẽ mở hộp thoại Save As và
+  chặn vòng poll.
+- WPP: `Font.Bold` nhận `msoTrue` = **-1** (không phải `true` như ET); `wpp.setNotes` ghi vào placeholder
+  **cuối** của `NotesPage` (trang ghi chú đo được có 2 placeholder: 1 = số trang, 2 = ghi chú).
+- `wpp.checkLayout` **không** báo `overflow` (cần chiều cao chữ thật, object model WPS không đo được); bốn loại
+  còn lại (`offslide`, `small-font`, `overlap`, `dense`) giữ nguyên ngưỡng của LibreOffice.
+- Object model ET/WPP khác Writer ở vài chỗ (`Cells.Item(r,c)`, `UsedRange.Address()` là hàm, màu BGR, chỉ số
+  1-based, `Application.Documents` không có) — bảng đầy đủ ở `tests/wps/REFERENCE.md`.
 
 ## 7. Pane Ask AI trong WPS
 Pane là một trang khác của add-in (`/wps/addin/pane.html`), mở bằng nút trên ribbon qua

@@ -20,6 +20,18 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
   thêm `--no-wps`, `--uninstall` gỡ đăng ký (TASK-000105)
 - Test: `tests/wps/test_wps_bridge_e2e.py` (Core, 35), `test_addin.mjs` (Node, 7), `test_wps_bridge_live.py`
   (WPS thật dưới Xvfb, 24 - chạy ở máy dev). Viết bởi aidev TASK-000094/095/103/104 theo spec viết trước
+- **Một add-in cho cả ba app WPS**: `publish.xml` đăng ký một entry `type="wps,et,wpp"` thay vì chỉ Writer
+  (đo trên WPS thật: ba entry riêng chỉ app khớp entry đầu nạp được) — `install_jsaddon.py` và `install.sh` cũng
+  đăng ký cả ba app (TASK-000113)
+- `tests/wps/REFERENCE.md` thêm kết quả đo object model WPS thật: biến thể `publish.xml` cho ba app, khác biệt
+  ET/WPP (`.Cells.Item(r,c)`, `.UsedRange.Address()` là hàm, màu BGR, chỉ số 1-based), và hai thứ **không** có —
+  `UndoRecord` (nên `et.undo` phải tự khôi phục) và xuất PDF ghi file
+- **Spec viết trước cho T6–T8** (đang đỏ, chờ aidev): `tests/wps/test_addin.mjs` (add-in tự nhận app đang chạy —
+  `appKind`/`catalogFor`, từ chối lệnh của app khác, `app.info` theo component, poll báo `app`),
+  `core-go/internal/wpsbridge/wpsbridge_test.go` (Core ghi `app` theo poll thay vì hard-code `"wps"`, để
+  `office_action.go` không lọc bỏ im lặng `et.*`/`wpp.*`), `tests/wps/test_addin_et.mjs` (23 lệnh `et.*`) và
+  `tests/wps/test_addin_wpp.mjs` (15 lệnh `wpp.*`); dùng chung `addin_harness.mjs` và object model giả
+  `addin_fake.mjs`
 
 ### Fixed — An toàn dữ liệu khi agent làm việc trên sheet có sẵn (log Calc thật 11/10/2026)
 Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho thấy ba vấn đề:
@@ -81,7 +93,7 @@ Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho th
   thật chạy ở máy dev; bỏ `LD_LIBRARY_PATH` (`33108f7`) đã thử và **không** phải nguyên nhân nên đã revert
 
 ### Fixed — An toàn khi người và AI cùng sửa tài liệu (LibreOffice + Core)
-- **Hoàn tác không còn xoá chỉnh sửa của người dùng** (LibreOffice): `writer.undo`/`et.undo`/`wpp.undo` chỉ gỡ
+- **Hoàn tác không còn xoá chỉnh sửa của người dùng** (LibreOffice): `writer.undo`/`et.undo` chỉ gỡ
   bước có tiêu đề `AI: …` (undo context do bridge tạo); gặp bước của người dùng thì dừng và trả `stoppedAt`.
   Trước đây "Hoàn tác lượt này" undo đúng N bước nên nếu người dùng gõ thêm sau lượt AI, thao tác của họ bị gỡ
   trước. Pane báo "đã hoàn tác x/N … dùng Ctrl+Z nếu muốn hoàn tác thêm"
