@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 
 	_ "modernc.org/sqlite" // SQLite thuan Go: build cheo khong can cgo
 
@@ -21,12 +23,15 @@ type DB struct {
 }
 
 // Open mo (tao neu chua co) core.db voi WAL + khoa ngoai + cho khoa 5s, giong CoreDb.Open.
+// _txlock=immediate: transaction ghi lay khoa ghi ngay tu dau (BEGIN IMMEDIATE) thay vi DEFERRED
+// doc truoc ghi sau - tranh nang khoa giua chung tra SQLITE_BUSY ngay ma busy_timeout khong cho
+// (mat du lieu am khi loi ghi bi bo qua, xem concurrency_test.go).
 func Open(path string) (*DB, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, err
 	}
 	dsn := "file:" + filepath.ToSlash(path) +
-		"?_pragma=journal_mode(WAL)&_pragma=foreign_keys(ON)&_pragma=busy_timeout(5000)"
+		"?_pragma=journal_mode(WAL)&_pragma=foreign_keys(ON)&_pragma=busy_timeout(5000)&_txlock=immediate"
 	conn, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err
@@ -43,6 +48,33 @@ func (d *DB) SQL() *sql.DB { return d.sql }
 
 func (d *DB) Close() error { return d.sql.Close() }
 
+// isBusyError: SQLite bao khoa ban (doi tuong ghi khac giu qua busy_timeout).
+func isBusyError(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "SQLITE_BUSY")
+}
+
+// BeginWrite mo transaction ghi (da BEGIN IMMEDIATE nho _txlock=immediate) va thu lai khi gap
+// SQLITE_BUSY voi backoff toi da khoang 15s - BEGIN IMMEDIATE van co the tra BUSY ngay khi tai ghi
+// nang (xem concurrency_test.go). Dung cho MOI transaction ghi o internal/memory va internal/store.
+func (d *DB) BeginWrite() (*sql.Tx, error) {
+	deadline := time.Now().Add(15 * time.Second)
+	delay := 5 * time.Millisecond
+	for {
+		tx, err := d.sql.Begin()
+		if err == nil {
+			return tx, nil
+		}
+		if !isBusyError(err) || time.Now().After(deadline) {
+			return nil, err
+		}
+		time.Sleep(delay)
+		delay *= 2
+		if delay > 200*time.Millisecond {
+			delay = 200 * time.Millisecond
+		}
+	}
+}
+
 // Migrate chay migration theo user_version. Loi -> Core bao memory "unavailable" (khong dung).
 func (d *DB) Migrate() error {
 	var version int
@@ -52,7 +84,7 @@ func (d *DB) Migrate() error {
 	if version >= SchemaVersion {
 		return nil
 	}
-	tx, err := d.sql.Begin()
+	tx, err := d.BeginWrite()
 	if err != nil {
 		return err
 	}

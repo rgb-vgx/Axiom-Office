@@ -131,6 +131,11 @@ func isBusyError(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "SQLITE_BUSY")
 }
 
+// isBusyErrorString: nhu isBusyError cho ly do loi da chuyen thanh chuoi.
+func isBusyErrorString(reason string) bool {
+	return strings.Contains(reason, "SQLITE_BUSY")
+}
+
 // AddBatch: ghi mot lo fact trong MOT transaction (muc 8.5.6) - bo trung hash trong lo va trong cung
 // (scope, scope_key), gan-trung bang cosine >= 0.96 neu co vector, link chi toi memory ton tai, ghi history ADD.
 //
@@ -153,7 +158,7 @@ func (s *Store) AddBatch(items []NewMemory, actor, runID string, vectors map[int
 // addBatchOnce: mot lan thu ghi lo (xem AddBatch) - tra ket qua + co gap khoa ban ma chua commit.
 func (s *Store) addBatchOnce(items []NewMemory, actor, runID string, vectors map[int][]float32, embeddingModel string) ([]OpResult, bool) {
 	results := make([]OpResult, 0, len(items))
-	tx, err := s.db.SQL().Begin()
+	tx, err := s.db.BeginWrite()
 	if err != nil {
 		for _, item := range items {
 			results = append(results, OpResult{Event: "SKIPPED", Text: item.Text, Reason: "database: " + err.Error()})
@@ -201,7 +206,19 @@ func (s *Store) addBatchOnce(items []NewMemory, actor, runID string, vectors map
 			existing = findNearDuplicate(tx, raw.Scope, scopeKey, vector)
 		}
 		if existing != nil {
-			_, _ = tx.Exec("UPDATE memories SET hits = hits + 1, last_used_at = ? WHERE id = ?", Now(), existing.ID)
+			// Lennh ghi loi -> bao SKIPPED chu khong bao DUPLICATE khi chua ghi (xem concurrency_test.go);
+			// BUSY giua lo -> rollback (defer) roi bao thu lai nhu INSERT.
+			if _, err := tx.Exec("UPDATE memories SET hits = hits + 1, last_used_at = ? WHERE id = ?", Now(), existing.ID); err != nil {
+				if isBusyError(err) {
+					results = append(results, OpResult{Event: "SKIPPED", Text: text, Reason: err.Error()})
+					for _, rest := range items[index+1:] {
+						results = append(results, OpResult{Event: "SKIPPED", Text: rest.Text, Reason: err.Error()})
+					}
+					return results, true
+				}
+				results = append(results, OpResult{Event: "SKIPPED", Text: text, Reason: err.Error()})
+				continue
+			}
 			results = append(results, OpResult{Event: "DUPLICATE", Text: text, Item: existing, Reason: "same as " + existing.ID})
 			continue
 		}
@@ -234,20 +251,52 @@ func (s *Store) addBatchOnce(items []NewMemory, actor, runID string, vectors map
 
 		var rowID int64
 		if err := tx.QueryRow("SELECT last_insert_rowid()").Scan(&rowID); err != nil {
-			rowID = 0
+			if isBusyError(err) {
+				results = append(results, OpResult{Event: "SKIPPED", Text: text, Reason: err.Error()})
+				for _, rest := range items[index+1:] {
+					results = append(results, OpResult{Event: "SKIPPED", Text: rest.Text, Reason: err.Error()})
+				}
+				return results, true
+			}
+			results = append(results, OpResult{Event: "SKIPPED", Text: text, Reason: err.Error()})
+			continue
 		}
-		indexText(tx, rowID, text)
-
-		for _, linked := range distinct(raw.LinkedIDs) {
-			if exists(tx, linked) {
-				_, _ = tx.Exec("INSERT OR IGNORE INTO memory_links (memory_id, linked_memory_id, created_at) VALUES (?, ?, ?)",
-					id, linked, now)
+		// Cac lenh phu (fts/link/history/vector) loi -> khong bao ADD khi chua ghi het (xem
+		// concurrency_test.go); BUSY -> rollback roi thu lai ca lo.
+		failed := ""
+		if err := indexText(tx, rowID, text); err != nil {
+			failed = err.Error()
+		} else {
+			for _, linked := range distinct(raw.LinkedIDs) {
+				if exists(tx, linked) {
+					if _, err := tx.Exec("INSERT OR IGNORE INTO memory_links (memory_id, linked_memory_id, created_at) VALUES (?, ?, ?)",
+						id, linked, now); err != nil {
+						failed = err.Error()
+						break
+					}
+				}
 			}
 		}
-
-		addHistory(tx, id, "ADD", "", text, actor, runID, "")
-		if len(vector) > 0 && embeddingModel != "" {
-			saveVector(tx, id, embeddingModel, vector, hash)
+		if failed == "" {
+			if err := addHistory(tx, id, "ADD", "", text, actor, runID, ""); err != nil {
+				failed = err.Error()
+			}
+		}
+		if failed == "" && len(vector) > 0 && embeddingModel != "" {
+			if err := saveVector(tx, id, embeddingModel, vector, hash); err != nil {
+				failed = err.Error()
+			}
+		}
+		if failed != "" {
+			if isBusyErrorString(failed) {
+				results = append(results, OpResult{Event: "SKIPPED", Text: text, Reason: failed})
+				for _, rest := range items[index+1:] {
+					results = append(results, OpResult{Event: "SKIPPED", Text: rest.Text, Reason: failed})
+				}
+				return results, true
+			}
+			results = append(results, OpResult{Event: "SKIPPED", Text: text, Reason: failed})
+			continue
 		}
 		results = append(results, OpResult{Event: "ADD", Text: text, Item: getItem(tx, id)})
 	}
@@ -336,7 +385,7 @@ func (s *Store) Vectors(model string) map[string][]float32 {
 }
 
 func (s *Store) SaveVector(id, model string, vector []float32, textHash string) {
-	saveVector(s.db.SQL(), id, model, vector, textHash)
+	_ = saveVector(s.db.SQL(), id, model, vector, textHash)
 }
 
 // MissingVectors: memory chua co vector cua model hien tai (tinh bu o nen khi doi EmbeddingModel).
@@ -367,14 +416,17 @@ func (s *Store) TouchHits(ids []string) {
 	if len(list) == 0 {
 		return
 	}
-	tx, err := s.db.SQL().Begin()
+	tx, err := s.db.BeginWrite()
 	if err != nil {
 		return
 	}
 	defer func() { _ = tx.Rollback() }()
 	now := Now()
 	for _, id := range list {
-		_, _ = tx.Exec("UPDATE memories SET hits = hits + 1, last_used_at = ? WHERE id = ?", now, id)
+		// Lennh ghi loi -> rollback (defer), khong commit nua voi (xem concurrency_test.go).
+		if _, err := tx.Exec("UPDATE memories SET hits = hits + 1, last_used_at = ? WHERE id = ?", now, id); err != nil {
+			return
+		}
 	}
 	_ = tx.Commit()
 }
@@ -383,7 +435,7 @@ func (s *Store) TouchHits(ids []string) {
 
 // Update: sua text/danh muc/han/ghim. Loi dinh dang -> error de API tra 400.
 func (s *Store) Update(id, newText, category, expiresAt string, clearExpires bool, pinned *bool, reason string) (*Item, error) {
-	tx, err := s.db.SQL().Begin()
+	tx, err := s.db.BeginWrite()
 	if err != nil {
 		return nil, err
 	}
@@ -394,6 +446,7 @@ func (s *Store) Update(id, newText, category, expiresAt string, clearExpires boo
 		return nil, nil
 	}
 
+	// Moi lenh ghi loi -> rollback (defer) va bao loi, khong bao thanh cong khi chua ghi (xem concurrency_test.go).
 	now := Now()
 	if newText != "" {
 		text := strings.TrimSpace(newText)
@@ -401,16 +454,28 @@ func (s *Store) Update(id, newText, category, expiresAt string, clearExpires boo
 			return nil, fmt.Errorf("text must be 1-%d characters", MaxFactLength)
 		}
 		if text != item.Text {
-			_, _ = tx.Exec("UPDATE memories SET text = ?, hash = ?, updated_at = ? WHERE id = ?", text, Hash(text), now, id)
-			_, _ = tx.Exec("DELETE FROM memories_fts WHERE rowid = ?", item.RowID)
-			indexText(tx, item.RowID, text)
-			_, _ = tx.Exec("DELETE FROM memory_embeddings WHERE memory_id = ?", id)
-			addHistory(tx, id, "UPDATE", item.Text, text, ActorUser, "", reason)
+			if _, err := tx.Exec("UPDATE memories SET text = ?, hash = ?, updated_at = ? WHERE id = ?", text, Hash(text), now, id); err != nil {
+				return nil, err
+			}
+			if _, err := tx.Exec("DELETE FROM memories_fts WHERE rowid = ?", item.RowID); err != nil {
+				return nil, err
+			}
+			if err := indexText(tx, item.RowID, text); err != nil {
+				return nil, err
+			}
+			if _, err := tx.Exec("DELETE FROM memory_embeddings WHERE memory_id = ?", id); err != nil {
+				return nil, err
+			}
+			if err := addHistory(tx, id, "UPDATE", item.Text, text, ActorUser, "", reason); err != nil {
+				return nil, err
+			}
 		}
 	}
 
 	if category != "" {
-		_, _ = tx.Exec("UPDATE memories SET category = ?, updated_at = ? WHERE id = ?", category, now, id)
+		if _, err := tx.Exec("UPDATE memories SET category = ?, updated_at = ? WHERE id = ?", category, now, id); err != nil {
+			return nil, err
+		}
 	}
 
 	if clearExpires || expiresAt != "" {
@@ -421,17 +486,25 @@ func (s *Store) Update(id, newText, category, expiresAt string, clearExpires boo
 				return nil, errors.New("expiresAt must be YYYY-MM-DD")
 			}
 		}
-		_, _ = tx.Exec("UPDATE memories SET expires_at = ?, updated_at = ? WHERE id = ?", nullText(date), now, id)
-		addHistory(tx, id, "EXPIRES", textOrEmpty(item.ExpiresAt), date, ActorUser, "", reason)
+		if _, err := tx.Exec("UPDATE memories SET expires_at = ?, updated_at = ? WHERE id = ?", nullText(date), now, id); err != nil {
+			return nil, err
+		}
+		if err := addHistory(tx, id, "EXPIRES", textOrEmpty(item.ExpiresAt), date, ActorUser, "", reason); err != nil {
+			return nil, err
+		}
 	}
 
 	if pinned != nil && *pinned != item.Pinned {
-		_, _ = tx.Exec("UPDATE memories SET pinned = ?, updated_at = ? WHERE id = ?", boolInt(*pinned), now, id)
+		if _, err := tx.Exec("UPDATE memories SET pinned = ?, updated_at = ? WHERE id = ?", boolInt(*pinned), now, id); err != nil {
+			return nil, err
+		}
 		event := "UNPIN"
 		if *pinned {
 			event = "PIN"
 		}
-		addHistory(tx, id, event, "", "", ActorUser, "", reason)
+		if err := addHistory(tx, id, event, "", "", ActorUser, "", reason); err != nil {
+			return nil, err
+		}
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -441,7 +514,7 @@ func (s *Store) Update(id, newText, category, expiresAt string, clearExpires boo
 }
 
 func (s *Store) Delete(id, reason string) bool {
-	tx, err := s.db.SQL().Begin()
+	tx, err := s.db.BeginWrite()
 	if err != nil {
 		return false
 	}
@@ -450,15 +523,22 @@ func (s *Store) Delete(id, reason string) bool {
 	if item == nil || item.DeletedAt != nil {
 		return false
 	}
+	// Lennh ghi loi -> rollback (defer) va bao that bai, khong bao true khi chua ghi (xem concurrency_test.go).
 	now := Now()
-	_, _ = tx.Exec("UPDATE memories SET deleted_at = ?, updated_at = ? WHERE id = ?", now, now, id)
-	_, _ = tx.Exec("DELETE FROM memories_fts WHERE rowid = ?", item.RowID)
-	addHistory(tx, id, "DELETE", item.Text, "", ActorUser, "", reason)
+	if _, err := tx.Exec("UPDATE memories SET deleted_at = ?, updated_at = ? WHERE id = ?", now, now, id); err != nil {
+		return false
+	}
+	if _, err := tx.Exec("DELETE FROM memories_fts WHERE rowid = ?", item.RowID); err != nil {
+		return false
+	}
+	if err := addHistory(tx, id, "DELETE", item.Text, "", ActorUser, "", reason); err != nil {
+		return false
+	}
 	return tx.Commit() == nil
 }
 
 func (s *Store) Restore(id string) bool {
-	tx, err := s.db.SQL().Begin()
+	tx, err := s.db.BeginWrite()
 	if err != nil {
 		return false
 	}
@@ -467,9 +547,16 @@ func (s *Store) Restore(id string) bool {
 	if item == nil || item.DeletedAt == nil {
 		return false
 	}
-	_, _ = tx.Exec("UPDATE memories SET deleted_at = NULL, updated_at = ? WHERE id = ?", Now(), id)
-	indexText(tx, item.RowID, item.Text)
-	addHistory(tx, id, "RESTORE", "", item.Text, ActorUser, "", "")
+	// Lennh ghi loi -> rollback (defer) va bao that bai, khong bao true khi chua ghi (xem concurrency_test.go).
+	if _, err := tx.Exec("UPDATE memories SET deleted_at = NULL, updated_at = ? WHERE id = ?", Now(), id); err != nil {
+		return false
+	}
+	if err := indexText(tx, item.RowID, item.Text); err != nil {
+		return false
+	}
+	if err := addHistory(tx, id, "RESTORE", "", item.Text, ActorUser, "", ""); err != nil {
+		return false
+	}
 	return tx.Commit() == nil
 }
 
@@ -497,7 +584,7 @@ func (s *Store) History(id string) []HistoryEntry {
 
 // Purge: xoa cung (scope rong = tat ca). Dung cho "Xoa toan bo ghi nho" va don xoa mem cu.
 func (s *Store) Purge(scope string) int {
-	tx, err := s.db.SQL().Begin()
+	tx, err := s.db.BeginWrite()
 	if err != nil {
 		return 0
 	}
@@ -506,8 +593,13 @@ func (s *Store) Purge(scope string) int {
 	if scope != "" {
 		filter, args = " WHERE scope = ?", []any{scope}
 	}
-	_, _ = tx.Exec("DELETE FROM memories_fts WHERE rowid IN (SELECT rowid FROM memories"+filter+")", args...)
-	_, _ = tx.Exec("DELETE FROM memory_history WHERE memory_id IN (SELECT id FROM memories"+filter+")", args...)
+	// Moi lenh ghi loi -> rollback (defer) va bao 0, khong bao so dong khi chua xoa het (xem concurrency_test.go).
+	if _, err := tx.Exec("DELETE FROM memories_fts WHERE rowid IN (SELECT rowid FROM memories"+filter+")", args...); err != nil {
+		return 0
+	}
+	if _, err := tx.Exec("DELETE FROM memory_history WHERE memory_id IN (SELECT id FROM memories"+filter+")", args...); err != nil {
+		return 0
+	}
 	result, err := tx.Exec("DELETE FROM memories"+filter, args...)
 	if err != nil {
 		return 0
@@ -548,8 +640,9 @@ func Cosine(a, b []float32) float64 {
 
 // ---- noi bo ----
 
-func indexText(db dbHandle, rowID int64, text string) {
-	_, _ = db.Exec("INSERT INTO memories_fts (rowid, text) VALUES (?, ?)", rowID, Normalize(text))
+func indexText(db dbHandle, rowID int64, text string) error {
+	_, err := db.Exec("INSERT INTO memories_fts (rowid, text) VALUES (?, ?)", rowID, Normalize(text))
+	return err
 }
 
 func findByHash(db dbHandle, scope, scopeKey, hash string) *Item {
@@ -581,11 +674,12 @@ func findNearDuplicate(db dbHandle, scope, scopeKey string, vector []float32) *I
 	return nil
 }
 
-func saveVector(db dbHandle, id, model string, vector []float32, textHash string) {
-	_, _ = db.Exec(`INSERT INTO memory_embeddings (memory_id, model, dim, vector, text_hash, created_at)
+func saveVector(db dbHandle, id, model string, vector []float32, textHash string) error {
+	_, err := db.Exec(`INSERT INTO memory_embeddings (memory_id, model, dim, vector, text_hash, created_at)
 		VALUES (?, ?, ?, ?, ?, ?)
 		ON CONFLICT(memory_id) DO UPDATE SET model = ?, dim = ?, vector = ?, text_hash = ?, created_at = ?`,
 		id, model, len(vector), toBlob(vector), textHash, Now(), model, len(vector), toBlob(vector), textHash, Now())
+	return err
 }
 
 func exists(db dbHandle, id string) bool {
@@ -663,10 +757,11 @@ func readItems(db dbHandle, query string, args ...any) []Item {
 	return items
 }
 
-func addHistory(db dbHandle, id, event, oldText, newText, actor, runID, reason string) {
-	_, _ = db.Exec(`INSERT INTO memory_history (memory_id, event, old_text, new_text, actor, run_id, reason, created_at)
+func addHistory(db dbHandle, id, event, oldText, newText, actor, runID, reason string) error {
+	_, err := db.Exec(`INSERT INTO memory_history (memory_id, event, old_text, new_text, actor, run_id, reason, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, id, event, nullText(oldText), nullText(newText), actor, nullText(runID),
 		nullText(reason), Now())
+	return err
 }
 
 func nullText(value string) any {

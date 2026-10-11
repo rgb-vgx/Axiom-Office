@@ -58,17 +58,24 @@ func (c *Conversations) Create(app, family string, documentKey, documentName, ti
 }
 
 func (c *Conversations) AppendMessage(conversationID, role, content string) int {
-	tx, err := c.db.sql.Begin()
+	tx, err := c.db.BeginWrite()
 	if err != nil {
 		return 0
 	}
 	defer func() { _ = tx.Rollback() }()
 
 	var seq int
-	_ = tx.QueryRow("SELECT COALESCE(MAX(seq), 0) + 1 FROM messages WHERE conversation_id = ?", conversationID).Scan(&seq)
-	_, _ = tx.Exec(`INSERT INTO messages (conversation_id, seq, role, content, created_at) VALUES (?, ?, ?, ?, ?)`,
-		conversationID, seq, role, content, Now())
-	_, _ = tx.Exec("UPDATE conversations SET updated_at = ? WHERE id = ?", Now(), conversationID)
+	if err := tx.QueryRow("SELECT COALESCE(MAX(seq), 0) + 1 FROM messages WHERE conversation_id = ?", conversationID).Scan(&seq); err != nil {
+		return 0
+	}
+	// Lennh ghi loi -> rollback (defer) va bao that bai (0), khong bao seq khi chua ghi (xem concurrency_test.go).
+	if _, err := tx.Exec(`INSERT INTO messages (conversation_id, seq, role, content, created_at) VALUES (?, ?, ?, ?, ?)`,
+		conversationID, seq, role, content, Now()); err != nil {
+		return 0
+	}
+	if _, err := tx.Exec("UPDATE conversations SET updated_at = ? WHERE id = ?", Now(), conversationID); err != nil {
+		return 0
+	}
 	if err := tx.Commit(); err != nil {
 		return 0
 	}
