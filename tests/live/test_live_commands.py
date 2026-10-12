@@ -115,11 +115,11 @@ def normalize(value, out):
     return value
 
 
-def tiny_png(path):
+def tiny_png(path, width=16, height=16):
     def chunk(kind, data):
         return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
-    raw = b"".join(b"\x00" + b"\xcc\x44\x22" * 16 for _ in range(16))
-    png = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 16, 16, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b"")
+    raw = b"".join(b"\x00" + b"\xcc\x44\x22" * width for _ in range(height))
+    png = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b"")
     with open(path, "wb") as handle:
         handle.write(png)
     return path
@@ -412,6 +412,23 @@ def test_presentation(b, out, png, run_ai):
           "PowerPoint checkLayout bắt được chồng + tràn + chữ nhỏ", qa)
     b.cmd("wpp.checkLayout", {"slide": 99}, expect_ok=False, key="wpp.checkLayout bad slide")
     b.cmd("wpp.deleteSlide", {}, key="wpp.deleteSlide qa")
+    # Lưới của skill trinh-bay-chuyen-nghiep (đo 13/10/2026): hộp chữ giữ chiều cao đã đặt nên tiêu đề 3 dòng
+    # báo overflow (trước đây hộp tự giãn, đè lên nội dung 9pt mà không lỗi nào); ảnh chỉ truyền width giữ tỉ lệ.
+    b.cmd("wpp.addSlide", {"layout": 12}, key="wpp.addSlide grid")
+    long_title = ("Kênh trực tuyến tăng 32%, bù được phần giảm của kênh truyền thống, nhờ chương trình khuyến mãi "
+                  "tháng 9 và kênh đối tác mới mở tại ba tỉnh")
+    b.cmd("wpp.addText", {"text": long_title, "left": 40, "top": 30, "width": 880, "height": 80, "fontSize": 28, "bold": True},
+          key="wpp.addText 3-line title")
+    wide = tiny_png(os.path.join(out, "wide.png"), 32, 18)
+    b.cmd("wpp.addImage", {"path": wide, "left": 40, "top": 150, "width": 320}, key="wpp.addImage width only")
+    grid = b.cmd("wpp.checkLayout", {"slide": 3}, key="wpp.checkLayout grid") or {}
+    shapes = (grid.get("slides") or [{}])[0].get("shapes", [])
+    kinds = [i.get("type") for s in grid.get("slides", []) for i in s.get("issues", [])]
+    check(len(shapes) == 2 and shapes[0]["height"] == 80 and kinds == ["overflow"],
+          "PowerPoint addText giữ chiều cao 80, tiêu đề 3 dòng báo overflow", grid)
+    check(len(shapes) == 2 and abs(shapes[1]["width"] - 320) < 1 and abs(shapes[1]["height"] - 180) < 1,
+          "PowerPoint addImage chỉ width giữ tỉ lệ 16:9 (320 x 180)", grid)
+    b.cmd("wpp.deleteSlide", {}, key="wpp.deleteSlide grid")
     pdf = os.path.join(out, "wpp.pdf")
     b.cmd("wpp.exportPdf", {"path": pdf})
     check(os.path.getsize(pdf) > 1000, "PowerPoint exportPdf tạo file", pdf)
