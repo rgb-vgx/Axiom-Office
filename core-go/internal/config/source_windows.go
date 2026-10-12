@@ -8,6 +8,9 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
+// DescribeSource mo ta nguon cau hinh nen tang de doctor in ra cho nguoi dung.
+func DescribeSource() string { return `HKCU\` + RegistryKeyPath }
+
 // RegistrySource doc HKCU\Software\AxiomOffice (dung chung voi add-in). Loi truy cap -> khong co gia tri.
 type RegistrySource struct{ KeyPath string }
 

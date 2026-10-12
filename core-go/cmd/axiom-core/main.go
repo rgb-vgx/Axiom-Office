@@ -22,6 +22,7 @@ import (
 	"axiomoffice/core/internal/config"
 	"axiomoffice/core/internal/corefile"
 	"axiomoffice/core/internal/corelog"
+	"axiomoffice/core/internal/doctor"
 	"axiomoffice/core/internal/instance"
 	"axiomoffice/core/internal/mcp"
 	"axiomoffice/core/internal/mcpserver"
@@ -64,6 +65,13 @@ func run() int {
 	if len(os.Args) > 1 && os.Args[1] == "mcp" {
 		mcpserver.SetVersion(version)
 		return mcpserver.Run(os.Args[2:])
+	}
+	if len(os.Args) > 1 && os.Args[1] == "doctor" {
+		if len(os.Args) > 2 {
+			fmt.Fprintln(os.Stderr, "usage: axiom-core doctor")
+			return 2
+		}
+		return doctor.Run(config.Load(), version, os.Stdout)
 	}
 
 	cfg := config.Load()

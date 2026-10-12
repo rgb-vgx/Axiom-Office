@@ -1,4 +1,4 @@
-.PHONY: help test test-lo test-wps test-core test-mcp test-oracle test-install core-build check-gen package clean fmt lint lint-go lint-py lint-js
+.PHONY: help test test-go test-lo test-wps test-core test-mcp test-oracle test-install core-build check-gen package clean fmt lint lint-go lint-py lint-js
 
 GOBIN := $(shell go env GOPATH)/bin
 RUFF ?= $(shell command -v ruff 2>/dev/null || echo python3 -m ruff)
@@ -9,6 +9,7 @@ help:
 	@echo "Danh sach dich:"
 	@echo "  help        - Hien thi danh sach dich kem mo ta"
 	@echo "  test        - Chay toan bo kiem thu khong can app that"
+	@echo "  test-go     - Kiem thu Go (cd core-go && go test ./...)"
 	@echo "  test-lo     - Kiem thu extension LibreOffice"
 	@echo "  test-wps    - Kiem thu add-in WPS"
 	@echo "  test-core   - Build Agent Core Go va kiem thu e2e"
@@ -25,7 +26,10 @@ help:
 	@echo "  lint-py     - Kiem loi Python (ruff check)"
 	@echo "  lint-js     - Kiem loi JS (ESLint: add-in WPS ES5 + tests modern)"
 
-test: test-lo test-wps test-core test-mcp test-oracle test-install
+test: test-go test-lo test-wps test-core test-mcp test-oracle test-install
+
+test-go:
+	cd core-go && go test ./...
 
 test-lo:
 	python3 -m unittest discover -s tests/lo -v
