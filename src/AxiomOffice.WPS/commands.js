@@ -225,7 +225,7 @@
       summary: "**Đóng mọi sổ, không lưu**",
       params: [] },
     { name: "et.checkRange", kind: "et", agent: true,
-      summary: "Soát bảng dữ liệu (chỉ đọc): tiêu đề trống, kiểu lẫn lộn, số dạng chữ, number format, dữ liệu lạc ngoài bảng",
+      summary: "Soát bảng dữ liệu (chỉ đọc): tiêu đề trống, kiểu lẫn lộn, số dạng chữ, number format, dữ liệu lạc ngoài bảng (chỉ khi không truyền range)",
       params: [
         { name: "range", required: false, hint: "default: the used range" },
         { name: "sheet", required: false, hint: null }
