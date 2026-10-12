@@ -21,9 +21,13 @@ import unittest
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 PYTHONPATH = os.path.join(ROOT, "src", "AxiomOffice.LibreOffice", "python", "pythonpath")
 if "uno" not in sys.modules:
-    UNO = types.ModuleType("uno")
-    UNO.createUnoStruct = lambda _name: types.SimpleNamespace()
-    sys.modules["uno"] = UNO
+    sys.modules["uno"] = types.ModuleType("uno")
+# test_calc.py chay truoc (discover xep theo abc) va cam mot module "uno" RONG. Neu o day chi dat stub khi
+# "uno" CHUA co thi stub yeu do thang, va _set_borders (writer.py:336) do voi "uno" khong co createUnoStruct
+# -> do o `python3 -m unittest discover -s tests/lo` (lenh CI) trong khi chay rieng file nay van xanh. Nen
+# bo sung vao module dang co, dung bo qua khi no da ton tai.
+if not hasattr(sys.modules["uno"], "createUnoStruct"):
+    sys.modules["uno"].createUnoStruct = lambda _name: types.SimpleNamespace()
 sys.path.insert(0, PYTHONPATH)
 
 from axiom import commands  # noqa: E402
