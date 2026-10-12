@@ -1,9 +1,9 @@
 """Xu ly URL org.axiomoffice.bridge:... tu menu (Addons.xcu -> ProtocolHandler.xcu -> component nay).
 
-Bon URL: `:askpane` (mo pane Ask AI), `:check` (soat tai lieu dang mo), `:setup` (mo wizard thiet lap cho
-nguoi dung khong chuyen) va `:settings` (cua so Cai dat nang cao). Dispatch chay tren main thread (menu cua
-LibreOffice), nen goi thang `panel.show_pane` / `dialogs.open_check` / `setupwizard.open_setup` /
-`dialogs.open_settings` ma khong qua UnoGate.
+Sau URL: `:askpane` (mo pane Ask AI), `:check` (soat tai lieu dang mo), `:skills` (ky nang Core dang dung),
+`:audit` (nhat ky lenh Core da goi vao tai lieu), `:setup` (mo wizard thiet lap cho nguoi dung khong chuyen)
+va `:settings` (cua so Cai dat nang cao). Dispatch chay tren main thread (menu cua LibreOffice), nen goi
+thang `panel.show_pane` / `dialogs.open_*` / `setupwizard.open_setup` ma khong qua UnoGate.
 
 ACTIONS la DANH SACH TRANG: mot muc menu trong Addons.xcu ma khong co ten o day thi bam vao KHONG lam gi
 (khong loi, khong thong bao). tests/lo/test_dispatch.py doi chieu hai ben voi nhau.
@@ -16,7 +16,7 @@ from com.sun.star.lang import XInitialization
 
 from . import log
 
-ACTIONS = {"askpane", "check", "settings", "setup"}
+ACTIONS = {"askpane", "audit", "check", "settings", "setup", "skills"}
 
 
 class Dispatcher(unohelper.Base, XDispatchProvider, XInitialization, XDispatch):
@@ -60,6 +60,14 @@ class Dispatcher(unohelper.Base, XDispatchProvider, XInitialization, XDispatch):
                 from . import dialogs
 
                 dialogs.open_check(_PaneTarget(self.ctx, self._frame()))
+            elif action == "skills":
+                from . import dialogs
+
+                dialogs.open_skills(_PaneTarget(self.ctx, self._frame()))
+            elif action == "audit":
+                from . import dialogs
+
+                dialogs.open_audit(_PaneTarget(self.ctx, self._frame()))
             elif action == "settings":
                 from . import dialogs
 

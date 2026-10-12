@@ -1,15 +1,17 @@
-"""Spec: dialog "Soat tai lieu" - import duoc, va bang CHECK_COMMANDS khop registry (khong can LibreOffice).
+"""Spec: dialog "Soat tai lieu" / "Ky nang" / "Nhat ky hoat dong" (khong can LibreOffice).
 
 Vi sao can: khong test nao khac import `axiom/dialogs.py` (no can UNO that), nen mot loi import trong file
 do chi lo ra khi nguoi dung mo LibreOffice. O day stub UNO vua du de import that, va kiem them rang:
 - moi loai tai lieu (wps|et|wpp) co dung mot lenh soat,
 - moi lenh do CO THAT trong registry (commands.REGISTRY) va dung `kind` - doi ten lenh trong checks.py ma
-  quen sua bang nay thi menu se bao "unknown action" thay vi im lang.
+  quen sua bang nay thi menu se bao "unknown action" thay vi im lang,
+- phan bien ket qua Core thanh chuoi hien cho nguoi dung (skill_lines, skill_status, audit_lines, _clock).
 
     python3 tests/lo/test_dialogs.py
 """
 from __future__ import annotations
 
+import datetime
 import os
 import sys
 import types
@@ -115,10 +117,74 @@ class CurrentKindTest(unittest.TestCase):
         self.assertIsNone(dialogs._current_kind(_Context(object())))
 
 
+class SkillLinesTest(unittest.TestCase):
+    """Hien thi ky nang: mot dong moi ky nang, va KHONG duoc im lang bo qua thu muc nap loi."""
+
+    def test_moi_ky_nang_mot_dong(self):
+        listing = {"skills": [{"name": "bao-cao-thang", "description": "Báo cáo tháng", "apps": ["wps"]},
+                              {"name": "trinh-bay", "description": "", "apps": []}]}
+        self.assertEqual(["bao-cao-thang — Báo cáo tháng · wps", "trinh-bay"], dialogs.skill_lines(listing))
+
+    def test_thu_muc_nap_loi_van_hien(self):
+        listing = {"skills": [], "errors": [{"directory": "/tmp/skills", "error": "missing name"}]}
+        self.assertEqual(["⚠ Không nạp được /tmp/skills: missing name"], dialogs.skill_lines(listing))
+
+    def test_khong_co_gi_thi_noi_thang(self):
+        for listing in ({}, None, {"skills": [], "errors": []}):
+            self.assertEqual(["Chưa có kỹ năng nào."], dialogs.skill_lines(listing))
+
+
+class SkillStatusTest(unittest.TestCase):
+    def test_dem_va_loc_theo_app(self):
+        listing = {"skills": [{"name": "x"}],
+                   "sources": [{"name": "builtin", "directory": "/x", "exists": True},
+                               {"name": "user", "directory": "/y", "exists": False}]}
+        self.assertEqual("1 kỹ năng cho Writer · nguồn: sẵn có", dialogs.skill_status(listing, "wps"))
+        self.assertEqual("1 kỹ năng · nguồn: sẵn có", dialogs.skill_status(listing))
+        self.assertEqual("1 kỹ năng cho Impress · nguồn: cá nhân",
+                         dialogs.skill_status({"skills": [{}], "sources": [{"name": "user", "exists": True}]}, "wpp"))
+
+    def test_bao_so_thu_muc_nap_loi(self):
+        self.assertEqual("0 kỹ năng · 2 thư mục nạp lỗi", dialogs.skill_status({"skills": [], "errors": [{}, {}]}))
+
+
+class AuditLinesTest(unittest.TestCase):
+    """Nhat ky hoat dong: gio · lenh · ok/loi · so ms. Gio doi theo mui gio may nen chi kiem phan duoi."""
+
+    def test_moi_lenh_mot_dong(self):
+        calls = [{"tool": "office_action", "action": "writer.insertText", "ok": True, "ms": 42,
+                  "createdAt": "2026-10-13T00:00:00.000Z"},
+                 {"tool": "office_action", "action": "wpp.addSlide", "ok": False, "ms": 3,
+                  "error": "khong tim thay slide", "createdAt": "2026-10-13T00:00:01.000Z"}]
+        lines = dialogs.audit_lines(calls)
+        self.assertTrue(lines[0].endswith("· office_action.writer.insertText · ok · 42 ms"), lines[0])
+        self.assertTrue(lines[1].endswith("· office_action.wpp.addSlide · LỖI · 3 ms — khong tim thay slide"),
+                        lines[1])
+
+    def test_tool_khong_co_action_thi_chi_in_ten_tool(self):
+        self.assertTrue(dialogs.audit_lines([{"tool": "memory", "ok": True, "ms": 1}])[0]
+                        .endswith("· memory · ok · 1 ms"))
+
+    def test_chua_co_lenh_thi_noi_thang(self):
+        for calls in ([], None):
+            self.assertEqual(["Chưa có lượt gọi lệnh nào."], dialogs.audit_lines(calls))
+
+
+class ClockTest(unittest.TestCase):
+    def test_gio_utc_doi_sang_gio_may(self):
+        expected = datetime.datetime(2026, 10, 13, 12, 34, 56, tzinfo=datetime.timezone.utc
+                                     ).astimezone().strftime("%d/%m %H:%M")
+        self.assertEqual(expected, dialogs._clock("2026-10-13T12:34:56.789Z"))
+
+    def test_chuoi_khong_doc_duoc_thi_tra_nguyen(self):
+        for stamp in ("", None, "khong-phai-gio", "2026-10-13"):
+            self.assertEqual(str(stamp or ""), dialogs._clock(stamp))
+
+
 class SurfaceTest(unittest.TestCase):
     def test_dialog_mo_duoc_voi_target_toi_thieu(self):
-        self.assertTrue(callable(dialogs.open_check))
-        self.assertTrue(callable(dialogs.open_memory))
+        for name in ("open_check", "open_memory", "open_skills", "open_audit"):
+            self.assertTrue(callable(getattr(dialogs, name)), name)
 
 
 if __name__ == "__main__":

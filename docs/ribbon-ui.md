@@ -84,17 +84,23 @@ Tab thứ hai **chỉ mở khi đã có ≥3 màn hình thật**; chưa làm gì
   Phía Linux chúng đã có sẵn bằng Python thuần: `axiom/checks.py` (`writer_check_tables`, `range_report`,
   `layout_report`), có test riêng, và cửa chạy tại chỗ là
   `bridge.run_on_main(ctx, gate, kind, action, params)`.
-- **Bộ nhớ / kỹ năng / hội thoại / audit đều có API đầy đủ** nhưng hiện **không UI nào gọi**:
-  `POST /v1/skills/reload` chỉ xuất hiện trong `tests/core/test_core_e2e.py:488`;
-  `axiom/core.py::skills()` (LibreOffice) là **hàm chết** — không nơi nào gọi.
+- **Bộ nhớ / kỹ năng / hội thoại / audit đều có API đầy đủ**; LibreOffice đã gọi được ba nhóm đầu:
+  `GET /v1/memory` + `DELETE /v1/memory/{id}` (dialog **Ghi nhớ**, mở từ liên kết ở header pane),
+  `GET /v1/skills?app=` + `POST /v1/skills/reload` (menu **Kỹ năng…**), `GET /v1/audit` (menu **Nhật ký…**).
+  Danh sách này **không còn là hàm chết**: `axiom/core.py` có `skill_listing` / `reload_skills` / `audit`
+  (`skills()` cũ bị thay vì nó trả về ít hơn payload thật — xem chú thích trong `skill_listing`).
+- **Còn chưa UI nào gọi**: `GET /v1/conversations` (**Hội thoại…**), `PATCH /v1/memory/{id}` (sửa / ghim / đặt
+  hạn), `POST /v1/memory/{id}/restore` + `GET /v1/memory/{id}/history` + `DELETE /v1/memory?scope&confirm`
+  (khôi phục / lịch sử / xoá cứng). Nghĩa là dialog **Ghi nhớ** mới chỉ **đọc, lọc, xoá mềm** — chưa đủ
+  nghiệm thu của đợt 2, và khoảng trống đó nằm ở UI chứ không phải ở Core.
 
 ## 4. Đợt triển khai
 
 | Đợt | Nội dung | Nghiệm thu |
 |---|---|---|
 | **1** | Toggle **Nhìn tài liệu** + ba nút **Soát** (bố cục/bảng/vùng) | Bấm ra kết quả ngay; toggle đổi được và lượt sau Core hành xử khác; ba nút Soát không tốn token · **LibreOffice ✅ 13/10** (mục menu *Soát tài liệu…*, §8) · Windows: chờ phiên máy Windows |
-| **2** | **Bộ nhớ AI…** — form 3 vùng (danh sách / chi tiết / lịch sử); phân biệt rõ **xoá mềm ≠ khôi phục ≠ xoá cứng** | Sửa, ghim, đặt hạn, xoá mềm, khôi phục, xoá cứng đều chạy; lọc được theo phạm vi user/document |
-| **3** | **Kỹ năng…**, **Nhật ký hoạt động…**, **Hội thoại…** → mở tab thứ hai | Thấy đúng skill của app đang mở; nạp lại được; audit đọc được |
+| **2** | **Bộ nhớ AI…** — form 3 vùng (danh sách / chi tiết / lịch sử); phân biệt rõ **xoá mềm ≠ khôi phục ≠ xoá cứng** | Sửa, ghim, đặt hạn, xoá mềm, khôi phục, xoá cứng đều chạy; lọc được theo phạm vi user/document · **LibreOffice: mới 1/3** — dialog *Ghi nhớ* có **đọc / lọc / xoá mềm / tải lại**; thiếu sửa, ghim, hạn, khôi phục, xoá cứng (§3) |
+| **3** | **Kỹ năng…**, **Nhật ký hoạt động…**, **Hội thoại…** → mở tab thứ hai | Thấy đúng skill của app đang mở; nạp lại được; audit đọc được · **LibreOffice ✅ 13/10** cho *Kỹ năng…* + *Nhật ký hoạt động…* (§8) · **Hội thoại…**: chưa (route `GET /v1/conversations` có sẵn) |
 | **4** | Nút theo từng app, xuất PDF, lối tắt soạn thảo đã kiểm thử | Chỉ hiện nút hợp với app |
 
 Cổng kiểm mỗi đợt: `make lint`, `make check-gen`, `make test` (Linux) · `scripts\build.ps1` +
@@ -152,3 +158,5 @@ handler trong tiến trình (như `CommandDispatcher.Execute` ở Windows) — n
 |---|---|---|
 | 13/10/2026 | LibreOffice | Mục menu **Soát tài liệu…** (`Addons.xcu` + `dispatch.py` action `check` + `dialogs.open_check`): chạy trong tiến trình qua `bridge.run_on_main`, tự nhận loại tài liệu đang mở, liệt kê vấn đề bằng nhãn tiếng Việt (`checks.ISSUE_LABELS`) kèm chi tiết gốc. Chỉ đọc, 0 token. Spec mới: `tests/lo/test_dispatch.py` (9), `tests/lo/test_report.py` (8), `tests/lo/test_dialogs.py` (6). |
 | 13/10/2026 | (kế hoạch) | Chốt plan; phát hiện §5.1 (toggle trên WPS Linux bị chặn vì Core không có endpoint ghi cấu hình). Giao phần Windows cho phiên trên máy Windows. |
+| 13/10/2026 | LibreOffice | Hai mục menu **Kỹ năng…** (`org.axiomoffice.bridge:skills`) và **Nhật ký hoạt động…** (`:audit`): `Addons.xcu` → `dispatch.ACTIONS` → `dialogs.open_skills` / `open_audit`. `core.py` thêm `skill_listing` (trả **cả payload**, không chỉ `skills`, để thư mục kỹ năng nạp lỗi không bị im lặng bỏ qua), `reload_skills`, `audit`. Nút *Nạp lại* gọi `POST /v1/skills/reload` (đọc lại thư mục, **không** khởi động lại Core); nhật ký đọc 100 dòng mới nhất và đổi giờ UTC của Core sang **giờ máy**. Spec mới: `SkillLinesTest`, `SkillStatusTest`, `AuditLinesTest`, `ClockTest` (`tests/lo/test_dialogs.py`), `CoreListingTests` (`tests/lo/test_chat.py`), và một ca dispatch cho hai URL. |
+| 13/10/2026 | LibreOffice | `tests/live/open_dialogs.py` — probe **không** phải unittest: dựng LibreOffice thật trong profile/XDG tạm, cài `.oxt`, gửi **đúng URL của menu** qua UNO rồi **chụp ảnh màn hình** (`xwd` + `ffmpeg`). Cần vì dialog ở đây là `awt.ChildWindow` — cửa sổ con **không có cửa sổ X riêng**, nên `xdotool search --name` không tìm được như với wizard. Đã chạy và xem ảnh: *Soát tài liệu* (bảng dựng thật bằng `writer.insertTable` → *"Có ô trống"*), *Kỹ năng* (3 kỹ năng, "nguồn: sẵn có"), *Nhật ký* (nhánh rỗng). Ảnh ở `/tmp/axiom-dialogs`. |

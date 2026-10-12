@@ -1,7 +1,7 @@
 """Client Agent Core (LibreOffice_arch.md muc 9, 10): ban Python cua CoreClient.cs.
 
 Pane trong LibreOffice noi chuyen voi Agent Core qua HTTP/SSE: POST /v1/runs, GET /v1/runs/{id}/events,
-POST /v1/runs/{id}/cancel|confirm, GET /v1/memory|/v1/skills. Core doc session registry cua bridge
+POST /v1/runs/{id}/cancel|confirm, GET /v1/memory|/v1/skills|/v1/audit. Core doc session registry cua bridge
 (theo `office.port`) nen agent sua dung tai lieu dang mo.
 
 Khong import uno: module thuan Python de test don vi duoc (xem tests/lo/test_chat.py).
@@ -238,6 +238,27 @@ def delete_memory(base: str, memory_id: str, reason: str = "pane") -> bool:
         return False
 
 
-def skills(base: str, kind: str | None = None) -> list:
+def skill_listing(base: str, kind: str | None = None) -> dict:
+    """GET /v1/skills?app=...: ky nang Core dang dung, VA thu muc nap loi, VA danh sach nguon.
+
+    Tra ca payload chu khong chi `skills`: mot file ky nang sai dinh dang chi lo ra o `errors`, con thi no
+    im lang khong xuat hien trong danh sach - nguoi dung tu viet ky nang se tuong Core bo qua minh.
+    """
     path = "/v1/skills" + ("?app=" + urllib.parse.quote(kind) if kind else "")
-    return call(base, "GET", path).get("skills") or []
+    return call(base, "GET", path) or {}
+
+
+def reload_skills(base: str) -> dict:
+    """POST /v1/skills/reload: Core doc lai cac thu muc ky nang (khong phai khoi dong lai Core).
+
+    Tra ve danh sach DAY DU (khong loc theo app) - ben goi muon loc thi hoi lai `skill_listing`.
+    """
+    return call(base, "POST", "/v1/skills/reload", {}) or {}
+
+
+def audit(base: str, run_id: str = "", limit: int = 100) -> list:
+    """GET /v1/audit: cac lenh Core da goi vao tai lieu, moi nhat truoc (khong loc duoc theo tai lieu)."""
+    params = {"limit": str(limit)}
+    if run_id:
+        params["runId"] = run_id
+    return call(base, "GET", "/v1/audit?" + urllib.parse.urlencode(params)).get("calls") or []

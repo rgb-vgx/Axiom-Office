@@ -1,4 +1,4 @@
-"""Dialog Cai dat + Quan ly ghi nho cua pane (LibreOffice_arch.md muc 10).
+"""Dialog cua pane (LibreOffice_arch.md muc 10): Cai dat, Ghi nho, Soat tai lieu, Ky nang, Nhat ky hoat dong.
 
 Mac dinh moi dialog la mot cua so con (`awt.ChildWindow`) giua cua so tai lieu. Mo TU WIZARD thi truyen
 `floating=True` de dung cua so roi (`awt.Dialog`): wizard cung la cua so roi nen cua so con nam duoi bi che,
@@ -11,6 +11,8 @@ phai khoi dong lai. Chi `Token` va `CorePort` moi chot luc Core khoi dong - doi 
 /v1/admin/shutdown) roi gui yeu cau moi de Core tu chay lai.
 """
 from __future__ import annotations
+
+import datetime
 
 import uno
 
@@ -81,6 +83,7 @@ SETTINGS_FLAGS = (
     ("VisualQaEnabled", "QA thị giác: gửi ảnh trang cho model (VisualQaEnabled)", False),
 )
 MEMORY_LIST_TIMEOUT = 10
+AUDIT_LIMIT = 100        # GET /v1/audit: so dong nhat ky moi nhat (Core cung lay 100 lam mac dinh)
 # Noi luu cau hinh: noi ro theo he dieu hanh de nguoi dung biet dang sua file nao.
 STORAGE_HINT = (r"Cấu hình dùng chung với add-in (HKCU\Software\AxiomOffice). Địa chỉ/model/khoá dùng được ngay; "
                 "chỉ 'Tắt Core' khi vừa đổi Token." if config.IS_WINDOWS else
@@ -317,3 +320,159 @@ def _current_kind(ctx):
         except Exception:  # noqa: BLE001 - component khong ho tro supportsService thi coi nhu khong khop
             continue
     return None
+
+
+# Ten nguon ky nang cua Core (skills.DefaultSources) -> chu hien cho nguoi dung.
+SKILL_SOURCE_LABELS = {"builtin": "sẵn có", "org": "tổ chức", "user": "cá nhân"}
+
+
+def _source_label(row) -> str:
+    name = str((row or {}).get("name") or "")
+    return SKILL_SOURCE_LABELS.get(name, name or "?")
+
+
+def skill_lines(listing) -> list:
+    """Cac dong cho ListBox "Ky nang": mot dong moi ky nang, roi mot dong cho moi thu muc nap loi.
+
+    Phan `errors` quan trong ngang phan `skills`: Core bo qua file SKILL.md sai dinh dang mot cach im lang,
+    nen neu khong in ra thi nguoi dung tu viet ky nang se khong hieu vi sao no khong xuat hien.
+    """
+    listing = listing or {}
+    lines = []
+    for row in listing.get("skills") or []:
+        name = str(row.get("name") or "?")
+        apps = ", ".join(str(app) for app in (row.get("apps") or []))
+        detail = " · ".join(part for part in (str(row.get("description") or "").strip(), apps) if part)
+        lines.append("%s — %s" % (name, detail) if detail else name)
+    for failure in listing.get("errors") or []:
+        lines.append("⚠ Không nạp được %s: %s" % (failure.get("directory") or "?",
+                                                   failure.get("error") or "?"))
+    return lines or ["Chưa có kỹ năng nào."]
+
+
+def skill_status(listing, kind: str | None = None) -> str:
+    """Dong trang thai: bao nhieu ky nang, cho app nao, va nguon nao dang co tren may."""
+    listing = listing or {}
+    app = theme.APP_NAMES.get(kind) if kind else ""
+    parts = ["%d kỹ năng%s" % (len(list(listing.get("skills") or [])), " cho %s" % app if app else "")]
+    errors = len(list(listing.get("errors") or []))
+    if errors:
+        parts.append("%d thư mục nạp lỗi" % errors)
+    sources = [_source_label(row) for row in (listing.get("sources") or []) if row.get("exists")]
+    if sources:
+        parts.append("nguồn: " + ", ".join(sources))
+    return " · ".join(parts)
+
+
+def open_skills(pane) -> None:
+    """Dialog "Ky nang": Core dang thay ky nang nao cho app dang mo, va nap lai thu muc ky nang.
+
+    Hoi Agent Core chu khong doc thu muc: Core moi la ben quyet dinh ky nang nao duoc dung, va chi no moi
+    biet thu muc nao nap loi (xem skill_lines).
+    """
+    ctx = pane.ctx
+    dialog = _open(ctx, pane.frame if hasattr(pane, "frame") else None, "Kỹ năng", 560, 440)
+    if dialog is None:
+        return
+    dialog.add("ListBox", "items", PositionX=12, PositionY=46, Width=536, Height=312,
+               StringItemList=uno.Any("[]string", ()))
+    dialog.add("FixedText", "status", PositionX=12, PositionY=364, Width=536, Height=32, MultiLine=True,
+               TextColor=theme.TEXT_MUTED, FontHeight=theme.SIZE_CAPTION, Label="Đang đọc…")
+    _button(dialog, "reload", 12, 402, 120, "Nạp lại")
+    _button(dialog, "close", 458, 402, 90, "Đóng")
+
+    def load(reread: bool = False) -> None:
+        kind = _current_kind(ctx)
+        try:
+            base, _ = core.ensure()
+            if reread:
+                core.reload_skills(base)     # tra ve danh sach day du, nen van hoi lai de loc theo app
+            listing = core.skill_listing(base, kind)
+        except core.CoreError as exc:
+            _set_list(dialog, "items", ())
+            dialog.set("status", Label="Không đọc được kỹ năng: %s" % exc)
+            return
+        _set_list(dialog, "items", skill_lines(listing))
+        dialog.set("status", Label=("Đã nạp lại · " if reread else "") + skill_status(listing, kind))
+
+    def on_action(command: str, event) -> None:
+        if command == "reload":
+            load(reread=True)
+        elif command == "close":
+            dialog.close()
+            DIALOGS.pop("Kỹ năng", None)
+
+    bind_actions(dialog, ("reload", "close"), on_action)
+    load()
+
+
+def _clock(stamp) -> str:
+    """'2026-10-13T12:34:56.789Z' (Core luu UTC) -> '13/10 19:34' theo gio may.
+
+    Khong doc duoc thi tra nguyen chuoi: nhat ky cu hay ban Core khac dinh dang van phai hien duoc.
+    """
+    text = str(stamp or "")
+    try:
+        when = datetime.datetime.strptime(text[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=datetime.timezone.utc)
+    except ValueError:
+        return text
+    return when.astimezone().strftime("%d/%m %H:%M")
+
+
+def audit_lines(calls) -> list:
+    """Cac dong cho ListBox "Nhat ky hoat dong": gio · lenh · ok/loi · so ms, moi nhat truoc.
+
+    `action` rong thi chi in ten tool (`office_action` goi vao MCP co the khong co action).
+    """
+    lines = []
+    for row in calls or []:
+        tool = str(row.get("tool") or "?")
+        action = str(row.get("action") or "").strip()
+        state = "ok" if row.get("ok") else "LỖI"
+        line = "%s · %s · %s · %s ms" % (_clock(row.get("createdAt")),
+                                         "%s.%s" % (tool, action) if action else tool,
+                                         state, row.get("ms") or 0)
+        error = str(row.get("error") or "").strip()
+        lines.append("%s — %s" % (line, error) if error else line)
+    return lines or ["Chưa có lượt gọi lệnh nào."]
+
+
+def open_audit(pane) -> None:
+    """Dialog "Nhat ky hoat dong": Core da goi nhung lenh nao vao tai lieu (GET /v1/audit).
+
+    Tra loi cau hoi "AI vua lam gi voi file cua toi" ma khong phai mo file nhat ky - Core da ghi lai moi
+    tool call (muc 8.6), chi la chua co UI nao doc.
+    """
+    ctx = pane.ctx
+    dialog = _open(ctx, pane.frame if hasattr(pane, "frame") else None, "Nhật ký hoạt động", 620, 440)
+    if dialog is None:
+        return
+    dialog.add("ListBox", "calls", PositionX=12, PositionY=46, Width=596, Height=312,
+               StringItemList=uno.Any("[]string", ()))
+    dialog.add("FixedText", "status", PositionX=12, PositionY=364, Width=596, Height=32, MultiLine=True,
+               TextColor=theme.TEXT_MUTED, FontHeight=theme.SIZE_CAPTION, Label="Đang đọc…")
+    _button(dialog, "reload", 12, 402, 120, "Tải lại")
+    _button(dialog, "close", 518, 402, 90, "Đóng")
+
+    def load() -> None:
+        try:
+            base, _ = core.ensure()
+            calls = core.audit(base, limit=AUDIT_LIMIT)
+        except core.CoreError as exc:
+            _set_list(dialog, "calls", ())
+            dialog.set("status", Label="Không đọc được nhật ký: %s" % exc)
+            return
+        _set_list(dialog, "calls", audit_lines(calls))
+        failed = sum(1 for row in calls if not row.get("ok"))
+        dialog.set("status", Label="%d lượt gọi lệnh (mới nhất trước)%s" % (
+            len(calls), " · %d lượt lỗi" % failed if failed else ""))
+
+    def on_action(command: str, event) -> None:
+        if command == "reload":
+            load()
+        elif command == "close":
+            dialog.close()
+            DIALOGS.pop("Nhật ký hoạt động", None)
+
+    bind_actions(dialog, ("reload", "close"), on_action)
+    load()

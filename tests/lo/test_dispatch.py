@@ -126,6 +126,8 @@ class RoutingTest(unittest.TestCase):
                 setattr(module, entry, make())
             module.open_settings = lambda *a: self.calls.append("settings")
             module.open_check = lambda *a: self.calls.append("check")
+            module.open_skills = lambda *a: self.calls.append("skills")
+            module.open_audit = lambda *a: self.calls.append("audit")
             self.fakes[name] = module
             sys.modules["axiom." + name] = module
             setattr(axiom, name, module)
@@ -145,6 +147,11 @@ class RoutingTest(unittest.TestCase):
     def test_soat_tai_lieu_mo_dialog(self):
         self._dispatch("check")
         self.assertEqual(["check"], self.calls)
+
+    def test_ky_nang_va_nhat_ky_mo_dialog(self):
+        self._dispatch("skills")
+        self._dispatch("audit")
+        self.assertEqual(["skills", "audit"], self.calls)
 
     def test_askpane_va_settings_van_chay(self):
         self._dispatch("askpane")

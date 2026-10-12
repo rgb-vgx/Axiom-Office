@@ -458,6 +458,47 @@ class SessionSweepTests(unittest.TestCase):
         self.assertTrue(os.path.exists(kept))        # ten la nhung con moi -> giu
 
 
+class CoreListingTests(unittest.TestCase):
+    """Duong goi API danh sach cua Core (axiom.core): dung duong dan/tham so, va luon tra ve dung kieu.
+
+    Gia `core.call` chu khong dung server gia: o day kiem phan de sai nhat - tham so loc `app`, tran
+    `limit`, va chuyen payload rong (None) thanh dict/list de ben goi khong phai kiem None.
+    """
+
+    def setUp(self):
+        self.calls = []
+        self.result = {}
+        mock.patch.object(core, "call", self._call).start()
+        self.addCleanup(mock.patch.stopall)
+
+    def _call(self, base, method, path, body=None, **extra):
+        self.calls.append((base, method, path))
+        return self.result
+
+    def test_skill_listing_loc_theo_app(self):
+        self.result = {"skills": [{"name": "x"}]}
+        self.assertEqual({"skills": [{"name": "x"}]}, core.skill_listing("http://c", "wpp"))
+        self.assertEqual(("http://c", "GET", "/v1/skills?app=wpp"), self.calls[-1])
+        core.skill_listing("http://c")
+        self.assertEqual("/v1/skills", self.calls[-1][2])
+
+    def test_skill_listing_rong_van_tra_dict(self):
+        self.result = None
+        self.assertEqual({}, core.skill_listing("http://c"))
+
+    def test_reload_ky_nang(self):
+        core.reload_skills("http://c")
+        self.assertEqual(("http://c", "POST", "/v1/skills/reload"), self.calls[-1])
+
+    def test_audit_tran_va_run_id(self):
+        self.result = {"calls": [{"id": 1}]}
+        self.assertEqual([{"id": 1}], core.audit("http://c", run_id="r-1", limit=5))
+        self.assertEqual("/v1/audit?limit=5&runId=r-1", self.calls[-1][2])
+        self.result = {}
+        self.assertEqual([], core.audit("http://c"))
+        self.assertEqual("/v1/audit?limit=100", self.calls[-1][2])
+
+
 class CoreSseTests(unittest.TestCase):
     """Doc SSE that: server gia gui dung dinh dang cua Agent Core (event:/data: + ping)."""
 
