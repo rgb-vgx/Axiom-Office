@@ -1,17 +1,20 @@
-.PHONY: help test test-lo test-wps test-core check-gen package clean
+.PHONY: help test test-lo test-wps test-core test-mcp test-install core-build check-gen package clean
 
 help:
 	@echo "Danh sach dich:"
-	@echo "  help      - Hien thi danh sach dich kem mo ta"
-	@echo "  test      - Chay toan bo kiem thu (test-lo, test-wps, test-core)"
-	@echo "  test-lo   - Kiem thu extension LibreOffice"
-	@echo "  test-wps  - Kiem thu add-in WPS"
-	@echo "  test-core - Build Agent Core Go va kiem thu e2e"
-	@echo "  check-gen - Kiem tra file sinh khong lech nguon"
-	@echo "  package   - Dong goi tarball Linux"
-	@echo "  clean     - Xoa thu muc dist/"
+	@echo "  help        - Hien thi danh sach dich kem mo ta"
+	@echo "  test        - Chay toan bo kiem thu khong can app that"
+	@echo "  test-lo     - Kiem thu extension LibreOffice"
+	@echo "  test-wps    - Kiem thu add-in WPS"
+	@echo "  test-core   - Build Agent Core Go va kiem thu e2e"
+	@echo "  test-mcp    - Kiem thu MCP portable tren binary vua build"
+	@echo "  test-install- Kiem thu bo cai dat Linux (install.sh)"
+	@echo "  core-build  - Build binary Agent Core Go vao dist/core/"
+	@echo "  check-gen   - Kiem tra file sinh khong lech nguon"
+	@echo "  package     - Dong goi tarball Linux"
+	@echo "  clean       - Xoa thu muc dist/"
 
-test: test-lo test-wps test-core
+test: test-lo test-wps test-core test-mcp test-install
 
 test-lo:
 	python3 -m unittest discover -s tests/lo -v
@@ -20,12 +23,20 @@ test-wps:
 	python3 tests/wps/test_install_jsaddon.py
 	node --test tests/wps/test_addin_fake.mjs tests/wps/test_addin.mjs tests/wps/test_addin_et.mjs tests/wps/test_addin_wpp.mjs tests/wps/test_probe.mjs tests/wps/test_pane.mjs tests/wps/test_pane_theme.mjs
 
-test-core:
+core-build:
 	mkdir -p dist/core
 	cd core-go && CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o ../dist/core/axiom-core ./cmd/axiom-core
 	rm -rf dist/core/skills
 	cp -r skills dist/core/skills
+
+test-core: core-build
 	AXIOM_E2E_CORE_EXE=$(CURDIR)/dist/core/axiom-core python3 tests/core/test_core_e2e.py --only fake_bridge,guards,skills,confirm,memory,mcp,visual,setup,shutdown,anthropic,embeddings,summarize,cancel,mcp_http,verify
+
+test-mcp: core-build
+	python3 tests/mcp-host/test_mcp_portable.py $(CURDIR)/dist/core/axiom-core
+
+test-install:
+	python3 tests/linux/test_install_sh.py
 
 check-gen:
 	python3 scripts/generate_setup_catalog.py --check
