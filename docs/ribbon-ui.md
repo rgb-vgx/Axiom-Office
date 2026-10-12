@@ -27,36 +27,36 @@ Hai phiên làm việc song song theo tài liệu này:
 
 Cột "Nền tảng": W = Windows COM · L = WPS Linux (ribbon) · O = LibreOffice (menu).
 
-### Tab 1 — "Axiom Office" (việc thường ngày)
+**Quyết định 13/10/2026 (người dùng):** chỉ **một tab "Axiom Office"** — không mở tab thứ hai "Axiom · Quản lý".
+Màn hình quản trị vào nhóm **Quản lý** của chính tab đó; nút ít dùng gom vào menu **Khác ▾**. **Bỏ** hai nút
+*Dừng* và *Xuất PDF* (pane đã có *Dừng*; xuất PDF để AI làm qua lệnh `*.exportPdf`). *Hội thoại* và *Nhật ký
+hoạt động* **không lên ribbon** — chúng nằm trong menu **⋯** ở header của khung chat.
+
+### Tab "Axiom Office"
 
 | Nhãn | Nhóm | Control | Nền tảng | Đứng sau bằng gì | P |
 |---|---|---|---|---|---|
 | **Ask AI** | Trợ lý | button | W L O | pane Ask AI (đã có) | P0 |
-| **Dừng** | Trợ lý | button | W L | `POST /v1/runs/{id}/cancel`; pane đã có nút Dừng (`AskAiPane.cs:105`) | P2 |
 | **Nhìn tài liệu** | Kiểm tra | **toggle** | W ✅ · O ✅ · ~~L~~ | W: ghi HKCU `VisualQaEnabled`; **O: đã có** (checkbox trong "Cài đặt nâng cao", `dialogs.py:81`); **L: chặn** — xem §5.1. Core đọc lại **mỗi lượt** | P0 |
 | **Soát bố cục** | Kiểm tra | button | **W ✅** · **O ✅** · L | `wpp.checkLayout` — chỉ đọc, tất định, **0 token** | P0 |
 | **Soát bảng** | Kiểm tra | button | W (chưa bấm) · **O ✅** · L | `writer.checkTables` | P1 |
 | **Soát vùng dữ liệu** | Kiểm tra | button | W (chưa bấm) · **O ✅** · L | `et.checkRange` | P1 |
-| **Thiết lập…** | Truy cập nhanh | button | W L O | wizard 5 bước (đã có) | P0 |
-| **Trạng thái** | Truy cập nhanh | button | W L O | `GET /health` + session registry + cổng theo app | P0 |
-| **Mở nhật ký** | Truy cập nhanh | button | W L | `%LOCALAPPDATA%\AxiomOffice\{bridge,core}.log` | P1 |
+| **Bộ nhớ AI…** | Quản lý | button | W L O | `GET/POST/PATCH/DELETE /v1/memory`, `/{id}/history`, `/{id}/restore` | P0 |
+| **Kỹ năng…** | Quản lý | button | W L O | `GET /v1/skills?app=` + `POST /v1/skills/reload` | P1 |
+| **Thiết lập…** | Hệ thống | button | W L O | wizard 5 bước (đã có) | P0 |
+| **Trạng thái** | Hệ thống | button | W L O | `/health` của bridge **qua HTTP** + `/health` của Core đang chạy (không khởi động Core) + `sessions/{pid}.json` | P0 |
+| **Mở nhật ký** | Hệ thống | button | W L | `%LOCALAPPDATA%\AxiomOffice\{bridge,core}.log` | P1 |
+| Khác ▸ **Cài đặt nâng cao…** | Hệ thống | menu | W O | `SettingsForm` (đã có) | P0 |
+| Khác ▸ **Kiểm tra mô hình** | Hệ thống | menu | W O | `POST /v1/llm/test` với cấu hình **đã lưu** (apiKey rỗng = khoá đã lưu) | P1 |
+| Khác ▸ **Sao chép API URL** | Hệ thống | menu | W | công cụ gỡ rối | P1 |
+| Khác ▸ **Tắt Agent Core…** | Hệ thống | menu | W | `POST /v1/admin/shutdown` — **bắt buộc xác nhận** | P2 |
 
-### Tab 2 — "Axiom · Quản lý"
+### Trong khung chat (không phải ribbon)
 
-| Nhãn | Nhóm | Control | Nền tảng | Đứng sau bằng gì | P |
-|---|---|---|---|---|---|
-| **Thiết lập ban đầu** | Cấu hình AI | button | W O | wizard (đã có) | P0 |
-| **Cấu hình nâng cao…** | Cấu hình AI | button | W O | `SettingsForm` (đã có) | P0 |
-| **Kiểm tra mô hình** | Cấu hình AI | button | W O | `POST /v1/llm/test` | P1 |
-| **Kỹ năng…** | Kỹ năng | button | W L O | `GET /v1/skills?app=` + `POST /v1/skills/reload` | P1 |
-| **Bộ nhớ AI…** | Bộ nhớ | button | W L O | `GET/POST/PATCH/DELETE /v1/memory`, `/{id}/history`, `/{id}/restore` | P0 |
-| **Hội thoại…** | Dữ liệu | button | W O | `GET/DELETE /v1/conversations` | P1 |
-| **Nhật ký hoạt động…** | Dữ liệu | button | W O | `GET /v1/audit` | P1 |
-| **Trạng thái bridge** | Kết nối | button | W | `/health` + `sessions/{pid}.json` | P0 |
-| **Sao chép API URL** | Kết nối | button | W | (đã có — hạ khỏi vị trí nổi bật, đây là công cụ gỡ rối) | P1 |
-| **Tắt Core** | Kết nối | button | W | `POST /v1/admin/shutdown` — **bắt buộc xác nhận** | P2 |
-
-Tab thứ hai **chỉ mở khi đã có ≥3 màn hình thật**; chưa làm gì thì nó là tab rỗng.
+| Nhãn | Chỗ | Nền tảng | Đứng sau bằng gì |
+|---|---|---|---|
+| **Hội thoại trước…** | menu **⋯** ở header pane | W O | `GET/DELETE /v1/conversations`, `GET /v1/conversations/{id}`; mặc định lọc theo tài liệu đang mở |
+| **Nhật ký hoạt động…** | menu **⋯** ở header pane | W O | `GET /v1/audit` (100 dòng mới nhất, giờ máy) |
 
 ### Rút gọn theo nền tảng
 
@@ -99,14 +99,14 @@ Tab thứ hai **chỉ mở khi đã có ≥3 màn hình thật**; chưa làm gì
 | Đợt | Nội dung | Nghiệm thu |
 |---|---|---|
 | **1** | Toggle **Nhìn tài liệu** + ba nút **Soát** (bố cục/bảng/vùng) | Bấm ra kết quả ngay; toggle đổi được và lượt sau Core hành xử khác; ba nút Soát không tốn token · **LibreOffice ✅ 13/10** (mục menu *Soát tài liệu…*, §8) · **Windows ✅ PowerPoint 13/10** (Word/Excel/WPS Windows chưa bấm, §8) |
-| **2** | **Bộ nhớ AI…** — form 3 vùng (danh sách / chi tiết / lịch sử); phân biệt rõ **xoá mềm ≠ khôi phục ≠ xoá cứng** | Sửa, ghim, đặt hạn, xoá mềm, khôi phục, xoá cứng đều chạy; lọc được theo phạm vi user/document · **LibreOffice: mới 1/3** — dialog *Ghi nhớ* có **đọc / lọc / xoá mềm / tải lại**; thiếu sửa, ghim, hạn, khôi phục, xoá cứng (§3) |
-| **3** | **Kỹ năng…**, **Nhật ký hoạt động…**, **Hội thoại…** → mở tab thứ hai | Thấy đúng skill của app đang mở; nạp lại được; audit đọc được · **LibreOffice ✅ 13/10** cho *Kỹ năng…* + *Nhật ký hoạt động…* (§8) · **Hội thoại…**: chưa (route `GET /v1/conversations` có sẵn) |
-| **4** | Nút theo từng app, xuất PDF, lối tắt soạn thảo đã kiểm thử | Chỉ hiện nút hợp với app |
+| **2** | **Bộ nhớ AI…** — form 3 vùng (danh sách / chi tiết / lịch sử); phân biệt rõ **xoá mềm ≠ khôi phục ≠ xoá cứng** | Sửa, ghim, đặt hạn, xoá mềm, khôi phục, xoá cứng đều chạy; lọc được theo phạm vi user/document · **LibreOffice: mới 1/3** — dialog *Ghi nhớ* có **đọc / lọc / xoá mềm / tải lại**; thiếu sửa, ghim, hạn, khôi phục, xoá cứng (§3) · **Windows: viết xong 13/10** (lọc phạm vi + *Xoá tạm* / *Xoá vĩnh viễn…* theo phạm vi; chưa bấm thử) |
+| **3** | **Kỹ năng…** (ribbon), **Nhật ký hoạt động…** + **Hội thoại…** (menu ⋯ của pane) — **không** mở tab thứ hai (§2) | Thấy đúng skill của app đang mở; nạp lại được; audit đọc được · **LibreOffice ✅ 13/10** cho *Kỹ năng…* + *Nhật ký hoạt động…* (§8) · **Hội thoại…**: chưa (route `GET /v1/conversations` có sẵn) · **Windows: viết xong 13/10**, gọi thử API thật OK, chưa bấm trong Office |
+| **4** | ~~Nút theo từng app, xuất PDF, lối tắt soạn thảo~~ — **bỏ** 13/10: soát theo app đã làm ở đợt 1 (`getVisible`); xuất PDF người dùng không muốn trên ribbon; "lối tắt soạn thảo" chưa ai định nghĩa là nút nào (nguyên tắc 3) | — |
 
-**Windows — ghi chú cho đợt 2:** `src/AxiomOffice/Ai/MemoryForm.cs` **đã có** đủ sửa, ghim, hạn dùng, xoá mềm,
-khôi phục, lịch sử, xoá toàn bộ, và mở được từ *Cài đặt nâng cao…*. Đợt 2 trên Windows là **đưa nó lên ribbon** và
-bổ sung phần còn thiếu (lọc theo phạm vi user/document, tách rõ xoá mềm ≠ xoá cứng), không viết form mới. Mục 3
-("còn chưa UI nào gọi" `PATCH`/`restore`/`history`) chỉ đúng với LibreOffice.
+**Windows — đợt 2:** dùng lại `src/AxiomOffice/Ai/MemoryForm.cs` (đã có sửa, ghim, hạn dùng, khôi phục, lịch sử),
+thêm lọc theo phạm vi và tách *Xoá tạm* (khôi phục được 30 ngày) khỏi *Xoá vĩnh viễn…*. Core **không có xoá cứng
+từng mục** — chỉ `DELETE /v1/memory?scope=all|user|document&confirm=true` — nên *Xoá vĩnh viễn…* xoá theo phạm vi
+đang lọc và nói rõ điều đó trong hộp xác nhận (không vẽ nút xoá cứng từng mục khi API không có).
 
 Cổng kiểm mỗi đợt: `make lint`, `make check-gen`, `make test` (Linux) · `scripts\build.ps1` +
 `scripts\package.ps1` và CI job `windows` (Windows).
@@ -166,3 +166,4 @@ handler trong tiến trình (như `CommandDispatcher.Execute` ở Windows) — n
 | 13/10/2026 | LibreOffice | Hai mục menu **Kỹ năng…** (`org.axiomoffice.bridge:skills`) và **Nhật ký hoạt động…** (`:audit`): `Addons.xcu` → `dispatch.ACTIONS` → `dialogs.open_skills` / `open_audit`. `core.py` thêm `skill_listing` (trả **cả payload**, không chỉ `skills`, để thư mục kỹ năng nạp lỗi không bị im lặng bỏ qua), `reload_skills`, `audit`. Nút *Nạp lại* gọi `POST /v1/skills/reload` (đọc lại thư mục, **không** khởi động lại Core); nhật ký đọc 100 dòng mới nhất và đổi giờ UTC của Core sang **giờ máy**. Spec mới: `SkillLinesTest`, `SkillStatusTest`, `AuditLinesTest`, `ClockTest` (`tests/lo/test_dialogs.py`), `CoreListingTests` (`tests/lo/test_chat.py`), và một ca dispatch cho hai URL. |
 | 13/10/2026 | LibreOffice | `tests/live/open_dialogs.py` — probe **không** phải unittest: dựng LibreOffice thật trong profile/XDG tạm, cài `.oxt`, gửi **đúng URL của menu** qua UNO rồi **chụp ảnh màn hình** (`xwd` + `ffmpeg`). Cần vì dialog ở đây là `awt.ChildWindow` — cửa sổ con **không có cửa sổ X riêng**, nên `xdotool search --name` không tìm được như với wizard. Đã chạy và xem ảnh: *Soát tài liệu* (bảng dựng thật bằng `writer.insertTable` → *"Có ô trống"*), *Kỹ năng* (3 kỹ năng, "nguồn: sẵn có"), *Nhật ký* (nhánh rỗng). Ảnh ở `/tmp/axiom-dialogs`. |
 | 13/10/2026 | Windows COM | Ribbon tab **Axiom Office** sắp lại thành *Trợ lý / Kiểm tra / Truy cập nhanh* (`Ribbon/RibbonUi.cs`). **Nhìn tài liệu** = `toggleButton`: ghi HKCU `VisualQaEnabled`, ghi hỏng thì vẽ lại theo HKCU; luồng nền hỏi `GET /v1/setup` lấy trạng thái thật của Core (biến môi trường `AXIOM_VISUAL_QA` đè được HKCU → nút theo Core + báo); mờ khi `CoreEnabled=0`. Ba nút **Soát** hiện theo app (`getVisible`), gọi `CommandDispatcher.Execute` ở **luồng nền**, kết quả đổi sang tiếng Việt (`Ribbon/RibbonChecks.cs`, tối đa 15 dòng). Đã bấm thật trên **PowerPoint**: toggle ghi HKCU và Core báo `visualQaEnabled=True` khớp; *Soát bố cục* trên bài 3 slide ra kết quả ~0,5s, 0 lượt gọi model. Kèm sửa `HostProbe` (cửa sổ PowerPoint không có `Visible` làm mất cả tên cửa sổ trong log). Chưa bấm: Word, Excel, WPS Windows. |
+| 13/10/2026 | Windows COM | Theo quyết định **một tab** (§2): thêm nhóm **Quản lý** (*Bộ nhớ AI…* = `MemoryForm` có lọc phạm vi + xoá tạm/vĩnh viễn; *Kỹ năng…* = `SkillsForm`, `Ai/AdminForms.cs`) và nhóm **Hệ thống** (*Trạng thái* kiểm thật bridge/Core/phiên ở luồng nền; menu *Khác*: Cài đặt nâng cao, Kiểm tra mô hình, Sao chép API URL, Tắt Agent Core có xác nhận). *Hội thoại trước…* / *Nhật ký hoạt động…* vào menu **⋯** ở header pane (`ConversationsForm`, `AuditForm`). Client mới ở `Ai/CoreAdmin.cs`. Đã gọi thử mọi API đọc trên Core thật (3 kỹ năng wpp, audit, 3 hội thoại, lọc ghi nhớ user/document); **chưa bấm trong Office**. |

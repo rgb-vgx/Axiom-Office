@@ -5,6 +5,21 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Ribbon Windows: nhóm Quản lý + Hệ thống trên **một tab duy nhất**; Hội thoại / Nhật ký vào khung chat (13/10/2026)
+- Chốt với người dùng: không mở tab thứ hai "Axiom · Quản lý"; bỏ nút *Dừng* (pane đã có) và *Xuất PDF*
+- **Bộ nhớ AI…** (ribbon): `MemoryForm` thêm ô lọc phạm vi (*Mọi phạm vi* / *Chung* / *Tài liệu đang mở*) và tách
+  **Xoá tạm** (khôi phục được 30 ngày) khỏi **Xoá vĩnh viễn…**. Core không có xoá cứng từng mục nên xoá vĩnh viễn
+  đi theo phạm vi đang lọc (`DELETE /v1/memory?scope=…&confirm=true`), hộp xác nhận nói rõ phạm vi
+- **Kỹ năng…** (ribbon, `SkillsForm`): kỹ năng Core thấy cho app đang mở, thư mục nạp lỗi hiện thành dòng ⚠, nút
+  *Nạp lại* (`POST /v1/skills/reload`) — cùng nội dung với dialog LibreOffice
+- **Trạng thái**: kiểm thật từng tầng ở luồng nền — `/health` của bridge **qua HTTP**, `/health` của Core đang
+  chạy (không khởi động Core chỉ để xem), các phiên Office còn sống trong `sessions/`
+- Menu **Khác**: *Cài đặt nâng cao…*, *Kiểm tra mô hình* (`POST /v1/llm/test` với cấu hình đã lưu), *Sao chép API
+  URL*, *Tắt Agent Core…* (hỏi xác nhận; `POST /v1/admin/shutdown` tới Core đang chạy, quên base URL đã nhớ)
+- Khung chat: nút **⋯** ở header mở *Hội thoại trước…* (`ConversationsForm`: xem, xoá, mặc định lọc theo tài liệu
+  đang mở) và *Nhật ký hoạt động…* (`AuditForm`: 100 lệnh gần nhất, giờ máy, dòng lỗi tô đỏ)
+- Client Core mới gom ở `Ai/CoreAdmin.cs`; bỏ `PurgeMemories()` không tham số (thay bằng bản có phạm vi)
+
 ### Added — Ribbon add-in COM (Windows), đợt 1 của `docs/ribbon-ui.md`: "Nhìn tài liệu" + ba nút Soát (13/10/2026)
 - Tab **Axiom Office** sắp lại thành ba nhóm **Trợ lý** / **Kiểm tra** / **Truy cập nhanh**, nhãn tiếng Việt theo
   kết quả người dùng muốn; *Cài đặt nâng cao…* và *Sao chép API URL* hạ xuống nút nhỏ (chuyển sang tab

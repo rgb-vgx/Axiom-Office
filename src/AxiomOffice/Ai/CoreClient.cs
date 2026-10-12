@@ -802,11 +802,6 @@ namespace AxiomOffice.Ai
             return result == null ? null : Items(result, "history");
         }
 
-        public bool PurgeMemories(out string error)
-        {
-            return MemoryCall("DELETE", "/v1/memory?scope=all&confirm=true", null, out error) != null;
-        }
-
         private Dictionary<string, object> MemoryCall(string method, string path, Dictionary<string, object> body, out string error)
         {
             string baseUrl = EnsureBaseUrl();

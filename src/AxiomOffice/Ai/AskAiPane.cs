@@ -27,6 +27,7 @@ namespace AxiomOffice.Ai
         private readonly SendButton _send;
         private readonly Label _headerSubtitle;
         private readonly LinkLabel _settingsLink;
+        private readonly LinkLabel _moreLink;
         private readonly Label _status;
         private readonly AccentDot _busyDot;
         private readonly LinkLabel _insertLink;
@@ -124,11 +125,15 @@ namespace AxiomOffice.Ai
             // New_arch.md mục 9.2: link ở header (trước đây ở footer, người dùng không thấy trong Word).
             _newChatLink = PaneTheme.MakeLink("Trò chuyện mới", PaneTheme.Caption);
             _newChatLink.AccessibleName = "Bắt đầu cuộc trò chuyện mới cho tài liệu này";
+            // Hội thoại trước / nhật ký hoạt động: thuộc về khung chat, không đặt trên ribbon (docs/ribbon-ui.md).
+            _moreLink = PaneTheme.MakeLink("⋯", PaneTheme.Caption);
+            _moreLink.AccessibleName = "Hội thoại trước và nhật ký hoạt động";
             header.Controls.Add(dot);
             header.Controls.Add(title);
             header.Controls.Add(_headerSubtitle);
             header.Controls.Add(_settingsLink);
             header.Controls.Add(_newChatLink);
+            header.Controls.Add(_moreLink);
             header.Resize += delegate { LayoutHeader(header); };
 
             Controls.Add(_chat);
@@ -148,6 +153,7 @@ namespace AxiomOffice.Ai
             _newChatLink.LinkClicked += delegate { StartNewConversation(); };
             _undoLink.LinkClicked += delegate { UndoLastRun(); };
             _settingsLink.LinkClicked += delegate { OpenSetup(); };
+            _moreLink.LinkClicked += delegate { ShowMoreMenu(); };
             _composer.Resize += delegate { LayoutComposer(); };
             Load += delegate
             {
@@ -186,8 +192,9 @@ namespace AxiomOffice.Ai
         {
             int padX = PaneTheme.Px(PaneTheme.PadX);
             _settingsLink.Location = new Point(header.ClientSize.Width - padX - _settingsLink.Width, (header.ClientSize.Height - _settingsLink.Height) / 2);
-            _newChatLink.Location = new Point(_settingsLink.Left - PaneTheme.Px(12) - _newChatLink.Width, _settingsLink.Top);
-            int right = _newChatLink.Visible ? _newChatLink.Left : _settingsLink.Left;
+            _moreLink.Location = new Point(_settingsLink.Left - PaneTheme.Px(10) - _moreLink.Width, _settingsLink.Top);
+            _newChatLink.Location = new Point(_moreLink.Left - PaneTheme.Px(10) - _newChatLink.Width, _settingsLink.Top);
+            int right = _newChatLink.Visible ? _newChatLink.Left : _moreLink.Left;
             int left = PaneTheme.Px(28);
             _headerSubtitle.SetBounds(left, PaneTheme.Px(26), Math.Max(PaneTheme.Px(40), right - PaneTheme.Px(8) - left), PaneTheme.Px(16));
         }
@@ -550,7 +557,7 @@ namespace AxiomOffice.Ai
 
         // Duong dan tai lieu chuan hoa (giong Orchestrator.DocumentKey ben Core) de tra hoi thoai cu.
         // Doc COM tu worker thread nen phai qua ComGate nhu moi noi khac trong add-in.
-        private static string DocumentKey(Connect host)
+        internal static string DocumentKey(Connect host)
         {
             string key = null;
             try
@@ -935,6 +942,29 @@ namespace AxiomOffice.Ai
             _stopLink.Visible = false;
             SetStatus("Đang dừng…", false);
             run.Cancel();
+        }
+
+        // Menu "⋯" ở header: xem lại hội thoại cũ và các lệnh AI đã gọi vào tài liệu.
+        private void ShowMoreMenu()
+        {
+            var menu = new ContextMenuStrip { Font = PaneTheme.Body };
+            menu.Items.Add("Hội thoại trước…", null, delegate
+            {
+                Connect host = CurrentHost;
+                using (var form = new ConversationsForm(host != null ? DocumentKey(host) : null))
+                {
+                    form.ShowDialog(this);
+                }
+            });
+            menu.Items.Add("Nhật ký hoạt động…", null, delegate
+            {
+                using (var form = new AuditForm())
+                {
+                    form.ShowDialog(this);
+                }
+            });
+            menu.Closed += delegate { BeginInvoke((Action)menu.Dispose); };
+            menu.Show(_moreLink, new Point(0, _moreLink.Height));
         }
 
         // Wizard thiet lap (cung noi dung voi ban Linux): nguoi dung khong chuyen cung lam duoc.

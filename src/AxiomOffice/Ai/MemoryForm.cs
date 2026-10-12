@@ -20,19 +20,36 @@ namespace AxiomOffice.Ai
         private readonly Button _delete;
         private readonly Button _restore;
         private readonly Button _history;
+        private readonly ComboBox _scope;
+        private readonly string _documentKey;
+
+        // Thứ tự mục trong _scope.
+        private const int ScopeAll = 0;
+        private const int ScopeUser = 1;
+        private const int ScopeDocument = 2;
 
         public MemoryForm()
+            : this(null)
         {
-            Text = "Axiom Office - Quản lý ghi nhớ";
+        }
+
+        // documentKey: khoá tài liệu đang mở (như Core tính) để lọc "Tài liệu đang mở"; null = không có.
+        public MemoryForm(string documentKey)
+        {
+            _documentKey = documentKey;
+            Text = "Axiom Office - Bộ nhớ AI";
             StartPosition = FormStartPosition.CenterParent;
             MinimizeBox = false;
             ClientSize = new Size(760, 460);
             MinimumSize = new Size(640, 360);
             Font = SystemFonts.MessageBoxFont;
 
-            _search = new TextBox { Left = 12, Top = 12, Width = 360, Anchor = AnchorStyles.Top | AnchorStyles.Left };
-            var find = new Button { Text = "Tìm", Left = 380, Top = 10, Width = 70 };
-            _showDeleted = new CheckBox { Text = "Hiện cả ghi nhớ đã xoá", Left = 462, Top = 13, Width = 200 };
+            _search = new TextBox { Left = 12, Top = 12, Width = 230, Anchor = AnchorStyles.Top | AnchorStyles.Left };
+            var find = new Button { Text = "Tìm", Left = 250, Top = 10, Width = 60 };
+            _scope = new ComboBox { Left = 320, Top = 11, Width = 170, DropDownStyle = ComboBoxStyle.DropDownList };
+            _scope.Items.AddRange(new object[] { "Mọi phạm vi", "Chung (mọi tài liệu)", "Tài liệu đang mở" });
+            _scope.SelectedIndex = ScopeAll;
+            _showDeleted = new CheckBox { Text = "Hiện cả ghi nhớ đã xoá", Left = 500, Top = 13, Width = 200 };
 
             _list = new ListView
             {
@@ -58,10 +75,10 @@ namespace AxiomOffice.Ai
             _edit = MakeButton("Sửa…", x, 76);
             _pin = MakeButton("Ghim / bỏ ghim", x, 110);
             _expires = MakeButton("Hạn dùng…", x, 144);
-            _delete = MakeButton("Xoá", x, 178);
+            _delete = MakeButton("Xoá tạm", x, 178);
             _restore = MakeButton("Khôi phục", x, 212);
             _history = MakeButton("Lịch sử…", x, 246);
-            var purge = MakeButton("Xoá toàn bộ…", x, 300);
+            var purge = MakeButton("Xoá vĩnh viễn…", x, 300);
             var close = MakeButton("Đóng", x, 380);
             close.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
 
@@ -75,12 +92,13 @@ namespace AxiomOffice.Ai
                 Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right,
             };
 
-            Controls.AddRange(new Control[] { _search, find, _showDeleted, _list, add, _edit, _pin, _expires, _delete, _restore, _history, purge, close, _status });
+            Controls.AddRange(new Control[] { _search, find, _scope, _showDeleted, _list, add, _edit, _pin, _expires, _delete, _restore, _history, purge, close, _status });
             AcceptButton = find;
             CancelButton = close;
 
             find.Click += delegate { Reload(); };
             _showDeleted.CheckedChanged += delegate { Reload(); };
+            _scope.SelectedIndexChanged += delegate { Reload(); };
             _list.SelectedIndexChanged += delegate { UpdateButtons(); };
             _list.DoubleClick += delegate { EditSelected(); };
             add.Click += delegate { AddMemory(); };
@@ -114,7 +132,18 @@ namespace AxiomOffice.Ai
         {
             string error;
             Cursor = Cursors.WaitCursor;
-            List<Dictionary<string, object>> items = CoreClient.Instance.ListMemories(_search.Text, null, _showDeleted.Checked, out error);
+            List<Dictionary<string, object>> items;
+            if (_scope.SelectedIndex == ScopeDocument && string.IsNullOrEmpty(_documentKey))
+            {
+                items = null;
+                error = "chưa có tài liệu đã lưu đang mở (tài liệu mới chưa lưu thì chưa có ghi nhớ riêng)";
+            }
+            else
+            {
+                string scope = _scope.SelectedIndex == ScopeUser ? "user" : _scope.SelectedIndex == ScopeDocument ? "document" : null;
+                string scopeKey = _scope.SelectedIndex == ScopeDocument ? _documentKey : null;
+                items = CoreClient.Instance.ListMemories(_search.Text, scope, scopeKey, _showDeleted.Checked, out error);
+            }
             Cursor = Cursors.Default;
             _list.BeginUpdate();
             _list.Items.Clear();
@@ -251,7 +280,8 @@ namespace AxiomOffice.Ai
                 return;
             }
             string error;
-            Report(CoreClient.Instance.DeleteMemory(Field(item, "id"), out error), "Đã xoá (khôi phục được trong 30 ngày).", error);
+            Report(CoreClient.Instance.DeleteMemory(Field(item, "id"), out error),
+                "Đã xoá tạm: AI không dùng nữa; bật \"Hiện cả ghi nhớ đã xoá\" để khôi phục trong 30 ngày.", error);
         }
 
         private void RestoreSelected()
@@ -292,17 +322,36 @@ namespace AxiomOffice.Ai
             MessageBox.Show(this, lines.Count == 0 ? "(chưa có)" : string.Join(Environment.NewLine, lines.ToArray()), "Lịch sử ghi nhớ", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
+        // Xoá cứng: Core chỉ cho xoá theo cả phạm vi (DELETE /v1/memory?scope=…&confirm=true), không xoá cứng từng mục.
         private void PurgeAll()
         {
+            string scope;
+            string what;
+            if (_scope.SelectedIndex == ScopeUser)
+            {
+                scope = "user";
+                what = "mọi ghi nhớ CHUNG";
+            }
+            else if (_scope.SelectedIndex == ScopeDocument)
+            {
+                scope = "document";
+                what = "mọi ghi nhớ RIÊNG THEO TÀI LIỆU (của mọi tài liệu, không chỉ tài liệu đang mở)";
+            }
+            else
+            {
+                scope = "all";
+                what = "TOÀN BỘ ghi nhớ của AI";
+            }
             DialogResult answer = MessageBox.Show(this,
-                "Xoá VĨNH VIỄN toàn bộ ghi nhớ của AI (không khôi phục được)?",
-                "Xoá toàn bộ ghi nhớ", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
+                "Xoá VĨNH VIỄN " + what + "?\n\nKhác với \"Xoá tạm\": không khôi phục được, kể cả ghi nhớ đã xoá tạm.\n"
+                + "Muốn chọn phạm vi khác, đổi ô lọc phạm vi trước khi bấm.",
+                "Xoá vĩnh viễn ghi nhớ", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
             if (answer != DialogResult.Yes)
             {
                 return;
             }
             string error;
-            Report(CoreClient.Instance.PurgeMemories(out error), "Đã xoá toàn bộ ghi nhớ.", error);
+            Report(CoreClient.Instance.PurgeMemories(scope, out error), "Đã xoá vĩnh viễn " + what + ".", error);
         }
 
         private void Report(bool ok, string message, string error)
