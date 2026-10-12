@@ -60,6 +60,22 @@ app nào đang chạy (`Application.Name`) và chỉ khai báo lệnh của app 
   `Application.Version` = `12.0` cả ba; `Application.Build` = `11723` (WPP trả `11.1.0.11723`).
 - `Application` trong cả ba app đều có `CommandBars.ExecuteMso`, `CreateTaskPane`, `FileSystem`
   (`existsSync`/`ReadFile`/`WriteFile`/... — dùng được để tự kiểm file xuất ra).
+- **`Application.CreateTaskPane(url)` chạy được** (đo 12/10/2026, ET, biến thể A): trả về object task pane
+  (`Visible` = `false`), đặt `Visible = true` là xong (`ok`, đọc lại `true`). URL tuyệt đối **có query vẫn nạp**
+  (`GET /addin/pane.html?app=et` → 200), URL tương đối, dạng hai tham số (`url, title`) và dạng object đều không lỗi.
+  `CreateTaskPane.length` = 0 và `String(...)` = `function CreateTaskPane() { [native code] }`; gọi **0 tham số** ném
+  `An signal occurred during the jsapi EXECUTE call.`; đặt `Visible` bằng **chuỗi** ném `参数类型错误(第0个).`
+  ⇒ lỗi `Error: arguments error` khi bấm nút Ask AI **không** đến từ lời gọi này.
+- Pane do `CreateTaskPane` tạo **có** nạp trang (CEF GET trang pane, 200) nhưng script trong trang pane **không báo
+  về** server probe — chưa rõ nguyên nhân, cần đo tiếp (nghi: script trong pane không chạy, hoặc pane không được
+  render dưới Xvfb).
+- Danh sách key liên quan task pane trên `Application`: `CreateTaskPane`, `GetTaskPane`,
+  `DisplayDocumentActionTaskPane`, `DisplayXMLSourcePane`, `DisplayDocumentInformationPanel`. `window.wps` **chính là**
+  `window.Application` (`wpsIsApplication` = true), `IsSandboxed` = `false`.
+- Đo được **song song với WPS đang mở của người dùng**: kênh JSAPI dùng pipe `/tmp/JSAPI_*{guid}` với GUID
+  **sinh theo từng phiên**, nên một tiến trình WPS thứ hai (HOME + DISPLAY riêng) không đụng phiên đang mở.
+  (Lệnh `probe_run.py --probe <tên>` từng dùng cho các phép đo dưới đây **không còn trong repo**; `probe.js` chỉ
+  còn là bản báo cáo cố định, không phải công cụ chạy JS tùy ý — muốn đo lại thì phải tự dựng lại lối vào.)
 
 ### ET (Spreadsheets) — khác Writer ở đâu
 
@@ -104,6 +120,31 @@ app nào đang chạy (`Application.Name`) và chỉ khai báo lệnh của app 
 | Xoá slide | `Slide.Delete()` chạy được | |
 | Lưu | `Presentation.Save()`, `Presentation.SaveAs(path)` **ghi file thật** (`.pptx` 48 KB) | |
 | Sổ mới/mở | `Presentations.Add()`, `Presentations.Open(path)`; `Application.ActivePresentation` | `Application.Documents` không có |
+| Đóng bài | **`Presentation.Close()` không tham số** | `Close(false)` bị từ chối: `参数太多.` — xem mục dưới |
+| Đóng sổ (ET) | `Workbook.Close(false)` chạy được | ET **nhận** tham số, WPP **không** — hai app khác arity |
+| Còn bẩn? | `Presentation.Saved` = **-1** khi đã lưu, `0` khi còn thay đổi | như VBA |
+
+### `wpp.closeAll` từng đóng 0 bài vì WPP từ chối tham số của `Close` (đo 12/10/2026)
+
+Triệu chứng: lượt live ba app để lại đúng một phép kiểm đỏ — `wpp.closeAll` trả `{closed: 0, rescued: []}`
+trong khi đang có bài mở, và lệnh vẫn báo `ok: true`.
+
+Cách khoanh vùng (theo thứ tự, mỗi bước loại một giả thuyết):
+
+1. **"WPS từ chối đóng bài cuối cùng"** → mở **hai** bài rồi gọi lại: vẫn `closed: 0` ⇒ sai.
+2. **"Vòng lặp không chạy (`Presentations.Count` = 0)"** → thêm trường chẩn đoán tạm vào handler (đã khôi phục
+   nguyên trạng, không commit): `dbgLen = 2` ⇒ vòng lặp **có** chạy, hai bài thật. `Saved` = `-1` cả hai ⇒
+   `rescued: []` là đúng, không phải nhánh cứu bài hỏng.
+3. **Nguyên nhân thật**: `dbgErr = 参数太多.` ("quá nhiều tham số") — `Presentation.Close(false)` **bị WPP từ
+   chối vì có tham số**. `closed` chỉ tăng khi `Close` không ném lỗi, mà lỗi thì bị `catch (e3) {}` nuốt, nên
+   lệnh báo thành công trong khi chẳng đóng gì.
+4. **Đường đi đúng**: `pres.Close()` **không tham số** — đo được `dbgNoArg = 2`, không lỗi, và
+   `Presentations.Count` về **0** (đóng thật, không phải chỉ "không ném lỗi").
+5. ET đối xứng mà **khác**: `Workbook.Close(false)` chạy được (`et.closeAll` xanh) ⇒ đừng suy từ app này sang
+   app kia.
+
+Bài học chung: **một `catch` rỗng biến lỗi arity thành "thành công"**. Với add-in này, "không ném lỗi" không
+phải bằng chứng đã làm xong việc — phải kiểm trạng thái sau đó (`Presentations.Count`, file trên đĩa).
 
 ### `Application.FileSystem`: đọc/ghi file (đo 11/10/2026, byte đã biết)
 
@@ -150,6 +191,38 @@ Gán chuỗi trông-như-số (`"42"`) hoặc trông-như-ngày (`"01/01"`) vào
   `addons/cef/` (trình duyệt nhúng chạy add-in).
 - HOME mới tinh: lần chạy `wps` đầu tiên tạo `~/.local/share/Kingsoft/office6/...`, `~/.local/share/Kingsoft/WPS Cloud
   Files/` và `~/.config/Kingsoft/Office.conf`.
+
+## Bridge: vòng poll, và vì sao một lệnh dài làm bridge báo "mất kết nối" oan (đo 12/10/2026)
+
+Add-in **không listen được** (CEF Chrome 87), nên Core giữ bridge còn add-in **poll**: mỗi lời gọi
+`/wps/poll` là một request dài mà Core giữ tới **20 giây** nếu chưa có lệnh (`DefaultPollSeconds`,
+`wpsbridge.go:30`). "Còn sống" vì thế là một phép đo **thời gian**, không phải một kết nối:
+
+```
+Connected() = busyLocked() || (everPoll && now - lastPoll <= DisconnectSeconds)   // wpsbridge.go:312-322
+```
+
+- `DisconnectSeconds` mặc định của sản phẩm là **45** (`wpsbridge.go:32`); tầng e2e dùng 4 giây
+  (`tests/wps/test_wps_bridge_e2e.py:92`) vì mọi lệnh ở đó đều nhanh.
+- `busyLocked()` **chỉ che khi job còn nằm trong `waiting`**, mà job bị bỏ khỏi `waiting` **ngay lúc kết quả
+  về** (`wpsbridge.go:423`). Nên `busy` thôi che đúng vào lúc lệnh vừa xong.
+
+**Hệ quả đo được**: add-in **đơn luồng** — trong lúc nó đang chạy một lệnh thì nó **không poll được**. Với
+`et.exportPdf` đo được **11 giây** (16:40:11 → 16:40:22), `lastPoll` đã cũ hơn ngưỡng 4 giây ngay khi lệnh
+xong, nên lệnh kế bị từ chối **trước khi gửi**:
+`WPS add-in is not connected: open a document in WPS to connect the add-in` (`wpsbridge.go:859-861`).
+Lượt đo có probe theo dõi tiến trình cho thấy ET **ALIVE liên tục** trong suốt thời gian đó — app không hề chết.
+
+Đây là **cấu hình quá chặt của tầng test**, không phải lỗi app: tầng live nay truyền ngưỡng mặc định của sản
+phẩm (45 giây) qua `extra_env`. Nhưng phép đo **cũng phơi ra một lỗi thật**: với ngưỡng 45 giây, một lệnh chạy
+quá 45 giây vẫn làm mọi người gọi khác thấy bridge mất kết nối, và vì `StartSessionLoop` **xoá file session**
+khi `!Connected()` (`wpsbridge.go:984`), pane giữa chừng báo "chưa mở tài liệu" rồi lại thấy lại. Hướng sửa:
+coi "add-in vừa trả kết quả" là bằng chứng còn sống (làm mới mốc hoạt động khi giao kết quả) — đã ghi thành
+việc riêng (T8b trong hàng đợi tái cấu trúc).
+
+Bài học cho người viết test live: một phép kiểm *mong đợi thất bại* sẽ xanh **kể cả khi** bridge đã mất kết
+nối. Sau mỗi lệnh dài phải có một phép kiểm **khẳng định bridge còn sống**, và phép kiểm lệnh sai phải đòi
+lỗi vì **tên lệnh sai**, không phải vì mất kết nối.
 
 ## Theo công cụ `wpsjs` của WPS (bản online chưa thử)
 
