@@ -222,7 +222,8 @@ type Job struct {
 type Bridge struct {
 	opts Options
 
-	mu           sync.Mutex
+	mu sync.Mutex
+	// lastPoll la moc song cuoi: luot poll gan nhat hoac ket qua vua tra.
 	lastPoll     time.Time
 	everPoll     bool
 	app          string
@@ -421,6 +422,12 @@ func (b *Bridge) Complete(id string, reply map[string]any) bool {
 	job, ok := b.waiting[id]
 	if ok {
 		delete(b.waiting, id)
+		// Add-in vua tra ket qua = bang chung con song moi hon lan poll cuoi. Add-in chay don
+		// luong nen trong luc chay lenh dai no khong poll duoc, va Complete vua bo job khoi
+		// waiting (busyLocked het hieu luc ngay): khong lam moi moc nay thi mot lenh dai hon
+		// DisconnectSeconds lam nguoi goi khac bi bao "mat ket noi" ngay sau khi add-in vua
+		// chung minh no dang song.
+		b.lastPoll = time.Now()
 	}
 	b.mu.Unlock()
 	if !ok {

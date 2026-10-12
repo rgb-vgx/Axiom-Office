@@ -361,6 +361,53 @@ func TestAppFollowsAddinPoll(t *testing.T) {
 	}
 }
 
+// Add-in vua tra ket qua la bang chung con song: lenh dai hon DisconnectSeconds lam lastPoll cu di,
+// Complete xoa job khoi waiting (busyLocked het hieu luc ngay) nen phai lam moi moc song, neu khong
+// nguoi goi ke tiep bi bao "mat ket noi" ngay sau khi add-in vua chung minh no dang song.
+func TestCompleteRefreshesLiveness(t *testing.T) {
+	b := testBridge(t, func(o *Options) { o.DisconnectSeconds = 1; o.CmdWaitSeconds = 5 })
+	b.recordPoll(map[string]any{})
+	replyCh := make(chan map[string]any, 1)
+	go func() {
+		reply, _ := b.Enqueue("writer.getText", map[string]any{})
+		replyCh <- reply
+	}()
+	jobs := takeJobsWithin(t, b, 3*time.Second)
+	if len(jobs) != 1 {
+		t.Fatalf("khong lay duoc job: %+v", jobs)
+	}
+	// Lenh dang chay: qua DisconnectSeconds (1s) nhung van connected nho busyLocked.
+	time.Sleep(1500 * time.Millisecond)
+	if !b.Connected() {
+		t.Fatal("dang chay lenh thi phai coi la con ket noi (add-in khong the vua chay vua poll)")
+	}
+	if !b.Complete(jobs[0].ID, map[string]any{"ok": true, "result": map[string]any{"n": 1}}) {
+		t.Fatal("Complete lan dau phai true")
+	}
+	// Ngay sau Complete, khong poll them lan nao: van phai connected.
+	if !b.Connected() {
+		t.Fatal("add-in vua tra ket qua thi phai coi la con ket noi, khong duoc bao mat ket noi")
+	}
+	if _, _, _, connected := b.Snapshot(); !connected {
+		t.Fatal("Snapshot sau Complete phai connected (duong /commands, /session dung chung cong thuc)")
+	}
+	select {
+	case <-replyCh:
+	case <-time.After(3 * time.Second):
+		t.Fatal("Enqueue khong nhan duoc ket qua")
+	}
+	// Chot canh: id la khong phai bang chung con song, khong duoc lam moi moc song.
+	b2 := testBridge(t, func(o *Options) { o.DisconnectSeconds = 1; o.CmdWaitSeconds = 5 })
+	b2.recordPoll(map[string]any{})
+	time.Sleep(1500 * time.Millisecond)
+	if b2.Complete("khong-co", map[string]any{}) {
+		t.Fatal("Complete id la phai false")
+	}
+	if b2.Connected() {
+		t.Fatal("Complete id la khong duoc lam moi moc song")
+	}
+}
+
 // Thong diep khi add-in chua ket noi khong duoc chi noi ve mot app cu the: nguoi dung co the dang mo
 // Spreadsheets hoac Presentation, ma ca ba app dung chung mot add-in.
 func TestNotConnectedMessageIsAppNeutral(t *testing.T) {
