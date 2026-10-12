@@ -36,7 +36,7 @@ Cần Go ≥ 1.26 (máy có Go cũ hơn tự tải toolchain nhờ `GOTOOLCHAIN=
 ```bash
 cd core-go
 go test ./...
-go build -trimpath -ldflags "-s -w -X main.version=1.2.3" -o axiom-core.exe ./cmd/axiom-core
+go build -trimpath -ldflags "-s -w -X main.version=$(cat ../VERSION)" -o axiom-core.exe ./cmd/axiom-core
 GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o axiom-core ./cmd/axiom-core
 ```
 

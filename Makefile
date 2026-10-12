@@ -41,6 +41,7 @@ test-install:
 check-gen:
 	python3 scripts/generate_setup_catalog.py --check
 	python3 scripts/generate_mcp_commands.py --check
+	python3 scripts/check_version.py
 
 package:
 	bash scripts/linux/package.sh

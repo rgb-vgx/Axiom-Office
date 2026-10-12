@@ -16,7 +16,7 @@ const instructions = "Office/WPS tools. File tools (doc_*, ppt_* file, excel_*) 
 	"without the app. Live tools talk to the Axiom Office add-in inside a running " +
 	"Word/Excel/PowerPoint or WPS; call office_sessions() to find live bridges and their ports."
 
-// version duoc gan luc build bang -ldflags "-X main.version=..." (xem cmd/axiom-core/main.go).
+// version la mac dinh khi khong ai goi SetVersion; cmd/axiom-core/main.go gan lai bang SetVersion().
 var version = "0.0.0"
 
 func SetVersion(value string) {

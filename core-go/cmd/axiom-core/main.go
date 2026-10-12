@@ -33,8 +33,9 @@ import (
 	"axiomoffice/core/internal/wpsbridge"
 )
 
-// version gan luc build: go build -ldflags "-X main.version=1.2.3" (build.ps1 dung chung so voi add-in).
-var version = "0.0.0"
+// version la ban sao cua VERSION o goc repo (scripts/check_version.py canh); khi dong goi thi
+// package.sh/build.ps1 gan lai bang -ldflags "-X main.version=<VERSION>".
+var version = "0.1.0"
 
 func main() {
 	os.Exit(run())

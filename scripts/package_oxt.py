@@ -3,7 +3,7 @@
     python3 scripts/package_oxt.py [--out dist] [--print-path]
 
 Giu dung cau truc goc cua extension (description.xml, META-INF/manifest.xml, *.xcu, python/...), bo __pycache__
-va *.pyc. Ten file: AxiomOffice-LibreOffice-<VERSION>.oxt (VERSION doc tu python/pythonpath/axiom/__init__.py).
+va *.pyc. Ten file: AxiomOffice-LibreOffice-<VERSION>.oxt (VERSION doc tu VERSION o goc repo).
 Chi dung thu vien chuan.
 """
 from __future__ import annotations
@@ -19,12 +19,15 @@ SOURCE = os.path.join(ROOT, "src", "AxiomOffice.LibreOffice")
 
 
 def version() -> str:
-    init = os.path.join(SOURCE, "python", "pythonpath", "axiom", "__init__.py")
-    with open(init, encoding="utf-8") as handle:
-        match = re.search(r'VERSION\s*=\s*"([^"]+)"', handle.read())
-    if not match:
-        raise SystemExit("khong doc duoc VERSION trong " + init)
-    return match.group(1)
+    path = os.path.join(ROOT, "VERSION")
+    try:
+        with open(path, encoding="utf-8") as handle:
+            value = handle.read().strip()
+    except OSError:
+        raise SystemExit("khong doc duoc VERSION trong " + path)
+    if not value:
+        raise SystemExit("khong doc duoc VERSION trong " + path)
+    return value
 
 
 def files():

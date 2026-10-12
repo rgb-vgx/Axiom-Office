@@ -763,10 +763,10 @@ sudo apt install -y libsecret-tools      # tuỳ chọn: lưu khoá API vào key
 
 # Lấy gói: tải artifact "axiom-office-linux-x64" của job `linux` trong GitHub Actions,
 # hoặc build tại máy có mã nguồn: bash scripts/linux/package.sh [--rid linux-arm64]
-#   (cần Go 1.26+ và .NET SDK 10; chạy được cả trong Git Bash/WSL)
+#   (cần Go 1.26+; chạy được cả trong Git Bash/WSL)
 scp dist/axiom-office-linux-x64-<ver>.tar.gz nguoidung@may-ubuntu:~
 
-tar -xzf axiom-office-linux-x64-0.1.0.tar.gz && cd axiom-office-linux-x64-0.1.0
+tar -xzf axiom-office-linux-x64-<ver>.tar.gz && cd axiom-office-linux-x64-<ver>
 ./install.sh              # không cần tham số: cấu hình AI sau bằng wizard (menu Axiom Office -> Thiết lập…)
 ./install.sh --systemd    # tuỳ chọn: Core chạy thường trực (systemd --user)
 ```

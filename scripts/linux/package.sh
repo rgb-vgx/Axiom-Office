@@ -13,7 +13,7 @@ RID="linux-x64"
 [ "${1:-}" = "--rid" ] && RID="$2"
 PYTHON="$(command -v python3 || command -v python)"
 
-VERSION="$(sed -n 's/^VERSION = "\(.*\)"/\1/p' "$ROOT/src/AxiomOffice.LibreOffice/python/pythonpath/axiom/__init__.py" | tr -d '\r')"
+VERSION="$(cat "$ROOT/VERSION" 2>/dev/null | tr -d '\r\n\t ' || true)"
 [ -n "$VERSION" ] || { echo "khong doc duoc VERSION" >&2; exit 1; }
 NAME="axiom-office-${RID}-${VERSION}"
 STAGE="$ROOT/dist/$NAME"

@@ -31,12 +31,16 @@ if (-not ($Package -or $Install -or $Uninstall -or $Status -or $Log)) {
 }
 
 function Get-BridgeVersion {
-    $init = Join-Path $source "python\pythonpath\axiom\__init__.py"
-    $match = Select-String -LiteralPath $init -Pattern 'VERSION\s*=\s*"([^"]+)"' | Select-Object -First 1
-    if (-not $match) {
-        throw "Khong doc duoc VERSION trong $init"
+    $versionFile = Join-Path $root "VERSION"
+    try {
+        $value = (Get-Content -LiteralPath $versionFile -Raw).Trim()
+    } catch {
+        throw "Khong doc duoc VERSION trong $versionFile"
     }
-    return $match.Matches[0].Groups[1].Value
+    if (-not $value) {
+        throw "Khong doc duoc VERSION trong $versionFile"
+    }
+    return $value
 }
 
 function Get-SofficeProcesses {
