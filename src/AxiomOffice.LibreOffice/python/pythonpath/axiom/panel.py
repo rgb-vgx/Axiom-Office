@@ -359,6 +359,14 @@ class PaneUI:
         threading.Thread(target=self._worker, args=(prompt,), name="axiom-pane-run", daemon=True).start()
 
     def _worker(self, prompt: str) -> None:
+        # Loi o day phai chot thanh chuoi NGAY, khong duoc de lambda bat bien `exc`: ten trong
+        # `except ... as exc` bi Python xoa khi roi khoi khoi except (PEP 3110). Callback cua `_ui` duoc
+        # day sang main thread qua AsyncCallback. Binh thuong worker con nam trong khoi except (dang cho
+        # ket qua) nen `exc` van song va loi hien ra binh thuong — nhung khi main thread ban (hop thoai
+        # dang mo, thao tac nang) thi gate.run het gio sau 5s, worker roi khoi khoi except, VA callback
+        # van nam trong hang doi VCL roi chay sau do: luc ay `exc` da bi xoa, lambda nem NameError, ma
+        # loi do bi nuot (khong ai doc `box` trong gate.run) nen pane khong hien thong bao loi nao.
+        # Do 12/10/2026: ruff F821 (undefined-name) bat dung hai cho nay — xem `message` o hai nhanh duoi.
         try:
             base, _ = core.ensure()
             info = self.gate.run_quiet(lambda: documents.describe(documents.active(self.ctx, self.kind, required=False)),
@@ -373,10 +381,12 @@ class PaneUI:
             final = core.get_run(base, run_id)
             self._ui(lambda: self.session.finish(final))
         except core.CoreError as exc:
-            self._ui(lambda: self.session.fail(str(exc)))
+            message = str(exc)   # chot chuoi truoc khi hoan callback (xem chu thich dau _worker)
+            self._ui(lambda: self.session.fail(message))
         except Exception as exc:  # noqa: BLE001
             log.error("pane run failed: %s" % exc)
-            self._ui(lambda: self.session.fail(str(exc)))
+            message = str(exc)
+            self._ui(lambda: self.session.fail(message))
         finally:
             self._busy = False
             self._ui(self._render)
