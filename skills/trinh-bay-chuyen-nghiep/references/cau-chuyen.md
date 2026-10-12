@@ -43,8 +43,8 @@ tư thời gian nhất — người quyết định thường không đọc quá
   - Slideworks, theo cách viết action title của McKinsey: **≤ 15 từ và không quá 2 dòng** — "Keep an
     action title under 15 words and never longer than two lines"
     (<https://slideworks.io/resources/how-to-write-action-titles-like-mckinsey>).
-  - Bộ skill này chọn **≤ 15 từ, ≤ 2 dòng**, vì trần kỹ thuật của lưới trong `SKILL.md` cũng đúng 2 dòng ở
-    28pt (≈ 92 ký tự ≈ 15 từ tiếng Việt) — hai bên khớp nhau. Muốn chắc ăn thì nhắm **6–10 từ**.
+  - Bộ skill này chọn **≤ 15 từ, ≤ 80 ký tự**: 15 từ tiếng Việt ≈ 80 ký tự, vừa gọn trong 2 dòng của
+    hộp tiêu đề 28pt trên PowerPoint (trần đo được ≈ 130 ký tự). Muốn chắc ăn thì nhắm **6–10 từ**.
 - Câu chữ thường (không viết hoa kiểu Title Case, càng không ALL CAPS).
 
 ## 4. Hình thức — kỷ luật, không phải khiếu thẩm mỹ
@@ -93,11 +93,11 @@ chứng này **không tìm được nguồn** cho các con số trong bảng —
 ## 7. Tiếng Việt
 
 - Dấu thanh **xếp tầng** (ế, ộ, ữ, ằ…) nên ở cỡ nhỏ nét dấu dính vào nhau; vì vậy không xuống dưới 12pt,
-  không viết hoa cả câu, tránh phông mảnh (thin/light). Lưu ý: con số 12pt ở đây là **đo được** trên bản
-  LibreOffice này (xem `co-so-do-duoc.md`), không phải khuyến nghị trợ năng — sàn trợ năng cao hơn, ở mục 8.
-- Phông có đủ dấu tiếng Việt: **Noto Sans, Be Vietnam Pro, DejaVu Sans, Vollkorn**. wpp **không đặt được
-  phông**, nên thông tin này chỉ dùng khi tổ chức cấu hình sẵn phông mặc định cho LibreOffice — đừng hứa
-  với người dùng là sẽ đổi được phông.
+  không viết hoa cả câu, tránh phông mảnh (thin/light). Lưu ý: con số 12pt ở đây là ngưỡng `small-font`
+  của `checkLayout`, không phải khuyến nghị trợ năng — sàn trợ năng cao hơn, ở mục 8.
+- Hộp chữ của `wpp.addText` trên PowerPoint luôn là **Arial** — đủ dấu tiếng Việt. wpp **không đặt được
+  phông**, nên đừng hứa với người dùng là sẽ đổi được phông (kể cả các phông Việt hoá tốt như Be Vietnam
+  Pro, Noto Sans).
 - Hướng dẫn thiết kế slide **riêng cho doanh nghiệp/nhà nước Việt Nam**: đợt tìm này **không có nguồn
   nào**. Các mục ở trên là thực hành chung, không phải chuẩn của Việt Nam.
 
@@ -133,7 +133,7 @@ rộng bao nhiêu thì chọn cỡ lớn (20–28pt), đừng chọn 14pt.
 - **Tương phản** — WCAG 2.1 SC 1.4.3: **4.5:1** cho chữ thường, **3:1** cho chữ lớn; "chữ lớn" được định
   nghĩa là **≥ 18pt, hoặc ≥ 14pt nếu in đậm** (<https://www.w3.org/TR/WCAG21/#contrast-minimum>). Đây là
   ngưỡng duy nhất trong tài liệu này có nguồn chuẩn; bảng tính đầy đủ cho `tokens.json` ở
-  `co-so-do-duoc.md` mục 4.
+  `co-so-do-duoc.md` mục 8.
 - **Màu không được là dấu hiệu duy nhất** — WCAG 2.1 SC 1.4.1, nguyên văn "Color is not used as the only
   visual means of conveying information, indicating an action, prompting a response, or distinguishing a
   visual element" (<https://www.w3.org/TR/WCAG21/#use-of-color>).

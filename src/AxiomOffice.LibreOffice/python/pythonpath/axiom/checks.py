@@ -520,7 +520,7 @@ def _layout_issues(boxes, slide_width, slide_height):
         total_chars += box["chars"]
         if box["chars"] and box["textHeight"] and (box["textHeight"] > box["height"] + LAYOUT_TOLERANCE):
             issues.append(issue("overflow",
-                "text of '%s' needs %dpt height but the box is %dpt: shorten the text, lower fontSize or enlarge the box"
+                "text of '%s' needs %dpt height but the box is %dpt: shorten the text, move details to notes (wpp.setNotes) or split into two slides; keep fontSize at the design size"
                 % (box["name"], round(box["textHeight"]), round(box["height"])), shapes=[box["name"]]))
         bottom = box["top"] + max(box["height"], box["textHeight"])
         if (box["left"] < -LAYOUT_TOLERANCE or box["top"] < -LAYOUT_TOLERANCE

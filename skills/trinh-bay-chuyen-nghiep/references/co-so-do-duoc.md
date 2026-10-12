@@ -1,102 +1,112 @@
-# Cơ sở đo được của lưới slide
+# Cơ sở đo được (Microsoft PowerPoint)
 
-Toàn bộ con số trong `SKILL.md` không phải ước lượng cho đẹp: chúng đo trên **LibreOffice thật** ngày
-**13/10/2026** (LibreOffice Impress mặc định, profile tạm, `xvfb-run` có màn hình ảo — chạy `--headless`
-thì số đo chiều cao chữ sai). Đo lại:
+Mọi con số trong `SKILL.md` và `bo-cuc-slide.md` đo trên **PowerPoint thật** (Office 16, qua COM) ngày
+**13/10/2026**, hộp chữ dựng **đúng như `wpp.addText`** trên Windows (`Shapes.AddTextbox`, toạ độ số
+nguyên, chỉ đặt cỡ chữ). Không phải ước lượng cho đẹp.
 
-```bash
-xvfb-run -a python3 -I tests/lo/measure_slide_grid.py
+## 1. Đo lại
+
+**Đóng PowerPoint trước** — script từ chối chạy nếu PowerPoint đang mở (nó mở bài không cửa sổ rồi bỏ đi
+bằng Quit; chạy chung phiên với người dùng thì hoặc làm sập bài họ đang mở, hoặc để lại bài rác):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tests\win\measure_slide_grid_ppt.ps1
 ```
 
-Script dựng đúng lưới trong `SKILL.md` lên slide thật rồi in ra từng hộp: cần bao nhiêu, có bao nhiêu,
-và `checkLayout` nói gì. Nó cũng kiểm giới hạn layout ở mục 4 của `SKILL.md` (cả bốn layout đều cho đúng
-hai hộp rỗng, và 1 với 11 là cùng một kiểu). Nếu LibreOffice đổi cách dàn chữ, script đỏ trước khi người
-dùng thấy slide xấu.
+Script in số đo từng mục dưới đây; so với bảng ở đây. Nó không tự đánh đỏ/xanh.
 
-## 1. Kích thước slide
+## 2. Slide và hộp chữ mặc định
 
 | Đo | Giá trị |
 |---|---|
-| Slide mặc định | **793.7 × 446.5pt** = 28 × 15.75cm, tỉ lệ 1.7778 (16:9) |
-| Mặc định PowerPoint (tham chiếu) | 960 × 540pt = 33.87 × 19.05cm |
+| Slide mặc định | **960 × 540pt** = 33.87 × 19.05cm (16:9) |
+| Phông của hộp `wpp.addText` | **Arial** — đủ dấu tiếng Việt; wpp không có lệnh đổi phông |
+| Lề trong hộp chữ | trên/dưới **3.6**, trái/phải **7.2** |
+| Ngắt dòng | bật (`WordWrap`) |
+| Co giãn | **tắt** (`AutoSize` = 0): hộp giữ chiều cao đã đặt — xem mục 5 |
+| `\n` trong `text` | xuống dòng trong **cùng một đoạn** (như Shift+Enter) — gạch đầu dòng `"• "` vẫn thẳng hàng |
 
-Hai bên đều 16:9 nhưng **không cùng cỡ**: slide LibreOffice nhỏ hơn **0.827 lần** theo chiều dài. Vì
-vậy một cỡ chữ "chuẩn" của tài liệu PowerPoint (tiêu đề 36–44pt) khi bê nguyên sang đây sẽ **quá to**;
-quy đổi tương đương là 36 × 0.827 ≈ **30pt**. Đó là lý do `slide.type.title` = **28** chứ không phải 36, và
-lý do lưới cũ (`title` 36pt trong hộp cao 60pt) tự sinh `overflow`: một tiêu đề hành động 2 dòng ở 36pt
-cần `7.1 + 2 × 1.12 × 36` = **87.7pt**, gấp rưỡi chiều cao hộp.
-
-Chọn 28 chứ không phải 30 (30 vẫn vừa hộp 80pt: cần 74.3pt) vì **bề ngang ký tự có sai số ±20%** — xem
-mục 2. Tiêu đề 2 dòng ở 28pt cần 69.8pt, tức còn **10pt dư**; ở 30pt chỉ còn 5.7pt, và đó là khoản dư duy
-nhất bảo vệ tiêu đề khỏi tràn khi câu thật dài hơn ước lượng.
-
-## 2. Ba hằng số dàn chữ
-
-Đo bằng cách dựng hộp chữ rồi ép `Size.Height` về 1/100mm với `TextAutoGrowHeight = True`, đọc lại
-chiều cao LibreOffice tự tính:
+## 3. Hai hằng số dàn chữ
 
 | Hằng số | Giá trị đo | Ghi chú |
 |---|---|---|
-| Chiều cao một dòng | **1.12 × cỡ chữ** | đo ở 18 / 20 / 28pt: 1.120 / 1.115 / 1.115 |
-| Lề trong của hộp chữ (trên + dưới) | **7.1pt** | không đổi theo cỡ chữ |
-| Bề ngang một ký tự | **≈ 0.55 × cỡ chữ** | đo được 0.48–0.64 tuỳ chữ — xem sai số bên dưới |
+| Chiều cao hộp CẦN cho n dòng | **`7.2 + n × 1.21 × cỡ_chữ`** | khớp cả sáu cỡ 14 / 18 / 20 / 24 / 28 / 40pt |
+| Bề ngang một ký tự | **0.48–0.53 × cỡ_chữ** | dò nhị phân trên hộp rộng 880 / 713 / 430 |
 
-Suy ra:
+Ví dụ chiều cao hộp (pt) đo được:
 
-```text
-chiều cao cần  = 7.1 + số_dòng × 1.12 × cỡ_chữ
-ký tự một dòng = width / (0.55 × cỡ_chữ)
-```
-
-**Sai số phải nhớ**: bề ngang ký tự dao động mạnh. Đo bằng cách **dò nhị phân** chuỗi dài nhất còn vừa
-một dòng (13/10/2026, hộp rộng 713.7pt): **75 ký tự** ở 20pt và **53 ký tự** ở 28pt với chữ thường viết
-liền — tức 1 ký tự = **0.48 × cỡ chữ**. Nhưng một mẫu văn xuôi thật có dấu chỉ được **55.5 ký tự/dòng**
-ở 20pt, tức 0.64 × cỡ chữ, vì chỗ ngắt từ ăn mất phần dư. Vậy 0.55 là ước lượng **ở giữa**, và sai số
-thật là **±20%**, không phải ±15%.
-
-Hệ quả: đừng thiết kế sát trần. Chừa **một dòng dư** ở hộp nội dung, và để `checkLayout` xác nhận —
-`checkLayout` đo chiều cao chữ thật nên nó đúng hơn mọi công thức ở đây.
-
-Phông chữ mặc định của bản LibreOffice này là **Liberation Sans**, hiển thị tiếng Việt đúng. wpp **không
-có lệnh đặt phông**, nên hướng dẫn "dùng phông X" là vô nghĩa — chỉ cỡ chữ, đậm, màu, căn lề là điều
-khiển được.
-
-## 3. Sức chứa theo lưới chuẩn
-
-Với `W` = 793.7 (mặc định): hộp nội dung rộng **713.7**, cột đôi rộng **346.85**.
-
-| Cỡ chữ | Dòng cao | Ký tự/dòng (713.7) | Ký tự/dòng (cột 346.85) |
-|---|---|---|---|
-| 28 = `slide.type.title` | 31.4 | 46 | 22 |
-| 20 = `slide.type.body` | 22.4 | 65 | 31 |
-| 18 (ô bảng, cố định) | 20.2 | 72 | 35 |
-| 14 = `slide.type.caption` | 15.7 | 93 | 45 |
-| 40 = `slide.type.hero`, `slide.type.figure` | 44.8 | 32 | 16 |
-
-Cột "Ký tự/dòng" tính bằng 0.55 nên là **ước lượng thận trọng** (đo được ở 28pt là 53 chứ không phải
-46). Viết theo cột này thì không tràn; viết quá nó chưa chắc đã tràn, nhưng phải để `checkLayout` xác nhận.
-
-Số dòng vừa hộp, tính từ công thức trên:
-
-| Hộp | Cao | Ở 28pt | Ở 20pt | Ở 14pt |
+| Cỡ | 1 dòng | 2 dòng | 4 dòng | 8 dòng |
 |---|---|---|---|---|
-| Tiêu đề (top 30) | 80 | **2** | — | — |
-| Nội dung (top 130) | 276.5 | — | **12** | — |
-| Nguồn (top H−36) | 24 | — | — | **1** |
-| Bìa (hero 40) | 100 | — | — | — (2 dòng) |
+| 14 | 24.2 | 41.1 | 75.1 | 142.9 |
+| 20 | 31.4 | 55.7 | 104.1 | 201.1 |
+| 28 | 41.1 | 75.1 | 142.9 | 278.6 |
+| 40 | 55.7 | 104.1 | 201.1 | 395.0 |
 
-**12 dòng là trần hình học, không phải mục tiêu**: `7.1 + 12 × 1.12 × 20` = 275.9pt, chỉ dư **0.6pt** trong
-hộp 276.5pt (`checkLayout` cho qua vì `LAYOUT_TOLERANCE` 2pt). Viết tới 12 dòng thì mọi sai số ngắt dòng
-đều thành `overflow` — nhắm **10 dòng** (5 gạch đầu dòng × 2 dòng), đúng như SKILL.md nói.
+Bề ngang: chuỗi chữ liền cho 0.49–0.53, văn xuôi có dấu cho 0.48–0.51 (chỗ ngắt từ ăn bớt phần dư ở hộp
+hẹp). `SKILL.md` dùng **0.53** — đầu trên của khoảng đo, nên viết theo nó thì không tràn.
 
-Đối chiếu với `checkLayout`: `dense` bắn khi **quá 600 ký tự** một slide. Hộp nội dung 20pt chứa được
-tới ~780 ký tự, tức **trần thật là 600 ký tự**, không phải sức chứa hình học. Năm gạch đầu dòng 12 từ
-(≈ 70 ký tự mỗi dòng) + tiêu đề + nguồn ≈ **470 ký tự** — vừa dưới trần, đúng bằng
-`slide.maxBulletsPerSlide` × `slide.maxWordsPerBullet` trong `tokens.json`. Hai con số đó khớp nhau, không
-phải đặt tuỳ ý. (Slide đầy nhất dựng thật trong `measure_slide_grid.py`, viết dài hơn mức này một chút, ra
-**501 ký tự** — vẫn dưới 600.)
+## 4. Sức chứa theo lưới chuẩn ở 960 × 540
 
-## 4. Tương phản màu — tính được, không phải cảm nhận
+Hộp nội dung rộng **880**, cột đôi rộng **430**, vùng nội dung cao **370**.
+
+| Hộp | Cao | Dòng vừa | Ký tự/dòng đo được (văn xuôi) |
+|---|---|---|---|
+| Tiêu đề, 28pt | 80 | **2** (75.1) — dòng 3 cần 109 | 65 → 2 dòng ≈ **130** |
+| Nội dung, 20pt | 370 | **14** (346.6) | 91 (cột đôi: 43) |
+| Nguồn, 14pt | 24 | **1** (24.2) | 131 |
+
+**Trần không phải mục tiêu**: `SKILL.md` cho viết tiêu đề ≤ 80 ký tự và nội dung 10 dòng, chừa dư cho câu
+thật dài hơn ước lượng. Slide đầy nhất (tiêu đề 66 ký tự + 5 gạch đầu dòng ≈ 75 ký tự + nguồn, tổng **505
+ký tự**) dựng thật: tiêu đề 2 dòng, mỗi gạch **1 dòng**, không lỗi.
+
+`dense` bắn khi **quá 600 ký tự** một slide — thấp hơn sức chứa hình học (14 dòng × 89 ≈ 1.200), nên 600
+mới là trần thật. Năm gạch đầu dòng 12 từ + tiêu đề + nguồn ≈ 470–500 ký tự: vừa dưới trần, khớp với
+`slide.maxBulletsPerSlide` × `slide.maxWordsPerBullet` trong `tokens.json`.
+
+## 5. Hộp tự giãn — `checkLayout` thấy gì, không thấy gì
+
+`Shapes.AddTextbox` mặc định **tự co giãn theo chữ** (`AutoSize` = 1). Với hộp như vậy `overflow` không
+bao giờ bắn (chữ không thể cao hơn hộp), chữ dài chỉ lộ qua `overlap` — ngưỡng **10%** diện tích hộp nhỏ
+hơn. Đo được: tiêu đề **3 dòng** giãn hộp tới 109, đè lên nội dung **9pt** = 8.3% → **không ai báo**.
+
+Vì vậy từ 13/10/2026 `wpp.addText` trên Windows **tắt tự giãn** (`AutoSize` = 0) và giữ đúng chiều cao
+được truyền. Cùng tiêu đề 3 dòng: hộp 80, chữ cần 100.8 → `overflow` (luật: `BoundHeight` > chiều cao hộp
++ 2pt). Slide chuẩn ở mục 4 vẫn không lỗi nào. Hộp chữ không viền, không nền nên nhìn bằng mắt không khác
+gì. (Cần build lại add-in — bản DLL cũ vẫn tự giãn.)
+
+`BoundHeight` chỉ tính dòng chữ, không tính lề trong 7.2pt, nên `overflow` hơi dễ dãi: hộp nội dung 370
+để lọt 15 dòng (360) dù nhìn thì dòng cuối sát mép. Viết 10 dòng như `SKILL.md` thì không chạm tới.
+
+## 6. Bảng
+
+| Đo | Giá trị |
+|---|---|
+| Chữ trong ô | **Arial 18pt** — `wpp.addTable` không nhận cỡ chữ |
+| Chiều cao hàng | chia đều chiều cao bảng: 7 hàng trong 370 → **52.9** mỗi hàng; 10 hàng → 37.0 |
+| Hàng thấp nhất (1 dòng 18pt) | ≈ 28.8 → bảng **13 hàng** đã cao 374.4, vượt vùng 370 |
+| Ô chữ dài | hàng giãn ra: ô 69 ký tự ở cột 220 thành 4 dòng, bảng 7 hàng từ 370 lên **410.7** (đáy 540.7) |
+
+`checkLayout` không đếm chữ trong ô, nhưng **có thấy khung bảng**: bảng giãn đè lên hộp "Nguồn" thì báo
+`overlap`. Đáy 540.7 trên slide cao 540 vẫn nằm trong dung sai 2pt nên **không** có `offslide` — đó là lý
+do `bo-cuc-slide.md` bắt luôn đặt hộp "Nguồn" khi có bảng.
+
+## 7. Ảnh và layout
+
+**Ảnh.** `Shapes.AddPicture` coi `-1` là "giữ cỡ gốc" cho **từng chiều riêng**: truyền `width` = 491 với
+`height` = -1 làm ảnh 16:9 (1600 × 900px) thành **491 × 445.5** — méo. Từ 13/10/2026 `wpp.addImage` trên
+Windows thêm ảnh ở cỡ gốc, khoá tỉ lệ rồi mới đặt chiều được truyền: cùng ảnh ra **491 × 276.2**, ảnh 4:3
+ra 491 × 368.3. (Cần build lại add-in — bản DLL cũ vẫn kéo méo.)
+
+**Layout** của `wpp.addSlide` — số placeholder, đều rỗng:
+
+| layout | 1 | 2 | 11 | 12 |
+|---|---|---|---|---|
+| Placeholder | 2 (tiêu đề + phụ đề) | 2 | 1 | **0** |
+
+`wpp.addText` luôn tạo hộp mới, không ghi vào placeholder. `checkLayout` bỏ qua placeholder rỗng (không
+hiện khi trình chiếu), nhưng khi soạn chúng vẫn hiện "Bấm để thêm tiêu đề" — nên luôn `layout: 12`.
+
+## 8. Tương phản màu — tính được, không phải cảm nhận
 
 Tỉ lệ tương phản theo WCAG 2.1 = `(L_sáng + 0.05) / (L_tối + 0.05)`, trong đó
 `L = 0.2126·R + 0.7152·G + 0.0722·B` với mỗi kênh đã giải gamma
@@ -127,15 +137,12 @@ Ba hệ quả thực dụng:
   cho đúng: đợt kiểm chứng 13/10/2026 **không tìm được nguồn** cho con số "máy chiếu làm màu nhạt đi
   20–30%" từng được ghi ở đây — lời khuyên giữ nguyên, con số bỏ.
 
-Cách tính lại: đọc `colors.*` trong `tokens.json`, chạy công thức trên — không cần LibreOffice.
+Cách tính lại: đọc `colors.*` trong `tokens.json`, chạy công thức trên — không cần mở PowerPoint.
 
-## 5. Cái chưa đo được — đừng bịa
+## 9. Chưa đo
 
-- **Chiều cao hàng của bảng chưa đo.** Biết chắc: ô bảng mặc định `CharHeight` = 18pt, và `wpp.addTable`
-  **không nhận cỡ chữ**. Chưa đo được hàng cao bao nhiêu khi `height` bị ép, nên quy tắc "≤ 6 dòng dữ
-  liệu" là **kinh nghiệm**, không phải số đo — muốn chắc thì dựng bảng rồi nhìn bằng mắt.
-- **`checkLayout` không kiểm được chữ trong bảng**: ô bảng không phải text shape nên `chars` = 0, không
-  có `overflow` cho bảng. Bảng tràn là lỗi duy nhất trong bộ lệnh này mà máy không bắt được.
-- **`_shape_text_height` bị chặn ở 900pt** khi bật autogrow. Trên slide cao 446.5pt thì hộp như vậy đã
-  bị `offslide` từ trước, nên trần này không ảnh hưởng thực tế — ghi lại để người sau khỏi tưởng số đo
-  sai.
+- **Slide 4:3 (720 × 540)** và các cỡ khác: hằng số dàn chữ ở mục 3 không phụ thuộc cỡ slide, nên lưới
+  tính theo `W`, `H` vẫn đúng; sức chứa thì tính lại bằng công thức. Ví dụ 720 × 540: hộp nội dung rộng
+  640 → ≈ 60 ký tự một dòng ở 20pt, vẫn 14 dòng.
+- **PowerPoint cho Mac / PowerPoint trên web**: không đo, không hỗ trợ (wpp chạy qua COM trên Windows).
+- **Tiêu đề bìa và nhãn ba con số** ở `bo-cuc-slide.md` tính bằng công thức, chưa dựng thật từng mẫu.

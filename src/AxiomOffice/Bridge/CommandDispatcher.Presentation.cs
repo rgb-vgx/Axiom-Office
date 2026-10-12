@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -133,6 +133,18 @@ namespace AxiomOffice.Bridge
             dynamic pres = app.ActivePresentation;
             dynamic slide = WppGetSlide(pres, ParamInt(p, "slide", 0));
             dynamic shape = slide.Shapes.AddTextbox(1, left, top, width, height);
+            // Hộp giữ đúng chiều cao được đặt (AddTextbox mặc định tự giãn theo chữ): chữ dài thì checkLayout báo
+            // `overflow`, thay vì hộp lặng lẽ dài xuống đè hộp dưới - tiêu đề 3 dòng đè nội dung 9pt mà không ai
+            // báo (đo trên PowerPoint 16, 13/10/2026). Hộp chữ không viền, không nền nên nhìn không khác.
+            bool fixedHeight = false;
+            try
+            {
+                shape.TextFrame.AutoSize = 0;
+                fixedHeight = true;
+            }
+            catch (Exception)
+            {
+            }
             dynamic textRange = shape.TextFrame.TextRange;
             textRange.Text = text;
             dynamic font = textRange.Font;
@@ -153,6 +165,11 @@ namespace AxiomOffice.Bridge
             {
                 string align = ParamString(p, "align", "left").ToLowerInvariant();
                 textRange.ParagraphFormat.Alignment = align == "center" ? 2 : (align == "right" ? 3 : 1);
+            }
+            if (fixedHeight)
+            {
+                // Đề phòng bản Office/WPS đã co giãn hộp trước khi tắt tự giãn: trả lại đúng chiều cao đã đặt.
+                shape.Height = height;
             }
             return new Dictionary<string, object>
             {
@@ -175,7 +192,22 @@ namespace AxiomOffice.Bridge
             dynamic app = host.Application;
             dynamic pres = app.ActivePresentation;
             dynamic slide = WppGetSlide(pres, ParamInt(p, "slide", 0));
-            dynamic shape = slide.Shapes.AddPicture(path, 0, -1, left, top, width, height);
+            // Chỉ một chiều thì co theo tỉ lệ ảnh: AddPicture coi -1 là "giữ cỡ gốc" cho TỪNG chiều, nên
+            // truyền width=491, height=-1 làm ảnh 16:9 thành 491x445.5 (đo trên PowerPoint 16, 13/10/2026).
+            bool keepAspect = (width > 0) != (height > 0);
+            dynamic shape = slide.Shapes.AddPicture(path, 0, -1, left, top, keepAspect ? -1 : width, keepAspect ? -1 : height);
+            if (keepAspect)
+            {
+                shape.LockAspectRatio = -1;
+                if (width > 0)
+                {
+                    shape.Width = width;
+                }
+                else
+                {
+                    shape.Height = height;
+                }
+            }
             return new Dictionary<string, object>
             {
                 { "slide", Convert.ToInt32(slide.SlideIndex) },

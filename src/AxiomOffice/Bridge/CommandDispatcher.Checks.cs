@@ -195,7 +195,7 @@ namespace AxiomOffice.Bridge
                 {
                     issues.Add(Issue("overflow",
                         "text of '" + b.Name + "' needs " + Math.Round(b.TextHeight) + "pt height but the box is " + Math.Round(b.Height)
-                        + "pt: shorten the text, lower fontSize or enlarge the box",
+                        + "pt: shorten the text, move details to notes (wpp.setNotes) or split into two slides; keep fontSize at the design size",
                         new Dictionary<string, object> { { "shapes", new[] { b.Name } } }));
                 }
                 double bottom = b.Top + Math.Max(b.Height, b.TextHeight);
