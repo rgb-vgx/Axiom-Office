@@ -140,6 +140,10 @@ viết lại); phần còn lại của §4 sửa theo. Ghi chú từng mục ở
 
 ### 4.1 `references/bo-cuc.md` chép cứng cỡ chữ và màu, lệch với `tokens.json`
 
+> **Cập nhật 13/10/2026:** file này **đã bị xoá** ở §4.10 — nó vẫn giữ bộ **toạ độ** thứ hai (960×540),
+> nên bám token thôi chưa đủ. Các liên kết tới `bo-cuc.md` dưới đây nay là liên kết chết, giữ lại để đọc
+> lịch sử; bố cục giờ ở `trinh-bay-chuyen-nghiep/references/bo-cuc-slide.md`.
+
 [bao-cao-thang/references/bo-cuc.md:7](../skills/bao-cao-thang/references/bo-cuc.md#L7) dùng
 `fontSize: 40` cho slide tiêu đề, [dòng 12](../skills/bao-cao-thang/references/bo-cuc.md#L12) dùng `32` cho
 tiêu đề slide nội dung — nhưng
@@ -346,6 +350,123 @@ Hướng đã chọn: **giữ từ khoá, hạ văn xuôi** (hướng 1), ghép 
 chứ **không bỏ cụm nào** chỉ vì ít gặp, vì bỏ cụm là bỏ đường định tuyến. Hướng 3 (nâng trần 300) không
 chọn: tốn token mỗi lượt cho **mọi** skill, và bỏ mất con số đang canh.
 
+### 4.10 **MỚI 13/10/2026** — Skill làm slide dựng lưới trên một slide **không tồn tại**, và lưới bị chép hai nơi — **đã sửa 13/10/2026**
+
+Phát hiện khi làm đợt "cải tạo skill làm slide" (yêu cầu người dùng). Đây là cùng **loại** lỗi với §4.1 —
+dữ liệu thiết kế nằm ở hai chỗ và một chỗ sai — nhưng lần này cái sai **tự sinh lỗi**, không chỉ lệch nhau.
+
+**Bằng chứng.** `trinh-bay-chuyen-nghiep/SKILL.md` viết *"16:9 thường 960×540"*. 960×540 là mặc định của
+**PowerPoint**; Impress mặc định là **793.7 × 446.5pt** (28 × 15.75cm) — nhỏ hơn **0.827 lần** theo chiều
+dài. Đo trên LibreOffice thật (màn hình ảo `xvfb-run`; `--headless` cho số đo chiều cao chữ sai).
+
+**Vì sao đây là lỗi chứ không phải chuyện thẩm mỹ.** Ba hằng số đo được: mỗi dòng chữ cao **1.12 × cỡ chữ**,
+hộp chữ có **7.1pt lề trong**, và lưới cũ đặt `slide.type.title` = 36 trong hộp cao **60pt**. Một tiêu đề
+2 dòng cần `7.1 + 2 × 1.12 × 36` = **87.7pt** — gấp rưỡi chiều cao hộp. Mà skill lại **bắt buộc** tiêu đề là
+câu kết luận ≤ 2 dòng ("Doanh thu tăng 12% nhờ kênh trực tuyến"). Tức **làm đúng hướng dẫn là chắc chắn
+`overflow`**, và lưới cũ còn không có chỗ cho dòng nguồn. Lỗi nằm ở **cỡ chữ lấy từ deck 960×540 rồi bê
+nguyên sang slide nhỏ hơn 0.83 lần**: cùng số point, chữ to hơn 0.83 lần so với dự kiến.
+
+**Lưới chép hai nơi.** `bao-cao-thang/references/bo-cuc.md` giữ bộ toạ độ **thứ hai** (960×540, 880, 920…)
+cho cùng loại slide mà `trinh-bay-chuyen-nghiep` dựng — hai skill được thiết kế để **dùng cùng nhau**. Đây
+là biến thể tệ hơn §4.1: chép cứng thì lệch khi `tokens.json` đổi, còn chép cứng **toạ độ** thì hai skill
+nói hai chuyện khác nhau ngay từ đầu. Sửa: **xoá** `bo-cuc.md`; toạ độ chỉ còn **một** nơi; `bao-cao-thang`
+chỉ nói *viết gì* (`references/noi-dung-slide.md`), vị trí thì trỏ về skill chung.
+
+**Sửa:**
+- `slide.type.title` **36 → 28** (= 36 × 0.827, tương đương thị giác với 36pt trên deck PowerPoint); hộp tiêu
+  đề 60 → **80pt** (top 30), vùng nội dung top 110 → **130** cao `H − 170`, thêm **dòng nguồn** ở `H − 36`.
+  Đây là **thay đổi nhìn thấy được** của slide do skill dựng ra
+- Skill nay **đọc `slideWidth`/`slideHeight` từ `wpp.checkLayout` rồi mới tính lưới**, thay vì tin vào một
+  con số viết sẵn — sửa tận gốc, không chỉ sửa 960 thành 793.7
+- **Sức chứa tính trước khi viết chữ**: `chiều cao = 7.1 + số_dòng × 1.12 × cỡ_chữ`. Trần thật của một slide
+  là **600 ký tự** (`dense` của `checks.py`), không phải sức chứa hình học (~780) — và 600 này **khớp** với
+  `slide.maxBulletsPerSlide` × `slide.maxWordsPerBullet` trong `tokens.json`
+- **Ghi rõ giới hạn thật của wpp** thay vì hứa suông: `addText` không có phông chữ / chữ nghiêng / gạch đầu
+  dòng / giãn dòng, và cỡ chữ–đậm–màu áp cho **cả hộp** (không in đậm riêng một con số trong câu); không có
+  lệnh biểu đồ, hình khối, sơ đồ, tô nền; `addTable` không nhận cỡ chữ hay màu ô; và **`checkLayout` không
+  đọc được chữ trong bảng** — nên trạng thái "Đạt/Chậm" **phải ghi bằng chữ**, không thể trông vào màu ô.
+  Đây là lỗi cùng họ với §4.3 ("hứa năng lực không tồn tại")
+- **Ba ngưỡng tương phản tính từ `tokens.json`** (công thức WCAG 2.1, ghi lại để tính lại được):
+  `colors.warning` **4.33:1** không đạt AA cho chữ thường; `colors.accent` 4.84:1 nhưng chỉ **4.33:1** trên
+  `colors.surface`, còn `colors.success` **4.06:1** trên `surface` — đều tụt xuống mức "chỉ chữ lớn";
+  `colors.muted` 7.00:1 vừa AAA trên nền trắng, trên `surface` còn AA. Ràng buộc kèm theo: **màu không được
+  là dấu hiệu duy nhất**
+
+**Đo lại được, không phải niềm tin.** Thêm `tests/lo/measure_slide_grid.py` — **không** phải unittest (không
+có tiền tố `test_` nên `make test-lo` không gom): dựng đúng lưới trong SKILL.md lên slide thật, in từng hộp
+*cần bao nhiêu / có bao nhiêu*, rồi hỏi `checkLayout`. Lệch một con số là in `LỆCH:` + trả mã 1, nên lần sau
+LibreOffice đổi cách dàn chữ thì script đỏ **trước** khi người dùng thấy slide xấu.
+
+| Đo | Kết quả |
+|---|---|
+| Slide đầy nhất dựng đúng lưới (65 + 379 + 61 = **501** ký tự) | `checkLayout` **issueCount=0**, không lỗi nào |
+| Tiêu đề 2 dòng 28pt cần / hộp có | 69.8 / 80pt ✅ |
+| Nội dung 10 dòng 20pt cần / hộp có | 231.1 / 276.5pt ✅ |
+| Nguồn 1 dòng 14pt cần / hộp có | 22.8 / 24pt ✅ |
+
+**Một chỗ số đo buộc phải nói "không biết".** Bề ngang ký tự **không có hằng số**: dò nhị phân chuỗi dài
+nhất còn vừa một dòng ra 75 ký tự ở 20pt và 53 ở 28pt (0.48 × cỡ chữ) với chữ viết liền, nhưng một mẫu văn
+xuôi thật có dấu chỉ được **55.5 ký tự/dòng** ở 20pt (0.64) vì chỗ ngắt từ ăn mất phần dư. Nên 0.55 là ước
+lượng **ở giữa**, sai số **±20%** (bản cũ ghi ±15%) — và bài viết nay nói rõ: **chừa một dòng dư**, đừng
+thiết kế sát trần. Ba thứ **chưa đo được** thì ghi thẳng vào mục "Cái chưa đo được — đừng bịa" của
+`references/co-so-do-duoc.md` (chiều cao hàng bảng; bảng vô hình với `checkLayout`; trần 900pt của
+`_shape_text_height`) thay vì đoán thành quy tắc.
+
+**Còn treo.** `colors.warning` không đạt AA cho chữ thường là chuyện của **bảng màu**, không phải của skill:
+sửa được thì phải sửa `tokens.json`, mà màu đó dùng chung với Word/Excel và có thể là màu nhận diện của tổ
+chức — **cần người quyết**, không tự đổi. Hiện xử lý bằng cách ràng buộc cách dùng (chỉ cỡ lớn/in đậm).
+
+### 4.11 **MỚI 13/10/2026** — Skill làm slide trích **"chuẩn" không tồn tại**: 13 khẳng định không có nguồn — **đã sửa 13/10/2026**
+
+Cùng họ với §4.3 ("hứa năng lực không tồn tại") và §4.10, nhưng lần này cái không tồn tại là **nguồn**:
+`references/cau-chuyen.md` ghi nhiều con số với giọng "theo chuẩn", mà đợt kiểm chứng không mở được trang
+nào nói đúng chúng.
+
+**Cách kiểm (quan trọng, vì nó quyết định kết quả).** `WebSearch` **trả về rỗng với mọi truy vấn** trong môi
+trường này, và các máy tìm kiếm thay thế bị CAPTCHA. Nên đợt kiểm chứng chạy bằng **`WebFetch` trực tiếp**:
+đoán URL đã biết rồi mở. Hệ quả phải nói thẳng: tìm được trang **đã biết đường dẫn**, **không** tìm được
+trang chưa biết. Vì vậy "không tìm thấy nguồn" **không đồng nghĩa với "khẳng định sai"** — nó nghĩa là
+"chưa kiểm chứng được", và file ghi đúng như vậy.
+
+**Kết quả: 9 khẳng định mở được trang thật, 13 khẳng định phải hạ xuống "chưa có nguồn".**
+
+| Kiểm chứng được (có URL) | Hạ xuống "chưa kiểm chứng" |
+|---|---|
+| Microsoft: chữ thường **≥ 18pt** · Guy Kawasaki: **không nhỏ hơn 30pt** · Bảng khoảng cách Paradi (24pt/32" → 15 ft) | Indezine 24pt — *và một bài của chính Indezine nói 30pt* · ngưỡng Kosslyn (> 4 gạch / > 2 dòng / < 20pt) |
+| PresentationLoad **6–10 từ** · Slideworks/McKinsey **< 15 từ, ≤ 2 dòng** · định nghĩa assertion–evidence | quy tắc "6x6" · số liệu thí nghiệm Mayer · chỉ số t/d của Garner & Alley 2013 (trang nguồn chỉ có "p < .01") |
+| WCAG 2.1 SC 1.4.3 (**4.5:1** / **3:1**, chữ lớn = **≥ 18pt hoặc ≥ 14pt đậm**) · SC 1.4.1 (màu không là dấu hiệu duy nhất) | "action safe 90%", lề 1/20, lưới 12 cột, nhịp 8pt/4pt · tỉ lệ màu 60-30-10 · cam/vàng trượt tương phản |
+| Okabe & Ito: bảng màu + tỉ lệ mù màu (1/12 gốc Âu = 8%, 1/20 gốc Á = 5%, 1/25 gốc Phi = 4%) | halation (trang Wikipedia nói về **ảnh phim**, không nói về chữ trên slide) · biểu đồ tròn ≤ 5 phần · Tufte phản đối PowerPoint |
+| Stephen Few về **hai trục tung** | "máy chiếu làm màu nhạt đi 20–30%" · mọi con số "số slide" |
+
+**Vài chỗ đáng nhớ vì nguồn được gán còn phản lại khẳng định**: "Indezine nói tối thiểu 24pt" — không có
+trang Indezine nào nói 24pt, và một bài của họ nói 30pt; "halation" bị trích từ một trang nói về hiện tượng
+trong **phim**, không phải màn hình; chỉ số thống kê hay được trích của Garner & Alley 2013
+(t(93.43) = 3.67, d = 0.81, 21,2 vs 41,5 từ/slide) **không có** trên trang của chính nhóm tác giả đó.
+
+**Vì sao đây là lỗi thật, không phải chuyện câu chữ.** Skill là thứ agent đọc rồi **nói lại với người
+dùng**. Một con số được gán cho "chuẩn X" mà X không nói thế thì dạy agent **nói giọng chắc chắn về điều
+mình không biết** — đúng thứ mà cả tài liệu này đang chống. Cái sai không nằm ở con số (nhiều con số vẫn
+hợp lý) mà ở **thẩm quyền được gán**: 60–30–10 nghe như định luật, thực ra chỉ là thực hành phổ biến.
+
+**Sửa:**
+- `references/cau-chuyen.md` viết lại: mỗi khẳng định có URL **chỉ khi trang đó đã mở thật**, và mục 10 liệt
+  kê đủ 13 mục "chưa kiểm chứng" kèm lý do từng mục (không mở được / mở được nhưng không khớp / paywall)
+- `references/co-so-do-duoc.md`: bỏ con số **"máy chiếu làm màu nhạt đi 20–30%"** (giữ lời khuyên "chừa dư
+  tương phản", bỏ con số); "**≈ 8% nam giới**" → **5–8%** kèm tỉ lệ theo nhóm gốc
+- `SKILL.md` mục 2 nay phân biệt **sàn kỹ thuật** (`slide.type.minimum` = 12, ngưỡng `small-font` của
+  `checkLayout`) với **sàn trợ năng** (**18pt**, theo Microsoft): chữ để đọc dùng `slide.type.title` /
+  `slide.type.body` (28/20 — trên cả hai sàn), **muốn vừa thì cắt chữ đừng hạ cỡ**; chỉ dòng phụ
+  (`slide.type.caption` 14pt) được dưới 18pt, và khi đó nó là **chữ thường** theo WCAG nên phải đủ 4.5:1 →
+  chỉ `colors.text` / `colors.muted`. Hai sự kiện rời nhau (cỡ chữ, tương phản) ghép thành một quy tắc dùng được
+- `SKILL.md` mục 3 nêu nguồn cho trần tiêu đề ≤ 15 từ / ≤ 2 dòng, và nói rõ nó **trùng** trần kỹ thuật của
+  lưới (2 dòng ở 28pt ≈ 92 ký tự ≈ 15 từ) — trước đó con số này không có xuất xứ
+
+**Còn treo.** Đợt này **không kết luận được cái gì là sai**, chỉ kết luận được cái gì **chưa có nguồn**.
+Nếu sau này có công cụ tìm kiếm chạy được, việc nên làm là **đi tìm nguồn cho 13 mục ở mục 10 và thăng cấp
+mục nào tìm được** — nhất là Kosslyn (nhiều khả năng có trong sách, chỉ không có trên web) và 60-30-10
+(nghe như bắt nguồn từ thiết kế nội thất, chưa xác minh). Trước khi tìm được thì mục 10 giữ nguyên là "chưa
+kiểm chứng", không nâng thành "sai".
+
 ## 5. Trần công cụ — phần chặn nhiều việc nhất
 
 Quét registry: `header|footer|toc|width|sort|pivot|merge|freeze|margin` **không khớp lệnh nào**. Danh sách
@@ -413,6 +534,8 @@ Hạ tầng đã có: harness `POST /v1/runs` + SSE trong [tests/bench/](../test
 | **P0** ✅ xong 11/10/2026 | §3.1 bỏ `writer.replaceAll` khỏi `the-thuc-van-ban`; §3.2 sửa quy tắc xoá `outside-table`; §3.3 thống nhất `empty-cells` cho bảng dàn trang | Sửa được **ngay**, không cần lệnh mới, và đang chủ động phá tài liệu người dùng |
 | **P1** ✅ xong 12/10/2026 | §4.1 `bo-cuc.md` bám token + test chặn hex/cỡ chữ trần; §4.2 chốt gọi `checkLayout` một lần; §4.3 bỏ "độ rộng bảng" khỏi description; §4.4 chốt cỡ nội dung 13; §4.5 bắt viết spec ra; §4.7 sửa luật `long-header-cell` cho bảng 2 cột (leave-one-out); §4.8 xoá token chết `plainTableStyle` | Rẻ, và §4.1/§4.3/§4.7 là loại lỗi sẽ nhân lên khi thêm skill mới |
 | **P1.5** ✅ xong 12/10/2026 | §4.9 `description` dài quá 300 ký tự bị cắt đuôi (5/8 skill; `mo-hinh-nhieu-sheet` mất cả danh sách từ khoá) — viết lại theo thứ tự từ khoá lên trước, thêm test chặn ở tầng router | Cùng loại với §4.3 nhưng nặng hơn, và là **điều kiện tiên quyết** của P3 (Recall@1 đo chính `description`) |
+| **P1.6** ✅ xong 13/10/2026 | §4.10 skill làm slide dựng lưới theo mặc định PowerPoint (960×540) nên **tự sinh `overflow`**; lưới bị chép hai nơi (`bao-cao-thang/references/bo-cuc.md` xoá); thêm `tests/lo/measure_slide_grid.py` để mọi con số đo lại được | Sửa được **ngay**, không cần lệnh mới, mà lại đang là skill dạy sai về mặt **số học** — cùng họ với §4.1 |
+| **P1.7** ✅ xong 13/10/2026 | §4.11 nguồn của skill làm slide: mở từng trang để kiểm — 9 khẳng định có nguồn thật, 13 khẳng định hạ xuống "chưa kiểm chứng" (Indezine 24pt, Kosslyn, 6x6, 60-30-10, "action safe 90%"…); thay bằng nguồn mở được (Microsoft 18pt, WCAG 1.4.3/1.4.1, Kawasaki, Slideworks, Okabe & Ito, Few) | Cùng họ §4.3/§4.10 nhưng ở tầng **thẩm quyền**: skill dạy agent nói "theo chuẩn X" cho X không tồn tại. Con số có thể vẫn đúng, nhưng **căn cứ thì không** — và đây là thứ đọc lại là thấy ngay |
 | **P2** | Bù lệnh bridge theo §5, thứ tự: `writer.setCell` (mở khoá sửa bảng/tài liệu có sẵn) → `et` width/border → `writer` page setup + header/footer → `wpp` sửa shape có sẵn | Đòn bẩy lớn nhất; mở khoá 5/7 dòng ở §6 |
 | **P3** | Viết eval theo §7, **rồi** mới thêm skill nghiệp vụ cho §6 | Tránh viết thêm 10 skill không đo được |
 | **P4** | §4.6 đối chiếu Phụ lục I NĐ30 bản gốc | Nhỏ, nhưng là căn cứ pháp lý — không nên đoán |

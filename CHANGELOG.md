@@ -5,6 +5,89 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — Nguồn của skill làm slide: **9 khẳng định mở được trang thật**, 13 khẳng định phải hạ xuống "chưa có nguồn" (13/10/2026)
+- **Đợt kiểm chứng mở từng trang**, không tin trí nhớ: mỗi khẳng định trong `references/cau-chuyen.md` được
+  đối chiếu bằng cách mở URL và đọc. Ghi chú lại cách làm vì nó ảnh hưởng kết quả: `WebSearch` **trả về rỗng
+  với mọi truy vấn** trong môi trường này, nên phải đoán URL rồi `WebFetch` trực tiếp — nghĩa là tìm được
+  trang đã biết đường dẫn, **không** tìm được trang chưa biết. Nhiều mục vì thế ghi "không tìm thấy", và đó
+  là câu trả lời thật, không phải chỗ để đoán
+- **Kiểm chứng được (có URL trong file)**: Microsoft 18pt cho chữ thường · Kawasaki "no font smaller than
+  thirty points" · bảng khoảng cách người xem của Paradi (24pt/32" → 15 ft, 28pt/32" → 18 ft) ·
+  PresentationLoad 6–10 từ · Slideworks/McKinsey "under 15 words and never longer than two lines" ·
+  định nghĩa assertion–evidence · WCAG 2.1 SC 1.4.3 (**4.5:1** chữ thường, **3:1** chữ lớn, chữ lớn =
+  **≥ 18pt hoặc ≥ 14pt đậm**) · WCAG 2.1 SC 1.4.1 (màu không là dấu hiệu duy nhất) · Okabe & Ito (bảng màu
+  và tỉ lệ mù màu) · Stephen Few về hai trục tung
+- **Hạ xuống mục "chưa kiểm chứng"** (13 mục): Indezine 24pt — *và một bài của chính Indezine nói 30pt, tức
+  nguồn được gán còn phản lại khẳng định*; ngưỡng của Kosslyn (> 4 gạch / > 2 dòng / < 20pt); quy tắc "6x6";
+  số liệu thí nghiệm của Mayer; chỉ số thống kê của Garner & Alley 2013 (trang nguồn chỉ có "p < .01", không
+  có t/d/21,2 vs 41,5 từ); "action safe 90%" và lề 1/20, lưới 12 cột, nhịp 8pt/4pt; tỉ lệ màu 60-30-10;
+  halation (trang Wikipedia đó nói về **ảnh phim**, không nói về chữ trên slide); cam/vàng trượt tương phản;
+  biểu đồ tròn ≤ 5 phần; Tufte phản đối PowerPoint; mọi con số "số slide"
+- **Sửa hai chỗ trong `references/co-so-do-duoc.md`**: bỏ con số **"máy chiếu làm màu nhạt đi 20–30%"** (không
+  có nguồn — giữ lời khuyên "chừa dư tương phản", bỏ con số), và "**≈ 8% nam giới**" viết lại thành **5–8%**
+  vì nguồn (Okabe & Ito) ghi 1/12 gốc Âu (8%), 1/20 gốc Á (5%), 1/25 gốc Phi (4%) — lấy 8% làm con số chung
+  là sai
+- **`SKILL.md` mục 2 nay phân biệt hai sàn**: `slide.type.minimum` = 12 là **sàn kỹ thuật** (ngưỡng
+  `small-font` của `checkLayout`), còn **sàn trợ năng** là **18pt** theo Microsoft. Chữ để đọc cứ dùng
+  `slide.type.title` / `slide.type.body` (28/20 — trên cả hai sàn), muốn vừa thì **cắt chữ, đừng hạ cỡ**.
+  Chỉ dòng phụ (`slide.type.caption` 14pt) được dưới 18pt, và khi đó nó là **chữ thường** theo WCAG nên phải
+  đủ 4.5:1 → chỉ `colors.text` hoặc `colors.muted`, không `colors.warning`, không `colors.accent` /
+  `colors.success` trên nền xám. Hai sự kiện rời nhau (cỡ chữ, tương phản) ghép lại thành một quy tắc dùng được
+- **`SKILL.md` mục 3** nêu nguồn cho trần tiêu đề ≤ 15 từ / ≤ 2 dòng, và nói rõ nó **trùng** trần kỹ thuật
+  của lưới (2 dòng ở 28pt ≈ 92 ký tự ≈ 15 từ) — trước đó con số này không có xuất xứ
+- Vì sao đợt này đáng làm: một skill ghi "theo chuẩn X" cho một X không tồn tại thì **dạy agent nói giọng
+  chắc chắn về điều mình không biết**. Nay file tách hẳn hai loại — "chuẩn có nguồn" và "thực hành phổ biến,
+  chưa kiểm chứng" — và mục 10 nói thẳng cái nào là cái nào
+
+### Fixed — Skill làm slide: lưới chép từ PowerPoint 960×540 nên **tự sinh `overflow`**, và hai skill giữ hai bộ toạ độ (13/10/2026)
+- **`trinh-bay-chuyen-nghiep` dựng lưới trên một slide không tồn tại.** Lưới cũ ghi "16:9 thường 960×540" —
+  đó là mặc định của **PowerPoint**; Impress mặc định là **793.7 × 446.5pt** (28 × 15.75cm), nhỏ hơn **0.827
+  lần** theo chiều dài. Đo 13/10/2026 trên LibreOffice thật, `xvfb-run` có màn hình ảo.
+- **Hệ quả là lỗi số học, không phải chuyện thẩm mỹ**: hộp tiêu đề cũ cao **60pt**, `slide.type.title` = 36,
+  mà mỗi dòng chữ cao **1.12 × cỡ chữ** và hộp có **7.1pt lề trong** → một tiêu đề 2 dòng cần
+  `7.1 + 2 × 1.12 × 36` = **87.7pt**, gấp rưỡi chiều cao hộp. Skill lại còn **bắt buộc** tiêu đề là câu kết
+  luận ≤ 2 dòng: làm đúng hướng dẫn là chắc chắn `overflow`
+- **`slide.type.title` 36 → 28** (= 36 × 0.827, tương đương thị giác với 36pt trên slide PowerPoint), hộp
+  tiêu đề 60pt → **80pt** (top 30), vùng nội dung top 110 → **130** cao `H − 170`, thêm **dòng nguồn** ở
+  `H − 36`. Đây là **thay đổi nhìn thấy được** của slide do skill dựng ra, không phải đổi chú thích
+- **`bao-cao-thang/references/bo-cuc.md` xoá**: file giữ bộ toạ độ **thứ hai** (960×540, 880, 920…) lệch với
+  lưới của `trinh-bay-chuyen-nghiep`, mà hai skill này được thiết kế để dùng cùng nhau. Nay **chỉ một nơi**
+  giữ toạ độ; `bao-cao-thang` chỉ còn nói *viết gì* trên từng slide (`references/noi-dung-slide.md`), còn vị
+  trí thì trỏ về skill chung
+- **Ghi rõ giới hạn thật của wpp** để agent thôi hứa suông: `addText` không có phông chữ / chữ nghiêng /
+  gạch đầu dòng / giãn dòng, và **cỡ chữ, đậm, màu áp cho cả hộp** nên không in đậm riêng được một con số;
+  không có lệnh biểu đồ, hình khối, sơ đồ, tô nền; `addTable` không nhận cỡ chữ hay màu ô; và **`checkLayout`
+  không đọc được chữ trong bảng** (ô bảng không phải text shape) — nên trạng thái "Đạt/Chậm" phải ghi bằng
+  **chữ**, không thể trông vào màu ô
+- **Ba ngưỡng tương phản tính từ `tokens.json`** (công thức WCAG ở `references/co-so-do-duoc.md`):
+  `colors.warning` 4.33:1 **không đạt AA cho chữ thường** nên chỉ dùng ở cỡ lớn/in đậm; `colors.accent`
+  (4.33:1) và `colors.success` (4.06:1) mất chuẩn AA khi đặt trên `colors.surface`; `colors.muted` 7.00:1 chỉ
+  vừa AAA trên nền trắng, trên `surface` còn AA. Ràng buộc này ghi luôn vào `tokens.json` (khoá
+  `colors.note`) vì nó là thuộc tính của **chính bảng màu**: ai đổi màu cũng phải thấy yêu cầu, chứ không
+  phải đọc skill mới biết
+
+### Added — Đo lại lưới slide trên LibreOffice thật, và ép skill viết đúng số đo (13/10/2026)
+- `tests/lo/measure_slide_grid.py` — **không** phải unittest (không có tiền tố `test_` nên `make test-lo`
+  không gom): dựng đúng lưới trong SKILL.md lên slide thật, in ra từng hộp *cần bao nhiêu / có bao nhiêu*,
+  rồi hỏi `checkLayout`. Lệch một con số là in `LỆCH:` và trả mã 1, nên lần sau LibreOffice đổi cách dàn chữ
+  thì script đỏ **trước** khi người dùng thấy slide xấu. Đây là cách tái lập mọi con số trong
+  `references/co-so-do-duoc.md`
+- Con số đo được, thay cho phỏng đoán: dòng cao **1.115–1.120 × cỡ chữ** (18/20/28pt), lề trong **7.1pt**
+  không đổi theo cỡ chữ. Bề ngang ký tự thì **không có một hằng số**: dò nhị phân chuỗi dài nhất còn vừa một
+  dòng ra **75 ký tự** ở 20pt và **53** ở 28pt (0.48 × cỡ chữ) với chữ viết liền, nhưng văn xuôi thật có dấu
+  chỉ được **55.5 ký tự/dòng** ở 20pt (0.64) vì chỗ ngắt từ ăn mất phần dư — nên 0.55 là ước lượng **ở giữa**
+  với sai số **±20%**, và bài viết nay nói rõ phải chừa một dòng dư thay vì thiết kế sát trần
+- Slide đầy nhất dựng theo lưới mới (tiêu đề 65 ký tự, 5 gạch đầu dòng 379 ký tự, nguồn 61 ký tự = **501 ký
+  tự**) qua `checkLayout` với **`issueCount=0`**, và mọi hộp đều vừa: 69.8 ≤ 80, 231.1 ≤ 276.5, 22.8 ≤ 24
+- `references/co-so-do-duoc.md` tách phần **"Cái chưa đo được — đừng bịa"**: chiều cao hàng bảng chưa đo nên
+  "≤ 6 dòng" là kinh nghiệm; bảng là lỗi duy nhất máy không bắt được; `_shape_text_height` bị chặn ở 900pt
+- **Kiểm luôn giới hạn layout** trong cùng script: cả bốn layout 1/2/11/12 cho đúng **hai hộp rỗng**, không
+  hộp nào có chữ — và **1 với 11 là cùng một kiểu** (`AUTOLAYOUT_TITLE`, cả hai đọc lại ra `DrawPageLayout 1`).
+  Đây là căn cứ cho quy tắc "luôn `layout: 12` + hộp chữ tự đặt", trước đó chỉ là ghi chú suông
+- `references/cau-chuyen.md`: dàn ý bài thuyết trình (kết luận trước theo tháp Minto, slide 2 là tóm tắt cho
+  người quyết định sáu phần, tiêu đề hành động) kèm danh sách **nguồn không thống nhất** (số slide mỗi bài) và
+  danh sách **không có nguồn** — giữ nguyên là "chưa rõ", không nâng thành quy tắc
+
 ### Fixed — Skill dựng sẵn: đợt P1 của review — lệch token, kiểm tra không bao giờ bắn, description bị cắt ở tầng 1 (12/10/2026)
 - **`bao-cao-thang/references/bo-cuc.md` chép cứng cỡ chữ và màu, lệch `tokens.json`**: bìa ghi `fontSize: 40`,
   tiêu đề slide nội dung `32`, kèm bốn mã màu — trong khi `tokens.json` đặt `slide.type.title = 36` và
