@@ -13,7 +13,9 @@ RID="linux-x64"
 [ "${1:-}" = "--rid" ] && RID="$2"
 PYTHON="$(command -v python3 || command -v python)"
 
-VERSION="$(cat "$ROOT/VERSION" 2>/dev/null | tr -d '\r\n\t ' || true)"
+# VERSION o goc repo la nguon duy nhat (scripts/check_version.py canh). '|| true' de khi thieu file thi
+# guard ben duoi in thong bao ro rang, thay vi set -e cat ngang giua script.
+VERSION="$(tr -d '\r\n\t ' < "$ROOT/VERSION" || true)"
 [ -n "$VERSION" ] || { echo "khong doc duoc VERSION" >&2; exit 1; }
 NAME="axiom-office-${RID}-${VERSION}"
 STAGE="$ROOT/dist/$NAME"

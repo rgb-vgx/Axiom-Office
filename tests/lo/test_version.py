@@ -24,6 +24,16 @@ COPIES = [
 JS = os.path.join("src", "AxiomOffice.WPS", "main.js")
 
 
+def repo_version() -> str:
+    """So phien ban hien tai, doc tu VERSION goc.
+
+    Doc dong nay thay vi viet cung: cay gia phai doi tu so THAT sang so khac, neu viet cung
+    thi moi lan bump VERSION test lai do vi ly do sai (ban sao da la so moi, khong con gi de doi).
+    """
+    with open(os.path.join(ROOT, "VERSION"), encoding="utf-8") as handle:
+        return handle.read().strip()
+
+
 def run_check(*args: str) -> subprocess.CompletedProcess:
     return subprocess.run(
         [sys.executable, SCRIPT, *args],
@@ -39,38 +49,32 @@ class VersionTests(unittest.TestCase):
         self.assertEqual(proc.returncode, 0, proc.stderr)
 
     def make_fake_tree(self, version: str) -> str:
+        """Cay gia: VERSION=<version>, va ca 4 ban sao da doi sang <version>."""
         tmp = tempfile.mkdtemp(prefix="axiom-version-")
         self.addCleanup(shutil.rmtree, tmp, True)
         with open(os.path.join(tmp, "VERSION"), "w", encoding="utf-8", newline="\n") as handle:
             handle.write(version + "\n")
+        current = repo_version()
         for rel in COPIES:
             src = os.path.join(ROOT, rel)
             dst = os.path.join(tmp, rel)
             os.makedirs(os.path.dirname(dst), exist_ok=True)
-            shutil.copyfile(src, dst)
+            with open(src, encoding="utf-8") as handle:
+                text = handle.read()
+            text = text.replace(current, version)
+            with open(dst, "w", encoding="utf-8", newline="\n") as handle:
+                handle.write(text)
         return tmp
 
     def test_cay_gia_khop(self):
         # Chung minh trinh kiem khong phai luc nao cung do: thay toan bo sang 9.9.9 van xanh.
         tmp = self.make_fake_tree("9.9.9")
-        for rel in COPIES:
-            with open(os.path.join(tmp, rel), encoding="utf-8") as handle:
-                text = handle.read()
-            text = text.replace("0.1.0", "9.9.9")
-            with open(os.path.join(tmp, rel), "w", encoding="utf-8", newline="\n") as handle:
-                handle.write(text)
         proc = run_check("--root", tmp)
         self.assertEqual(proc.returncode, 0, proc.stderr)
 
     def test_cay_gia_lech_bao_do(self):
         # Phep thu bat buoc: mot trinh kiem luon bao xanh la vo dung.
         tmp = self.make_fake_tree("9.9.9")
-        for rel in COPIES:
-            with open(os.path.join(tmp, rel), encoding="utf-8") as handle:
-                text = handle.read()
-            text = text.replace("0.1.0", "9.9.9")
-            with open(os.path.join(tmp, rel), "w", encoding="utf-8", newline="\n") as handle:
-                handle.write(text)
         target = os.path.join(tmp, JS)
         with open(target, encoding="utf-8") as handle:
             text = handle.read()
