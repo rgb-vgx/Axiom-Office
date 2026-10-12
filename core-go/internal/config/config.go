@@ -48,8 +48,8 @@ type Config struct {
 	// VerifyWorkEnabled: agent tu doc lai tai lieu sau khi sua, truoc khi tra loi (xem
 	// model.AgentOptions.Verify). MAC DINH BAT: do duoc la bo khung khong tu kiem chung thi phai co
 	// nguoi nhac moi chay tiep, con bo khung tu kiem chung thi xong viec mot minh.
-	VerifyWorkEnabled bool
-	VisualQaEnabled   bool
+	VerifyWorkEnabled        bool
+	VisualQaEnabled          bool
 	LlmApiKey                string
 	MemoryModel              string
 	EmbeddingModel           string

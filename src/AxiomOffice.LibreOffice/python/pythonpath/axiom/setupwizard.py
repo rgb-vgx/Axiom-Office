@@ -201,9 +201,9 @@ class Wizard:
             icon = holder.add("ImageControl", 2, 3, 12, 12, Border=0, ScaleImage=False, BackgroundColor=theme.PANE_BG,
                               Tabstop=False)
             set_icon(icon, "dot", 12, theme.PANE_BG)
-            label = holder.add("FixedText", 24, 0, WIDTH - 2 * PAD - 150, 18, Label=meta["label"], Border=0,
-                               NoLabel=True, BackgroundColor=theme.PANE_BG, TextColor=theme.TEXT_PRIMARY,
-                               font=(theme.FONT_SEMIBOLD, theme.SIZE_SMALL))
+            holder.add("FixedText", 24, 0, WIDTH - 2 * PAD - 150, 18, Label=meta["label"], Border=0,
+                       NoLabel=True, BackgroundColor=theme.PANE_BG, TextColor=theme.TEXT_PRIMARY,
+                       font=(theme.FONT_SEMIBOLD, theme.SIZE_SMALL))
             detail = holder.add("FixedText", 24, 18, WIDTH - 2 * PAD - 150, 22, Label=meta["help"], Border=0,
                                 NoLabel=True, BackgroundColor=theme.PANE_BG, TextColor=theme.TEXT_MUTED,
                                 font=(theme.FONT, theme.SIZE_CAPTION))

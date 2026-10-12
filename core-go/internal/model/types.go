@@ -44,7 +44,7 @@ type Turn struct {
 	HasText bool
 	// Reasoning: phan suy nghi cua model reasoning (`reasoning_content`), tach khoi cau tra loi.
 	// Rong khi model khong suy luan hoac da tat bang `thinking: {type: disabled}`.
-	Reasoning string
+	Reasoning    string
 	ToolCalls    []ToolCall
 	InputTokens  int
 	OutputTokens int

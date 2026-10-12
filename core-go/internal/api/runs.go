@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -320,6 +319,3 @@ func nilIfEmpty(value string) any {
 	}
 	return value
 }
-
-// jsonUnmarshal giu cho ham readJSON dung chung kieu du lieu don gian.
-func jsonUnmarshal(data []byte, target any) error { return json.Unmarshal(data, target) }

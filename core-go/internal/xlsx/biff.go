@@ -44,9 +44,7 @@ const (
 	recBlank    = 0x0201
 	recMulBlank = 0x00BE
 
-	// dt trong ban ghi BOF.
-	bofWorkbookGlobals = 0x0005
-	bofWorksheet       = 0x0010
+	// Ban ghi BOF co id 0x0005 (workbook globals) va 0x0010 (worksheet), hien chua can phan biet.
 
 	// BIFF8 la 0x0600; nho hon la BIFF cu hon.
 	biff8Version = 0x0600

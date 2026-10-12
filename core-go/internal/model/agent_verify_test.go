@@ -284,7 +284,7 @@ func TestRunAgentBudgetCountsOnlyBillableTokens(t *testing.T) {
 	reply := `{"choices":[{"message":{"role":"assistant","content":null,"tool_calls":[{"id":"c","function":{"name":"t","arguments":"{}"}}]}}],"usage":{"prompt_tokens":20000,"completion_tokens":100,"prompt_cache_hit_tokens":19000}}`
 	server, _ := verifyServer(t, []string{reply})
 	options := DefaultAgentOptions()
-	options.MaxTokens = 5000   // nho hon raw (20100/vong) nhung lon hon billable (1100/vong)
+	options.MaxTokens = 5000 // nho hon raw (20100/vong) nhung lon hon billable (1100/vong)
 	options.MaxRounds = 4
 	result := runOn(server, false, options)
 

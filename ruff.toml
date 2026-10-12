@@ -1,0 +1,11 @@
+# Chi bat luat bat loi that: E9 (loi cu phap) va F (pyflakes: ten chua dinh nghia,
+# import thua, bien thua). Khong bat ruff format, luat tham my hay line-length: cay Python
+# ~40k dong, bat dinh dang se tao diff khong lo khong ai doc duoc.
+select = ["E9", "F"]
+
+extend-exclude = [
+  # Ba goi oracle la ban doi chieu giu nguyen (co 2 phat hien F401 trong do, giu nguyen la chu y).
+  "tests/oracle",
+  # Thu muc worktree cua agent, khong phai ma nguon.
+  ".kilo",
+]

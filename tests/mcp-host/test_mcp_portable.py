@@ -303,7 +303,7 @@ def main() -> int:
     out = tempfile.mkdtemp(prefix="axiom-mcp-")
     server = Server(command, args.split())
     try:
-        tools = test_protocol(server)
+        test_protocol(server)
         check(len(server.stderr) >= 0, "server khong in ra stdout rac", "")
         test_docx(server, out)
         test_xlsx(server, out)

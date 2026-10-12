@@ -14,10 +14,6 @@ type argError struct{ message string }
 
 func (e argError) Error() string { return e.message }
 
-func fail(format string, values ...any) {
-	panic(argError{message: fmt.Sprintf(format, values...)})
-}
-
 // ToolArgs doc arguments cua tools/call. JSON null duoc coi nhu khong truyen.
 type ToolArgs struct {
 	values map[string]any

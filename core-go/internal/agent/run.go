@@ -42,12 +42,12 @@ type Run struct {
 	// phai tham so. 0 khi nha cung cap khong cache hoac khong bao.
 	CachedTokens int
 	// Verified: luot nay co sua tai lieu nen da duoc yeu cau doc lai truoc khi tra loi.
-	Verified  bool
-	Seconds   float64
-	ToolCalls int
-	Transcript     []string
-	Events         *EventStream
-	Confirmations  *Confirmations
+	Verified      bool
+	Seconds       float64
+	ToolCalls     int
+	Transcript    []string
+	Events        *EventStream
+	Confirmations *Confirmations
 
 	ctx    context.Context
 	cancel context.CancelFunc

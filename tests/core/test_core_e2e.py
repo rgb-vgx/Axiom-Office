@@ -334,10 +334,6 @@ def test_fake_bridge(core: Core, bridge: FakeBridge, llm: FakeLlm, document_path
     document = {"name": os.path.basename(document_path), "fullName": document_path}
 
     # 1. Mot luot day du: goi tool roi tra loi.
-    llm_script = [
-        {"tool": "office_action", "arguments": {"action": "et.writeRange", "params": {"range": "A1", "values": [["a", 1]]}}},
-        {"text": "Da ghi xong bang diem"},
-    ]
     start = len(llm.requests())
     status, reply = core.run("ghi bang diem", office, document=document)
     check(status == 200 and reply["ok"] is True, "POST /v1/runs tao luot chay", reply)
@@ -1215,7 +1211,7 @@ def test_visual(work: str, token: str, bridge: FakeBridge, document_path: str, s
             before = len(llm.requests())
             bridge.commands.clear()
             status, created = core.run("Lam dep bang", office, document={"name": "bao-cao.xlsx", "fullName": document_path})
-            events = core.events(created["result"]["runId"])
+            core.events(created["result"]["runId"])
             bodies = [item["body"] for item in llm.requests()[before:]]
             tools = [t["function"]["name"] for t in bodies[0].get("tools", [])]
             if not enabled:

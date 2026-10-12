@@ -54,7 +54,7 @@ func TestListenFailsWhenRangeExhausted(t *testing.T) {
 	if err == nil {
 		t.Fatal("het khoang port thi phai loi")
 	}
-	if !strings.Contains(err.Error(), "No free port in range 65535..65544") {
+	if !strings.Contains(err.Error(), "no free port in range 65535..65544") {
 		t.Fatalf("thong bao loi phai giong ban .NET: %v", err)
 	}
 }

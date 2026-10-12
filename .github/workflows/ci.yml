@@ -33,6 +33,12 @@ jobs:
           go-version-file: core-go/go.mod
           cache-dependency-path: core-go/go.sum
 
+      - name: Lint Go + Python (gofmt + vet + staticcheck + ruff)
+        run: |
+          go install honnef.co/go/tools/cmd/staticcheck@v0.8.1
+          python3 -m pip install "ruff==0.17.0"
+          make lint
+
       - name: File sinh khong duoc lech nguon
         run: |
           python3 scripts/generate_setup_catalog.py --check

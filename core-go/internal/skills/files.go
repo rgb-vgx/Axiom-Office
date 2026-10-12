@@ -16,10 +16,8 @@ var binaryExtensions = map[string]bool{".docx": true, ".xlsx": true, ".pptx": tr
 
 // AllowedExtensions liet ke cho thong bao loi (thu tu on dinh).
 func AllowedExtensions() string {
-	all := []string{}
-	for _, extension := range []string{".md", ".txt", ".json", ".csv", ".docx", ".xlsx", ".pptx", ".png", ".jpg"} {
-		all = append(all, extension)
-	}
+	// Thu tu co dinh co chu y: giu nguyen khi them duoi moi.
+	all := []string{".md", ".txt", ".json", ".csv", ".docx", ".xlsx", ".pptx", ".png", ".jpg"}
 	return strings.Join(all, ", ")
 }
 

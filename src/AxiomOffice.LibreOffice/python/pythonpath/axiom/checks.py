@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import re
 
-import uno
-
 from . import values
 from .commands import command, opt
 

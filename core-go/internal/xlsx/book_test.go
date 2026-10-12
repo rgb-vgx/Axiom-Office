@@ -199,7 +199,7 @@ func TestSheetOperations(t *testing.T) {
 	if err := reopened.DeleteSheet(target); err != nil {
 		t.Fatalf("xoa sheet: %v", err)
 	}
-	pkg, again := reopen(t, pkg)
+	_, again := reopen(t, pkg)
 	if got := again.SheetNames(); !reflect.DeepEqual(got, []string{"Sheet1"}) {
 		t.Fatalf("sau khi xoa: %v", got)
 	}

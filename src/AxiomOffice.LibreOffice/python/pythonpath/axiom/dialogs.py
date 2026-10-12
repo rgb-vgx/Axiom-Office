@@ -14,8 +14,6 @@ from __future__ import annotations
 
 import uno
 
-import os
-
 from . import config, core, theme
 from .awt import ChildWindow, Dialog, bind_actions
 

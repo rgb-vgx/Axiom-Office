@@ -4,7 +4,6 @@ import (
 	"strconv"
 	"strings"
 
-	"axiomoffice/core/internal/model"
 	"axiomoffice/core/internal/office"
 	"axiomoffice/core/internal/skills"
 )
@@ -169,6 +168,3 @@ func summaryPrompt(messageCount int) string {
 		"Keep: what the user asked for, what was already done to the document, decisions, and open items. " +
 		"The conversation has " + strconv.Itoa(messageCount) + " messages; the older ones are being dropped from context."
 }
-
-// truncate: cat theo rune (dung cho transcript/audit).
-func truncate(value string, max int) string { return model.Truncate(value, max) }

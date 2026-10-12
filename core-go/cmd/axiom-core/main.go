@@ -243,7 +243,7 @@ func listen(cfg config.Config) (net.Listener, error) {
 			return listener, nil
 		}
 	}
-	return nil, fmt.Errorf("No free port in range %d..%d; Agent Core cannot start.", cfg.CorePort, cfg.CorePort+9)
+	return nil, fmt.Errorf("no free port in range %d..%d; Agent Core cannot start", cfg.CorePort, cfg.CorePort+9)
 }
 
 func sessionDir(cfg config.Config) string {

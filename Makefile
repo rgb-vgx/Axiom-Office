@@ -1,4 +1,8 @@
-.PHONY: help test test-lo test-wps test-core test-mcp test-oracle test-install core-build check-gen package clean
+.PHONY: help test test-lo test-wps test-core test-mcp test-oracle test-install core-build check-gen package clean fmt lint lint-go lint-py
+
+GOBIN := $(shell go env GOPATH)/bin
+RUFF ?= $(shell command -v ruff 2>/dev/null || echo python3 -m ruff)
+STATICCHECK ?= $(shell command -v staticcheck 2>/dev/null || echo $(GOBIN)/staticcheck)
 
 help:
 	@echo "Danh sach dich:"
@@ -14,6 +18,10 @@ help:
 	@echo "  check-gen   - Kiem tra file sinh khong lech nguon"
 	@echo "  package     - Dong goi tarball Linux"
 	@echo "  clean       - Xoa thu muc dist/"
+	@echo "  fmt         - Dinh dang cay Go (gofmt -w)"
+	@echo "  lint        - Chay lint-go + lint-py (T6 noi them lint-js)"
+	@echo "  lint-go     - Kiem dinh dang Go + go vet + staticcheck"
+	@echo "  lint-py     - Kiem loi Python (ruff check)"
 
 test: test-lo test-wps test-core test-mcp test-oracle test-install
 
@@ -54,3 +62,16 @@ package:
 
 clean:
 	rm -rf dist/
+
+fmt:
+	cd core-go && gofmt -l -w .
+
+lint: lint-go lint-py
+
+lint-go:
+	cd core-go && test -z "$$(gofmt -l .)" || (gofmt -l .; exit 1)
+	cd core-go && go vet ./...
+	cd core-go && $(STATICCHECK) ./...
+
+lint-py:
+	$(RUFF) check .
