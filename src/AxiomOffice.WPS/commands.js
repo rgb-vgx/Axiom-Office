@@ -2509,7 +2509,13 @@
         var rp = tmp + "/rescued/" + nm;
         try { pres.SaveAs(rp); rescued.push(rp); } catch (e2) {}
       }
-      try { pres.Close(false); closed++; } catch (e3) {}
+      // WPP KHONG nhan tham so cho `Presentation.Close`: `Close(false)` bi tu choi bang "参数太多.", va vi loi
+      // bi nuot ngay day nen lenh truoc kia bao "thanh cong" ma khong dong bai nao (do 12/10/2026: hai bai dang
+      // mo ma `closed` = 0). Goi khong tham so moi dung: do duoc la dong that, `Presentations.Count` ve 0. Nhanh
+      // du phong cho ban WPS khac chi nhan dang co tham so — ET thi `Workbook.Close(false)` chay duoc.
+      // Do tren hai bai DA LUU (`Saved` = -1); duong cuu bai chua luu o tren giu cho Close() khong gap bai ban.
+      try { pres.Close(); closed++; }
+      catch (e3) { try { pres.Close(false); closed++; } catch (e4) {} }
     }
     return { closed: closed, rescued: rescued };
   }
