@@ -22,11 +22,19 @@ from .awt import ChildWindow, Dialog, bind_actions
 DIALOGS: dict = {}   # ten -> cua so dang mo (ChildWindow hoac Dialog; bam lai thi dong cai cu)
 
 
-def _open(ctx, frame, name: str, width: int, height: int, floating: bool = False):
+def _open(ctx, frame, name: str, width: int, height: int, floating: bool | None = None):
     """Mo cua so giua cua so tai lieu (dang bam lai thi dong cua so cu truoc).
 
-    floating=True: cua so roi (`awt.Dialog`) - dung khi mo tu wizard thiet lap (cung la cua so roi): cua so
-    con nam DUOI wizard nen bi che, va tren Linux cua so con khong nhan chuot (xem awt.Dialog).
+    `floating=None` (mac dinh) = TU CHON THEO NEN TANG, va tren Linux luon la cua so roi. Ly do do bang
+    xdotool ngay 13/10/2026: cua so con (`awt.ChildWindow`) VE ra duoc nhung KHONG nhan duoc cu bam chuot -
+    bam dung vao nut "Dong" cua dialog ma dialog van nguyen, trong khi bam vao thanh menu thi menu mo ra (tuc
+    chot chuot co toi LibreOffice, chi khong toi cua so con; cua so tai lieu nam tren cung). Dialog nao co nut
+    thi BAT BUOC la cua so roi, khong thi nguoi dung chi nhin duoc chu.
+    Tren Windows giu nguyen cua so con: do la cua so that cua he dieu hanh, chua do lai o day nen khong doi
+    hanh vi dang chay duoc.
+
+    floating=True: ep cua so roi - dung khi mo tu wizard thiet lap (cung la cua so roi nen cua so con nam
+    DUOI wizard va bi che).
     """
     old = DIALOGS.pop(name, None)
     if old is not None:
@@ -34,6 +42,8 @@ def _open(ctx, frame, name: str, width: int, height: int, floating: bool = False
             old.close()
         except Exception:  # noqa: BLE001
             pass
+    if floating is None:
+        floating = not config.IS_WINDOWS
     if frame is None:
         from . import documents
 
@@ -53,6 +63,8 @@ def _open(ctx, frame, name: str, width: int, height: int, floating: bool = False
     window.add("FixedText", "title_line", PositionX=0, PositionY=34, Width=width, Height=1, Label="",
                BackgroundColor=theme.DIVIDER)
     window.place(x, y, width, height)
+    if floating:
+        window.to_front()      # cua so roi co the nam sau cua so LibreOffice (nhu wizard: setupwizard.CURRENT)
     DIALOGS[name] = window
     return window
 
@@ -114,7 +126,9 @@ def _set_list(dialog: ChildWindow, name: str, items) -> None:
     uno.invoke(dialog.models[name], "setPropertyValue", ("StringItemList", uno.Any("[]string", tuple(items))))
 
 
-def open_settings(pane, floating: bool = False) -> None:
+def open_settings(pane, floating: bool | None = None) -> None:
+    """floating=None: tu chon theo nen tang nhu `_open` - tren Linux cua so roi, neu khong thi bon nut
+    ("Luu", "Kiem tra Core", "Tat Core", "Dong") khong bam duoc."""
     ctx = pane.ctx
     dialog = _open(ctx, pane.frame if hasattr(pane, "frame") else None, "Cài đặt", 470, 380, floating)
     if dialog is None:
