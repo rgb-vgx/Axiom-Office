@@ -457,7 +457,7 @@ scripts/                                 build, install, uninstall, legacy, pack
 tests/live/                              test lệnh bridge trên app thật
 tests/core/                              xUnit của Core, e2e (fake_llm.py, mcp_sample_server.py, test_core_e2e.py)
 tests/mcp-host/                          test MCP server, round-trip Office
-tools/*-mcp/                             MCP server Python cũ (đối chiếu)
+tests/oracle/*-mcp/                      bản đối chiếu (oracle) cho test parity MCP
 ```
 
 ## 11. Add-in: vòng đời, nhận diện app, UI
@@ -1127,7 +1127,7 @@ flowchart TD
 | `tests/live/test_live_commands.py` | Word/Excel/PowerPoint thật (`--wps`: WPS) | Mọi lệnh bridge và lỗi tham số; bảo mật HTTP (401/403/415); `--ai`: `ai.ask` thật trên 3 app, không tự lưu/xuất; offline: `office_action` từ chối lệnh ngoài danh sách (reflection vào DLL); `--record` / `--compare`: so kết quả từng lệnh với bản ghi golden |
 | `tests/mcp-host/test_mcp_host.py` | Offline | Giao thức MCP qua client chính thức; so kết quả 50 tool với bản Python cũ trên cùng file; mở lại file C# ghi bằng python-docx / openpyxl / python-pptx; README khớp `commands --markdown`; mô tả `*_command` đủ lệnh |
 | `tests/mcp-host/office_roundtrip.ps1` | Office thật | File do Office tạo đọc được bằng C# và ngược lại |
-| `tools/*-mcp/tests` | Offline | Unit test của 3 MCP server Python cũ |
+| `tests/oracle/*-mcp/tests` | Offline | Unit test của 3 gói oracle (chạy trong `make test-oracle`) |
 | `tests/core/AxiomOffice.Core.Tests` (xUnit, chạy invariant globalization như Core) | Offline | Config, vòng đời, codec, thử lại, SSE, SQLite, skill (frontmatter, nguồn, chặn `..`), memory (FTS bỏ dấu, hash, link, chấm điểm, extractor, lọc nhạy cảm), policy + xác nhận, MCP config, QA thị giác |
 | `tests/core/test_core_e2e.py` | Core thật + LLM giả + bridge giả (`--office`: Excel thật) | SSE, hội thoại, allowlist, hủy, trần token, skill, memory 3 phiên + khởi động lại Core, xác nhận (đồng ý/từ chối/hết giờ), MCP server mẫu, QA thị giác, audit |
 | `test_core_e2e.py --real-llm` | LLM thật trong HKCU (thủ công) | Model tự chọn đúng skill cho yêu cầu mẫu, không nạp skill cho sửa nhỏ |

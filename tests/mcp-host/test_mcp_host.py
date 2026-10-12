@@ -10,7 +10,7 @@ chuyển tiếp. Muốn nhắm thẳng vào Core: `AXIOM_MCP_CMD="<đường-d�
 - Hợp lệ: đọc lại file MCP ghi ra bằng python-docx / openpyxl / python-pptx.
 
 Chạy (cần 3 venv của tests/oracle/*-mcp đã cài requirements):
-    tests\oracle\excel-mcp\.venv\Scripts\python.exe tests\mcp-host\test_mcp_host.py [thư_mục_output]
+    tests\\oracle\\excel-mcp\\.venv\\Scripts\\python.exe tests\\mcp-host\\test_mcp_host.py [thư_mục_output]
 """
 from __future__ import annotations
 
