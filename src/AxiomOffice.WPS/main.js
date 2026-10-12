@@ -85,15 +85,42 @@
     return "wps";
   }
 
+  function hasHandlerOf(name) {
+    try {
+      if (window.AxiomCommands && typeof window.AxiomCommands.hasHandler === "function") {
+        return window.AxiomCommands.hasHandler(name);
+      }
+    } catch (e) {}
+    try {
+      if (typeof AxiomCommands !== "undefined" && AxiomCommands &&
+          typeof AxiomCommands.hasHandler === "function") {
+        return AxiomCommands.hasHandler(name);
+      }
+    } catch (e2) {}
+    return true;
+  }
+
+  // CATALOG la hop dong day du registry (ke ca lenh chua co handler): chi khai voi Core
+  // nhung lenh add-in chay duoc, khong thi agent duoc moi goi tool luon that bai.
+  function filterRunnable(list) {
+    var out = [];
+    for (var i = 0; i < list.length; i++) {
+      try {
+        if (hasHandlerOf(list[i].name)) { out.push(list[i]); }
+      } catch (e) {}
+    }
+    return out;
+  }
+
   function getCommands() {
     try {
       var kind = "wps";
       try { kind = currentAppKind(); } catch (eK) { kind = "wps"; }
       if (window.AxiomCommands && typeof window.AxiomCommands.catalogFor === "function") {
-        return window.AxiomCommands.catalogFor(kind);
+        return filterRunnable(window.AxiomCommands.catalogFor(kind));
       }
       if (window.AxiomCommands && typeof window.AxiomCommands.catalog === "function") {
-        return window.AxiomCommands.catalog();
+        return filterRunnable(window.AxiomCommands.catalog());
       }
     } catch (e) {}
     try {
@@ -101,11 +128,11 @@
       try { kind2 = currentAppKind(); } catch (eK2) { kind2 = "wps"; }
       if (typeof AxiomCommands !== "undefined" && AxiomCommands &&
           typeof AxiomCommands.catalogFor === "function") {
-        return AxiomCommands.catalogFor(kind2);
+        return filterRunnable(AxiomCommands.catalogFor(kind2));
       }
       if (typeof AxiomCommands !== "undefined" && AxiomCommands &&
           typeof AxiomCommands.catalog === "function") {
-        return AxiomCommands.catalog();
+        return filterRunnable(AxiomCommands.catalog());
       }
     } catch (e2) {}
     return [];

@@ -1,7 +1,11 @@
 /*
  * Axiom Office - WPS JS add-in command registry + handlers.
  *
- * Global AxiomCommands { catalog(), execute(app, action, params) }.
+ * Global AxiomCommands { catalog(), catalogFor(kind), appKind(app), hasHandler(action),
+ * execute(app, action, params) }.
+ * CATALOG la ban SINH TU DONG tu registry Python (axiom.commands) bang
+ * scripts/generate_mcp_commands.py - KHONG sua tay (vung giua hai moc BEGIN/END SINH TU DONG).
+ * HANDLERS + MUTATING viet tay.
  * Port of src/AxiomOffice/Bridge/CommandDispatcher.Writer.cs (+ app.info) with the
  * same parameter names and result shapes as the LibreOffice handlers in
  * src/AxiomOffice.LibreOffice/python/pythonpath/axiom/writer.py.
@@ -24,10 +28,29 @@
     "writer.replaceAll": true
   };
 
+  // --- BEGIN SINH TU DONG (scripts/generate_mcp_commands.py) - KHONG SUA TAY ---
   var CATALOG = [
     { name: "app.info", kind: null, agent: false,
       summary: "Tên/version app, tài liệu đang mở, `state` (tài liệu, cửa sổ, visible)",
       params: [] },
+    { name: "ai.ask", kind: null, agent: false,
+      summary: "Chạy AI agent trên tài liệu đang mở; trả `reply`, `transcript`, `seconds`, `rounds`",
+      params: [{ name: "prompt", required: true, hint: null }] },
+    { name: "ui.askpane", kind: null, agent: false,
+      summary: "Mở panel Ask AI trong sidebar",
+      params: [] },
+    { name: "ui.setup", kind: null, agent: false,
+      summary: "Mở wizard thiết lập (nhập máy chủ AI, model, kiểm tra kết nối)",
+      params: [] },
+    { name: "app.screenshot", kind: null, agent: false,
+      summary: "Ảnh chụp trang/slide hiện tại (PNG base64, thu nhỏ theo `maxWidth`, mặc định 1280)",
+      params: [{ name: "maxWidth", required: false, hint: null }] },
+    { name: "writer.newDocument", kind: "wps", agent: false,
+      summary: "Tạo tài liệu mới",
+      params: [] },
+    { name: "writer.open", kind: "wps", agent: false,
+      summary: "Mở .docx/.doc/.odt",
+      params: [{ name: "path", required: true, hint: null }] },
     { name: "writer.getText", kind: "wps", agent: true,
       summary: "Đọc toàn bộ text",
       params: [{ name: "maxChars", required: false, hint: null }] },
@@ -80,9 +103,39 @@
         { name: "values", required: false, hint: "2D array of rows" },
         { name: "style", required: false, hint: null }
       ] },
+    { name: "writer.formatTable", kind: "wps", agent: true,
+      summary: "Định dạng bảng CÓ SẴN (không tạo lại): kiểu, font, màu hàng tiêu đề, màu sọc, viền, căn lề, co giãn",
+      params: [
+        { name: "table", required: false, hint: "1-based index; default: table at cursor, else last table" },
+        { name: "style", required: false, hint: "e.g. 'Grid Table 4 - Accent 1'" },
+        { name: "font", required: false, hint: null },
+        { name: "size", required: false, hint: null },
+        { name: "color", required: false, hint: "#RRGGBB text color" },
+        { name: "headerFill", required: false, hint: "#RRGGBB" },
+        { name: "headerColor", required: false, hint: "#RRGGBB header text" },
+        { name: "headerBold", required: false, hint: null },
+        { name: "bandFill", required: false, hint: "#RRGGBB every other data row" },
+        { name: "borderColor", required: false, hint: "#RRGGBB" },
+        { name: "borders", required: false, hint: "false = no borders (layout tables)" },
+        { name: "alignment", required: false, hint: "left/center/right" },
+        { name: "autoFit", required: false, hint: "content/window" }
+      ] },
     { name: "writer.insertPageBreak", kind: "wps", agent: true,
       summary: "Ngắt trang",
       params: [] },
+    { name: "writer.insertImage", kind: "wps", agent: true,
+      summary: "Chèn ảnh tại con trỏ (kích thước theo point)",
+      params: [
+        { name: "path", required: true, hint: null },
+        { name: "width", required: false, hint: null },
+        { name: "height", required: false, hint: null }
+      ] },
+    { name: "writer.insertHyperlink", kind: "wps", agent: true,
+      summary: "Chèn liên kết",
+      params: [
+        { name: "url", required: true, hint: null },
+        { name: "text", required: false, hint: null }
+      ] },
     { name: "writer.replaceAll", kind: "wps", agent: true,
       summary: "Tìm và thay toàn bộ",
       params: [
@@ -92,18 +145,18 @@
     { name: "writer.undo", kind: "wps", agent: true,
       summary: "Hoàn tác (mỗi thao tác AI = 1 bước)",
       params: [{ name: "count", required: false, hint: null }] },
+    { name: "writer.exportPdf", kind: "wps", agent: true,
+      summary: "Xuất PDF",
+      params: [{ name: "path", required: true, hint: null }] },
     { name: "writer.save", kind: "wps", agent: true,
       summary: "Lưu",
       params: [] },
     { name: "writer.saveAs", kind: "wps", agent: true,
       summary: "Lưu thành file mới",
       params: [{ name: "path", required: true, hint: null }] },
-    { name: "writer.exportPdf", kind: "wps", agent: true,
-      summary: "Xuất PDF",
-      params: [{ name: "path", required: true, hint: null }] },
-    // Lenh Spreadsheets (ET) va Presentation (WPP): metadata y het registry LibreOffice
-    // (tests/wps/lo_catalog.py la nguon duy nhat - ten, kind, agent, summary, params).
-    // Handler cua chung nam o phan duoi; lenh khong co handler thi execute() bao unknown action.
+    { name: "writer.closeAll", kind: "wps", agent: false,
+      summary: "**Đóng mọi tài liệu, không lưu**",
+      params: [] },
     { name: "et.newWorkbook", kind: "et", agent: false,
       summary: "Tạo sổ tính mới",
       params: [] },
@@ -224,12 +277,6 @@
     { name: "et.closeAll", kind: "et", agent: false,
       summary: "**Đóng mọi sổ, không lưu**",
       params: [] },
-    { name: "et.checkRange", kind: "et", agent: true,
-      summary: "Soát bảng dữ liệu (chỉ đọc): tiêu đề trống, kiểu lẫn lộn, số dạng chữ, number format, dữ liệu lạc ngoài bảng (chỉ khi không truyền range)",
-      params: [
-        { name: "range", required: false, hint: "default: the used range" },
-        { name: "sheet", required: false, hint: null }
-      ] },
     { name: "wpp.newPresentation", kind: "wpp", agent: false,
       summary: "Tạo bài trình bày mới",
       params: [] },
@@ -309,10 +356,20 @@
     { name: "wpp.closeAll", kind: "wpp", agent: false,
       summary: "**Đóng mọi bài trình bày, không lưu**",
       params: [] },
+    { name: "writer.checkTables", kind: "wps", agent: true,
+      summary: "Soát các bảng (chỉ đọc): số dòng/cột, ô trống, ô tiêu đề lẫn đoạn văn. Bảng dàn trang — bảng đã gọi writer.formatTable với borders:false — được đánh dấu layout và KHÔNG báo empty-cells (ô trống ở đó là cố ý: khoảng trống ký, ô chờ điền)",
+      params: [] },
+    { name: "et.checkRange", kind: "et", agent: true,
+      summary: "Soát bảng dữ liệu (chỉ đọc): tiêu đề trống, kiểu lẫn lộn, số dạng chữ, number format, dữ liệu lạc ngoài bảng (chỉ khi không truyền range)",
+      params: [
+        { name: "range", required: false, hint: "default: the used range" },
+        { name: "sheet", required: false, hint: null }
+      ] },
     { name: "wpp.checkLayout", kind: "wpp", agent: true,
       summary: "Soát bố cục slide (chỉ đọc): chữ tràn khung, shape ra ngoài slide, shape chồng nhau, chữ quá nhỏ",
       params: [{ name: "slide", required: false, hint: "slide number; default: every slide" }] },
   ];
+  // --- END SINH TU DONG ---
 
   function errMessage(err) {
     try {
@@ -2817,7 +2874,13 @@
     }
   }
 
-  var api = { catalog: catalog, catalogFor: catalogFor, appKind: appKind, execute: execute };
+  // hasHandler(action): add-in co chay duoc lenh nay khong (CATALOG la hop dong day du
+  // registry, ke ca lenh chua co handler; main.js dung de loc danh sach khai voi Core).
+  function hasHandler(action) {
+    return typeof HANDLERS[action] === "function";
+  }
+
+  var api = { catalog: catalog, catalogFor: catalogFor, appKind: appKind, execute: execute, hasHandler: hasHandler };
   try {
     if (root) { root.AxiomCommands = api; }
   } catch (e) {}

@@ -58,7 +58,7 @@ test("commands.js dinh nghia AxiomCommands voi catalog + execute", () => {
 
 test("registry add-in co du lenh dot 1 va metadata giong het registry LibreOffice", () => {
   const ctx = loadAddin();
-  assertMetadata(REQUIRED, addinCatalog(ctx));
+  assert.deepEqual(addinCatalog(ctx), loCatalog());
 });
 
 test("lenh sua tai lieu: dung 1 buoc UndoRecord 'AI: <lenh>' (Start roi End)", () => {
@@ -161,6 +161,8 @@ test("main.js: ribbon.OnAddinLoad tra true va bat vong poll; job -> result dung 
   assert.ok(Array.isArray(first.body.commands) && first.body.commands.some((c) => c.name === "writer.getText"),
     "poll phai gui catalog lenh");
   assert.ok("document" in first.body, "poll phai gui document (co the null)");
+  const forbidden = first.body.commands.filter((c) => CHUA_CO_HANDLER[c.name]).map((c) => c.name);
+  assert.deepEqual(forbidden, [], "poll khong duoc khai bao lenh chua co handler: " + JSON.stringify(forbidden));
   const contentType = Object.entries(first.headers).find(([key]) => key.toLowerCase() === "content-type");
   assert.ok(contentType && /application\/json/.test(contentType[1]), "poll gui Content-Type application/json");
   const byId = new Map(results.map((r) => [r.id, r]));
@@ -284,6 +286,14 @@ test("registry LibreOffice: moi lenh deu co handler, hoac nam trong danh sach ch
   }
 });
 
+test("hasHandler: true voi moi lenh co handler, false voi lenh trong CHUA_CO_HANDLER", () => {
+  const ctx = loadAddin();
+  assert.equal(typeof ctx.AxiomCommands.hasHandler, "function", "thieu AxiomCommands.hasHandler");
+  for (const entry of loCatalog()) {
+    assert.equal(!!ctx.AxiomCommands.hasHandler(entry.name), !CHUA_CO_HANDLER[entry.name], entry.name);
+  }
+});
+
 test("execute: lenh cua app khac bi tu choi, khong chay nham", () => {
   const ctx = loadAddin();
   const reply = ctx.AxiomCommands.execute(etApp(), "writer.getText", {});
@@ -355,6 +365,9 @@ test("main.js: poll bao dung app dang chay + catalog da loc theo app do", async 
     const names = body.commands.map((c) => c.name);
     assert.ok(names.includes(expected), kind + ": poll thieu " + expected);
     assert.ok(!names.includes(absent), kind + ": poll khong duoc khai bao " + absent + " (cua app khac)");
+    for (const name of names) {
+      assert.ok(!CHUA_CO_HANDLER[name], kind + ": poll khong duoc khai bao " + name + " (chua co handler)");
+    }
     assert.equal(body.document.name, app.ActiveDocument ? app.ActiveDocument.Name
       : (app.ActiveWorkbook ? app.ActiveWorkbook.Name : app.ActivePresentation.Name),
     kind + ": poll phai bao tai lieu dang mo");
