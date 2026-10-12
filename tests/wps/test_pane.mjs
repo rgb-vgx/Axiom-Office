@@ -51,9 +51,9 @@ class FakeSource {
 }
 FakeSource.all = [];
 
-function harness(responses = {}) {
+function harness(responses = {}, fetchOverride = null) {
   const calls = [];
-  const fetch = (url, options = {}) => {
+  const defaultFetch = (url, options = {}) => {
     const body = options.body ? JSON.parse(options.body) : null;
     calls.push({ url: String(url), method: options.method || "GET", body });
     const key = Object.keys(responses).find((k) => String(url).endsWith(k));
@@ -61,6 +61,7 @@ function harness(responses = {}) {
     return Promise.resolve({ ok: status < 400, status, json: () => Promise.resolve(payload),
       text: () => Promise.resolve(JSON.stringify(payload)) });
   };
+  const fetch = fetchOverride || defaultFetch;
   const ctx = load(["pane-core.js"]);
   assert.equal(typeof ctx.AxiomPaneCore, "object", "thieu global AxiomPaneCore (src/AxiomOffice.WPS/pane-core.js)");
   let state = null;
@@ -104,6 +105,7 @@ test("409 add-in chua ket noi -> loi tieng Viet, khong chay", async () => {
   const last = h.state.messages[h.state.messages.length - 1];
   assert.equal(last.role, "error");
   assert.match(last.text, /Mở một tài liệu/);
+  assert.doesNotMatch(last.text, /Writer/);
 });
 
 test("the xac nhan: confirm.required -> confirm(false) POST /confirm; confirm.resolved xoa the", async () => {
@@ -172,4 +174,29 @@ test("ribbon co nut Ask AI; bam mo task pane pane.html va dung lai lan sau", () 
 test("pane.html nap pane-core.js", () => {
   const html = fs.readFileSync(path.join(ADDIN, "pane.html"), "utf8");
   assert.match(html, /pane-core\.js/);
+});
+
+test("Core tat (fetch bi tu choi) -> loi noi ro phai kiem tra gi", async () => {
+  const failingFetch = () => Promise.reject(new Error("connect refused"));
+  const h = harness({}, failingFetch);
+  await h.pane.send("Xin chao Core oi");
+  await tick();
+  assert.equal(h.state.running, false);
+  const last = h.state.messages[h.state.messages.length - 1];
+  assert.equal(last.role, "error");
+  assert.match(last.text, /Agent Core/);
+  assert.match(last.text, /kiểm tra|khởi động|chạy/i);
+});
+
+test("SSE dut giua luot -> khong im lang", async () => {
+  const h = harness({ "/runs": [200, { ok: true, result: { runId: "r9", conversationId: "c9" } }] });
+  await h.pane.send("Lam viec lau");
+  await tick();
+  assert.equal(h.state.running, true);
+  FakeSource.last.emit("error", {});
+  await tick();
+  assert.equal(h.state.running, false);
+  const last = h.state.messages[h.state.messages.length - 1];
+  assert.equal(last.role, "error");
+  assert.match(last.text, /Agent Core/);
 });

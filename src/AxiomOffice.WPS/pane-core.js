@@ -29,9 +29,9 @@
 (function (root) {
   "use strict";
 
-  var NOT_CONNECTED = "Ch\u01B0a k\u1EBFt n\u1ED1i v\u1EDBi WPS. M\u1EDF m\u1ED9t t\u00E0i li\u1EC7u trong WPS Writer r\u1ED3i th\u1EED l\u1EA1i.";
-  var NET_ERROR = "L\u1ED7i m\u1EA1ng: kh\u00F4ng k\u1EBFt n\u1ED1i \u0111\u01B0\u1EE3c t\u1EDBi Core. Vui l\u00F2ng th\u1EED l\u1EA1i.";
-  var SEND_ERROR = "Kh\u00F4ng g\u1EEDi \u0111\u01B0\u1EE3c y\u00EAu c\u1EA7u. Vui l\u00F2ng th\u1EED l\u1EA1i.";
+  var NOT_CONNECTED = "Ch\u01B0a k\u1EBFt n\u1ED1i v\u1EDBi WPS. M\u1EDF m\u1ED9t t\u00E0i li\u1EC7u trong WPS r\u1ED3i th\u1EED l\u1EA1i.";
+  var NET_ERROR = "Kh\u00F4ng g\u1ECDi \u0111\u01B0\u1EE3c Agent Core. Ki\u1EC3m tra Core \u0111ang ch\u1EA1y tr\u00EAn m\u00E1y n\u00E0y r\u1ED3i th\u1EED l\u1EA1i.";
+  var SEND_ERROR = "Agent Core tr\u1EA3 l\u1EDDi kh\u00F4ng h\u1EE3p l\u1EC7. Vui l\u00F2ng th\u1EED l\u1EA1i; n\u1EBFu v\u1EABn l\u1ED7i, kh\u1EDFi \u0111\u1ED9ng l\u1EA1i Core.";
 
   function safeString(value) {
     try {
