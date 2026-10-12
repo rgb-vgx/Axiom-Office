@@ -15,6 +15,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tests\win\measure_slide_grid
 
 Script in số đo từng mục dưới đây; so với bảng ở đây. Nó không tự đánh đỏ/xanh.
 
+Bộ slide mẫu — dựng đủ sáu mẫu của `bo-cuc-slide.md` (bìa, chia mục, gạch đầu dòng, ba con số, bảng, hai
+cột, ảnh) đúng như wpp, soát theo luật của `checkLayout`, xuất PNG để nhìn bằng mắt:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tests\win\sample_deck_ppt.ps1
+```
+
+Lần chạy 13/10/2026: cả 7 slide không lỗi nào, ảnh giữ đúng tỉ lệ.
+
 ## 2. Slide và hộp chữ mặc định
 
 | Đo | Giá trị |
@@ -145,4 +154,3 @@ Cách tính lại: đọc `colors.*` trong `tokens.json`, chạy công thức tr
   tính theo `W`, `H` vẫn đúng; sức chứa thì tính lại bằng công thức. Ví dụ 720 × 540: hộp nội dung rộng
   640 → ≈ 60 ký tự một dòng ở 20pt, vẫn 14 dòng.
 - **PowerPoint cho Mac / PowerPoint trên web**: không đo, không hỗ trợ (wpp chạy qua COM trên Windows).
-- **Tiêu đề bìa và nhãn ba con số** ở `bo-cuc-slide.md` tính bằng công thức, chưa dựng thật từng mẫu.

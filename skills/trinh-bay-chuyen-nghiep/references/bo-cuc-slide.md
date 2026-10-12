@@ -56,6 +56,9 @@ width: W − 80 (880), height: H − 170 (370)}` + dòng nguồn ở hộp "Ngu�
 
 - Tối đa **6 dòng dữ liệu** + 1 hàng tiêu đề; cột "Thay đổi" ghi "+12%" / "−5%" (dấu trừ là ký tự `−`,
   không phải gạch nối).
+- Bảng lấy **style mặc định của theme PowerPoint** (hàng đầu nền xanh chữ trắng đậm, các hàng tô sọc) —
+  không đổi được sang `colors.primary`, và cũng không cần: nhìn đã gọn. Đừng hứa với người dùng "bảng màu
+  theo nhận diện".
 - Ô luôn **Arial 18pt** (`wpp.addTable` không nhận cỡ chữ). Các hàng chia đều chiều cao bảng: 7 hàng →
   mỗi hàng 52.9, đủ cho **2 dòng** chữ trong ô. Chữ dài hơn thì hàng giãn ra và cả bảng dài xuống.
 - Chữ **một dòng** trong một ô, theo số cột của bảng rộng 880:
@@ -82,14 +85,15 @@ Sức chứa một cột ở 20pt: **≈ 43 ký tự một dòng**, viết **10 
 ## 6. Ảnh
 
 `wpp.addImage {path, slide, left, top, width}` — **chỉ truyền `width`**, ảnh tự giữ tỉ lệ (truyền cả
-`width` lẫn `height` là kéo méo ảnh). Chiều cao suy ra = `width / tỉ_lệ_ảnh`, và phải ≤ **H − 170 (370)**:
+`width` lẫn `height` là kéo méo ảnh). Chiều cao suy ra = `width / tỉ_lệ_ảnh`, và nên ≤ **H − 190 (350)** —
+vùng nội dung cao 370, nhưng ảnh cao hết 370 thì dính sát dòng nguồn trông chật (đã dựng thử):
 
 | Tỉ lệ ảnh | width tối đa |
 |---|---|
-| 16:9 | 657 |
-| 3:2 | 555 |
-| 4:3 | 493 |
-| 1:1 | 370 |
+| 16:9 | 620 |
+| 3:2 | 525 |
+| 4:3 | 465 |
+| 1:1 | 350 |
 
 Căn giữa trong vùng nội dung: `left = (W − width) / 2`, `top = 130 + (370 − height) / 2`. Ảnh rộng quá
 giới hạn sẽ đẩy đáy xuống đè hộp "Nguồn" (`overlap`) hoặc vượt `H` (`offslide`); sửa bằng cách giảm
