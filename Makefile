@@ -1,4 +1,4 @@
-.PHONY: help test test-lo test-wps test-core test-mcp test-install core-build check-gen package clean
+.PHONY: help test test-lo test-wps test-core test-mcp test-oracle test-install core-build check-gen package clean
 
 help:
 	@echo "Danh sach dich:"
@@ -8,13 +8,14 @@ help:
 	@echo "  test-wps    - Kiem thu add-in WPS"
 	@echo "  test-core   - Build Agent Core Go va kiem thu e2e"
 	@echo "  test-mcp    - Kiem thu MCP portable tren binary vua build"
+	@echo "  test-oracle - Kiem thu ban doi chieu (oracle) tests/oracle/*-mcp"
 	@echo "  test-install- Kiem thu bo cai dat Linux (install.sh)"
 	@echo "  core-build  - Build binary Agent Core Go vao dist/core/"
 	@echo "  check-gen   - Kiem tra file sinh khong lech nguon"
 	@echo "  package     - Dong goi tarball Linux"
 	@echo "  clean       - Xoa thu muc dist/"
 
-test: test-lo test-wps test-core test-mcp test-install
+test: test-lo test-wps test-core test-mcp test-oracle test-install
 
 test-lo:
 	python3 -m unittest discover -s tests/lo -v
@@ -34,6 +35,11 @@ test-core: core-build
 
 test-mcp: core-build
 	python3 tests/mcp-host/test_mcp_portable.py $(CURDIR)/dist/core/axiom-core
+
+test-oracle:
+	cd tests/oracle/word-mcp && python3 -m unittest discover -s tests
+	cd tests/oracle/excel-mcp && python3 -m unittest discover -s tests
+	cd tests/oracle/ppt-mcp && python3 -m unittest discover -s tests
 
 test-install:
 	python3 tests/linux/test_install_sh.py

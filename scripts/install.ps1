@@ -124,7 +124,7 @@ Write-Output "  Config:   HKCU\Software\AxiomOffice (Port, PortOffice, Token, En
 Write-Output "  Core:     port $corePort (Agent Core starts on demand; AxiomOffice.Core.exe next to the DLL)"
 if ($tokenGenerated) {
     Write-Output "  Token:    auto-generated (32 hex) - requests to /cmd and /config must send X-Auth-Token"
-    Write-Output "            (AxiomOffice.Host.exe mcp and tools/*-mcp read it from the registry automatically)"
+    Write-Output "            (AxiomOffice.Host.exe mcp and tests/oracle/*-mcp read it from the registry automatically)"
 } else {
     Write-Output "  Token:    existing value kept"
 }

@@ -608,14 +608,14 @@ thêm/sửa lệnh:
 # Mọi lệnh bridge trên Word/Excel/PowerPoint thật (test tự mở app riêng, xong tự đóng; dừng nếu
 # port đã có app của bạn). --wps: chạy trên WPS; --ai: thêm ai.ask (gọi LLM thật);
 # --record/--compare golden.json: ghi / so kết quả từng lệnh trước-sau khi refactor.
-tools\excel-mcp\.venv\Scripts\python.exe tests\live\test_live_commands.py [--wps] [--ai] [--compare golden.json]
+tests\oracle\excel-mcp\.venv\Scripts\python.exe tests\live\test_live_commands.py [--wps] [--ai] [--compare golden.json]
 # MCP server: MCP client chính thức + so kết quả với bản Python trên cùng file, registry lệnh
-tools\excel-mcp\.venv\Scripts\python.exe tests\mcp-host\test_mcp_host.py <thư_mục_output>
+tests\oracle\excel-mcp\.venv\Scripts\python.exe tests\mcp-host\test_mcp_host.py <thư_mục_output>
 # Tạo file mẫu bằng Office thật / mở file C# ghi ra bằng Office thật
 powershell -ExecutionPolicy Bypass -File tests\mcp-host\office_roundtrip.ps1 -Dir <thư_mục_output> -Make
 powershell -ExecutionPolicy Bypass -File tests\mcp-host\office_roundtrip.ps1 -Dir <thư_mục_output> -Verify
-# Unit test của các MCP Python (legacy)
-cd tools\word-mcp; .venv\Scripts\python.exe -m unittest discover -s tests
+# Unit test của các MCP Python (oracle đối chiếu)
+cd tests\oracle\word-mcp; .venv\Scripts\python.exe -m unittest discover -s tests
 # Làn LibreOffice: 56 unit test (giải mã tham số + registry lệnh khớp bản C#, logic pane, theme + đọc SSE của
 # Core) và test mọi lệnh trên LibreOffice thật (script tự mở LibreOffice bằng profile người dùng;
 # --ui: bản có cửa sổ; --ai: ai.ask). Chạy được cả trên Linux (đường dẫn soffice tự dò, tắt app bằng
@@ -629,29 +629,29 @@ cd core-go && go test ./...
 # Wizard thiết lập (Windows): render wizard thật ra ảnh từng bước để soi giao diện (không cần Office)
 powershell -ExecutionPolicy Bypass -File tests\ui\shots.ps1 [-OutDir <thư mục>]   # ảnh vào tests\ui\out\
 # Agent Core e2e: Core thật + LLM giả + bridge giả (không cần Office)
-tools\excel-mcp\.venv\Scripts\python.exe tests\core\test_core_e2e.py
+tests\oracle\excel-mcp\.venv\Scripts\python.exe tests\core\test_core_e2e.py
 # ... chỉ vài phần (fake_bridge,guards,skills,memory,confirm,mcp,visual,setup,shutdown,anthropic,
 #     embeddings,summarize,cancel,mcp_http),
 #     hoặc với Core bản Go (core-go/README.md)
 $env:AXIOM_E2E_CORE_EXE = "<đường dẫn axiom-core.exe>"; python tests\core\test_core_e2e.py --only setup
 # ... hoặc trên Office thật: tự mở Excel, agent sửa tài liệu thật (cần add-in đã cài)
-tools\excel-mcp\.venv\Scripts\python.exe tests\core\test_core_e2e.py --office
+tests\oracle\excel-mcp\.venv\Scripts\python.exe tests\core\test_core_e2e.py --office
 # ... hoặc với LLM thật trong HKCU (tốn token, không chạy mặc định): model có tự chọn đúng skill không
 #     AXIOM_REAL_LLM_APPS=wps,et,wpp lọc app; AXIOM_REAL_LLM_MODEL=<model> thử model khác cùng endpoint
-tools\excel-mcp\.venv\Scripts\python.exe tests\core\test_core_e2e.py --real-llm
+tests\oracle\excel-mcp\.venv\Scripts\python.exe tests\core\test_core_e2e.py --real-llm
 ```
 
-Test MCP cần venv của `tools/word-mcp`, `tools/excel-mcp`, `tools/ppt-mcp` (python-docx, openpyxl,
+Test MCP cần venv của `tests/oracle/word-mcp`, `tests/oracle/excel-mcp`, `tests/oracle/ppt-mcp` (python-docx, openpyxl,
 python-pptx, mcp) để đối chiếu.
 
-### MCP servers Python (`tools/`, legacy)
+### MCP servers Python (`tests/oracle/`, bản đối chiếu)
 
-Ba server Python cũ (`tools/excel-mcp` 17 tool, `tools/word-mcp` 20, `tools/ppt-mcp` 16) được giữ
+Ba server Python cũ (`tests/oracle/excel-mcp` 17 tool, `tests/oracle/word-mcp` 20, `tests/oracle/ppt-mcp` 16) được giữ
 để đối chiếu trong test và cho `excel_query` (DuckDB SQL). Không phát triển thêm; cài đặt mới dùng
 [MCP server C#](#mcp-server).
 
 ```powershell
-cd tools\excel-mcp
+cd tests\oracle\excel-mcp
 python -m venv .venv
 .venv\Scripts\python.exe -m pip install -r requirements.txt
 .venv\Scripts\python.exe -m excel_mcp.server   # hoặc run.cmd
@@ -867,7 +867,7 @@ tests/live/                   test mọi lệnh bridge trên Office/WPS thật
 tests/lo/                     unit test extension LibreOffice (không cần LibreOffice: uno giả)
 tests/mcp-host/               test parity MCP + registry lệnh + round-trip với Office thật
 tests/ui/                     render wizard thiết lập (Windows) ra ảnh từng bước để soi giao diện
-tools/*-mcp/                  MCP servers Python (legacy)
+tests/oracle/*-mcp/            bản đối chiếu (oracle) cho test parity MCP
 ```
 
 Đăng ký ghi hoàn toàn vào HKCU (không cần admin):

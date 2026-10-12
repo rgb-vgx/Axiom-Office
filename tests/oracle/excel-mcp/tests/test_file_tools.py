@@ -102,12 +102,26 @@ class FileToolsTest(unittest.TestCase):
         with self.assertRaises(Exception):
             file_tools.query(self.xlsx, "COPY data TO 'C:/Users/Public/evil.csv' (FORMAT CSV)")
 
-    def test_locked_file_raises_and_leaves_no_temp(self):
+    @unittest.skipUnless(sys.platform == "win32",
+                             "khoa file khi mo chi co tren Windows; tren Linux os.replace van ghi duoc")
+    def test_locked_file_raises(self):
         self._create()
         handle = open(self.xlsx, "r")
         try:
             with self.assertRaises(PermissionError):
                 file_tools.write_range(self.xlsx, "Data", "D1", [["x"]])
+        finally:
+            handle.close()
+
+    def test_write_leaves_no_temp(self):
+        # Ghi qua file tam .~* roi doi ten: du ghi duoc hay bi khoa thi thu muc cung khong con file tam.
+        self._create()
+        handle = open(self.xlsx, "r")
+        try:
+            try:
+                file_tools.write_range(self.xlsx, "Data", "D1", [["x"]])
+            except PermissionError:
+                pass
         finally:
             handle.close()
         leftovers = [n for n in os.listdir(self.dir) if n.startswith(".~")]

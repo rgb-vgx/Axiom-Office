@@ -5,12 +5,12 @@ Bản chạy mặc định là `AxiomOffice.Host.exe mcp`, nhưng từ khi MCP g
 chuyển tiếp. Muốn nhắm thẳng vào Core: `AXIOM_MCP_CMD="<đường-dẫn>AxiomOffice.Core.exe mcp all"`.
 
 - Giao thức: initialize / tools/list / tools/call.
-- Parity: so kết quả tool file với tools/*-mcp/*/file_tools.py (bản Python cũ) trên cùng file
+- Parity: so kết quả tool file với tests/oracle/*-mcp/*/file_tools.py (bản Python cũ) trên cùng file
   (file do MCP tạo, do python-docx/openpyxl/python-pptx tạo, file Office thật).
 - Hợp lệ: đọc lại file MCP ghi ra bằng python-docx / openpyxl / python-pptx.
 
-Chạy (cần 3 venv của tools/*-mcp đã cài requirements):
-    tools\\excel-mcp\\.venv\\Scripts\\python.exe tests\\mcp-host\\test_mcp_host.py [thư_mục_output]
+Chạy (cần 3 venv của tests/oracle/*-mcp đã cài requirements):
+    tests\oracle\excel-mcp\.venv\Scripts\python.exe tests\mcp-host\test_mcp_host.py [thư_mục_output]
 """
 from __future__ import annotations
 
@@ -38,10 +38,13 @@ if os.environ.get("AXIOM_MCP_CMD"):
 
 # Thư viện Python của 3 venv + package file_tools cũ để so parity.
 for name in ("word-mcp", "ppt-mcp", "excel-mcp"):
-    sys.path.insert(0, os.path.join(ROOT, "tools", name))
-    site = os.path.join(ROOT, "tools", name, ".venv", "Lib", "site-packages")
+    sys.path.insert(0, os.path.join(ROOT, "tests", "oracle", name))
+    site = os.path.join(ROOT, "tests", "oracle", name, ".venv", "Lib", "site-packages")
     if os.path.isdir(site) and site not in sys.path:
         sys.path.append(site)
+    for lib in glob.glob(os.path.join(ROOT, "tests", "oracle", name, ".venv", "lib", "python*", "site-packages")):
+        if lib not in sys.path:
+            sys.path.append(lib)
 
 import docx  # noqa: E402
 import openpyxl  # noqa: E402
@@ -115,7 +118,7 @@ async def test_protocol(session: ClientSession) -> None:
     check(len(tools) == 50, "tools/list returns 50 tools", str(len(tools)))
     expected_py = set()
     for server in ("word-mcp/word_mcp", "ppt-mcp/ppt_mcp", "excel-mcp/excel_mcp"):
-        with open(os.path.join(ROOT, "tools", server.split("/")[0], server.split("/")[1], "server.py"), encoding="utf-8") as handle:
+        with open(os.path.join(ROOT, "tests", "oracle", server.split("/")[0], server.split("/")[1], "server.py"), encoding="utf-8") as handle:
             for line in handle:
                 if line.startswith("def ") and "_safe" not in line and "_clean" not in line and "_live" not in line and "main" not in line:
                     expected_py.add(line[4:line.index("(")])

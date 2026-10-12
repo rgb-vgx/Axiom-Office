@@ -152,12 +152,11 @@ Các phần e2e chạy riêng được: `fake_bridge`, `guards`, `skills`, `memo
 
 1. **Bạn bấm thử wizard Windows** trong Word/Excel/WPS (5 bước, nhất là **Thử ngay**) rồi báo lại.
 2. Chạy `--real-llm` cho **memory** (trích xuất bằng model thật) khi muốn chắc chắn chất lượng fact.
-3. Dọn `tools/` (các MCP server Python cũ) nếu không còn dùng.
-4. Chạy `test_mcp_host.py` (parity sâu) **trên Linux** — đợt này mới chạy được trên Windows; máy Linux
+3. Chạy `test_mcp_host.py` (parity sâu) **trên Linux** — đợt này mới chạy được trên Windows; máy Linux
    không kết nối được lúc kiểm. Trên Linux cần venv có `mcp`/`python-docx`/`openpyxl`/`python-pptx`
    (xem ghi chú máy kiểm chứng) và đặt `AXIOM_MCP_NO_CATALOG=1`.
-5. `src/AxiomOffice.Core/` và `src/WpsAiBridge.Native/` chỉ còn là thư mục build cũ (không được git
-   theo dõi) — xoá được nếu muốn cây làm việc gọn.
+4. Nhánh C# đã đóng băng (không sửa `src/AxiomOffice/**` và `src/AxiomOffice.Host/**`);
+   `Host.exe mcp` chỉ là shim chuyển tiếp byte sang Core Go (`src/AxiomOffice.Host/Mcp/McpHost.cs`).
 
 ## 7. Đối chiếu benchmark & lộ trình hiệu năng (02–03/10/2026)
 
