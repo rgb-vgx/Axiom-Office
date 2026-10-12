@@ -36,6 +36,12 @@ def opt(name: str, hint: str | None = None) -> Param:
 
 
 def command(name, kind, handler, summary, *params, agent=False, gated=True, undo=False) -> Command:
+    if name in REGISTRY:
+        prev = REGISTRY[name]
+        old = prev.handler
+        mod = getattr(old, "__module__", None) or "?"
+        qual = getattr(old, "__qualname__", None) or getattr(old, "__name__", None) or repr(old)
+        raise ValueError(f"trung lenh '{name}': da dang ky boi {mod}.{qual}")
     item = Command(name, kind, handler, summary, list(params), agent, gated, undo)
     REGISTRY[name] = item
     return item

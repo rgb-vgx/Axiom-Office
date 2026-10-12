@@ -301,6 +301,3 @@ command("wpp.save", "wpp", lambda env, p: documents.save(env.document, "wpp", No
 command("wpp.saveAs", "wpp", lambda env, p: documents.save(env.document, "wpp", values.string(p, "path")),
         "Lưu thành file mới", req("path"), agent=True)
 command("wpp.closeAll", "wpp", lambda env, p: documents.close_all(env.ctx, "wpp"), "**Đóng mọi bài trình bày, không lưu**")
-command("wpp.checkLayout", "wpp", check_layout,
-        "Soát bố cục slide (chỉ đọc): chữ tràn khung, shape ra ngoài slide, shape chồng nhau, chữ quá nhỏ",
-        opt("slide", "slide number; default: every slide"), agent=True)

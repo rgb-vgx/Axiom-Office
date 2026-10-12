@@ -1,13 +1,12 @@
 """Sinh danh sach lenh bridge tu registry lenh cua extension LibreOffice.
 
-Nguon duy nhat: `catalog/live-commands.json` (thay cho `src/AxiomOffice.Mcp/live-commands.json` cu).
-Ban Windows lay danh sach lenh tu CommandCatalog cua add-in (AxiomOffice.Host.exe); ban chay doc lap
-(MCP server .NET 10 cu, va MCP server Go) khong co add-in nen nhung san file nay - dung cho mo ta cac
-tool `word_command`/`ppt_command`/`wps_live_command`.
+Nguon duy nhat: registry Python `axiom.commands` (cac module general/writer/calc/impress/checks
+tu dang ky qua `command()`; trung ten bi bao loi).
 
-Ra hai dich, KHONG sua tay:
-  - `catalog/live-commands.json`  - nguon cho moi ban (nhu `catalog/setup.json`).
-  - `core-go/internal/mcpserver/livecommands_gen.go` - Agent Core ban Go nhung san.
+Ra hai ban sinh, KHONG sua tay (ca hai deu sinh tu registry Python):
+  - `catalog/live-commands.json`  - dung nguyen dau ra cua `commands.catalog()`.
+  - `core-go/internal/mcpserver/livecommands_gen.go` - Agent Core ban Go nhung san (chi lay
+    name/kind/params name+hint tu registry).
 
 `tests/lo/test_extension.py` so lai file JSON voi registry de khong bi lech.
 
@@ -26,7 +25,7 @@ sys.path.insert(0, os.path.join(ROOT, "src", "AxiomOffice.LibreOffice", "python"
 TARGET = os.path.join(ROOT, "catalog", "live-commands.json")
 GO = os.path.join(ROOT, "core-go", "internal", "mcpserver", "livecommands_gen.go")
 
-HEADER_GO = "// SINH TU DONG tu catalog/live-commands.json bang scripts/generate_mcp_commands.py - KHONG sua tay.\n"
+HEADER_GO = "// SINH TU DONG tu registry Python (axiom.commands) bang scripts/generate_mcp_commands.py - KHONG sua tay.\n"
 
 
 def build() -> list:
@@ -49,9 +48,7 @@ def build() -> list:
     from axiom import commands
 
     commands.load_all()
-    return [{"name": item["name"], "kind": item["kind"],
-             "params": [{"name": p["name"], "hint": p["hint"]} for p in item["params"]]}
-            for item in commands.catalog()]
+    return commands.catalog()
 
 
 def render(items: list) -> str:
@@ -68,7 +65,7 @@ def render_go(items: list) -> str:
     lines = [HEADER_GO, "package mcpserver\n\n"]
     lines.append("type liveCommandParam struct {\n\tName string\n\tHint string\n}\n\n")
     lines.append("type liveCommand struct {\n\tName   string\n\tKind   string\n\tParams []liveCommandParam\n}\n\n")
-    lines.append("// liveCommands la danh sach lenh bridge (sinh tu catalog/live-commands.json).\n")
+    lines.append("// liveCommands la danh sach lenh bridge (sinh tu registry Python).\n")
     lines.append("var liveCommands = []liveCommand{\n")
     for item in items:
         params = ", ".join("{Name: %s, Hint: %s}" % (go_string(p["name"]), go_string(p["hint"]))

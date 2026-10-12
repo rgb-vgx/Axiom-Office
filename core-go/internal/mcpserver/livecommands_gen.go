@@ -1,4 +1,4 @@
-// SINH TU DONG tu catalog/live-commands.json bang scripts/generate_mcp_commands.py - KHONG sua tay.
+// SINH TU DONG tu registry Python (axiom.commands) bang scripts/generate_mcp_commands.py - KHONG sua tay.
 package mcpserver
 
 type liveCommandParam struct {
@@ -12,7 +12,7 @@ type liveCommand struct {
 	Params []liveCommandParam
 }
 
-// liveCommands la danh sach lenh bridge (sinh tu catalog/live-commands.json).
+// liveCommands la danh sach lenh bridge (sinh tu registry Python).
 var liveCommands = []liveCommand{
 	{Name: "app.info", Kind: "", Params: []liveCommandParam{}},
 	{Name: "ai.ask", Kind: "", Params: []liveCommandParam{{Name: "prompt", Hint: ""}}},
@@ -62,7 +62,6 @@ var liveCommands = []liveCommand{
 	{Name: "et.save", Kind: "et", Params: []liveCommandParam{}},
 	{Name: "et.saveAs", Kind: "et", Params: []liveCommandParam{{Name: "path", Hint: ""}}},
 	{Name: "et.closeAll", Kind: "et", Params: []liveCommandParam{}},
-	{Name: "et.checkRange", Kind: "et", Params: []liveCommandParam{{Name: "range", Hint: "default: the used range"}, {Name: "sheet", Hint: ""}}},
 	{Name: "wpp.newPresentation", Kind: "wpp", Params: []liveCommandParam{}},
 	{Name: "wpp.open", Kind: "wpp", Params: []liveCommandParam{{Name: "path", Hint: ""}}},
 	{Name: "wpp.listSlides", Kind: "wpp", Params: []liveCommandParam{}},
@@ -77,6 +76,7 @@ var liveCommands = []liveCommand{
 	{Name: "wpp.save", Kind: "wpp", Params: []liveCommandParam{}},
 	{Name: "wpp.saveAs", Kind: "wpp", Params: []liveCommandParam{{Name: "path", Hint: ""}}},
 	{Name: "wpp.closeAll", Kind: "wpp", Params: []liveCommandParam{}},
-	{Name: "wpp.checkLayout", Kind: "wpp", Params: []liveCommandParam{{Name: "slide", Hint: "slide number; default: every slide"}}},
 	{Name: "writer.checkTables", Kind: "wps", Params: []liveCommandParam{}},
+	{Name: "et.checkRange", Kind: "et", Params: []liveCommandParam{{Name: "range", Hint: "default: the used range"}, {Name: "sheet", Hint: ""}}},
+	{Name: "wpp.checkLayout", Kind: "wpp", Params: []liveCommandParam{{Name: "slide", Hint: "slide number; default: every slide"}}},
 }

@@ -128,19 +128,37 @@ class CatalogTests(unittest.TestCase):
             for param in item["params"]:
                 self.assertEqual(set(param), {"name", "required", "hint"})
 
+    def test_registry_rejects_duplicate_name(self):
+        """Dang ky trung ten phai nem loi (neu ro ten lenh + module/handler da dang ky truoc)."""
+        before = dict(commands.REGISTRY)
+        self.assertEqual(len(before), 65)
+        with self.assertRaises(ValueError) as raised:
+            commands.command("et.checkRange", "et", lambda env, p: None, "ban trung")
+        message = str(raised.exception)
+        self.assertIn("et.checkRange", message)
+        self.assertIn("axiom.checks.range_report", message)
+        self.assertEqual(dict(commands.REGISTRY), before, "dang ky loi khong duoc doi registry")
+
+    def test_load_all_nap_du_65_lenh(self):
+        commands.load_all()
+        self.assertEqual(len(commands.REGISTRY), 65)
+
     def test_mcp_live_commands_khop_registry(self):
-        """`catalog/live-commands.json` (nguồn duy nhất) phải khớp registry này.
+        """`catalog/live-commands.json` phai la dung dau ra cua `commands.catalog()`.
+
+        Nguon duy nhat la registry Python (axiom.commands); file JSON nay va
+        `core-go/internal/mcpserver/livecommands_gen.go` la HAI BAN SINH tu registry do
+        (xem scripts/generate_mcp_commands.py).
 
         Bản Windows lấy danh sách lệnh từ CommandCatalog của add-in; bản chạy độc lập (MCP server .NET 10
         cũ, MCP server Go) không có add-in nên nhúng sẵn file này - lệch nghĩa là mô tả tool `*_command`
-        nói sai việc bridge làm được. Agent Core bản Go nhúng qua `livecommands_gen.go` (sinh từ file này).
+        nói sai việc bridge làm được. Agent Core bản Go nhúng qua `livecommands_gen.go` (cung sinh tu
+        registry nay bang scripts/generate_mcp_commands.py).
         """
         path = os.path.join(ROOT, "catalog", "live-commands.json")
         with open(path, encoding="utf-8", newline="") as handle:
             text = handle.read().replace("\r\n", "\n")
-        expected = [{"name": item["name"], "kind": item["kind"],
-                     "params": [{"name": p["name"], "hint": p["hint"]} for p in item["params"]]}
-                    for item in commands.catalog()]
+        expected = commands.catalog()
         self.assertEqual(json.loads(text), expected, "chạy lại scripts/generate_mcp_commands.py")
         self.assertEqual(text, json.dumps(expected, ensure_ascii=False, indent=2) + "\n",
                          "file phải đúng định dạng của scripts/generate_mcp_commands.py")

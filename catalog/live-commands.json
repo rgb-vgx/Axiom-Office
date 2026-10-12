@@ -2,14 +2,19 @@
   {
     "name": "app.info",
     "kind": null,
+    "agent": false,
+    "summary": "Tên/version app, tài liệu đang mở, `state` (tài liệu, cửa sổ, visible)",
     "params": []
   },
   {
     "name": "ai.ask",
     "kind": null,
+    "agent": false,
+    "summary": "Chạy AI agent trên tài liệu đang mở; trả `reply`, `transcript`, `seconds`, `rounds`",
     "params": [
       {
         "name": "prompt",
+        "required": true,
         "hint": null
       }
     ]
@@ -17,19 +22,26 @@
   {
     "name": "ui.askpane",
     "kind": null,
+    "agent": false,
+    "summary": "Mở panel Ask AI trong sidebar",
     "params": []
   },
   {
     "name": "ui.setup",
     "kind": null,
+    "agent": false,
+    "summary": "Mở wizard thiết lập (nhập máy chủ AI, model, kiểm tra kết nối)",
     "params": []
   },
   {
     "name": "app.screenshot",
     "kind": null,
+    "agent": false,
+    "summary": "Ảnh chụp trang/slide hiện tại (PNG base64, thu nhỏ theo `maxWidth`, mặc định 1280)",
     "params": [
       {
         "name": "maxWidth",
+        "required": false,
         "hint": null
       }
     ]
@@ -37,14 +49,19 @@
   {
     "name": "writer.newDocument",
     "kind": "wps",
+    "agent": false,
+    "summary": "Tạo tài liệu mới",
     "params": []
   },
   {
     "name": "writer.open",
     "kind": "wps",
+    "agent": false,
+    "summary": "Mở .docx/.doc/.odt",
     "params": [
       {
         "name": "path",
+        "required": true,
         "hint": null
       }
     ]
@@ -52,9 +69,12 @@
   {
     "name": "writer.getText",
     "kind": "wps",
+    "agent": true,
+    "summary": "Đọc toàn bộ text",
     "params": [
       {
         "name": "maxChars",
+        "required": false,
         "hint": null
       }
     ]
@@ -62,14 +82,19 @@
   {
     "name": "writer.selection",
     "kind": "wps",
+    "agent": true,
+    "summary": "Text + vị trí đang chọn",
     "params": []
   },
   {
     "name": "writer.typeText",
     "kind": "wps",
+    "agent": true,
+    "summary": "Gõ tại con trỏ",
     "params": [
       {
         "name": "text",
+        "required": true,
         "hint": null
       }
     ]
@@ -77,9 +102,12 @@
   {
     "name": "writer.appendText",
     "kind": "wps",
+    "agent": true,
+    "summary": "Nối vào cuối tài liệu",
     "params": [
       {
         "name": "text",
+        "required": true,
         "hint": null
       }
     ]
@@ -87,33 +115,42 @@
   {
     "name": "writer.insertStyledText",
     "kind": "wps",
+    "agent": true,
+    "summary": "Chèn text có định dạng tại con trỏ (`color` dạng `#RRGGBB`)",
     "params": [
       {
         "name": "text",
+        "required": true,
         "hint": null
       },
       {
         "name": "bold",
+        "required": false,
         "hint": null
       },
       {
         "name": "italic",
+        "required": false,
         "hint": null
       },
       {
         "name": "underline",
+        "required": false,
         "hint": null
       },
       {
         "name": "size",
+        "required": false,
         "hint": null
       },
       {
         "name": "color",
+        "required": false,
         "hint": null
       },
       {
         "name": "font",
+        "required": false,
         "hint": null
       }
     ]
@@ -121,17 +158,22 @@
   {
     "name": "writer.heading",
     "kind": "wps",
+    "agent": true,
+    "summary": "Heading 1-9 (`level`, mặc định 1) + tự xuống dòng (`break`, mặc định true)",
     "params": [
       {
         "name": "text",
+        "required": false,
         "hint": null
       },
       {
         "name": "level",
+        "required": false,
         "hint": null
       },
       {
         "name": "break",
+        "required": false,
         "hint": null
       }
     ]
@@ -139,33 +181,42 @@
   {
     "name": "writer.formatSelection",
     "kind": "wps",
+    "agent": true,
+    "summary": "Định dạng vùng chọn",
     "params": [
       {
         "name": "bold",
+        "required": false,
         "hint": null
       },
       {
         "name": "italic",
+        "required": false,
         "hint": null
       },
       {
         "name": "underline",
+        "required": false,
         "hint": null
       },
       {
         "name": "size",
+        "required": false,
         "hint": null
       },
       {
         "name": "color",
+        "required": false,
         "hint": null
       },
       {
         "name": "font",
+        "required": false,
         "hint": null
       },
       {
         "name": "alignment",
+        "required": false,
         "hint": null
       }
     ]
@@ -173,9 +224,12 @@
   {
     "name": "writer.setParagraphAlignment",
     "kind": "wps",
+    "agent": true,
+    "summary": "Căn đoạn: left/center/right/justify",
     "params": [
       {
         "name": "alignment",
+        "required": true,
         "hint": null
       }
     ]
@@ -183,21 +237,27 @@
   {
     "name": "writer.insertTable",
     "kind": "wps",
+    "agent": true,
+    "summary": "Chèn bảng; `rows`/`cols` tự suy ra/nới theo `values`",
     "params": [
       {
         "name": "rows",
+        "required": false,
         "hint": null
       },
       {
         "name": "cols",
+        "required": false,
         "hint": null
       },
       {
         "name": "values",
+        "required": false,
         "hint": "2D array of rows"
       },
       {
         "name": "style",
+        "required": false,
         "hint": null
       }
     ]
@@ -205,57 +265,72 @@
   {
     "name": "writer.formatTable",
     "kind": "wps",
+    "agent": true,
+    "summary": "Định dạng bảng CÓ SẴN (không tạo lại): kiểu, font, màu hàng tiêu đề, màu sọc, viền, căn lề, co giãn",
     "params": [
       {
         "name": "table",
+        "required": false,
         "hint": "1-based index; default: table at cursor, else last table"
       },
       {
         "name": "style",
+        "required": false,
         "hint": "e.g. 'Grid Table 4 - Accent 1'"
       },
       {
         "name": "font",
+        "required": false,
         "hint": null
       },
       {
         "name": "size",
+        "required": false,
         "hint": null
       },
       {
         "name": "color",
+        "required": false,
         "hint": "#RRGGBB text color"
       },
       {
         "name": "headerFill",
+        "required": false,
         "hint": "#RRGGBB"
       },
       {
         "name": "headerColor",
+        "required": false,
         "hint": "#RRGGBB header text"
       },
       {
         "name": "headerBold",
+        "required": false,
         "hint": null
       },
       {
         "name": "bandFill",
+        "required": false,
         "hint": "#RRGGBB every other data row"
       },
       {
         "name": "borderColor",
+        "required": false,
         "hint": "#RRGGBB"
       },
       {
         "name": "borders",
+        "required": false,
         "hint": "false = no borders (layout tables)"
       },
       {
         "name": "alignment",
+        "required": false,
         "hint": "left/center/right"
       },
       {
         "name": "autoFit",
+        "required": false,
         "hint": "content/window"
       }
     ]
@@ -263,22 +338,29 @@
   {
     "name": "writer.insertPageBreak",
     "kind": "wps",
+    "agent": true,
+    "summary": "Ngắt trang",
     "params": []
   },
   {
     "name": "writer.insertImage",
     "kind": "wps",
+    "agent": true,
+    "summary": "Chèn ảnh tại con trỏ (kích thước theo point)",
     "params": [
       {
         "name": "path",
+        "required": true,
         "hint": null
       },
       {
         "name": "width",
+        "required": false,
         "hint": null
       },
       {
         "name": "height",
+        "required": false,
         "hint": null
       }
     ]
@@ -286,13 +368,17 @@
   {
     "name": "writer.insertHyperlink",
     "kind": "wps",
+    "agent": true,
+    "summary": "Chèn liên kết",
     "params": [
       {
         "name": "url",
+        "required": true,
         "hint": null
       },
       {
         "name": "text",
+        "required": false,
         "hint": null
       }
     ]
@@ -300,13 +386,17 @@
   {
     "name": "writer.replaceAll",
     "kind": "wps",
+    "agent": true,
+    "summary": "Tìm và thay toàn bộ",
     "params": [
       {
         "name": "find",
+        "required": true,
         "hint": null
       },
       {
         "name": "replace",
+        "required": false,
         "hint": null
       }
     ]
@@ -314,9 +404,12 @@
   {
     "name": "writer.undo",
     "kind": "wps",
+    "agent": true,
+    "summary": "Hoàn tác (mỗi thao tác AI = 1 bước)",
     "params": [
       {
         "name": "count",
+        "required": false,
         "hint": null
       }
     ]
@@ -324,9 +417,12 @@
   {
     "name": "writer.exportPdf",
     "kind": "wps",
+    "agent": true,
+    "summary": "Xuất PDF",
     "params": [
       {
         "name": "path",
+        "required": true,
         "hint": null
       }
     ]
@@ -334,14 +430,19 @@
   {
     "name": "writer.save",
     "kind": "wps",
+    "agent": true,
+    "summary": "Lưu",
     "params": []
   },
   {
     "name": "writer.saveAs",
     "kind": "wps",
+    "agent": true,
+    "summary": "Lưu thành file mới",
     "params": [
       {
         "name": "path",
+        "required": true,
         "hint": null
       }
     ]
@@ -349,19 +450,26 @@
   {
     "name": "writer.closeAll",
     "kind": "wps",
+    "agent": false,
+    "summary": "**Đóng mọi tài liệu, không lưu**",
     "params": []
   },
   {
     "name": "et.newWorkbook",
     "kind": "et",
+    "agent": false,
+    "summary": "Tạo sổ tính mới",
     "params": []
   },
   {
     "name": "et.open",
     "kind": "et",
+    "agent": false,
+    "summary": "Mở .xlsx/.xls/.ods/.csv",
     "params": [
       {
         "name": "path",
+        "required": true,
         "hint": null
       }
     ]
@@ -369,23 +477,31 @@
   {
     "name": "et.listSheets",
     "kind": "et",
+    "agent": true,
+    "summary": "Danh sách sheet + sheet đang active",
     "params": []
   },
   {
     "name": "et.sheetInfo",
     "kind": "et",
+    "agent": true,
+    "summary": "Kích thước dùng thật của TỪNG sheet trong một lời gọi (`usedRange`/`rows`/`cols`/`empty`) — dùng để soát sheet nào thực sự có nội dung, không chỉ có tên",
     "params": []
   },
   {
     "name": "et.addSheet",
     "kind": "et",
+    "agent": true,
+    "summary": "Thêm sheet mới (bỏ trống `name` thì đặt tên Sheet1, Sheet2...)",
     "params": [
       {
         "name": "name",
+        "required": false,
         "hint": null
       },
       {
         "name": "index",
+        "required": false,
         "hint": "0-based, default: append"
       }
     ]
@@ -393,13 +509,17 @@
   {
     "name": "et.renameSheet",
     "kind": "et",
+    "agent": true,
+    "summary": "Đổi tên sheet",
     "params": [
       {
         "name": "sheet",
+        "required": true,
         "hint": null
       },
       {
         "name": "name",
+        "required": true,
         "hint": null
       }
     ]
@@ -407,9 +527,12 @@
   {
     "name": "et.activateSheet",
     "kind": "et",
+    "agent": true,
+    "summary": "Chuyển sheet",
     "params": [
       {
         "name": "sheet",
+        "required": true,
         "hint": null
       }
     ]
@@ -417,17 +540,22 @@
   {
     "name": "et.readRange",
     "kind": "et",
+    "agent": true,
+    "summary": "Đọc vùng, ví dụ `A1:C10`; `formulas=true` trả về công thức (ô không có công thức = null)",
     "params": [
       {
         "name": "range",
+        "required": true,
         "hint": null
       },
       {
         "name": "sheet",
+        "required": false,
         "hint": null
       },
       {
         "name": "formulas",
+        "required": false,
         "hint": "true = trả mảng `formulas` thay cho `values`"
       }
     ]
@@ -435,17 +563,22 @@
   {
     "name": "et.writeRange",
     "kind": "et",
+    "agent": true,
+    "summary": "Ghi vùng từ ô góc trên-trái; `values` là mảng 2 chiều. Công thức viết theo cú pháp en-US (dấu phẩy); nếu máy dùng dấu chấm phẩy thì tự đổi. Công thức còn lỗi trả về ở `formulaErrors`",
     "params": [
       {
         "name": "range",
+        "required": true,
         "hint": "top-left cell e.g. 'A1'"
       },
       {
         "name": "values",
+        "required": true,
         "hint": "2D array of rows e.g. [[\"Tên\",\"Điểm\"],[\"An\",9.5]]"
       },
       {
         "name": "sheet",
+        "required": false,
         "hint": null
       }
     ]
@@ -453,25 +586,32 @@
   {
     "name": "et.importCsv",
     "kind": "et",
+    "agent": true,
+    "summary": "Nạp một file CSV vào sổ: không có `range` thì tạo sheet mới đặt tên theo tên file, có `range` thì ghi vào ô góc đó. Ô trông như số thì thành số, còn lại là chuỗi; ngày để nguyên chuỗi",
     "params": [
       {
         "name": "path",
+        "required": true,
         "hint": "e.g. 'D:\\data\\raw.csv'"
       },
       {
         "name": "range",
+        "required": false,
         "hint": "top-left cell; bỏ trống thì tạo sheet mới"
       },
       {
         "name": "sheet",
+        "required": false,
         "hint": null
       },
       {
         "name": "delimiter",
+        "required": false,
         "hint": "một ký tự, mặc định ','"
       },
       {
         "name": "encoding",
+        "required": false,
         "hint": "mặc định utf-8-sig"
       }
     ]
@@ -479,13 +619,17 @@
   {
     "name": "et.writeRanges",
     "kind": "et",
+    "agent": true,
+    "summary": "Ghi NHIỀU vùng trong MỘT lời gọi: `writes` là mảng {range, values, sheet?}. Dùng khi cần viết nhiều khối trong cùng một phản hồi (bớt vòng qua bridge); công thức vẫn theo cú pháp en-US và lỗi công thức gom ở `formulaErrors`. Kiểm hết tham số trước khi ghi: một vùng sai thì không vùng nào được ghi",
     "params": [
       {
         "name": "writes",
+        "required": true,
         "hint": "array of {range, values, sheet?}"
       },
       {
         "name": "sheet",
+        "required": false,
         "hint": null
       }
     ]
@@ -493,17 +637,22 @@
   {
     "name": "et.fillRange",
     "kind": "et",
+    "agent": true,
+    "summary": "Viết MỘT công thức vào ô góc trên-trái của `range` rồi điền ra cả vùng, tham chiếu tương đối tự dịch (dùng cho bảng nghìn dòng: đừng gửi từng ô)",
     "params": [
       {
         "name": "range",
+        "required": true,
         "hint": "the whole area e.g. 'B2:H1000'"
       },
       {
         "name": "formula",
+        "required": false,
         "hint": "written to the top-left cell first"
       },
       {
         "name": "sheet",
+        "required": false,
         "hint": null
       }
     ]
@@ -511,45 +660,57 @@
   {
     "name": "et.formatRange",
     "kind": "et",
+    "agent": true,
+    "summary": "Định dạng vùng",
     "params": [
       {
         "name": "range",
+        "required": true,
         "hint": null
       },
       {
         "name": "bold",
+        "required": false,
         "hint": null
       },
       {
         "name": "italic",
+        "required": false,
         "hint": null
       },
       {
         "name": "fontSize",
+        "required": false,
         "hint": null
       },
       {
         "name": "fontColor",
+        "required": false,
         "hint": null
       },
       {
         "name": "fillColor",
+        "required": false,
         "hint": null
       },
       {
         "name": "numFmt",
+        "required": false,
         "hint": null
       },
       {
         "name": "horizontal",
+        "required": false,
         "hint": null
       },
       {
         "name": "wrap",
+        "required": false,
         "hint": null
       },
       {
         "name": "sheet",
+        "required": false,
         "hint": null
       }
     ]
@@ -557,17 +718,22 @@
   {
     "name": "et.setConditionalFormat",
     "kind": "et",
+    "agent": true,
+    "summary": "Đặt định dạng điều kiện cho vùng: `rules` là mảng rule, mỗi rule có operator (less/lessEqual/greater/greaterEqual/equal/notEqual/between/notBetween/formula), formula1, formula2 (chỉ between), và styleName có sẵn (Good/Bad/Neutral/Warning/Error/...) hoặc bold/italic/fontColor/fillColor/numFmt. Gọi lại trên cùng vùng thì THAY rule cũ của vùng đó, nên nhiều rule trên một vùng phải để trong MỘT lần gọi",
     "params": [
       {
         "name": "range",
+        "required": true,
         "hint": null
       },
       {
         "name": "rules",
+        "required": true,
         "hint": "array of rule objects"
       },
       {
         "name": "sheet",
+        "required": false,
         "hint": null
       }
     ]
@@ -575,13 +741,17 @@
   {
     "name": "et.listConditionalFormats",
     "kind": "et",
+    "agent": true,
+    "summary": "Liệt kê định dạng điều kiện đang có (đọc lại để tự kiểm); bỏ trống `range` thì cả sheet",
     "params": [
       {
         "name": "range",
+        "required": false,
         "hint": "chỉ xem một vùng"
       },
       {
         "name": "sheet",
+        "required": false,
         "hint": null
       }
     ]
@@ -589,37 +759,47 @@
   {
     "name": "et.addChart",
     "kind": "et",
+    "agent": true,
+    "summary": "Chèn biểu đồ từ vùng dữ liệu; `type` column/bar/line/pie/area/scatter, `width`/`height` tính bằng cm",
     "params": [
       {
         "name": "range",
+        "required": true,
         "hint": "source data e.g. 'A1:B13'"
       },
       {
         "name": "type",
+        "required": false,
         "hint": "column (default)/bar/line/pie/area/scatter"
       },
       {
         "name": "title",
+        "required": false,
         "hint": null
       },
       {
         "name": "name",
+        "required": false,
         "hint": null
       },
       {
         "name": "anchor",
+        "required": false,
         "hint": "top-left cell, default 'A1'"
       },
       {
         "name": "width",
+        "required": false,
         "hint": "cm, default 12"
       },
       {
         "name": "height",
+        "required": false,
         "hint": "cm, default 7"
       },
       {
         "name": "sheet",
+        "required": false,
         "hint": null
       }
     ]
@@ -627,9 +807,12 @@
   {
     "name": "et.listCharts",
     "kind": "et",
+    "agent": true,
+    "summary": "Danh sách biểu đồ trên sheet",
     "params": [
       {
         "name": "sheet",
+        "required": false,
         "hint": null
       }
     ]
@@ -637,9 +820,12 @@
   {
     "name": "et.undo",
     "kind": "et",
+    "agent": true,
+    "summary": "Hoàn tác",
     "params": [
       {
         "name": "count",
+        "required": false,
         "hint": null
       }
     ]
@@ -647,9 +833,12 @@
   {
     "name": "et.exportPdf",
     "kind": "et",
+    "agent": true,
+    "summary": "Xuất PDF",
     "params": [
       {
         "name": "path",
+        "required": true,
         "hint": null
       }
     ]
@@ -657,14 +846,19 @@
   {
     "name": "et.save",
     "kind": "et",
+    "agent": true,
+    "summary": "Lưu",
     "params": []
   },
   {
     "name": "et.saveAs",
     "kind": "et",
+    "agent": true,
+    "summary": "Lưu thành file mới",
     "params": [
       {
         "name": "path",
+        "required": true,
         "hint": null
       }
     ]
@@ -672,33 +866,26 @@
   {
     "name": "et.closeAll",
     "kind": "et",
+    "agent": false,
+    "summary": "**Đóng mọi sổ, không lưu**",
     "params": []
-  },
-  {
-    "name": "et.checkRange",
-    "kind": "et",
-    "params": [
-      {
-        "name": "range",
-        "hint": "default: the used range"
-      },
-      {
-        "name": "sheet",
-        "hint": null
-      }
-    ]
   },
   {
     "name": "wpp.newPresentation",
     "kind": "wpp",
+    "agent": false,
+    "summary": "Tạo bài trình bày mới",
     "params": []
   },
   {
     "name": "wpp.open",
     "kind": "wpp",
+    "agent": false,
+    "summary": "Mở .pptx/.ppt/.odp",
     "params": [
       {
         "name": "path",
+        "required": true,
         "hint": null
       }
     ]
@@ -706,14 +893,19 @@
   {
     "name": "wpp.listSlides",
     "kind": "wpp",
+    "agent": true,
+    "summary": "Số slide + text từng slide",
     "params": []
   },
   {
     "name": "wpp.addSlide",
     "kind": "wpp",
+    "agent": true,
+    "summary": "Thêm slide cuối; `layout` mặc định 12 = trống (1 = tiêu đề, 2 = tiêu đề + nội dung, 11 = chỉ tiêu đề)",
     "params": [
       {
         "name": "layout",
+        "required": false,
         "hint": "number: 1 title, 2 title+content, 11 title only, 12 blank"
       }
     ]
@@ -721,45 +913,57 @@
   {
     "name": "wpp.addText",
     "kind": "wpp",
+    "agent": true,
+    "summary": "Textbox có định dạng (`color` dạng `#RRGGBB`, `align` left/center/right)",
     "params": [
       {
         "name": "text",
+        "required": true,
         "hint": null
       },
       {
         "name": "slide",
+        "required": false,
         "hint": null
       },
       {
         "name": "left",
+        "required": false,
         "hint": null
       },
       {
         "name": "top",
+        "required": false,
         "hint": null
       },
       {
         "name": "width",
+        "required": false,
         "hint": null
       },
       {
         "name": "height",
+        "required": false,
         "hint": null
       },
       {
         "name": "fontSize",
+        "required": false,
         "hint": null
       },
       {
         "name": "bold",
+        "required": false,
         "hint": null
       },
       {
         "name": "color",
+        "required": false,
         "hint": null
       },
       {
         "name": "align",
+        "required": false,
         "hint": null
       }
     ]
@@ -767,29 +971,37 @@
   {
     "name": "wpp.addTextBox",
     "kind": "wpp",
+    "agent": false,
+    "summary": "Textbox",
     "params": [
       {
         "name": "text",
+        "required": true,
         "hint": null
       },
       {
         "name": "slide",
+        "required": false,
         "hint": null
       },
       {
         "name": "left",
+        "required": false,
         "hint": null
       },
       {
         "name": "top",
+        "required": false,
         "hint": null
       },
       {
         "name": "width",
+        "required": false,
         "hint": null
       },
       {
         "name": "height",
+        "required": false,
         "hint": null
       }
     ]
@@ -797,29 +1009,37 @@
   {
     "name": "wpp.addImage",
     "kind": "wpp",
+    "agent": true,
+    "summary": "Chèn ảnh (kích thước gốc nếu bỏ trống `width`/`height`)",
     "params": [
       {
         "name": "path",
+        "required": true,
         "hint": null
       },
       {
         "name": "slide",
+        "required": false,
         "hint": null
       },
       {
         "name": "left",
+        "required": false,
         "hint": null
       },
       {
         "name": "top",
+        "required": false,
         "hint": null
       },
       {
         "name": "width",
+        "required": false,
         "hint": null
       },
       {
         "name": "height",
+        "required": false,
         "hint": null
       }
     ]
@@ -827,37 +1047,47 @@
   {
     "name": "wpp.addTable",
     "kind": "wpp",
+    "agent": true,
+    "summary": "Bảng; `rows`/`cols` tự suy ra/nới theo `values`",
     "params": [
       {
         "name": "rows",
+        "required": false,
         "hint": null
       },
       {
         "name": "cols",
+        "required": false,
         "hint": null
       },
       {
         "name": "values",
+        "required": false,
         "hint": "2D array of rows"
       },
       {
         "name": "slide",
+        "required": false,
         "hint": null
       },
       {
         "name": "left",
+        "required": false,
         "hint": null
       },
       {
         "name": "top",
+        "required": false,
         "hint": null
       },
       {
         "name": "width",
+        "required": false,
         "hint": null
       },
       {
         "name": "height",
+        "required": false,
         "hint": null
       }
     ]
@@ -865,13 +1095,17 @@
   {
     "name": "wpp.setNotes",
     "kind": "wpp",
+    "agent": true,
+    "summary": "Ghi chú thuyết trình",
     "params": [
       {
         "name": "text",
+        "required": true,
         "hint": null
       },
       {
         "name": "slide",
+        "required": false,
         "hint": null
       }
     ]
@@ -879,9 +1113,12 @@
   {
     "name": "wpp.deleteSlide",
     "kind": "wpp",
+    "agent": true,
+    "summary": "Xoá slide (mặc định slide cuối)",
     "params": [
       {
         "name": "slide",
+        "required": false,
         "hint": null
       }
     ]
@@ -889,9 +1126,12 @@
   {
     "name": "wpp.exportPdf",
     "kind": "wpp",
+    "agent": true,
+    "summary": "Xuất PDF",
     "params": [
       {
         "name": "path",
+        "required": true,
         "hint": null
       }
     ]
@@ -899,14 +1139,19 @@
   {
     "name": "wpp.save",
     "kind": "wpp",
+    "agent": true,
+    "summary": "Lưu",
     "params": []
   },
   {
     "name": "wpp.saveAs",
     "kind": "wpp",
+    "agent": true,
+    "summary": "Lưu thành file mới",
     "params": [
       {
         "name": "path",
+        "required": true,
         "hint": null
       }
     ]
@@ -914,21 +1159,46 @@
   {
     "name": "wpp.closeAll",
     "kind": "wpp",
+    "agent": false,
+    "summary": "**Đóng mọi bài trình bày, không lưu**",
     "params": []
-  },
-  {
-    "name": "wpp.checkLayout",
-    "kind": "wpp",
-    "params": [
-      {
-        "name": "slide",
-        "hint": "slide number; default: every slide"
-      }
-    ]
   },
   {
     "name": "writer.checkTables",
     "kind": "wps",
+    "agent": true,
+    "summary": "Soát các bảng (chỉ đọc): số dòng/cột, ô trống, ô tiêu đề lẫn đoạn văn. Bảng dàn trang — bảng đã gọi writer.formatTable với borders:false — được đánh dấu layout và KHÔNG báo empty-cells (ô trống ở đó là cố ý: khoảng trống ký, ô chờ điền)",
     "params": []
+  },
+  {
+    "name": "et.checkRange",
+    "kind": "et",
+    "agent": true,
+    "summary": "Soát bảng dữ liệu (chỉ đọc): tiêu đề trống, kiểu lẫn lộn, số dạng chữ, number format, dữ liệu lạc ngoài bảng (chỉ khi không truyền range)",
+    "params": [
+      {
+        "name": "range",
+        "required": false,
+        "hint": "default: the used range"
+      },
+      {
+        "name": "sheet",
+        "required": false,
+        "hint": null
+      }
+    ]
+  },
+  {
+    "name": "wpp.checkLayout",
+    "kind": "wpp",
+    "agent": true,
+    "summary": "Soát bố cục slide (chỉ đọc): chữ tràn khung, shape ra ngoài slide, shape chồng nhau, chữ quá nhỏ",
+    "params": [
+      {
+        "name": "slide",
+        "required": false,
+        "hint": "slide number; default: every slide"
+      }
+    ]
   }
 ]

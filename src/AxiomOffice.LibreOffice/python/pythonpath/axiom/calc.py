@@ -1063,4 +1063,3 @@ command("et.save", "et", lambda env, p: documents.save(env.document, "et", None)
 command("et.saveAs", "et", lambda env, p: documents.save(env.document, "et", values.string(p, "path")),
         "Lưu thành file mới", req("path"), agent=True)
 command("et.closeAll", "et", lambda env, p: documents.close_all(env.ctx, "et"), "**Đóng mọi sổ, không lưu**")
-command("et.checkRange", "et", check_range, "Soát vùng (chỉ đọc): lỗi công thức, ô trống, vùng ngoài bảng", opt("range", "default: the used range"), opt("sheet"), agent=True)
