@@ -5,6 +5,41 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Ribbon Windows: nhóm Quản lý + Hệ thống trên **một tab duy nhất**; Hội thoại / Nhật ký vào khung chat (13/10/2026)
+- Chốt với người dùng: không mở tab thứ hai "Axiom · Quản lý"; bỏ nút *Dừng* (pane đã có) và *Xuất PDF*
+- **Bộ nhớ AI…** (ribbon): `MemoryForm` thêm ô lọc phạm vi (*Mọi phạm vi* / *Chung* / *Tài liệu đang mở*) và tách
+  **Xoá tạm** (khôi phục được 30 ngày) khỏi **Xoá vĩnh viễn…**. Core không có xoá cứng từng mục nên xoá vĩnh viễn
+  đi theo phạm vi đang lọc (`DELETE /v1/memory?scope=…&confirm=true`), hộp xác nhận nói rõ phạm vi
+- **Kỹ năng…** (ribbon, `SkillsForm`): kỹ năng Core thấy cho app đang mở, thư mục nạp lỗi hiện thành dòng ⚠, nút
+  *Nạp lại* (`POST /v1/skills/reload`) — cùng nội dung với dialog LibreOffice
+- **Trạng thái**: kiểm thật từng tầng ở luồng nền — `/health` của bridge **qua HTTP**, `/health` của Core đang
+  chạy (không khởi động Core chỉ để xem), các phiên Office còn sống trong `sessions/`
+- Menu **Khác**: *Cài đặt nâng cao…*, *Kiểm tra mô hình* (`POST /v1/llm/test` với cấu hình đã lưu), *Sao chép API
+  URL*, *Tắt Agent Core…* (hỏi xác nhận; `POST /v1/admin/shutdown` tới Core đang chạy, quên base URL đã nhớ)
+- Khung chat: nút **⋯** ở header mở *Hội thoại trước…* (`ConversationsForm`: xem, xoá, mặc định lọc theo tài liệu
+  đang mở) và *Nhật ký hoạt động…* (`AuditForm`: 100 lệnh gần nhất, giờ máy, dòng lỗi tô đỏ)
+- Client Core mới gom ở `Ai/CoreAdmin.cs`; bỏ `PurgeMemories()` không tham số (thay bằng bản có phạm vi)
+
+### Added — Ribbon add-in COM (Windows), đợt 1 của `docs/ribbon-ui.md`: "Nhìn tài liệu" + ba nút Soát (13/10/2026)
+- Tab **Axiom Office** sắp lại thành ba nhóm **Trợ lý** / **Kiểm tra** / **Truy cập nhanh**, nhãn tiếng Việt theo
+  kết quả người dùng muốn; *Cài đặt nâng cao…* và *Sao chép API URL* hạ xuống nút nhỏ (chuyển sang tab
+  "Axiom · Quản lý" ở đợt 3)
+- **Nhìn tài liệu** (toggleButton): ghi HKCU `VisualQaEnabled`, ghi hỏng thì nút vẽ lại theo HKCU chứ không hiện
+  trạng thái chưa lưu. Sau khi ghi, luồng nền hỏi `GET /v1/setup` để lấy trạng thái **thật** của Core; Core báo
+  khác (biến môi trường `AXIOM_VISUAL_QA` đè HKCU) thì nút hiện theo Core và báo người dùng. Nút mờ khi
+  `CoreEnabled = 0` (agent in-process không dùng ảnh). Wizard/Cài đặt đóng lại thì nút vẽ lại theo HKCU
+- **Soát bố cục** (`wpp.checkLayout`), **Soát bảng** (`writer.checkTables`), **Soát vùng dữ liệu** (`et.checkRange`):
+  chỉ hiện ở app hợp (`getVisible`), gọi thẳng `CommandDispatcher.Execute` ở **luồng nền** (luồng UI rảnh để host
+  trả lời COM) — không qua model, không cần Core, 0 token. Kết quả diễn giải sang tiếng Việt theo loại lỗi
+  (`Ribbon/RibbonChecks.cs`), tối đa 15 dòng. Không đổi hành vi lệnh bridge nào
+- Đã bấm thử trên PowerPoint (13/10): toggle ghi HKCU và `GET /v1/setup` của Core báo đúng giá trị; *Soát bố cục*
+  trên bài 3 slide ra kết quả sau ~0,5s, không gọi model
+
+### Fixed — Log chẩn đoán PowerPoint mất tên cửa sổ (13/10/2026)
+- `HostProbe.Describe` đọc `Caption` và `Visible` trong cùng một lần thử; `DocumentWindow` của PowerPoint không có
+  `Visible` nên cả cụm thành `<RuntimeBinderException>`. Nay đọc riêng từng thuộc tính, thiếu `Visible` thì ghi
+  `state=` (`WindowState`). Chỉ ảnh hưởng dòng log "First bridge command" / `OnConnection`, không ảnh hưởng lệnh
+
 ### Fixed — Nguồn của skill làm slide: **9 khẳng định mở được trang thật**, 13 khẳng định phải hạ xuống "chưa có nguồn" (13/10/2026)
 - **Đợt kiểm chứng mở từng trang**, không tin trí nhớ: mỗi khẳng định trong `references/cau-chuyen.md` được
   đối chiếu bằng cách mở URL và đọc. Ghi chú lại cách làm vì nó ảnh hưởng kết quả: `WebSearch` **trả về rỗng

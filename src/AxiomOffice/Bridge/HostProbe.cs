@@ -83,8 +83,7 @@ namespace AxiomOffice.Bridge
             }));
             sb.Append(" activeWindow=").Append(Safe(delegate
             {
-                dynamic window = app.ActiveWindow;
-                return "'" + Convert.ToString(window.Caption) + "' visible=" + Convert.ToString(window.Visible);
+                return WindowText(app.ActiveWindow);
             }));
             sb.Append(" windows=[").Append(Safe(delegate
             {
@@ -93,13 +92,25 @@ namespace AxiomOffice.Bridge
                 var parts = new List<string>();
                 for (int i = 1; i <= count && i <= 10; i++)
                 {
-                    dynamic window = windows[i];
-                    parts.Add("'" + Convert.ToString(window.Caption) + "' visible=" + Convert.ToString(window.Visible));
+                    parts.Add(WindowText(windows[i]));
                 }
                 return string.Join(", ", parts.ToArray());
             })).Append("]");
             sb.Append(" appVisible=").Append(Safe(delegate { return Convert.ToString(app.Visible); }));
             return sb.ToString();
+        }
+
+        // DocumentWindow của PowerPoint không có Visible (Word/Excel có): đọc riêng để không mất cả Caption,
+        // thiếu thì ghi WindowState (1 = thường, 2 = thu nhỏ, 3 = phóng to).
+        private static string WindowText(dynamic window)
+        {
+            string caption = Safe(delegate { return Convert.ToString(window.Caption); });
+            string visible = Safe(delegate { return "visible=" + Convert.ToString(window.Visible); });
+            if (visible.StartsWith("<", StringComparison.Ordinal))
+            {
+                visible = "state=" + Safe(delegate { return Convert.ToString(window.WindowState); });
+            }
+            return "'" + caption + "' " + visible;
         }
 
         public static bool IsRetryable(COMException ex)

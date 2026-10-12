@@ -18,7 +18,7 @@ namespace AxiomOffice.Bridge
         private const int HeartbeatMs = 25000;
         private const int ProbeTimeoutMs = 2000;
 
-        private static readonly string SessionsDir = Path.Combine(
+        internal static readonly string SessionsDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AxiomOffice", "sessions");
 
         private readonly IAppHost _host;
