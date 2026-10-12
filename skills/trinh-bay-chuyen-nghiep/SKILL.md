@@ -2,8 +2,8 @@
 name: trinh-bay-chuyen-nghiep
 description: >-
   Quy tắc trình bày slide PowerPoint chuyên nghiệp: một thông điệp mỗi slide, lưới và lề, thang cỡ chữ,
-  mật độ chữ, khi nào dùng bảng, chuyển chi tiết sang ghi chú thuyết trình. Dùng khi tạo mới hoặc làm
-  lại bài thuyết trình, slide, "làm slide cho đẹp", "thiết kế lại slide". Không dùng khi chỉ sửa một chữ.
+  mật độ chữ, bảng khi cần so sánh, chi tiết dài đưa vào ghi chú. Dùng khi tạo mới hoặc làm lại bài
+  thuyết trình, slide, "làm slide cho đẹp", "thiết kế lại slide". Không dùng khi chỉ sửa một chữ.
 apps: [wpp]
 ---
 

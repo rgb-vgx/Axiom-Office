@@ -29,4 +29,5 @@ trong câu trả lời — **không bịa số liệu**.
 - [ ] Mỗi slide: `wpp.addSlide {layout: 12}` → tiêu đề (`wpp.addText`, cỡ title, màu primary, đậm) →
       nội dung theo `references/bo-cuc.md`.
 - [ ] Chi tiết/diễn giải → `wpp.setNotes`.
-- [ ] **Soát** `wpp.checkLayout` cho từng slide mới, sửa đến khi không còn `issues`.
+- [ ] **Soát** `wpp.checkLayout` **một lần** sau khi dựng xong hết slide — mặc định nó đã kiểm **mọi**
+      slide, nên gọi từng slide là thừa lượt. Sửa đến khi `issueCount` = 0.

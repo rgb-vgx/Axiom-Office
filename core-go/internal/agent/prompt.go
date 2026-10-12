@@ -92,6 +92,11 @@ func DocumentSection(session *office.Session, document *DocumentContext) string 
 	return text
 }
 
+// skillDescriptionLimit: so ky tu cua description lot vao chi muc tang 1 (SkillsSection). Dai hon thi
+// bi cat duoi, va vi day la thu DUY NHAT model thay khi chon skill, tu khoa dinh tuyen phai nam trong
+// han muc nay (docs/skills-review.md muc 4.9).
+const skillDescriptionLimit = 300
+
 // SkillsSection: tang 1 cua chuan Agent Skills - chi muc ten + mo ta.
 func SkillsSection(list []skills.Definition) string {
 	if len(list) == 0 {
@@ -99,7 +104,7 @@ func SkillsSection(list []skills.Definition) string {
 	}
 	lines := make([]string, 0, len(list))
 	for _, skill := range list {
-		lines = append(lines, "- "+skill.Name+": "+flatten(skill.Description, 300))
+		lines = append(lines, "- "+skill.Name+": "+flatten(skill.Description, skillDescriptionLimit))
 	}
 	return "Available skills (call load_skill to read one when it fits the request):\n" + strings.Join(lines, "\n")
 }

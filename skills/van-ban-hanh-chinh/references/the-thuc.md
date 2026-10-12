@@ -15,7 +15,7 @@ lề trái 30–35mm, lề phải 15–20mm.
 | Trích yếu (văn bản có tên loại) | thường, đứng, đậm | 13–14 | Về việc ban hành quy chế … |
 | Trích yếu công văn | thường, đứng | 12–13 | V/v đề nghị cung cấp số liệu |
 | Kính gửi | thường, đứng | 13–14 | Kính gửi: Sở Tài chính tỉnh X. |
-| Nội dung | thường, đứng, căn đều, lùi đầu dòng 1–1,27cm | 13–14 | |
+| Nội dung | thường, đứng, căn đều, lùi đầu dòng 1–1,27cm | 13 | |
 | Chức vụ người ký | IN HOA, đứng, đậm | 13–14 | GIÁM ĐỐC |
 | Họ tên người ký | thường, đứng, đậm | 13–14 | Nguyễn Văn A |
 | "Nơi nhận:" | thường, nghiêng, đậm | 12 | Nơi nhận: |

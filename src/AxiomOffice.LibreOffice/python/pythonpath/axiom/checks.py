@@ -71,14 +71,19 @@ def writer_check_tables(env, params):
         layout = writer.is_layout_table(table)
         if empty and not layout:
             issues.append(issue("empty-cells", "table %d has %d empty cell(s)" % (index, empty), table=index))
-        lengths = sorted(len(h) for h in header)
-        if len(header) > 1:
-            typical = lengths[len(lengths) // 2]
-            for text in header:
-                if len(text) > LONG_HEADER_CHARS and len(text) > 3 * max(1, typical):
-                    issues.append(issue("long-header-cell",
-                        "table %d has a header cell with %d characters ('%s'): text that should be outside the table may have been typed into it"
-                        % (index, len(text), text[:40]), table=index))
+        # Moi o tieu de so voi trung vi cac o tieu de CON LAI (leave-one-out), khong so voi trung vi ca nhom:
+        # voi bang 2 cot, trung vi ca nhom chinh la o dai hon nen nguong "3 x trung vi" khong bao gio voi toi
+        # (docs/skills-review.md muc 4.7) - mot dieu kien khong bao gio sai thi khong phai la kiem tra.
+        # Bang 1 cot khong co nhom de so, nen khong bao (khong co ti le nao de noi o do dai BAT THUONG).
+        for position, text in enumerate(header):
+            others = sorted(len(other) for at, other in enumerate(header) if at != position)
+            if not others:
+                continue
+            typical = others[len(others) // 2]
+            if len(text) > LONG_HEADER_CHARS and len(text) > 3 * max(1, typical):
+                issues.append(issue("long-header-cell",
+                    "table %d has a header cell with %d characters ('%s'): text that should be outside the table may have been typed into it"
+                    % (index, len(text), text[:40]), table=index))
         report.append({"index": index, "rows": rows, "cols": cols, "emptyCells": empty, "header": header,
                        "layout": layout})
     return {"tableCount": len(tables), "tables": report, "issueCount": len(issues), "issues": issues}

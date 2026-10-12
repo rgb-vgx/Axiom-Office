@@ -1,10 +1,9 @@
 ---
 name: the-thuc-van-ban
 description: >-
-  Quy tắc trình bày tài liệu Word: phân cấp tiêu đề (heading), font và cỡ chữ, căn lề đoạn, bảng có
-  kiểu thống nhất, chú thích bảng, ngắt trang hợp lý. Dùng khi soạn mới hoặc trình bày lại báo cáo,
-  tờ trình, kế hoạch, biên bản, tài liệu Word dài, hay khi người dùng muốn văn bản "đẹp", "chuẩn".
-  Không dùng cho sửa một câu hay in đậm một từ.
+  Quy tắc trình bày tài liệu Word: phân cấp heading, font và cỡ chữ, căn lề đoạn, bảng thống nhất, chú
+  thích bảng, ngắt trang. Dùng khi soạn mới hoặc trình bày lại báo cáo, tờ trình, kế hoạch, biên bản,
+  tài liệu Word dài, hay khi người dùng muốn văn bản "đẹp", "chuẩn". Không sửa một câu.
 apps: [wps]
 ---
 
@@ -23,7 +22,9 @@ apps: [wps]
 4. **Bảng**: chèn bằng `writer.insertTable {values, style}` với `values` là mảng 2 chiều đầy đủ (hàng
    đầu là tiêu đề), rồi `writer.formatTable` với `style` = `document.tableStyle`, `font`, `size`.
    Đặt một dòng chú thích ngắn ngay dưới bảng ("Bảng 1. …").
-5. **Không** tự lưu, không đổi tên file.
+5. **Ngắt trang**: văn bản dài thì mục lớn bắt đầu ở trang mới — `writer.insertPageBreak` ngay trước
+   heading đó; đừng gõ dòng trống cho hết trang.
+6. **Không** tự lưu, không đổi tên file.
 
 ## Checklist
 

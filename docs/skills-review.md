@@ -1,7 +1,8 @@
 # Review bộ skill dựng sẵn (8 skill) và khoảng trống so với công việc văn phòng
 
-Trạng thái: **P0 (§3) đã sửa xong 11/10/2026** — và chính lúc sửa §3.3 sinh thêm hai phát hiện P1 mới
-(§4.7, §4.8); P1–P4 còn nguyên (xem §8). Cách làm: 4 lượt review độc lập qua
+Trạng thái: **P0 (§3) xong 11/10/2026, P1 (§4.1–§4.9) xong 12/10/2026** — P0 sửa §3.3 sinh thêm hai phát
+hiện P1 (§4.7, §4.8), và P1 sửa §4.3 sinh thêm **§4.9** (`description` dài quá 300 ký tự bị cắt đuôi),
+đã sửa trong cùng ngày sau khi chốt hướng. P2–P4 còn nguyên (xem §8). Cách làm: 4 lượt review độc lập qua
 ChatGPT, rồi **đối chiếu máy móc lại với mã** — registry lệnh trong
 [livecommands_gen.go](../core-go/internal/mcpserver/livecommands_gen.go) (65 mục: 60 lệnh tài liệu — `writer`
 22, `et` 23, `wpp` 15 — cộng 5 lệnh app/UI), mã bridge LibreOffice
@@ -132,7 +133,10 @@ report để agent thấy, chỉ không thành `issue`. Ba chi tiết đo đư�
 - `long-header-cell` **vẫn báo cho mọi bảng**, kể cả bảng dàn trang — nó bắt chữ lọt vào ô tiêu đề, mà với
   bảng dàn trang thì đó cũng là lỗi thật, và `van-ban-hanh-chinh` vốn đòi soát nó.
 
-## 4. P1 — mâu thuẫn, lệch token, description hứa quá năng lực
+## 4. P1 — mâu thuẫn, lệch token, description hứa quá năng lực — **đã sửa 12/10/2026**
+
+Năm điểm cần người quyết đã chốt 12/10/2026 (§4.1 cách ánh xạ cỡ chữ, §4.2, §4.4, §4.7, §4.9 hướng
+viết lại); phần còn lại của §4 sửa theo. Ghi chú từng mục ở dưới.
 
 ### 4.1 `references/bo-cuc.md` chép cứng cỡ chữ và màu, lệch với `tokens.json`
 
@@ -149,6 +153,24 @@ Hệ quả: hai skill dùng cùng nhau cho ra hai cỡ tiêu đề khác nhau, v
 **Sửa:** `bo-cuc.md` chỉ giữ **toạ độ và bố cục**, mọi cỡ chữ/màu ghi theo tên token (`type.title`,
 `colors.primary`). Thêm test: mọi file `references/*.md` không được chứa `#RRGGBB` hay số cỡ chữ trần.
 
+**Đã sửa 12/10/2026.**
+
+- `bo-cuc.md` giờ chỉ còn toạ độ; cỡ chữ/màu ghi bằng tên token **đường dẫn đầy đủ từ gốc**
+  (`slide.type.hero`, `colors.primary`) — ghi đầy đủ để test tra được thẳng vào `tokens.json`, không phải
+  đoán khối nào.
+- Ba cỡ chữ không có token đã được người dùng chốt: **thêm** `slide.type.hero` = 40 (chữ bìa) và
+  `slide.type.figure` = 40 (con số lớn) vào `tokens.json`, giữ đúng kích thước đang thấy. Hai chỗ còn lại
+  **không** thêm token mà gán về token có sẵn, vì đó mới đúng là chỗ hai skill lệch nhau:
+  tiêu đề slide 32 → `slide.type.title` (36, khớp `trinh-bay-chuyen-nghiep`), nhãn dưới số 18 →
+  `slide.type.body` (20). Đây là **thay đổi nhìn thấy được** của slide (tiêu đề 32→36, nhãn 18→20).
+- Test mới [repo_skills_tokens_test.go](../core-go/internal/tools/repo_skills_tokens_test.go) (chạy trong
+  `go test ./...`): `references/*.md` không được có `#RRGGBB` hay `fontSize: <số>`, và mọi tên token được
+  nhắc trong đó phải **có thật** trong `tokens.json`. Đã kiểm ngược: với `bo-cuc.md` cũ test **đỏ** đúng
+  ba lý do (màu chép cứng, cỡ chữ chép cứng, không có tên token nào).
+- Luật "cấm cỡ chữ trần" bắt **đúng dạng lệnh** `fontSize: <số>`, nên nó không đụng tới bảng cỡ chữ của
+  `van-ban-hanh-chinh/references/the-thuc.md`: ở đó cỡ chữ là **quy định của NĐ30** (12–13, 13–14…), không
+  phải token thiết kế. Luật `#RRGGBB` thì áp cho mọi file `references/*.md`.
+
 ### 4.2 Hai skill lệch nhau về số lần gọi `wpp.checkLayout`
 
 [bao-cao-thang/SKILL.md:32](../skills/bao-cao-thang/SKILL.md#L32): *"`wpp.checkLayout` cho **từng** slide mới"*.
@@ -158,6 +180,9 @@ Hệ quả: hai skill dùng cùng nhau cho ra hai cỡ tiêu đề khác nhau, v
 `checkLayout` mặc định kiểm **mọi** slide, nên cách của `bao-cao-thang` là thừa lượt gọi — mà chính
 `CheckRule`/`PlanRule` trong [prompt.go](../core-go/internal/agent/prompt.go) đang cấm đọc thừa. Chốt một
 cách: gọi một lần, không truyền `slide`.
+
+**Chốt 12/10/2026 — gọi một lần, không truyền `slide`.** Đã sửa `bao-cao-thang/SKILL.md` theo
+`trinh-bay-chuyen-nghiep`.
 
 ### 4.3 `description` của `bao-cao-du-lieu` hứa "độ rộng bảng" — không lệnh nào làm được
 
@@ -170,6 +195,9 @@ sheet` — **không có width/height**, và quét cả registry không có lện
 
 **Sửa:** bỏ "độ rộng bảng" khỏi description cho tới khi có lệnh đặt width.
 
+**Đã sửa 12/10/2026:** description còn "…công thức thay cho số tính tay, **mật độ trình bày**". Chưa có
+lệnh nào đặt độ rộng cột, nên lời hứa đó chưa được phép quay lại (§5, dòng `et`).
+
 ### 4.4 Cho hai lựa chọn thay vì một mặc định
 
 [van-ban-hanh-chinh/references/the-thuc.md:18](../skills/van-ban-hanh-chinh/references/the-thuc.md#L18) ghi
@@ -177,11 +205,20 @@ cỡ nội dung `13–14`, [SKILL.md:32](../skills/van-ban-hanh-chinh/SKILL.md#L
 `tokens.json` đặt `document.type.body = 13`. [New_arch.md:563-564](../New_arch.md#L563-L564) §8.4.5 đã đặt
 luật: *"nêu một cách mặc định thay vì liệt kê nhiều lựa chọn"*. Chốt một số.
 
+**Chốt 12/10/2026 — 13, theo token.** `document.type.body` giữ nguyên 13 (không đổi token, vì
+`the-thuc-van-ban` đã dùng `type.body` cho mọi tài liệu Word); đã sửa `van-ban-hanh-chinh/SKILL.md`
+(`size: 14` → `13`, "13–14" → "`type.body` (13)") và `references/the-thuc.md` (Nội dung: 13–14 → 13).
+Các dòng khác của `the-thuc.md` **vẫn để khoảng** (quốc hiệu 12–13, tiêu ngữ 13–14…): đó là khoảng của
+NĐ30, không phải token, và chốt chúng sẽ là bịa số.
+
 ### 4.5 `thiet-ke-van-phong` dạy "viết spec ngắn **trong đầu**"
 
 [thiet-ke-van-phong/SKILL.md:34](../skills/thiet-ke-van-phong/SKILL.md#L34). Chỉ dẫn này không kiểm chứng
 được và không ràng buộc hành vi. Cách `mo-hinh-nhieu-sheet` làm mới đúng: bắt **viết plan ra** rồi bám theo
 (quy tắc 9 của skill đó, và `PlanRule` trong `prompt.go`).
+
+**Đã sửa 12/10/2026:** quy trình giờ đòi **viết spec ra** trước lệnh đầu tiên, kèm lý do ("nghĩ thầm thì
+không có gì ràng buộc các lệnh sau").
 
 ### 4.6 NĐ30: một quy tắc chưa đối chiếu được bản gốc **(chưa xác minh)**
 
@@ -211,15 +248,32 @@ Hệ quả trực tiếp: [van-ban-hanh-chinh/SKILL.md:44-45](../skills/van-ban-
 thì không phải là kiểm tra — nó chỉ làm checklist trông chặt hơn thực tế, và đúng cái lỗi nó sinh ra để bắt
 (chữ lọt vào ô tiêu đề) thì nó không bắt được.
 
-**Chưa chốt cách sửa** — và đừng sửa bằng cách nới con số:
+**Đã chốt 12/10/2026 — so với trung vị các ô tiêu đề CÒN LẠI (leave-one-out).** Chỗ hỏng là **nhóm so
+sánh có chứa chính ô đang xét**: bỏ nó ra khỏi nhóm thì phép toán hết suy biến mà không phải nới con số
+nào (`LONG_HEADER_CHARS` vẫn 40, tỉ lệ vẫn 3×):
 
-- đổi mốc so sánh từ trung vị **ô tiêu đề** sang trung vị **mọi ô trong bảng** thì bắt thêm được vài ca
-  (đã kiểm bằng mã: bảng "Nơi nhận:" 2 cột bắt được), nhưng **vẫn trượt** bảng phần đầu NĐ30 — vì ô
-  `"CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"` (34 ký tự) là chữ **hợp lệ** mà lại kéo trung vị lên;
-- nên hướng đúng nhiều khả năng là **bỏ hẳn tỉ lệ**, thay bằng luật theo số cột, hoặc **bỏ yêu cầu này khỏi
-  checklist** của `van-ban-hanh-chinh` và dựa vào `writer.getText` đọc lại (việc skill vốn đã yêu cầu).
+| ô tiêu đề | trung vị còn lại | kết quả |
+|---|---|---|
+| 2 cột `[10, 57]` | `[10]` → 10 | 57 > 40 và 57 > 30 → **báo** |
+| 2 cột `[12, 34]` (quốc hiệu NĐ30) | `[12]` → 12 | 34 > 40 **sai** → không báo oan |
+| 3 cột, mọi tiêu đề đều dài | ~50 | 55 > 150 sai → không báo oan |
 
-Cần người quyết trước khi sửa, vì cả ba hướng đều đổi hành vi soát của `the-thuc-van-ban` cho **mọi** bảng.
+Bảng **1 cột** vẫn không bao giờ báo (không có nhóm để so — ghi rõ trong mã, không phải im lặng).
+Đã sửa [checks.py](../src/AxiomOffice.LibreOffice/python/pythonpath/axiom/checks.py) và thêm 4 test vào
+`tests/lo/test_checks.py`; đã **kiểm ngược**: test "bảng 2 cột có đoạn văn lọt vào ô tiêu đề" **đỏ** với
+luật cũ (`'long-header-cell' not found`), xanh với luật mới — tức lời hứa "không được có
+`long-header-cell`" của `van-ban-hanh-chinh` (SKILL.md:44-45) nay mới thật sự kiểm được với hai bảng 2 cột
+của chính nó.
+
+**Ba hướng đã cân và loại** (ghi lại để đừng thử lại):
+
+- **trung vị mọi ô trong bảng** thay vì ô tiêu đề: bắt thêm được vài ca (bảng "Nơi nhận:" 2 cột) nhưng
+  **vẫn trượt** bảng phần đầu NĐ30 — ô `"CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"` (34 ký tự) là chữ **hợp lệ**
+  mà lại kéo trung vị lên;
+- **nới ngưỡng** (bỏ tỉ lệ khi ≤2 cột, hoặc hạ `LONG_HEADER_CHARS`): đổi hành vi soát cho **mọi** bảng và
+  bắt đầu báo oan những bảng 2 cột có tiêu đề dài hợp lệ;
+- **bỏ yêu cầu khỏi checklist** `van-ban-hanh-chinh`, dựa vào `writer.getText` đọc lại: rẻ và không sai,
+  nhưng vứt mất một kiểm tra thật. Leave-one-out giữ được cả hai.
 
 ### 4.8 `tokens.json` có một token không ai đọc: `plainTableStyle`
 
@@ -236,6 +290,61 @@ sang autoformat LibreOffice), `plainTableStyle` không có đường nào tới 
 được nếu có ai gọi (`"table grid"` khớp nhánh `"grid" in lower` → `"Default Table Style"`), nên đây là token
 **thừa**, không phải token **sai**. Sửa: hoặc dùng nó cho `writer.formatTable {style}` của bảng dữ liệu, hoặc
 xoá khỏi `tokens.json`. Xoá là lựa chọn rẻ hơn cho tới khi có nhu cầu thật.
+
+**Đã sửa 12/10/2026 — xoá.** `document.plainTableStyle` không còn trong `tokens.json`. `document.tableStyle`
+giữ nguyên (có người dùng thật). Khi nào có lệnh đặt style cho bảng dữ liệu thì thêm lại kèm chỗ đọc.
+
+### 4.9 **MỚI 12/10/2026** — 5/8 `description` dài hơn 300 ký tự nên phần đuôi **không tới model** — **đã sửa 12/10/2026**
+
+Phát hiện khi sửa §4.3. Tầng 1 chỉ đưa `name` + `description` vào system prompt, và
+[prompt.go:107](../core-go/internal/agent/prompt.go#L107) cắt ở **300 rune**:
+
+```go
+lines = append(lines, "- "+skill.Name+": "+flatten(skill.Description, skillDescriptionLimit))
+```
+
+Chỗ đo là **chuỗi một dòng mà router thật sự thấy** — `flatten` gộp mọi xuống dòng thành dấu cách rồi mới
+đếm, nên đo khối `description:` trong YAML sẽ lệch vài chục ký tự. Trước khi sửa:
+
+| skill | dài | phần bị cắt |
+|---|---|---|
+| `mo-hinh-nhieu-sheet` | **665** | **toàn bộ 12 cụm "Dùng cho …"** — "mô hình tài chính", "FP&A", "ngân sách", "P&L", "dự báo", "dashboard KPI"… **không cụm nào tới model** |
+| `van-ban-hanh-chinh` | 339 | "thông báo", "văn bản hành chính", "giấy mời" |
+| `thiet-ke-van-phong` | 348 | "Không dùng cho sửa nhỏ như in đậm một dòng hay sửa một con số" |
+| `the-thuc-van-ban` | 338 | "Không dùng cho sửa một câu hay in đậm một từ" |
+| `trinh-bay-chuyen-nghiep` | 305 | "chữ" (cụt) |
+| `bang-diem` / `bao-cao-du-lieu` / `bao-cao-thang` | 265 / 282 / 253 | không bị cắt |
+
+Đây **cùng loại lỗi với §4.3** nhưng nặng hơn: `mo-hinh-nhieu-sheet` mất **cả** danh sách từ khoá dùng để
+được nạp — nó gần như không thể định tuyến tới, trừ khi câu người dùng chứa đúng "mô hình tài" ở ngay mốc
+300. Hai skill bị cắt phần **"Không dùng khi…"** thì rủi ro ngược lại: model nạp skill thiết kế cho một yêu
+cầu sửa nhỏ, đúng ca mà [test_core_e2e.py:1241](../tests/core/test_core_e2e.py#L1241) đang canh (`forbidden`).
+
+**Đã sửa 12/10/2026 — từ khoá lên trước.** Mỗi description viết lại theo thứ tự: một câu định vị ngắn → danh
+sách "Dùng khi …" **nằm gọn trong 300** → "Không dùng khi …" ngắn. Phần mô tả năng lực bị bỏ khỏi
+description đều **đã có ở thân SKILL.md** (tầng 2, model đọc ngay sau `load_skill`); chỗ duy nhất thiếu thì
+bù vào thân — `the-thuc-van-ban` thêm quy tắc 5 (`writer.insertPageBreak`) vì description còn nhắc "ngắt
+trang".
+
+| skill | trước | sau | bỏ/rút gì khỏi description |
+|---|---|---|---|
+| `mo-hinh-nhieu-sheet` | 665 | 291 | danh sách 5 loại sheet ở câu đầu (thân có ở quy tắc 1); các cụm từ khoá dài rút lại: "phân tích độ nhạy" → "độ nhạy", "quản lý tiến độ - nguồn lực - chi phí" → "tiến độ dự án" |
+| `van-ban-hanh-chinh` | 339 | 284 | 4 thành phần thể thức khỏi câu đầu (thân vẫn liệt kê đủ ở mục Bố cục) |
+| `thiet-ke-van-phong` | 348 | 287 | "Không dùng cho sửa nhỏ như in đậm một dòng hay sửa một con số" → "Không dùng cho sửa nhỏ" |
+| `the-thuc-van-ban` | 338 | 286 | "Không dùng cho sửa một câu hay in đậm một từ" → "Không sửa một câu" |
+| `trinh-bay-chuyen-nghiep` | 305 | 295 | viết gọn lại, không mất ý ("khi nào dùng bảng" → "bảng khi cần so sánh") |
+| `bang-diem` / `bao-cao-du-lieu` / `bao-cao-thang` | 265 / 282 / 253 | không đổi | |
+
+**Test chặn** (giờ mới thêm được): trần 300 có tên — `skillDescriptionLimit`
+([prompt.go:98](../core-go/internal/agent/prompt.go#L98)) — và
+[TestRepoSkillDescriptionsFitRouterLimit](../core-go/internal/agent/skills_router_test.go) đọc **skill thật
+trong repo**, đo bằng **chính `flatten` của router** (không đo lại bằng tay), in bảng `dài/300` khi chạy
+`-v`. Test nằm ở package `agent` chứ không phải `tools` vì phải gọi `flatten` + hằng số của chính router. Đã
+chạy khi **chưa** sửa: đỏ đúng 5 skill (665/348/339/338/305) — test bắt đúng lỗi, rồi xanh sau khi sửa.
+
+Hướng đã chọn: **giữ từ khoá, hạ văn xuôi** (hướng 1), ghép một phần hướng 2 — rút chữ trong cụm cho gọn
+chứ **không bỏ cụm nào** chỉ vì ít gặp, vì bỏ cụm là bỏ đường định tuyến. Hướng 3 (nâng trần 300) không
+chọn: tốn token mỗi lượt cho **mọi** skill, và bỏ mất con số đang canh.
 
 ## 5. Trần công cụ — phần chặn nhiều việc nhất
 
@@ -272,11 +381,19 @@ lệnh bridge là việc có đòn bẩy lớn hơn viết thêm skill.
 [New_arch.md:557-558](../New_arch.md#L557-L558) §8.4.5 đã tự đặt luật: *"Viết eval trước, viết hướng dẫn
 sau: mỗi skill có ≥ 3 kịch bản test dựng từ chỗ model làm sai khi **chưa** có skill."*
 
-Hiện trạng: test duy nhất chạm tới skill là
-[TestRepoSkillsLoadAndReferencesResolve](../core-go/internal/tools/repo_skills_test.go) — nó kiểm skill
-**nạp được** và mọi `read_skill_file` trỏ tới file **có thật**. Đó là test **cấu trúc**, không phải eval:
-nó không nói gì về việc chỉ dẫn có đúng, có gọi được bằng lệnh thật, hay model có làm tốt hơn khi có skill.
-`tests/bench/` là benchmark Calc 4 bài, không phải eval skill.
+Hiện trạng: ba test chạm tới skill, **cả ba đều là test cấu trúc, không phải eval**:
+
+- [TestRepoSkillsLoadAndReferencesResolve](../core-go/internal/tools/repo_skills_test.go) — skill **nạp
+  được** và mọi `read_skill_file` trỏ tới file **có thật**;
+- [TestSkillReferencesDoNotHardcodeDesignValues](../core-go/internal/tools/repo_skills_tokens_test.go)
+  (thêm 12/10/2026, §4.1) — `references/*.md` không chép cứng màu/cỡ chữ, và mọi tên token nhắc tới đều
+  **có thật** trong `tokens.json`;
+- [TestRepoSkillDescriptionsFitRouterLimit](../core-go/internal/agent/skills_router_test.go) (thêm
+  12/10/2026, §4.9) — `description` không vượt trần 300 ký tự của router, nên không skill nào bị cắt mất
+  phần từ khoá.
+
+Chúng không nói gì về việc chỉ dẫn có đúng, có gọi được bằng lệnh thật, hay model có làm tốt hơn khi có
+skill. `tests/bench/` là benchmark Calc 4 bài, không phải eval skill.
 
 Vì vậy **"đủ" phải định nghĩa bằng tiêu chí phủ, không bằng con số**:
 
@@ -294,7 +411,8 @@ Hạ tầng đã có: harness `POST /v1/runs` + SSE trong [tests/bench/](../test
 | Ưu tiên | Việc | Vì sao trước |
 |---|---|---|
 | **P0** ✅ xong 11/10/2026 | §3.1 bỏ `writer.replaceAll` khỏi `the-thuc-van-ban`; §3.2 sửa quy tắc xoá `outside-table`; §3.3 thống nhất `empty-cells` cho bảng dàn trang | Sửa được **ngay**, không cần lệnh mới, và đang chủ động phá tài liệu người dùng |
-| **P1** | §4.1 `bo-cuc.md` bám token + test chặn hex/cỡ chữ trần; §4.2 chốt một cách gọi `checkLayout`; §4.3 bỏ "độ rộng bảng" khỏi description; §4.4 chốt một cỡ chữ; §4.5 bắt viết plan ra; §4.7 **quyết** luật `long-header-cell` cho bảng 2 cột (cần người chốt); §4.8 xử lý token chết `plainTableStyle` | Rẻ, và §4.1/§4.3/§4.7 là loại lỗi sẽ nhân lên khi thêm skill mới |
+| **P1** ✅ xong 12/10/2026 | §4.1 `bo-cuc.md` bám token + test chặn hex/cỡ chữ trần; §4.2 chốt gọi `checkLayout` một lần; §4.3 bỏ "độ rộng bảng" khỏi description; §4.4 chốt cỡ nội dung 13; §4.5 bắt viết spec ra; §4.7 sửa luật `long-header-cell` cho bảng 2 cột (leave-one-out); §4.8 xoá token chết `plainTableStyle` | Rẻ, và §4.1/§4.3/§4.7 là loại lỗi sẽ nhân lên khi thêm skill mới |
+| **P1.5** ✅ xong 12/10/2026 | §4.9 `description` dài quá 300 ký tự bị cắt đuôi (5/8 skill; `mo-hinh-nhieu-sheet` mất cả danh sách từ khoá) — viết lại theo thứ tự từ khoá lên trước, thêm test chặn ở tầng router | Cùng loại với §4.3 nhưng nặng hơn, và là **điều kiện tiên quyết** của P3 (Recall@1 đo chính `description`) |
 | **P2** | Bù lệnh bridge theo §5, thứ tự: `writer.setCell` (mở khoá sửa bảng/tài liệu có sẵn) → `et` width/border → `writer` page setup + header/footer → `wpp` sửa shape có sẵn | Đòn bẩy lớn nhất; mở khoá 5/7 dòng ở §6 |
 | **P3** | Viết eval theo §7, **rồi** mới thêm skill nghiệp vụ cho §6 | Tránh viết thêm 10 skill không đo được |
 | **P4** | §4.6 đối chiếu Phụ lục I NĐ30 bản gốc | Nhỏ, nhưng là căn cứ pháp lý — không nên đoán |
@@ -310,4 +428,7 @@ Hạ tầng đã có: harness `POST /v1/runs` + SSE trong [tests/bench/](../test
   ([loader.go:32-79](../core-go/internal/skills/loader.go#L32-L79)) chỉ đọc `name`, `description`, `apps` —
   field mới sẽ **bị bỏ qua im lặng**, không có tác dụng gì cho tới khi sửa loader và `SkillsSection`.
 - **Nhồi thêm chỉ dẫn vào `description`.** Nó bị cắt ở 300 ký tự khi vào system prompt
-  ([prompt.go:102](../core-go/internal/agent/prompt.go#L102)) — phần vượt sẽ không tới model.
+  ([prompt.go:107](../core-go/internal/agent/prompt.go#L107)) — phần vượt sẽ **không tới model**. Cả 8 skill
+  nay đã trong trần (§4.9), và `description` chỉ nên chứa thứ để **định tuyến**: một câu định vị + danh sách
+  "Dùng khi …" + "Không dùng khi …". Chỉ dẫn thao tác thuộc về thân SKILL.md (tầng 2) — thêm vào
+  description thì vừa bị cắt, vừa đẩy từ khoá ra ngoài trần.

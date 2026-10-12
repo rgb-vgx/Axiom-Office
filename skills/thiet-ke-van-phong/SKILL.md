@@ -1,10 +1,9 @@
 ---
 name: thiet-ke-van-phong
 description: >-
-  Nguyên tắc thiết kế chung cho tài liệu văn phòng (Word, Excel, PowerPoint): phân cấp chữ, bảng màu
-  theo ngữ nghĩa, khoảng cách, độ tương phản, nhất quán. Dùng khi người dùng muốn tạo mới hoặc làm lại
-  cho "đẹp", "chuyên nghiệp", "trình bày lại", "thiết kế" một tài liệu, bảng hay slide. Không dùng cho
-  sửa nhỏ như in đậm một dòng hay sửa một con số.
+  Thiết kế chung cho tài liệu văn phòng (Word, Excel, PowerPoint): phân cấp chữ, màu theo ngữ nghĩa,
+  tương phản, nhất quán, khoảng trắng. Dùng khi người dùng muốn tạo mới hoặc làm lại cho "đẹp", "chuyên
+  nghiệp", "trình bày lại", "thiết kế" tài liệu, bảng hay slide. Không dùng cho sửa nhỏ.
 ---
 
 # Thiết kế văn phòng
@@ -31,7 +30,9 @@ lệnh (màu `#RRGGBB`, cỡ chữ, number format). Không tự chế màu mới
 ## Quy trình
 
 - [ ] Đọc tài liệu hiện tại trước (getText / readRange / listSlides) để biết đang có gì.
-- [ ] Viết ra một **spec ngắn** trong đầu: font, 2–3 màu, cỡ chữ từng cấp — rồi bám theo cho mọi lệnh.
+- [ ] Viết ra **spec ngắn** trước lệnh đầu tiên — font, 2–3 màu, cỡ chữ từng cấp — rồi bám đúng spec đó
+      cho mọi lệnh. Spec phải nằm trong phần bạn viết ra (kèm lệnh gọi đầu tiên), không chỉ nghĩ trong đầu:
+      nghĩ thầm thì không có gì ràng buộc các lệnh sau.
 - [ ] Nạp thêm skill riêng của app nếu có trong danh sách: `the-thuc-van-ban` (Word),
       `bao-cao-du-lieu` (Excel), `trinh-bay-chuyen-nghiep` (PowerPoint).
 - [ ] Làm xong thì **đọc lại để tự kiểm** bằng lệnh kiểm tra của app (`writer.checkTables`,

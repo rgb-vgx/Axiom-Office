@@ -5,6 +5,65 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — Skill dựng sẵn: đợt P1 của review — lệch token, kiểm tra không bao giờ bắn, description bị cắt ở tầng 1 (12/10/2026)
+- **`bao-cao-thang/references/bo-cuc.md` chép cứng cỡ chữ và màu, lệch `tokens.json`**: bìa ghi `fontSize: 40`,
+  tiêu đề slide nội dung `32`, kèm bốn mã màu — trong khi `tokens.json` đặt `slide.type.title = 36` và
+  `trinh-bay-chuyen-nghiep` bảo dùng đúng token. Hai skill dùng cùng nhau ra hai cỡ tiêu đề khác nhau, và sửa
+  `tokens.json` **không** lan tới file này. Nay `bo-cuc.md` chỉ còn toạ độ; cỡ chữ/màu ghi bằng tên token đường
+  dẫn đầy đủ từ gốc (`slide.type.hero`, `colors.primary`). Hai cỡ chữ không có token thì **thêm** token —
+  `slide.type.hero = 40` (chữ bìa), `slide.type.figure = 40` (con số lớn) — giữ đúng kích thước đang thấy; hai
+  chỗ còn lại gán về token có sẵn: tiêu đề slide 32 → `slide.type.title` (36), nhãn dưới số 18 → `slide.type.body`
+  (20). Đây là **thay đổi nhìn thấy được** của slide, không phải chỉ đổi chú thích
+- **Hai skill chống nhau về số lần gọi `wpp.checkLayout`**: `bao-cao-thang` đòi gọi cho **từng** slide mới, còn
+  `trinh-bay-chuyen-nghiep` gọi **một lần**. `checkLayout` mặc định đã kiểm **mọi** slide nên cách đầu là thừa
+  lượt gọi — mà `CheckRule`/`PlanRule` của prompt cấm đọc thừa. Chốt: gọi một lần, không truyền `slide`
+- **`bao-cao-du-lieu` hứa "độ rộng bảng" mà không lệnh nào làm được**: `et.formatRange` không nhận width/height và
+  quét cả registry không có lệnh nào đặt độ rộng cột. Nặng hơn nó trông, vì `description` **chính là router**
+  (tầng 1 — model chỉ thấy dòng đó để quyết định nạp skill): hứa năng lực không tồn tại thì model nạp skill rồi
+  kẹt. Bỏ khỏi description cho tới khi có lệnh đặt độ rộng
+- **`van-ban-hanh-chinh` cho hai lựa chọn cỡ chữ nội dung**: `the-thuc.md` ghi `13–14`, SKILL.md dùng `size: 14`,
+  còn `tokens.json` đặt `document.type.body = 13`. Chốt **13** theo token ở cả hai chỗ. Các dòng khác của
+  `the-thuc.md` **vẫn để khoảng** (quốc hiệu 12–13, tiêu ngữ 13–14…): đó là khoảng của NĐ30 chứ không phải token,
+  chốt chúng sẽ là bịa số
+- **`thiet-ke-van-phong` dạy "viết spec ngắn trong đầu"** — không kiểm chứng được và không ràng buộc hành vi. Nay
+  quy trình đòi **viết spec ra** trước lệnh đầu tiên, kèm lý do (nghĩ thầm thì không có gì ràng buộc các lệnh sau)
+- **`long-header-cell` bất khả thi về mặt số học với bảng 2 cột**: `checks.py` lấy trung vị **của chính các ô tiêu
+  đề** rồi đòi `len(text) > 3 * typical`; với đúng 2 cột thì trung vị **là** ô dài hơn, nên điều kiện luôn sai.
+  Mà `van-ban-hanh-chinh` chỉ dựng bảng 2 cột — tức lời hứa "không được có `long-header-cell`" của nó chưa bao
+  giờ kiểm được gì, đúng cái lỗi nó sinh ra để bắt thì nó không bắt được. Nay mỗi ô so với trung vị các ô tiêu đề
+  **còn lại** (leave-one-out): bảng 2 cột `[10, 57]` **báo**, bảng 2 cột quốc hiệu NĐ30 `[12, 34]` **không báo
+  oan**, bảng mà mọi tiêu đề đều dài **không báo oan**; bảng 1 cột vẫn không báo (không có nhóm để so — ghi rõ
+  trong mã, không phải im lặng). Không nới con số nào: `LONG_HEADER_CHARS` vẫn 40, tỉ lệ vẫn 3×
+- **`tokens.json` có một token chết: `document.plainTableStyle`** — không file `.md`/`.go`/`.py` nào đọc nó, và
+  không có đường nào tới tài liệu. Xoá (`document.tableStyle` giữ nguyên vì có người dùng thật)
+- **5/8 `description` dài hơn 300 ký tự nên phần đuôi không tới model**: tầng 1 cắt ở 300 rune
+  (`prompt.go:107`), mà `mo-hinh-nhieu-sheet` dài **665** — **toàn bộ** danh sách "Dùng cho …" ("mô hình tài
+  chính", "FP&A", "ngân sách", "P&L", "dự báo", "dashboard KPI"…) bị cắt mất, gần như không thể định tuyến tới;
+  hai skill khác mất phần **"Không dùng khi…"** — rủi ro ngược lại, model nạp skill thiết kế cho một yêu cầu sửa
+  nhỏ. Nay mỗi description viết lại theo thứ tự **từ khoá lên trước**: câu định vị ngắn → danh sách "Dùng khi …"
+  nằm gọn trong 300 → "Không dùng khi …" ngắn. Phần mô tả năng lực bị bỏ khỏi description đều **đã có ở thân
+  SKILL.md** (tầng 2, model đọc ngay sau `load_skill`); chỗ duy nhất thiếu thì bù vào thân — `the-thuc-van-ban`
+  thêm quy tắc `writer.insertPageBreak` vì description còn nhắc "ngắt trang". Trước → sau: 665→291, 348→287,
+  339→284, 338→286, 305→295; ba skill còn lại vốn đã lọt (265/282/253)
+
+### Added — Test chặn bốn loại lỗi vừa sửa (12/10/2026)
+- `core-go/internal/agent/skills_router_test.go` (chạy trong `go test ./...`): mọi `description` trong `skills/`
+  phải lọt qua `skillDescriptionLimit` — hằng số mới ở `prompt.go` đặt tên cho hạn mức 300 rune của tầng 1, để
+  test và mã dùng chung một số. Đã **kiểm ngược**: với description cũ, 5 skill đỏ đúng số đo trong review
+  (`mo-hinh-nhieu-sheet 665`…)
+- `core-go/internal/tools/repo_skills_tokens_test.go`: `references/*.md` không được chứa `#RRGGBB` hay
+  `fontSize: <số>`, và mọi tên token được nhắc trong đó phải **có thật** trong `tokens.json`. Đã kiểm ngược:
+  `bo-cuc.md` cũ đỏ đúng ba lý do. Luật cấm cỡ chữ trần bắt đúng dạng lệnh `fontSize: <số>` nên không đụng bảng
+  cỡ chữ của `van-ban-hanh-chinh/references/the-thuc.md` (đó là quy định của NĐ30, không phải token thiết kế)
+- `tests/lo/test_checks.py` thêm 4 test cho luật leave-one-out, gồm ca **phải báo** (bảng 2 cột có đoạn văn lọt
+  vào ô tiêu đề — đỏ với luật cũ) và hai ca **không được báo oan**
+- **Hai lỗi CI tiềm ẩn phát hiện khi làm đợt này, đã sửa riêng**: `tests/lo/test_checks.py` tự đặt stub `uno`
+  **rỗng** nên `python3 -m unittest discover -s tests/lo` (đúng lệnh CI) đổ 2 lỗi trong khi chạy riêng file vẫn
+  xanh; và `commands.js` — mirror của WPS — chưa theo summary mới của `et.checkRange`, mà
+  `tests/wps/addin_harness.mjs` so summary hai bên **từng byte**, nên commit P0 trước đó sẽ làm CI đỏ khi lên
+  `main`. Bản C# (`src/AxiomOffice/Bridge`) **cố ý** để nguyên: ở đó `EtCheckRange` vẫn là bản cũ, chưa có phần
+  kiểm dữ liệu lạc ngoài bảng, nên chép summary mới vào sẽ là một lời hứa sai khác
+
 ### Fixed — Skill dựng sẵn: ba chỗ dạy agent phá tài liệu người dùng (review 11/10/2026)
 - **`the-thuc-van-ban` bảo sửa một ô bằng `writer.replaceAll`**: `replaceAll` tạo `ReplaceDescriptor` rồi gọi
   `document.replaceAll(...)` — **toàn tài liệu**, không nhắm được bảng/ô, và đặt `SearchCaseSensitive = False`.

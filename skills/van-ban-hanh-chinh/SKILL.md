@@ -2,9 +2,8 @@
 name: van-ban-hanh-chinh
 description: >-
   Soạn công văn, quyết định, tờ trình, thông báo đúng thể thức văn bản hành chính Việt Nam (Nghị định
-  30/2020/NĐ-CP): tên cơ quan, quốc hiệu, tiêu ngữ, số ký hiệu, địa danh ngày tháng, trích yếu, nơi
-  nhận, chức vụ và người ký. Dùng khi người dùng muốn soạn "công văn", "quyết định", "tờ trình",
-  "thông báo", "văn bản hành chính", "giấy mời".
+  30/2020/NĐ-CP): quốc hiệu, số ký hiệu, trích yếu, nơi nhận, người ký. Dùng khi người dùng muốn soạn
+  "công văn", "quyết định", "tờ trình", "thông báo", "văn bản hành chính", "giấy mời".
 apps: [wps]
 ---
 
@@ -21,7 +20,7 @@ Dùng cùng skill `the-thuc-van-ban` cho phần nội dung.
 2. **Tên loại + trích yếu** (quyết định, tờ trình…) căn giữa; công văn thì trích yếu "V/v …" nằm dưới
    số ký hiệu ở cột trái.
 3. **Kính gửi** (công văn).
-4. **Nội dung**: căn đều, Times New Roman 13–14.
+4. **Nội dung**: căn đều, Times New Roman cỡ `type.body` (13).
 5. **Phần cuối** = bảng 2 cột không viền: trái = "Nơi nhận:" + danh sách; phải = chức vụ người ký
    (in hoa, đậm), khoảng trống ký, họ tên (đậm).
 
@@ -29,7 +28,7 @@ Dùng cùng skill `the-thuc-van-ban` cho phần nội dung.
 
 - Bảng phần đầu: `writer.insertTable {values: [["<CƠ QUAN>","CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"],["Số: …/…","Độc lập - Tự do - Hạnh phúc"],["V/v …","<Địa danh>, ngày … tháng … năm …"]]}`
   rồi `writer.formatTable {borders: false, font: "Times New Roman", size: 13, alignment: "center"}`.
-- Nội dung: `writer.insertStyledText {text, font: "Times New Roman", size: 14}` +
+- Nội dung: `writer.insertStyledText {text, font: "Times New Roman", size: 13}` +
   `writer.setParagraphAlignment {alignment: "justify"}`.
 - Phần cuối: bảng 2 cột như trên, `borders: false`.
 

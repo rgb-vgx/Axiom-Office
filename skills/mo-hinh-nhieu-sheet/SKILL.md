@@ -1,13 +1,9 @@
 ---
 name: mo-hinh-nhieu-sheet
 description: >-
-  Dựng MÔ HÌNH NHIỀU SHEET trong Excel và tự soát trước khi trả bài: tách sheet dữ liệu thô / giả định /
-  tính toán / dashboard / sheet kiểm tra PASS-FAIL, mọi con số đọc từ ô giả định, mọi sheet đề yêu cầu
-  đều phải được dựng, và phải đổi một giả định rồi đọc lại mới coi là xong. Dùng cho "mô hình tài chính",
-  "FP&A", "ngân sách", "P&L", "dự báo", "phân tích độ nhạy", "kịch bản base/optimistic/pessimistic",
-  "mô phỏng Monte Carlo", "danh mục dự án / project portfolio", "quản lý tiến độ - nguồn lực - chi phí",
-  "quản lý tồn kho / tối ưu đặt hàng", "dashboard KPI", "bảng kiểm tra tài liệu". Không dùng khi chỉ cần
-  một bảng đơn lẻ hoặc chỉ cần làm đẹp một bảng đã có.
+  Dựng mô hình nhiều sheet trong Excel rồi tự soát bằng số. Dùng khi người dùng nói "mô hình tài
+  chính", "FP&A", "ngân sách", "P&L", "dự báo", "độ nhạy", "kịch bản", "Monte Carlo", "danh mục dự
+  án", "tiến độ dự án", "tồn kho", "dashboard KPI", "bảng kiểm tra". Không dùng khi chỉ cần một bảng.
 apps: [et]
 ---
 

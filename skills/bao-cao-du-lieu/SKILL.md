@@ -2,7 +2,7 @@
 name: bao-cao-du-lieu
 description: >-
   Quy tắc trình bày bảng dữ liệu và báo cáo Excel: hàng tiêu đề, number format theo loại số, hàng tổng,
-  công thức thay cho số tính tay, mật độ và độ rộng bảng. Dùng khi tạo mới hoặc làm đẹp bảng tính,
+  công thức thay cho số tính tay, mật độ trình bày. Dùng khi tạo mới hoặc làm đẹp bảng tính,
   bảng số liệu, báo cáo doanh thu, thống kê, KPI trong Excel. Không dùng khi chỉ sửa một ô.
 apps: [et]
 ---

@@ -198,15 +198,45 @@ class LayoutTableTests(unittest.TestCase):
     def test_long_header_cell_still_reported_on_layout_table(self):
         """Chu lot vao o tieu de la loi that voi moi bang - van-ban-hanh-chinh van doi soat no.
 
-        Bang phai >= 3 cot: nguong la 3 x trung vi(do dai o tieu de), ma voi 2 cot thi trung vi chinh la o
-        dai hon nen nguong do khong bao gio voi toi (xem docs/skills-review.md). O dai o day la chu that,
-        khong phai khoang trang: _cell_text cat khoang trang hai dau truoc khi do.
+        O dai o day la chu that, khong phai khoang trang: _cell_text cat khoang trang hai dau truoc khi do.
         """
         table = FakeTable([["Lịch họp áp dụng cho toàn bộ phòng ban - thời gian có thể điều chỉnh.Thứ", "Giờ", "Nội dung"],
                            ["- Như trên;", "x", ""]], name="AxiomLayout")
         result = run_check_tables([table])
         self.assertIn("long-header-cell", issue_types(result, 1))
         self.assertNotIn("empty-cells", issue_types(result, 1), "bang dan trang van duoc mien empty-cells")
+
+    # Muc 4.7 docs/skills-review.md: nguong "3 x trung vi(do dai o tieu de)" voi bang 2 cot lay trung vi cua
+    # CHINH HAI O do, tuc la o dai hon -> o dai nhat luon co len == typical nen khong bao gio vuot 3 x typical.
+    # Hai bang cua van-ban-hanh-chinh deu 2 cot, nen loi hua "khong duoc co long-header-cell" cua no khong the
+    # sai. Nay moi o so voi trung vi cac o tieu de CON LAI (leave-one-out).
+
+    def test_two_column_table_with_paragraph_in_header_is_reported(self):
+        """Bang 2 cot: doan van go lot vao o tieu de phai bat duoc (truoc 4.7: khong bao gio bat)."""
+        table = FakeTable([["Nơi nhận:", "Lịch họp áp dụng cho toàn bộ phòng ban - thời gian có thể điều chỉnh."],
+                           ["- Như trên;", "Hai"]], name="AxiomLayout")
+        result = run_check_tables([table])
+        self.assertIn("long-header-cell", issue_types(result, 1), result["issues"])
+
+    def test_two_column_table_with_legal_header_is_not_reported(self):
+        """...nhung KHONG duoc bao oan bang 2 cot that: quoc hieu 34 ky tu la chu hop le, dai nhat bang."""
+        table = FakeTable([["CỤC THUẾ TỈNH X", "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"],
+                           ["Số: 12/CT-VP", "Độc lập - Tự do - Hạnh phúc"]], name="AxiomLayout")
+        result = run_check_tables([table])
+        self.assertNotIn("long-header-cell", issue_types(result, 1), result["issues"])
+
+    def test_all_long_headers_are_not_reported(self):
+        """Ti-le con giu tac dung: bang ma MOI tieu de deu dai thi mot o dai hon chut khong phai loi."""
+        table = FakeTable([["Tình hình thực hiện kế hoạch quý III năm 2026 toàn tỉnh", "Kết quả ước tính đạt được",
+                            "Nguyên nhân và bài học kinh nghiệm rút ra", "x"]])
+        result = run_check_tables([table])
+        self.assertNotIn("long-header-cell", issue_types(result, 1), result["issues"])
+
+    def test_single_column_table_is_left_alone(self):
+        """Bang 1 cot khong co nhom de so -> khong bao (khong co ti le nao noi o do la BAT THUONG)."""
+        table = FakeTable([["Lịch họp áp dụng cho toàn bộ phòng ban - thời gian có thể điều chỉnh."]])
+        result = run_check_tables([table])
+        self.assertNotIn("long-header-cell", issue_types(result, 1), result["issues"])
 
     def test_mark_is_per_table(self):
         result = run_check_tables([FakeTable(LAYOUT_VALUES, name="AxiomLayout"), FakeTable(DATA_VALUES, name="Table2")])
