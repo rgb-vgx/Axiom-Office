@@ -555,11 +555,11 @@
     try {
       if (!action) { return "Thao tác trên tài liệu"; }
       var key = String(action);
-      if (ACTION_LABELS.hasOwnProperty(key)) { return ACTION_LABELS[key]; }
-      if (TOOL_LABELS.hasOwnProperty(key)) { return TOOL_LABELS[key]; }
+      if (Object.prototype.hasOwnProperty.call(ACTION_LABELS, key)) { return ACTION_LABELS[key]; }
+      if (Object.prototype.hasOwnProperty.call(TOOL_LABELS, key)) { return TOOL_LABELS[key]; }
       var suffix = key;
       try { suffix = key.split('.').slice(-1)[0]; } catch (e) { suffix = key; }
-      if (key.indexOf('.') >= 0 && SUFFIX_LABELS.hasOwnProperty(suffix)) { return SUFFIX_LABELS[suffix]; }
+      if (key.indexOf('.') >= 0 && Object.prototype.hasOwnProperty.call(SUFFIX_LABELS, suffix)) { return SUFFIX_LABELS[suffix]; }
       if (key.indexOf('.') >= 0) { return "Thao tác trên tài liệu"; }
       return key;
     } catch (e2) { return "Thao tác trên tài liệu"; }
@@ -567,8 +567,8 @@
 
   function emptyState(kind) {
     try {
-      var noun = NOUNS.hasOwnProperty(kind) ? NOUNS[kind] : "tài liệu";
-      var sugg = SUGGESTIONS.hasOwnProperty(kind) ? SUGGESTIONS[kind] : SUGGESTIONS["wps"];
+      var noun = Object.prototype.hasOwnProperty.call(NOUNS, kind) ? NOUNS[kind] : "tài liệu";
+      var sugg = Object.prototype.hasOwnProperty.call(SUGGESTIONS, kind) ? SUGGESTIONS[kind] : SUGGESTIONS["wps"];
       return {
         title: "Bạn muốn làm gì với " + noun + " này?",
         description: "Tôi đọc và chỉnh sửa trực tiếp tài liệu đang mở. Thay đổi hiện ngay trên trang khi tôi làm.",

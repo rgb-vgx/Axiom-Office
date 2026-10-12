@@ -22,6 +22,14 @@ jobs:
       - name: Unit test extension LibreOffice (khong can LibreOffice)
         run: python3 -m unittest discover -s tests/lo -v
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Cai dependencies JS (de lint + test add-in WPS)
+        run: npm ci
+
       # test_wps_bridge_live.py can WPS that + Xvfb + oem.ini bat JsApiPlugin: chi chay o may dev.
       - name: Unit test add-in WPS (trinh cai + registry/vong poll + probe, khong can WPS)
         run: |

@@ -32,10 +32,6 @@ const MUTATING = ["writer.typeText", "writer.appendText", "writer.insertStyledTe
   "writer.replaceAll"];
 const READ_ONLY = ["app.info", "writer.getText", "writer.selection"];
 
-function catalogMap(ctx) {
-  return new Map(addinCatalog(ctx).map((c) => [c.name, c]));
-}
-
 // `kind` rong = lenh dung chung moi app. Registry LibreOffice dung `null` cho nam lenh nay
 // (app.info, ai.ask, ui.askpane, ui.setup, app.screenshot), nen phai chap nhan ca null lan "".
 function sharedKind(kind) {

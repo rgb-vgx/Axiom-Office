@@ -9,6 +9,7 @@ obj/
 .venv/
 __pycache__/
 *.pyc
+node_modules/
 /dist/
 .ua
 # Anh render cua test thi giac wizard (tests/ui/shots.ps1)

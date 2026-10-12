@@ -385,7 +385,7 @@
   }
 
   function unwrapScalar(value) {
-    var depth, key, k;
+    var depth, k;
     for (depth = 0; depth < 8; depth++) {
       if (Array.isArray(value) && value.length === 1) {
         value = value[0];
@@ -675,11 +675,9 @@
   function cmdSelection(app) {
     var sel = app.Selection;
     var text = "";
-    try {
-      var raw = sel.Text;
-      if (typeof raw === "function") { raw = raw.call(sel); }
-      text = (raw === undefined || raw === null) ? "" : String(raw);
-    } catch (e) { throw e; }
+    var raw = sel.Text;
+    if (typeof raw === "function") { raw = raw.call(sel); }
+    text = (raw === undefined || raw === null) ? "" : String(raw);
     var start = null, end = null;
     try {
       var s = sel.Start;
@@ -877,9 +875,7 @@
       }
       count = countOccurrences(docText, find);
     } catch (e3) { count = 0; }
-    try {
-      content.Find.Execute(findText, false, false, false, false, false, true, 0, false, replaceText, 2);
-    } catch (e4) { throw e4; }
+    content.Find.Execute(findText, false, false, false, false, false, true, 0, false, replaceText, 2);
     return { replaced: count > 0, count: count };
   }
 
@@ -956,6 +952,7 @@
     var raw = t.split("\n");
     var out = [];
     for (var i = 0; i < raw.length; i++) {
+      // eslint-disable-next-line no-control-regex -- chu y: loc ky tu dieu khien khi lay text PDF
       var line = raw[i].split("\t").join("    ").replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
       var parts = pdfWrap(line, width);
       for (var j = 0; j < parts.length; j++) { out.push(parts[j]); }
@@ -1298,7 +1295,7 @@
   }
 
   function cmdEtNewWorkbook(app) {
-    var wb = app.Workbooks.Add();
+    app.Workbooks.Add();
     var active = app.ActiveWorkbook;
     var info = etDocInfo(active);
     return { name: info.name, fullName: info.fullName, saved: info.saved, opened: true };
@@ -1628,7 +1625,7 @@
       var base = path.split("/").pop().split("\\").pop();
       var dot = base.lastIndexOf(".");
       if (dot > 0) { base = base.substring(0, dot); }
-      base = base.replace(/[\[\]\*\?\/\\:]/g, "_").substring(0, 31) || "Import";
+      base = base.replace(/[[\]*?/\\:]/g, "_").substring(0, 31) || "Import";
       var existing = etSheetNames(wb);
       var nm = base, suffix = 2;
       while (existing.indexOf(nm) >= 0) {
@@ -2223,8 +2220,6 @@
           if (Math.abs(info.v - Math.round(info.v)) > 1e-9) { fractional++; }
         } else if (typeof info.v === "boolean") {
           texts++;
-        } else if (isF && typeof info.v === "number") {
-          numbers++;
         } else if (info.v === null || info.v === undefined) {
           if (txt === "") { blanks++; }
           else {

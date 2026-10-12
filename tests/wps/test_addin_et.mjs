@@ -229,7 +229,7 @@ test("et.importCsv: doc file bang FileSystem.ReadFile (readFileString cua WPS bi
 test("et.importCsv: cat BOM cua utf-8-sig, tu choi encoding khong phai UTF-8", () => {
   const ctx = loadAddin();
   // ReadFile tra ve nguyen noi dung file ke ca BOM (xem makeFileSystem), nen add-in phai tu cat theo utf-8-sig:
-  // khong cat thi o dau tien thanh "﻿Ten" - sai ten cot va sai moi so sanh sau do.
+  // khong cat thi o dau tien thanh "\uFEFFTen" - sai ten cot va sai moi so sanh sau do.
   const app = makeEtApp({ files: { "/tmp/bom.csv": "﻿Ten,So\nAn,42\n" } });
   const out = run(ctx, app, "et.importCsv", { path: "/tmp/bom.csv" });
   assert.equal(out.rows, 2);

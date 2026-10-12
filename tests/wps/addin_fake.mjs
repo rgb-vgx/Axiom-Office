@@ -393,13 +393,6 @@ function makeSort(state, prefix) {
 // ---------------------------------------------------------------------------------------------
 
 const FC_TYPE_CELL_VALUE = 1;
-const FC_TYPE_EXPRESSION = 2;
-const FC_OPERATORS = {
-  1: "between", 2: "notBetween", 3: "equal", 4: "notEqual",
-  5: "greater", 6: "less", 7: "greaterEqual", 8: "lessEqual",
-};
-
-function boxKey(box) { return box.r1 + "," + box.c1 + "," + box.r2 + "," + box.c2; }
 
 function boxContains(outer, inner) {
   return outer.r1 <= inner.r1 && outer.c1 <= inner.c1 && outer.r2 >= inner.r2 && outer.c2 >= inner.c2;
@@ -1447,7 +1440,7 @@ function makeTextHolderProxy(state, prefix, holder) {
 
 const WPP_TITLE_LAYOUTS = { 1: true, 2: true, 11: true };
 
-function makeShapesWpp(state, slideState, slidePrefix) {
+function makeShapesWpp(state, slideState) {
   const prefix = "Shapes";
 
   function addShape(kind, name, type, left, top, width, height, logLine) {
@@ -1610,7 +1603,7 @@ function makeSlide(state, pres, slideState, labelPath) {
       Name: { get: () => slideState.name },
       SlideIndex: { get: () => pres.slides.indexOf(slideState) + 1 },
       Layout: { get: () => slideState.layout },
-      Shapes: { get: () => makeShapesWpp(state, slideState, prefix) },
+      Shapes: { get: () => makeShapesWpp(state, slideState) },
       NotesPage: { get: () => makeNotesPage(state, pres, slideState, prefix) },
     },
     methods: {
