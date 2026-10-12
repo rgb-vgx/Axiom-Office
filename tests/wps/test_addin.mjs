@@ -24,16 +24,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { addinCatalog, assertMetadata, loadAddin, loCatalog, mockApp, run, throwing } from "./addin_harness.mjs";
+import { addinCatalog, loadAddin, loCatalog, mockApp, run, throwing } from "./addin_harness.mjs";
 
 
-// Lenh dot 1 (docs/wps-bridge.md muc 5, T2): add-in phai co, metadata giong het registry LibreOffice.
-const REQUIRED = [
-  "app.info",
-  "writer.getText", "writer.selection", "writer.typeText", "writer.appendText", "writer.insertStyledText",
-  "writer.heading", "writer.formatSelection", "writer.setParagraphAlignment", "writer.insertTable",
-  "writer.insertPageBreak", "writer.replaceAll", "writer.undo", "writer.save", "writer.saveAs", "writer.exportPdf",
-];
 const MUTATING = ["writer.typeText", "writer.appendText", "writer.insertStyledText", "writer.heading",
   "writer.formatSelection", "writer.setParagraphAlignment", "writer.insertTable", "writer.insertPageBreak",
   "writer.replaceAll"];
@@ -56,7 +49,9 @@ test("commands.js dinh nghia AxiomCommands voi catalog + execute", () => {
   assert.equal(typeof ctx.AxiomCommands.execute, "function");
 });
 
-test("registry add-in co du lenh dot 1 va metadata giong het registry LibreOffice", () => {
+// CATALOG cua add-in la ban sinh tu registry LibreOffice (scripts/generate_mcp_commands.py):
+// phai khop ca ve thu tu lan metadata, khong chi la tap con.
+test("catalog add-in = registry LibreOffice (du lenh, dung thu tu, dung metadata)", () => {
   const ctx = loadAddin();
   assert.deepEqual(addinCatalog(ctx), loCatalog());
 });
