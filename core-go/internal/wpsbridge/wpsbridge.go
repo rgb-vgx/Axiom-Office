@@ -476,6 +476,8 @@ func (b *Bridge) recordPoll(body map[string]any) {
 
 // ServeAddin phuc vu file tinh GET /wps/addin/<file>: khong token, chi GET/HEAD, chan thoat thu muc.
 func (b *Bridge) ServeAddin(w http.ResponseWriter, r *http.Request) {
+	// File add-in duoc CEF/WPS nap tu localhost; ban moi phai thang ban cache, va cac file nay nho nen nap lai khong dang ke.
+	w.Header().Set("Cache-Control", "no-store")
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		writeErr(w, http.StatusMethodNotAllowed, "method not allowed")
 		return

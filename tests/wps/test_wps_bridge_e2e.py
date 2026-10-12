@@ -179,6 +179,8 @@ def main() -> int:
         status, headers, text = request(core.base + "/wps/addin/index.html")
         check(status == 200 and "main.js" in text and "text/html" in headers.get("Content-Type", ""),
               "GET /wps/addin/index.html khong token -> 200 text/html", (status, headers.get("Content-Type"), text[:200]))
+        check(headers.get("Cache-Control") == "no-store",
+              "GET /wps/addin/index.html -> Cache-Control no-store", headers.get("Cache-Control"))
         status, headers, _ = request(core.base + "/wps/addin/ribbon.xml")
         check(status == 200 and "xml" in headers.get("Content-Type", ""), "ribbon.xml -> 200 Content-Type xml",
               (status, headers.get("Content-Type")))

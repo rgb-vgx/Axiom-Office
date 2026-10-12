@@ -169,11 +169,18 @@ func TestServeAddin(t *testing.T) {
 	if got.Code != 200 || !strings.Contains(got.Header().Get("Content-Type"), "text/html") {
 		t.Fatalf("index.html -> 200 text/html, duoc %d %q", got.Code, got.Header().Get("Content-Type"))
 	}
+	if got.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("index.html -> Cache-Control no-store, duoc %q", got.Header().Get("Cache-Control"))
+	}
 	if got := call("/wps/addin/../secret.txt", nil); got.Code != 404 {
 		t.Fatalf("thoat thu muc -> 404, duoc %d", got.Code)
+	} else if got.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("thoat thu muc -> Cache-Control no-store, duoc %q", got.Header().Get("Cache-Control"))
 	}
 	if got := call("/wps/addin/index.html", map[string]string{"Origin": "http://evil.example"}); got.Code != 403 {
 		t.Fatalf("Origin la -> 403, duoc %d", got.Code)
+	} else if got.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("Origin la -> Cache-Control no-store, duoc %q", got.Header().Get("Cache-Control"))
 	}
 }
 
