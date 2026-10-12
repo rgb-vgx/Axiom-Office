@@ -1,8 +1,12 @@
 """Xu ly URL org.axiomoffice.bridge:... tu menu (Addons.xcu -> ProtocolHandler.xcu -> component nay).
 
-Ba URL: `:askpane` (mo pane Ask AI), `:setup` (mo wizard thiet lap cho nguoi dung khong chuyen) va `:settings`
-(cua so Cai dat nang cao). Dispatch chay tren main thread (menu cua LibreOffice), nen goi thang
-`panel.show_pane` / `setupwizard.open_setup` / `dialogs.open_settings` ma khong qua UnoGate.
+Bon URL: `:askpane` (mo pane Ask AI), `:check` (soat tai lieu dang mo), `:setup` (mo wizard thiet lap cho
+nguoi dung khong chuyen) va `:settings` (cua so Cai dat nang cao). Dispatch chay tren main thread (menu cua
+LibreOffice), nen goi thang `panel.show_pane` / `dialogs.open_check` / `setupwizard.open_setup` /
+`dialogs.open_settings` ma khong qua UnoGate.
+
+ACTIONS la DANH SACH TRANG: mot muc menu trong Addons.xcu ma khong co ten o day thi bam vao KHONG lam gi
+(khong loi, khong thong bao). tests/lo/test_dispatch.py doi chieu hai ben voi nhau.
 """
 from __future__ import annotations
 
@@ -12,7 +16,7 @@ from com.sun.star.lang import XInitialization
 
 from . import log
 
-ACTIONS = {"askpane", "settings", "setup"}
+ACTIONS = {"askpane", "check", "settings", "setup"}
 
 
 class Dispatcher(unohelper.Base, XDispatchProvider, XInitialization, XDispatch):
@@ -52,14 +56,18 @@ class Dispatcher(unohelper.Base, XDispatchProvider, XInitialization, XDispatch):
                 from . import panel
 
                 panel.show_pane(self.ctx, self._frame())
+            elif action == "check":
+                from . import dialogs
+
+                dialogs.open_check(_PaneTarget(self.ctx, self._frame()))
             elif action == "settings":
                 from . import dialogs
 
-                dialogs.open_settings(_SettingsTarget(self.ctx, self._frame()))
+                dialogs.open_settings(_PaneTarget(self.ctx, self._frame()))
             elif action == "setup":
                 from . import setupwizard
 
-                setupwizard.open_setup(_SettingsTarget(self.ctx, self._frame()))
+                setupwizard.open_setup(_PaneTarget(self.ctx, self._frame()))
         except Exception as exc:  # noqa: BLE001 - khong duoc lam sap LibreOffice tu menu
             log.error("dispatch %s failed: %s" % (action, exc))
 
@@ -90,8 +98,8 @@ class Dispatcher(unohelper.Base, XDispatchProvider, XInitialization, XDispatch):
         return action if action in ACTIONS else None
 
 
-class _SettingsTarget:
-    """Doi tuong toi thieu ma dialogs.open_settings can: ctx + frame."""
+class _PaneTarget:
+    """Doi tuong toi thieu ma `dialogs.open_*` can: ctx + frame (nhu mot pane rut gon)."""
 
     def __init__(self, ctx, frame):
         self.ctx = ctx

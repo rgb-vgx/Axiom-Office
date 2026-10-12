@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import uno
 
-from . import config, core, theme
+from . import bridge, checks, config, core, documents, theme
 from .awt import ChildWindow, Dialog, bind_actions
 
 DIALOGS: dict = {}   # ten -> cua so dang mo (ChildWindow hoac Dialog; bam lai thi dong cai cu)
@@ -100,6 +100,15 @@ def _edit(dialog: ChildWindow, name: str, y: int, x: int, width: int, text: str 
 
 def _button(dialog: ChildWindow, name: str, x: int, y: int, width: int, text: str) -> None:
     dialog.add("Button", name, PositionX=x, PositionY=y, Width=width, Height=24, Label=text)
+
+
+def _set_list(dialog: ChildWindow, name: str, items) -> None:
+    """Do danh sach vao ListBox.
+
+    pyuno doi kieu tuong minh cho sequence<string> va `uno.Any` chi dung duoc qua `uno.invoke` (dat thang
+    mot tuple thi bao "Unable to convert the given value for the property StringItemList").
+    """
+    uno.invoke(dialog.models[name], "setPropertyValue", ("StringItemList", uno.Any("[]string", tuple(items))))
 
 
 def open_settings(pane, floating: bool = False) -> None:
@@ -200,7 +209,7 @@ def open_memory(pane) -> None:
             base, _ = core.ensure()
             rows = core.memories(base, query=query)
         except core.CoreError as exc:
-            uno.invoke(dialog.models["items"], "setPropertyValue", ("StringItemList", uno.Any("[]string", ())))
+            _set_list(dialog, "items", ())
             dialog.set("status", Label="Không đọc được ghi nhớ: %s" % exc)
             return
         labels = []
@@ -208,10 +217,7 @@ def open_memory(pane) -> None:
             state["items"].append(row)
             text = str(row.get("text") or "").replace("\n", " ")
             labels.append("%s · %s" % (row.get("scope") or "user", text[:90]))
-        # pyuno can kieu tuong minh cho sequence<string> va uno.Any chi dung duoc qua uno.invoke (dat tuple
-        # truc tiep thi bao "Unable to convert the given value for the property StringItemList").
-        uno.invoke(dialog.models["items"], "setPropertyValue",
-                   ("StringItemList", uno.Any("[]string", tuple(labels))))
+        _set_list(dialog, "items", labels)
         dialog.set("status", Label="%d ghi nhớ%s" % (len(labels), " · chọn rồi bấm Xoá" if labels else ""))
 
     def on_action(command: str, event) -> None:
@@ -239,3 +245,75 @@ def open_memory(pane) -> None:
 
     bind_actions(dialog, ("search", "delete", "reload", "close"), on_action)
     load()
+
+
+# Lenh "soat" theo loai tai lieu: (ten lenh, nhan ngan de bao ket qua). Ba lenh nay chi DOC va tat dinh
+# (xem checks.py) nen chay thang trong tien trinh, khong qua Agent Core: ra ket qua ngay, khong can mang,
+# khong ton token.
+CHECK_COMMANDS = {
+    "wps": ("writer.checkTables", "bảng trong văn bản"),
+    "et": ("et.checkRange", "vùng dữ liệu"),
+    "wpp": ("wpp.checkLayout", "bố cục trang"),
+}
+
+
+def open_check(pane) -> None:
+    """Dialog "Soat tai lieu": soat tai lieu dang mo roi liet ke van de tim thay.
+
+    Menu cua LibreOffice chay o main thread, cung nhu pane, nen dung `bridge.run_on_main` (qua gate se treo).
+    """
+    ctx = pane.ctx
+    dialog = _open(ctx, pane.frame if hasattr(pane, "frame") else None, "Soát tài liệu", 560, 440)
+    if dialog is None:
+        return
+    dialog.add("ListBox", "issues", PositionX=12, PositionY=46, Width=536, Height=312,
+               StringItemList=uno.Any("[]string", ()))
+    dialog.add("FixedText", "status", PositionX=12, PositionY=364, Width=536, Height=32, MultiLine=True,
+               TextColor=theme.TEXT_MUTED, FontHeight=theme.SIZE_CAPTION, Label="Đang soát…")
+    _button(dialog, "run", 12, 402, 100, "Soát lại")
+    _button(dialog, "close", 458, 402, 90, "Đóng")
+
+    def run() -> None:
+        kind = _current_kind(ctx)
+        if kind is None:
+            _set_list(dialog, "issues", ())
+            dialog.set("status", Label="Mở một tài liệu (Writer, Calc hoặc Impress) trước đã.")
+            return
+        action, label = CHECK_COMMANDS[kind]
+        try:
+            uno_gate = bridge.gate()
+        except Exception:  # noqa: BLE001 - cau noi chua chay thi van soat duoc (lenh soat khong dung gate)
+            uno_gate = None
+        payload = bridge.run_on_main(ctx, uno_gate, kind, action, {})
+        if not payload.get("ok"):
+            _set_list(dialog, "issues", ())
+            dialog.set("status", Label="Không soát được: %s" % payload.get("error"))
+            return
+        _set_list(dialog, "issues", checks.report_lines(payload.get("result")))
+        dialog.set("status", Label="Đã soát %s · chỉ đọc, tài liệu không bị sửa" % label)
+
+    def on_action(command: str, event) -> None:
+        if command == "run":
+            run()
+        elif command == "close":
+            dialog.close()
+            DIALOGS.pop("Soát tài liệu", None)
+
+    bind_actions(dialog, ("run", "close"), on_action)
+    run()
+
+
+def _current_kind(ctx):
+    """Loai tai lieu dang mo o cua so truoc (wps|et|wpp), khong phai loai nao do dang mo; khac thi None.
+
+    Khong dung `documents.active(kind, required=False)`: ham do con lang sang tai lieu cung loai CUOI CUNG
+    trong danh sach, nen mo mot Writer o sau mot Calc se tra ve nham loai.
+    """
+    current = documents.desktop(ctx).getCurrentComponent()
+    for kind, service in documents.SERVICES.items():
+        try:
+            if current is not None and current.supportsService(service):
+                return kind
+        except Exception:  # noqa: BLE001 - component khong ho tro supportsService thi coi nhu khong khop
+            continue
+    return None

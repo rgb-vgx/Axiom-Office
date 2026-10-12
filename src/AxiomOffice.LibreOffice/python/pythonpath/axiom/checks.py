@@ -417,22 +417,39 @@ def _is_error(cell, text: str) -> bool:
 # ---------------------------------------------------------------- Impress
 
 def _shape_text_height(shape) -> float:
-    """Chieu cao chu can (point): bat TextAutoGrowHeight tam de LibreOffice do roi tra lai."""
+    """Chieu cao chu can (point): bat TextAutoGrowHeight tam de LibreOffice do, do xong TRA LAI nguyen trang.
+
+    Phai tra lai ca CHIEU CAO, khong chi tham so autogrow: autogrow chi lon ra chu khong tu nho lai, nen
+    neu de nguyen thi chinh phep do lam khung cao vinh vien. Do 13/10/2026 tren LibreOffice that: mot
+    khung 20pt chua 300 ky tu bi keo len 107.9pt ngay o lan do dau, va tu lan sau khung da vua chu nen
+    `overflow` khong bao nua - mot slide qua day bao 3 loi o lan goi dau (overflow, overflow, dense) roi
+    chi con 1 loi (dense) o lan goi thu hai. Agent sua xong goi lai thay issueCount sach se tuong da xong,
+    trong khi chu van tran. Ban WPS cua cung lenh nay da dung hop dong "goi lai ket qua khong doi"
+    (tests/wps/test_addin_wpp.mjs: checkLayout hai lan van ra issueCount 1).
+    """
     try:
-        was = shape.TextAutoGrowHeight
+        was_grow = shape.TextAutoGrowHeight
+        was_width, was_height = shape.Size.Width, shape.Size.Height
     except Exception:  # noqa: BLE001
         return 0.0
+    height = 0.0
     try:
         shape.TextAutoGrowHeight = False
         shape.TextAutoGrowHeight = True
-        return shape.Size.Height * HMM_TO_POINT
+        height = shape.Size.Height * HMM_TO_POINT
     except Exception:  # noqa: BLE001
-        return 0.0
+        height = 0.0
     finally:
         try:
-            shape.TextAutoGrowHeight = was
+            # Tra autogrow TRUOC roi moi tra hinh hoc: con bat autogrow thi LibreOffice bo qua chieu cao
+            # vua gan, nen tra nguoc lai thi khung van o chieu cao da bi keo gian.
+            shape.TextAutoGrowHeight = was_grow
+            size = shape.Size
+            size.Width, size.Height = was_width, was_height
+            shape.Size = size
         except Exception:  # noqa: BLE001
             pass
+    return height
 
 
 def _min_font(shape) -> float:
@@ -568,3 +585,88 @@ command("et.checkRange", "et", range_report,
 command("wpp.checkLayout", "wpp", layout_report,
         "Soát bố cục slide (chỉ đọc): chữ tràn khung, shape ra ngoài slide, shape chồng nhau, chữ quá nhỏ",
         opt("slide", "slide number; default: every slide"), agent=True)
+
+
+# ----------------------------------------------------------------------------------------------
+# Bao cao cho NGUOI DUNG (dialog "Soat tai lieu" cua extension).
+#
+# `detail` cua moi van de duoc viet cho model ("agent mu", xem dau file) va la tieng Anh, vi no mang so
+# lieu cu the (dia chi o, so dong, toa do) ma mot bang nhan khong dung lai duoc. Nen o day: nhan tieng
+# Viet theo `type` + giu nguyen `detail` lam phan chi tiet. Them `type` moi trong file nay thi phai them
+# nhan vao ISSUE_LABELS - tests/lo/test_report.py kiem dung dieu do (quet ma nguon, khong chep tay).
+
+ISSUE_LABELS = {
+    # wpp.checkLayout
+    "overflow": "Chữ tràn khung",
+    "offslide": "Ra ngoài trang",
+    "small-font": "Cỡ chữ nhỏ",
+    "overlap": "Chồng lên nhau",
+    "dense": "Quá nhiều chữ trên một trang",
+    # writer.checkTables
+    "empty-cells": "Có ô trống",
+    "long-header-cell": "Ô tiêu đề quá dài",
+    # et.checkRange
+    "outside-table": "Dữ liệu nằm ngoài bảng",
+    "empty-reference": "Tham chiếu tới ô trống",
+    "empty-header": "Cột thiếu tiêu đề",
+    "numbers-as-text": "Số đang lưu dạng chữ",
+    "mixed-types": "Cột trộn số và chữ",
+    "error-values": "Có ô lỗi",
+    "no-number-format": "Số chưa có định dạng",
+}
+
+
+def issue_label(kind) -> str:
+    """Nhan tieng Viet cua mot loai van de; loai la thi tra ve chinh ten do (khong nuot van de)."""
+    return ISSUE_LABELS.get(str(kind), str(kind))
+
+
+def report_lines(result) -> list:
+    """Cac dong bao cao cho dialog "Soat tai lieu" (thuan - khong uno, nen test duoc).
+
+    Dong dau la boi canh (trang nao / vung nao / may bang) de nguoi dung biet dang doc cai gi; sau do
+    moi van de mot dong. Khong co van de thi noi thang la khong co, khong tra ve danh sach rong.
+    """
+    result = result or {}
+    issues = list(result.get("issues") or [])
+    lines = []
+    context = _report_context(result)
+    if context:
+        lines.append(context)
+    if not issues:
+        lines.append("Không phát hiện vấn đề.")
+        return lines
+    lines.append("%s vấn đề:" % _count(result.get("issueCount"), len(issues)))
+    for item in issues:
+        detail = str(item.get("detail") or "").strip()
+        lines.append("• %s — %s" % (issue_label(item.get("type")), detail) if detail
+                     else "• %s" % issue_label(item.get("type")))
+    return lines
+
+
+def _report_context(result) -> str:
+    """Mot dong mo ta pham vi da soat, nhan dien theo khoa dac trung cua tung lenh."""
+    if "slideWidth" in result:                      # wpp.checkLayout
+        return "%d trang · khổ %s×%s pt" % (len(result.get("slides") or []),
+                                            _number(result.get("slideWidth")), _number(result.get("slideHeight")))
+    if "sheet" in result:                           # et.checkRange
+        return "Trang tính %s · vùng %s · %s dòng × %s cột" % (
+            result.get("sheet") or "?", result.get("range") or result.get("usedRange") or "?",
+            _count(result.get("rows"), "?"), _count(result.get("cols"), "?"))
+    if "tableCount" in result:                      # writer.checkTables
+        return "%s bảng trong tài liệu" % _count(result.get("tableCount"), 0)
+    return ""
+
+
+def _count(value, fallback) -> str:
+    try:
+        return "%d" % int(value)
+    except (TypeError, ValueError):
+        return str(fallback)
+
+
+def _number(value) -> str:
+    try:
+        return "%g" % float(value)
+    except (TypeError, ValueError):
+        return "?"
