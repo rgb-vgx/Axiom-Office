@@ -5,6 +5,26 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Ribbon add-in COM (Windows), đợt 1 của `docs/ribbon-ui.md`: "Nhìn tài liệu" + ba nút Soát (13/10/2026)
+- Tab **Axiom Office** sắp lại thành ba nhóm **Trợ lý** / **Kiểm tra** / **Truy cập nhanh**, nhãn tiếng Việt theo
+  kết quả người dùng muốn; *Cài đặt nâng cao…* và *Sao chép API URL* hạ xuống nút nhỏ (chuyển sang tab
+  "Axiom · Quản lý" ở đợt 3)
+- **Nhìn tài liệu** (toggleButton): ghi HKCU `VisualQaEnabled`, ghi hỏng thì nút vẽ lại theo HKCU chứ không hiện
+  trạng thái chưa lưu. Sau khi ghi, luồng nền hỏi `GET /v1/setup` để lấy trạng thái **thật** của Core; Core báo
+  khác (biến môi trường `AXIOM_VISUAL_QA` đè HKCU) thì nút hiện theo Core và báo người dùng. Nút mờ khi
+  `CoreEnabled = 0` (agent in-process không dùng ảnh). Wizard/Cài đặt đóng lại thì nút vẽ lại theo HKCU
+- **Soát bố cục** (`wpp.checkLayout`), **Soát bảng** (`writer.checkTables`), **Soát vùng dữ liệu** (`et.checkRange`):
+  chỉ hiện ở app hợp (`getVisible`), gọi thẳng `CommandDispatcher.Execute` ở **luồng nền** (luồng UI rảnh để host
+  trả lời COM) — không qua model, không cần Core, 0 token. Kết quả diễn giải sang tiếng Việt theo loại lỗi
+  (`Ribbon/RibbonChecks.cs`), tối đa 15 dòng. Không đổi hành vi lệnh bridge nào
+- Đã bấm thử trên PowerPoint (13/10): toggle ghi HKCU và `GET /v1/setup` của Core báo đúng giá trị; *Soát bố cục*
+  trên bài 3 slide ra kết quả sau ~0,5s, không gọi model
+
+### Fixed — Log chẩn đoán PowerPoint mất tên cửa sổ (13/10/2026)
+- `HostProbe.Describe` đọc `Caption` và `Visible` trong cùng một lần thử; `DocumentWindow` của PowerPoint không có
+  `Visible` nên cả cụm thành `<RuntimeBinderException>`. Nay đọc riêng từng thuộc tính, thiếu `Visible` thì ghi
+  `state=` (`WindowState`). Chỉ ảnh hưởng dòng log "First bridge command" / `OnConnection`, không ảnh hưởng lệnh
+
 ### Fixed — Nguồn của skill làm slide: **9 khẳng định mở được trang thật**, 13 khẳng định phải hạ xuống "chưa có nguồn" (13/10/2026)
 - **Đợt kiểm chứng mở từng trang**, không tin trí nhớ: mỗi khẳng định trong `references/cau-chuyen.md` được
   đối chiếu bằng cách mở URL và đọc. Ghi chú lại cách làm vì nó ảnh hưởng kết quả: `WebSearch` **trả về rỗng

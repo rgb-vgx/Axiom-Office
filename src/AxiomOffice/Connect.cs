@@ -33,18 +33,83 @@ namespace AxiomOffice
             return RibbonUi.RibbonXml;
         }
 
-        public void OnButtonAction(object control)
+        // Callback ribbon (host gọi qua IDispatch theo tên trong RibbonUi.RibbonXml).
+        public void OnRibbonLoad(object ribbon)
         {
-            string tag = "";
+            Logger.Info("OnRibbonLoad");
+            RibbonUi.OnLoad(ribbon);
+        }
+
+        public bool GetPressed(object control)
+        {
             try
             {
-                dynamic c = control;
-                tag = Convert.ToString(c.Tag);
+                return RibbonUi.GetPressed(ControlTag(control));
             }
             catch (Exception ex)
             {
-                Logger.Error("OnButtonAction: cannot read Tag", ex);
+                Logger.Error("GetPressed failed", ex);
+                return false;
             }
+        }
+
+        public bool GetEnabled(object control)
+        {
+            try
+            {
+                return RibbonUi.GetEnabled(ControlTag(control));
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("GetEnabled failed", ex);
+                return true;
+            }
+        }
+
+        public bool GetVisible(object control)
+        {
+            try
+            {
+                return RibbonUi.GetVisible(this, ControlTag(control));
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("GetVisible failed", ex);
+                return true;
+            }
+        }
+
+        public void OnToggleAction(object control, bool pressed)
+        {
+            string tag = ControlTag(control);
+            Logger.Info("OnToggleAction: tag=" + tag + " pressed=" + pressed);
+            try
+            {
+                RibbonUi.HandleToggle(this, tag, pressed);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("OnToggleAction failed", ex);
+            }
+        }
+
+        private static string ControlTag(object control)
+        {
+            try
+            {
+                dynamic c = control;
+                return Convert.ToString(c.Tag);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Ribbon: cannot read control Tag", ex);
+                return "";
+            }
+        }
+
+        public void OnButtonAction(object control)
+        {
+            string tag = ControlTag(control);
             Logger.Info("OnButtonAction: tag=" + tag);
             try
             {

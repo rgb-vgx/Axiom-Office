@@ -33,10 +33,10 @@ Cột "Nền tảng": W = Windows COM · L = WPS Linux (ribbon) · O = LibreOffi
 |---|---|---|---|---|---|
 | **Ask AI** | Trợ lý | button | W L O | pane Ask AI (đã có) | P0 |
 | **Dừng** | Trợ lý | button | W L | `POST /v1/runs/{id}/cancel`; pane đã có nút Dừng (`AskAiPane.cs:105`) | P2 |
-| **Nhìn tài liệu** | Kiểm tra | **toggle** | W · O ✅ · ~~L~~ | W: ghi HKCU `VisualQaEnabled`; **O: đã có** (checkbox trong "Cài đặt nâng cao", `dialogs.py:81`); **L: chặn** — xem §5.1. Core đọc lại **mỗi lượt** | P0 |
-| **Soát bố cục** | Kiểm tra | button | W · **O ✅** · L | `wpp.checkLayout` — chỉ đọc, tất định, **0 token** | P0 |
-| **Soát bảng** | Kiểm tra | button | W · **O ✅** · L | `writer.checkTables` | P1 |
-| **Soát vùng dữ liệu** | Kiểm tra | button | W · **O ✅** · L | `et.checkRange` | P1 |
+| **Nhìn tài liệu** | Kiểm tra | **toggle** | W ✅ · O ✅ · ~~L~~ | W: ghi HKCU `VisualQaEnabled`; **O: đã có** (checkbox trong "Cài đặt nâng cao", `dialogs.py:81`); **L: chặn** — xem §5.1. Core đọc lại **mỗi lượt** | P0 |
+| **Soát bố cục** | Kiểm tra | button | **W ✅** · **O ✅** · L | `wpp.checkLayout` — chỉ đọc, tất định, **0 token** | P0 |
+| **Soát bảng** | Kiểm tra | button | W (chưa bấm) · **O ✅** · L | `writer.checkTables` | P1 |
+| **Soát vùng dữ liệu** | Kiểm tra | button | W (chưa bấm) · **O ✅** · L | `et.checkRange` | P1 |
 | **Thiết lập…** | Truy cập nhanh | button | W L O | wizard 5 bước (đã có) | P0 |
 | **Trạng thái** | Truy cập nhanh | button | W L O | `GET /health` + session registry + cổng theo app | P0 |
 | **Mở nhật ký** | Truy cập nhanh | button | W L | `%LOCALAPPDATA%\AxiomOffice\{bridge,core}.log` | P1 |
@@ -98,10 +98,15 @@ Tab thứ hai **chỉ mở khi đã có ≥3 màn hình thật**; chưa làm gì
 
 | Đợt | Nội dung | Nghiệm thu |
 |---|---|---|
-| **1** | Toggle **Nhìn tài liệu** + ba nút **Soát** (bố cục/bảng/vùng) | Bấm ra kết quả ngay; toggle đổi được và lượt sau Core hành xử khác; ba nút Soát không tốn token · **LibreOffice ✅ 13/10** (mục menu *Soát tài liệu…*, §8) · Windows: chờ phiên máy Windows |
+| **1** | Toggle **Nhìn tài liệu** + ba nút **Soát** (bố cục/bảng/vùng) | Bấm ra kết quả ngay; toggle đổi được và lượt sau Core hành xử khác; ba nút Soát không tốn token · **LibreOffice ✅ 13/10** (mục menu *Soát tài liệu…*, §8) · **Windows ✅ PowerPoint 13/10** (Word/Excel/WPS Windows chưa bấm, §8) |
 | **2** | **Bộ nhớ AI…** — form 3 vùng (danh sách / chi tiết / lịch sử); phân biệt rõ **xoá mềm ≠ khôi phục ≠ xoá cứng** | Sửa, ghim, đặt hạn, xoá mềm, khôi phục, xoá cứng đều chạy; lọc được theo phạm vi user/document · **LibreOffice: mới 1/3** — dialog *Ghi nhớ* có **đọc / lọc / xoá mềm / tải lại**; thiếu sửa, ghim, hạn, khôi phục, xoá cứng (§3) |
 | **3** | **Kỹ năng…**, **Nhật ký hoạt động…**, **Hội thoại…** → mở tab thứ hai | Thấy đúng skill của app đang mở; nạp lại được; audit đọc được · **LibreOffice ✅ 13/10** cho *Kỹ năng…* + *Nhật ký hoạt động…* (§8) · **Hội thoại…**: chưa (route `GET /v1/conversations` có sẵn) |
 | **4** | Nút theo từng app, xuất PDF, lối tắt soạn thảo đã kiểm thử | Chỉ hiện nút hợp với app |
+
+**Windows — ghi chú cho đợt 2:** `src/AxiomOffice/Ai/MemoryForm.cs` **đã có** đủ sửa, ghim, hạn dùng, xoá mềm,
+khôi phục, lịch sử, xoá toàn bộ, và mở được từ *Cài đặt nâng cao…*. Đợt 2 trên Windows là **đưa nó lên ribbon** và
+bổ sung phần còn thiếu (lọc theo phạm vi user/document, tách rõ xoá mềm ≠ xoá cứng), không viết form mới. Mục 3
+("còn chưa UI nào gọi" `PATCH`/`restore`/`history`) chỉ đúng với LibreOffice.
 
 Cổng kiểm mỗi đợt: `make lint`, `make check-gen`, `make test` (Linux) · `scripts\build.ps1` +
 `scripts\package.ps1` và CI job `windows` (Windows).
@@ -160,3 +165,4 @@ handler trong tiến trình (như `CommandDispatcher.Execute` ở Windows) — n
 | 13/10/2026 | (kế hoạch) | Chốt plan; phát hiện §5.1 (toggle trên WPS Linux bị chặn vì Core không có endpoint ghi cấu hình). Giao phần Windows cho phiên trên máy Windows. |
 | 13/10/2026 | LibreOffice | Hai mục menu **Kỹ năng…** (`org.axiomoffice.bridge:skills`) và **Nhật ký hoạt động…** (`:audit`): `Addons.xcu` → `dispatch.ACTIONS` → `dialogs.open_skills` / `open_audit`. `core.py` thêm `skill_listing` (trả **cả payload**, không chỉ `skills`, để thư mục kỹ năng nạp lỗi không bị im lặng bỏ qua), `reload_skills`, `audit`. Nút *Nạp lại* gọi `POST /v1/skills/reload` (đọc lại thư mục, **không** khởi động lại Core); nhật ký đọc 100 dòng mới nhất và đổi giờ UTC của Core sang **giờ máy**. Spec mới: `SkillLinesTest`, `SkillStatusTest`, `AuditLinesTest`, `ClockTest` (`tests/lo/test_dialogs.py`), `CoreListingTests` (`tests/lo/test_chat.py`), và một ca dispatch cho hai URL. |
 | 13/10/2026 | LibreOffice | `tests/live/open_dialogs.py` — probe **không** phải unittest: dựng LibreOffice thật trong profile/XDG tạm, cài `.oxt`, gửi **đúng URL của menu** qua UNO rồi **chụp ảnh màn hình** (`xwd` + `ffmpeg`). Cần vì dialog ở đây là `awt.ChildWindow` — cửa sổ con **không có cửa sổ X riêng**, nên `xdotool search --name` không tìm được như với wizard. Đã chạy và xem ảnh: *Soát tài liệu* (bảng dựng thật bằng `writer.insertTable` → *"Có ô trống"*), *Kỹ năng* (3 kỹ năng, "nguồn: sẵn có"), *Nhật ký* (nhánh rỗng). Ảnh ở `/tmp/axiom-dialogs`. |
+| 13/10/2026 | Windows COM | Ribbon tab **Axiom Office** sắp lại thành *Trợ lý / Kiểm tra / Truy cập nhanh* (`Ribbon/RibbonUi.cs`). **Nhìn tài liệu** = `toggleButton`: ghi HKCU `VisualQaEnabled`, ghi hỏng thì vẽ lại theo HKCU; luồng nền hỏi `GET /v1/setup` lấy trạng thái thật của Core (biến môi trường `AXIOM_VISUAL_QA` đè được HKCU → nút theo Core + báo); mờ khi `CoreEnabled=0`. Ba nút **Soát** hiện theo app (`getVisible`), gọi `CommandDispatcher.Execute` ở **luồng nền**, kết quả đổi sang tiếng Việt (`Ribbon/RibbonChecks.cs`, tối đa 15 dòng). Đã bấm thật trên **PowerPoint**: toggle ghi HKCU và Core báo `visualQaEnabled=True` khớp; *Soát bố cục* trên bài 3 slide ra kết quả ~0,5s, 0 lượt gọi model. Kèm sửa `HostProbe` (cửa sổ PowerPoint không có `Visible` làm mất cả tên cửa sổ trong log). Chưa bấm: Word, Excel, WPS Windows. |
