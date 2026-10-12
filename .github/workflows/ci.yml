@@ -66,6 +66,11 @@ jobs:
           PARTS=fake_bridge,guards,skills,confirm,memory,mcp,visual,setup,shutdown,anthropic,embeddings,summarize,cancel,mcp_http,verify
           python3 tests/core/test_core_e2e.py --only "$PARTS"
 
+      # Hai bo e2e nay chay Core that qua HTTP (dong vai add-in bang poll/result + LLM gia) nhung
+      # KHONG can WPS; dich Makefile la nguon duy nhat liet ke chung.
+      - name: E2e kenh WPS + pane Ask AI (Core that, khong can WPS)
+        run: make test-wps-e2e
+
       - name: MCP server ban Go (khong can app dang mo)
         env:
           AXIOM_MCP_ARGS: mcp all
