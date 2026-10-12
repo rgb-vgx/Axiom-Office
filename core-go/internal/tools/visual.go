@@ -3,12 +3,15 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"axiomoffice/core/internal/model"
 )
 
-// VisualTool: look_at_document - chup cua so app (bridge app.screenshot) va gui ANH cho model de soat bo cuc
-// bang mat (QA thi giac, muc 8.4.6). Chi dang ky khi nguoi dung bat VisualQaEnabled (ton token).
+// VisualTool: look_at_document - lay anh trang/slide hien tai (bridge app.screenshot) va gui ANH cho model de
+// soat bo cuc bang mat (QA thi giac, muc 8.4.6). Chi dang ky khi nguoi dung bat VisualQaEnabled (ton token).
+// Trinh chieu: bridge xuat thang slide (Windows: Slide.Export, LibreOffice: filter PNG); ban Windows bao them
+// "slide"/"slideCount" de model biet minh dang nhin slide nao - chi co slide dang mo, khong chon duoc slide khac.
 type VisualTool struct{}
 
 const (
@@ -21,8 +24,9 @@ func NewVisualTool() *VisualTool { return &VisualTool{} }
 func (t *VisualTool) Name() string { return VisualToolName }
 
 func (t *VisualTool) Description() string {
-	return "Take a screenshot of the document window and look at it, to check the visual layout (text overflowing, " +
-		"overlapping shapes, alignment, contrast) after creating or redesigning slides, tables or pages. " +
+	return "Look at an image of the page or slide currently shown in the document window, to check the visual " +
+		"layout (text overflowing, overlapping shapes, alignment, contrast) after creating or redesigning slides, " +
+		"tables or pages. It shows ONLY the current page/slide (the result says which slide). " +
 		"It costs many tokens: call it at most once or twice per task, after the structural checks."
 }
 
@@ -43,13 +47,17 @@ func (t *VisualTool) Invoke(ctx context.Context, arguments map[string]any, run *
 		mime = "image/png"
 	}
 	// Anh khong vao audit: tool call chi ghi tham so (khong co base64), anh di kem ket qua cho codec.
-	summary := map[string]any{
-		"ok": true,
-		"result": map[string]any{
-			"width": shot.Result["width"], "height": shot.Result["height"],
-			"note": "The screenshot is attached as an image.",
-		},
+	result := map[string]any{
+		"width": shot.Result["width"], "height": shot.Result["height"],
+		"note": "The image is attached.",
 	}
+	if slide, ok := shot.Result["slide"]; ok {
+		result["slide"] = slide
+		result["slideCount"] = shot.Result["slideCount"]
+		result["note"] = fmt.Sprintf("The image is attached: slide %v of %v (the slide shown in the window), "+
+			"not the whole presentation.", slide, shot.Result["slideCount"])
+	}
+	summary := map[string]any{"ok": true, "result": result}
 	return Result{
 		JSON:         model.MarshalRelaxed(summary),
 		OK:           true,

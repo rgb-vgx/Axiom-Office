@@ -234,15 +234,19 @@ namespace AxiomOffice.Ai
         private readonly string _text;
         private readonly bool _isUser;
         private readonly ContextMenuStrip _menu;
+        // Trả lời của AI hiện markdown (MarkdownView.cs); tin của người dùng giữ chữ thường.
+        private readonly List<MdBlock> _blocks;
+        private MdLayout _layout;
 
         public ChatBubble(string text, bool isUser)
         {
             _text = text ?? "";
             _isUser = isUser;
+            _blocks = isUser ? null : Markdown.Parse(_text);
             Font = PaneTheme.Body;
             TabStop = true;
             AccessibleRole = AccessibleRole.ListItem;
-            AccessibleName = (isUser ? "Bạn: " : "AI: ") + _text;
+            AccessibleName = (isUser ? "Bạn: " : "AI: ") + (isUser ? _text : Markdown.ToPlainText(_text));
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.Selectable, true);
             _menu = new ContextMenuStrip();
             _menu.Items.Add("Sao chép", null, delegate { CopyText(); });
@@ -264,6 +268,12 @@ namespace AxiomOffice.Ai
             int padX = PaneTheme.Px(PaneTheme.BubblePadX);
             int padY = PaneTheme.Px(PaneTheme.BubblePadY);
             maxWidth = Math.Max(PaneTheme.Px(100), maxWidth);
+            if (_blocks != null)
+            {
+                _layout = MdLayout.Build(_blocks, maxWidth - 2 * padX, PaneTheme.TextPrimary);
+                Size = new Size(Math.Min(maxWidth, _layout.Width + 2 * padX + 2), Math.Max(_layout.Height, Font.Height) + 2 * padY);
+                return;
+            }
             Size measured = TextRenderer.MeasureText(_text, Font, new Size(maxWidth - 2 * padX, int.MaxValue), PaneTheme.WrapFlags);
             int width = Math.Min(maxWidth, measured.Width + 2 * padX + 2);
             measured = TextRenderer.MeasureText(_text, Font, new Size(width - 2 * padX, int.MaxValue), PaneTheme.WrapFlags);
@@ -308,6 +318,11 @@ namespace AxiomOffice.Ai
             }
             int padX = PaneTheme.Px(PaneTheme.BubblePadX);
             int padY = PaneTheme.Px(PaneTheme.BubblePadY);
+            if (_layout != null)
+            {
+                _layout.Paint(g, new Point(padX, padY));
+                return;
+            }
             TextRenderer.DrawText(g, _text, Font, new Rectangle(padX, padY, Width - 2 * padX, Height - 2 * padY),
                 _isUser ? PaneTheme.UserFg : PaneTheme.TextPrimary, PaneTheme.WrapFlags);
         }
@@ -360,7 +375,7 @@ namespace AxiomOffice.Ai
             }
             try
             {
-                Clipboard.SetText(_text);
+                Clipboard.SetText(_isUser ? _text : Markdown.ToPlainText(_text));
             }
             catch (ExternalException)
             {
@@ -421,6 +436,9 @@ namespace AxiomOffice.Ai
             { "writer.checkTables", "Kiểm tra bảng" },
             { "et.checkRange", "Kiểm tra bảng dữ liệu" },
             { "wpp.checkLayout", "Kiểm tra bố cục slide" },
+            // Công cụ của Agent Core ngoài office_action (AskAiPane.ProgressLine đưa tên tool vào chỗ action).
+            { "look_at_document", "Nhìn ảnh trang/slide" },
+            { "recall", "Tra ghi nhớ" },
         };
 
         private static readonly Dictionary<string, string> SuffixLabels = new Dictionary<string, string>
@@ -507,6 +525,12 @@ namespace AxiomOffice.Ai
             if (Labels.TryGetValue(actionId, out label))
             {
                 return label;
+            }
+            // Tool MCP của Core: mcp__<server>__<tool>.
+            if (actionId.StartsWith("mcp__", StringComparison.Ordinal))
+            {
+                int cut = actionId.LastIndexOf("__", StringComparison.Ordinal);
+                return "Công cụ ngoài: " + actionId.Substring(cut + 2);
             }
             int dot = actionId.LastIndexOf('.');
             if (dot >= 0 && SuffixLabels.TryGetValue(actionId.Substring(dot + 1), out label))

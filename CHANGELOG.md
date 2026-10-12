@@ -5,6 +5,39 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Khung chat Windows hiển thị markdown trong câu trả lời của AI (13/10/2026)
+- Trước đây bong bóng trả lời vẽ nguyên văn (`TextRenderer.DrawText`): người dùng thấy `**`, `##`, `` ` ``, `-`.
+  Nay `Ai/MarkdownView.cs` đọc phần model hay dùng — **đậm**, *nghiêng*, `mã` trong dòng, link (tô màu, không
+  bấm), tiêu đề `#`–`######`, danh sách `-`/`*`/`1.` (lồng theo thụt lề), khối mã ```` ``` ````, trích dẫn `>`,
+  đường kẻ `---` — và tự xếp chữ, xuống dòng trong bong bóng. Bảng hiện bằng chữ đều Consolas, cột đệm cho thẳng
+  (pane hẹp, không dựng lưới). Dấu `_` giữa hai chữ (`ten_bien`) không bị hiểu là nghiêng
+- Xếp chữ đo **cả cụm** chữ cùng kiểu trên dòng và trừ khoản lề cố định mỗi lần đo của `TextRenderer`; đo từng từ
+  rồi cộng thì khoảng cách giữa các chữ rộng gấp mấy lần (đã dựng ảnh bong bóng ở 280 px và 340 px để kiểm)
+- *Sao chép* và tên đọc màn hình của bong bóng AI dùng chữ đã bỏ ký hiệu (`Markdown.ToPlainText`); tin của người
+  dùng giữ nguyên chữ thường. Bản LibreOffice vẫn chỉ bỏ `**` và `` ` `` (`theme.plain_reply`)
+
+### Fixed — "Nhìn tài liệu" trên PowerPoint: model nhận ảnh slide thật, không phải ảnh cả cửa sổ (13/10/2026)
+- **Đo trên bài thật**: `app.screenshot` bản Windows chụp **nguyên cửa sổ** (`PrintWindow`) rồi thu về 1280 px —
+  slide chỉ chiếm ~30% ảnh (680×385 trong 1280×689, zoom 58%), phần còn lại là ribbon, cột thumbnail, khung chat,
+  ghi chú. Model free nhận ảnh đó rồi im hơn 3 phút (lượt bị dừng sau 310 s). Hợp đồng của lệnh (`catalog/
+  live-commands.json`) vốn ghi *"trang/slide hiện tại"* và bản LibreOffice đã xuất trang qua filter PNG — chỉ bản
+  Windows lệch
+- Trình chiếu nay xuất thẳng **slide đang mở** bằng `Slide.Export` (1280×720 cho slide 16:9, ~140 ms), kèm
+  `slide`/`slideCount`; xuất lỗi thì quay về chụp cửa sổ như cũ. Word/Excel giữ chụp cửa sổ. Không đổi tên/tham số
+  lệnh, không đổi danh sách lệnh
+- Core (`look_at_document`): ghi chú gửi model nói rõ *"slide N of M (the slide shown in the window)"*; mô tả tool
+  nói nó chỉ thấy trang/slide hiện tại. Test Go mới `internal/tools/visual_test.go` (có slide / không slide / lỗi
+  bridge)
+
+### Fixed — Khung chat trông như "đơ": các bước ngoài `office_action` bị ẩn, bước lỗi hiện tích xanh (13/10/2026)
+- `AskAiPane.ProgressLine` bỏ mọi tool khác `office_action`, nên một lượt gọi tool MCP lỗi (`ppt_profile`: *file
+  not found* vì model chỉ đưa tên file) rồi chờ model trông như pane đứng ở bước `office_action` cuối. Nay hiện
+  `look_at_document` (*Nhìn ảnh trang/slide*), `recall` (*Tra ghi nhớ*), tool MCP (*Công cụ ngoài: …*); vẫn ẩn
+  `load_skill`/`read_skill_file`/`remember` vì đã có dòng riêng
+- Dòng tiến trình chỉ coi là lỗi khi preview có `"ok":false`; lỗi dạng `{"error":"'wpp.listShapes' is not an
+  available action…"}` hiện thành **tích xanh**. Nay Core báo thất bại (`ok=false` trong `tool.finished`) thì luôn
+  hiện là lỗi kèm câu lỗi
+
 ### Added — Ribbon Windows: nhóm Quản lý + Hệ thống trên **một tab duy nhất**; Hội thoại / Nhật ký vào khung chat (13/10/2026)
 - Chốt với người dùng: không mở tab thứ hai "Axiom · Quản lý"; bỏ nút *Dừng* (pane đã có) và *Xuất PDF*
 - **Bộ nhớ AI…** (ribbon): `MemoryForm` thêm ô lọc phạm vi (*Mọi phạm vi* / *Chung* / *Tài liệu đang mở*) và tách

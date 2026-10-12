@@ -526,22 +526,32 @@ namespace AxiomOffice.Ai
                 return "(Dùng kỹ năng: " + (item.Name ?? "?") + ")";
             }
 
-            // load_skill / read_skill_file: đã có dòng "Dùng kỹ năng", không hiện như thao tác trên tài liệu.
-            if (item.Type == "tool.finished" && !string.IsNullOrEmpty(item.Tool) && item.Tool != "office_action")
+            // load_skill / read_skill_file: đã có dòng "Dùng kỹ năng"; remember: đã có dòng "Đã ghi nhớ".
+            // Công cụ khác (look_at_document, recall, MCP) PHẢI hiện: trước đây bị ẩn hết nên một lượt gọi MCP
+            // lỗi rồi chờ model trông như pane đứng ở bước office_action cuối (đo 13/10/2026).
+            if (item.Type == "tool.finished" && (item.Tool == "load_skill" || item.Tool == "read_skill_file" || item.Tool == "remember"))
             {
                 return null;
             }
 
             if (item.Type == "tool.finished")
             {
+                bool officeAction = string.IsNullOrEmpty(item.Tool) || item.Tool == "office_action";
                 string outcome = !string.IsNullOrEmpty(item.ResultPreview)
                     ? item.ResultPreview
                     : (item.Ok
                         ? "{\"ok\":true}"
                         : "{\"ok\":false,\"error\":\"" + (item.Error ?? "loi") + "\"}");
+                // Core báo thất bại mà preview không có "ok":false (vd {"error":"'wpp.listShapes' is not an available
+                // action…"}, lỗi MCP dạng chữ) thì ToolLine sẽ vẽ tích xanh: ép thành dòng lỗi.
+                if (!item.Ok && !outcome.Contains("\"ok\":false"))
+                {
+                    string message = !string.IsNullOrEmpty(item.Error) ? item.Error : ErrorText(outcome);
+                    outcome = "{\"ok\":false,\"error\":" + new System.Web.Script.Serialization.JavaScriptSerializer().Serialize(message) + "}";
+                }
                 // Cung dinh dang dong tien trinh cua che do in-process ({"action": ..., "params": ...}) de
                 // PaneControls hien nhan tieng Viet theo action (truoc day chi co "{}").
-                string call = "{\"action\": \"" + (item.Action ?? "") + "\""
+                string call = "{\"action\": \"" + (officeAction ? item.Action ?? "" : item.Tool) + "\""
                     + (string.IsNullOrEmpty(item.ParamsPreview) ? "" : ", \"params\": " + item.ParamsPreview)
                     + "}";
                 return "office_action " + call + " -> " + outcome;
@@ -553,6 +563,25 @@ namespace AxiomOffice.Ai
             }
 
             return null;
+        }
+
+        // Câu lỗi trong preview kết quả ({"error":"…"} có thể bị cắt ở 150 ký tự); không có thì trả nguyên preview.
+        private static string ErrorText(string preview)
+        {
+            System.Text.RegularExpressions.Match match = System.Text.RegularExpressions.Regex.Match(
+                preview ?? "", "\"error\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)");
+            if (!match.Success)
+            {
+                return string.IsNullOrEmpty(preview) ? "lỗi" : preview;
+            }
+            try
+            {
+                return System.Text.RegularExpressions.Regex.Unescape(match.Groups[1].Value);
+            }
+            catch (ArgumentException)
+            {
+                return match.Groups[1].Value;
+            }
         }
 
         // Duong dan tai lieu chuan hoa (giong Orchestrator.DocumentKey ben Core) de tra hoi thoai cu.

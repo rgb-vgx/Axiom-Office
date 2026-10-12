@@ -242,7 +242,7 @@ namespace AxiomOffice.Bridge
                 Command("ui.askpane", null, UiAskPane, "Mở task pane Ask AI").Ungated(),
                 // QA thị giác (New_arch.md 8.4.6): Core gửi ảnh cho model qua tool look_at_document; agent không
                 // gọi thẳng (base64 lớn sẽ đổ vào ngữ cảnh) nên không ForAgent.
-                Command("app.screenshot", null, AppScreenshot, "Ảnh chụp cửa sổ app (PNG base64, thu nhỏ theo `maxWidth`, mặc định 1280)",
+                Command("app.screenshot", null, AppScreenshot, "Ảnh chụp trang/slide hiện tại (PNG base64, thu nhỏ theo `maxWidth`, mặc định 1280)",
                     Opt("maxWidth"))
             };
         }
@@ -289,6 +289,87 @@ namespace AxiomOffice.Bridge
         private static Dictionary<string, object> AppScreenshot(IAppHost host, Dictionary<string, object> p)
         {
             int maxWidth = Math.Max(320, Math.Min(ParamInt(p, "maxWidth", 1280), 2560));
+            // Hợp đồng (catalog/live-commands.json): "trang/slide hiện tại" - bản LibreOffice xuất trang qua filter PNG.
+            // Chụp cả cửa sổ thì slide chỉ chiếm ~30% ảnh (ribbon, thumbnail, pane, ghi chú; đo 13/10/2026), nên
+            // trình chiếu xuất thẳng slide; host không xuất được (WPS cũ…) thì mới quay về chụp cửa sổ.
+            if (host.AppKind == "wpp")
+            {
+                try
+                {
+                    return ExportCurrentSlide(host, maxWidth);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Info("app.screenshot: slide export failed (" + ex.GetType().Name + ": " + ex.Message + "), capturing window");
+                }
+            }
+            return CaptureWindow(host, maxWidth);
+        }
+
+        // Slide đang hiện trong cửa sổ (normal view: View.Slide; thumbnail đang chọn: Selection.SlideRange), mặc định slide 1.
+        private static Dictionary<string, object> ExportCurrentSlide(IAppHost host, int maxWidth)
+        {
+            dynamic app = host.Application;
+            dynamic pres = app.ActivePresentation;
+            int count = Convert.ToInt32(pres.Slides.Count);
+            if (count == 0)
+            {
+                throw new InvalidOperationException("presentation has no slides");
+            }
+            int index = 0;
+            foreach (Func<object> read in new Func<object>[]
+                { () => app.ActiveWindow.View.Slide.SlideIndex, () => app.ActiveWindow.Selection.SlideRange.SlideIndex })
+            {
+                try
+                {
+                    index = Convert.ToInt32(read());
+                    if (index >= 1 && index <= count)
+                    {
+                        break;
+                    }
+                }
+                catch (Exception)
+                {
+                }
+                index = 0;
+            }
+            if (index == 0)
+            {
+                index = 1;
+            }
+            double slideWidth = Convert.ToDouble(pres.PageSetup.SlideWidth);
+            double slideHeight = Convert.ToDouble(pres.PageSetup.SlideHeight);
+            int width = maxWidth;
+            int height = Math.Max(1, (int)Math.Round(maxWidth * slideHeight / slideWidth));
+            string path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "axiom-shot-" + Guid.NewGuid().ToString("N") + ".png");
+            try
+            {
+                pres.Slides[index].Export(path, "PNG", width, height);
+                byte[] raw = System.IO.File.ReadAllBytes(path);
+                return new Dictionary<string, object>
+                {
+                    { "width", width },
+                    { "height", height },
+                    { "mime", "image/png" },
+                    { "base64", Convert.ToBase64String(raw) },
+                    { "slide", index },
+                    { "slideCount", count }
+                };
+            }
+            finally
+            {
+                try
+                {
+                    System.IO.File.Delete(path);
+                }
+                catch (Exception)
+                {
+                }
+            }
+        }
+
+        private static Dictionary<string, object> CaptureWindow(IAppHost host, int maxWidth)
+        {
             IntPtr hwnd = AppWindow(host);
             WindowRect rect;
             if (hwnd == IntPtr.Zero || !GetWindowRect(hwnd, out rect) || rect.Right - rect.Left <= 0 || rect.Bottom - rect.Top <= 0)
