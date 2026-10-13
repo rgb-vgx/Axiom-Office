@@ -99,6 +99,33 @@ func TestChatRetriesTransientAndSendsAuth(t *testing.T) {
 	}
 }
 
+// Nha cung cap tu choi `thinking`: lan dau bo tham so roi thu lai; tu lan sau KHONG gui nua (log 13/10/2026:
+// moi luot deu mat them mot request 400 vi co nay nam trong bien cuc bo).
+func TestThinkingRejectionIsRemembered(t *testing.T) {
+	var calls, withThinking atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		body, _ := io.ReadAll(r.Body)
+		if strings.Contains(string(body), `"thinking"`) {
+			withThinking.Add(1)
+			w.WriteHeader(400)
+			_, _ = io.WriteString(w, `{"error":"unknown parameter: thinking"}`)
+			return
+		}
+		_, _ = io.WriteString(w, `{"choices":[{"message":{"content":"OK"}}]}`)
+	}))
+	defer server.Close()
+	client := NewClient(server.Client(), "openai", server.URL+"/v1", "k", "m")
+	for i := range 2 {
+		if text, errText, ok := client.Chat(context.Background(), "s", "u", 0); !ok || text != "OK" {
+			t.Fatalf("lan %d: text=%q err=%q", i+1, text, errText)
+		}
+	}
+	if calls.Load() != 3 || withThinking.Load() != 1 {
+		t.Fatalf("muon 3 request (chi 1 co thinking), co %d request, %d co thinking", calls.Load(), withThinking.Load())
+	}
+}
+
 func TestChatErrorShapes(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.URL.Path, "slow") {

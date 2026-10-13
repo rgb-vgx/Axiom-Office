@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"axiomoffice/core/internal/corelog"
@@ -83,6 +84,11 @@ type Client struct {
 	// (finish_reason=length) tren prompt lon - xem CHANGELOG 02/10/2026. Tat thi tra loi nhanh va
 	// chac hon nhieu (do duoc: 2,0s so voi 15,6s). Bat len thi phan suy luan hien o pane.
 	ShowReasoning bool
+
+	// thinkingRejected: nha cung cap da tu choi tham so `thinking` mot lan -> khong gui nua cho client nay
+	// (client song qua cac luot cho toi khi doi cau hinh, model.Source). Truoc day co nam trong bien cuc bo
+	// cua post() nen MOI request lai gui, bi 400, roi gui lai - moi luot mat them mot lan goi (log 13/10/2026).
+	thinkingRejected atomic.Bool
 }
 
 func NewClient(httpClient *http.Client, provider, endpoint, apiKey, model string) *Client {
@@ -194,7 +200,7 @@ func (c *Client) post(ctx, userCtx context.Context, body map[string]any, stream 
 	}
 	// Tat suy luan cho model reasoning: khong co cai nay thi prompt lon bi dot het max_tokens vao
 	// phan nghi va content tra ve rong. Chi gui cho codec OpenAI (Anthropic co `thinking` khac dang).
-	if c.Codec.Name() == "openai" {
+	if c.Codec.Name() == "openai" && !c.thinkingRejected.Load() {
 		mode := "disabled"
 		if c.ShowReasoning {
 			mode = "enabled"
@@ -208,9 +214,13 @@ func (c *Client) post(ctx, userCtx context.Context, body map[string]any, stream 
 	droppedThinking := false
 	for attempt := 0; ; attempt++ {
 		text, errText, status, retryAfter := c.postOnce(ctx, userCtx, payload)
+		// Bo `thinking` roi thanh cong thi moi nho: 400 vi ly do khac khong duoc tat vinh vien tham so nay.
+		if text != nil && droppedThinking {
+			c.thinkingRejected.Store(true)
+		}
 		// Nha cung cap khong biet tham so `thinking` (OpenAI that, vai gateway khac) -> bo no roi
 		// thu lai ngay, va tat han cho cac lan sau. Tu lanh, nguoi dung khong phai cau hinh gi.
-		if text == nil && status == 400 && !droppedThinking {
+		if _, sent := body["thinking"]; text == nil && status == 400 && sent && !droppedThinking {
 			droppedThinking = true
 			delete(body, "thinking")
 			if payload, err = json.Marshal(body); err == nil {
