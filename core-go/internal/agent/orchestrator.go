@@ -78,13 +78,18 @@ func ParseRequest(body map[string]any) (*Request, string) {
 		name, _ := raw["name"].(string)
 		fullName, _ := raw["fullName"].(string)
 		document = &DocumentContext{Name: name, FullName: fullName, SelectionText: selection}
+		if view, ok := raw["view"].(map[string]any); ok {
+			document.Slide = intOf(view["slide"])
+			document.SlideCount = intOf(view["slideCount"])
+			document.Sheet = strings.TrimSpace(textOf(view["sheet"]))
+			document.Range = strings.TrimSpace(textOf(view["range"]))
+		}
 	}
 
 	interactive := true
 	if value, ok := tryMap(body["options"])["interactive"].(bool); ok {
 		interactive = value
 	}
-
 	return &Request{
 		Prompt: prompt,
 		// Bo khoang trang thua: ban .NET giu nguyen nen " c_1 " se thanh hoi thoai moi (id do Core sinh,
@@ -235,6 +240,9 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 			run.Events.Publish(eventType, data)
 		},
 		Confirm: confirm,
+	}
+	if request.Document != nil {
+		runContext.FocusSlide = request.Document.Slide
 	}
 
 	systemPrompt := Build(appKind, session, request.Document, appSkills, memoryContext.Lines, assembled.Summary,

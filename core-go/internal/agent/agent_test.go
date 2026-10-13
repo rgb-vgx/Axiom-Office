@@ -214,6 +214,31 @@ func TestBuildPromptSections(t *testing.T) {
 	}
 }
 
+// Pane gui cho nguoi dung dang nhin; prompt phai noi "slide hien tai" la slide nao, va dat o CUOI (doi moi luot).
+func TestDocumentViewReachesPromptEnd(t *testing.T) {
+	request, problem := ParseRequest(map[string]any{
+		"prompt": "cap nhat slide hien tai", "office": map[string]any{"port": float64(1)},
+		"document": map[string]any{"name": "a.pptx", "view": map[string]any{"slide": float64(5), "slideCount": float64(87)}},
+	})
+	if problem != "" || request.Document.Slide != 5 || request.Document.SlideCount != 87 {
+		t.Fatalf("view: problem=%q document=%+v", problem, request.Document)
+	}
+	session := &office.Session{App: "wpp"}
+	prompt := Build("wpp", session, request.Document, nil, nil, "", nil)
+	if !strings.HasSuffix(prompt, "Work on that slide in place unless the user asks for new slides or the whole presentation.") ||
+		!strings.Contains(prompt, "slide 5 of 87") {
+		t.Fatalf("prompt phai ket thuc bang dong slide dang mo:\n%s", prompt[len(prompt)-300:])
+	}
+
+	sheet := &DocumentContext{Sheet: "ADT", Range: "B2:D9", SelectionText: ""}
+	if got := ViewSection(sheet); !strings.Contains(got, "Active sheet: 'ADT', selected range B2:D9") {
+		t.Fatalf("sheet view = %q", got)
+	}
+	if got := ViewSection(&DocumentContext{Name: "x"}); got != "" {
+		t.Fatalf("khong co view thi khong them gi: %q", got)
+	}
+}
+
 func TestParseRequestValidatesAndClamps(t *testing.T) {
 	if _, problem := ParseRequest(nil); problem != "invalid JSON body" {
 		t.Fatalf("body rong: %q", problem)
@@ -317,5 +342,17 @@ func TestShouldSummarize(t *testing.T) {
 		if got := ShouldSummarize(item.first, item.last); got != item.want {
 			t.Errorf("ShouldSummarize(%d, %d) = %t, want %t", item.first, item.last, got, item.want)
 		}
+	}
+}
+
+func TestDocumentSectionGivesFullPathOfSavedFile(t *testing.T) {
+	session := &office.Session{App: "wpp"}
+	saved := DocumentSection(session, &DocumentContext{Name: "Y4.4-GAN.14.ppt", FullName: `C:\Bai giang\Y4.4-GAN.14.ppt`})
+	if !strings.Contains(saved, `Its full path: C:\Bai giang\Y4.4-GAN.14.ppt`) {
+		t.Fatalf("thieu duong dan: %s", saved)
+	}
+	unsaved := DocumentSection(session, &DocumentContext{Name: "Presentation1", FullName: "Presentation1"})
+	if strings.Contains(unsaved, "full path") {
+		t.Fatalf("bai chua luu khong co duong dan: %s", unsaved)
 	}
 }

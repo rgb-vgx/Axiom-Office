@@ -35,14 +35,14 @@ func decodeBody(t *testing.T, raw string) map[string]any {
 
 func TestTruncateReadRangeNguyenVenNho(t *testing.T) {
 	result := map[string]any{"range": "A1:C10", "values": matrix(10, 3)}
-	if TruncateBridgeResult("et.readRange", result, "goc") != "goc" {
+	if TruncateBridgeResult("et.readRange", result, "goc", 0) != "goc" {
 		t.Fatal("vung nho khong duoc cat")
 	}
 }
 
 func TestTruncateReadRangeCatDau(t *testing.T) {
 	result := map[string]any{"range": "A1:C5000", "values": matrix(5000, 3)}
-	raw := TruncateBridgeResult("et.readRange", result, "")
+	raw := TruncateBridgeResult("et.readRange", result, "", 0)
 	body := decodeBody(t, raw)
 	if body["ok"] != true {
 		t.Fatalf("mat ok: %v", body)
@@ -77,7 +77,7 @@ func TestTruncateReadRangeCatDau(t *testing.T) {
 func TestTruncateReadRangeFormulasVaCellBudget(t *testing.T) {
 	// 100 cot: budget 6000/100 = 60 dong dau thoi
 	result := map[string]any{"range": "A1:CV5000", "formulas": matrix(5000, 100)}
-	TruncateBridgeResult("et.readRange", result, "")
+	TruncateBridgeResult("et.readRange", result, "", 0)
 	if got := len(result["formulas"].([]any)); got != 60 {
 		t.Fatalf("dau = %d, muon 60 (cell budget)", got)
 	}
@@ -88,7 +88,7 @@ func TestTruncateReadRangeFormulasVaCellBudget(t *testing.T) {
 
 func TestTruncateReadRangeDiaChiKhongDocDuoc(t *testing.T) {
 	result := map[string]any{"range": "cai gi do", "values": matrix(1000, 2)}
-	TruncateBridgeResult("et.readRange", result, "")
+	TruncateBridgeResult("et.readRange", result, "", 0)
 	if _, ok := result["nextRange"]; ok {
 		t.Fatal("khong duoc nextRange khi dia chi la")
 	}
@@ -104,7 +104,7 @@ func TestTruncateCheckRangeGiuIssueCount(t *testing.T) {
 		issues[i] = map[string]any{"kind": "x"}
 	}
 	result := map[string]any{"issueCount": 250, "issues": issues, "columns": []any{"a", "b"}}
-	TruncateBridgeResult("et.checkRange", result, "")
+	TruncateBridgeResult("et.checkRange", result, "", 0)
 	if len(result["issues"].([]any)) != CheckIssuesCap {
 		t.Fatalf("issues = %d, muon %d", len(result["issues"].([]any)), CheckIssuesCap)
 	}
@@ -118,24 +118,24 @@ func TestTruncateCheckRangeGiuIssueCount(t *testing.T) {
 
 func TestTruncateCheckRangeNhoKhongCat(t *testing.T) {
 	result := map[string]any{"issueCount": 2, "issues": []any{1, 2}}
-	if TruncateBridgeResult("et.checkRange", result, "goc") != "goc" {
+	if TruncateBridgeResult("et.checkRange", result, "goc", 0) != "goc" {
 		t.Fatal("issue it khong duoc cat")
 	}
 }
 
 func TestTruncateKhongDoiLenhKhac(t *testing.T) {
 	result := map[string]any{"values": matrix(5000, 3)}
-	if TruncateBridgeResult("et.writeRange", result, "goc") != "goc" {
+	if TruncateBridgeResult("et.writeRange", result, "goc", 0) != "goc" {
 		t.Fatal("lenh khac khong duoc dot")
 	}
-	if TruncateBridgeResult("et.readRange", nil, "goc") != "goc" {
+	if TruncateBridgeResult("et.readRange", nil, "goc", 0) != "goc" {
 		t.Fatal("result rong -> goc")
 	}
 }
 
 func TestTruncateBodyLaJSONHopLe(t *testing.T) {
 	result := map[string]any{"range": "A1:A3000", "values": matrix(3000, 1)}
-	raw := TruncateBridgeResult("et.readRange", result, "")
+	raw := TruncateBridgeResult("et.readRange", result, "", 0)
 	if !strings.Contains(raw, `"truncated":true`) {
 		t.Fatalf("body thieu truncated: %s", raw)
 	}
@@ -204,7 +204,7 @@ func TestInvokeLenhLoiKhongBiCat(t *testing.T) {
 // Vung 205 dong: head 200 + tail 5 dong con lai (201..205) - khong trung, khong thieu.
 func TestTruncateTailKhongTrungDau(t *testing.T) {
 	result := map[string]any{"range": "A1:A205", "values": matrix(205, 1)}
-	TruncateBridgeResult("et.readRange", result, "")
+	TruncateBridgeResult("et.readRange", result, "", 0)
 	tail := result["tailValues"].([]any)
 	if len(tail) != 5 {
 		t.Fatalf("tail = %d dong, muon 5 (201..205)", len(tail))
@@ -217,7 +217,7 @@ func TestTruncateTailKhongTrungDau(t *testing.T) {
 // Formulas cung co tailFormulas doi xung.
 func TestTruncateTailFormulas(t *testing.T) {
 	result := map[string]any{"range": "A1:A3000", "formulas": matrix(3000, 1)}
-	TruncateBridgeResult("et.readRange", result, "")
+	TruncateBridgeResult("et.readRange", result, "", 0)
 	tail, ok := result["tailFormulas"].([]any)
 	if !ok || len(tail) != TailRows {
 		t.Fatalf("tailFormulas thieu/sai: %v", result["tailFormulas"])

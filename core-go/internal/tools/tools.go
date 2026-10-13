@@ -60,6 +60,8 @@ type RunContext struct {
 	// OverwriteApproved: sheet da duoc nguoi dung dong y ghi de trong luot nay - da dong y mot
 	// lan thi cac lenh sau tren cung sheet trong cung luot khong hoi lai.
 	OverwriteApproved map[string]bool
+	// FocusSlide: slide nguoi dung dang mo (pane gui document.view) - ket qua doc ca bai giu nguyen slide nay.
+	FocusSlide int
 }
 
 func (c *RunContext) ConfirmOrDecline(action, reason, paramsPreview string) (bool, error) {

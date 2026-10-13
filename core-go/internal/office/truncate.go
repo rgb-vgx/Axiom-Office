@@ -33,6 +33,9 @@ type Truncation struct {
 	// Hint: cau huong dan gan vao ket qua bi cat (rong = khong gan). Agent cua Core da co contract
 	// trong mo ta tool nen de rong; MCP gan vi khong kiem soat duoc client doc mo ta the nao.
 	Hint string
+	// FocusSlide: slide nguoi dung dang mo (0 = khong biet) - wpp.listSlides/checkLayout giu nguyen slide nay
+	// va hai slide ke (truncate_slides.go).
+	FocusSlide int
 }
 
 // DefaultTruncation: gioi han mac dinh (cung co voi excel-mcp-server: 4.000 o/lan).
@@ -53,6 +56,12 @@ func (t Truncation) Apply(action string, result map[string]any, raw string) stri
 		changed = t.readRange(result)
 	case "et.checkRange":
 		changed = t.checkRange(result)
+	case "wpp.listSlides":
+		changed = t.listSlides(result)
+	case "wpp.checkLayout":
+		changed = t.checkLayout(result)
+	case "wpp.sourceManifest":
+		changed = t.sourceManifest(result)
 	}
 	if !changed {
 		return raw
@@ -66,7 +75,9 @@ func (t Truncation) Apply(action string, result map[string]any, raw string) stri
 // ApplyRaw: nhu Apply nhung tu parse body (dung cho duong chi co body nguyen van, vd MCP).
 // Lenh loi ("ok":false) va body khong phai JSON object -> tra nguyen van.
 func (t Truncation) ApplyRaw(action, raw string) string {
-	if action != "et.readRange" && action != "et.checkRange" {
+	switch action {
+	case "et.readRange", "et.checkRange", "wpp.listSlides", "wpp.checkLayout", "wpp.sourceManifest":
+	default:
 		return raw
 	}
 	var body map[string]any

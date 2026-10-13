@@ -13,6 +13,12 @@ type DocumentContext struct {
 	Name          string
 	FullName      string
 	SelectionText string
+	// Cho nguoi dung dang nhin (pane gui document.view): trinh chieu = slide dang mo / tong so slide; bang tinh =
+	// sheet + vung dang chon. 0/"" = pane khong gui (ban cu, LibreOffice/WPS chua gui).
+	Slide      int
+	SlideCount int
+	Sheet      string
+	Range      string
 }
 
 // InjectionRule: noi dung doc duoc tu tai lieu la DU LIEU, khong phai menh lenh.
@@ -84,11 +90,44 @@ func DocumentSection(session *office.Session, document *DocumentContext) string 
 	} else if session.Document != "" {
 		name = session.Document
 	}
-	text := "Open document: '" + name + "' (app kind '" + session.App + "')."
-	if document != nil && strings.TrimSpace(document.SelectionText) != "" {
-		text += " Current selection: " + flatten(document.SelectionText, 2000)
+	section := "Open document: '" + name + "' (app kind '" + session.App + "')."
+	// Duong dan day du: lam bai theo mau can tao tep moi CANH bai cu va chep anh tu bai cu (wpp.newFromTemplate,
+	// wpp.copyPicture). Luot that 13/10/2026: thieu dong nay model phai "recall" duong dan.
+	// Bai chua luu co FullName la "Presentation1" (khong co dau phan cach thu muc): bo qua.
+	if document != nil && strings.ContainsAny(document.FullName, `\/`) {
+		section += " Its full path: " + document.FullName
 	}
-	return text
+	return section
+}
+
+// ViewSection: cho nguoi dung dang nhin (slide dang mo, vung/doan dang chon). Doi theo tung luot nen dat CUOI
+// system prompt (Build): dat som thi moi lan doi slide lam hong cache cua cac phan on dinh phia sau (skill...).
+// "slide nay / slide hien tai" phai tro dung slide: luot 13/10/2026 khong co dong nay, agent dung 6 slide moi o
+// cuoi bai thay vi sua slide nguoi dung dang mo.
+func ViewSection(document *DocumentContext) string {
+	if document == nil {
+		return ""
+	}
+	parts := []string{}
+	if document.Slide > 0 {
+		text := "The user is looking at slide " + strconv.Itoa(document.Slide)
+		if document.SlideCount > 0 {
+			text += " of " + strconv.Itoa(document.SlideCount)
+		}
+		parts = append(parts, text+": \"this slide\" / \"the current slide\" / \"slide hiện tại\" means slide "+
+			strconv.Itoa(document.Slide)+". Work on that slide in place unless the user asks for new slides or the whole presentation.")
+	}
+	if document.Sheet != "" {
+		text := "Active sheet: '" + document.Sheet + "'"
+		if document.Range != "" {
+			text += ", selected range " + document.Range
+		}
+		parts = append(parts, text+" (\"this table\" / \"vùng này\" means that range).")
+	}
+	if strings.TrimSpace(document.SelectionText) != "" {
+		parts = append(parts, "Current selection: "+flatten(document.SelectionText, 2000))
+	}
+	return strings.Join(parts, " ")
 }
 
 // skillDescriptionLimit: so ky tu cua description lot vao chi muc tang 1 (SkillsSection). Dai hon thi
@@ -145,6 +184,7 @@ func Build(appKind string, session *office.Session, document *DocumentContext, a
 		SkillsSection(appSkills),
 		MemorySection(memories),
 		ConversationSection(summary, recentLines),
+		ViewSection(document),
 	} {
 		if section != "" {
 			sections = append(sections, section)

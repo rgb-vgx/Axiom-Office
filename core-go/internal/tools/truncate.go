@@ -16,7 +16,10 @@ var agentTruncation = office.Truncation{
 	HeadRows: ReadHeadRows, CellBudget: ReadCellBudget, TailRows: TailRows, IssuesCap: CheckIssuesCap,
 }
 
-// TruncateBridgeResult: cat payload cua et.readRange / et.checkRange (xem office.Truncation).
-func TruncateBridgeResult(action string, result map[string]any, raw string) string {
-	return agentTruncation.Apply(action, result, raw)
+// TruncateBridgeResult: cat payload cua lenh doc lon (et.readRange/checkRange, wpp.listSlides/checkLayout -
+// xem office.Truncation). focusSlide: slide nguoi dung dang mo, giu nguyen (0 = khong biet).
+func TruncateBridgeResult(action string, result map[string]any, raw string, focusSlide int) string {
+	limits := agentTruncation
+	limits.FocusSlide = focusSlide
+	return limits.Apply(action, result, raw)
 }

@@ -188,7 +188,7 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 	// loi van tra nguyen van de model doc thong diep loi day du) - xem truncate.go.
 	raw := result.RawJSON
 	if result.OK {
-		raw = TruncateBridgeResult(action, result.Result, raw)
+		raw = TruncateBridgeResult(action, result.Result, raw, run.FocusSlide)
 	}
 	// Lenh that bai thi tai lieu khong doi -> khong tinh la da sua.
 	return Result{JSON: raw, OK: result.OK, Action: action,
