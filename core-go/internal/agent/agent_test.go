@@ -239,6 +239,23 @@ func TestDocumentViewReachesPromptEnd(t *testing.T) {
 	}
 }
 
+func TestParseRequestMode(t *testing.T) {
+	base := func(mode any) map[string]any {
+		return map[string]any{"prompt": "x", "office": map[string]any{"port": float64(1)}, "options": map[string]any{"mode": mode}}
+	}
+	if request, problem := ParseRequest(base("plan")); problem != "" || !request.Plan {
+		t.Fatalf("mode=plan: plan=%v problem=%q", request != nil && request.Plan, problem)
+	}
+	for _, mode := range []any{"act", nil, ""} {
+		if request, problem := ParseRequest(base(mode)); problem != "" || request.Plan {
+			t.Fatalf("mode=%v phai la luot thuong: problem=%q", mode, problem)
+		}
+	}
+	if _, problem := ParseRequest(base("ask")); !strings.Contains(problem, "'options.mode'") {
+		t.Fatalf("mode la phai bi tu choi: %q", problem)
+	}
+}
+
 func TestParseRequestValidatesAndClamps(t *testing.T) {
 	if _, problem := ParseRequest(nil); problem != "invalid JSON body" {
 		t.Fatalf("body rong: %q", problem)

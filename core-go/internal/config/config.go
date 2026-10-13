@@ -48,9 +48,11 @@ type Config struct {
 	// VerifyWorkEnabled: agent tu doc lai tai lieu sau khi sua, truoc khi tra loi (xem
 	// model.AgentOptions.Verify). MAC DINH BAT: do duoc la bo khung khong tu kiem chung thi phai co
 	// nguoi nhac moi chay tiep, con bo khung tu kiem chung thi xong viec mot minh.
-	VerifyWorkEnabled        bool
-	VisualQaEnabled          bool
-	LlmApiKey                string
+	VerifyWorkEnabled bool
+	VisualQaEnabled   bool
+	LlmApiKey         string
+	// TavilyApiKey: khoa tim kiem web (tool web_search); rong = khong co tool. Windows luu "dpapi:" nhu LlmApiKey.
+	TavilyApiKey             string
 	MemoryModel              string
 	EmbeddingModel           string
 	EmbeddingEndpoint        string
@@ -101,6 +103,7 @@ func From(env Env, source Source) Config {
 		VerifyWorkEnabled:        flag(env, "AXIOM_VERIFY_WORK", source, "VerifyWorkEnabled", true),
 		VisualQaEnabled:          flag(env, "AXIOM_VISUAL_QA", source, "VisualQaEnabled", false),
 		LlmApiKey:                Unprotect(text(env, "AXIOM_LLM_API_KEY", source, "LlmApiKey")),
+		TavilyApiKey:             Unprotect(text(env, "AXIOM_TAVILY_API_KEY", source, "TavilyApiKey")),
 		MemoryModel:              text(env, "AXIOM_MEMORY_MODEL", source, "MemoryModel"),
 		EmbeddingModel:           text(env, "AXIOM_EMBEDDING_MODEL", source, "EmbeddingModel"),
 		EmbeddingEndpoint:        text(env, "AXIOM_EMBEDDING_ENDPOINT", source, "EmbeddingEndpoint"),

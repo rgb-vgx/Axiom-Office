@@ -31,6 +31,9 @@ type Request struct {
 	Options        model.AgentOptions
 	// Interactive: false (ai.ask cua agent ben ngoai) = khong co ai bam xac nhan -> tu choi lenh can xac nhan.
 	Interactive bool
+	// Plan: che do lap ke hoach (options.mode = "plan") - chi doc tai lieu, tra ve ke hoach, khong sua gi.
+	// Buoc thuc hien la mot luot thuong tiep theo trong CUNG hoi thoai (model thay lai ke hoach trong lich su).
+	Plan bool
 }
 
 const (
@@ -90,6 +93,11 @@ func ParseRequest(body map[string]any) (*Request, string) {
 	if value, ok := tryMap(body["options"])["interactive"].(bool); ok {
 		interactive = value
 	}
+	mode := strings.TrimSpace(textOf(tryMap(body["options"])["mode"]))
+	if mode != "" && mode != "plan" && mode != "act" {
+		return nil, "'options.mode' must be \"plan\" or \"act\""
+	}
+
 	return &Request{
 		Prompt: prompt,
 		// Bo khoang trang thua: ban .NET giu nguyen nen " c_1 " se thanh hoi thoai moi (id do Core sinh,
@@ -106,6 +114,7 @@ func ParseRequest(body map[string]any) (*Request, string) {
 			MaxResponseTokens: model.DefaultMaxResponseTokens,
 		},
 		Interactive: interactive,
+		Plan:        mode == "plan",
 	}, ""
 }
 
@@ -167,8 +176,12 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 
 	run.ConversationID = conversation.ID
 	o.Runs.Insert(run.ID, &conversation.ID, client.Model)
+	mode := "act"
+	if request.Plan {
+		mode = "plan"
+	}
 	run.Events.Publish("run.started", map[string]any{
-		"conversationId": conversation.ID, "model": client.Model, "app": appKind, "port": request.Port,
+		"conversationId": conversation.ID, "model": client.Model, "app": appKind, "port": request.Port, "mode": mode,
 	})
 
 	userSeq := o.Conversations.AppendMessage(conversation.ID, "user", request.Prompt)
@@ -194,7 +207,11 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 	if o.Skills != nil {
 		appSkills = o.Skills.ForApp(appKind)
 	}
-	list := []tools.Tool{tools.NewOfficeActionTool(catalog, appKind)}
+	officeTool := tools.NewOfficeActionTool(catalog, appKind)
+	if request.Plan {
+		officeTool = tools.NewReadOnlyOfficeActionTool(catalog, appKind)
+	}
+	list := []tools.Tool{officeTool}
 	if len(appSkills) > 0 && o.Skills != nil {
 		list = append(list, tools.NewLoadSkillTool(o.Skills, appKind), tools.NewReadSkillFileTool(o.Skills, appKind))
 	}
@@ -207,7 +224,15 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 	memoryContext := memory.EmptyContext()
 	if o.Memory != nil && o.Memory.Enabled() {
 		memoryContext = o.Memory.Context(ctx, request.Prompt, memoryDocumentKey)
-		list = append(list, tools.NewRememberTool(o.Memory, memoryDocumentKey), tools.NewRecallTool(o.Memory, memoryDocumentKey))
+		// Lap ke hoach khong ghi nho (remember la ghi): chi tra cuu.
+		if !request.Plan {
+			list = append(list, tools.NewRememberTool(o.Memory, memoryDocumentKey))
+		}
+		list = append(list, tools.NewRecallTool(o.Memory, memoryDocumentKey))
+	}
+	// Tim kiem web (Tavily): chi khi nguoi dung nhap khoa trong Thiet lap; chi doc web nen co ca trong plan mode.
+	if key := o.Config().TavilyApiKey; key != "" {
+		list = append(list, tools.NewWebSearchTool(key))
 	}
 	// QA thi giac (muc 8.4.6): chi khi nguoi dung bat VisualQaEnabled (doc lai moi luot qua cau hinh).
 	if o.Config().VisualQaEnabled {
@@ -216,7 +241,11 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 
 	// MCP (muc 8.7): lan file office + server nguoi dung cau hinh; loi server khong hong run.
 	if o.MCP != nil {
-		if bound := o.MCP.Tools(ctx); len(bound) > 0 {
+		bound := o.MCP.Tools(ctx)
+		if request.Plan {
+			bound = tools.ReadOnlyMCP(bound)
+		}
+		if len(bound) > 0 {
 			list = append(list, tools.WrapMCPTools(bound)...)
 		}
 	}
@@ -247,6 +276,9 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 
 	systemPrompt := Build(appKind, session, request.Document, appSkills, memoryContext.Lines, assembled.Summary,
 		assembled.RecentActionLines)
+	if request.Plan {
+		systemPrompt += "\n\n" + PlanModeRule
+	}
 
 	callbacks := model.AgentCallbacks{
 		Transcript: func(line string) { run.Transcript = append(run.Transcript, line) },
@@ -299,7 +331,7 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 
 	// Tu kiem chung doc lai tu cau hinh moi luot (nhu VisualQaEnabled): doi trong Cai dat co hieu luc ngay.
 	options := request.Options
-	options.Verify = o.Config().VerifyWorkEnabled
+	options.Verify = o.Config().VerifyWorkEnabled && !request.Plan
 
 	result := client.RunAgent(ctx, systemPrompt, assembled.PriorTurns, request.Prompt, registry.ModelTools(),
 		func(inner context.Context, call model.ToolCall) model.ToolResult {
@@ -358,7 +390,7 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 	o.Runs.Finish(run.ID, run.Status, run.Rounds, run.InputTokens, run.OutputTokens, o.errorPtr(run), nil)
 	if o.Memory != nil {
 		o.Memory.TouchHits(memoryContext.IDs)
-		if result.OK {
+		if result.OK && !request.Plan {
 			o.Memory.QueueExtraction(memory.ExtractionJob{
 				RunID: run.ID, ConversationID: conversation.ID, Prompt: request.Prompt,
 				Reply: result.Text, DocumentKey: memoryDocumentKey,

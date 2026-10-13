@@ -61,6 +61,19 @@ const CheckRule = "When you have changed the document, read the result back and 
 	"formulas really depend on existing data, read the formulas back (et.readRange with formulas:true) " +
 	"instead of changing values. "
 
+// PlanModeRule: che do lap ke hoach (Request.Plan). Ghi de cau "reply with a very short summary" cua Base cho
+// luot nay. Tool cua luot chi con lenh doc (NewReadOnlyOfficeActionTool, ReadOnlyMCP) nen model khong sua duoc
+// tai lieu du co muon; quy tac van noi ro de model khong mo ta nhu da lam xong.
+const PlanModeRule = "PLAN MODE for this turn: the user wants to approve a plan BEFORE anything is changed. " +
+	"Only read actions are available now. Look at what you need (a few targeted reads), then reply - in the " +
+	"user's language, instead of the short summary - with: one line stating the goal; a numbered list of " +
+	"concrete steps (where: which slide/sheet/section; what changes; which action you will use); one line on " +
+	"how you will check the result; and any question the user must answer first. For EVERY question also write " +
+	"the default you will use if the user runs the plan without answering - always the smallest, safest " +
+	"choice (only the slide/section the user is looking at, keep the user's existing content and images, do " +
+	"not add new slides/sheets unless asked). Do not claim that anything was changed, and do not ask for " +
+	"permission inside the steps: the user will reply to run the plan."
+
 // Base: phan 1 cua system prompt - vai tro va quy tac chung (giu hanh vi da kiem chung tren Office that).
 func Base(appName string) string {
 	return "You are an AI assistant embedded inside " + appName + ", working on the document that is currently open. " +

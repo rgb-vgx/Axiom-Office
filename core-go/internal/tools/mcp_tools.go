@@ -21,6 +21,19 @@ func WrapMCPTools(list []mcp.ServerTool) []Tool {
 	return wrapped
 }
 
+// ReadOnlyMCP: cong cu MCP duoc dung trong che do lap ke hoach - chi cong cu DOC FILE cua server built-in
+// "office" (mcp.OfficeReadOnlyTools: doc file .docx/.xlsx/.pptx dinh kem). Server nguoi dung tu cau hinh khong
+// biet cong cu nao ghi -> bo het.
+func ReadOnlyMCP(list []mcp.ServerTool) []mcp.ServerTool {
+	kept := []mcp.ServerTool{}
+	for _, item := range list {
+		if item.Server != nil && item.Server.Config.Name == "office" && mcp.OfficeReadOnlyTools[item.Tool.Name] {
+			kept = append(kept, item)
+		}
+	}
+	return kept
+}
+
 func (t *MCPTool) Name() string { return t.bound.Name() }
 
 func (t *MCPTool) Description() string { return t.bound.Description() }

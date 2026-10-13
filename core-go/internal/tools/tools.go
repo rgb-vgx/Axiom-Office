@@ -42,6 +42,19 @@ var noDocumentChange = map[string]bool{
 // ChangesDocument: lenh nay co lam doi noi dung tai lieu dang mo khong.
 func ChangesDocument(action string) bool { return !noDocumentChange[action] }
 
+// readOnly: lenh CHI DOC - tap con cua noDocumentChange ma che do lap ke hoach (plan mode) cho goi.
+// save/saveAs/exportPdf khong sua tai lieu nhung GHI FILE ra dia nen khong nam day. Lenh moi chua co
+// trong bang nay bi chan trong plan mode - cung huong sai an toan nhu noDocumentChange.
+var readOnly = map[string]bool{
+	"app.info": true, "app.screenshot": true,
+	"et.readRange": true, "et.checkRange": true, "et.listSheets": true,
+	"writer.getText": true, "writer.selection": true, "writer.checkTables": true,
+	"wpp.listSlides": true, "wpp.checkLayout": true,
+}
+
+// ReadOnly: lenh nay chi doc tai lieu, khong sua va khong ghi file.
+func ReadOnly(action string) bool { return readOnly[action] }
+
 // RunContext: trang thai cua mot luot chay ma tool can (muc 8.3).
 type RunContext struct {
 	RunID          string

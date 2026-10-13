@@ -62,6 +62,18 @@ func NewOfficeActionTool(catalog *office.CommandCatalog, appKind string) *Office
 	return &OfficeActionTool{allowed: allowed, names: names, signatures: strings.Join(signatures, "; ")}
 }
 
+// NewReadOnlyOfficeActionTool: office_action cho che do lap ke hoach - chi liet ke VA chi cho goi lenh doc
+// (ReadOnly). Model yeu thay lenh sua trong mo ta tool thi hay goi thu; an han khoi danh sach thay vi chi chan.
+func NewReadOnlyOfficeActionTool(catalog *office.CommandCatalog, appKind string) *OfficeActionTool {
+	reads := &office.CommandCatalog{Version: catalog.Version}
+	for _, command := range catalog.Commands {
+		if ReadOnly(command.Name) {
+			reads.Commands = append(reads.Commands, command)
+		}
+	}
+	return NewOfficeActionTool(reads, appKind)
+}
+
 func signature(command office.Command) string {
 	params := make([]string, 0, len(command.Params))
 	for _, param := range command.Params {
