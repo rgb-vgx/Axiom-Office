@@ -5,6 +5,58 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — Năm điểm yếu thấy khi theo dõi một lượt thật (bài 87 slide, 13/10/2026)
+Lượt "dùng template đính kèm + Tavily, cập nhật slide hiện tại": model dựng 6 slide **mới** ở cuối bài thay vì
+sửa slide đang mở, chọn màu xanh trong khi mẫu tông đỏ đô, và tốn **1.271.221 token đầu vào** trong 30 vòng.
+- **AI biết người dùng đang nhìn đâu**: pane gửi `document.view` — trình chiếu: `slide`/`slideCount`
+  (`HostProbe.View`, qua `ComGate`); bảng tính: `sheet`/`range`; văn bản: đoạn đang chọn (trước đây Core có chỗ
+  nhận `selection` mà pane không gửi). Core thêm `ViewSection` ở **cuối** system prompt (đổi mỗi lượt; đặt sớm
+  thì làm hỏng cache của phần ổn định phía sau): *"this slide / slide hiện tại means slide N - work on that slide
+  in place unless the user asks for new slides"*
+- **Câu hỏi của kế hoạch có phương án mặc định**: `PlanModeRule` bắt mỗi câu hỏi ghi kèm mặc định nhỏ nhất, an
+  toàn nhất (chỉ slide đang xem, giữ nội dung và ảnh cũ, không thêm slide). Nút *Thực hiện kế hoạch* gửi
+  *"… Câu hỏi nào tôi chưa trả lời thì dùng phương án mặc định đã ghi trong kế hoạch"*; thẻ kế hoạch nói rõ điều đó
+- **Kết quả đọc cả bài trình chiếu được cắt gọn** (`office/truncate_slides.go`, cùng nguyên tắc với
+  `et.readRange`: cắt chi tiết, giữ đủ số, không cắt im lặng): `wpp.listSlides` vượt ~8.000 ký tự thì rút chữ
+  từng slide (giữ tiêu đề), **slide đang mở và hai slide kề giữ nguyên**; `wpp.checkLayout` nhiều slide thì bỏ
+  slide không lỗi (đếm vào `slidesWithoutIssues`), giữ toạ độ khung cho slide đang mở + 5 slide lỗi đầu,
+  `issueCount` nguyên vẹn, tối đa 100 issue. Áp dụng cho cả tool live của MCP server
+- **Không gửi lại `thinking` cho nhà cung cấp đã từ chối**: cờ trước đây là biến cục bộ của một request nên
+  request nào cũng bị 400 rồi gửi lại. Nay nhớ trên `model.Client` (sống qua các lượt tới khi đổi cấu hình), và
+  chỉ nhớ khi gửi lại **không** có `thinking` thành công (400 vì lý do khác không tắt vĩnh viễn tham số)
+- **`ppt_profile` đọc được phong cách của mẫu**: khổ slide theo pt + tỉ lệ (`16:9`, `4:3`…), bảng màu/font của
+  theme, và **màu/font thực sự tô trên slide** (`usedColors`/`usedFonts`, xếp theo số lần dùng). Đo trên mẫu thật:
+  theme là Office mặc định (accent xanh) còn `usedColors` mới ra tông đỏ đô `#CC1254 #BE4B4B #C00000 #C51553` —
+  chỉ đọc theme thì model vẫn chọn sai. Mô tả tool và lời dặn kèm tệp đính kèm chỉ model dùng `ppt_profile`
+- Test mới: `TestDocumentViewReachesPromptEnd`, `truncate_slides_test.go` (bài 87 slide), 
+  `TestThinkingRejectionIsRemembered`, `pptx/style_test.go`. `go test ./...`, e2e Core 169/169, e2e MCP 63/63
+
+### Added — Plan mode, đính kèm tệp, tìm kiếm web (Tavily) (13/10/2026)
+- **Plan mode (Core + pane Windows)**: `POST /v1/runs` nhận `options.mode = "plan" | "act"` (giá trị lạ bị từ chối).
+  Ở `plan`: `office_action` chỉ còn lệnh **đọc** (`tools.ReadOnly` — chặn cả save/saveAs/exportPdf vì ghi file),
+  ẩn hẳn lệnh sửa khỏi mô tả tool chứ không chỉ chặn; MCP chỉ còn tool đọc tệp của server `office`
+  (`mcp.OfficeReadOnlyTools`); bỏ `remember`; tắt tự kiểm chứng; không trích ghi nhớ từ bản kế hoạch; prompt thêm
+  `PlanModeRule` (mục tiêu · bước đánh số · cách kiểm · câu hỏi). `run.started` có `mode`. Bước thực hiện là một
+  lượt thường **cùng hội thoại** ("Thực hiện kế hoạch ở trên.") nên model thấy lại kế hoạch trong lịch sử
+- Pane: công tắc **● Lập kế hoạch trước** ở góc ô nhập (gợi ý phím Enter chuyển vào tooltip); bản kế hoạch kèm thẻ
+  **Thực hiện kế hoạch** (bấm rồi thì khoá; gửi yêu cầu mới thì thẻ cũ khoá). Core không chạy thì **báo lỗi**, không
+  rơi về agent trong add-in (agent đó không có chế độ chỉ đọc, sẽ sửa tài liệu)
+- **Đính kèm tệp (pane Windows)**: nút **+ Đính kèm** — tối đa 3 tệp `.docx/.xlsx/.pptx`, hiện thành hàng
+  "📄 tên ✕" trên ô nhập. Gửi kèm **đường dẫn đầy đủ** và chỉ tên tool đọc tệp (`doc_get_text`, `excel_profile`,
+  `excel_read`, `ppt_get_text`) — lượt 13/10 model gọi `ppt_profile` bằng tên tệp trần và nhận *file not found*.
+  Không đổi API Core. Core không chạy thì báo lỗi thay vì trả lời như không có tệp. Ảnh/PDF chưa hỗ trợ
+- **Tìm kiếm web (Tavily, Core)**: tool `web_search` gọi thẳng REST `POST https://api.tavily.com/search`
+  (`search_depth: basic`, `include_answer`), trả câu trả lời + tối đa 8 kết quả (tiêu đề, url, đoạn ≤ 500 ký tự);
+  lỗi 401/403 → "khoá Tavily sai, sửa trong Thiết lập", 429/432/433 → hết hạn mức. Chỉ đăng ký khi có khoá
+  (`TavilyApiKey` trong HKCU/`config.json`, hoặc `AXIOM_TAVILY_API_KEY`; Windows lưu `dpapi:` như khoá LLM).
+  Chỉ đọc web nên có cả trong plan mode. `/v1/setup` có `hasTavilyKey`. Không cài CLI `tvly`/skill Tavily: tài
+  liệu `tavily.com/agent-setup/SKILL.md` là để gắn Tavily vào trợ lý lập trình, sản phẩm chỉ cần REST API
+- Wizard Windows bước **Tính năng**: ô khoá Tavily (ẩn ký tự) + link lấy khoá; chỉ ghi khi đổi, để trống = xoá.
+  Pane hiện bước `web_search` là *Tìm trên web*
+- Test Go mới: `TestParseRequestMode`, `plan_test.go` (lệnh đọc/ẩn lệnh sửa, MCP chỉ đọc), `websearch_test.go`
+  (gọi đúng API + header, cắt kết quả, khoá sai, hết hạn mức). Đã dựng ảnh pane (thẻ kế hoạch, hàng tệp, công tắc)
+  và wizard bước 4
+
 ### Added — Khung chat Windows hiển thị markdown trong câu trả lời của AI (13/10/2026)
 - Trước đây bong bóng trả lời vẽ nguyên văn (`TextRenderer.DrawText`): người dùng thấy `**`, `##`, `` ` ``, `-`.
   Nay `Ai/MarkdownView.cs` đọc phần model hay dùng — **đậm**, *nghiêng*, `mã` trong dòng, link (tô màu, không

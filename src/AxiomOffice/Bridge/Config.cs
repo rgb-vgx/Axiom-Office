@@ -66,25 +66,34 @@ namespace AxiomOffice.Bridge
 
         public static string LlmApiKey
         {
-            get
+            get { return ReadSecret("LlmApiKey"); }
+        }
+
+        // Khoá tìm kiếm web (Tavily) của Agent Core - tuỳ chọn; lưu "dpapi:" như LlmApiKey.
+        public static string TavilyApiKey
+        {
+            get { return ReadSecret("TavilyApiKey"); }
+        }
+
+        // Khoá lưu "dpapi:<base64>" (WriteSecret) hoặc chữ thường (cấu hình cũ / nhập tay).
+        private static string ReadSecret(string name)
+        {
+            string raw = ReadString(name, "");
+            if (raw.StartsWith("dpapi:", StringComparison.Ordinal))
             {
-                string raw = ReadString("LlmApiKey", "");
-                if (raw.StartsWith("dpapi:", StringComparison.Ordinal))
+                try
                 {
-                    try
-                    {
-                        byte[] encrypted = Convert.FromBase64String(raw.Substring(6));
-                        byte[] plain = System.Security.Cryptography.ProtectedData.Unprotect(
-                            encrypted, null, System.Security.Cryptography.DataProtectionScope.CurrentUser);
-                        return System.Text.Encoding.UTF8.GetString(plain);
-                    }
-                    catch
-                    {
-                        return "";
-                    }
+                    byte[] encrypted = Convert.FromBase64String(raw.Substring(6));
+                    byte[] plain = System.Security.Cryptography.ProtectedData.Unprotect(
+                        encrypted, null, System.Security.Cryptography.DataProtectionScope.CurrentUser);
+                    return System.Text.Encoding.UTF8.GetString(plain);
                 }
-                return raw;
+                catch
+                {
+                    return "";
+                }
             }
+            return raw;
         }
 
         public static string LlmModel

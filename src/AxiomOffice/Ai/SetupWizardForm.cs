@@ -41,6 +41,10 @@ namespace AxiomOffice.Ai
         private string _providerId = "company";
         private readonly TextBox _endpoint = new TextBox();
         private readonly TextBox _apiKey = new TextBox();
+        // Bước 4: khoá Tavily cho công cụ tìm kiếm web của Agent Core (tuỳ chọn, để trống = không tìm web).
+        private readonly TextBox _tavilyKey = new TextBox();
+        private FieldBox _tavilyKeyBox;
+        private string _tavilyLoaded = "";
         private readonly ComboBox _model = new ComboBox();
         private readonly Label _keyLink = new Label();
         private readonly CardBox _probeCard = new CardBox();
@@ -98,6 +102,9 @@ namespace AxiomOffice.Ai
             _endpointBox = new FieldBox(_endpoint);
             _apiKeyBox = new FieldBox(_apiKey);
             _modelBox = new FieldBox(_model);
+            _tavilyKey.Font = PaneTheme.Small;
+            _tavilyKey.UseSystemPasswordChar = true;
+            _tavilyKeyBox = new FieldBox(_tavilyKey);
 
             BuildChrome();
             BuildWelcome();
@@ -904,10 +911,42 @@ namespace AxiomOffice.Ai
                 box.Hint = feature.Description;
                 box.Checked = FeatureValue(feature.Key);
                 panel.Controls.Add(box);
-                y += 58;
+                y += 50;
             }
 
-            y += 4;
+            // Tìm kiếm web: ô nhập khoá, không phải công tắc (setup.json chỉ có công tắc nên đặt riêng ở đây).
+            y += 2;
+            panel.Controls.Add(new Label
+            {
+                AutoSize = false,
+                Location = new Point(24, y),
+                Size = new Size(Width0 - 48, 20),
+                Font = PaneTheme.SmallBold,
+                ForeColor = PaneTheme.TextPrimary,
+                Text = "Tìm kiếm web (Tavily) - tuỳ chọn"
+            });
+            y += 22;
+            _tavilyKeyBox.Location = new Point(24, y);
+            _tavilyKeyBox.Size = new Size(300, 30);
+            _tavilyLoaded = Config.TavilyApiKey;
+            _tavilyKey.Text = _tavilyLoaded;
+            panel.Controls.Add(_tavilyKeyBox);
+            var tavilyHelp = PaneTheme.MakeLink("Lấy khoá miễn phí tại tavily.com", PaneTheme.Small);
+            tavilyHelp.Location = new Point(24 + 300 + 12, y + 7);
+            tavilyHelp.LinkClicked += delegate
+            {
+                try
+                {
+                    System.Diagnostics.Process.Start("https://app.tavily.com/");
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error("SetupWizard: open tavily.com failed", ex);
+                }
+            };
+            panel.Controls.Add(tavilyHelp);
+            y += 42;
+
             _advanced.Location = new Point(24, y);
             _advanced.Size = new Size(190, 32);
             _advanced.Click += delegate
@@ -992,7 +1031,8 @@ namespace AxiomOffice.Ai
                 & Config.WriteDword("MemoryAutoExtract", _autoExtract.Checked ? 1 : 0)
                 & Config.WriteDword("VerifyWorkEnabled", _verify.Checked ? 1 : 0)
                 & Config.WriteDword("LlmShowReasoning", _reasoning.Checked ? 1 : 0)
-                & Config.WriteDword("VisualQaEnabled", _visualQa.Checked ? 1 : 0);
+                & Config.WriteDword("VisualQaEnabled", _visualQa.Checked ? 1 : 0)
+                & SaveTavilyKey();
             if (!ok && showMessage)
             {
                 MessageBox.Show(this, "Không ghi được tuỳ chọn tính năng.", "Thiết lập Axiom Office",
@@ -1001,6 +1041,23 @@ namespace AxiomOffice.Ai
 
             Logger.Info("SetupWizard: tinh nang memory=" + _memory.Checked + " autoExtract=" + _autoExtract.Checked
                 + " visualQa=" + _visualQa.Checked);
+        }
+
+        // Chỉ ghi khi người dùng đổi khoá: để trống = xoá (không tìm web).
+        private bool SaveTavilyKey()
+        {
+            string key = (_tavilyKey.Text ?? "").Trim();
+            if (key == _tavilyLoaded)
+            {
+                return true;
+            }
+            bool ok = key.Length == 0 ? Config.WriteString("TavilyApiKey", "") : Config.WriteSecret("TavilyApiKey", key);
+            if (ok)
+            {
+                _tavilyLoaded = key;
+                Logger.Info("SetupWizard: khoa Tavily " + (key.Length == 0 ? "da xoa" : "da luu"));
+            }
+            return ok;
         }
 
         // ---------- B5: hoan tat ----------

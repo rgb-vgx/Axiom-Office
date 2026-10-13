@@ -53,6 +53,60 @@ namespace AxiomOffice.Bridge
             };
         }
 
+        // Chỗ người dùng đang nhìn, gửi kèm mỗi lượt cho Agent Core ("slide này", "đoạn đang chọn", "vùng này").
+        // Lượt 13/10/2026: người dùng nói "cập nhật slide hiện tại", agent không biết slide nào nên dựng 6 slide
+        // mới ở cuối bài. Từng phần đọc riêng: host thiếu thuộc tính (WPS) thì bỏ phần đó, không hỏng cả lượt.
+        public static Dictionary<string, object> View(IAppHost host)
+        {
+            var view = new Dictionary<string, object>();
+            dynamic app = host.Application;
+            if (app == null)
+            {
+                return view;
+            }
+            if (host.AppKind == "wpp")
+            {
+                TryPut(view, "slideCount", () => Convert.ToInt32(app.ActivePresentation.Slides.Count));
+                if (!TryPut(view, "slide", () => Convert.ToInt32(app.ActiveWindow.View.Slide.SlideIndex)))
+                {
+                    TryPut(view, "slide", () => Convert.ToInt32(app.ActiveWindow.Selection.SlideRange.SlideIndex));
+                }
+            }
+            else if (host.AppKind == "et")
+            {
+                TryPut(view, "sheet", () => Convert.ToString(app.ActiveSheet.Name));
+                TryPut(view, "range", () => Convert.ToString(app.Selection.Address(false, false)));
+            }
+            else
+            {
+                TryPut(view, "selection", () =>
+                {
+                    string text = Convert.ToString(app.Selection.Text) ?? "";
+                    // Con trỏ đứng yên (không bôi đen) Word trả 1 ký tự: không phải vùng chọn.
+                    return text.Trim().Length > 1 ? (text.Length > 2000 ? text.Substring(0, 2000) : text) : null;
+                });
+            }
+            return view;
+        }
+
+        private static bool TryPut(Dictionary<string, object> map, string key, Func<object> read)
+        {
+            try
+            {
+                object value = read();
+                if (value == null)
+                {
+                    return false;
+                }
+                map[key] = value;
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
         // Mô tả một dòng cho log chẩn đoán: số tài liệu, tài liệu active, các cửa sổ và trạng thái hiển thị.
         public static string Describe(IAppHost host)
         {

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
 using AxiomOffice.Bridge;
@@ -14,6 +15,10 @@ namespace AxiomOffice.Ai
     public class AskAiPane : UserControl
     {
         private const string PromptPlaceholder = "Nhập yêu cầu cho tài liệu này…";
+        private const string PlanPlaceholder = "Mô tả việc cần làm - AI lập kế hoạch trước, chưa sửa gì…";
+        // Nói rõ dùng phương án mặc định cho câu hỏi chưa trả lời (Core: PlanModeRule bắt kế hoạch ghi mặc định an
+        // toàn). Lượt 13/10/2026 bấm thực hiện khi còn 3 câu hỏi bỏ ngỏ, model tự chọn phạm vi lớn nhất.
+        private const string ExecutePlanPrompt = "Thực hiện kế hoạch ở trên. Câu hỏi nào tôi chưa trả lời thì dùng phương án mặc định đã ghi trong kế hoạch.";
         private const int MinPaneWidth = 300;
         private const int TargetPaneWidth = 360;
 
@@ -34,6 +39,17 @@ namespace AxiomOffice.Ai
         private readonly LinkLabel _stopLink;
         private readonly LinkLabel _newChatLink;
         private readonly LinkLabel _undoLink;
+        // Plan mode: lượt chạy chỉ đọc, trả về kế hoạch; thẻ dưới kế hoạch cho chạy thật (options.mode của Core).
+        private readonly LinkLabel _planToggle;
+        private bool _planMode;
+        private bool _lastPlan;
+        private PlanCard _planCard;
+        // Đính kèm tệp Office: Core đọc bằng công cụ MCP đọc tệp của server "office" theo đường dẫn đầy đủ.
+        private const int MaxAttachments = 3;
+        private readonly List<string> _attachments = new List<string>();
+        private readonly LinkLabel _attachLink;
+        private readonly FlowLayoutPanel _attachStrip;
+        private List<string> _lastAttachments = new List<string>();
         private int _runEdits;                       // so thao tac writer.* sua tai lieu thanh cong trong luot (Word)
         private int _lastRunEdits;
         private EmptyState _empty;
@@ -87,6 +103,24 @@ namespace AxiomOffice.Ai
             _composer.Controls.Add(_placeholder);
             _composer.Controls.Add(_prompt);
             _composer.Controls.Add(_hint);
+            // Công tắc lập kế hoạch đứng chỗ dòng gợi ý phím (pane hẹp không đủ chỗ cho cả hai); gợi ý vào tooltip.
+            _planToggle = PaneTheme.MakeLink("", PaneTheme.Caption);
+            _composer.Controls.Add(_planToggle);
+            _hint.Visible = false;
+            _attachLink = PaneTheme.MakeLink("+ Đính kèm", PaneTheme.Caption);
+            _attachLink.LinkColor = PaneTheme.TextMuted;
+            _attachLink.AccessibleName = "Đính kèm tệp Word, Excel hoặc PowerPoint cho AI đọc";
+            _composer.Controls.Add(_attachLink);
+            _attachStrip = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Bottom,
+                Height = PaneTheme.Px(24),
+                BackColor = PaneTheme.PaneBg,
+                Padding = new Padding(PaneTheme.Px(PaneTheme.PadX), 0, PaneTheme.Px(PaneTheme.PadX), 0),
+                WrapContents = false,
+                AutoScroll = false,
+                Visible = false,
+            };
             _composer.Controls.Add(_send);
 
             var footer = new Panel
@@ -137,6 +171,7 @@ namespace AxiomOffice.Ai
             header.Resize += delegate { LayoutHeader(header); };
 
             Controls.Add(_chat);
+            Controls.Add(_attachStrip);   // thêm trước composer: nằm ngay TRÊN ô nhập
             Controls.Add(_composer);
             Controls.Add(footer);
             Controls.Add(header);
@@ -153,6 +188,10 @@ namespace AxiomOffice.Ai
             _newChatLink.LinkClicked += delegate { StartNewConversation(); };
             _undoLink.LinkClicked += delegate { UndoLastRun(); };
             _settingsLink.LinkClicked += delegate { OpenSetup(); };
+            _planToggle.LinkClicked += delegate { SetPlanMode(!_planMode); };
+            _attachLink.LinkClicked += delegate { PickAttachments(); };
+            new ToolTip().SetToolTip(_prompt, "Enter để gửi · Shift+Enter xuống dòng");
+            SetPlanMode(false);
             _moreLink.LinkClicked += delegate { ShowMoreMenu(); };
             _composer.Resize += delegate { LayoutComposer(); };
             Load += delegate
@@ -215,6 +254,8 @@ namespace AxiomOffice.Ai
             _prompt.SetBounds(innerLeft, textTop, Math.Max(PaneTheme.Px(40), innerRight - innerLeft), textHeight);
             _placeholder.SetBounds(innerLeft + 1, textTop, Math.Max(PaneTheme.Px(40), innerRight - innerLeft - 1), textHeight);
             _hint.SetBounds(innerLeft, faceY, Math.Max(0, faceX - inset - PaneTheme.Px(4) - innerLeft), PaneTheme.Px(PaneTheme.AskH));
+            _planToggle.Location = new Point(innerLeft, faceY + (PaneTheme.Px(PaneTheme.AskH) - _planToggle.Height) / 2);
+            _attachLink.Location = new Point(_planToggle.Right + PaneTheme.Px(10), _planToggle.Top);
         }
 
         // Ô nhập cao theo nội dung từ 2 đến 5 dòng; quá 5 dòng thì TextBox tự cuộn theo con trỏ.
@@ -293,9 +334,10 @@ namespace AxiomOffice.Ai
             Color surface = blocked ? PaneTheme.InputDisabled : PaneTheme.PaneBg;
             _prompt.BackColor = surface;
             _placeholder.BackColor = surface;
-            _placeholder.Text = blocked ? reason : PromptPlaceholder;
+            _placeholder.Text = blocked ? reason : (_planMode ? PlanPlaceholder : PromptPlaceholder);
             _placeholder.Cursor = blocked ? Cursors.Hand : Cursors.IBeam;
-            _hint.Visible = !blocked;
+            _planToggle.Visible = !blocked;
+            _attachLink.Visible = !blocked && CoreClient.Instance.Enabled;
             UpdatePlaceholder();
             UpdateSendEnabled();
         }
@@ -371,10 +413,108 @@ namespace AxiomOffice.Ai
                 return;
             }
             _prompt.Clear();
-            StartRun(promptText);
+            StartRun(promptText, _planMode, new List<string>(_attachments));
+            _attachments.Clear();
+            RefreshAttachments();
         }
 
-        private void StartRun(string promptText)
+        private void PickAttachments()
+        {
+            using (var dialog = new OpenFileDialog
+            {
+                Title = "Đính kèm tệp cho AI đọc",
+                Filter = "Tài liệu Office (*.docx;*.xlsx;*.pptx)|*.docx;*.xlsx;*.pptx",
+                Multiselect = true,
+                CheckFileExists = true,
+            })
+            {
+                if (dialog.ShowDialog(this) != DialogResult.OK)
+                {
+                    return;
+                }
+                foreach (string path in dialog.FileNames)
+                {
+                    if (_attachments.Count >= MaxAttachments)
+                    {
+                        SetStatus("Tối đa " + MaxAttachments + " tệp mỗi lượt", true);
+                        break;
+                    }
+                    if (!_attachments.Contains(path, StringComparer.OrdinalIgnoreCase))
+                    {
+                        _attachments.Add(path);
+                    }
+                }
+            }
+            Logger.Info("AskAiPane: attachments=" + _attachments.Count);
+            RefreshAttachments();
+            _prompt.Focus();
+        }
+
+        // Hàng tệp đính kèm trên ô nhập: "📄 tên ✕", bấm để bỏ tệp đó.
+        private void RefreshAttachments()
+        {
+            _attachStrip.SuspendLayout();
+            foreach (Control old in _attachStrip.Controls.Cast<Control>().ToList())
+            {
+                _attachStrip.Controls.Remove(old);
+                old.Dispose();
+            }
+            foreach (string path in _attachments)
+            {
+                string captured = path;
+                var chip = PaneTheme.MakeLink("📄 " + System.IO.Path.GetFileName(path) + "  ✕", PaneTheme.Caption);
+                chip.AccessibleName = "Bỏ tệp đính kèm " + System.IO.Path.GetFileName(path);
+                chip.Margin = new Padding(0, PaneTheme.Px(4), PaneTheme.Px(10), 0);
+                new ToolTip().SetToolTip(chip, path);
+                chip.LinkClicked += delegate
+                {
+                    _attachments.Remove(captured);
+                    RefreshAttachments();
+                };
+                _attachStrip.Controls.Add(chip);
+            }
+            _attachStrip.Visible = _attachments.Count > 0;
+            _attachStrip.ResumeLayout(true);
+            _attachLink.Text = _attachments.Count > 0 ? "+ Đính kèm (" + _attachments.Count + ")" : "+ Đính kèm";
+        }
+
+        // Câu gửi Core: lời người dùng + đường dẫn đầy đủ. Model trước đây gọi ppt_profile bằng tên tệp trần và
+        // nhận "file not found" (13/10/2026) - nên nói rõ dùng NGUYÊN đường dẫn.
+        private static string WithAttachments(string promptText, List<string> files)
+        {
+            if (files == null || files.Count == 0)
+            {
+                return promptText;
+            }
+            var lines = new List<string> { promptText, "", "[Attached files - read them with the office file tools " +
+                "(doc_get_text, excel_profile, excel_read, ppt_get_text; ppt_profile gives a template's size, colors, " +
+                "fonts and slide kinds for wpp.newFromTemplate) using the full path exactly as written:]" };
+            foreach (string path in files)
+            {
+                lines.Add("- " + path);
+            }
+            return string.Join("\n", lines.ToArray());
+        }
+
+        private void SetPlanMode(bool on)
+        {
+            _planMode = on;
+            _planToggle.Text = (on ? "● " : "○ ") + "Lập kế hoạch trước";
+            _planToggle.LinkColor = on ? PaneTheme.AccentFg : PaneTheme.TextMuted;
+            _planToggle.AccessibleName = "Lập kế hoạch trước khi sửa: " + (on ? "đang bật" : "đang tắt");
+            if (_blockedReason == null)
+            {
+                _placeholder.Text = on ? PlanPlaceholder : PromptPlaceholder;
+            }
+            Logger.Info("AskAiPane: plan mode " + (on ? "on" : "off"));
+        }
+
+        private void StartRun(string promptText, bool plan)
+        {
+            StartRun(promptText, plan, new List<string>());
+        }
+
+        private void StartRun(string promptText, bool plan, List<string> files)
         {
             Connect host = CurrentHost;
             if (host == null)
@@ -396,14 +536,26 @@ namespace AxiomOffice.Ai
             _reasoningBlock = null;   // mỗi lượt một khối suy luận riêng
             _undoLink.Visible = false;
             _lastPrompt = promptText;
+            _lastPlan = plan;
+            _lastAttachments = files;
+            string corePrompt = WithAttachments(promptText, files);
+            if (_planCard != null && _planCard.IsOpen)
+            {
+                _planCard.Close(promptText == ExecutePlanPrompt && !plan ? "Đang thực hiện kế hoạch…" : "Đã gửi yêu cầu mới");
+            }
             _insertLink.Visible = false;
             _stopLink.Visible = true;
             _busyDot.Visible = true;
             UpdateSendEnabled();
-            _chat.AddMessage(promptText, true);
+            _chat.AddMessage(files.Count == 0 ? promptText
+                : promptText + "\n📎 " + string.Join(", ", files.Select(f => System.IO.Path.GetFileName(f)).ToArray()), true);
+            if (plan)
+            {
+                _chat.AddInfo("Lập kế hoạch: AI chỉ đọc tài liệu, chưa sửa gì");
+            }
             _chat.AddTyping();
             SetStatus("Đang xử lý…", false);
-            Logger.Info("AskAiPane: prompt=" + promptText);
+            Logger.Info("AskAiPane: prompt=" + promptText + (plan ? " (plan)" : "") + (files.Count > 0 ? " files=" + files.Count : ""));
 
             Action<string> progress = delegate(string line)
             {
@@ -418,8 +570,22 @@ namespace AxiomOffice.Ai
                 {
                     // Uu tien Agent Core (New_arch.md muc 9); Core khong dung duoc thi chay trong add-in
                     // nhu cu de pane khong bao gio bi khoa vi Core.
-                    result = RunViaCore(host, promptText, run, progress);
-                    if (result == null)
+                    result = RunViaCore(host, corePrompt, run, progress, plan);
+                    if (result == null && files.Count > 0)
+                    {
+                        // Agent trong add-in không đọc được tệp ngoài: báo rõ thay vì trả lời như không có tệp.
+                        result = new LlmResult();
+                        result.Error = "Đọc tệp đính kèm cần Agent Core, mà Core đang không chạy được ("
+                            + (CoreClient.Instance.LastError ?? "không rõ lý do") + ").";
+                    }
+                    else if (result == null && plan)
+                    {
+                        // Agent trong add-in không có chế độ chỉ đọc: không được chạy thay (nó sẽ sửa tài liệu).
+                        result = new LlmResult();
+                        result.Error = "Lập kế hoạch cần Agent Core, mà Core đang không chạy được ("
+                            + (CoreClient.Instance.LastError ?? "không rõ lý do") + "). Tắt \"Lập kế hoạch trước\" để AI làm ngay.";
+                    }
+                    else if (result == null)
                     {
                         result = AiAgent.Run(host, promptText, progress, run.Token);
                     }
@@ -443,7 +609,7 @@ namespace AxiomOffice.Ai
                 {
                     Logger.Error("AskAiPane failed after " + result.Seconds.ToString("0.0") + "s: " + result.Error, null);
                 }
-                if (!PostToUi(delegate { FinishRun(run, host, result); }))
+                if (!PostToUi(delegate { FinishRun(run, host, result, plan); }))
                 {
                     Logger.Error("AskAiPane: result not delivered to UI (pane closed or handle gone)", null);
                 }
@@ -451,7 +617,7 @@ namespace AxiomOffice.Ai
         }
 
         // Chay mot luot qua Agent Core. Tra null khi Core khong dung duoc (pane se chay in-process).
-        private LlmResult RunViaCore(Connect host, string promptText, CancellationTokenSource run, Action<string> progress)
+        private LlmResult RunViaCore(Connect host, string promptText, CancellationTokenSource run, Action<string> progress, bool plan)
         {
             CoreClient core = CoreClient.Instance;
             if (!core.Enabled)
@@ -468,7 +634,7 @@ namespace AxiomOffice.Ai
             }
             _freshConversation = false;
 
-            LlmResult result = core.Run(host, promptText, conversationId, delegate(CoreEvent item)
+            LlmResult result = core.Run(host, promptText, conversationId, plan ? "plan" : null, delegate(CoreEvent item)
             {
                 if (item.Type == "confirm.required" && !string.IsNullOrEmpty(item.ConfirmationId))
                 {
@@ -848,7 +1014,7 @@ namespace AxiomOffice.Ai
             }
         }
 
-        private void FinishRun(CancellationTokenSource run, Connect host, LlmResult result)
+        private void FinishRun(CancellationTokenSource run, Connect host, LlmResult result, bool plan)
         {
             if (run != _run)
             {
@@ -876,7 +1042,29 @@ namespace AxiomOffice.Ai
                 {
                     _chat.AddMessage(result.Text, false);
                     _lastReply = result.Text;
-                    _insertLink.Visible = host.AppKind == "wps";
+                    _insertLink.Visible = host.AppKind == "wps" && !plan;
+                }
+                if (plan)
+                {
+                    _planCard = new PlanCard();
+                    PlanCard card = _planCard;
+                    card.RunClicked += delegate
+                    {
+                        if (_busy)
+                        {
+                            return;
+                        }
+                        RefreshState();
+                        if (_blockedReason == null)
+                        {
+                            StartRun(ExecutePlanPrompt, false);
+                        }
+                    };
+                    _chat.AddBlock(card);
+                    SetStatus("Đã lập kế hoạch trong " + seconds + "s · chưa sửa gì", false);
+                    Announce("Đã lập kế hoạch. " + (result.Text ?? ""));
+                    UpdateSendEnabled();
+                    return;
                 }
                 SetStatus("Xong trong " + seconds + "s · " + _toolCount + " thao tác" + BackendNote(), false);
                 Announce("Xong. " + (result.Text ?? ""));
@@ -897,7 +1085,7 @@ namespace AxiomOffice.Ai
                         RefreshState();
                         if (_blockedReason == null)
                         {
-                            StartRun(_lastPrompt);
+                            StartRun(_lastPrompt, _lastPlan, _lastAttachments);
                         }
                     }
                 };

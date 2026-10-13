@@ -438,6 +438,7 @@ namespace AxiomOffice.Ai
             { "wpp.checkLayout", "Kiểm tra bố cục slide" },
             // Công cụ của Agent Core ngoài office_action (AskAiPane.ProgressLine đưa tên tool vào chỗ action).
             { "look_at_document", "Nhìn ảnh trang/slide" },
+            { "web_search", "Tìm trên web" },
             { "recall", "Tra ghi nhớ" },
         };
 
@@ -1150,6 +1151,102 @@ namespace AxiomOffice.Ai
         }
     }
 
+    // Thẻ dưới bản kế hoạch (plan mode): AI mới chỉ đọc; "Thực hiện kế hoạch" chạy một lượt thường trong cùng hội
+    // thoại, hoặc người dùng gõ góp ý để lập lại. Bấm rồi thì thẻ khoá lại (không chạy hai lần).
+    internal sealed class PlanCard : Panel
+    {
+        private readonly Label _title;
+        private readonly Label _message;
+        private readonly LinkLabel _run;
+
+        public event EventHandler RunClicked;
+
+        public PlanCard()
+        {
+            BackColor = PaneTheme.ChipHover;
+            AccessibleRole = AccessibleRole.Grouping;
+            AccessibleName = "Kế hoạch đã sẵn sàng";
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
+            _title = PaneTheme.MakeLabel("Kế hoạch đã sẵn sàng - tài liệu chưa bị sửa", PaneTheme.SmallBold, PaneTheme.AccentFg);
+            _message = PaneTheme.MakeLabel("Trả lời câu hỏi trong kế hoạch (nếu có) hoặc gõ góp ý để AI sửa kế hoạch. "
+                + "Bấm \"Thực hiện kế hoạch\" khi còn câu hỏi chưa trả lời thì AI dùng phương án mặc định đã ghi.",
+                PaneTheme.Small, PaneTheme.TextPrimary);
+            _run = PaneTheme.MakeLink("Thực hiện kế hoạch", PaneTheme.SmallBold);
+            _run.AccessibleName = "Thực hiện kế hoạch vừa lập";
+            foreach (Control control in new Control[] { _title, _message, _run })
+            {
+                control.BackColor = PaneTheme.ChipHover;
+                Controls.Add(control);
+            }
+            _run.LinkClicked += delegate
+            {
+                EventHandler handler = RunClicked;
+                if (handler != null && _run.Enabled)
+                {
+                    handler(this, EventArgs.Empty);
+                }
+            };
+        }
+
+        // Đã thực hiện / có lượt mới: khoá nút để không chạy lại kế hoạch cũ.
+        public void Close(string note)
+        {
+            _run.Enabled = false;
+            _run.Text = note;
+            _run.LinkColor = PaneTheme.TextMuted;
+            _run.DisabledLinkColor = PaneTheme.TextMuted;
+            Measure(Width);
+        }
+
+        public bool IsOpen
+        {
+            get { return _run.Enabled; }
+        }
+
+        public void Measure(int width)
+        {
+            int left = PaneTheme.Px(3 + 12);
+            int right = PaneTheme.Px(12);
+            int inner = Math.Max(PaneTheme.Px(60), width - left - right);
+            int y = PaneTheme.Px(8);
+            int h = PaneTheme.MeasureHeight(_title.Text, _title.Font, inner);
+            _title.SetBounds(left, y, inner, h);
+            y += h + PaneTheme.Px(2);
+            h = PaneTheme.MeasureHeight(_message.Text, _message.Font, inner);
+            _message.SetBounds(left, y, inner, h);
+            y += h + PaneTheme.Px(6);
+            _run.Location = new Point(left, y);
+            y += _run.Height + PaneTheme.Px(8);
+            Size = new Size(width, y);
+        }
+
+        protected override void OnPaintBackground(PaintEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            PaneTheme.ClearToParent(this, g);
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            var rect = new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f);
+            using (var path = PaneTheme.RoundedPath(rect, PaneTheme.PxF(PaneTheme.RadiusControl)))
+            {
+                using (var brush = new SolidBrush(PaneTheme.ChipHover))
+                {
+                    g.FillPath(brush, path);
+                }
+                GraphicsState state = g.Save();
+                g.SetClip(path);
+                using (var stripe = new SolidBrush(PaneTheme.Accent))
+                {
+                    g.FillRectangle(stripe, 0, 0, PaneTheme.PxF(3), Height);
+                }
+                g.Restore(state);
+                using (var pen = new Pen(PaneTheme.ChipBorder))
+                {
+                    g.DrawPath(pen, path);
+                }
+            }
+        }
+    }
+
     // Thẻ xác nhận của policy (New_arch.md mục 7.4 confirm.required, 8.6): Đồng ý / Từ chối; hết giờ = từ chối.
     internal sealed class ConfirmCard : Panel
     {
@@ -1640,7 +1737,13 @@ namespace AxiomOffice.Ai
                 var note = control as MemoryNote;
                 var confirm = control as ConfirmCard;
                 var reasoning = control as ReasoningBlock;
-                if (confirm != null)
+                var plan = control as PlanCard;
+                if (plan != null)
+                {
+                    plan.Measure(available);
+                    bottom = PaneTheme.GapMessage;
+                }
+                else if (confirm != null)
                 {
                     confirm.Measure(available);
                     bottom = PaneTheme.GapMessage;

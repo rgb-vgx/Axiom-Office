@@ -139,8 +139,19 @@ namespace AxiomOffice.Ai
             return Run(host, prompt, conversationId, onEvent, cancel, true);
         }
 
+        // mode = "plan": Core chỉ cho đọc tài liệu và trả về kế hoạch (pane: "Lập kế hoạch trước"); null = làm ngay.
+        public LlmResult Run(Connect host, string prompt, string conversationId, string mode, Action<CoreEvent> onEvent, CancellationToken cancel)
+        {
+            return Run(host, prompt, conversationId, onEvent, cancel, true, mode);
+        }
+
         // interactive = false: không có người bấm xác nhận (ai.ask của agent bên ngoài) -> Core từ chối ngay lệnh cần xác nhận.
         public LlmResult Run(Connect host, string prompt, string conversationId, Action<CoreEvent> onEvent, CancellationToken cancel, bool interactive)
+        {
+            return Run(host, prompt, conversationId, onEvent, cancel, interactive, null);
+        }
+
+        private LlmResult Run(Connect host, string prompt, string conversationId, Action<CoreEvent> onEvent, CancellationToken cancel, bool interactive, string mode)
         {
             string baseUrl = EnsureBaseUrl();
             if (baseUrl == null)
@@ -175,7 +186,12 @@ namespace AxiomOffice.Ai
             request["document"] = document;
             // Khong dat maxSeconds: luot chay do so vong, ngan sach token va nut Dung kiem soat.
             // Pane di theo SSE va co nut Dung nen khong can tran dong ho (giong opencode/goclaw).
-            request["options"] = new Dictionary<string, object> { { "maxTokens", 200000 }, { "interactive", interactive } };
+            var options = new Dictionary<string, object> { { "maxTokens", 200000 }, { "interactive", interactive } };
+            if (!string.IsNullOrEmpty(mode))
+            {
+                options["mode"] = mode;
+            }
+            request["options"] = options;
 
             string error;
             string responseText = PostJson(baseUrl + "/v1/runs", Serialize(request), 30000, cancel, out error);
@@ -736,6 +752,30 @@ namespace AxiomOffice.Ai
             catch (Exception ex)
             {
                 Logger.Info("CoreClient: doc thong tin tai lieu that bai: " + ex.Message);
+            }
+
+            // Slide đang mở / vùng đang chọn: đọc COM từ worker thread nên qua ComGate như mọi nơi khác.
+            Dictionary<string, object> view = null;
+            try
+            {
+                ComGate.TryRun(2000, delegate { view = HostProbe.View(host); });
+            }
+            catch (Exception ex)
+            {
+                Logger.Info("CoreClient: doc vung dang xem that bai: " + ex.Message);
+            }
+            if (view != null && view.Count > 0)
+            {
+                object selection;
+                if (view.TryGetValue("selection", out selection))
+                {
+                    view.Remove("selection");
+                    document["selection"] = new Dictionary<string, object> { { "text", selection } };
+                }
+                if (view.Count > 0)
+                {
+                    document["view"] = view;
+                }
             }
 
             return document;
