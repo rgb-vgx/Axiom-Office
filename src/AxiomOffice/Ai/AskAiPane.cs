@@ -686,8 +686,8 @@ namespace AxiomOffice.Ai
                 return null;
             }
 
-            // Đổi sang model dự phòng: dòng thông tin, không phải dòng công cụ.
-            if (item.Type == "run.model_switched" && !string.IsNullOrEmpty(item.Text))
+            // Danh sách việc (write_todos) và đổi sang model dự phòng: dòng thông tin, không phải dòng công cụ.
+            if ((item.Type == "run.todos" || item.Type == "run.model_switched") && !string.IsNullOrEmpty(item.Text))
             {
                 return "(" + item.Text + ")";
             }
@@ -701,7 +701,8 @@ namespace AxiomOffice.Ai
             // load_skill / read_skill_file: đã có dòng "Dùng kỹ năng"; remember: đã có dòng "Đã ghi nhớ".
             // Công cụ khác (look_at_document, recall, MCP) PHẢI hiện: trước đây bị ẩn hết nên một lượt gọi MCP
             // lỗi rồi chờ model trông như pane đứng ở bước office_action cuối (đo 13/10/2026).
-            if (item.Type == "tool.finished" && (item.Tool == "load_skill" || item.Tool == "read_skill_file" || item.Tool == "remember"))
+            if (item.Type == "tool.finished" && (item.Tool == "load_skill" || item.Tool == "read_skill_file" || item.Tool == "remember"
+                || item.Tool == "write_todos"))
             {
                 return null;
             }

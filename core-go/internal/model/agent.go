@@ -54,6 +54,8 @@ type AgentOptions struct {
 	// FallbackModels: model du phong cung nha cung cap, thu lan luot khi model dang dung hong ma thu lai khong qua
 	// (fallbackGuard). Rong = khong co.
 	FallbackModels []string
+	// OncePerReply: tool chi chay mot lan moi phan hoi cua model (vd write_todos ghi de ca danh sach).
+	OncePerReply []string
 }
 
 // FitWindow: chinh nguong theo cua so ngu canh cua model (LangChain trigger ("fraction", x)). Nguong don giu

@@ -224,3 +224,24 @@ func TestFallbackSkipsModelsWithoutTools(t *testing.T) {
 		t.Fatalf("%+v %v", result, models())
 	}
 }
+
+// write_todos goi hai lan trong cung mot phan hoi: lan thu hai bi bo qua (lan nao thang khong ro).
+func TestOncePerReplyBlocksSecondCall(t *testing.T) {
+	twice := `{"choices":[{"message":{"role":"assistant","content":null,"tool_calls":[` +
+		`{"id":"a","function":{"name":"t","arguments":"{\"n\":1}"}},{"id":"b","function":{"name":"t","arguments":"{\"n\":2}"}}]}}],` +
+		`"usage":{"prompt_tokens":10,"completion_tokens":1}}`
+	server, _ := verifyServer(t, []string{twice, twice, strings.Replace(replyText, "%s", "xong", 1)})
+	client := NewClient(server.Client(), "openai", server.URL, "", "m")
+	options := DefaultAgentOptions()
+	options.Verify = false
+	options.OncePerReply = []string{"t"}
+	executed := 0
+	client.RunAgent(context.Background(), "s", nil, "u", mutatingTools(),
+		func(ctx context.Context, call ToolCall) ToolResult {
+			executed++
+			return ToolResult{CallID: call.ID, Name: call.Name, OK: true, ResultJSON: `{"ok":true}`}
+		}, options, AgentCallbacks{})
+	if executed != 2 {
+		t.Fatalf("moi phan hoi chi chay mot lan: chay %d lan qua 2 phan hoi", executed)
+	}
+}

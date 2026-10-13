@@ -79,6 +79,8 @@ type RunContext struct {
 	OverwriteApproved map[string]bool
 	// FocusSlide: slide nguoi dung dang mo (pane gui document.view) - ket qua doc ca bai giu nguyen slide nay.
 	FocusSlide int
+	// Todos: danh sach viec model ghi gan nhat (write_todos).
+	Todos []Todo
 	// calls: so lan goi tung tool/lenh trong luot (CallLimit).
 	calls map[string]int
 	// templateBuilt: so slide slides_from_template da dung trong CA luot (cac lo truoc + lo nay) - cau tra loi cuoi

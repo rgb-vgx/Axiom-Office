@@ -5,6 +5,30 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Vòng lặp agent theo guard, model dự phòng, cứu lượt khi tràn ngữ cảnh, danh sách việc (13/10/2026)
+Học từ LangChain 1.4.5 (`agents/middleware`):
+- **Sửa lỗi**: lượt thật không có ba cơ chế chống làm thừa của §6.6 (dọn kết quả tool cũ, chặn lệnh y hệt lần 5, dừng
+  khi lặp một lỗi) — `ParseRequest` dựng `AgentOptions` từ số 0, các cơ chế chỉ chạy trong test. Nay bắt đầu từ
+  `DefaultAgentOptions()` (`TestParseRequestKeepsAgentGuards`)
+- **Guard** (`model/guards.go`, theo `AgentMiddleware`): `RunAgent` chỉ còn gọi model, chạy tool và hỏi chuỗi guard ở 4
+  điểm móc (trả lời không tool, trước một tool call, sau một vòng tool, gọi model hỏng). Mỗi cơ chế cũ (trả lời rỗng,
+  tự kiểm chứng, lệnh y hệt, tool báo xong, dọn ngữ cảnh, lặp lỗi, ngân sách) là một guard; hành vi giữ nguyên
+- **Model dự phòng** (`ModelFallbackMiddleware`): cấu hình `LlmFallbackModels` (Cài đặt nâng cao → "Dự phòng", phân
+  cách bằng dấu phẩy; `AXIOM_LLM_FALLBACK_MODELS`). Model đang dùng hỏng mà thử lại không qua (402/403/404/408/409/429,
+  5xx, mất kết nối, trả lời rỗng) → chuyển sang model kế tiếp cho phần còn lại của lượt; bỏ qua model nhà cung cấp khai
+  không gọi tool. Không chuyển với 401/400 (lỗi cấu hình). Sự kiện `run.model_switched`, `run.completed.model`
+- **Tràn ngữ cảnh** (`SummarizationMiddleware` bắt `ContextOverflowError`): nhà cung cấp báo vượt cửa sổ → dọn mạnh
+  kết quả tool cũ (giữ 1) rồi gọi lại vòng đó, tối đa 2 lần/lượt, thay vì dừng cả lượt. Lỗi 400 tràn ngữ cảnh không
+  còn kích hoạt lần gửi lại bỏ `thinking`
+- **Cửa sổ ngữ cảnh theo model** (`model-profiles`): đọc `GET /models` một lần (`context_length`,
+  `capabilities.contextWindow`, `max_input_tokens`, `max_model_len`…) hoặc cấu hình `LlmContextWindow` (Cài đặt nâng
+  cao → "Ngữ cảnh", cho Ollama/LM Studio). Ngưỡng dọn không quá nửa cửa sổ, `max_tokens` không quá 1/4 cửa sổ nhỏ;
+  **không nâng** ngưỡng cho model cửa sổ lớn (ngưỡng 40k vì ngân sách token, không vì cửa sổ)
+- **Danh sách việc** (`TodoListMiddleware`): tool `write_todos` (không có trong plan mode) — model ghi các bước của việc
+  ≥ 3 bước và đánh dấu dần; khung chat hiện "(Bước 2/5: Dựng bảng)". Mỗi phản hồi chỉ một lần (`OncePerReply`)
+- Test: `model/fallback_test.go` (chuyển model, không chuyển với 401, bỏ model không có tool, cứu tràn ngữ cảnh,
+  nhận diện lỗi tràn, `FitWindow`, đọc `/models`, một lần mỗi phản hồi), `tools/todo_test.go`
+
 ### Added — Chống agent làm thừa sau khi xong, ngân sách 3 mức (13/10/2026)
 Lượt thật Y4.5-ĐM.14 (95 slide) hết trần 200k token dù việc xong ở vòng 5. Theo tư vấn ChatGPT (OpenAI Agents SDK
 `StopAtTools`, Anthropic context editing, LangChain `ContextEditingMiddleware`/`ToolCallLimitMiddleware`):

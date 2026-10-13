@@ -642,7 +642,11 @@ namespace AxiomOffice.Ai
                     item.OutputTokens = Convert.ToInt32(data["outputTokens"]);
                 }
 
-                if (type == "run.model_switched")
+                if (type == "run.todos")
+                {
+                    item.Text = TodoProgress(data);
+                }
+                else if (type == "run.model_switched")
                 {
                     item.Text = "Model " + Read(data, "from") + " lỗi - chuyển sang model dự phòng " + Read(data, "to");
                 }
@@ -654,6 +658,52 @@ namespace AxiomOffice.Ai
                 Logger.Info("CoreClient: su kien hong (" + type + "): " + ex.Message);
                 return null;
             }
+        }
+
+        // run.todos (write_todos): một dòng tiến độ "Bước 2/5: Dựng bảng" cho khung chat.
+        private static string TodoProgress(Dictionary<string, object> data)
+        {
+            var todos = data.ContainsKey("todos") ? data["todos"] as System.Collections.IEnumerable : null;
+            if (todos == null)
+            {
+                return null;
+            }
+
+            int total = 0, done = 0;
+            string current = null;
+            foreach (object entry in todos)
+            {
+                var todo = entry as Dictionary<string, object>;
+                if (todo == null)
+                {
+                    continue;
+                }
+
+                total++;
+                string status = Read(todo, "status");
+                if (status == "completed")
+                {
+                    done++;
+                }
+                else if (status == "in_progress" && current == null)
+                {
+                    current = Read(todo, "content");
+                }
+            }
+
+            if (total == 0)
+            {
+                return null;
+            }
+
+            if (done == total)
+            {
+                return "Xong " + total + "/" + total + " bước";
+            }
+
+            return current != null
+                ? "Bước " + (done + 1) + "/" + total + ": " + current
+                : "Kế hoạch " + total + " bước, xong " + done;
         }
 
         private static string Read(Dictionary<string, object> data, string key)

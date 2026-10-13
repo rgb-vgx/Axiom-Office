@@ -84,6 +84,9 @@ func newGuards(options AgentOptions) guardChain {
 	if options.MaxIdenticalCalls > 0 {
 		chain = append(chain, &identicalCallGuard{limit: options.MaxIdenticalCalls, counts: map[string]int{}})
 	}
+	if len(options.OncePerReply) > 0 {
+		chain = append(chain, &oncePerReplyGuard{names: options.OncePerReply})
+	}
 	chain = append(chain, finalGuard{})
 	if options.ContextClearAt > 0 {
 		chain = append(chain, contextClearGuard{})
@@ -219,6 +222,33 @@ func (g *identicalCallGuard) beforeCall(_ *agentLoop, call ToolCall) *ToolResult
 	return &ToolResult{CallID: call.ID, Name: call.Name, ResultJSON: ErrorJSON(fmt.Sprintf(
 		"blocked: this exact call (same tool, same arguments) already ran %d times in this request; "+
 			"use the earlier result, change the arguments, or answer the user", g.limit))}
+}
+
+// oncePerReplyGuard (OncePerReply): tool thay CA trang thai (write_todos ghi de ca danh sach) chi chay mot lan moi
+// phan hoi - hai lan song song thi khong biet lan nao thang (LangChain TodoListMiddleware).
+type oncePerReplyGuard struct {
+	names []string
+	round int
+	seen  map[string]bool
+}
+
+func (g *oncePerReplyGuard) beforeCall(loop *agentLoop, call ToolCall) *ToolResult {
+	if g.round != loop.result.Rounds {
+		g.round, g.seen = loop.result.Rounds, map[string]bool{}
+	}
+	limited := false
+	for _, name := range g.names {
+		limited = limited || name == call.Name
+	}
+	if !limited {
+		return nil
+	}
+	if g.seen[call.Name] {
+		return &ToolResult{CallID: call.ID, Name: call.Name, ResultJSON: ErrorJSON(
+			call.Name + " may be called only once per reply (each call replaces the whole state); this extra call was ignored")}
+	}
+	g.seen[call.Name] = true
+	return nil
 }
 
 // finalGuard: tool da xong CA viec va tu kiem chung -> ket thuc ngay, khong goi model them (tu van ChatGPT

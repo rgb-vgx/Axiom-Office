@@ -223,6 +223,10 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 	if appKind == "wpp" && !request.Plan && catalog.Has("wpp.sourceManifest") {
 		list = append(list, tools.NewSlidesFromTemplateTool())
 	}
+	// Danh sach viec (write_todos): chi khi lam that - lap ke hoach da tra ve ke hoach bang chu.
+	if !request.Plan {
+		list = append(list, tools.NewTodoTool())
+	}
 	if len(appSkills) > 0 && o.Skills != nil {
 		list = append(list, tools.NewLoadSkillTool(o.Skills, appKind), tools.NewReadSkillFileTool(o.Skills, appKind))
 	}
@@ -350,6 +354,7 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 	// Model du phong + cua so ngu canh (GET /models doc mot lan cho moi cau hinh LLM).
 	options.FallbackModels = o.Config().LlmFallbackModels
 	options.ContextWindow = client.ModelInfo(ctx, client.Model).ContextWindow
+	options.OncePerReply = []string{tools.TodoToolName}
 
 	result := client.RunAgent(ctx, systemPrompt, assembled.PriorTurns, request.Prompt, registry.ModelTools(),
 		func(inner context.Context, call model.ToolCall) model.ToolResult {
