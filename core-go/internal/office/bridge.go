@@ -60,6 +60,19 @@ type CommandCatalog struct {
 	Commands []Command
 }
 
+// Has: DLL dang chay co lenh nay khong (lenh moi chi co o ban add-in moi, hoac chi o PowerPoint).
+func (c *CommandCatalog) Has(name string) bool {
+	if c == nil {
+		return false
+	}
+	for _, command := range c.Commands {
+		if command.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
 type cachedCatalog struct {
 	catalog   *CommandCatalog
 	fetchedAt time.Time

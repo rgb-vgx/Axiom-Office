@@ -9,6 +9,17 @@ apps: [wpp]
 
 # Trình bày slide chuyên nghiệp (Microsoft PowerPoint)
 
+**Có tệp mẫu đính kèm** ("dùng template", "làm theo mẫu") → đọc
+`read_skill_file {name: "trinh-bay-chuyen-nghiep", path: "references/mau-dinh-kem.md"}` và làm theo đó
+(cả bài: tool `slides_from_template`; vài slide lẻ: `wpp.newFromTemplate`, `wpp.addSlideFromTemplate`,
+`wpp.setShapeText`, `wpp.copyPicture`); mục 1–2 và 5
+dưới đây không áp dụng. Không tự vẽ lại mẫu bằng `wpp.addText`.
+
+**Nguồn là văn bản của cơ quan Đảng, Nhà nước** (nghị quyết, kế hoạch, báo cáo, chuyên đề có quốc hiệu
+hoặc "ĐẢNG CỘNG SẢN VIỆT NAM" ở đầu) → đọc thêm
+`read_skill_file {name: "trinh-bay-chuyen-nghiep", path: "references/van-ban-nha-nuoc.md"}`: giữ nguyên
+văn, tiêu đề là tên mục của văn bản (thay cho mục 4.1), bìa lấy từ đầu văn bản.
+
 Đọc `read_skill_file {name: "_design", path: "tokens.json"}` (khối `slide`, `colors`) và dùng đúng giá
 trị ở đó. Cỡ chữ và màu trong bài này ghi bằng **tên token**; số trong ngoặc là giá trị hiện tại để dễ
 hình dung — `tokens.json` mới là chuẩn. Mọi số đo là của PowerPoint thật (`references/co-so-do-duoc.md`).
@@ -64,7 +75,8 @@ Hộp của `wpp.addText` **giữ đúng chiều cao đã đặt**: chữ dài h
 `checkLayout` báo `overflow`. Đếm ký tự trước khi viết vẫn rẻ hơn viết rồi sửa.
 
 **Chữ không vừa thì làm theo thứ tự**: (1) viết ngắn lại; (2) chuyển diễn giải sang `wpp.setNotes`;
-(3) tách thành hai slide, mỗi slide một thông điệp. Không hạ `fontSize`, không dời hộp ra khỏi lưới.
+(3) tách thành hai slide, mỗi slide một thông điệp — slide sau giữ tiêu đề, thêm "(tiếp theo)", đánh số
+ý nối tiếp. Không hạ `fontSize`, không dời hộp ra khỏi lưới.
 
 ## 4. Nội dung
 
@@ -113,10 +125,27 @@ Hộp của `wpp.addText` **giữ đúng chiều cao đã đặt**: chữ dài h
   - `small-font` → trả cỡ chữ về token ở mục 2.
 - [ ] Nếu có tool `look_at_document`: gọi **một lần** sau khi soát xong để nhìn slide (lệch lưới, màu,
       bảng), sửa chỗ còn lỗi.
+- [ ] Đối chiếu với nguồn: không sót ý nào, thứ tự giữ theo mạch bản gốc, số liệu đều có trong nguồn.
+
+## 7. Báo cáo cho người dùng
+
+Người đọc là nhân viên văn phòng, không phải lập trình viên. Viết ngắn, tiếng Việt thường, **không** đưa
+tên lệnh (`wpp.*`), số kind, toạ độ. Gọi slide bằng số trang và tên dễ hiểu ("slide 5 — bốn mục đích").
+
+- Một câu: bao nhiêu slide (so với bản gốc nếu làm lại), đã soát lỗi.
+- **Khác bản gốc**: slide nào gộp, tách ("(tiếp theo)"), đổi thứ tự; phần nào chuyển vào ghi chú.
+- **Chỗ tự thêm hoặc sửa** để người dùng duyệt: nhãn ngắn, chữ đã rút gọn, lỗi chính tả, chữ viết tắt.
+- **Cần lưu ý**: việc không làm được (biểu đồ → đã làm bảng), slide còn lỗi `checkLayout`, nhắc lưu
+  (Ctrl+S).
 
 ## Đọc thêm
 
-- `references/bo-cuc-slide.md` — toạ độ từng mẫu: bìa, chia mục, ba con số, bảng, hai cột, ảnh.
+- `references/bo-cuc-slide.md` — toạ độ từng mẫu: bìa, chia mục, ba con số, bảng, hai cột, ảnh; bảng
+  chọn mẫu theo loại nội dung (mục 7).
+- `references/van-ban-nha-nuoc.md` — slide từ nghị quyết, kế hoạch, báo cáo của cơ quan Đảng, Nhà nước:
+  giữ nguyên văn, bìa từ đầu văn bản, phân biệt Đảng / chính quyền.
 - `references/cau-chuyen.md` — dàn ý cả bài: slide tóm tắt cho người quyết định, tiêu đề hành động, số
   slide, cỡ chữ theo khoảng cách người xem, nguồn tham khảo.
 - `references/co-so-do-duoc.md` — số đo trên PowerPoint, cách đo lại, bảng tương phản màu.
+- `references/mau-dinh-kem.md` — làm bài theo tệp mẫu đính kèm: đọc `kinds` của `ppt_profile`, nhân bản slide
+  mẫu, thay chữ theo tên khung, chép ảnh từ bài cũ.

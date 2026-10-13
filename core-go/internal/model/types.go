@@ -35,6 +35,11 @@ type ToolResult struct {
 	// Mutating: tool nay co lam THAY DOI tai lieu khong. Chi luot co thay doi moi can tu kiem chung
 	// truoc khi tra loi, nen day la dau vao cua buoc kiem chung (xem AgentOptions.Verify).
 	Mutating bool
+	// Final: tool da hoan tat CA viec nguoi dung yeu cau va tu kiem chung (vd slides_from_template dung xong ca bai,
+	// da luu): vong lap ket thuc ngay voi FinalText, khong goi model them. Luot that 13/10/2026: viec xong o vong 5,
+	// model con chay 25 vong kiem lai roi het ngan sach.
+	Final     bool
+	FinalText string
 }
 
 // Turn: mot luot tra loi cua model (co tool call hoac cau tra loi cuoi). Raw giu nguyen phan assistant

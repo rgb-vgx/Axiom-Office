@@ -5,6 +5,26 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Dựng lại cả bài theo mẫu, từng lô: `slides_from_template` (13/10/2026)
+Theo tư vấn ChatGPT (docs/template-design.md §6.5): model chỉ viết những slide máy không tự quyết được.
+- **Tool Core `slides_from_template`** (`tools/template_build.go`, chỉ PowerPoint, không có trong plan mode): tự tạo/mở
+  bài đích cạnh bài cũ, đọc bài cũ một lần, dựng theo lô 25 slide bằng chuỗi lệnh bridge cố định. Tự quyết: bìa; tiêu
+  đề từ khung cao nhất hoặc **mang sang từ mục đang trình bày**; đoạn mô tả giữ nguyên ở cột trái, ảnh cột phải; ảnh
+  chia lưới theo tỉ lệ thật, > 4 ảnh tách slide; slide chữ ngắn vào mục lặp của mẫu, dài giữ nguyên văn. Còn lại trả
+  `needsPlan` (chữ gốc + lý do); dòng kế hoạch sai trả lỗi theo từng trường. Trên Y4.4-GAN.14: **86/87 slide tự dựng
+  trong ~91 s**, 0 lỗi bố cục
+- Bridge: `wpp.sourceManifest` (tiêu đề, chữ, ảnh + nhãn đè của từng slide nguồn; OLE nhúng tính là ảnh);
+  `wpp.addSlideFromTemplate {tag}` (dấu `AXIOM_SRC`: chạy lại thay tại chỗ, giữ thứ tự); `wpp.listSlides` trả `tag`;
+  `wpp.copyPicture {overlays, format}` (ảnh có nhãn/đường kẻ vẽ đè → xuất vùng slide; `jpg` chất lượng 90 —
+  bài 87 slide 97,8 MB → 9,2 MB); `wpp.open` tệp đang mở chỉ kích hoạt cửa sổ. Registry 71 lệnh
+- `ppt_profile.kinds` có kiểu dữ liệu (`pptx.ReadTemplate`, `Kind.Title()`, `Kind.ItemBodies()`) để tool dùng lại
+- Sau lượt thật đầu tiên của người dùng (deepseek-v4.1-flash, 18 vòng, ~10 vòng đọc lại tệp chưa lưu): tool lưu bài mới
+  sau mỗi lô; dòng kế hoạch chỉ ghi đè trường model viết (bìa không còn giữ tên giảng viên của tệp mẫu); tool tệp gặp
+  `.ppt/.doc/.xls` báo lỗi rõ ngay
+- Lượt thật cả bài (Y4.5-ĐM.14, 95 slide): 95/95 slide tự dựng trong ~90 s, nhưng lượt hết ngân sách vì model xoá tay
+  ghi chú của tệp mẫu bị chép theo slide mẫu và kiểm lại từng slide → tool luôn đặt lại ghi chú; thông báo kết thúc
+  bảo model trả lời ngay
+
 ### Added — Làm bài theo tệp mẫu đính kèm (PowerPoint, 13/10/2026)
 Thí nghiệm trên PowerPoint 16 với mẫu thật của trường (docs/template-design.md §6.1): master/layout là Office
 mặc định, logo + dải màu nằm trong **ảnh nền trên từng slide**, chữ là textbox tự vẽ — nên `AddSlide` theo layout

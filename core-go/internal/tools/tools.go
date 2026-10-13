@@ -21,6 +21,10 @@ type Result struct {
 	// kiem chung truoc khi tra loi (model.AgentOptions.Verify) - luot chi doc ma bat doc lai thi chi
 	// ton them mot vong vo ich.
 	Mutating bool
+	// Final / FinalText: tool da xong CA viec nguoi dung yeu cau (va tu kiem chung) - luot ket thuc voi FinalText,
+	// khong goi model them (model.ToolResult.Final).
+	Final     bool
+	FinalText string
 }
 
 // noDocumentChange: cac lenh KHONG doi noi dung tai lieu dang mo - doc de tra loi, chay chan doan,
@@ -75,6 +79,11 @@ type RunContext struct {
 	OverwriteApproved map[string]bool
 	// FocusSlide: slide nguoi dung dang mo (pane gui document.view) - ket qua doc ca bai giu nguyen slide nay.
 	FocusSlide int
+	// calls: so lan goi tung tool/lenh trong luot (CallLimit).
+	calls map[string]int
+	// templateBuilt: so slide slides_from_template da dung trong CA luot (cac lo truoc + lo nay) - cau tra loi cuoi
+	// tach "dung trong lan nay" voi "co tu luot truoc".
+	templateBuilt int
 }
 
 func (c *RunContext) ConfirmOrDecline(action, reason, paramsPreview string) (bool, error) {

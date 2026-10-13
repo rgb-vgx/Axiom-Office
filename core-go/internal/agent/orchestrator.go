@@ -212,6 +212,11 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 		officeTool = tools.NewReadOnlyOfficeActionTool(catalog, appKind)
 	}
 	list := []tools.Tool{officeTool}
+	// Dung lai ca bai theo mau tung lo (docs/template-design.md muc 6.6): chi trinh chieu, chi khi sua duoc, va
+	// chi khi bridge co lenh doc bai nguon (PowerPoint; LibreOffice/WPS chua co).
+	if appKind == "wpp" && !request.Plan && catalog.Has("wpp.sourceManifest") {
+		list = append(list, tools.NewSlidesFromTemplateTool())
+	}
 	if len(appSkills) > 0 && o.Skills != nil {
 		list = append(list, tools.NewLoadSkillTool(o.Skills, appKind), tools.NewReadSkillFileTool(o.Skills, appKind))
 	}
@@ -506,10 +511,19 @@ func executeTool(ctx context.Context, registry *tools.Registry, call model.ToolC
 		// Tham so khong phai JSON: tool se bao thieu 'action'.
 		arguments = nil
 	}
+	// Han muc theo tool/lenh trong mot luot (tools.CallLimits): het han muc thi khong chay, bao model doi cach.
+	key := call.Name
+	if action, _ := arguments["action"].(string); call.Name == "office_action" && action != "" {
+		key = action
+	}
+	if problem := run.CountCall(key); problem != "" {
+		return model.ToolResult{CallID: call.ID, Name: call.Name, ResultJSON: tools.ErrorJSON(problem)}
+	}
 	output := tool.Invoke(ctx, arguments, run)
 	return model.ToolResult{
 		CallID: call.ID, Name: call.Name, ResultJSON: output.JSON, OK: output.OK,
 		ImageDataURL: output.ImageDataURL, Mutating: output.Mutating,
+		Final: output.Final, FinalText: output.FinalText,
 	}
 }
 

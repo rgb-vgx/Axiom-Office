@@ -98,3 +98,24 @@ vùng nội dung cao 370, nhưng ảnh cao hết 370 thì dính sát dòng ngu�
 Căn giữa trong vùng nội dung: `left = (W − width) / 2`, `top = 130 + (370 − height) / 2`. Ảnh rộng quá
 giới hạn sẽ đẩy đáy xuống đè hộp "Nguồn" (`overlap`) hoặc vượt `H` (`offslide`); sửa bằng cách giảm
 `width`. Ảnh chụp màn hình (tỉ lệ lạ): truyền `width` = 400 rồi đọc lại `checkLayout`.
+
+## 7. Chọn mẫu theo loại nội dung
+
+Chọn mẫu **theo số ý thật**, không theo ý thích: ba con số chỉ khi có đúng 3 con số; hai cột chỉ khi có
+đúng 2 vế. Nhiều ý hơn sức chứa → tách thành nhiều slide cùng mẫu, tiêu đề slide sau thêm "(tiếp theo)",
+đánh số ý liên tục. Ít ý hơn → dùng mẫu ít ô hơn, không để ô trống.
+
+| Nội dung | Mẫu |
+|---|---|
+| Trang đầu | Bìa (mục 1) |
+| Bố cục bài, mở đầu từng phần | Chia mục (mục 2) — tên phần, không gạch đầu dòng |
+| Mục đích, yêu cầu, nhiệm vụ, giải pháp (≤ 5 ý) | Gạch đầu dòng ở hộp "Nội dung" (lưới `SKILL.md` mục 1) |
+| Kết quả nổi bật, đúng 3 chỉ tiêu | Ba con số (mục 3) |
+| Chỉ tiêu – kế hoạch – thực hiện; so sánh cũ – mới; căn cứ pháp lý (số hiệu · ngày · trích yếu) | Bảng (mục 4) |
+| Phân công (đơn vị · nhiệm vụ · thời hạn); lộ trình theo mốc; chương trình hội nghị | Bảng (mục 4), mỗi mốc/đơn vị một hàng |
+| Kết quả – hạn chế; thuận lợi – khó khăn; hiện tại – đề xuất | Hai cột (mục 5) |
+| Ảnh hoạt động, hiện trường kèm 2–3 ý | Hai cột: chữ ↔ ảnh (mục 5, 6) |
+| Quy trình, thủ tục nhiều bước | Gạch đầu dòng đánh số "1. … 2. …"; quá 5 bước thì tách slide |
+
+Đừng dùng **một mẫu cho cả bài**: hơn ba slide gạch đầu dòng liền nhau thì xem có ý nào thành bảng,
+hai cột hay ba con số được không. Nhưng chỉ đổi khi nội dung thật sự hợp — đừng ép.
