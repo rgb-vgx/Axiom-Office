@@ -8,7 +8,11 @@ import (
 func pptFileTools() []*Tool {
 	return []*Tool{
 		NewTool("ppt_profile",
-			"Inspect a .pptx file: slide count, per-slide layout, shapes, texts and speaker notes.",
+			"Inspect a .pptx file: slide count, slide size and aspect (16:9, 4:3), per-slide layout, shapes, texts, "+
+				"speaker notes, and its style (theme colors/fonts plus the colors and fonts actually used on the slides - "+
+				"follow usedColors/usedFonts when the file is a template), and for a template its slide kinds: per kind the "+
+				"text slots (shape name, size, maxChars), repeated items, the fixed background, the safe area and the box for "+
+				"a picture - use them with wpp.addSlideFromTemplate / wpp.setShapeText / wpp.copyPicture.",
 			[]Param{ParamStr("path", "", true, nil)},
 			func(a *ToolArgs) (any, error) { return pptx.Profile(a.Req("path")) }),
 		NewTool("ppt_get_text",

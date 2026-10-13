@@ -54,15 +54,34 @@ type Package struct {
 
 // OpenRead mo goi OOXML de doc.
 func OpenRead(path string) (*Package, error) {
+	// .ppt/.doc/.xls nhi phan: bao ro ngay (luot that 13/10/2026: mot tep .ppt doc qua zip ra "no main part").
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".ppt", ".doc", ".xls":
+		if _, err := os.Stat(path); err == nil {
+			return nil, notOOXML(path)
+		}
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
 	pkg, err := OpenBytes(data)
 	if err != nil {
-		return nil, fmt.Errorf("'%s' is not a valid Office Open XML file (zip)", path)
+		return nil, notOOXML(path)
 	}
 	return pkg, nil
+}
+
+// notOOXML: tep khong phai zip OOXML. Dinh dang nhi phan cu (.ppt/.doc/.xls) thi chi duong cho model: luot that
+// 13/10/2026, model doc bai .ppt dang mo bang ppt_profile/ppt_get_text, nhan loi tron roi doan duong dan khac.
+func notOOXML(path string) error {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".ppt", ".doc", ".xls":
+		return fmt.Errorf("'%s' is an old binary Office file (%s), the file tools read only .pptx/.docx/.xlsx: "+
+			"if it is the document open in the app, read it with office_action (wpp.listSlides, writer.getText, "+
+			"et.readRange); wpp.copyPicture copies pictures from an old .ppt", path, strings.ToLower(filepath.Ext(path)))
+	}
+	return fmt.Errorf("'%s' is not a valid Office Open XML file (zip)", path)
 }
 
 // OpenBytes mo goi tu bytes (dung cho template nhung san).
@@ -489,7 +508,7 @@ func Edit(path string, edit func(*Package) error) error {
 	}
 	pkg, err := OpenBytes(data)
 	if err != nil {
-		return fmt.Errorf("'%s' is not a valid Office Open XML file (zip)", path)
+		return notOOXML(path)
 	}
 	if err := edit(pkg); err != nil {
 		return err

@@ -187,7 +187,17 @@ func Profile(path string) (map[string]any, error) {
 		return nil, err
 	}
 	slides := []any{}
+	used := newUsage()
+	scannedLayouts := map[string]bool{}
+	if master := pkg.RelOfType(presentation, "slideMaster"); master != nil {
+		used.scanPart(pkg, master.TargetPart)
+	}
 	for index, slidePart := range slideParts {
+		used.scanPart(pkg, slidePart)
+		if layout := pkg.RelOfType(slidePart, "slideLayout"); layout != nil && !scannedLayouts[layout.TargetPart] {
+			scannedLayouts[layout.TargetPart] = true
+			used.scanPart(pkg, layout.TargetPart)
+		}
 		doc, err := pkg.XML(slidePart)
 		if err != nil {
 			return nil, err
@@ -220,12 +230,41 @@ func Profile(path string) (map[string]any, error) {
 			height, _ = strconv.ParseInt(size.AttrValue("", "cy"), 10, 64)
 		}
 	}
-	return map[string]any{
+	size := map[string]any{"width": width, "height": height}
+	if w, ok := width.(int64); ok {
+		if h, ok := height.(int64); ok {
+			for key, value := range slideSize(w, h) {
+				size[key] = value
+			}
+		}
+	}
+	profile := map[string]any{
 		"path":        path,
 		"slide_count": len(slideParts),
-		"size":        map[string]any{"width": width, "height": height},
+		"size":        size,
 		"slides":      slides,
-	}, nil
+	}
+	// Kieu slide de nhan ban khi tep la mau (kinds.go) - bai dai thi bo cho gon.
+	if w, ok := width.(int64); ok && len(slideParts) <= maxKindSlides {
+		if h, ok := height.(int64); ok && w > 0 && h > 0 {
+			profile["kinds"] = slideKinds(pkg, slideParts, float64(w)/emuPerPoint, float64(h)/emuPerPoint)
+		}
+	}
+	// Phong cach de "dung theo mau": theme + mau/font thuc su to tren slide (style.go).
+	style := themeStyle(pkg, presentation)
+	if style == nil {
+		style = map[string]any{}
+	}
+	if colors := top(used.colors, 8); len(colors) > 0 {
+		style["usedColors"] = colors
+	}
+	if fonts := top(used.fonts, 4); len(fonts) > 0 {
+		style["usedFonts"] = fonts
+	}
+	if len(style) > 0 {
+		profile["style"] = style
+	}
+	return profile, nil
 }
 
 // GetText gop text cua tat ca slide (kem ghi chu).
