@@ -252,6 +252,14 @@ const CHUA_CO_HANDLER = {
   "writer.insertImage": "chua co handler trong add-in (agent=true)",
   "writer.insertHyperlink": "chua co handler trong add-in (agent=true)",
   "writer.checkTables": "chua co handler trong add-in (agent=true)",
+  // Nam lenh lam bai theo mau (docs/template-design.md muc 6.3): moi co tren PowerPoint (COM InsertFromFile,
+  // Shape.Export); WPP chua kiem.
+  "wpp.newFromTemplate": "chua co handler trong add-in (chi PowerPoint)",
+  "wpp.addSlideFromTemplate": "chua co handler trong add-in (chi PowerPoint)",
+  "wpp.sourceManifest": "chua co handler trong add-in (chi PowerPoint)",
+  "wpp.setShapeText": "chua co handler trong add-in (chi PowerPoint)",
+  "wpp.deleteShapes": "chua co handler trong add-in (chi PowerPoint)",
+  "wpp.copyPicture": "chua co handler trong add-in (chi PowerPoint)",
 };
 
 test("registry LibreOffice: moi lenh deu co handler, hoac nam trong danh sach chua lam (co ly do)", () => {

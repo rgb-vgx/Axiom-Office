@@ -5,6 +5,39 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Làm bài theo tệp mẫu đính kèm (PowerPoint, 13/10/2026)
+Thí nghiệm trên PowerPoint 16 với mẫu thật của trường (docs/template-design.md §6.1): master/layout là Office
+mặc định, logo + dải màu nằm trong **ảnh nền trên từng slide**, chữ là textbox tự vẽ — nên `AddSlide` theo layout
+ra slide trắng, `ApplyTemplate` giữ khổ 4:3 và mất logo. Cách làm được: nhân bản slide mẫu rồi thay chữ theo tên khung.
+- **Năm lệnh mới** (`CommandDispatcher.Template.cs`, ForAgent): `wpp.newFromTemplate {template, path}` (mở bản sao
+  của mẫu, bỏ slide mẫu, lưu tệp MỚI — từ chối ghi đè), `wpp.addSlideFromTemplate {template, kind, slide?}`
+  (`InsertFromFile`, giữ ảnh nền + định dạng; trả tên các khung chữ), `wpp.setShapeText {shape, text, slide?}`
+  (giữ font/cỡ/màu của khung; khung tự giãn của mẫu được đặt lại chiều cao vì PowerPoint điều khiển qua COM không
+  tự giãn; sai tên → trả danh sách tên đúng), `wpp.deleteShapes {shapes, slide?}` (xoá mục lặp thừa, **từ chối xoá
+  ảnh nền**), `wpp.copyPicture {from, fromSlide, shape?, slide?, left, top, width, height}` (`Shape.Export` → PNG đúng
+  độ phân giải gốc, **không đụng clipboard**; co vừa khung, giữ tỉ lệ, căn giữa; bài nguồn chưa mở thì mở chỉ đọc có
+  cửa sổ rồi trả quyền cho bài đang làm). LibreOffice báo "not available"; WPS chưa có handler (lọc khỏi catalog)
+- **`ppt_profile` trả `kinds`** cho tệp ≤ 40 slide (`pptx/kinds.go`): mỗi slide mẫu → ảnh nền cố định (`fixed`),
+  khung chữ kèm **sức chứa** (`maxLines`/`maxChars`, chặn bởi shape bên dưới hoặc ô màu bao quanh), **mục lặp**
+  (nhóm shape cùng hình lệch theo trục y/x), **vùng an toàn** (hình chữ nhật trắng lớn nhất trên ảnh nền, giải mã
+  JPEG/PNG) và `pictureBox`. Trên mẫu thật: tiêu đề sidebar 2 dòng/76 ký tự, ô mục tiêu 2 dòng/110 ký tự (đo
+  PowerPoint: 57 ký tự/dòng), vùng an toàn bên phải sidebar x 222–948
+- **`wpp.checkLayout` không báo lỗi giả trên slide mẫu**: bỏ qua `offslide` của ảnh nền phủ ≥ 90% slide; khung chữ
+  xét mép chữ thật (`BoundLeft`) thay vì mép khung; hai hình trang trí chồng nhau hoặc khung chữ nằm gọn trong ô màu
+  là chủ ý. Chữ dài làm khung giãn ra khỏi ô màu → `overflow` ("runs out of 'Rectangle 8'"). Slide mẫu: 20 → 0 lỗi
+- Skill `trinh-bay-chuyen-nghiep`: có tệp mẫu → `references/mau-dinh-kem.md` (quy trình + ví dụ), không tự vẽ mẫu
+- **Sau lượt thật với `ocg/mimo-v2.6-flash`** (docs/template-design.md §6.4): lượt 1 model không biết đường dẫn
+  bài cũ và chèn slide mẫu 16:9 thẳng vào bài cũ 4:3 → (a) prompt có *"Its full path: …"* của tài liệu đang mở
+  (`DocumentSection`); (b) `wpp.addSlideFromTemplate` từ chối khi khổ bài đang mở ≠ khổ mẫu (đọc `p:sldSz` bằng
+  `ZipArchive`; add-in thêm tham chiếu `System.IO.Compression`); (c) tool tệp gặp `.ppt/.doc/.xls` nhị phân thì lỗi
+  chỉ sang `office_action`/`copyPicture`; (d) skill cấm gắn nhãn lên ảnh y khoa. Lượt 2 hoàn thành 6 slide: 27 vòng,
+  889 s, 67.804 token phải trả, `checkLayout` 0 lỗi, bài cũ không đổi
+- **Lưu ý đo đạc**: WPS ghi đè CLSID `PowerPoint.Application` ở HKCU → `New-Object -ComObject PowerPoint.Application`
+  chạy WPS Presentation. Đã kiểm lại 5 lệnh trên PowerPoint 16 thật (`POWERPNT.EXE /automation` + `GetActiveObject`)
+- Kiểm: chạy thật 5 lệnh trên PowerPoint (bài mới 4 slide: bìa, mục tiêu 2 mục, ảnh giải phẫu từ `.ppt` 4:3, cảm
+  ơn — `checkLayout` chỉ còn đúng lỗi cố tình viết quá dài); `go test ./...`; `tests/lo/test_extension.py` khớp
+  catalog C#; test add-in WPS. Registry 65 → 70 lệnh, sinh lại catalog
+
 ### Fixed — Năm điểm yếu thấy khi theo dõi một lượt thật (bài 87 slide, 13/10/2026)
 Lượt "dùng template đính kèm + Tavily, cập nhật slide hiện tại": model dựng 6 slide **mới** ở cuối bài thay vì
 sửa slide đang mở, chọn màu xanh trong khi mẫu tông đỏ đô, và tốn **1.271.221 token đầu vào** trong 30 vòng.

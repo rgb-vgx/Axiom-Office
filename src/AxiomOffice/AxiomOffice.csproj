@@ -26,6 +26,7 @@
     <Reference Include="System.Drawing" />
     <Reference Include="System.Security" />
     <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.IO.Compression" />
   </ItemGroup>
   <ItemGroup>
     <!-- Giong scripts/build.ps1: moi *.cs trong thu muc (tru bin/obj), khong phai liet ke tung file. -->

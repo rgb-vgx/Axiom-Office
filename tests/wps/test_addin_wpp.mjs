@@ -68,9 +68,13 @@ function slideOf(app, index) {
   return app.ActivePresentation.Slides.Item(index);
 }
 
+// Lenh lam bai theo mau: chi co handler tren PowerPoint (CHUA_CO_HANDLER cua test_addin.mjs).
+const TEMPLATE_COMMANDS = ["wpp.newFromTemplate", "wpp.addSlideFromTemplate", "wpp.sourceManifest", "wpp.setShapeText",
+  "wpp.deleteShapes", "wpp.copyPicture"];
+
 test("registry: du 15 lenh wpp.*, metadata giong het registry LibreOffice", () => {
   const ctx = loadAddin();
-  const mine = addinCatalog(ctx).filter((c) => c.name.indexOf("wpp.") === 0);
+  const mine = addinCatalog(ctx).filter((c) => c.name.indexOf("wpp.") === 0 && !TEMPLATE_COMMANDS.includes(c.name));
   assertMetadata(WPP_COMMANDS, mine);
   assert.equal(mine.length, WPP_COMMANDS.length, "catalog co lenh wpp.* la khong co trong danh sach nay");
   for (const command of mine) {

@@ -281,23 +281,65 @@ def check_layout(env, params):
 
 command("wpp.newPresentation", "wpp", lambda env, p: documents.open_document(env.ctx, "wpp", None), "Tạo bài trình bày mới")
 command("wpp.open", "wpp", lambda env, p: documents.open_document(env.ctx, "wpp", values.string(p, "path")), "Mở .pptx/.ppt/.odp", req("path"))
-command("wpp.listSlides", "wpp", list_slides, "Số slide + text từng slide", agent=True)
+command("wpp.listSlides", "wpp", list_slides, "Số slide + text từng slide", opt("presentation", "full path of the presentation to work on; default: the active one"), agent=True)
 command("wpp.addSlide", "wpp", add_slide, "Thêm slide cuối; `layout` mặc định 12 = trống (1 = tiêu đề, 2 = tiêu đề + nội dung, 11 = chỉ tiêu đề)",
         opt("layout", "number: 1 title, 2 title+content, 11 title only, 12 blank"), agent=True, undo=True)
 command("wpp.addText", "wpp", add_text, "Textbox có định dạng (`color` dạng `#RRGGBB`, `align` left/center/right)",
         req("text"), opt("slide"), opt("left"), opt("top"), opt("width"), opt("height"), opt("fontSize"), opt("bold"), opt("color"), opt("align"),
-        agent=True, undo=True)
+        opt("presentation", "full path of the presentation to work on; default: the active one"), agent=True, undo=True)
 command("wpp.addTextBox", "wpp", add_text, "Textbox", req("text"), opt("slide"), opt("left"), opt("top"), opt("width"), opt("height"), undo=True)
 command("wpp.addImage", "wpp", add_image, "Chèn ảnh (kích thước gốc nếu bỏ trống `width`/`height`)",
         req("path"), opt("slide"), opt("left"), opt("top"), opt("width"), opt("height"), agent=True, undo=True)
 command("wpp.addTable", "wpp", add_table, "Bảng; `rows`/`cols` tự suy ra/nới theo `values`",
         opt("rows"), opt("cols"), opt("values", "2D array of rows"), opt("slide"), opt("left"), opt("top"), opt("width"), opt("height"),
         agent=True, undo=True)
-command("wpp.setNotes", "wpp", set_notes, "Ghi chú thuyết trình", req("text"), opt("slide"), agent=True, undo=True)
+command("wpp.setNotes", "wpp", set_notes, "Ghi chú thuyết trình", req("text"), opt("slide"), opt("presentation", "full path of the presentation to work on; default: the active one"), agent=True, undo=True)
 command("wpp.deleteSlide", "wpp", delete_slide, "Xoá slide (mặc định slide cuối)", opt("slide"), agent=True, undo=True)
 command("wpp.exportPdf", "wpp", lambda env, p: documents.export_pdf(env.document, "wpp", values.string(p, "path")),
         "Xuất PDF", req("path"), agent=True)
-command("wpp.save", "wpp", lambda env, p: documents.save(env.document, "wpp", None), "Lưu", agent=True)
+command("wpp.save", "wpp", lambda env, p: documents.save(env.document, "wpp", None), "Lưu", opt("presentation", "full path of the presentation to work on; default: the active one"), agent=True)
 command("wpp.saveAs", "wpp", lambda env, p: documents.save(env.document, "wpp", values.string(p, "path")),
         "Lưu thành file mới", req("path"), agent=True)
+
+def _template_unsupported(env, params):
+    # Lam bai theo mau (docs/template-design.md muc 6) moi co tren PowerPoint (CommandDispatcher.Template.cs):
+    # can InsertFromFile + Shape.Export cua COM. Ban LibreOffice lam o phien Linux.
+    raise values.ParamError("not available on LibreOffice yet: build the slides with wpp.addSlide/wpp.addText "
+                            "and wpp.addImage, using the template's colors from ppt_profile")
+
+
+command("wpp.newFromTemplate", "wpp", _template_unsupported,
+        "Tạo bài MỚI từ tệp mẫu (.pptx/.potx): giữ khổ + master, bỏ hết slide mẫu, lưu ở `path` và mở ra",
+        req("template", "path of the template file"), req("path", "new .pptx to create; must not exist"), agent=True)
+command("wpp.addSlideFromTemplate", "wpp", _template_unsupported,
+        "Chèn bản sao slide số `kind` của tệp mẫu (giữ ảnh nền, khung chữ, định dạng); trả tên các khung chữ",
+        req("template"), req("kind", "slide number in the template (kinds of ppt_profile)"),
+        opt("slide", "insert after this slide; default: at the end"),
+        opt("tag", "source slide number; a slide already tagged so is replaced in place"),
+        opt("expect", "shape name the inserted slide must have (checks it is the template slide)"), opt("presentation", "full path of the presentation to work on; default: the active one"), agent=True, undo=True)
+command("wpp.sourceManifest", "wpp", _template_unsupported,
+        "Đọc bài nguồn (vd bài cũ .ppt) theo slide: tiêu đề, chữ, danh sách ảnh - để dựng lại theo mẫu",
+        req("from", "path of the source presentation"), opt("first"), opt("last"), agent=True)
+command("wpp.setShapeText", "wpp", _template_unsupported,
+        "Thay chữ của một khung theo TÊN shape, giữ định dạng của khung (font, cỡ, màu)",
+        req("shape", "shape name, e.g. 'TextBox 2'"), req("text", "\\n = new paragraph"), opt("slide"), opt("presentation", "full path of the presentation to work on; default: the active one"),
+        agent=True, undo=True)
+command("wpp.deleteShapes", "wpp", _template_unsupported,
+        "Xoá các shape theo tên (mục lặp thừa của slide mẫu); không xoá ảnh nền",
+        req("shapes", "array of shape names"), opt("slide"), opt("presentation", "full path of the presentation to work on; default: the active one"), agent=True, undo=True)
+command("wpp.copyPicture", "wpp", _template_unsupported,
+        "Chép ảnh từ slide của bài khác (vd bài cũ) vào slide của bài đang làm, co vừa khung, giữ tỉ lệ",
+        req("from", "path of the source presentation"), req("fromSlide"), opt("shape", "picture name; default: largest picture"),
+        opt("slide"), opt("left"), opt("top"), opt("width"), opt("height"),
+        opt("overlays", "true: also copy the labels/arrows drawn over the picture"),
+        opt("format", "png (default) or jpg (much smaller for photos and scans)"), opt("presentation", "full path of the presentation to work on; default: the active one"), agent=True, undo=True)
+command("wpp.addParagraphs", "wpp", _template_unsupported,
+        "Khung chữ nhiều đoạn giữ phân cấp (cấp thụt lề, đậm, nghiêng, số thứ tự, gạch đầu dòng); tự chọn cỡ chữ lớn nhất vừa khung",
+        req("paragraphs", "array of {t: text, l: level 1-5, b: bold, i: italic, n: number prefix like '1.', u: bullet}"),
+        opt("slide"), opt("left"), opt("top"), opt("width"), opt("height"),
+        opt("fontSize", "largest size to try (default 24)"), opt("minFontSize", "smallest size (default 16)"),
+        opt("color", "#RRGGBB body text"), opt("accent", "#RRGGBB bold (heading) paragraphs"), opt("font", "font name"),
+        opt("anchor", "top (default) or middle"),
+        opt("presentation", "full path of the presentation to work on; default: the active one"), undo=True)
+
 command("wpp.closeAll", "wpp", lambda env, p: documents.close_all(env.ctx, "wpp"), "**Đóng mọi bài trình bày, không lưu**")

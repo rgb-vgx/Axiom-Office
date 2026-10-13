@@ -15,20 +15,22 @@ namespace AxiomOffice.Bridge
             {
                 Command("wpp.newPresentation", "wpp", WppNewPresentation, "Tạo bản trình chiếu mới"),
                 Command("wpp.open", "wpp", WppOpen, "Mở .pptx", Req("path")),
-                Command("wpp.listSlides", "wpp", WppListSlides, "Số slide + text từng slide").ForAgent(),
+                Command("wpp.listSlides", "wpp", WppListSlides, "Số slide + text từng slide", Opt("presentation", "full path of the presentation to work on; default: the active one")).ForAgent(),
                 Command("wpp.addSlide", "wpp", WppAddSlide, "Thêm slide cuối; `layout` mặc định 12 = trống (1 = tiêu đề, 2 = tiêu đề + nội dung, 11 = chỉ tiêu đề)",
                     Opt("layout", "number: 1 title, 2 title+content, 11 title only, 12 blank")).ForAgent(),
                 Command("wpp.addText", "wpp", WppAddText, "Textbox có định dạng (`color` dạng `#RRGGBB`, `align` left/center/right)",
-                    Req("text"), Opt("slide"), Opt("left"), Opt("top"), Opt("width"), Opt("height"), Opt("fontSize"), Opt("bold"), Opt("color"), Opt("align")).ForAgent(),
+                    Req("text"), Opt("slide"), Opt("left"), Opt("top"), Opt("width"), Opt("height"), Opt("fontSize"), Opt("bold"), Opt("color"), Opt("align"),
+                    Opt("presentation", "full path of the presentation to work on; default: the active one")).ForAgent(),
                 Command("wpp.addTextBox", "wpp", WppAddTextBox, "Textbox", Req("text"), Opt("slide"), Opt("left"), Opt("top"), Opt("width"), Opt("height")),
                 Command("wpp.addImage", "wpp", WppAddImage, "Chèn ảnh (kích thước gốc nếu bỏ trống `width`/`height`)",
                     Req("path"), Opt("slide"), Opt("left"), Opt("top"), Opt("width"), Opt("height")).ForAgent(),
                 Command("wpp.addTable", "wpp", WppAddTable, "Bảng; `rows`/`cols` tự suy ra/nới theo `values`",
                     Opt("rows"), Opt("cols"), Opt("values", "2D array of rows"), Opt("slide"), Opt("left"), Opt("top"), Opt("width"), Opt("height")).ForAgent(),
-                Command("wpp.setNotes", "wpp", WppSetNotes, "Ghi chú thuyết trình", Req("text"), Opt("slide")).ForAgent(),
+                Command("wpp.setNotes", "wpp", WppSetNotes, "Ghi chú thuyết trình", Req("text"), Opt("slide"), Opt("presentation", "full path of the presentation to work on; default: the active one")).ForAgent(),
                 Command("wpp.deleteSlide", "wpp", WppDeleteSlide, "Xoá slide (mặc định slide cuối)", Opt("slide")).ForAgent(),
                 Command("wpp.exportPdf", "wpp", WppExportPdf, "Xuất PDF", Req("path")).ForAgent(),
-                Command("wpp.save", "wpp", (host, p) => SaveDocument(host, "wpp", null), "Lưu").ForAgent(),
+                Command("wpp.save", "wpp", (host, p) => SaveDocument(host, "wpp", null, ParamString(p, "presentation", null)), "Lưu",
+                    Opt("presentation", "full path of the presentation to work on; default: the active one")).ForAgent(),
                 Command("wpp.saveAs", "wpp", (host, p) => SaveDocument(host, "wpp", ParamString(p, "path", null)), "Lưu thành file mới", Req("path")).ForAgent()
             };
         }
@@ -36,7 +38,7 @@ namespace AxiomOffice.Bridge
         private static Dictionary<string, object> WppListSlides(IAppHost host, Dictionary<string, object> p)
         {
             dynamic app = host.Application;
-            dynamic pres = app.ActivePresentation;
+            dynamic pres = TargetPresentation(app, p);
             int count = Convert.ToInt32(pres.Slides.Count);
             var slides = new List<object>();
             for (int i = 1; i <= count; i++)
@@ -58,11 +60,18 @@ namespace AxiomOffice.Bridge
                     {
                     }
                 }
-                slides.Add(new Dictionary<string, object>
+                var entry = new Dictionary<string, object>
                 {
                     { "index", i },
                     { "shapeTexts", texts }
-                });
+                };
+                // Slide dựng lại từ slide nguồn số này (wpp.addSlideFromTemplate {tag}).
+                string tag = SlideTag(slide);
+                if (tag != null)
+                {
+                    entry["tag"] = tag;
+                }
+                slides.Add(entry);
             }
             return new Dictionary<string, object>
             {
@@ -90,6 +99,18 @@ namespace AxiomOffice.Bridge
                 throw new InvalidOperationException("'path' is required");
             }
             dynamic app = host.Application;
+            // Đang mở rồi thì chỉ đưa cửa sổ của nó lên (dựng theo mẫu nhiều lô quay lại bài mới giữa chừng).
+            dynamic open = FindPresentation(app, path);
+            if (open != null)
+            {
+                open.Windows[1].Activate();
+                return new Dictionary<string, object>
+                {
+                    { "name", Convert.ToString(open.Name) },
+                    { "fullName", Convert.ToString(open.FullName) },
+                    { "alreadyOpen", true }
+                };
+            }
             dynamic pres = app.Presentations.Open(path);
             return new Dictionary<string, object>
             {
@@ -130,7 +151,7 @@ namespace AxiomOffice.Bridge
             int width = ParamInt(p, "width", 540);
             int height = ParamInt(p, "height", 120);
             dynamic app = host.Application;
-            dynamic pres = app.ActivePresentation;
+            dynamic pres = TargetPresentation(app, p);
             dynamic slide = WppGetSlide(pres, ParamInt(p, "slide", 0));
             dynamic shape = slide.Shapes.AddTextbox(1, left, top, width, height);
             // Hộp giữ đúng chiều cao được đặt (AddTextbox mặc định tự giãn theo chữ): chữ dài thì checkLayout báo
@@ -269,7 +290,7 @@ namespace AxiomOffice.Bridge
         {
             string text = ParamString(p, "text", "");
             dynamic app = host.Application;
-            dynamic pres = app.ActivePresentation;
+            dynamic pres = TargetPresentation(app, p);
             dynamic slide = WppGetSlide(pres, ParamInt(p, "slide", 0));
             dynamic notesPage = slide.NotesPage;
             dynamic target = null;

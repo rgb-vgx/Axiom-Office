@@ -108,7 +108,9 @@ $commonArgs = @(
     "/r:$fw\System.Windows.Forms.dll",
     "/r:$fw\System.Drawing.dll",
     "/r:$fw\System.Security.dll",
-    "/r:$fw\Microsoft.CSharp.dll"
+    "/r:$fw\Microsoft.CSharp.dll",
+    # Doc kho slide trong tep mau .pptx (wpp.addSlideFromTemplate) - ZipArchive.
+    "/r:$fw\System.IO.Compression.dll"
 )
 
 # Build vao .stage roi moi chep de: loi bien dich hay file dich bi lock deu giu nguyen DLL cu.
@@ -119,7 +121,6 @@ if ($LASTEXITCODE -ne 0) { throw "Add-in build failed with exit code $LASTEXITCO
 # Companion: chi con `commands --json` va `llm-test`. MCP server da gom ve Core ban Go, nen khong con
 # template docx/pptx nhung trong exe nua (chung chi phuc vu ban MCP C# da bo).
 $hostArgs = @(
-    "/r:$fw\System.IO.Compression.dll",
     "/r:$fw\System.IO.Compression.FileSystem.dll",
     "/r:$fw\System.Xml.dll",
     "/r:$fw\System.Xml.Linq.dll"

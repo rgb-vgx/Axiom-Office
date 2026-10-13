@@ -23,7 +23,7 @@ namespace AxiomOffice.Bridge
                     Opt("range", "default: the used range"), Opt("sheet")).ForAgent(),
                 Command("wpp.checkLayout", "wpp", WppCheckLayout,
                     "Soát bố cục slide (chỉ đọc): chữ tràn khung, shape ra ngoài slide, shape chồng nhau, chữ quá nhỏ",
-                    Opt("slide", "slide number; default: every slide")).ForAgent()
+                    Opt("slide", "slide number; default: every slide"), Opt("presentation", "full path of the presentation to work on; default: the active one")).ForAgent()
             };
         }
 
@@ -56,13 +56,18 @@ namespace AxiomOffice.Bridge
             public int Chars;
             public double TextHeight;
             public double TextWidth;
+            // Mép trái của chữ (BoundLeft); NaN = không đọc được. Khung của mẫu có thể rộng quá mép slide
+            // mà chữ căn giữa vẫn nằm trong slide ("TextBox 3" của mẫu trường: 45 + 938 > 960).
+            public double TextLeft = double.NaN;
+            // MsoShapeType (1 hình vẽ, 13 ảnh, 17 textbox...); 0 = không rõ.
+            public int Type;
             public double MinFont;
         }
 
         private static Dictionary<string, object> WppCheckLayout(IAppHost host, Dictionary<string, object> p)
         {
             dynamic app = host.Application;
-            dynamic pres = app.ActivePresentation;
+            dynamic pres = TargetPresentation(app, p);
             int count = Convert.ToInt32(pres.Slides.Count);
             int only = ParamInt(p, "slide", 0);
             if (only > count || only < 0)
@@ -129,6 +134,7 @@ namespace AxiomOffice.Bridge
                             box.Chars = Convert.ToString(text.Text).Length;
                             box.TextHeight = Convert.ToDouble(text.BoundHeight);
                             box.TextWidth = Convert.ToDouble(text.BoundWidth);
+                            box.TextLeft = Convert.ToDouble(text.BoundLeft);
                             box.MinFont = MinRunFontSize(text);
                         }
                     }
@@ -139,7 +145,8 @@ namespace AxiomOffice.Bridge
                     bool emptyPlaceholder = false;
                     try
                     {
-                        emptyPlaceholder = box.Chars == 0 && Convert.ToInt32(shape.Type) == 14;
+                        box.Type = Convert.ToInt32(shape.Type);
+                        emptyPlaceholder = box.Chars == 0 && box.Type == 14;
                     }
                     catch (Exception)
                     {
@@ -199,8 +206,13 @@ namespace AxiomOffice.Bridge
                         new Dictionary<string, object> { { "shapes", new[] { b.Name } } }));
                 }
                 double bottom = b.Top + Math.Max(b.Height, b.TextHeight);
-                if (b.Left < -LayoutTolerance || b.Top < -LayoutTolerance
-                    || b.Left + b.Width > slideWidth + LayoutTolerance || bottom > slideHeight + LayoutTolerance)
+                // Khung chữ: xét mép chữ thật theo chiều ngang (khung của mẫu có thể rộng quá mép slide).
+                bool textBounds = b.Chars > 0 && !double.IsNaN(b.TextLeft) && b.TextWidth > 0;
+                double left = textBounds ? b.TextLeft : b.Left;
+                double right = textBounds ? b.TextLeft + b.TextWidth : b.Left + b.Width;
+                if (!IsBackground(b, slideWidth, slideHeight)
+                    && (left < -LayoutTolerance || b.Top < -LayoutTolerance
+                        || right > slideWidth + LayoutTolerance || bottom > slideHeight + LayoutTolerance))
                 {
                     issues.Add(Issue("offslide",
                         "'" + b.Name + "' goes outside the slide (" + Math.Round(slideWidth) + "x" + Math.Round(slideHeight) + "pt)",
@@ -216,11 +228,30 @@ namespace AxiomOffice.Bridge
             // Shape nền phủ gần cả slide là chủ ý thiết kế: không tính là chồng.
             double slideArea = slideWidth * slideHeight;
             List<ShapeBox> content = boxes.Where(b => b.Width * b.Height < slideArea * 0.9).ToList();
+            var spilled = new HashSet<string>();
             for (int a = 0; a < content.Count; a++)
             {
                 for (int c = a + 1; c < content.Count; c++)
                 {
                     double overlap = OverlapArea(content[a], content[c]);
+                    LayeringKind layering = Layering(content[a], content[c], content, overlap);
+                    if (layering == LayeringKind.Intended)
+                    {
+                        continue;
+                    }
+                    if (layering == LayeringKind.Spill)
+                    {
+                        ShapeBox text = content[a].Chars > 0 ? content[a] : content[c];
+                        ShapeBox under = text == content[a] ? content[c] : content[a];
+                        if (spilled.Add(text.Name))
+                        {
+                            issues.Add(Issue("overflow",
+                                "text of '" + text.Name + "' runs out of '" + under.Name + "', the shape it sits on: shorten the text "
+                                + "(maxChars of the slot in ppt_profile kinds) or move details to notes; keep fontSize at the design size",
+                                new Dictionary<string, object> { { "shapes", new[] { text.Name, under.Name } } }));
+                        }
+                        continue;
+                    }
                     double smaller = Math.Min(content[a].Width * content[a].Height, content[c].Width * content[c].Height);
                     if (smaller > 0 && overlap > smaller * 0.1)
                     {
@@ -235,6 +266,56 @@ namespace AxiomOffice.Bridge
                 issues.Add(Issue("dense", "the slide has " + totalChars + " characters; keep one message per slide and move details to notes (wpp.setNotes)"));
             }
             return issues;
+        }
+
+        // Ảnh nền của mẫu (logo, dải màu) phủ gần cả slide, có thể lệch vài pt ra ngoài mép: không phải lỗi.
+        private static bool IsBackground(ShapeBox b, double slideWidth, double slideHeight)
+        {
+            return b.Type == 13 && b.Chars == 0 && b.Width * b.Height >= slideWidth * slideHeight * 0.9;
+        }
+
+        // Hình trang trí không chữ (hình vẽ, đường, textbox rỗng).
+        private static bool IsDecoration(ShapeBox b)
+        {
+            return b.Chars == 0 && (b.Type == 1 || b.Type == 5 || b.Type == 9 || b.Type == 17);
+        }
+
+        private enum LayeringKind
+        {
+            Overlap,
+            Intended,
+            Spill
+        }
+
+        // Chồng có chủ ý của mẫu (đo trên mẫu trường 13/10/2026: mỗi mục I/II/III = ô màu + bóng xám + vòng tròn
+        // + hai khung chữ đặt trên): hai hình trang trí chồng nhau, hoặc khung chữ nằm GỌN trong một hình trang trí
+        // nào đó (nhãn - chồng lên hình trang trí khác bên cạnh cũng là chủ ý). Khung chữ đè phần lớn lên hình
+        // trang trí mà không còn gọn trong hình nào = chữ dài làm khung giãn ra khỏi ô màu (Spill).
+        private static LayeringKind Layering(ShapeBox a, ShapeBox b, IList<ShapeBox> all, double overlap)
+        {
+            if (IsDecoration(a) && IsDecoration(b))
+            {
+                return LayeringKind.Intended;
+            }
+            ShapeBox decoration = IsDecoration(a) ? a : (IsDecoration(b) ? b : null);
+            ShapeBox text = decoration == a ? b : a;
+            if (decoration == null || text.Chars == 0)
+            {
+                return LayeringKind.Overlap;
+            }
+            if (all.Any(d => IsDecoration(d) && Contains(d, text)))
+            {
+                return LayeringKind.Intended;
+            }
+            return overlap >= 0.5 * text.Width * Math.Max(text.Height, text.TextHeight) ? LayeringKind.Spill : LayeringKind.Overlap;
+        }
+
+        private static bool Contains(ShapeBox outer, ShapeBox inner)
+        {
+            double innerBottom = inner.Top + Math.Max(inner.Height, inner.TextHeight);
+            return inner.Left >= outer.Left - LayoutTolerance && inner.Top >= outer.Top - LayoutTolerance
+                && inner.Left + inner.Width <= outer.Left + outer.Width + LayoutTolerance
+                && innerBottom <= outer.Top + outer.Height + LayoutTolerance;
         }
 
         private static double OverlapArea(ShapeBox a, ShapeBox b)

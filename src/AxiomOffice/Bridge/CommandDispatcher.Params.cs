@@ -532,11 +532,15 @@ namespace AxiomOffice.Bridge
             }
         }
 
-        private static Dictionary<string, object> SaveDocument(IAppHost host, string kind, string path)
+        private static Dictionary<string, object> SaveDocument(IAppHost host, string kind, string path, string presentation = null)
         {
             dynamic app = host.Application;
             dynamic target;
-            if (kind == "wps")
+            if (kind == "wpp" && !string.IsNullOrWhiteSpace(presentation))
+            {
+                target = TargetPresentation(app, new Dictionary<string, object> { { "presentation", presentation } });
+            }
+            else if (kind == "wps")
             {
                 target = app.ActiveDocument;
             }

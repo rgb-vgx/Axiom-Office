@@ -584,7 +584,8 @@ command("et.checkRange", "et", range_report,
         "(chỉ khi không truyền range)", opt("range", "default: the used range"), opt("sheet"), agent=True)
 command("wpp.checkLayout", "wpp", layout_report,
         "Soát bố cục slide (chỉ đọc): chữ tràn khung, shape ra ngoài slide, shape chồng nhau, chữ quá nhỏ",
-        opt("slide", "slide number; default: every slide"), agent=True)
+        opt("slide", "slide number; default: every slide"),
+        opt("presentation", "full path of the presentation to work on; default: the active one"), agent=True)
 
 
 # ----------------------------------------------------------------------------------------------

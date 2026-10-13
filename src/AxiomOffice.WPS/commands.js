@@ -285,7 +285,7 @@
       params: [{ name: "path", required: true, hint: null }] },
     { name: "wpp.listSlides", kind: "wpp", agent: true,
       summary: "Số slide + text từng slide",
-      params: [] },
+      params: [{ name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }] },
     { name: "wpp.addSlide", kind: "wpp", agent: true,
       summary: "Thêm slide cuối; `layout` mặc định 12 = trống (1 = tiêu đề, 2 = tiêu đề + nội dung, 11 = chỉ tiêu đề)",
       params: [{ name: "layout", required: false, hint: "number: 1 title, 2 title+content, 11 title only, 12 blank" }] },
@@ -301,7 +301,8 @@
         { name: "fontSize", required: false, hint: null },
         { name: "bold", required: false, hint: null },
         { name: "color", required: false, hint: null },
-        { name: "align", required: false, hint: null }
+        { name: "align", required: false, hint: null },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
       ] },
     { name: "wpp.addTextBox", kind: "wpp", agent: false,
       summary: "Textbox",
@@ -339,7 +340,8 @@
       summary: "Ghi chú thuyết trình",
       params: [
         { name: "text", required: true, hint: null },
-        { name: "slide", required: false, hint: null }
+        { name: "slide", required: false, hint: null },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
       ] },
     { name: "wpp.deleteSlide", kind: "wpp", agent: true,
       summary: "Xoá slide (mặc định slide cuối)",
@@ -349,10 +351,80 @@
       params: [{ name: "path", required: true, hint: null }] },
     { name: "wpp.save", kind: "wpp", agent: true,
       summary: "Lưu",
-      params: [] },
+      params: [{ name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }] },
     { name: "wpp.saveAs", kind: "wpp", agent: true,
       summary: "Lưu thành file mới",
       params: [{ name: "path", required: true, hint: null }] },
+    { name: "wpp.newFromTemplate", kind: "wpp", agent: true,
+      summary: "Tạo bài MỚI từ tệp mẫu (.pptx/.potx): giữ khổ + master, bỏ hết slide mẫu, lưu ở `path` và mở ra",
+      params: [
+        { name: "template", required: true, hint: "path of the template file" },
+        { name: "path", required: true, hint: "new .pptx to create; must not exist" }
+      ] },
+    { name: "wpp.addSlideFromTemplate", kind: "wpp", agent: true,
+      summary: "Chèn bản sao slide số `kind` của tệp mẫu (giữ ảnh nền, khung chữ, định dạng); trả tên các khung chữ",
+      params: [
+        { name: "template", required: true, hint: null },
+        { name: "kind", required: true, hint: "slide number in the template (kinds of ppt_profile)" },
+        { name: "slide", required: false, hint: "insert after this slide; default: at the end" },
+        { name: "tag", required: false, hint: "source slide number; a slide already tagged so is replaced in place" },
+        { name: "expect", required: false, hint: "shape name the inserted slide must have (checks it is the template slide)" },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
+      ] },
+    { name: "wpp.sourceManifest", kind: "wpp", agent: true,
+      summary: "Đọc bài nguồn (vd bài cũ .ppt) theo slide: tiêu đề, chữ, danh sách ảnh - để dựng lại theo mẫu",
+      params: [
+        { name: "from", required: true, hint: "path of the source presentation" },
+        { name: "first", required: false, hint: null },
+        { name: "last", required: false, hint: null }
+      ] },
+    { name: "wpp.setShapeText", kind: "wpp", agent: true,
+      summary: "Thay chữ của một khung theo TÊN shape, giữ định dạng của khung (font, cỡ, màu)",
+      params: [
+        { name: "shape", required: true, hint: "shape name, e.g. 'TextBox 2'" },
+        { name: "text", required: true, hint: "\\n = new paragraph" },
+        { name: "slide", required: false, hint: null },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
+      ] },
+    { name: "wpp.deleteShapes", kind: "wpp", agent: true,
+      summary: "Xoá các shape theo tên (mục lặp thừa của slide mẫu); không xoá ảnh nền",
+      params: [
+        { name: "shapes", required: true, hint: "array of shape names" },
+        { name: "slide", required: false, hint: null },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
+      ] },
+    { name: "wpp.copyPicture", kind: "wpp", agent: true,
+      summary: "Chép ảnh từ slide của bài khác (vd bài cũ) vào slide của bài đang làm, co vừa khung, giữ tỉ lệ",
+      params: [
+        { name: "from", required: true, hint: "path of the source presentation" },
+        { name: "fromSlide", required: true, hint: null },
+        { name: "shape", required: false, hint: "picture name; default: largest picture" },
+        { name: "slide", required: false, hint: null },
+        { name: "left", required: false, hint: null },
+        { name: "top", required: false, hint: null },
+        { name: "width", required: false, hint: null },
+        { name: "height", required: false, hint: null },
+        { name: "overlays", required: false, hint: "true: also copy the labels/arrows drawn over the picture" },
+        { name: "format", required: false, hint: "png (default) or jpg (much smaller for photos and scans)" },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
+      ] },
+    { name: "wpp.addParagraphs", kind: "wpp", agent: false,
+      summary: "Khung chữ nhiều đoạn giữ phân cấp (cấp thụt lề, đậm, nghiêng, số thứ tự, gạch đầu dòng); tự chọn cỡ chữ lớn nhất vừa khung",
+      params: [
+        { name: "paragraphs", required: true, hint: "array of {t: text, l: level 1-5, b: bold, i: italic, n: number prefix like '1.', u: bullet}" },
+        { name: "slide", required: false, hint: null },
+        { name: "left", required: false, hint: null },
+        { name: "top", required: false, hint: null },
+        { name: "width", required: false, hint: null },
+        { name: "height", required: false, hint: null },
+        { name: "fontSize", required: false, hint: "largest size to try (default 24)" },
+        { name: "minFontSize", required: false, hint: "smallest size (default 16)" },
+        { name: "color", required: false, hint: "#RRGGBB body text" },
+        { name: "accent", required: false, hint: "#RRGGBB bold (heading) paragraphs" },
+        { name: "font", required: false, hint: "font name" },
+        { name: "anchor", required: false, hint: "top (default) or middle" },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
+      ] },
     { name: "wpp.closeAll", kind: "wpp", agent: false,
       summary: "**Đóng mọi bài trình bày, không lưu**",
       params: [] },
@@ -367,7 +439,10 @@
       ] },
     { name: "wpp.checkLayout", kind: "wpp", agent: true,
       summary: "Soát bố cục slide (chỉ đọc): chữ tràn khung, shape ra ngoài slide, shape chồng nhau, chữ quá nhỏ",
-      params: [{ name: "slide", required: false, hint: "slide number; default: every slide" }] },
+      params: [
+        { name: "slide", required: false, hint: "slide number; default: every slide" },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
+      ] },
   ];
   // --- END SINH TU DONG ---
 

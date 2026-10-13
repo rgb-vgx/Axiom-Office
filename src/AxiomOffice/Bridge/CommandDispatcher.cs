@@ -23,6 +23,7 @@ namespace AxiomOffice.Bridge
             .Concat(WriterCommands())
             .Concat(SpreadsheetCommands())
             .Concat(PresentationCommands())
+            .Concat(TemplateCommands())
             .Concat(CheckCommands())
             .ToArray();
 
