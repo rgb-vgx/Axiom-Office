@@ -242,6 +242,7 @@ func TestRunAgentKeepsGoingWhenFailureChanges(t *testing.T) {
 	attempt := 0
 	options := DefaultAgentOptions()
 	options.MaxRounds = 6
+	options.MaxIdenticalCalls = 0 // cung doi so moi vong: thu bo dem loi lap, khong thu bo chan goi y het
 	result := client.RunAgent(context.Background(), "s", nil, "u", mutatingTools(),
 		func(ctx context.Context, call ToolCall) ToolResult {
 			attempt++

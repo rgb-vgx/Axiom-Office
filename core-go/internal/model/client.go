@@ -42,6 +42,13 @@ const (
 	// lenh that, khong phai tu hoi lai suy nghi - model tu danh gia bang tri nho thi luon thay dung.
 	// Gioi han 11/10/2026 (log sheet ADT cua nguoi dung): chi thu doi-dat-lai voi o do luot nay tao,
 	// khong bao gio ghi vao o nguoi dung da co du lieu truoc luot.
+	// BudgetEconomyNudge / BudgetFinalNudge: ngan sach token cua luot da dung 80% / 90% (AgentOptions.MaxTokens).
+	// Tu van ChatGPT 13/10/2026: cat cung o 100% lam mat cau tra loi du viec da xong; o 90% tat tool de model chi con
+	// viet cau tra loi cuoi.
+	BudgetEconomyNudge = "Note: this request has used most of its token budget. Do only what is still missing for " +
+		"the user's request; do not re-read or re-check work that is already done."
+	BudgetFinalNudge = "The token budget of this request is almost used up, so tools are now off. Answer the user " +
+		"now: say what was done, what (if anything) is still missing, and how to continue."
 	VerifyWorkNudge = "Before you finish: check the work you just did. Read the document back with the " +
 		"actions available to you (for example et.readRange or et.checkRange, et.listSheets, writer.getText " +
 		"or writer.checkTables, wpp.listSlides or wpp.checkLayout) and compare what is really there with what " +

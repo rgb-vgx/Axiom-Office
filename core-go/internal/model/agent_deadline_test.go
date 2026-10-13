@@ -23,6 +23,7 @@ func TestRunAgentEnforcesDeadline(t *testing.T) {
 	client := NewClient(server.Client(), "openai", server.URL, "", "m")
 	options := DefaultAgentOptions()
 	options.Deadline = 2 * time.Second
+	options.MaxIdenticalCalls = 0 // server gia lap lai mot tool call y het: thu dong ho, khong thu bo chan lap
 	result := client.RunAgent(context.Background(), "s", nil, "u",
 		[]Tool{{Name: "t", Description: "d", Parameters: json.RawMessage(`{"type":"object"}`)}},
 		func(ctx context.Context, call ToolCall) ToolResult {

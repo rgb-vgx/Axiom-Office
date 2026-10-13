@@ -108,14 +108,20 @@ func ParseRequest(body map[string]any) (*Request, string) {
 		App:            textOf(off["app"]),
 		Family:         textOf(off["family"]),
 		Document:       document,
-		Options: model.AgentOptions{
-			MaxRounds: maxRounds, MaxTokens: maxTokens,
-			Deadline:          time.Duration(maxSeconds) * time.Second,
-			MaxResponseTokens: model.DefaultMaxResponseTokens,
-		},
-		Interactive: interactive,
-		Plan:        mode == "plan",
+		Options:        requestOptions(maxRounds, maxTokens, maxSeconds),
+		Interactive:    interactive,
+		Plan:           mode == "plan",
 	}, ""
+}
+
+// requestOptions: tuy chon cua luot = DefaultAgentOptions + gioi han ben goi gui. Truoc 13/10/2026 toi dung
+// AgentOptions tu so 0 nen ba co che chong lam thua (don ket qua tool cu, chan lenh y het, dung khi lap mot loi)
+// chi chay trong test, luot that khong co.
+func requestOptions(maxRounds, maxTokens, maxSeconds int) model.AgentOptions {
+	options := model.DefaultAgentOptions()
+	options.MaxRounds, options.MaxTokens = maxRounds, maxTokens
+	options.Deadline = time.Duration(maxSeconds) * time.Second
+	return options
 }
 
 // Orchestrator: chay mot luot agent (New_arch.md muc 8.1) - dung prompt, goi model, chay tool qua bridge,

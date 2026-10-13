@@ -39,6 +39,15 @@ type AgentOptions struct {
 	// roi tra loi thi phai co nguoi nhac moi chay tiep. Cac lenh doc lai da co san tu truoc
 	// (et.checkRange, writer.checkTables, wpp.checkLayout) nhung khong ai buoc model dung chung.
 	Verify bool
+
+	// MaxIdenticalCalls: lan goi thu (n+1) Y HET (cung tool, cung doi so) trong mot luot bi chan, khong chay -
+	// ca khi cac lan truoc thanh cong (doc lai cung mot thu, sua cung mot cho). 0 = khong chan.
+	MaxIdenticalCalls int
+	// ContextClearAt: dau vao cua mot vong vuot so token nay thi thay ket qua tool cu bang mot dong tom tat, chi giu
+	// ContextKeepResults ket qua gan nhat (Anthropic context editing / LangChain ClearToolUsesEdit). Chi don khi thu
+	// hoi duoc it nhat contextClearMinChars ky tu - don lam hong cache tien to mot lan nen phai dang. 0 = tat.
+	ContextClearAt     int
+	ContextKeepResults int
 }
 
 func DefaultAgentOptions() AgentOptions {
@@ -47,8 +56,22 @@ func DefaultAgentOptions() AgentOptions {
 		MaxResponseTokens:    DefaultMaxResponseTokens,
 		Verify:               true,
 		MaxIdenticalFailures: DefaultMaxIdenticalFailures,
+		MaxIdenticalCalls:    DefaultMaxIdenticalCalls,
+		ContextClearAt:       DefaultContextClearAt,
+		ContextKeepResults:   DefaultContextKeepResults,
 	}
 }
+
+const (
+	DefaultMaxIdenticalCalls  = 4
+	DefaultContextClearAt     = 40_000
+	DefaultContextKeepResults = 3
+	// contextClearMinChars: ~10k token - don it hon thi khong bu duoc cache bi hong.
+	contextClearMinChars = 40_000
+	// budgetEconomyShare / budgetFinalShare: phan ngan sach (MaxTokens) bat dau tiet kiem / tat tool.
+	budgetEconomyShare = 0.8
+	budgetFinalShare   = 0.9
+)
 
 // DefaultMaxIdenticalFailures: so vong lap lai y het mot tool call hong truoc khi dung luot chay.
 const DefaultMaxIdenticalFailures = 3
@@ -100,7 +123,8 @@ func (r AgentResult) BillableTokens() int {
 // Executor chay mot tool. Loi (panic) cua tool khong lam hong luot chay: tra ve model de no tu xu ly.
 type Executor func(ctx context.Context, call ToolCall) ToolResult
 
-// RunAgent: goi model, chay tool model yeu cau, lap toi khi model tra loi xong (ModelClient.RunAgentAsync).
+// RunAgent: goi model, chay tool model yeu cau, lap toi khi model tra loi xong (ModelClient.RunAgentAsync). Cac co
+// che chan/nhac/cuu (tu kiem chung, ngan sach, don ngu canh, model du phong...) nam trong guards.go.
 func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []ConversationTurn, userPrompt string,
 	tools []Tool, execute Executor, options AgentOptions, callbacks AgentCallbacks) AgentResult {
 	started := time.Now()
@@ -145,21 +169,20 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 		return done(false, "", fmt.Sprintf("agent timed out after %.0fs", options.Deadline.Seconds()), "timeout")
 	}
 
-	turns := make([]Message, 0, len(prior)+1)
+	loop := &agentLoop{client: c, options: options, callbacks: callbacks, result: &result, systemPrompt: systemPrompt,
+		toolsEnabled: len(tools) > 0, model: c.Model, addLine: addLine}
+	loop.turns = make([]Message, 0, len(prior)+1)
 	for _, turn := range prior {
-		turns = append(turns, map[string]any{"role": turn.Role, "content": turn.Content})
+		loop.turns = append(loop.turns, map[string]any{"role": turn.Role, "content": turn.Content})
 	}
-	turns = append(turns, map[string]any{"role": "user", "content": userPrompt})
+	loop.say(userPrompt)
+	guards := newGuards(options)
+	finish := func(decision *verdict) AgentResult {
+		return done(decision.ok, decision.text, decision.err, decision.kind)
+	}
 
-	toolsEnabled := len(tools) > 0
-	nudged, truncated := false, false
-	// mutated: luot nay da sua tai lieu chua; verified: da yeu cau tu kiem chung chua. Moi luot chi
-	// kiem chung MOT lan - du de bat loi that, khong du de quay vong vo tan.
-	mutated, verified := false, false
-	// Chan vong lap: chu ky cua vong truoc va so vong lien tiep lap lai y het.
-	identicalFailures, lastFailure := 0, ""
 	for options.MaxRounds <= 0 || result.Rounds < options.MaxRounds {
-		result.ToolsDisabled = !toolsEnabled
+		result.ToolsDisabled = !loop.toolsEnabled
 		if runCtx.Err() != nil {
 			return stopped()
 		}
@@ -168,83 +191,40 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 			callbacks.RoundStarted(result.Rounds)
 		}
 
-		body := c.Codec.BuildRequest(c.Model, systemPrompt, turns, tools, toolsEnabled, options.MaxResponseTokens)
-		responseText, errText, status := c.post(runCtx, ctx, body, c.Stream)
-		if responseText == nil {
+		turn, failure := loop.ask(runCtx, ctx, tools)
+		if failure == nil {
+			result.InputTokens += turn.InputTokens
+			result.OutputTokens += turn.OutputTokens
+			result.CachedTokens += turn.CachedTokens
+			if turn.Reasoning != "" && callbacks.Reasoning != nil {
+				callbacks.Reasoning(result.Rounds, turn.Reasoning)
+			}
+			if len(turn.ToolCalls) == 0 {
+				reply := StripThoughts(turn.Text)
+				decision := guards.onReply(loop, turn, reply)
+				if decision == nil {
+					return done(true, reply, "", "")
+				}
+				if decision.next {
+					continue
+				}
+				if decision.failure == nil {
+					return finish(decision)
+				}
+				failure = decision.failure
+			}
+		}
+		if failure != nil {
 			if runCtx.Err() != nil {
 				return stopped()
 			}
-			if toolsEnabled && errText != "" && c.Codec.IsToolUnsupported(errText) {
-				// Provider khong ho tro tools: tat tools va chay nhu chat thuong.
-				toolsEnabled = false
-				addLine("(provider khong ho tro tools - chay che do thuong)")
+			if guards.recover(loop, failure) {
 				continue
 			}
-			detail := Truncate(errText, 300)
-			if status > 0 {
-				detail = fmt.Sprintf("HTTP %d: %s", status, detail)
-			}
-			return done(false, "", detail, "provider")
+			return done(false, "", failure.detail, "provider")
 		}
 
-		// Luot agent gui stream: true, nen body thuong la SSE; ParseStream tu roi ve Parse khi may
-		// chu bo qua stream va tra JSON mot cuc.
-		turn, parseError := c.Codec.ParseStream(responseText)
-		if turn == nil {
-			return done(false, "", parseError, "provider")
-		}
-		result.InputTokens += turn.InputTokens
-		result.OutputTokens += turn.OutputTokens
-		result.CachedTokens += turn.CachedTokens
-		if turn.Reasoning != "" && callbacks.Reasoning != nil {
-			callbacks.Reasoning(result.Rounds, turn.Reasoning)
-		}
-
-		if len(turn.ToolCalls) == 0 {
-			reply := StripThoughts(turn.Text)
-			if strings.TrimSpace(reply) == "" && !nudged {
-				// Model free doi khi tra loi rong giua chung: nhac mot lan de no lam tiep hoac tom tat.
-				nudged = true
-				addLine("(model tra loi rong - nhac lam tiep)")
-				turns = append(turns, map[string]any{"role": "user", "content": EmptyReplyNudge})
-				continue
-			}
-			if strings.TrimSpace(reply) == "" {
-				// Bi cat ngang vi het ngan sach token cua CHINH phan hoi nay: nhac viet nho lai roi lam
-				// tiep, thay vi nem di ca luot chay da lam duoc nhieu. Chi thu mot lan.
-				if turn.FinishReason == "length" && !truncated {
-					truncated = true
-					addLine("(phan hoi bi cat vi het ngan sach token - nhac viet nho lai)")
-					turns = append(turns, map[string]any{"role": "user", "content": TruncatedReplyNudge})
-					continue
-				}
-				// Kem ly do may chu dung lai: finish_reason=length nghia la model dot het ngan sach
-				// token vao phan suy luan truoc khi viet duoc gi - thuong gap voi model reasoning.
-				detail := "provider returned an empty reply"
-				if turn.FinishReason != "" {
-					detail += " (finish_reason=" + turn.FinishReason
-					if turn.FinishReason == "length" {
-						detail += " - model het ngan sach token truoc khi tra loi)"
-					} else {
-						detail += ")"
-					}
-				}
-				return done(false, "", detail, "provider")
-			}
-			// Luot nay da sua tai lieu ma chua doc lai lan nao: bat model tu kiem chung truoc khi
-			// ket thuc. Day la khac biet do duoc giua cac bo khung chay cung mot prompt - xem
-			// AgentOptions.Verify. Cau tra loi hien tai duoc giu lai lam ban nhap de model doi chieu.
-			if options.Verify && mutated && !verified {
-				verified, result.Verified = true, true
-				addLine("(sua tai lieu - yeu cau tu kiem chung truoc khi ket thuc)")
-				turns = c.Codec.AppendAssistant(turns, turn)
-				turns = append(turns, map[string]any{"role": "user", "content": VerifyWorkNudge})
-				continue
-			}
-			return done(true, reply, "", "")
-		}
-
-		turns = c.Codec.AppendAssistant(turns, turn)
+		loop.turns = c.Codec.AppendAssistant(loop.turns, turn)
 		results := make([]ToolResult, 0, len(turn.ToolCalls))
 		for _, call := range turn.ToolCalls {
 			if runCtx.Err() != nil {
@@ -254,44 +234,49 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 				callbacks.ToolStarted(call)
 			}
 			toolStarted := time.Now()
-			toolResult := safeExecute(runCtx, execute, call)
-			toolResult.Ms = time.Since(toolStarted).Milliseconds()
-			if toolResult.Mutating {
-				mutated = true
+			var toolResult ToolResult
+			if replaced := guards.beforeCall(loop, call); replaced != nil {
+				toolResult = *replaced
+			} else {
+				toolResult = safeExecute(runCtx, execute, call)
 			}
+			toolResult.Ms = time.Since(toolStarted).Milliseconds()
 			results = append(results, toolResult)
 			if callbacks.ToolFinished != nil {
 				callbacks.ToolFinished(toolResult)
 			}
 			addLine(call.Name + " " + Truncate(call.Arguments, 150) + " -> " + Truncate(toolResult.ResultJSON, 150))
 		}
-		turns = c.Codec.AppendToolResults(turns, results)
-
-		// Chan vong lap vo ich: model lap lai Y HET mot tool call da hong thi dung han, thay vi de no
-		// dot het ngan sach (do ngay 02/10/2026: 90 lan goi cung mot lenh cung mot loi).
-		if signature := failureSignature(turn.ToolCalls, results); signature == "" {
-			identicalFailures, lastFailure = 0, ""
-		} else if signature == lastFailure {
-			identicalFailures++
-		} else {
-			identicalFailures, lastFailure = 1, signature
-		}
-		if options.MaxIdenticalFailures > 0 && identicalFailures >= options.MaxIdenticalFailures {
-			call := turn.ToolCalls[0]
-			return done(false, "", fmt.Sprintf("the model repeated the same failing call %d times in a row "+
-				"(%s: %s) - stopping instead of repeating", identicalFailures, call.Name,
-				Truncate(results[0].ResultJSON, 200)), "internal")
-		}
-
-		if billable := result.BillableTokens(); options.MaxTokens > 0 && billable > options.MaxTokens {
-			result.Stopped = true
-			return done(false, "", fmt.Sprintf("token budget exceeded (billable %d > %d; raw %d with %d from cache)",
-				billable, options.MaxTokens, result.InputTokens+result.OutputTokens, result.CachedTokens), "provider")
+		loop.turns = c.Codec.AppendToolResults(loop.turns, results)
+		if decision := guards.afterTools(loop, turn, results); decision != nil && decision.end {
+			return finish(decision)
 		}
 	}
 
 	// Chi xay ra khi ben goi tu dat gioi han vong: bao chua xong, khong gia lam cau tra loi.
 	return done(false, "", fmt.Sprintf("agent stopped after %d rounds without a final answer", options.MaxRounds), "provider")
+}
+
+// ask: goi model dang dung (loop.model) mot lan. Loi -> modelFailure de chuoi guard quyet dinh (goi lai sau khi don
+// ngu canh, chuyen model du phong, hay dung luot).
+func (l *agentLoop) ask(runCtx, userCtx context.Context, tools []Tool) (*Turn, *modelFailure) {
+	c := l.client
+	body := c.Codec.BuildRequest(l.model, l.systemPrompt, l.turns, tools, l.toolsEnabled, l.options.MaxResponseTokens)
+	responseText, errText, status := c.post(runCtx, userCtx, body, c.Stream)
+	if responseText == nil {
+		detail := Truncate(errText, 300)
+		if status > 0 {
+			detail = fmt.Sprintf("HTTP %d: %s", status, detail)
+		}
+		return nil, &modelFailure{detail: detail, errText: errText, status: status}
+	}
+	// Luot agent gui stream: true, nen body thuong la SSE; ParseStream tu roi ve Parse khi may
+	// chu bo qua stream va tra JSON mot cuc.
+	turn, parseError := c.Codec.ParseStream(responseText)
+	if turn == nil {
+		return nil, &modelFailure{detail: parseError, empty: true}
+	}
+	return turn, nil
 }
 
 // failureSignature: chu ky cua mot vong CHI toan loi - rong khi co it nhat mot tool chay duoc.
@@ -322,4 +307,62 @@ func safeExecute(ctx context.Context, execute Executor, call ToolCall) (result T
 		}
 	}()
 	return execute(ctx, call)
+}
+
+// clearedToolResult: noi dung thay cho ket qua tool cu da don.
+const clearedToolResult = `{"cleared":true,"note":"older tool result removed to keep the context small; call the tool again if you still need it"}`
+
+// clearOldToolResults: thay noi dung moi ket qua tool tru keep cai gan nhat bang clearedToolResult, NEU tong so ky
+// tu thu hoi >= minChars (khong thi de nguyen - don it khong bu duoc cache bi hong). Hieu ca hai dang: OpenAI
+// ({"role":"tool","content":"..."}) va Anthropic (tin user co khoi tool_result). Tra so ky tu da thu hoi.
+func clearOldToolResults(turns []Message, keep, minChars int) int {
+	type slot struct {
+		holder map[string]any
+		size   int
+	}
+	slots := []slot{}
+	for _, message := range turns {
+		turn, ok := message.(map[string]any)
+		if !ok {
+			continue
+		}
+		if turn["role"] == "tool" {
+			if text, ok := turn["content"].(string); ok && text != clearedToolResult {
+				slots = append(slots, slot{turn, len(text)})
+			}
+			continue
+		}
+		blocks, ok := turn["content"].([]any)
+		if !ok {
+			continue
+		}
+		for _, block := range blocks {
+			entry, ok := block.(map[string]any)
+			if !ok || entry["type"] != "tool_result" {
+				continue
+			}
+			if text, ok := entry["content"].(string); ok {
+				if text != clearedToolResult {
+					slots = append(slots, slot{entry, len(text)})
+				}
+				continue
+			}
+			slots = append(slots, slot{entry, len(fmt.Sprint(entry["content"]))})
+		}
+	}
+	if len(slots) <= keep {
+		return 0
+	}
+	old := slots[:len(slots)-keep]
+	reclaim := 0
+	for _, item := range old {
+		reclaim += item.size - len(clearedToolResult)
+	}
+	if reclaim < minChars {
+		return 0
+	}
+	for _, item := range old {
+		item.holder["content"] = clearedToolResult
+	}
+	return reclaim
 }

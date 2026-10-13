@@ -5,6 +5,23 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Chống agent làm thừa sau khi xong, ngân sách 3 mức (13/10/2026)
+Lượt thật Y4.5-ĐM.14 (95 slide) hết trần 200k token dù việc xong ở vòng 5. Theo tư vấn ChatGPT (OpenAI Agents SDK
+`StopAtTools`, Anthropic context editing, LangChain `ContextEditingMiddleware`/`ToolCallLimitMiddleware`):
+- **Tool báo xong → kết thúc lượt** (`ToolResult.Final`): `slides_from_template` dựng đủ mọi slide nguồn, không lỗi, đã
+  lưu → Core trả câu trả lời do nó viết, không gọi model thêm
+- **Ngân sách 3 mức**: 80% nhắc chỉ làm phần còn thiếu; 90% tắt tool, buộc trả lời; 100% dừng như cũ
+- **Dọn ngữ cảnh**: đầu vào một vòng > 40k token thì thay kết quả tool cũ bằng dòng tóm tắt (giữ 3 kết quả gần nhất,
+  chỉ khi thu hồi ≥ ~10k token); `wpp.sourceManifest` cho model được cắt gọn khi lớn
+- **Hạn mức theo lệnh mỗi lượt** (`tools.CallLimits`: đọc bài nguồn 3, `web_search` 5, `setNotes`/`checkLayout` 20…)
+  và **chặn lần gọi y hệt thứ 5**
+- Test: `model/agent_guard_test.go`, `TestCallLimitsStopRepeatedReads`, `slides_from_template` báo `Final`
+- Lượt thật sau khi cài: 6 vòng, 79 s, tự kết thúc sau lô cuối (trước: 29 vòng, 8,5 phút, hết ngân sách). Câu cuối nói
+  rõ dựng mới / có sẵn bao nhiêu; mọi slide đã có sẵn thì vẫn kết thúc dù không lưu
+- **Lệnh trình chiếu chỉ đích danh bài**: 9 lệnh `wpp.*` nhận `presentation` (đường dẫn, mặc định bài đang hoạt động);
+  `slides_from_template` luôn truyền bài mới. Lượt thật 17:04: người dùng bấm vào cửa sổ bài cũ (nơi có khung Axiom)
+  giữa lô → các lệnh sau trúng bài cũ (chốt "khác khổ" đã chặn). Câu cuối đếm đúng số slide dựng trong cả lượt
+
 ### Added — Dựng lại cả bài theo mẫu, từng lô: `slides_from_template` (13/10/2026)
 Theo tư vấn ChatGPT (docs/template-design.md §6.5): model chỉ viết những slide máy không tự quyết được.
 - **Tool Core `slides_from_template`** (`tools/template_build.go`, chỉ PowerPoint, không có trong plan mode): tự tạo/mở

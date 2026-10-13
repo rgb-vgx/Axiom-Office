@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"axiomoffice/core/internal/model"
 	"axiomoffice/core/internal/office"
 	"axiomoffice/core/internal/skills"
 	"axiomoffice/core/internal/store"
@@ -371,5 +372,23 @@ func TestDocumentSectionGivesFullPathOfSavedFile(t *testing.T) {
 	unsaved := DocumentSection(session, &DocumentContext{Name: "Presentation1", FullName: "Presentation1"})
 	if strings.Contains(unsaved, "full path") {
 		t.Fatalf("bai chua luu khong co duong dan: %s", unsaved)
+	}
+}
+
+// Luot that phai co cac co che chong lam thua (don ngu canh, chan lenh y het, dung khi lap loi): truoc 13/10/2026
+// ParseRequest dung AgentOptions tu so 0 nen chung chi chay trong test.
+func TestParseRequestKeepsAgentGuards(t *testing.T) {
+	request, problem := ParseRequest(map[string]any{"prompt": "x", "office": map[string]any{"port": float64(1)},
+		"options": map[string]any{"maxRounds": float64(7)}})
+	if problem != "" {
+		t.Fatal(problem)
+	}
+	options, defaults := request.Options, model.DefaultAgentOptions()
+	if options.ContextClearAt != defaults.ContextClearAt || options.MaxIdenticalCalls != defaults.MaxIdenticalCalls ||
+		options.MaxIdenticalFailures != defaults.MaxIdenticalFailures || options.ContextKeepResults == 0 {
+		t.Fatalf("thieu co che mac dinh: %+v", options)
+	}
+	if options.MaxRounds != 7 || options.MaxTokens != DefaultMaxTokens {
+		t.Fatalf("gioi han ben goi: %+v", options)
 	}
 }
