@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -96,6 +97,12 @@ type Client struct {
 	// (client song qua cac luot cho toi khi doi cau hinh, model.Source). Truoc day co nam trong bien cuc bo
 	// cua post() nen MOI request lai gui, bi 400, roi gui lai - moi luot mat them mot lan goi (log 13/10/2026).
 	thinkingRejected atomic.Bool
+
+	// ContextWindowOverride: cua so ngu canh nguoi dung khai (LlmContextWindow) - thang so GET /models khai. Can cho
+	// model chay may (Ollama, LM Studio) vi /models cua chung khong noi cua so dang dat.
+	ContextWindowOverride int
+	infoOnce              sync.Once
+	infos                 map[string]ModelInfo
 }
 
 func NewClient(httpClient *http.Client, provider, endpoint, apiKey, model string) *Client {
@@ -227,7 +234,9 @@ func (c *Client) post(ctx, userCtx context.Context, body map[string]any, stream 
 		}
 		// Nha cung cap khong biet tham so `thinking` (OpenAI that, vai gateway khac) -> bo no roi
 		// thu lai ngay, va tat han cho cac lan sau. Tu lanh, nguoi dung khong phai cau hinh gi.
-		if _, sent := body["thinking"]; text == nil && status == 400 && sent && !droppedThinking {
+		// Loi tran ngu canh cung la 400 nhung khong lien quan `thinking` - de contextOverflowGuard xu ly.
+		if _, sent := body["thinking"]; text == nil && status == 400 && sent && !droppedThinking &&
+			!IsContextOverflow(status, errText) {
 			droppedThinking = true
 			delete(body, "thinking")
 			if payload, err = json.Marshal(body); err == nil {

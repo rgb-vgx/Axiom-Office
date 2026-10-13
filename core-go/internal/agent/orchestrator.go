@@ -300,6 +300,10 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 				"round": round, "text": text, "model": client.Model,
 			})
 		},
+		ModelSwitched: func(from, to, reason string) {
+			corelog.Info("run %s: model %s failed (%s) - switching to fallback %s", run.ID, from, reason, to)
+			run.Events.Publish("run.model_switched", map[string]any{"from": from, "to": to, "reason": reason})
+		},
 		ToolStarted: func(call model.ToolCall) {
 			run.ToolCalls++
 			action, params := readCall(call)
@@ -343,6 +347,9 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 	// Tu kiem chung doc lai tu cau hinh moi luot (nhu VisualQaEnabled): doi trong Cai dat co hieu luc ngay.
 	options := request.Options
 	options.Verify = o.Config().VerifyWorkEnabled && !request.Plan
+	// Model du phong + cua so ngu canh (GET /models doc mot lan cho moi cau hinh LLM).
+	options.FallbackModels = o.Config().LlmFallbackModels
+	options.ContextWindow = client.ModelInfo(ctx, client.Model).ContextWindow
 
 	result := client.RunAgent(ctx, systemPrompt, assembled.PriorTurns, request.Prompt, registry.ModelTools(),
 		func(inner context.Context, call model.ToolCall) model.ToolResult {
@@ -365,7 +372,7 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 			"reply": result.Text, "rounds": result.Rounds, "seconds": round2(result.Seconds),
 			"inputTokens": result.InputTokens, "outputTokens": result.OutputTokens,
 			"cachedTokens": result.CachedTokens, "billableTokens": result.BillableTokens(),
-			"verified": result.Verified,
+			"verified": result.Verified, "model": result.Model,
 		})
 	case result.Cancelled:
 		run.Status = StatusCancelled

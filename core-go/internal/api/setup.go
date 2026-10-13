@@ -227,6 +227,8 @@ func currentJSON(cfg config.Config) map[string]any {
 		"visualQaEnabled":   cfg.VisualQaEnabled,
 		"verifyWorkEnabled": cfg.VerifyWorkEnabled,
 		"llmShowReasoning":  cfg.LlmShowReasoning,
+		"fallbackModels":    cfg.LlmFallbackModels,
+		"contextWindow":     cfg.LlmContextWindow,
 		"tokenSet":          cfg.Token != "",
 		"configured":        cfg.LlmEndpoint != "" && cfg.LlmModel != "",
 	}

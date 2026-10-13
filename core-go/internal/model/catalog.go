@@ -97,7 +97,8 @@ func NewSource(httpClient *http.Client, load func() config.Config) *Source {
 func (s *Source) Current() *Client {
 	cfg := s.load()
 	signature := strings.Join([]string{cfg.LlmProvider, cfg.LlmEndpoint, cfg.LlmModel, cfg.LlmApiKey,
-		fmt.Sprint(cfg.LlmRequestTimeoutSeconds), fmt.Sprint(cfg.LlmShowReasoning)}, "\n")
+		fmt.Sprint(cfg.LlmRequestTimeoutSeconds), fmt.Sprint(cfg.LlmShowReasoning),
+		fmt.Sprint(cfg.LlmContextWindow)}, "\n")
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.current == nil || signature != s.signature {
@@ -109,6 +110,7 @@ func (s *Source) Current() *Client {
 			client.RequestTimeout = time.Duration(cfg.LlmRequestTimeoutSeconds) * time.Second
 		}
 		client.ShowReasoning = cfg.LlmShowReasoning
+		client.ContextWindowOverride = cfg.LlmContextWindow
 		s.current, s.signature = client, signature
 	}
 	return s.current

@@ -1,7 +1,9 @@
 package model
 
 import (
+	"context"
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -92,7 +94,10 @@ func newGuards(options AgentOptions) guardChain {
 	if options.MaxTokens > 0 {
 		chain = append(chain, &budgetGuard{})
 	}
-	chain = append(chain, toolsUnsupportedGuard{})
+	chain = append(chain, toolsUnsupportedGuard{}, &contextOverflowGuard{})
+	if len(options.FallbackModels) > 0 {
+		chain = append(chain, &fallbackGuard{})
+	}
 	return chain
 }
 
@@ -303,4 +308,89 @@ func (toolsUnsupportedGuard) recover(loop *agentLoop, failure *modelFailure) boo
 	loop.toolsEnabled = false
 	loop.addLine("(provider khong ho tro tools - chay che do thuong)")
 	return true
+}
+
+// contextOverflowGuard: nha cung cap bao vuot cua so ngu canh -> don manh ket qua tool cu (chi giu ket qua gan nhat)
+// roi goi lai, thay vi bo ca luot da lam duoc nhieu (LangChain SummarizationMiddleware bat ContextOverflowError).
+// Toi da maxOverflowRecoveries lan moi luot; khong con gi de don thi de guard sau (model du phong) xu ly.
+type contextOverflowGuard struct{ used int }
+
+const maxOverflowRecoveries = 2
+
+func (g *contextOverflowGuard) recover(loop *agentLoop, failure *modelFailure) bool {
+	if g.used >= maxOverflowRecoveries || !IsContextOverflow(failure.status, failure.errText) {
+		return false
+	}
+	cleared := clearOldToolResults(loop.turns, 1, 0)
+	if cleared <= 0 {
+		return false
+	}
+	g.used++
+	loop.addLine(fmt.Sprintf("(vuot cua so ngu canh cua model - don ket qua tool cu, thu hoi %d ky tu, goi lai)", cleared))
+	return true
+}
+
+// contextOverflowText: cach cac nha cung cap bao vuot cua so ngu canh (OpenAI context_length_exceeded, Anthropic
+// "prompt is too long", DeepSeek/vLLM "maximum context length", gateway "context window"...).
+var contextOverflowText = regexp.MustCompile(`(?i)context[_ ]length[_ ]exceeded|maximum context length|context window|` +
+	`prompt is too long|input is too long|too many (input )?tokens|exceeds? the (model'?s? )?(max(imum)? )?context|` +
+	`reduce the length of the (messages|prompt)|request too large`)
+
+// IsContextOverflow: loi nay la vuot cua so ngu canh (gui it lai thi qua duoc).
+func IsContextOverflow(status int, errText string) bool {
+	if status == 413 {
+		return true
+	}
+	return (status == 400 || status == 0 || status == 422) && contextOverflowText.MatchString(errText)
+}
+
+// fallbackGuard (FallbackModels): model dang dung hong ma thu lai khong qua (het han muc free 403/429, model bi go
+// 404, may chu 5xx, mat ket noi, tra loi rong) -> chuyen sang model du phong ke tiep cho phan con lai cua luot
+// (LangChain ModelFallbackMiddleware). Khong chuyen voi loi do cau hinh (401 sai khoa, 400 request sai) vi model nao
+// cung se hong nhu vay. Luot sau lai bat dau tu model chinh.
+type fallbackGuard struct{ next int }
+
+func (g *fallbackGuard) recover(loop *agentLoop, failure *modelFailure) bool {
+	models := loop.options.FallbackModels
+	if !failure.switchable() {
+		return false
+	}
+	for g.next < len(models) {
+		candidate := strings.TrimSpace(models[g.next])
+		g.next++
+		if candidate == "" || candidate == loop.model {
+			continue
+		}
+		// Nha cung cap khai ro model nay khong goi tool: chuyen sang no thi luot lam viec cung hong.
+		if loop.toolsEnabled && loop.client.ModelInfo(context.Background(), candidate).NoTools {
+			loop.addLine("(bo qua model du phong " + candidate + " - nha cung cap khai khong ho tro tool)")
+			continue
+		}
+		previous := loop.model
+		loop.model = candidate
+		loop.result.Model = candidate
+		loop.addLine(fmt.Sprintf("(model %s loi: %s - chuyen sang model du phong %s)", previous,
+			Truncate(failure.detail, 120), candidate))
+		if loop.callbacks.ModelSwitched != nil {
+			loop.callbacks.ModelSwitched(previous, candidate, failure.detail)
+		}
+		return true
+	}
+	return false
+}
+
+// switchable: loi nay co the do RIENG model dang dung (doi model thi co the qua).
+func (f *modelFailure) switchable() bool {
+	if f.empty {
+		return true
+	}
+	switch {
+	case f.status == 0:
+		return f.errText != "cancelled"
+	case f.status == 402, f.status == 403, f.status == 404, f.status == 408, f.status == 409, f.status == 429:
+		return true
+	case f.status >= 500:
+		return true
+	}
+	return IsContextOverflow(f.status, f.errText)
 }

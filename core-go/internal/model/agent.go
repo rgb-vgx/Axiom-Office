@@ -48,6 +48,30 @@ type AgentOptions struct {
 	// hoi duoc it nhat contextClearMinChars ky tu - don lam hong cache tien to mot lan nen phai dang. 0 = tat.
 	ContextClearAt     int
 	ContextKeepResults int
+	// ContextWindow: cua so ngu canh cua model (token; 0 = khong biet). Biet thi nguong don va max_tokens tinh theo
+	// no (FitWindow) - model cua so nho khong tran truoc khi don.
+	ContextWindow int
+	// FallbackModels: model du phong cung nha cung cap, thu lan luot khi model dang dung hong ma thu lai khong qua
+	// (fallbackGuard). Rong = khong co.
+	FallbackModels []string
+}
+
+// FitWindow: chinh nguong theo cua so ngu canh cua model (LangChain trigger ("fraction", x)). Nguong don giu
+// ContextClearAt nhung khong qua nua cua so (cua so 32k -> don o 16k). KHONG noi nguong len voi model cua so lon
+// (deepseek-v4 1M): nguong 40k dat vi ngan sach token cua luot, khong vi cua so - noi len la dot ngan sach nhanh hon.
+// max_tokens khong qua 1/4 cua so khi cua so nho hon hai lan max_tokens - mot so may chu tu choi request co dau vao
+// + max_tokens vuot cua so.
+func (o AgentOptions) FitWindow() AgentOptions {
+	if o.ContextWindow <= 0 {
+		return o
+	}
+	if o.ContextClearAt > 0 {
+		o.ContextClearAt = min(o.ContextClearAt, o.ContextWindow/2)
+	}
+	if o.MaxResponseTokens > 0 && o.ContextWindow < 2*o.MaxResponseTokens {
+		o.MaxResponseTokens = o.ContextWindow / 4
+	}
+	return o
 }
 
 func DefaultAgentOptions() AgentOptions {
@@ -84,6 +108,8 @@ type AgentCallbacks struct {
 	// Reasoning: phan suy nghi cua model cho mot vong (rong khi model khong suy luan hoac da tat).
 	// Goi mot lan moi vong co suy luan, voi TOAN BO phan suy luan cua vong do.
 	Reasoning func(round int, text string)
+	// ModelSwitched: luot chuyen sang model du phong (from -> to) vi model dang dung hong (reason).
+	ModelSwitched func(from, to, reason string)
 }
 
 type AgentResult struct {
@@ -103,6 +129,8 @@ type AgentResult struct {
 	ToolsDisabled bool
 	// Verified: luot nay co sua tai lieu nen da duoc yeu cau tu kiem chung truoc khi tra loi.
 	Verified bool
+	// Model: model tra loi cuoi cung (khac Client.Model khi da chuyen sang model du phong).
+	Model string
 }
 
 // BillableTokens: so token phai tra that, tuc la phan nha cung cap THAT SU phai tinh.
@@ -128,7 +156,7 @@ type Executor func(ctx context.Context, call ToolCall) ToolResult
 func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []ConversationTurn, userPrompt string,
 	tools []Tool, execute Executor, options AgentOptions, callbacks AgentCallbacks) AgentResult {
 	started := time.Now()
-	result := AgentResult{Transcript: []string{}}
+	result := AgentResult{Transcript: []string{}, Model: c.Model}
 	addLine := func(line string) {
 		result.Transcript = append(result.Transcript, line)
 		if callbacks.Transcript != nil {
@@ -169,6 +197,7 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 		return done(false, "", fmt.Sprintf("agent timed out after %.0fs", options.Deadline.Seconds()), "timeout")
 	}
 
+	options = options.FitWindow()
 	loop := &agentLoop{client: c, options: options, callbacks: callbacks, result: &result, systemPrompt: systemPrompt,
 		toolsEnabled: len(tools) > 0, model: c.Model, addLine: addLine}
 	loop.turns = make([]Message, 0, len(prior)+1)

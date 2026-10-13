@@ -45,6 +45,12 @@ type Config struct {
 	// nghi truoc khi tra loi, va tren prompt lon tung cho ra cau tra loi RONG (finish_reason=length) -
 	// xem CHANGELOG 02/10/2026. Doi lai nguoi dung thay duoc qua trinh suy nghi.
 	LlmShowReasoning bool
+	// LlmFallbackModels: model du phong cung endpoint/khoa, thu lan luot khi model chinh hong ma thu lai khong qua
+	// (het han muc free, 403/429/5xx). Phan cach bang dau phay/cham phay/xuong dong. Rong = khong co.
+	LlmFallbackModels []string
+	// LlmContextWindow: cua so ngu canh cua model (token) khi nha cung cap khong khai trong GET /models (Ollama,
+	// LM Studio). 0 = theo nha cung cap.
+	LlmContextWindow int
 	// VerifyWorkEnabled: agent tu doc lai tai lieu sau khi sua, truoc khi tra loi (xem
 	// model.AgentOptions.Verify). MAC DINH BAT: do duoc la bo khung khong tu kiem chung thi phai co
 	// nguoi nhac moi chay tiep, con bo khung tu kiem chung thi xong viec mot minh.
@@ -100,6 +106,8 @@ func From(env Env, source Source) Config {
 		LlmRequestTimeoutSeconds: clamp(intValue(env, "AXIOM_LLM_REQUEST_TIMEOUT", source, "LlmRequestTimeoutSeconds", 0), 0, 600),
 		ConfirmTimeoutSeconds:    clamp(intValue(env, "AXIOM_CONFIRM_TIMEOUT", source, "ConfirmTimeoutSeconds", 120), 1, 3600),
 		LlmShowReasoning:         flag(env, "AXIOM_LLM_SHOW_REASONING", source, "LlmShowReasoning", false),
+		LlmFallbackModels:        modelList(text(env, "AXIOM_LLM_FALLBACK_MODELS", source, "LlmFallbackModels")),
+		LlmContextWindow:         clamp(intValue(env, "AXIOM_LLM_CONTEXT_WINDOW", source, "LlmContextWindow", 0), 0, 10_000_000),
 		VerifyWorkEnabled:        flag(env, "AXIOM_VERIFY_WORK", source, "VerifyWorkEnabled", true),
 		VisualQaEnabled:          flag(env, "AXIOM_VISUAL_QA", source, "VisualQaEnabled", false),
 		LlmApiKey:                Unprotect(text(env, "AXIOM_LLM_API_KEY", source, "LlmApiKey")),
@@ -163,6 +171,17 @@ func clamp(value, low, high int) int {
 func list(raw string) []string {
 	var items []string
 	for _, part := range strings.Split(raw, ";") {
+		if part = strings.TrimSpace(part); part != "" {
+			items = append(items, part)
+		}
+	}
+	return items
+}
+
+// modelList: danh sach ten model phan cach bang dau phay, cham phay hoac xuong dong (o nhap mot dong hay nhieu dong).
+func modelList(raw string) []string {
+	var items []string
+	for _, part := range strings.FieldsFunc(raw, func(r rune) bool { return strings.ContainsRune(",;\n\r", r) }) {
 		if part = strings.TrimSpace(part); part != "" {
 			items = append(items, part)
 		}

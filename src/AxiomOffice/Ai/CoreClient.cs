@@ -642,6 +642,11 @@ namespace AxiomOffice.Ai
                     item.OutputTokens = Convert.ToInt32(data["outputTokens"]);
                 }
 
+                if (type == "run.model_switched")
+                {
+                    item.Text = "Model " + Read(data, "from") + " lỗi - chuyển sang model dự phòng " + Read(data, "to");
+                }
+
                 return item;
             }
             catch (Exception ex)

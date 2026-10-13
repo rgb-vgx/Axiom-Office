@@ -686,6 +686,12 @@ namespace AxiomOffice.Ai
                 return null;
             }
 
+            // Đổi sang model dự phòng: dòng thông tin, không phải dòng công cụ.
+            if (item.Type == "run.model_switched" && !string.IsNullOrEmpty(item.Text))
+            {
+                return "(" + item.Text + ")";
+            }
+
             if (item.Type == "skill.loaded")
             {
                 // Dòng thông tin (không có " -> ") - New_arch.md mục 7.4.

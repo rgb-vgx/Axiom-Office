@@ -26,6 +26,8 @@ namespace AxiomOffice.Ai
         private readonly CheckBox _visual;
         private readonly CheckBox _verify;
         private readonly CheckBox _reasoning;
+        private readonly TextBox _fallback;
+        private readonly TextBox _window;
 
         public SettingsForm()
         {
@@ -34,7 +36,7 @@ namespace AxiomOffice.Ai
             MaximizeBox = false;
             MinimizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
-            ClientSize = new Size(500, 382);
+            ClientSize = new Size(500, 454);
             Font = SystemFonts.MessageBoxFont;
 
             var lblProvider = new Label { Text = "Provider:", Left = 14, Top = 19, Width = 90 };
@@ -52,37 +54,52 @@ namespace AxiomOffice.Ai
             var lblModel = new Label { Text = "Model:", Left = 14, Top = 127, Width = 90 };
             _model = new TextBox { Left = 110, Top = 123, Width = 370 };
 
+            // Model dự phòng (cùng endpoint/khóa): model chính hết hạn mức free hoặc lỗi thì Core chuyển sang model kế tiếp.
+            var lblFallback = new Label { Text = "Dự phòng:", Left = 14, Top = 163, Width = 90 };
+            _fallback = new TextBox { Left = 110, Top = 159, Width = 370 };
+            // Cửa sổ ngữ cảnh: chỉ cần cho model chạy máy (Ollama, LM Studio) - nhà cung cấp khác tự khai.
+            var lblWindow = new Label { Text = "Ngữ cảnh:", Left = 14, Top = 199, Width = 90 };
+            _window = new TextBox { Left = 110, Top = 195, Width = 90 };
+            var windowHint = new Label
+            {
+                Text = "token; để trống = theo nhà cung cấp",
+                Left = 208,
+                Top = 199,
+                Width = 272,
+                ForeColor = SystemColors.GrayText
+            };
+
             var hint = new Label
             {
                 Text = "OpenAI-compatible: base URL (e.g. https://api.openai.com/v1, http://localhost:11434/v1). Gemini: key from aistudio.google.com.",
                 Left = 110,
-                Top = 151,
+                Top = 223,
                 Width = 370,
                 Height = 28,
                 ForeColor = SystemColors.GrayText
             };
 
             // Agent Core + ghi nhớ dài hạn (New_arch.md mục 9.4, 8.5.10).
-            var lblAgent = new Label { Text = "Agent:", Left = 14, Top = 190, Width = 90 };
-            _core = new CheckBox { Text = "Dùng Agent Core (hội thoại liên tục, kỹ năng, ghi nhớ)", Left = 110, Top = 186, Width = 370 };
-            _memory = new CheckBox { Text = "Ghi nhớ dài hạn", Left = 110, Top = 210, Width = 150 };
-            _autoExtract = new CheckBox { Text = "Tự ghi nhớ sau mỗi lượt", Left = 270, Top = 210, Width = 210 };
-            var manage = new Button { Text = "Quản lý ghi nhớ…", Left = 110, Top = 232, Width = 150 };
+            var lblAgent = new Label { Text = "Agent:", Left = 14, Top = 262, Width = 90 };
+            _core = new CheckBox { Text = "Dùng Agent Core (hội thoại liên tục, kỹ năng, ghi nhớ)", Left = 110, Top = 258, Width = 370 };
+            _memory = new CheckBox { Text = "Ghi nhớ dài hạn", Left = 110, Top = 282, Width = 150 };
+            _autoExtract = new CheckBox { Text = "Tự ghi nhớ sau mỗi lượt", Left = 270, Top = 282, Width = 210 };
+            var manage = new Button { Text = "Quản lý ghi nhớ…", Left = 110, Top = 304, Width = 150 };
             // Tự kiểm chứng (bật mặc định): sửa tài liệu xong thì đọc lại rồi mới trả lời.
-            _verify = new CheckBox { Text = "Tự kiểm chứng: đọc lại tài liệu sau khi sửa trước khi trả lời", Left = 110, Top = 256, Width = 370 };
+            _verify = new CheckBox { Text = "Tự kiểm chứng: đọc lại tài liệu sau khi sửa trước khi trả lời", Left = 110, Top = 328, Width = 370 };
             // Suy luận (tắt mặc định): hiện phần model nghĩ, đổi lại tốn token và chậm hơn.
-            _reasoning = new CheckBox { Text = "Hiện suy luận của model trong khung chat (tốn token)", Left = 110, Top = 276, Width = 370 };
+            _reasoning = new CheckBox { Text = "Hiện suy luận của model trong khung chat (tốn token)", Left = 110, Top = 348, Width = 370 };
             // QA thị giác (New_arch.md 8.4.6): tắt mặc định vì mỗi ảnh tốn nhiều token; cần model đọc được ảnh.
             // Riêng một dòng: để cạnh nút "Quản lý ghi nhớ" thì nhãn bị cắt cụt.
-            _visual = new CheckBox { Text = "Cho AI xem ảnh chụp cửa sổ (tốn token)", Left = 110, Top = 296, Width = 370 };
+            _visual = new CheckBox { Text = "Cho AI xem ảnh chụp cửa sổ (tốn token)", Left = 110, Top = 368, Width = 370 };
 
-            _status = new Label { Left = 14, Top = 322, Width = 466, Height = 18, AutoEllipsis = true, ForeColor = SystemColors.GrayText };
+            _status = new Label { Left = 14, Top = 394, Width = 466, Height = 18, AutoEllipsis = true, ForeColor = SystemColors.GrayText };
 
-            _test = new Button { Text = "Test", Left = 110, Top = 346, Width = 80 };
-            var save = new Button { Text = "Save", Left = 312, Top = 346, Width = 80 };
-            var cancel = new Button { Text = "Cancel", Left = 400, Top = 346, Width = 80 };
+            _test = new Button { Text = "Test", Left = 110, Top = 418, Width = 80 };
+            var save = new Button { Text = "Save", Left = 312, Top = 418, Width = 80 };
+            var cancel = new Button { Text = "Cancel", Left = 400, Top = 418, Width = 80 };
 
-            Controls.AddRange(new Control[] { lblProvider, _provider, lblEndpoint, _endpoint, lblKey, _apiKey, lblModel, _model, hint,
+            Controls.AddRange(new Control[] { lblProvider, _provider, lblEndpoint, _endpoint, lblKey, _apiKey, lblModel, _model, lblFallback, _fallback, lblWindow, _window, windowHint, hint,
                 lblAgent, _core, _memory, _autoExtract, manage, _visual, _verify, _reasoning, _status, _test, save, cancel });
             _memory.CheckedChanged += delegate { _autoExtract.Enabled = _memory.Checked; };
             manage.Click += delegate
@@ -133,6 +150,8 @@ namespace AxiomOffice.Ai
             _visual.Checked = Config.VisualQaEnabled;
             _verify.Checked = Config.VerifyWorkEnabled;
             _reasoning.Checked = Config.LlmShowReasoning;
+            _fallback.Text = Config.LlmFallbackModels;
+            _window.Text = Config.LlmContextWindow > 0 ? Config.LlmContextWindow.ToString() : "";
             if (string.IsNullOrEmpty(_endpoint.Text))
             {
                 _endpoint.Text = DefaultEndpoint();
@@ -164,6 +183,13 @@ namespace AxiomOffice.Ai
                 _status.Text = "Model is required";
                 return;
             }
+            int window = 0;
+            string windowText = (_window.Text ?? "").Trim().Replace(".", "").Replace(",", "");
+            if (windowText.Length > 0 && (!int.TryParse(windowText, out window) || window < 1024))
+            {
+                _status.Text = "Ngữ cảnh: nhập số token (ví dụ 32768) hoặc để trống";
+                return;
+            }
             bool saved = Config.WriteString("LlmProvider", SelectedProvider());
             saved &= Config.WriteString("LlmEndpoint", _endpoint.Text.Trim());
             saved &= Config.WriteSecret("LlmApiKey", _apiKey.Text);
@@ -174,6 +200,8 @@ namespace AxiomOffice.Ai
             saved &= Config.WriteDword("VisualQaEnabled", _visual.Checked ? 1 : 0);
             saved &= Config.WriteDword("VerifyWorkEnabled", _verify.Checked ? 1 : 0);
             saved &= Config.WriteDword("LlmShowReasoning", _reasoning.Checked ? 1 : 0);
+            saved &= Config.WriteString("LlmFallbackModels", (_fallback.Text ?? "").Trim());
+            saved &= Config.WriteDword("LlmContextWindow", window);
             if (!saved)
             {
                 _status.Text = "Failed to save settings to the registry";

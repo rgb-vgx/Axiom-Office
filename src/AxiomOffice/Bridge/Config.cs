@@ -101,6 +101,17 @@ namespace AxiomOffice.Bridge
             get { return ReadString("LlmModel", ""); }
         }
 
+        // Model dự phòng (phân cách bằng dấu phẩy) và cửa sổ ngữ cảnh (token, 0 = theo nhà cung cấp) - Core đọc.
+        public static string LlmFallbackModels
+        {
+            get { return ReadString("LlmFallbackModels", ""); }
+        }
+
+        public static int LlmContextWindow
+        {
+            get { return Math.Max(0, ReadInt("LlmContextWindow", 0)); }
+        }
+
         public static bool WriteString(string name, string value)
         {
             try
