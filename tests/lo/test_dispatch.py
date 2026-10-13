@@ -84,6 +84,19 @@ class MenuParityTest(unittest.TestCase):
     def test_menu_co_muc_soat_tai_lieu(self):
         self.assertIn("check", menu_actions())
 
+    def test_chi_mot_muc_axiom_office_tren_menubar(self):
+        """Chi MOT muc "Axiom Office" (nguoi dung chot 13/10/2026, docs/ribbon-ui.md muc 1.2).
+
+        Them muc thu hai vao OfficeMenuBar thi menubar co hai cho cho cung mot tinh nang; chan ngay tu file
+        .xcu thay vi doi den luc nhin thay tren man hinh.
+        """
+        oor = "{http://openoffice.org/2001/registry}name"
+        bars = [node for node in ET.parse(ADDONS_XCU).iter()
+                if node.tag.endswith("node") and node.get(oor) == "OfficeMenuBar"]
+        self.assertEqual(1, len(bars), "phai co dung mot OfficeMenuBar")
+        menus = [node.get(oor) for node in bars[0] if node.tag.endswith("node")]
+        self.assertEqual(["org.axiomoffice.bridge.menu"], menus, "menubar phai co dung mot muc Axiom Office")
+
 
 class ActionTest(unittest.TestCase):
     def _dispatcher(self, frame=None):

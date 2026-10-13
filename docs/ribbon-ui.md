@@ -16,11 +16,14 @@ Hai phiên làm việc song song theo tài liệu này:
 ## 1. Nguyên tắc
 
 1. **Ribbon khởi động việc — pane điều phối — màn hình quản trị cấu hình.** Không nhân đôi giao diện.
-2. **Không biến API thành nút.** Nhãn là kết quả người dùng muốn ("Soát bố cục"), không phải tên lệnh
+2. **Chỉ MỘT tab "Axiom Office".** Người dùng chốt 13/10/2026: không có tab thứ hai, không tab "Quản lý"
+   riêng. Màn hình quản trị nằm trong **nhóm *Quản lý* của chính tab đó**, nút ít dùng gom vào **menu *Khác ▸***
+   cùng tab, và việc của khung chat (*Hội thoại*, *Nhật ký hoạt động*) nằm ở **menu ⋯ của pane** — vẫn một tab.
+3. **Không biến API thành nút.** Nhãn là kết quả người dùng muốn ("Soát bố cục"), không phải tên lệnh
    (`wpp.checkLayout`).
-3. **Không vẽ control giả.** Nút chỉ lên ribbon khi có đường thật đứng sau (API/lệnh đã có, hoặc ghi
+4. **Không vẽ control giả.** Nút chỉ lên ribbon khi có đường thật đứng sau (API/lệnh đã có, hoặc ghi
    cấu hình mà Core đọc lại được).
-4. **Không đổi hành vi lệnh bridge.** 62 lệnh của add-in COM nằm trong hợp đồng parity với MCP; việc này
+5. **Không đổi hành vi lệnh bridge.** 62 lệnh của add-in COM nằm trong hợp đồng parity với MCP; việc này
    chỉ **thêm UI**, không sửa tên/tham số/kết quả lệnh.
 
 ## 2. Bộ nút
@@ -28,11 +31,11 @@ Hai phiên làm việc song song theo tài liệu này:
 Cột "Nền tảng": W = Windows COM · L = WPS Linux (ribbon) · O = LibreOffice (menu).
 
 **Quyết định 13/10/2026 (người dùng):** chỉ **một tab "Axiom Office"** — không mở tab thứ hai "Axiom · Quản lý".
-Màn hình quản trị vào nhóm **Quản lý** của chính tab đó; nút ít dùng gom vào menu **Khác ▾**. **Bỏ** hai nút
+Màn hình quản trị vào nhóm **Quản lý** của chính tab đó; nút ít dùng gom vào menu **Khác ▸**. **Bỏ** hai nút
 *Dừng* và *Xuất PDF* (pane đã có *Dừng*; xuất PDF để AI làm qua lệnh `*.exportPdf`). *Hội thoại* và *Nhật ký
 hoạt động* **không lên ribbon** — chúng nằm trong menu **⋯** ở header của khung chat.
 
-### Tab "Axiom Office"
+### Tab duy nhất — "Axiom Office"
 
 | Nhãn | Nhóm | Control | Nền tảng | Đứng sau bằng gì | P |
 |---|---|---|---|---|---|
@@ -51,6 +54,10 @@ hoạt động* **không lên ribbon** — chúng nằm trong menu **⋯** ở h
 | Khác ▸ **Sao chép API URL** | Hệ thống | menu | W | công cụ gỡ rối | P1 |
 | Khác ▸ **Tắt Agent Core…** | Hệ thống | menu | W | `POST /v1/admin/shutdown` — **bắt buộc xác nhận** | P2 |
 
+Vì sao gom vào menu chứ không thêm tab: cùng một tab thì người dùng không phải học "việc này ở tab nào"; đổi
+lại hàng nút phải ngắn, nên thứ ít dùng rút vào **Khác ▸**. Ribbon tự thu nhóm khi cửa sổ hẹp, không cần cắt
+bớt nút thật.
+
 ### Trong khung chat (không phải ribbon)
 
 | Nhãn | Chỗ | Nền tảng | Đứng sau bằng gì |
@@ -60,11 +67,15 @@ hoạt động* **không lên ribbon** — chúng nằm trong menu **⋯** ở h
 
 ### Rút gọn theo nền tảng
 
-- **WPS Linux** (ribbon.xml đơn giản): *Ask AI · Soát tài liệu · Thiết lập · Trạng thái · Quản lý…*.
-  **Nhìn tài liệu chưa lên được** (§5.1). Nếu chỉ giữ được 3: **Ask AI · Soát tài liệu · Thiết lập**.
-  Bộ nhớ/kỹ năng phải vào được bằng đường khác (mục **Quản lý…**), không được bỏ.
-- **LibreOffice**: menu *Axiom Office* + sidebar là trung tâm. Không dựng cửa sổ tiến trình riêng — dùng
-  chung lối hiển thị của pane.
+- **WPS Linux**: đúng **một** tab `axiomTab` trong `ribbon.xml`; các nhóm trên là nhóm của tab đó và
+  **Khác ▸** là `<menu>` trong cùng tab. Nhìn tài liệu chưa lên được (§5.1). Hiện `ribbon.xml` mới có hai nút
+  chỗ trống (*Axiom*, *Ask AI*) — bảng trên còn phải dựng.
+- **LibreOffice**: **một** mục menu *Axiom Office* (`Addons.xcu`, `OfficeMenuBar`) + một deck sidebar. Menu
+  đang phẳng 6 mục (askai / check / skills / audit / setup / settings); theo bảng trên thì chúng thành các dải
+  phân cách và **Khác ▸** là menu con cùng cấp. Không dựng cửa sổ tiến trình riêng — dùng chung lối hiển thị
+  của pane.
+- **Windows**: một tab với các nhóm *Trợ lý / Kiểm tra / Quản lý / Hệ thống*, **Khác ▸** là `menu` trong tab
+  (đã dựng, `Ribbon/RibbonUi.cs`), và menu **⋯** của pane cho *Hội thoại* / *Nhật ký*.
 
 ## 3. Vì sao các nút này là thật (đối chiếu mã)
 
@@ -89,10 +100,11 @@ hoạt động* **không lên ribbon** — chúng nằm trong menu **⋯** ở h
   `GET /v1/skills?app=` + `POST /v1/skills/reload` (menu **Kỹ năng…**), `GET /v1/audit` (menu **Nhật ký…**).
   Danh sách này **không còn là hàm chết**: `axiom/core.py` có `skill_listing` / `reload_skills` / `audit`
   (`skills()` cũ bị thay vì nó trả về ít hơn payload thật — xem chú thích trong `skill_listing`).
-- **Còn chưa UI nào gọi**: `GET /v1/conversations` (**Hội thoại…**), `PATCH /v1/memory/{id}` (sửa / ghim / đặt
-  hạn), `POST /v1/memory/{id}/restore` + `GET /v1/memory/{id}/history` + `DELETE /v1/memory?scope&confirm`
-  (khôi phục / lịch sử / xoá cứng). Nghĩa là dialog **Ghi nhớ** mới chỉ **đọc, lọc, xoá mềm** — chưa đủ
-  nghiệm thu của đợt 2, và khoảng trống đó nằm ở UI chứ không phải ở Core.
+- **Phía Linux còn chưa UI nào gọi**: `GET /v1/conversations` (**Hội thoại…**), `PATCH /v1/memory/{id}` (sửa /
+  ghim / đặt hạn), `POST /v1/memory/{id}/restore` + `GET /v1/memory/{id}/history` + `DELETE
+  /v1/memory?scope&confirm` (khôi phục / lịch sử / xoá cứng). Nghĩa là dialog **Ghi nhớ** của LibreOffice mới
+  chỉ **đọc, lọc, xoá mềm** — chưa đủ nghiệm thu của đợt 2, và khoảng trống đó nằm ở UI chứ không phải ở Core.
+  Trên **Windows** những đường đó đã có UI từ 13/10 (`Ai/MemoryForm.cs`, `Ai/AdminForms.cs`, `Ai/CoreAdmin.cs`).
 
 ## 4. Đợt triển khai
 
@@ -140,6 +152,7 @@ handler trong tiến trình (như `CommandDispatcher.Execute` ở Windows) — n
 | Rủi ro | Cách chống |
 |---|---|
 | Ribbon thành danh mục API (65 lệnh) | Chỉ đưa nút có workflow hoàn chỉnh; còn lại qua pane. Tên nhãn theo kết quả, không theo lệnh |
+| Một tab duy nhất bị nhồi nút | Thứ ít dùng nằm trong **Khác ▸** hoặc menu **⋯** của pane (vẫn cùng một tab) — thêm nút mới thì phải bỏ một nút ra khỏi hàng, không nới hàng |
 | Người dùng không biết AI đang làm gì | Pane là nguồn duy nhất hiển thị tiến trình (công cụ, skill, ghi nhớ, xác nhận, kết quả) trên cả ba nền tảng |
 | UI hiển thị một trạng thái, Core làm trạng thái khác | Toggle đọc trạng thái **thật** (`GET /v1/setup`), ghi thành công rồi mới đổi hình; không suy ra "Core khỏe" từ việc mở được cổng TCP |
 
@@ -162,6 +175,8 @@ handler trong tiến trình (như `CommandDispatcher.Execute` ở Windows) — n
 | Ngày | Nền tảng | Việc |
 |---|---|---|
 | 13/10/2026 | LibreOffice | Mục menu **Soát tài liệu…** (`Addons.xcu` + `dispatch.py` action `check` + `dialogs.open_check`): chạy trong tiến trình qua `bridge.run_on_main`, tự nhận loại tài liệu đang mở, liệt kê vấn đề bằng nhãn tiếng Việt (`checks.ISSUE_LABELS`) kèm chi tiết gốc. Chỉ đọc, 0 token. Spec mới: `tests/lo/test_dispatch.py` (9), `tests/lo/test_report.py` (8), `tests/lo/test_dialogs.py` (6). |
+| 13/10/2026 | LibreOffice | **Nút trong cả năm dialog là nút chết — đã tìm ra và sửa.** `awt.bind_actions` gắn **một** `ActionListener` chung rồi đọc `event.ActionCommand` để biết nút nào vừa bấm; đo trong LibreOffice thật (dialog *Kỹ năng*, cắm log tạm) thì `event.ActionCommand` đến tay người nghe là **chuỗi rỗng**: listener có chạy nhưng `command == "reload"` / `== "close"` đều sai, nên bấm "Nạp lại" không nạp, bấm "Đóng" không đóng. Sửa gốc: mỗi nút một listener **mang sẵn tên của nó** (`awt.ActionListener(handler, name)`), vẫn đặt `ActionCommand` lên model cho bản khác. Spec mới: `BindActionsTest` (`tests/lo/test_dialogs.py`). Kiểm lại bằng LibreOffice thật: `tests/live/open_dialogs.py skills --click-window "Kỹ năng:72,414" --click-window "Kỹ năng:503,414"` → trạng thái đổi thành *"Đã nạp lại · 3 kỹ năng cho Writer"* rồi cửa sổ **mất hẳn** khỏi X (`xwininfo`: không còn cửa sổ nào), và dialog *Soát tài liệu* cũng đóng được. |
+| 13/10/2026 | (kế hoạch) | **Chốt: chỉ một tab "Axiom Office"** (người dùng yêu cầu). Bỏ "Tab 2 — Axiom · Quản lý" khỏi §2; các mục của nó rút vào nhóm *Quản lý* / *Hệ thống*, menu **Khác ▸** và menu **⋯** của pane — vẫn một tab. Kiểm lại mã: WPS đã đúng một tab (`ribbon.xml`, `axiomTab`) và LibreOffice đã đúng một mục menu (`Addons.xcu`, `OfficeMenuBar`) — không phải sửa mã, chỉ sửa plan cho khỏi phình ra tab thứ hai về sau. Cùng ngày, phiên trên máy Windows **đã dựng** đúng một tab theo quyết định này (xem dòng Windows COM bên dưới). |
 | 13/10/2026 | (kế hoạch) | Chốt plan; phát hiện §5.1 (toggle trên WPS Linux bị chặn vì Core không có endpoint ghi cấu hình). Giao phần Windows cho phiên trên máy Windows. |
 | 13/10/2026 | LibreOffice | Hai mục menu **Kỹ năng…** (`org.axiomoffice.bridge:skills`) và **Nhật ký hoạt động…** (`:audit`): `Addons.xcu` → `dispatch.ACTIONS` → `dialogs.open_skills` / `open_audit`. `core.py` thêm `skill_listing` (trả **cả payload**, không chỉ `skills`, để thư mục kỹ năng nạp lỗi không bị im lặng bỏ qua), `reload_skills`, `audit`. Nút *Nạp lại* gọi `POST /v1/skills/reload` (đọc lại thư mục, **không** khởi động lại Core); nhật ký đọc 100 dòng mới nhất và đổi giờ UTC của Core sang **giờ máy**. Spec mới: `SkillLinesTest`, `SkillStatusTest`, `AuditLinesTest`, `ClockTest` (`tests/lo/test_dialogs.py`), `CoreListingTests` (`tests/lo/test_chat.py`), và một ca dispatch cho hai URL. |
 | 13/10/2026 | LibreOffice | `tests/live/open_dialogs.py` — probe **không** phải unittest: dựng LibreOffice thật trong profile/XDG tạm, cài `.oxt`, gửi **đúng URL của menu** qua UNO rồi **chụp ảnh màn hình** (`xwd` + `ffmpeg`). Cần vì dialog ở đây là `awt.ChildWindow` — cửa sổ con **không có cửa sổ X riêng**, nên `xdotool search --name` không tìm được như với wizard. Đã chạy và xem ảnh: *Soát tài liệu* (bảng dựng thật bằng `writer.insertTable` → *"Có ô trống"*), *Kỹ năng* (3 kỹ năng, "nguồn: sẵn có"), *Nhật ký* (nhánh rỗng). Ảnh ở `/tmp/axiom-dialogs`. |

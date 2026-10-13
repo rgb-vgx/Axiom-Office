@@ -12,10 +12,12 @@ do chi lo ra khi nguoi dung mo LibreOffice. O day stub UNO vua du de import that
 from __future__ import annotations
 
 import datetime
+import inspect
 import os
 import sys
 import types
 import unittest
+from unittest import mock
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 PYTHONPATH = os.path.join(ROOT, "src", "AxiomOffice.LibreOffice", "python", "pythonpath")
@@ -61,7 +63,7 @@ def _install_stubs() -> None:
 _install_stubs()
 sys.path.insert(0, PYTHONPATH)
 
-from axiom import commands, dialogs, documents  # noqa: E402
+from axiom import awt, commands, dialogs, documents  # noqa: E402
 
 commands.load_all()
 
@@ -179,6 +181,131 @@ class ClockTest(unittest.TestCase):
     def test_chuoi_khong_doc_duoc_thi_tra_nguyen(self):
         for stamp in ("", None, "khong-phai-gio", "2026-10-13"):
             self.assertEqual(str(stamp or ""), dialogs._clock(stamp))
+
+
+class _Window:
+    """Cua so gia: du `add`/`place`/`to_front`/`on_close`/`close` de `_open` chay het."""
+
+    def __init__(self, kind: str):
+        self.kind = kind
+        self.front = False
+        self.closed = False
+
+    def add(self, *args, **kwargs):
+        return None
+
+    def place(self, *args):
+        self.placed = args
+
+    def to_front(self):
+        self.front = True
+
+    def on_close(self, handler):
+        self.handler = handler
+
+    def close(self):
+        self.closed = True
+
+
+class FloatingTest(unittest.TestCase):
+    """Tren Linux cua so con KHONG nhan duoc cu bam chuot -> dialog co nut phai la cua so ROI.
+
+    Do 13/10/2026 bang xdotool trong LibreOffice that: bam dung vao nut "Dong" cua dialog "Ky nang" thi
+    dialog van nguyen, con bam vao thanh menu thi menu mo ra - chot chuot toi duoc LibreOffice nhung khong
+    toi cua so con (cua so tai lieu nam tren cung). Doi lai thanh cua so con thi MOI nut trong nam dialog
+    thanh nut chet, ma anh chup man hinh van dep nen nhin ngoai khong thay gi.
+    """
+
+    FRAME = types.SimpleNamespace(
+        ContainerWindow="cua-so-me",
+        ComponentWindow=types.SimpleNamespace(
+            getPosSize=lambda: types.SimpleNamespace(X=0, Y=100, Width=800, Height=600)))
+
+    def setUp(self):
+        self.addCleanup(dialogs.DIALOGS.clear)
+
+    def _open(self, windows: bool, floating=None) -> _Window:
+        made = []
+
+        def factory(kind):
+            def make(*args, **kwargs):
+                window = _Window(kind)
+                made.append(window)
+                return window
+            return make
+
+        with mock.patch.object(dialogs.config, "IS_WINDOWS", windows), \
+                mock.patch.object(dialogs, "Dialog", factory("Dialog")), \
+                mock.patch.object(dialogs, "ChildWindow", factory("ChildWindow")):
+            dialogs._open(object(), self.FRAME, "Thử", 200, 100, floating)
+        return made[-1]
+
+    def test_linux_mac_dinh_la_cua_so_roi(self):
+        window = self._open(windows=False)
+        self.assertEqual("Dialog", window.kind, "tren Linux phai la cua so roi, khong thi khong bam duoc nut")
+        self.assertTrue(window.front, "cua so roi phai duoc dua len truoc, khong thi bi cua so tai lieu che")
+
+    def test_windows_giu_cua_so_con(self):
+        window = self._open(windows=True)
+        self.assertEqual("ChildWindow", window.kind)
+        self.assertFalse(window.front)          # ChildWindow khong co to_front -> khong duoc goi
+
+    def test_ep_cua_so_con_van_dung_duoc(self):
+        self.assertEqual("ChildWindow", self._open(windows=False, floating=False).kind)
+
+    def test_open_settings_khong_chot_cung_cua_so_con(self):
+        # default False cu = bon nut trong "Cai dat nang cao" chet tren Linux (mo tu menu).
+        self.assertIsNone(inspect.signature(dialogs.open_settings).parameters["floating"].default)
+
+
+class _ButtonControl:
+    """Control gia: ghi lai listener duoc gan, du de kiem `bind_actions`."""
+
+    def __init__(self):
+        self.listeners = []
+
+    def addActionListener(self, listener):
+        self.listeners.append(listener)
+
+
+class _ButtonModel:
+    def __init__(self):
+        self.props = {}
+
+    def setPropertyValue(self, key, value):
+        self.props[key] = value
+
+
+class BindActionsTest(unittest.TestCase):
+    """Moi nut phai co listener mang san TEN CUA NO.
+
+    Do 13/10/2026 trong LibreOffice that: mot listener dung chung doc `event.ActionCommand` thi nhan duoc
+    chuoi RONG (listener co chay, nhung command == ""), nen nam dialog (Cai dat / Ghi nho / Soat / Ky nang /
+    Nhat ky) deu co nut chet: bam "Dong" khong dong duoc cua so, bam "Nap lai" khong nap lai - ma anh chup man
+    hinh van dep nen nhin ngoai khong thay gi.
+    """
+
+    def _host(self, names):
+        controls = {name: _ButtonControl() for name in names}
+        models = {name: _ButtonModel() for name in names}
+        return types.SimpleNamespace(models=models, control=controls.__getitem__), controls
+
+    def test_moi_nut_bao_dung_ten_minh_du_event_rong(self):
+        seen = []
+        host, controls = self._host(("reload", "close"))
+        awt.bind_actions(host, ("reload", "close"), lambda command, event: seen.append(command))
+        for name in ("reload", "close"):
+            self.assertEqual(1, len(controls[name].listeners), "nut '%s' phai co dung mot listener" % name)
+            # LibreOffice 24.2 gui ActionCommand rong; ban nao gui du ten thi cung phai ra dung ten nut.
+            for command in ("", name):
+                controls[name].listeners[0].actionPerformed(
+                    types.SimpleNamespace(ActionCommand=command, Source=None))
+        self.assertEqual(["reload", "reload", "close", "close"], seen)
+
+    def test_van_dat_actioncommand_len_model(self):
+        host, _ = self._host(("close",))
+        awt.bind_actions(host, ("close",), lambda command, event: None)
+        self.assertEqual("close", host.models["close"].props.get("ActionCommand"))
 
 
 class SurfaceTest(unittest.TestCase):

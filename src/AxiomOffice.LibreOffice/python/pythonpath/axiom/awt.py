@@ -28,13 +28,19 @@ def log_error(message: str) -> None:
 
 
 class ActionListener(unohelper.Base, XActionListener):
-    """Goi lai theo `ActionCommand` cua nut (uoc giua nhieu nut tren cung mot host)."""
+    """Goi lai cho MOT nut da biet truoc ten (xem `bind_actions`)."""
 
-    def __init__(self, handler):
+    def __init__(self, handler, command: str = ""):
         self._handler = handler
+        self._command = command
 
     def actionPerformed(self, event):  # noqa: N802 - ten UNO
-        self._handler(event.ActionCommand, event)
+        # KHONG doc `event.ActionCommand`: tren LibreOffice 24.2/Linux truong do den tay nguoi nghe la CHUOI
+        # RONG - do that 13/10/2026 trong LibreOffice that: bam "Nap lai"/"Dong" cua dialog "Ky nang" thi
+        # listener CO chay, nhung `event.ActionCommand == ""`, nen `command == "reload"`/`== "close"` deu sai
+        # va MOI nut trong nam dialog thanh nut chet (man hinh van dep nen nhin ngoai khong thay gi). Ten nut
+        # biet tu luc gan thi khong phu thuoc vao ban LibreOffice nao.
+        self._handler(self._command or event.ActionCommand, event)
 
     def disposing(self, event):
         pass
@@ -317,11 +323,13 @@ class Dialog(_Host):
         self.container.setVisible(True)
 
     def close(self) -> None:
+        # Khong nuot loi im lang: mot lan dong that bai ma khong co gi trong log thi nguoi dung chi thay
+        # "bam nut Dong khong duoc" (da gap that: nut "Dong" cua dialog Ky nang khong dong duoc cua so).
         try:
             self.container.setVisible(False)
             self.container.dispose()
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as exc:  # noqa: BLE001
+            log_error("dialog close failed: %s" % exc)
 
     def on_close(self, handler) -> None:
         """Goi handler khi nguoi dung bam X (cua so tao bang toolkit KHONG tu dong khi bam X)."""
@@ -344,11 +352,15 @@ class Dialog(_Host):
             log_error("dialog to_front failed: %s" % exc)
 
 def bind_actions(host, names, handler) -> None:
-    """Gan mot ActionListener chung; moi nut tu khai ActionCommand = ten cua no."""
-    listener = ActionListener(handler)
+    """Gan cho MOI nut mot ActionListener biet ten cua no.
+
+    Mot listener dung chung roi doc `event.ActionCommand` la khong dung duoc (xem `ActionListener`), nen moi
+    nut co listener rieng mang san ten. Van dat `ActionCommand` len model de nut "tu khai" ten minh o noi khac
+    (ban Windows, trinh doc man hinh).
+    """
     for name in names:
         host.models[name].setPropertyValue("ActionCommand", name)
-        host.control(name).addActionListener(listener)
+        host.control(name).addActionListener(ActionListener(handler, name))
 
 
 def toolkit(ctx):
