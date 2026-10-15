@@ -538,6 +538,28 @@ def _regex_escape(text: str) -> str:
     return "".join("\\" + ch if ch in _REGEX_SPECIAL else ch for ch in text)
 
 
+def replace_many(env, params):
+    """Nhieu cap tim/thay trong mot lenh (gom cho model, bot vong goi - luot that 14/10/2026: 137 lan replaceAll)."""
+    edits = params.get("edits") if isinstance(params, dict) else None
+    if not isinstance(edits, list) or not edits:
+        raise values.ParamError("'edits' must be a non-empty array of {find, replace}")
+    if len(edits) > 200:
+        raise values.ParamError("'edits' has %d items; send at most 200 per call" % len(edits))
+    counts, not_found = [], []
+    for edit in edits:
+        if not isinstance(edit, dict) or not values.string(edit, "find"):
+            counts.append(0)
+            continue
+        count = replace_all(env, edit).get("count", 0)
+        counts.append(count)
+        if not count:
+            not_found.append(values.string(edit, "find")[:60])
+    result = {"edits": len(edits), "replaced": sum(counts), "counts": counts}
+    if not_found:
+        result["notFound"] = not_found
+    return result
+
+
 def replace_all(env, params):
     find = values.string(params, "find")
     replace = values.string(params, "replace", "") or ""
@@ -596,6 +618,9 @@ command("writer.insertImage", "wps", insert_image, "Chèn ảnh tại con trỏ 
         req("path"), opt("width"), opt("height"), agent=True, undo=True)
 command("writer.insertHyperlink", "wps", insert_hyperlink, "Chèn liên kết", req("url"), opt("text"), agent=True, undo=True)
 command("writer.replaceAll", "wps", replace_all, "Tìm và thay toàn bộ", req("find"), opt("replace"), agent=True, undo=True)
+command("writer.replaceMany", "wps", replace_many,
+        "Thay NHIỀU chỗ trong một lần: `edits` = [{find, replace}] theo thứ tự (mỗi cặp thay mọi chỗ khớp) - dùng thay cho nhiều lần writer.replaceAll; trả số chỗ đã thay của từng cặp",
+        req("edits", "array of {find, replace}; up to 200"), agent=True, undo=True)
 command("writer.undo", "wps", undo, "Hoàn tác (mỗi thao tác AI = 1 bước)", opt("count"), agent=True)
 command("writer.exportPdf", "wps", lambda env, p: documents.export_pdf(env.document, "wps", values.string(p, "path")),
         "Xuất PDF", req("path"), agent=True)

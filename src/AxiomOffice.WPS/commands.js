@@ -142,6 +142,9 @@
         { name: "find", required: true, hint: null },
         { name: "replace", required: false, hint: null }
       ] },
+    { name: "writer.replaceMany", kind: "wps", agent: true,
+      summary: "Thay NHIỀU chỗ trong một lần: `edits` = [{find, replace}] theo thứ tự (mỗi cặp thay mọi chỗ khớp) - dùng thay cho nhiều lần writer.replaceAll; trả số chỗ đã thay của từng cặp",
+      params: [{ name: "edits", required: true, hint: "array of {find, replace}; up to 200" }] },
     { name: "writer.undo", kind: "wps", agent: true,
       summary: "Hoàn tác (mỗi thao tác AI = 1 bước)",
       params: [{ name: "count", required: false, hint: null }] },

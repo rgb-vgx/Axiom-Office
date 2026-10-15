@@ -39,6 +39,9 @@ namespace AxiomOffice.Bridge
                 Command("writer.insertImage", "wps", WriterInsertImage, "Chèn ảnh tại con trỏ (kích thước theo point)", Req("path"), Opt("width"), Opt("height")).ForAgent(),
                 Command("writer.insertHyperlink", "wps", WriterInsertHyperlink, "Chèn liên kết", Req("url"), Opt("text")).ForAgent(),
                 Command("writer.replaceAll", "wps", WriterReplaceAll, "Tìm và thay toàn bộ", Req("find"), Opt("replace")).ForAgent(),
+                Command("writer.replaceMany", "wps", WriterReplaceMany,
+                    "Thay NHIỀU chỗ trong một lần: `edits` = [{find, replace}] theo thứ tự (mỗi cặp thay mọi chỗ khớp) - dùng thay cho nhiều lần writer.replaceAll; trả số chỗ đã thay của từng cặp",
+                    Req("edits", "array of {find, replace}; up to 200")).ForAgent(),
                 Command("writer.undo", "wps", WriterUndo, "Hoàn tác (mỗi thao tác AI = 1 bước)", Opt("count")).ForAgent(),
                 Command("writer.exportPdf", "wps", WriterExportPdf, "Xuất PDF", Req("path")).ForAgent(),
                 Command("writer.save", "wps", (host, p) => SaveDocument(host, "wps", null), "Lưu").ForAgent(),
@@ -149,12 +152,132 @@ namespace AxiomOffice.Bridge
             }
             dynamic app = host.Application;
             dynamic doc = app.ActiveDocument;
-            dynamic result;
+            // Không dùng Find.Execute kiểu "thay tất cả" (Replace = wdReplaceAll): lượt thật 14/10/2026 trên Word 365, giáo án
+            // GA HG.docx, lệnh này làm SẬP Word cả với chuỗi ngắn (127/167 ký tự); chuỗi > 255 ký tự thì Word báo "String
+            // parameter too long" rồi sập ở lần gọi sau. Find chỉ để TÌM (tối đa WordFindLimit ký tự đầu), kiểm đúng nguyên
+            // văn rồi gán Range.Text - đã chạy ổn trên Word thật với đoạn 459 ký tự.
+            int count;
             using (new UndoRecordScope(host.Application, "AI: replace all"))
             {
-                result = doc.Content.Find.Execute(ToWordFindText(find), false, false, false, false, false, true, 1, false, ToWordFindText(replace), 2);
+                count = ReplaceLong(doc, find, replace);
             }
-            return new Dictionary<string, object> { { "replaced", Convert.ToBoolean(result) } };
+            return new Dictionary<string, object> { { "replaced", count > 0 }, { "count", count } };
+        }
+
+        // Nhiều cặp tìm/thay trong MỘT lệnh (một bước hoàn tác): lượt thật 14/10/2026 sửa giáo án bằng 137 lần
+        // writer.replaceAll (nhiều lần chỉ đổi 1-2 ký tự) -> 48 vòng, 1,48 triệu token. Gom lại thì vài vòng là xong.
+        private static Dictionary<string, object> WriterReplaceMany(IAppHost host, Dictionary<string, object> p)
+        {
+            object raw;
+            var edits = new List<KeyValuePair<string, string>>();
+            if (p != null && p.TryGetValue("edits", out raw) && raw is IEnumerable && !(raw is string))
+            {
+                foreach (object item in (IEnumerable)raw)
+                {
+                    var entry = item as Dictionary<string, object>;
+                    if (entry == null)
+                    {
+                        continue;
+                    }
+                    object find, replace;
+                    entry.TryGetValue("find", out find);
+                    entry.TryGetValue("replace", out replace);
+                    string findText = Convert.ToString(find);
+                    if (!string.IsNullOrEmpty(findText))
+                    {
+                        edits.Add(new KeyValuePair<string, string>(findText, Convert.ToString(replace) ?? ""));
+                    }
+                }
+            }
+            if (edits.Count == 0)
+            {
+                throw new ArgumentException("'edits' must be a non-empty array of {find, replace}");
+            }
+            if (edits.Count > 200)
+            {
+                throw new ArgumentException("'edits' has " + edits.Count + " items; send at most 200 per call");
+            }
+            dynamic app = host.Application;
+            dynamic doc = app.ActiveDocument;
+            var counts = new List<int>();
+            var notFound = new List<string>();
+            using (new UndoRecordScope(host.Application, "AI: replace many"))
+            {
+                foreach (var edit in edits)
+                {
+                    int count = ReplaceLong(doc, edit.Key, edit.Value);
+                    counts.Add(count);
+                    if (count == 0)
+                    {
+                        notFound.Add(edit.Key.Length > 60 ? edit.Key.Substring(0, 60) + "..." : edit.Key);
+                    }
+                }
+            }
+            var result = new Dictionary<string, object>
+            {
+                { "edits", edits.Count },
+                { "replaced", counts.Sum() },
+                { "counts", counts }
+            };
+            if (notFound.Count > 0)
+            {
+                result["notFound"] = notFound;
+            }
+            return result;
+        }
+
+        // Giới hạn an toàn của chuỗi Find (Word: 255 ký tự sau khi đổi ^p, ^t...).
+        private const int WordFindLimit = 240;
+
+        // Thay chuỗi dài: Find chỉ tìm phần đầu (<= WordFindLimit), kiểm cả đoạn đúng nguyên văn rồi gán Range.Text.
+        private static int ReplaceLong(dynamic doc, string find, string replace)
+        {
+            string target = find.Replace("\r\n", "\r").Replace("\n", "\r");
+            string replacement = (replace ?? "").Replace("\r\n", "\r").Replace("\n", "\r");
+            string prefix = target;
+            while (prefix.Length > 1 && ToWordFindText(prefix).Length > WordFindLimit)
+            {
+                prefix = prefix.Substring(0, Math.Max(1, Math.Min(prefix.Length - 1, WordFindLimit - (ToWordFindText(prefix).Length - prefix.Length) - 1)));
+            }
+            int count = 0;
+            int start = 0;
+            int lastAt = -1;
+            for (int guard = 0; guard < 200; guard++)
+            {
+                int end = Convert.ToInt32(doc.Content.End);
+                if (start >= end)
+                {
+                    break;
+                }
+                dynamic range = doc.Range(start, end);
+                dynamic finder = range.Find;
+                finder.ClearFormatting();
+                bool found = Convert.ToBoolean(finder.Execute(ToWordFindText(prefix), false, false, false, false, false, true, 0));
+                if (!found)
+                {
+                    break;
+                }
+                int at = Convert.ToInt32(range.Start);
+                // Find của Word có lúc trả lại đúng chỗ vừa thay (lượt thật 14/10/2026: thay "+ Cách sửa: " bằng chuỗi bắt đầu
+                // bằng chính nó -> chèn lặp 74 lần rồi Word báo "no document is open"). Không tiến lên được thì dừng.
+                if (at < start || at <= lastAt)
+                {
+                    break;
+                }
+                lastAt = at;
+                dynamic whole = doc.Range(at, Math.Min(at + target.Length, end));
+                if (string.Equals(Convert.ToString(whole.Text), target, StringComparison.Ordinal))
+                {
+                    whole.Text = replacement;
+                    count++;
+                    start = at + replacement.Length;
+                }
+                else
+                {
+                    start = Convert.ToInt32(range.End);
+                }
+            }
+            return count;
         }
 
         private static void ApplyWriterFont(dynamic font, Dictionary<string, object> p)

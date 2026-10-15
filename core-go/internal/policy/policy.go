@@ -130,7 +130,7 @@ func Evaluate(ctx context.Context, action string, params map[string]any, prompt 
 		return Ask("Xoá slide khỏi bài thuyết trình")
 	}
 
-	if action == "writer.replaceAll" {
+	if action == "writer.replaceAll" || action == "writer.replaceMany" {
 		if length := documentLength(ctx); length != nil && *length > LargeDocumentChars {
 			return Ask("Thay thế toàn bộ trong tài liệu dài (" + groupDigits(*length) + " ký tự)")
 		}

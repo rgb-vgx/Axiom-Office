@@ -35,6 +35,7 @@ var liveCommands = []liveCommand{
 	{Name: "writer.insertImage", Kind: "wps", Params: []liveCommandParam{{Name: "path", Hint: ""}, {Name: "width", Hint: ""}, {Name: "height", Hint: ""}}},
 	{Name: "writer.insertHyperlink", Kind: "wps", Params: []liveCommandParam{{Name: "url", Hint: ""}, {Name: "text", Hint: ""}}},
 	{Name: "writer.replaceAll", Kind: "wps", Params: []liveCommandParam{{Name: "find", Hint: ""}, {Name: "replace", Hint: ""}}},
+	{Name: "writer.replaceMany", Kind: "wps", Params: []liveCommandParam{{Name: "edits", Hint: "array of {find, replace}; up to 200"}}},
 	{Name: "writer.undo", Kind: "wps", Params: []liveCommandParam{{Name: "count", Hint: ""}}},
 	{Name: "writer.exportPdf", Kind: "wps", Params: []liveCommandParam{{Name: "path", Hint: ""}}},
 	{Name: "writer.save", Kind: "wps", Params: []liveCommandParam{}},

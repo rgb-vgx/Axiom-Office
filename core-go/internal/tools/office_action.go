@@ -97,11 +97,21 @@ const TruncationContract = "Large reads may come back truncated: truncated=true 
 	"chunks). A truncated sample never proves anything about the rest of the range - before concluding " +
 	"the whole range is clean, uniform, or complete, read the omitted part or use et.checkRange. "
 
+// BatchEditRule: luot that 14/10/2026 sua giao an bang 137 lan writer.replaceAll (nhieu lan chi 1-2 ky tu) -> 48 vong,
+// 1,48 trieu token. Gom vao writer.replaceMany thi vai vong; find ngan thi de thay nham cho khac.
+const BatchEditRule = "For several text edits, send them together in ONE writer.replaceMany call (up to 200 " +
+	"{find, replace} pairs, applied in order) instead of many writer.replaceAll calls; make each find long " +
+	"enough to occur only where you mean it, because every occurrence is replaced. "
+
 func (t *OfficeActionTool) Description() string {
+	batch := ""
+	if _, ok := t.allowed["writer.replaceMany"]; ok {
+		batch = BatchEditRule
+	}
 	return "Read and modify the LIVE document that is currently open in the office application. " +
 		"Call this for every document change the user asks for so it happens immediately on screen. " +
 		"Array params such as values must be real JSON arrays of rows, not objects. " +
-		UndoRule + " " + ChunkRule + SheetRefRule + TruncationContract +
+		UndoRule + " " + ChunkRule + SheetRefRule + batch + TruncationContract +
 		"Available actions (with params): " + t.signatures
 }
 

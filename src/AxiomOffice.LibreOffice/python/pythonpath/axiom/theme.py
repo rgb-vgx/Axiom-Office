@@ -97,6 +97,7 @@ ACTION_LABELS = {
     "writer.typeText": "Gõ văn bản",
     "writer.appendText": "Viết thêm nội dung",
     "writer.replaceAll": "Thay thế văn bản",
+    "writer.replaceMany": "Thay thế nhiều chỗ",
     "writer.insertStyledText": "Chèn đoạn văn",
     "writer.formatSelection": "Định dạng vùng chọn",
     "writer.setParagraphAlignment": "Căn lề đoạn văn",
