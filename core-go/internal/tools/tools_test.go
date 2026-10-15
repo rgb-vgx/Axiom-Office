@@ -224,3 +224,35 @@ func TestAppGoneDetectsDeadBridge(t *testing.T) {
 		t.Fatal("loi lenh thuong khong phai ung dung da dong")
 	}
 }
+
+// Luot deepseek 15/10/2026: thay "/" -> "" tren ca tai lieu lam mat dau ngay thang.
+func TestLoneSymbolFindRejected(t *testing.T) {
+	bad := []map[string]any{
+		{"find": "/", "replace": ""},
+		{"find": "/", "replace": "‡"},
+		{"find": "⁄", "replace": ""},
+	}
+	for _, params := range bad {
+		if loneSymbolFind("writer.replaceAll", params) == "" {
+			t.Fatalf("phai chan %v", params)
+		}
+	}
+	many := map[string]any{"edits": []any{map[string]any{"find": "Ngày soạn", "replace": "Ngày"}, map[string]any{"find": "/", "replace": ""}}}
+	if loneSymbolFind("writer.replaceMany", many) == "" {
+		t.Fatal("replaceMany co mot find '/' le phai bi chan")
+	}
+	ok := []map[string]any{
+		{"find": "10102026", "replace": "10/10/2026"},
+		{"find": "–", "replace": "-"},
+		{"find": "…", "replace": "..."},
+		{"find": "a", "replace": "b"},
+	}
+	for _, params := range ok {
+		if problem := loneSymbolFind("writer.replaceAll", params); problem != "" {
+			t.Fatalf("khong duoc chan %v: %s", params, problem)
+		}
+	}
+	if loneSymbolFind("writer.insertText", map[string]any{"find": "/", "replace": ""}) != "" {
+		t.Fatal("chi ap dung cho lenh thay chu")
+	}
+}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"sort"
 	"strings"
+	"unicode"
 
 	"axiomoffice/core/internal/model"
 	"axiomoffice/core/internal/office"
@@ -171,6 +172,9 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 		return Result{JSON: ErrorJSON(problem), Action: action}
 	}
 	params = aliasParams(t.allowed[action], params)
+	if problem := loneSymbolFind(action, params); problem != "" {
+		return Result{JSON: ErrorJSON(problem), Action: action}
+	}
 
 	// Guard chong ghi de (log 11/10/2026): lenh ghi o vao sheet co tu truoc ma dung vao o
 	// khong rong voi gia tri moi khac gia tri cu thi hoi nguoi dung truoc - xem overwrite.go.
@@ -218,6 +222,42 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 		output.Abort = appGoneMessage
 	}
 	return output
+}
+
+// loneSymbolFind: luot that deepseek 15/10/2026 thay "/" -> "" tren ca giao an de xoa dong "/" ma (thuc ra la
+// hinh/khoi) -> mat dau ngay "10/10/2026", "quả cầu/1 lần"; roi doi qua ~40 ky tu giong "/" (59 vong, 2 trieu token).
+// find chi mot ky tu dau cau (hoac xoa han mot ky tu) thi tu choi: dau do nam trong ngay thang, so lieu, link.
+func loneSymbolFind(action string, params map[string]any) string {
+	var edits []map[string]any
+	switch action {
+	case "writer.replaceAll":
+		edits = []map[string]any{params}
+	case "writer.replaceMany":
+		if list, ok := params["edits"].([]any); ok {
+			for _, item := range list {
+				if edit, ok := item.(map[string]any); ok {
+					edits = append(edits, edit)
+				}
+			}
+		}
+	default:
+		return ""
+	}
+	for _, edit := range edits {
+		find, _ := edit["find"].(string)
+		replace, _ := edit["replace"].(string)
+		runes := []rune(find)
+		if len(runes) != 1 {
+			continue
+		}
+		symbol := !unicode.IsLetter(runes[0]) && !unicode.IsDigit(runes[0]) && !unicode.IsSpace(runes[0])
+		if replace == "" || (symbol && strings.ContainsRune("/.,:-", runes[0])) {
+			return "find '" + find + "' alone changes every occurrence in the whole document, including dates " +
+				"(10/10/2026), numbers and links. Put the surrounding words in find so it matches only the place you " +
+				"mean. A line that shows only '/' or '[...]' in writer.getText is a picture or design block, not text: leave it."
+		}
+	}
+	return ""
 }
 
 // appGoneMessage: ung dung Office da dong / sap giua luot - dung luot thay vi de model goi lai mai (luot that

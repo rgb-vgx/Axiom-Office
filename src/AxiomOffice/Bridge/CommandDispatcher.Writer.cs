@@ -54,7 +54,7 @@ namespace AxiomOffice.Bridge
         {
             dynamic app = host.Application;
             dynamic doc = app.ActiveDocument;
-            string text = Convert.ToString(doc.Content.Text);
+            string text = LabelObjects(doc, Convert.ToString(doc.Content.Text));
             int totalChars = text.Length;
             int maxChars = ParamInt(p, "maxChars", 0);
             bool truncated = false;

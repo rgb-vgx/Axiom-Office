@@ -110,9 +110,21 @@ namespace AxiomOffice.Bridge
                 {
                     entry["list"] = list;
                 }
-                if (hasShape && text.Length == 0)
+                if (hasShape && text.Trim('/', ' ').Length == 0)
                 {
-                    entry["t"] = "[block or picture]";
+                    string label = "[ảnh]";
+                    try
+                    {
+                        foreach (dynamic shape in range.ShapeRange)
+                        {
+                            label = ShapeLabel(shape);
+                            break;
+                        }
+                    }
+                    catch
+                    {
+                    }
+                    entry["t"] = label.Length > maxChars ? label.Substring(0, maxChars) + "…" : label;
                 }
                 items.Add(entry);
             }
@@ -142,6 +154,92 @@ namespace AxiomOffice.Bridge
                 }
             }
             return -1;
+        }
+
+        // Hình và khối (writer.insertBlocks) hiện trong Range.Text là một dấu "/". Bản chạy deepseek 15/10/2026: model
+        // tưởng là rác, xoá mọi "/" (mất dấu ngày tháng) rồi dò ~40 ký tự giống "/" suốt 59 vòng. Thay bằng nhãn
+        // kèm chữ trong khối để model biết đó là gì và không mất dấu nội dung đã đưa vào khối.
+        private static string LabelObjects(dynamic doc, string text)
+        {
+            var marks = new List<KeyValuePair<int, string>>();
+            try
+            {
+                foreach (dynamic shape in doc.Shapes)
+                {
+                    try
+                    {
+                        marks.Add(new KeyValuePair<int, string>(Convert.ToInt32(shape.Anchor.Start), ShapeLabel(shape)));
+                    }
+                    catch
+                    {
+                    }
+                }
+                foreach (dynamic picture in doc.InlineShapes)
+                {
+                    try
+                    {
+                        string label = ShapeLabel(picture);
+                        marks.Add(new KeyValuePair<int, string>(Convert.ToInt32(picture.Range.Start), label == "[hình]" ? "[ảnh]" : label));
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+            catch
+            {
+                return text;
+            }
+            if (marks.Count == 0 || marks.Count > 200)
+            {
+                return text;
+            }
+            int docStart = Convert.ToInt32(doc.Content.Start);
+            var sb = new StringBuilder(text);
+            foreach (var mark in marks.OrderByDescending(m => m.Key))
+            {
+                int offset;
+                try
+                {
+                    // Vị trí Range khác chỉ số trong Text (mã trường của link bị ẩn): đo bằng độ dài Text phía trước.
+                    offset = Convert.ToString(doc.Range(docStart, mark.Key).Text ?? "").Length;
+                }
+                catch
+                {
+                    continue;
+                }
+                if (offset > sb.Length)
+                {
+                    continue;
+                }
+                if (offset < sb.Length && sb[offset] == '/')
+                {
+                    sb.Remove(offset, 1);
+                }
+                sb.Insert(offset, mark.Value);
+            }
+            return sb.ToString();
+        }
+
+        private static string ShapeLabel(dynamic shape)
+        {
+            string inner = "";
+            try
+            {
+                if (Convert.ToInt32(shape.TextFrame.HasText) != 0)
+                {
+                    inner = Convert.ToString(shape.TextFrame.TextRange.Text);
+                }
+            }
+            catch
+            {
+            }
+            inner = Regex.Replace(inner ?? "", @"[\r\n\v\a]+", " | ").Trim(' ', '|');
+            if (inner.Length == 0)
+            {
+                return "[hình]";
+            }
+            return "[khối: " + (inner.Length > 400 ? inner.Substring(0, 400) + "…" : inner) + "]";
         }
 
         private static string CleanCellText(string text, int limit)
