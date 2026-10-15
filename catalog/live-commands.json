@@ -415,6 +415,65 @@
     ]
   },
   {
+    "name": "writer.outline",
+    "kind": "wps",
+    "agent": false,
+    "summary": "Dàn bài tài liệu: các đoạn (số thứ tự toàn tài liệu, chữ rút gọn, số tự động) và bảng (số hàng, cột, hàng tiêu đề)",
+    "params": [
+      {
+        "name": "maxChars",
+        "required": false,
+        "hint": "characters per paragraph (default 160)"
+      }
+    ]
+  },
+  {
+    "name": "writer.restyle",
+    "kind": "wps",
+    "agent": false,
+    "summary": "Trình bày lại nền chung KHÔNG đổi chữ: tiêu đề mục (I., A., *), tiêu đề con (1.), nhãn (a. ...:), gạch đầu dòng hai cấp, bỏ dòng trống thừa, bảng (viền mảnh, hàng tiêu đề nhạt lặp lại), lề trang, số trang",
+    "params": [
+      {
+        "name": "accent",
+        "required": false,
+        "hint": "#RRGGBB headings (default #2E5C8A)"
+      },
+      {
+        "name": "font",
+        "required": false,
+        "hint": "default Times New Roman"
+      },
+      {
+        "name": "size",
+        "required": false,
+        "hint": "body size (default 13)"
+      }
+    ]
+  },
+  {
+    "name": "writer.insertBlocks",
+    "kind": "wps",
+    "agent": false,
+    "summary": "Chèn khối bo tròn nền nhạt (ô ghi chú, cảnh báo, thẻ cạnh nhau) - thay các đoạn [replaceFrom, replaceTo] hoặc chèn trước đoạn `before`",
+    "params": [
+      {
+        "name": "blocks",
+        "required": true,
+        "hint": "array of {before | replaceFrom, replaceTo, kind: box|row, gap, after, cells: [{tone, lines: [{k: title|bullet|text|small|center, t, size, bold}]}]}"
+      },
+      {
+        "name": "accent",
+        "required": false,
+        "hint": null
+      },
+      {
+        "name": "font",
+        "required": false,
+        "hint": null
+      }
+    ]
+  },
+  {
     "name": "writer.undo",
     "kind": "wps",
     "agent": true,

@@ -229,6 +229,10 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 	if appKind == "wpp" && !request.Plan && catalog.Has("wpp.sourceManifest") {
 		list = append(list, tools.NewSlidesFromTemplateTool())
 	}
+	// Trinh bay lai tai lieu Word theo mau (khoi bo tron nen nhat): chi khi sua duoc va bridge co lenh dung khoi.
+	if appKind == "wps" && !request.Plan && catalog.Has("writer.insertBlocks") {
+		list = append(list, tools.NewDocDesignTool())
+	}
 	// Danh sach viec (write_todos): chi khi lam that - lap ke hoach da tra ve ke hoach bang chu.
 	if !request.Plan {
 		list = append(list, tools.NewTodoTool())

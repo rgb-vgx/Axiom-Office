@@ -17,6 +17,7 @@ var CallLimits = map[string]int{
 	"slides_from_template":      40,
 	"web_search":                8,
 	"write_todos":               30,
+	"doc_design":                8,
 	"mcp__office__ppt_get_text": 4,
 	"mcp__office__ppt_profile":  4,
 	"mcp__office__doc_get_text": 4,

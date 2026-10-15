@@ -21,6 +21,7 @@ namespace AxiomOffice.Bridge
         // Mọi lệnh, theo thứ tự hiển thị trong README và mô tả tool.
         internal static readonly CommandInfo[] Commands = GeneralCommands()
             .Concat(WriterCommands())
+            .Concat(WriterDesignCommands())
             .Concat(SpreadsheetCommands())
             .Concat(PresentationCommands())
             .Concat(TemplateCommands())

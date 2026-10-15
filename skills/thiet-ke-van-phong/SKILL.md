@@ -29,6 +29,10 @@ lệnh (màu `#RRGGBB`, cỡ chữ, number format). Không tự chế màu mới
 
 ## Quy trình
 
+**Word, trình bày lại cả tài liệu có sẵn**: có tool `doc_design` thì dùng nó thay cho mọi bước dưới đây
+(không định dạng từng đoạn). Gọi một lần không tham số để nhận dàn bài, rồi gọi lại với `blocks` chỉ cho
+vài chỗ đáng nhấn (mục tiêu, lưu ý, so sánh); phần lớn các mục để nguyên, không cần khối.
+
 - [ ] Đọc tài liệu hiện tại trước (getText / readRange / listSlides) để biết đang có gì.
 - [ ] Viết ra **spec ngắn** trước lệnh đầu tiên — font, 2–3 màu, cỡ chữ từng cấp — rồi bám đúng spec đó
       cho mọi lệnh. Spec phải nằm trong phần bạn viết ra (kèm lệnh gọi đầu tiên), không chỉ nghĩ trong đầu:

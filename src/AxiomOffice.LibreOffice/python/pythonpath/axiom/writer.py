@@ -621,6 +621,22 @@ command("writer.replaceAll", "wps", replace_all, "Tìm và thay toàn bộ", req
 command("writer.replaceMany", "wps", replace_many,
         "Thay NHIỀU chỗ trong một lần: `edits` = [{find, replace}] theo thứ tự (mỗi cặp thay mọi chỗ khớp) - dùng thay cho nhiều lần writer.replaceAll; trả số chỗ đã thay của từng cặp",
         req("edits", "array of {find, replace}; up to 200"), agent=True, undo=True)
+def _design_unsupported(env, params):
+    # Trinh bay lai tai lieu (tool doc_design) moi co tren Word (CommandDispatcher.WriterDesign.cs): khoi bo tron
+    # dung bang InsertXML + wps shape. Ban LibreOffice lam sau.
+    raise values.ParamError("not available on LibreOffice yet: format with writer.formatSelection/writer.formatTable")
+
+
+command("writer.outline", "wps", _design_unsupported,
+        "Dàn bài tài liệu: các đoạn (số thứ tự toàn tài liệu, chữ rút gọn, số tự động) và bảng (số hàng, cột, hàng tiêu đề)",
+        opt("maxChars", "characters per paragraph (default 160)"))
+command("writer.restyle", "wps", _design_unsupported,
+        "Trình bày lại nền chung KHÔNG đổi chữ: tiêu đề mục (I., A., *), tiêu đề con (1.), nhãn (a. ...:), gạch đầu dòng hai cấp, bỏ dòng trống thừa, bảng (viền mảnh, hàng tiêu đề nhạt lặp lại), lề trang, số trang",
+        opt("accent", "#RRGGBB headings (default #2E5C8A)"), opt("font", "default Times New Roman"), opt("size", "body size (default 13)"), undo=True)
+command("writer.insertBlocks", "wps", _design_unsupported,
+        "Chèn khối bo tròn nền nhạt (ô ghi chú, cảnh báo, thẻ cạnh nhau) - thay các đoạn [replaceFrom, replaceTo] hoặc chèn trước đoạn `before`",
+        req("blocks", "array of {before | replaceFrom, replaceTo, kind: box|row, gap, after, cells: [{tone, lines: [{k: title|bullet|text|small|center, t, size, bold}]}]}"),
+        opt("accent"), opt("font"), undo=True)
 command("writer.undo", "wps", undo, "Hoàn tác (mỗi thao tác AI = 1 bước)", opt("count"), agent=True)
 command("writer.exportPdf", "wps", lambda env, p: documents.export_pdf(env.document, "wps", values.string(p, "path")),
         "Xuất PDF", req("path"), agent=True)

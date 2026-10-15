@@ -39,7 +39,7 @@ var noDocumentChange = map[string]bool{
 	"app.info": true, "app.screenshot": true,
 	"et.readRange": true, "et.checkRange": true, "et.listSheets": true,
 	"et.save": true, "et.saveAs": true, "et.exportPdf": true,
-	"writer.getText": true, "writer.selection": true, "writer.checkTables": true,
+	"writer.getText": true, "writer.selection": true, "writer.checkTables": true, "writer.outline": true,
 	"writer.save": true, "writer.saveAs": true, "writer.exportPdf": true,
 	"wpp.listSlides": true, "wpp.checkLayout": true,
 	"wpp.save": true, "wpp.saveAs": true, "wpp.exportPdf": true,
@@ -54,7 +54,7 @@ func ChangesDocument(action string) bool { return !noDocumentChange[action] }
 var readOnly = map[string]bool{
 	"app.info": true, "app.screenshot": true,
 	"et.readRange": true, "et.checkRange": true, "et.listSheets": true,
-	"writer.getText": true, "writer.selection": true, "writer.checkTables": true,
+	"writer.getText": true, "writer.selection": true, "writer.checkTables": true, "writer.outline": true,
 	"wpp.listSlides": true, "wpp.checkLayout": true,
 }
 
@@ -94,6 +94,8 @@ type RunContext struct {
 	// templateBuilt: so slide slides_from_template da dung trong CA luot (cac lo truoc + lo nay) - cau tra loi cuoi
 	// tach "dung trong lan nay" voi "co tu luot truoc".
 	templateBuilt int
+	// docRestyled: doc_design da trinh bay lai nen chung trong luot (so doan cua dan bai da doi theo).
+	docRestyled bool
 }
 
 func (c *RunContext) ConfirmOrDecline(action, reason, paramsPreview string) (bool, error) {
