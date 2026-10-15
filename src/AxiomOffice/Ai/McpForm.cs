@@ -307,6 +307,11 @@ namespace AxiomOffice.Ai
             {
                 row.SubItems.Add("Sẽ nạp ở lượt sau");
             }
+            // Server đánh dấu là nguồn tìm kiếm web: nói rõ để khỏi thắc mắc vì sao nó nằm trong menu Tìm web.
+            if (!isOffice && McpFile.Str(entry, "role") == SearchSources.WebSearchRole)
+            {
+                row.SubItems[row.SubItems.Count - 1].Text += " · nguồn tìm web";
+            }
             return row;
         }
 
@@ -514,6 +519,7 @@ namespace AxiomOffice.Ai
         private readonly TextBox _url;
         private readonly TextBox _headers;
         private readonly CheckBox _trusted;
+        private readonly CheckBox _webSearch;
         private readonly CheckBox _disabled;
         private readonly Label _error;
 
@@ -591,6 +597,17 @@ namespace AxiomOffice.Ai
             Controls.Add(trustNote);
             top += 24;
 
+            _webSearch = new CheckBox
+            {
+                Text = "Là nguồn tìm kiếm web (hiện trong menu Tìm web trên ribbon)",
+                Left = 12,
+                Top = top,
+                Width = 536,
+                AutoSize = true,
+            };
+            Controls.Add(_webSearch);
+            top += 30;
+
             _disabled = new CheckBox { Text = "Tắt server này", Left = 12, Top = top, Width = 536, AutoSize = true };
             Controls.Add(_disabled);
             top += 30;
@@ -634,6 +651,7 @@ namespace AxiomOffice.Ai
             _url.Text = McpFile.Str(entry, "url");
             _headers.Lines = MapLines(McpFile.StrMap(entry, "headers"), ": ");
             _trusted.Checked = McpFile.Flag(entry, "trusted");
+            _webSearch.Checked = McpFile.Str(entry, "role") == SearchSources.WebSearchRole;
             _disabled.Checked = McpFile.Flag(entry, "disabled");
             if (McpFile.Str(entry, "url").Length > 0)
             {
@@ -745,6 +763,11 @@ namespace AxiomOffice.Ai
             if (_trusted.Checked)
             {
                 entry["trusted"] = true;
+            }
+            // Đánh dấu nguồn tìm kiếm web: menu "Tìm web" trên ribbon liệt kê server có "role" này.
+            if (!_isOffice && _webSearch.Checked)
+            {
+                entry["role"] = SearchSources.WebSearchRole;
             }
             if (_disabled.Checked)
             {

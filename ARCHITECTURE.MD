@@ -1107,7 +1107,7 @@ giữ port) → idle. Ctrl+C dừng bridge và `Quit` app.
 | `LlmModel` | String | rỗng | Tên model |
 | `LlmApiKey` | String | rỗng | `dpapi:<base64>` (DPAPI `CurrentUser`, không entropy; Linux: libsecret hoặc plaintext trong `config.json` 0600) |
 | `TavilyApiKey` | String | rỗng | Khoá tìm kiếm web cho tool `tavily_search` (lưu `dpapi:` như trên) |
-| `TavilyEnabled` | DWORD | 1 | Cho AI tìm trên web (toggle ribbon); tắt thì không đăng ký tool dù đã có khoá |
+| `TavilyEnabled` | DWORD | 1 | Nguồn tìm web đang chọn là Tavily (menu **Tìm web** trên ribbon); 0 = Tavily tắt. Menu còn ghi cờ `disabled` của các server MCP đánh dấu `"role": "web-search"` trong `mcp.json` |
 | `LlmFallbackModels` | String | rỗng | Model dự phòng cùng provider, phân cách `,`/`;`/xuống dòng |
 | `LlmContextWindow` | DWORD | 0 | Cửa sổ ngữ cảnh khi provider không khai (Ollama/LM Studio); 0 = theo provider |
 | `CorePort` | DWORD | 47840 | Port Agent Core (bận thì thử 47840–47849; Core Go giữ luôn listener đã bind được) |
@@ -1384,10 +1384,12 @@ từ chối; lượt `interactive=false` từ chối ngay. Mọi tool call vào 
 
 ### 22.9 MCP client (`internal/mcp/`)
 
-- `Manager` đọc `mcp.json` (`{"mcpServers": {name: {command, args, env | url, headers, trusted, disabled}}}`)
+- `Manager` đọc `mcp.json` (`{"mcpServers": {name: {command, args, env | url, headers, trusted, disabled, role}}}`)
   cộng server built-in `office` = `AxiomOffice.Core mcp` (Windows: `Host.exe mcp`; Linux: chính binary
   Core — tin cậy, **chỉ tool làn file**; tool live bị lọc vì đi vòng allowlist/policy). Khởi động
   lười ở lượt đầu, timeout 20s, lỗi → ẩn tool + log; `mcp.json` đổi → nạp lại ở lượt sau.
+  Riêng `role: "web-search"` là đánh dấu của add-in (Core bỏ qua): server nằm trong menu **Tìm web**
+  trên ribbon, cạnh nguồn Tavily tích hợp — chọn nguồn nào thì add-in tắt các nguồn còn lại.
 - Transport: stdio (JSON-RPC mỗi dòng) và Streamable HTTP (JSON hoặc SSE, giữ `Mcp-Session-Id`).
 
 ### 22.10 QA hai mức

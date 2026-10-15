@@ -109,6 +109,60 @@ namespace AxiomOffice
             }
         }
 
+        // Menu "Tìm web" (dropDown chọn nguồn tìm kiếm): danh sách đọc từ HKCU + mcp.json mỗi lần host hỏi,
+        // nên thêm/bớt nguồn ngoài là thấy ngay, không cần mở lại ứng dụng.
+        public int OnSearchCount(object control)
+        {
+            try
+            {
+                return RibbonUi.SearchCount();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("OnSearchCount failed", ex);
+                return 0;
+            }
+        }
+
+        public string OnSearchLabel(object control, int index)
+        {
+            try
+            {
+                return RibbonUi.SearchLabel(index);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("OnSearchLabel failed", ex);
+                return "";
+            }
+        }
+
+        public int OnSearchSelected(object control)
+        {
+            try
+            {
+                return RibbonUi.SearchSelected();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("OnSearchSelected failed", ex);
+                return 0;
+            }
+        }
+
+        public void OnSearchPick(object control, string selectedId, int selectedIndex)
+        {
+            Logger.Info("OnSearchPick: index=" + selectedIndex);
+            try
+            {
+                RibbonUi.HandleSearchPick(this, selectedIndex);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("OnSearchPick failed", ex);
+            }
+        }
+
         public void OnToggleAction(object control, bool pressed)
         {
             string tag = ControlTag(control);

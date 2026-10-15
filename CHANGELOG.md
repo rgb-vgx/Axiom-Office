@@ -17,13 +17,18 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 - `tests/win/check_wizard_i18n.ps1`: test reflection không cần Office — đổi sang English giữa
   chừng, kiểm tra chữ đổi và dữ liệu còn nguyên (13/13 PASS).
 
-### Added — Bật/tắt tìm web (Tavily) một chạm trên ribbon (15/10/2026)
-- Cờ riêng `TavilyEnabled` (HKCU, mặc định bật; `AXIOM_TAVILY_ENABLED` ghi đè): Core chỉ đăng ký
-  tool `web_search` khi cờ bật và đã có khoá — khác xoá khoá (xoá là mất, bật lại phải nhập lại).
-  `GET /v1/setup` thêm `tavilyEnabled` để nút hiện trạng thái thật của Core.
-- Ribbon nhóm Kiểm tra thêm toggle **Tìm trên web** (cạnh Nhìn tài liệu, cùng pattern xác nhận
-  Core ở luồng nền): bật mà chưa có khoá thì mở thẳng wizard để nhập; Core đọc lại mỗi lượt nên
-  có hiệu lực ngay, không cần khởi động lại.
+### Added — Menu "Tìm web" trên ribbon: chọn nguồn tìm kiếm (Tắt · Tavily · MCP) (16/10/2026)
+- Nhóm **Tìm web** thay cho toggle cũ: dropDown chọn **1 nguồn** cho AI — *Tắt (không tìm web)*,
+  *Tavily (tích hợp)*, hoặc từng server ngoài đánh dấu là nguồn tìm kiếm. Chọn nguồn nào thì tắt
+  các nguồn còn lại: ghi `TavilyEnabled` (HKCU) + cờ `disabled` của server trong `mcp.json` —
+  Core đọc lại mỗi lượt, có hiệu lực ngay. Danh sách đọc lại mỗi lần mở menu (thêm server là thấy luôn).
+- **Tavily được coi như một nguồn ngang hàng với MCP**: server ngoài muốn nằm trong menu thì thêm
+  `"role": "web-search"` trong `mcp.json` — `McpServerEditForm` (Công cụ ngoài…) có ô tick
+  "Là nguồn tìm kiếm web"; dòng trạng thái trong dialog ghi rõ "· nguồn tìm web".
+- `TavilyEnabled` (HKCU, mặc định 1; `AXIOM_TAVILY_ENABLED` ghi đè): Core chỉ đăng ký tool
+  `tavily_search` khi cờ bật và đã có khoá. `GET /v1/setup` thêm `tavilyEnabled` để menu kiểm tra
+  trạng thái thật; chọn Tavily mà chưa có khoá thì mở thẳng wizard để nhập; biến môi trường đè
+  cấu hình thì báo rõ thay vì im lặng.
 
 ### Added — Dialog Công cụ ngoài (MCP) trên ribbon (15/10/2026)
 - Nhóm Quản lý thêm nút **Công cụ ngoài…** (`Ai/McpForm.cs`, cạnh Kỹ năng…): gộp `mcp.json`
