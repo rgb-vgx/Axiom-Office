@@ -1,7 +1,8 @@
 # Kiến trúc Axiom Office
 
 Tài liệu thiết kế của Axiom Office (sau đợt **Agent Core** giai đoạn 0–4 theo [New_arch.md](New_arch.md),
-tháng 9/2026), chia hai phần:
+đợt viết lại Core bằng Go G1–G12 và đợt tích hợp LibreOffice/WPS Linux theo
+[LibreOffice_arch.md](LibreOffice_arch.md) và [docs/wps-bridge.md](docs/wps-bridge.md), tháng 10/2026), chia hai phần:
 
 - **Phần I: High Level Design (HLD)**: hệ thống nhìn từ ngoài vào: mục tiêu, bối cảnh, các khối
   lớn và cách chúng nói chuyện, kịch bản chính, triển khai, yêu cầu phi chức năng, quyết định kiến
@@ -58,9 +59,9 @@ cách chuẩn để điều khiển app đang mở hoặc xử lý file Office.
 
 | Mã | Mục tiêu |
 |---|---|
-| G1 | Một bản cài phục vụ cả **Microsoft Office** và **WPS Office**: Word/Writer, Excel/Spreadsheets, PowerPoint/Presentation |
+| G1 | Một bản cài phục vụ cả **Microsoft Office**, **WPS** và **LibreOffice**: Word/Writer, Excel/Spreadsheets/Calc, PowerPoint/Presentation/Impress |
 | G2 | Ba cách dùng trên cùng một lõi: **Ask AI** trong app, **HTTP API** localhost, **MCP server** |
-| G3 | Cài **không cần admin**, không cần Python hay runtime thêm (add-in: .NET Framework 4.8 có sẵn; Agent Core: exe tự chứa .NET 10) |
+| G3 | Cài **không cần admin**, không cần Python hay runtime thêm (add-in Windows: .NET Framework 4.8 có sẵn; Agent Core Go: một file ~12MB; LibreOffice: Python UNO có sẵn theo app) |
 | G4 | **An toàn**: chỉ localhost, có token; AI không làm mất dữ liệu người dùng |
 | G5 | **Dễ mở rộng**: thêm một lệnh chỉ sửa một chỗ |
 | G6 | **Agent Core**: agent chạy ở process riêng, nhớ hội thoại theo tài liệu và **ghi nhớ dài hạn**, dùng **kỹ năng** theo chuẩn Agent Skills, **hỏi xác nhận** trước thao tác rủi ro, dùng thêm công cụ **MCP** |
@@ -124,8 +125,8 @@ flowchart TB
         addin -->|"COM late-bound"| om
     end
 
-    core["AxiomOffice.Core.exe<br/>.NET 10, một bản / người dùng<br/>agent · skills · memory · policy · MCP client"]
-    hostexe["AxiomOffice.Host.exe<br/>.NET 4.8 console<br/>MCP server · companion · công cụ dev"]
+    core["AxiomOffice.Core.exe<br/>Go, một file ~12MB, một bản / người dùng<br/>agent · skills · memory · policy · MCP client · MCP server (subcommand mcp)"]
+    hostexe["AxiomOffice.Host.exe<br/>.NET 4.8 console<br/>shim mcp (forward byte sang Core) · companion · công cụ dev"]
     cfg[("Config store<br/>HKCU\\Software\\AxiomOffice")]
     rt[("Runtime files<br/>%LOCALAPPDATA%\\AxiomOffice<br/>bridge.log · core.log · core.json · sessions")]
     db[("core\\core.db (SQLite)<br/>hội thoại · memory · audit")]
@@ -153,8 +154,10 @@ flowchart TB
 | Container | Công nghệ | Trách nhiệm | Giao tiếp |
 |---|---|---|---|
 | **Add-in `AxiomOffice.dll`** | .NET 4.8, C# 7.3, COM in-process, WinForms | UI trong app (pane, cài đặt, quản lý ghi nhớ), HTTP bridge, thực thi lệnh trên tài liệu; agent in-process khi Core không dùng được | COM với app; HTTP server loopback; HTTP client tới Core; HTTPS tới LLM (dự phòng) |
-| **`AxiomOffice.Core.exe`** | .NET 10, ASP.NET Minimal API (Kestrel), SQLite, single-file tự chứa | Agent cho mọi app: prompt, vòng tool-calling, hội thoại, skill, memory dài hạn, policy xác nhận, audit, MCP client, QA | HTTP loopback `127.0.0.1:47840` (+SSE); HTTP client tới bridge; HTTPS tới LLM; stdio/HTTP tới MCP server |
-| **`AxiomOffice.Host.exe`** | .NET 4.8 console (biên dịch cùng source add-in) | MCP server (live + file), companion không cần add-in, công cụ dev | stdio với MCP client (và với Core: làn file); HTTP client tới bridge; COM (companion, đọc `.xls`) |
+| **`AxiomOffice.Core.exe`** | **Go (thuần Go, không cgo; SQLite `modernc.org/sqlite`), một file ~12MB**, một bản / người dùng | Agent cho mọi app: prompt, vòng tool-calling + chuỗi guard, hội thoại, skill, memory dài hạn, policy xác nhận, audit, MCP client, QA | HTTP loopback `127.0.0.1:47840` (+SSE); HTTP client tới bridge; HTTPS tới LLM; stdio/HTTP tới MCP server |
+| **`AxiomOffice.Host.exe`** | .NET 4.8 console (biên dịch cùng source add-in) | **Shim chuyển tiếp byte** `mcp` sang Core Go; companion không cần add-in, công cụ dev | stdio với MCP client (và với Core: làn file); HTTP client tới bridge; COM (companion) |
+| **Extension LibreOffice** | Python UNO (`.oxt`), chạy trong `soffice` | Bridge HTTP + sidebar Ask AI cho Writer/Calc/Impress (cùng tên lệnh, cùng giao thức) | UNO với tài liệu; HTTP loopback `:47851–47853` |
+| **Add-in WPS Linux** | JS add-in (`src/AxiomOffice.WPS`) | Bridge cho WPS Linux qua Core (`:47861`, long-poll) | JS API của WPS; HTTP tới Core |
 | **Config store** | Registry HKCU | Port, token, cấu hình LLM (API key mã hoá DPAPI), bật/tắt Core/memory/QA thị giác | Đọc/ghi trực tiếp; Core đọc lại mỗi lượt |
 | **Runtime + dữ liệu** | File trong `%LOCALAPPDATA%\AxiomOffice` | Log, `core.json` (tìm Core), `sessions\` (bridge đang sống), `core\core.db`, `skills\`, `mcp.json` | Đọc/ghi trực tiếp |
 
@@ -178,15 +181,15 @@ flowchart TB
     end
     subgraph io["Giao tiếp"]
         http["HTTP bridge"]
-        mcpserver["MCP server (Host)"]
+        mcpserver["MCP server (Core Go, subcommand mcp)"]
         discovery["Session registry · SSE"]
     end
     subgraph cmd["Hệ lệnh"]
-        registry["Command registry + dispatcher<br/>lệnh writer/et/wpp + QA cấu trúc"]
+        registry["Command registry + dispatcher<br/>lệnh writer/et/wpp + template/design + QA cấu trúc"]
     end
     subgraph integ["Tích hợp host"]
-        gate["COM gate · retry · nhận diện app"]
-        om["Object model Office / WPS"]
+        gate["COM gate / UnoGate · retry · nhận diện app"]
+        om["Object model Office / WPS / UNO"]
     end
     subgraph filecore["Xử lý file"]
         ooxml["OOXML engine<br/>docx · xlsx · pptx"]
@@ -218,8 +221,8 @@ flowchart TB
 | Session registry · SSE | Cho bên ngoài biết bridge nào đang sống, tài liệu nào đang mở, vùng chọn thay đổi | Add-in |
 | **Hệ lệnh** | Danh sách lệnh duy nhất (`writer.*`, `et.*`, `wpp.*`, chung, QA cấu trúc), kiểm tra tham số, thực thi | Add-in (Host dùng chung metadata) |
 | Tích hợp host | Tuần tự hoá truy cập COM, thử lại khi app bận, nhận diện loại app | Add-in |
-| MCP server + tools | 50 tool cho MCP client: làn live gọi bridge, làn file sửa file trực tiếp | Host.exe |
-| OOXML engine | Đọc/ghi docx/xlsx/pptx không cần app, lưu atomic | Host.exe |
+| MCP server + tools | 50 tool cho MCP client: làn live gọi bridge, làn file sửa file trực tiếp | **Core Go (`core-go/internal/mcpserver`)**; `Host.exe mcp` chỉ forward |
+| OOXML engine | Đọc/ghi docx/xlsx/pptx không cần app, lưu atomic | Core Go (`internal/ooxml`, `internal/xlsx`, `internal/docx`, `internal/pptx`, `internal/sheet`, `internal/cfb` cho `.xls` BIFF8) |
 
 ## 5. Kịch bản chính
 
@@ -316,8 +319,8 @@ flowchart LR
         subgraph wps["WPS Office 12"]
             wpsexe["wps.exe (một process cho cả 3 thành phần)<br/>Writer :47821 · Spreadsheets :47822 · Presentation :47823"]
         end
-        mcphost["AxiomOffice.Host.exe mcp<br/>(MCP client spawn, sống theo phiên)"]
-        core["AxiomOffice.Core.exe :47840<br/>(một bản / người dùng, add-in khởi động khi cần)"]
+        mcphost["AxiomOffice.Host.exe mcp<br/>(MCP client spawn, sống theo phiên; forward sang Core)"]
+        core["AxiomOffice.Core.exe :47840 (Go)<br/>(một bản / người dùng, add-in khởi động khi cần)"]
         reg[("HKCU\\Software\\AxiomOffice")]
         local[("%LOCALAPPDATA%\\AxiomOffice")]
     end
@@ -339,10 +342,16 @@ flowchart LR
   nạp add-in qua khóa `Addins`, WPS qua whitelist `AddinsWL`. DLL chạy thẳng từ thư mục giải nén.
 - **Nâng cấp**: build/giải nén bản mới đè lên, mở lại app. Bản tên cũ `WpsAiBridge` được tự gỡ và
   chuyển cấu hình khi cài.
-- **Agent Core**: một process cho mỗi người dùng Windows (mutex `Local\AxiomOffice.Core`), chỉ nghe
-  `127.0.0.1`, ghi `core.json` (port, pid, version, protocol) khi sẵn sàng. Pane đọc `core.json`, hỏi
-  `/health`, chưa có thì khởi động `AxiomOffice.Core.exe` cạnh DLL; build/gỡ cài đặt tắt Core qua
-  `/v1/admin/shutdown`.
+- **Agent Core**: một process cho mỗi người dùng Windows (mutex `Local\AxiomOffice.Core`; trên Linux
+  là `flock` trong `$XDG_RUNTIME_DIR/axiom-office`), chỉ nghe `127.0.0.1`, ghi `core.json`
+  (port, pid, version, protocol) khi sẵn sàng. Pane đọc `core.json`, hỏi `/health`, chưa có thì
+  khởi động `AxiomOffice.Core.exe` cạnh DLL; build/gỡ cài đặt tắt Core qua `/v1/admin/shutdown`
+  (Linux: SIGTERM cũng dừng êm).
+- **LibreOffice** (Linux/Windows): extension Python UNO mở ba bridge `:47851` (Writer) /
+  `:47852` (Calc) / `:47853` (Impress), cùng giao thức và tên lệnh; session file
+  `{pid}-{kind}.json`. Chi tiết: [LibreOffice_arch.md](LibreOffice_arch.md).
+- **WPS Linux**: JS add-in (`src/AxiomOffice.WPS`) nối long-poll về Core; Core mở bridge `:47861`
+  nói đúng giao thức bridge. Chi tiết: [docs/wps-bridge.md](docs/wps-bridge.md).
 
 ## 7. Yêu cầu phi chức năng
 
@@ -352,8 +361,8 @@ flowchart LR
 | **An toàn dữ liệu** | AI không làm mất dữ liệu | Agent chỉ gọi lệnh trong allowlist (không `closeAll`, không tạo sổ Excel mới); không tự lưu/xuất file, **policy xác nhận** khi model vẫn gọi lưu/xuất, ghi đè file, xoá slide, `replaceAll` tài liệu dài, tool MCP ngoài; mỗi thao tác Word = 1 bước Undo; làn file lưu atomic; MCP làn file chỉ mở tool file (tool live đi vòng allowlist bị lọc) |
 | **Ổn định host** | Add-in không được làm crash/treo Office | Mọi truy cập COM đi qua một cổng tuần tự; COM call bọc try/catch; thử lại khi app bận; heartbeat/poller bỏ lượt khi app bận; interface host gọi đều là dispinterface |
 | **Tương thích** | Office x64 và WPS 12 với cùng một DLL | Late-bound `dynamic`; lệnh viết theo loại app logic; fallback khi API khác nhau (`SaveAs2` → `SaveAs`...). Đã kiểm chứng Office 2024 x64, WPS 12.1 (Writer) |
-| **Phản hồi** | UI không đơ; một lượt AI có giới hạn | Agent chạy ở Core, tiến trình qua SSE; 120s mỗi request LLM (chỉnh được), 5 phút và 200k token mỗi lượt; nút Dừng hủy request ngay; trích xuất ghi nhớ và tóm tắt chạy nền |
-| **Bền với LLM** | Lỗi tạm thời của provider không làm hỏng lượt | Thử lại 429/5xx/rớt mạng tối đa 3 lần (1s→2s→4s, theo `Retry-After`); nhắc một lần khi model trả lời rỗng; sửa tên lệnh viết sai nhẹ; gỡ dữ liệu bọc `{"item":…}` |
+| **Phản hồi** | UI không đơ; một lượt AI có giới hạn | Agent chạy ở Core, tiến trình qua SSE; 120s mỗi request ngắn (chỉnh được), lượt agent không trần thời gian (giới hạn bằng 100 vòng + nút Dừng); model hỏng thì chuyển model dự phòng; trích xuất ghi nhớ và tóm tắt chạy nền |
+| **Bền với LLM** | Lỗi tạm thời của provider không làm hỏng lượt | Thử lại 429/5xx/rớt mạng tối đa 3 lần (1s→2s→4s, theo `Retry-After`); nhắc một lần khi model trả lời rỗng; chuyển model dự phòng khi thử lại không qua; dọn ngữ cảnh + cứu tràn cửa sổ; sửa tên lệnh viết sai nhẹ; gỡ dữ liệu bọc `{"item":…}` |
 | **Riêng tư** | Dữ liệu ở lại máy người dùng | Memory/hội thoại/audit trong `core.db` cục bộ; không lưu mật khẩu, số thẻ/CCCD, API key vào memory; model chỉ thêm memory, sửa/xoá chỉ người dùng; `uninstall -Purge` xoá sạch |
 | **Quan sát** | Chẩn đoán được lỗi ngay trên máy người dùng | `bridge.log` (pid từng dòng, transcript agent, trạng thái tài liệu khi nạp và ở lệnh đầu tiên); `/health`, `/session`, `office_sessions` |
 | **Cài đặt, vận hành** | Không admin, không runtime thêm, gỡ sạch | Toàn bộ đăng ký trong HKCU; chỉ cần .NET 4.8; `uninstall -Purge` xoá cả cấu hình và log |
@@ -372,25 +381,25 @@ flowchart LR
 | AD-6 | SSE bằng poll-diff 500ms | Chạy giống nhau trên Office và WPS, không cần COM event sink | Trễ tới 500ms |
 | AD-7 | Agent chỉ có một tool `office_action` | Prompt gọn, thêm lệnh không đổi schema tool | Model phải đọc danh sách lệnh trong mô tả |
 | AD-8 | Registry lệnh khai báo cạnh handler | Một chỗ sửa; dispatcher, agent, MCP, README không lệch nhau | Mô tả tiếng Việt và gợi ý tiếng Anh nằm cùng dòng |
-| AD-9 | MCP server C# trong cùng exe | Người dùng không cần Python; dùng chung cấu hình và registry | Tự viết JSON-RPC và engine OOXML. **Cập nhật 01/10/2026**: Windows giữ nguyên bản C# trong `Host.exe`; Linux chuyển sang subcommand `mcp` của Agent Core Go (cùng hợp đồng tool, bỏ hẳn .NET trên máy Linux) |
+| AD-9 | MCP server là subcommand `mcp` của Core Go (cùng hợp đồng 50 tool); `Host.exe mcp` chỉ forward byte | Một bản duy nhất cho Windows + Linux, không lệch hợp đồng | Shim giữ để cấu hình MCP client cũ không phải đổi |
 | AD-10 | Mọi đăng ký trong HKCU | Không cần admin | Chỉ cài cho từng người dùng |
-| AD-11 | Agent Core là process riêng .NET 10 (single-file tự chứa) | Dùng được thư viện hiện đại (Kestrel, SQLite), một agent cho mọi app, không làm nặng process Office | Exe ~50MB; thêm một process và giao thức HTTP nội bộ |
+| AD-11 | Agent Core là process riêng viết bằng Go (một file ~12MB, không runtime, không cgo) | Dùng được SQLite thuần Go, một agent cho mọi app, không làm nặng process Office; build chéo Windows/Linux từ một máy | Thêm một process và giao thức HTTP nội bộ |
 | AD-12 | Core chỉ thao tác tài liệu qua bridge (`/cmd`), không gọi COM | Một đường thực thi lệnh duy nhất (allowlist, ComGate, Undo); Core không phụ thuộc Office | Mỗi lệnh thêm một vòng HTTP loopback |
 | AD-13 | Pane thử Core trước, dự phòng agent in-process; đã có runId thì không chạy lại | Pane không bao giờ bị khoá vì Core; không sửa tài liệu hai lần | Hai bản agent (C# 7.3 và .NET 10) phải giữ hành vi gần nhau |
 | AD-14 | Skill theo chuẩn Agent Skills (thư mục + `SKILL.md`), nạp 3 tầng | Hệ sinh thái sẵn có; prompt gọn (chỉ mục ~100 token/skill) | Không chạy script trong skill |
 | AD-15 | Memory tự làm bằng C# theo ý tưởng mem0 2.2.1 (chỉ-ADD) | Dữ liệu ở lại máy, không Python/Docker, model không tự sửa/xoá memory | Tự bảo trì thuật toán chấm điểm; embedding tuỳ chọn |
 | AD-16 | Policy xác nhận trong Core, trả lời qua pane | Người dùng quyết định thao tác rủi ro; audit đầy đủ | Lượt chạy có thể dừng chờ tới 120s |
 | AD-17 | QA hai mức: cấu trúc bằng số (mặc định) + thị giác (tuỳ chọn) | Agent "mù" vẫn soát được tràn chữ/chồng shape/dữ liệu lạc ô với chi phí thấp | QA thị giác tốn token, cần model đọc ảnh |
+| AD-18 | Vòng agent chạy qua chuỗi guard (`model/guards.go`, học LangChain `AgentMiddleware`): `RunAgent` chỉ gọi model + chạy tool, mỗi cơ chế chống lỗi là một guard | Thêm cơ chế mới không sửa vòng lặp; hành vi đã kiểm chứng giữ nguyên | Thứ tự guard có nghĩa, phải giữ khi thêm guard mới |
 
 ## 9. Rủi ro và giới hạn
 
 | Rủi ro / giới hạn | Ảnh hưởng | Hướng xử lý |
 |---|---|---|
-| DLL chưa ký số | Máy có chính sách chỉ nạp add-in đã ký sẽ không nạp | Ký bằng certificate của tổ chức |
+| Exe Core (~12MB, Go, chưa ký số) và DLL chưa ký số | Máy có chính sách chỉ nạp add-in đã ký sẽ không nạp; diệt virus có thể chặn exe | Ký bằng certificate của tổ chức |
 | Lệnh WPS Spreadsheets/Presentation chưa chạy test live | Có thể có khác biệt object model chưa phát hiện | Chạy `test_live_commands.py --wps` |
 | Bridge xử lý HTTP tuần tự | Request tới cùng app chờ nhau (trừ `ai.ask` và SSE chạy trên thread riêng) | Lệnh COM vẫn tuần tự qua ComGate; `ai.ask` tách thread để Core gọi ngược `/cmd` không kẹt |
-| Model free/chậm | Lượt dài, có lúc > 60s một request | Timeout request 120s (chỉnh `LlmRequestTimeoutSeconds`), thử lại, nhắc khi trả lời rỗng |
-| Exe Core ~50MB chưa ký số | Diệt virus có thể chặn | Ký số khi có certificate; framework-dependent/NativeAOT về sau |
+| Model free/chậm | Lượt dài, có lúc > 60s một request | Timeout request 120s (chỉnh `LlmRequestTimeoutSeconds`), thử lại, nhắc khi trả lời rỗng; model hỏng thì chuyển model dự phòng (`LlmFallbackModels`) |
 | WPS có thể đăng ký đè ProgID `Word/Excel/PowerPoint.Application` | Companion `word|excel|ppt` tạo ra WPS | Mở app Office trực tiếp (add-in tự nạp) |
 | Token và key đọc được bởi mọi process cùng tài khoản | Mô hình tin cậy là tài khoản Windows | Chấp nhận (giống mọi app desktop) |
 | Excel: `#N/A` đọc ra `null`; `.xls` chỉ đọc; `et.undo` không hoàn tác thay đổi qua COM | Giới hạn của COM/Excel | Ghi rõ trong tài liệu |
@@ -402,62 +411,87 @@ flowchart LR
 ## 10. Tổ chức mã nguồn
 
 `AxiomOffice.Host.exe` biên dịch từ **toàn bộ** `src/AxiomOffice/**/*.cs` cộng `src/AxiomOffice.Host/**/*.cs`,
-nên Host dùng trực tiếp `CommandDispatcher.Commands`, `Config`, `Logger`, `HttpBridge` (companion).
+trong đó `Mcp/McpHost.cs` chỉ forward byte sang Core Go (bản MCP C# cũ đã xoá).
 
 ```
 src/AxiomOffice/                         → AxiomOffice.dll
-  Connect.cs                    360      Điểm vào COM: IDTExtensibility2, Ribbon, CTP, IAppHost, nhận diện app
+  Connect.cs                    478      Điểm vào COM: IDTExtensibility2, Ribbon, CTP, IAppHost, nhận diện app
   Interop/                               IDTExtensibility2, IRibbonExtensibility, ICustomTaskPaneConsumer (dispinterface)
-  Ribbon/RibbonUi.cs            101      Ribbon XML + xử lý nút
+  Ribbon/RibbonUi.cs + RibbonChecks.cs   Ribbon XML + xử lý nút + 3 nút Soát (không qua model, 0 token)
   Ai/
-    AskAiPane.cs                657      Pane chat: vòng đời một lượt chạy, hủy, lỗi, chèn trả lời
-    PaneControls.cs            1357      Control vẽ bằng GDI+, design token PaneTheme
-    AiAgent.cs                   49      System prompt + tool office_action
-    LlmClient.cs                659      OpenAI-compatible / Anthropic, vòng tool-calling, timeout, hủy
-    OfficeActionTool.cs          94      Định nghĩa tool (từ registry), allowlist, gọi dispatcher
-    SettingsForm.cs             160      Cấu hình LLM, nút Test
+    AskAiPane.cs               ~1300     Pane chat: CoreClient + plan mode + đính kèm tệp, hủy, lỗi, chèn trả lời
+    PaneControls.cs            ~1300     Control vẽ bằng GDI+, design token PaneTheme
+    MarkdownView.cs                      Hiển thị markdown trong bubble trả lời (đậm/nghiêng/mã/link/list/code)
+    AiAgent.cs                            System prompt + tool office_action (in-process, dự phòng)
+    LlmClient.cs                          OpenAI-compatible / Anthropic, vòng tool-calling, timeout, hủy
+    OfficeActionTool.cs                   Định nghĩa tool (từ registry), allowlist, gọi dispatcher
+    CoreClient.cs + CoreAdmin.cs          Tìm/khởi động Core, POST /v1/runs + SSE, hủy, confirm, API memory/audit
+    SettingsForm.cs + SetupWizardForm.cs  Cài đặt LLM, wizard 5 bước (câu chữ từ catalog/setup.json)
+    MemoryForm.cs + AdminForms.cs         Quản lý ghi nhớ, hội thoại trước, nhật ký hoạt động
   Bridge/
-    HttpBridge.cs               264      HttpListener, kiểm tra Origin/token/Content-Type, định tuyến
-    CommandDispatcher.cs        329      Execute, retry, lệnh chung, builder Command/Req/Opt
-    CommandDispatcher.Writer.cs 457      21 lệnh writer.*
-    CommandDispatcher.Spreadsheet.cs 246 11 lệnh et.*
-    CommandDispatcher.Presentation.cs 352 12 lệnh wpp.*
-    CommandDispatcher.Params.cs 453      Tham số, values, chuyển giá trị COM, Undo, Save
-    CommandCatalog.cs           137      CommandInfo/CommandParam, sinh chữ ký/markdown/JSON
-    ComGate.cs                   41      Tuần tự hoá COM
-    HostProbe.cs                126      Tài liệu active, mô tả trạng thái, mã COM retryable
-    SessionRegistry.cs          238      sessions\{pid}.json, heartbeat
-    EventStream.cs              513      SSE /events
-    Config.cs                   172      HKCU, port, DPAPI
-    Logger.cs                    57      bridge.log
-    IAppHost.cs                   9      Trừu tượng host (add-in / companion)
+    HttpBridge.cs                        HttpListener, kiểm tra Origin/token/Content-Type, định tuyến
+    CommandDispatcher.cs                 Execute, retry, lệnh chung, builder Command/Req/Opt
+    CommandDispatcher.Writer.cs          Lệnh writer.*
+    CommandDispatcher.WriterDesign.cs    Lệnh dựng khối Word theo mẫu (writer.insertBlocks...)
+    CommandDispatcher.Spreadsheet.cs     Lệnh et.*
+    CommandDispatcher.Presentation.cs    Lệnh wpp.*
+    CommandDispatcher.Template.cs        Lệnh làm theo tệp mẫu (newFromTemplate, addSlideFromTemplate,
+                                         setShapeText, deleteShapes, copyPicture, sourceManifest)
+    CommandDispatcher.Params.cs          Tham số, values, chuyển giá trị COM, Undo, Save
+    CommandCatalog.cs                    CommandInfo/CommandParam, sinh chữ ký/markdown/JSON
+    ComGate.cs                            Tuần tự hoá COM
+    HostProbe.cs                         Tài liệu active, mô tả trạng thái (+ document.view), mã COM retryable
+    SessionRegistry.cs                   sessions\{pid}.json, heartbeat
+    EventStream.cs                       SSE /events
+    Config.cs                            HKCU, port, DPAPI (gồm TavilyApiKey, LlmFallbackModels, LlmContextWindow)
+    Logger.cs                            bridge.log
+    IAppHost.cs                          Trừu tượng host (add-in / companion)
 
 src/AxiomOffice.Host/                    → AxiomOffice.Host.exe (+ toàn bộ source ở trên)
-  HostProgram.cs                216      Chọn chế độ: mcp, companion, commands, llm-test
-  Mcp/
-    McpHost.cs                  115      Nhóm tool, template nhúng
-    McpServer.cs                490      JSON-RPC stdio, schema tham số, ToolArgs
-    LiveTools.cs                216      30 tool live
-    BridgeClient.cs             240      Gọi bridge, tìm session, prune
-    WordFiles.cs / PptFiles.cs  570/466  Tool file Word / PowerPoint
-    ExcelFiles.cs               826      Tool file Excel, đọc .xls qua COM
-    XlsxBook.cs / XlsxStyles.cs / Cells.cs   Mô hình workbook, style, ô / CSV
-    OoxmlPackage.cs             523      Zip + XLinq, lưu atomic
-    Templates/                           default.docx, default.pptx (MIT)
+  HostProgram.cs                         Chọn chế độ: mcp (forward), companion, commands, llm-test
+  Mcp/McpHost.cs                         Shim: forward byte stdin/stdout/stderr sang AxiomOffice.Core.exe mcp
 
-src/AxiomOffice.Core/                    → AxiomOffice.Core.exe (.NET 10, mục 22)
-  Program.cs                             Khởi tạo: config, SQLite, skill, memory, MCP, API
-  Api/                                   /health, /v1/runs (+SSE, confirm), /v1/conversations, /v1/skills, /v1/memory, /v1/audit
-  Agent/                                 Orchestrator, RunManager, PromptBuilder, ContextAssembler, PolicyEngine
-  Models/                                ModelClient (vòng tool-calling), codec OpenAI/Anthropic, ModelSource, ModelText
-  Tools/                                 office_action, load_skill/read_skill_file, remember/recall, look_at_document
-  Skills/  Memory/  Mcp/                 SkillLoader/Index · CoreDb, store, retriever, extractor · MCP client
+core-go/                                 → AxiomOffice.Core.exe (Go, không cgo; chi tiết mục 22)
+  cmd/axiom-core                         main: mutex một-phiên-bản, chọn port, HTTP server, subcommand mcp
+  internal/config                        AXIOM_* → HKCU / config.json → mặc định; DPAPI/libsecret
+  internal/agent                         Orchestrator, RunManager, PromptBuilder (+Plan/Check/Undo/Chunk rules),
+                                         ContextAssembler, xác nhận
+  internal/model                         Client + vòng RunAgent, codec OpenAI/Anthropic, chuỗi guard, fallback,
+                                         cửa sổ ngữ cảnh, live stream
+  internal/tools                         office_action (+read-only plan mode), skill, memory, todo, tavily_search
+                                         (Tavily), visual, template_build, truncate
+  internal/skills                        SkillIndex/Loader (chuẩn Agent Skills, 3 nguồn, watch 2s)
+  internal/memory                        Store (chỉ-ADD, hash+cosine), Retriever (BM25+entity+embedding),
+                                         Extractor (nền, 1 LLM call)
+  internal/policy                        PolicyEngine (hỏi lưu/xuất, ghi đè, xoá slide, replaceAll dài)
+  internal/mcp                           MCP client (stdio + Streamable HTTP, server built-in office)
+  internal/mcpserver                     MCP server 50 tool (subcommand mcp) + engine OOXML
+  internal/ooxml|xlsx|docx|pptx|sheet|cfb  Đọc/ghi file trực tiếp, .xls BIFF8 thuần Go
+  internal/office                        BridgeClient (/cmd, /commands, /session), SessionDirectory
+  internal/api                           Core API v1 (runs, SSE, confirm, conversations, skills, memory, audit,
+                                         setup, mcp, admin) + kênh /wps cho WPS Linux
+  internal/store                         SQLite core.db (schema 2): hội thoại, lượt chạy, audit
+  internal/setup                         /v1/setup, /v1/llm/*, catalog sinh từ catalog/setup.json
+
+src/AxiomOffice.LibreOffice/             → axiom-office.oxt (Python UNO; thiết kế LibreOffice_arch.md)
+  python/pythonpath/axiom/               bridge.py, commands.py (cùng tên lệnh), writer.py, calc.py,
+                                         impress.py, checks.py, gate.py (UnoGate), sessions.py, pane.py,
+                                         chat.py, awt.py, setup*.py, theme.py...
+
+src/AxiomOffice.WPS/                     → add-in JS cho WPS Linux (thiết kế docs/wps-bridge.md)
+  commands.js, main.js, probe.js         appKind/catalogFor theo app, 16 lệnh writer.* + 23 et.* + 15 wpp.*
+
 skills/                                  Skill dựng sẵn + _design/tokens.json (chép cạnh exe khi build)
-scripts/                                 build, install, uninstall, legacy, package, core.ps1; dist/ (install.cmd, hướng dẫn)
-tests/live/                              test lệnh bridge trên app thật
-tests/core/                              xUnit của Core, e2e (fake_llm.py, mcp_sample_server.py, test_core_e2e.py)
-tests/mcp-host/                          test MCP server, round-trip Office
-tests/oracle/*-mcp/                      bản đối chiếu (oracle) cho test parity MCP
+catalog/                                 live-commands.json (nguồn mô tả tool MCP live),
+                                         setup.json (nguồn duy nhất cho wizard 3 nền tảng)
+scripts/                                 build, install, uninstall, legacy, package, core.ps1; dist/ (install.cmd...);
+                                         linux/ (package.sh, install.sh); wps/ (install_jsaddon.py)
+tests/live/                              test lệnh bridge trên app thật (Office/WPS)
+tests/lo/                                test extension LibreOffice (unit + live + checks)
+tests/wps/                               test bridge WPS Linux (Core e2e + add-in Node + live)
+tests/core/                              e2e Agent Core (fake_llm.py, test_core_e2e.py 14 phần)
+tests/mcp-host/                          test MCP server (portable, parity sâu, oracle_diff, round-trip)
+tests/bench/                             benchmark Calc + lộ trình hiệu năng
 ```
 
 ## 11. Add-in: vòng đời, nhận diện app, UI
@@ -684,22 +718,25 @@ flowchart LR
 
 | File | Nội dung |
 |---|---|
-| `CommandDispatcher.cs` | `Execute`, retry, `EnsureVisibleWordDocument`, `Health`, `ConfigInfo`, builder `Command`/`Req`/`Opt`, lệnh chung |
-| `CommandDispatcher.Writer.cs` | Lệnh `writer.*` |
+| `CommandDispatcher.cs` | `Execute`, retry, `EnsureVisibleWordDocument`, `Health`, `ConfigInfo`, builder `Command`/`Req`/`Opt`, lệnh chung (`app.info`, `ai.ask`, `ui.askpane`, `app.screenshot`) |
+| `CommandDispatcher.Writer.cs` | Lệnh `writer.*` (đọc/ghi/định dạng văn bản, bảng, ảnh) |
+| `CommandDispatcher.WriterDesign.cs` | Lệnh dựng khối Word theo mẫu (`writer.insertBlocks`...) |
 | `CommandDispatcher.Spreadsheet.cs` | Lệnh `et.*` |
 | `CommandDispatcher.Presentation.cs` | Lệnh `wpp.*` |
+| `CommandDispatcher.Template.cs` | Lệnh làm theo tệp mẫu (`newFromTemplate`, `addSlideFromTemplate`, `setShapeText`, `deleteShapes`, `copyPicture`, `sourceManifest`) |
 | `CommandDispatcher.Params.cs` | Đọc tham số, giải mã `values`, chuyển giá trị COM, `UndoRecordScope`, `SaveDocument` |
 | `CommandCatalog.cs` | `CommandInfo`, `CommandParam`, sinh chữ ký / markdown / JSON |
 
-| Nhóm | Số lệnh | Cho agent (`ForAgent`) | Không cho agent |
-|---|---|---|---|
-| Chung | 3 | 0 | `app.info`, `ai.ask`, `ui.askpane` |
-| `writer.*` | 21 | 18 | `newDocument`, `open`, `closeAll` |
-| `et.*` | 11 | 10 | `open` |
-| `wpp.*` | 12 | 9 | `newPresentation`, `open`, `addTextBox` |
-| **Tổng** | **47** | **37** | |
+| Nhóm | Cho agent (`ForAgent`) | Không cho agent (ví dụ) |
+|---|---|---|
+| Chung | `app.screenshot` (QA thị giác, agent gọi qua `look_at_document`, không gọi thẳng) | `app.info`, `ai.ask`, `ui.askpane` |
+| `writer.*` | đọc/ghi/định dạng, `replaceAll`/`replaceMany`, `checkTables`, `insertBlocks` | `newDocument`, `open`, `closeAll` |
+| `et.*` | đọc/ghi nhiều vùng, `fillRange`, chart, conditional format, `checkRange` | `open` |
+| `wpp.*` | slide/text/ảnh/bảng/notes, `checkLayout`, `sourceManifest`, `addSlideFromTemplate`... | `newPresentation`, `open`, `addTextBox` |
 
-Danh sách đầy đủ kèm tham số: bảng *Danh sách lệnh* trong README (sinh bằng `commands --markdown`).
+Tổng registry C# hiện khoảng **71 lệnh** (tăng từ 47 ban đầu sau các đợt template/design/`replaceMany`); danh sách chuẩn
+nằm ở `catalog/live-commands.json` (gồm cả biến thể LibreOffice/WPS, ~78 mục, 57 `agent=true`) và bảng
+*Danh sách lệnh* trong README (sinh bằng `commands --markdown`).
 
 ### 14.2 Luồng thực thi
 
@@ -793,34 +830,57 @@ Chiều ra, `ToPlain` / `ToMatrix` chuyển giá trị COM sang JSON: `object[,]
 |---|---|
 | `AskAiPane` | UI chat: gửi prompt, hiện từng thao tác, Dừng, Thử lại, Chèn trả lời (`writer.insertStyledText`) |
 | `PaneControls` | `PaneTheme` (design token, scale DPI), `ChatBubble`, `ToolLine`, `TypingBubble`, `PromptBox`, `ComposerPanel`, `ErrorCard`, `ChatList`... |
-| `AiAgent` | Dựng system prompt theo loại app, gắn tool `office_action`, gọi `LlmClient.RunAgent` |
-| `LlmClient` | Vòng tool-calling; `Chat` cho nút Test và `llm-test` |
+| `AiAgent` | Dựng system prompt theo loại app, gắn tool `office_action`, gọi `LlmClient.RunAgent` (đường dự phòng) |
+| `LlmClient` | Vòng tool-calling in-process; `Chat` cho nút Test và `llm-test` |
 | `OfficeActionTool` | Định nghĩa tool (mô tả sinh từ registry), allowlist, thực thi → `CommandDispatcher` |
-| `SettingsForm` | Provider (OpenAI-compatible / Anthropic / Google Gemini), endpoint, model, API key (lưu DPAPI), nút Test; bật/tắt Agent Core, ghi nhớ, tự ghi nhớ, QA thị giác; mở Quản lý ghi nhớ |
-| `CoreClient` | Tìm/khởi động Agent Core, `POST /v1/runs` + đọc SSE, hủy, trả lời xác nhận, API memory (mục 22.11) |
-| `MemoryForm` | Xem, thêm, sửa, ghim, hạn dùng, xoá/khôi phục, lịch sử, xoá toàn bộ ghi nhớ |
+| `MarkdownView` | Hiển thị markdown trong bubble trả lời (đậm/nghiêng/mã/link/list/khối mã) |
+| `SettingsForm` | Provider, endpoint, model, API key (lưu DPAPI), Tavily key, nút Test; bật/tắt Core, ghi nhớ, tự ghi nhớ, QA thị giác, model dự phòng, cửa sổ ngữ cảnh; mở Quản lý ghi nhớ |
+| `SetupWizardForm` + `SetupWizardControls` | Wizard 5 bước (câu chữ từ `catalog/setup.json`), tự mở một lần khi chưa cấu hình, bước 5 **Thử ngay** qua Core |
+| `CoreClient` + `CoreAdmin` | Tìm/khởi động Agent Core, `POST /v1/runs` + đọc SSE, hủy, trả lời xác nhận, API memory/audit/skills/mcp (mục 22.11) |
+| `MemoryForm` + `AdminForms` | Xem, thêm, sửa, ghim, hạn dùng, xoá/khôi phục, lịch sử, xoá toàn bộ ghi nhớ; hội thoại trước; nhật ký hoạt động; kỹ năng; trạng thái |
+| `McpForm` (+`McpServerEditForm`, `McpFile`) | Nút ribbon Công cụ ngoài…: gộp mcp.json + `GET /v1/mcp`, bật/tắt, tin cậy, thêm/sửa/xoá server; ghi UTF-8 không BOM |
 
-Từ giai đoạn 1 pane chạy qua **Agent Core** (mục 22); `AiAgent`/`LlmClient` là **dự phòng in-process**
-khi Core không nhận được lượt chạy, và là đường chạy của companion (`Host.exe word|excel|ppt`).
+Pane chạy qua **Agent Core** (mục 22) là đường chính; `AiAgent`/`LlmClient` là **dự phòng in-process**
+khi Core không nhận được lượt chạy (đã có runId thì không bao giờ chạy lại in-process, tránh sửa
+tài liệu hai lần), và là đường chạy của companion (`Host.exe word|excel|ppt`). Core không chạy
+trong plan mode thì pane **báo lỗi** thay vì rơi về in-process (agent đó không có chế độ chỉ đọc).
 
-### 15.2 Một lượt chạy
+### 15.2 Một lượt chạy (đường chính: qua Core; xem mục 22.3)
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor U as Người dùng
     participant P as AskAiPane (UI thread)
-    participant W as ThreadPool worker
-    participant AG as AiAgent / LlmClient
+    participant C as CoreClient
+    participant CO as Agent Core (Go)
     participant L as LLM provider
-    participant T as OfficeActionTool
-    participant D as CommandDispatcher
+    participant B as HTTP bridge + hệ lệnh
 
+    U->>P: nhập yêu cầu, bấm Ask (kèm conversationId, document.view, tệp đính kèm)
+    P->>C: POST /v1/runs {prompt, office.port, document, options.mode}
+    C->>CO: HTTP 127.0.0.1:47840
+    CO-->>P: runId → đọc SSE /v1/runs/{id}/events (?after= để nối lại)
+    loop tới khi model trả lời không kèm tool call
+        CO->>L: messages + tools (office_action, load_skill, remember, mcp__*...)
+        L-->>CO: tool_calls
+        CO->>B: POST /cmd (qua policy xác nhận khi cần)
+        B-->>CO: JSON kết quả
+        CO-->>P: SSE tool.started / tool.finished / skill.loaded / memory.written
+    end
+    CO-->>P: SSE run.completed (reply) / failed / cancelled
+    P-->>U: bubble trả lời (markdown), link Chèn trả lời
+```
+
+Đường dự phòng in-process (Core không nhận lượt chạy) đi như cũ qua `AiAgent`/`LlmClient` trên
+ThreadPool worker, mỗi tool qua `ComGate.Run`:
+
+```
     U->>P: nhập yêu cầu, bấm Ask
     P->>W: QueueUserWorkItem (CancellationTokenSource)
     W->>AG: AiAgent.Run(host, prompt, progress, token)
     loop tới khi model trả lời không kèm tool call
-        AG->>L: messages + tool office_action (timeout 60s/request)
+        AG->>L: messages + tool office_action (timeout 120s/request)
         L-->>AG: tool_calls
         AG->>T: Execute(office_action, {action, params})
         alt action không có ForAgent
@@ -844,8 +904,8 @@ stateDiagram-v2
     Idle --> Running: Ask / Enter
     Running --> Running: tool call + progress
     Running --> Done: model trả lời xong
-    Running --> Cancelled: bấm Dừng (Abort request đang chờ)
-    Running --> TimedOut: quá 5 phút (AgentTimeoutMs)
+    Running --> Cancelled: bấm Dừng (hủy request đang chờ / POST /cancel với Core)
+    Running --> TimedOut: quá trần (in-process: 5 phút; Core: hết ngân sách token → run.stopped)
     Running --> Failed: lỗi provider / cấu hình
     Done --> Idle
     Cancelled --> Idle
@@ -861,11 +921,12 @@ stateDiagram-v2
 | `anthropic` | `{endpoint}/messages` | `x-api-key`, `anthropic-version: 2023-06-01` | `tools` + `tool_use` / `tool_result` |
 
 - `LlmResult`: `Ok`, `Text`, `Error`, `Seconds`, `Rounds`, `Transcript`, `Cancelled`, `TimedOut`,
-  `StepLimitReached`.
-- **Thời gian**: `TimeoutMs` = 60s mỗi request; `AgentTimeoutMs` = 300s cả lượt (linked
-  `CancellationTokenSource`); hủy gọi `HttpWebRequest.Abort()` nên dừng ngay.
-- **Số vòng**: không giới hạn (`maxIterations` = 0). `StepLimitReached` chỉ xảy ra khi bên gọi tự đặt
-  giới hạn.
+  `StepLimitReached`, `ViaCore`, `ConversationId`, `RunId`.
+- **Thời gian (in-process)**: `TimeoutMs` = 120s mỗi request; `AgentTimeoutMs` = 300s cả lượt (linked
+  `CancellationTokenSource`); hủy gọi `HttpWebRequest.Abort()` nên dừng ngay. **Core không đặt trần
+  thời gian mặc định** (kiểm soát bằng số vòng + nút Dừng; bên gọi vẫn đặt `maxSeconds` được, vd `ai.ask`).
+- **Số vòng**: in-process không giới hạn (`maxIterations` = 0); Core mặc định 100 vòng
+  (`options.maxRounds`, tối đa 1000) và ngân sách token (mặc định không trần; bên gọi đặt `maxTokens` được).
 - **Provider không hỗ trợ tools**: lỗi có chữ "tool" → tắt tools, chạy tiếp như chat thường.
 
 ### 15.4 Quy tắc của agent
@@ -877,11 +938,16 @@ stateDiagram-v2
 - **System prompt**: dùng `office_action` cho mọi thay đổi để người dùng thấy trực tiếp; đọc tài
   liệu khi cần; viết nội dung bằng ngôn ngữ của người dùng; **không `save` / `saveAs` / `exportPdf`
   nếu người dùng không yêu cầu**; không bịa kết quả tool; trả lời tóm tắt 1–2 câu.
-- **Mỗi lần Ask là một phiên mới**.
+- **Hội thoại liên tục**: các lượt trong cùng tài liệu nối thành một cuộc trò chuyện (lưu ở Core,
+  `core.db`); "làm tiếp" hiểu ngữ cảnh lượt trước. Link **Trò chuyện mới** để bắt đầu lại.
+- **Plan mode** (`options.mode = "plan"`): lượt chỉ đọc, trả về kế hoạch (mục tiêu · bước đánh số ·
+  cách kiểm · câu hỏi kèm phương án mặc định an toàn nhất); bước thực hiện là lượt thường tiếp theo
+  trong cùng hội thoại. Pane có công tắc "Lập kế hoạch trước" và thẻ "Thực hiện kế hoạch".
 - **Nhật ký** trong `bridge.log`: `AskAiPane: prompt=`, `AskAiPane progress:` (từng tool call + kết
   quả), `AskAiPane: ok ... N tool calls, M rounds`; ghi ngay trên worker kể cả khi pane đã đóng.
-- **`ai.ask`** (lệnh bridge) chạy cùng `AiAgent` trên thread HTTP, trả `reply`, `transcript`,
-  `seconds`, `rounds`, và log `ai.ask progress:`.
+- **`ai.ask`** (lệnh bridge) chạy qua Core ở chế độ không tương tác (`interactive=false`) trên thread
+  riêng của bridge, trả `reply`, `transcript`, `seconds`, `rounds`, thêm `viaCore`, và log
+  `ai.ask progress:`. Core không dùng được thì chạy agent in-process như trước.
 
 ## 16. Session registry
 
@@ -946,23 +1012,29 @@ dòng/phút cho mỗi loại. Response đặt `Cache-Control: no-cache`, `X-Acce
 
 ```mermaid
 flowchart LR
-    exe["AxiomOffice.Host.exe"] --> m1["mcp [all|word|excel|ppt] [--list]<br/>MCP server stdio"]
+    exe["AxiomOffice.Host.exe"] --> m1["mcp [all|word|excel|ppt] [--list]<br/>shim forward byte sang Core Go"]
     exe --> m2["word | excel | ppt | wps | et | wpp [--visible]<br/>companion"]
     exe --> m3["commands [--json|--markdown]<br/>danh sách lệnh bridge"]
     exe --> m4["llm-test<br/>thử cấu hình LLM"]
+    core["AxiomOffice.Core.exe mcp [all|word|excel|ppt]<br/>MCP server thật (Go, 2 nền tảng)"]
+    m1 -.->|"stdin/stdout/stderr"| core
 ```
 
-### 18.1 MCP server
+### 18.1 MCP server (bản Go duy nhất: `core-go/internal/mcpserver`)
 
+- `AxiomOffice.Host.exe mcp` chỉ nối thẳng stdin/stdout/stderr sang tiến trình con
+  `AxiomOffice.Core.exe mcp` theo byte (không giải mã/mã lại), nên cấu hình MCP client cũ giữ nguyên.
+  Gói cài thiếu Core thì báo rõ và thoát mã 2.
 - JSON-RPC 2.0 qua stdio, mỗi message một dòng, hỗ trợ batch; tự viết, không dùng SDK. `stdout`
-  chỉ dành cho JSON-RPC (`Console.SetOut(stderr)`), log vào `bridge.log`.
+  chỉ dành cho JSON-RPC, log ra `stderr`.
 - Phương thức: `initialize` (protocol `2025-11-25`, `2025-06-18`, `2025-03-26`, `2024-11-05`; client
   xin version lạ thì trả bản mới nhất), `ping`, `tools/list`, `tools/call`; notification bỏ qua,
   method lạ → `-32601`.
 - `tools/call` trả `content: [{type:"text", text}]`; exception trong tool → `isError: true` với
   `{"ok":false,"error":...}`.
 - Nhóm: `all` (50 tool, server `office-tools`), `word` (20), `excel` (16), `ppt` (16); nhóm nào cũng
-  có `office_sessions`.
+  có `office_sessions`. Mô tả tool `*_command` sinh từ `catalog/live-commands.json`
+  (sinh bằng `scripts/generate_mcp_commands.py`, nhúng vào Go qua `livecommands_gen.go`).
 
 | Nhóm | Làn file (không cần app) | Làn live (qua bridge) |
 |---|---|---|
@@ -999,18 +1071,18 @@ sequenceDiagram
 - Lỗi kết nối (app chưa mở, add-in chưa nạp) trả `{"ok":false,"error":...}` như kết quả bình thường
   để model đọc được, không phải lỗi giao thức MCP.
 
-### 18.3 Làn file
+### 18.3 Làn file (engine Go: `core-go/internal/{ooxml,xlsx,docx,pptx,sheet,cfb}`)
 
-- **`OoxmlPackage`**: đọc/ghi `.docx` / `.xlsx` / `.pptx` bằng `ZipArchive` + XLinq; relationships,
+- **`ooxml`**: đọc/ghi `.docx` / `.xlsx` / `.pptx` bằng zip + XML thuần Go; relationships,
   content types, tên part mới. Chỉ part đã sửa được ghi lại nên chart, ảnh, pivot, macro giữ
-  nguyên. Lưu **atomic** qua `FileSafety`: ghi bản sao tạm `.~<tên>.<id>.tmp` cạnh file gốc rồi
-  `File.Replace`.
-- **Word** (`WordFiles`), **PowerPoint** (`PptFiles`): tạo file mới từ template `default.docx` /
-  `default.pptx` nhúng trong exe (lấy từ python-docx / python-pptx, MIT).
-- **Excel** (`ExcelFiles`, `XlsxBook`, `XlsxStyles`, `Cells`, `CsvTable`): `.xlsx`/`.xlsm` sửa trực
-  tiếp (dịch công thức khi chép sheet, style, bảng); `.csv`/`.tsv` đọc/ghi text; `.xls` (BIFF)
-  **chỉ đọc** qua COM (`Excel.Application` → `KET.Application` → `ET.Application`). Không có truy
-  vấn SQL (`excel_query` của bản Python cũ), không xuất parquet.
+  nguyên. Lưu **atomic** qua `filesafe`: ghi file tạm rồi thay thế.
+- **Word** (`docx`), **PowerPoint** (`pptx`): tạo file mới từ template `default.docx` /
+  `default.pptx` nhúng trong binary (lấy từ python-docx / python-pptx, MIT; xem `NOTICE.md` cạnh `internal/templates`).
+- **Excel** (`xlsx`, `sheet`): `.xlsx`/`.xlsm` sửa trực tiếp (dịch công thức khi chép sheet, style, bảng);
+  `.csv`/`.tsv` đọc/ghi text; `.xls` (BIFF8) **đọc thẳng thuần Go** (`internal/cfb` mở thùng OLE2,
+  `biff.go` đọc bản ghi) — không cần Excel/WPS/LibreOffice; chỉ `.xls` cũ hơn BIFF8 mới nhờ
+  `soffice --headless --convert-to xlsx` (profile riêng). Không có truy vấn SQL (`excel_query`
+  của bản Python cũ), không xuất parquet.
 
 ### 18.4 Companion
 
@@ -1021,31 +1093,39 @@ giữ port) → idle. Ctrl+C dừng bridge và `Quit` app.
 
 ## 19. Dữ liệu: cấu hình, đăng ký COM, file
 
-### 19.1 `HKCU\Software\AxiomOffice`
+### 19.1 `HKCU\Software\AxiomOffice` (Linux: `~/.config/axiom-office/config.json`, cùng tên khoá)
 
 | Giá trị | Kiểu | Mặc định | Ý nghĩa |
 |---|---|---|---|
 | `Port` | DWORD | 47821 | Port gốc cho WPS |
 | `PortOffice` | DWORD | 47831 | Port gốc cho Microsoft Office |
+| `PortLibreOffice` | DWORD | 47851 | Port gốc cho LibreOffice (Linux; Windows: extension cũng dùng dải này) |
 | `Enabled` | DWORD | 1 | 0 = không mở bridge |
 | `Token` | String | 32 hex ngẫu nhiên, sinh khi cài | Header `X-Auth-Token` |
-| `LlmProvider` | String | `openai` | `openai` hoặc `anthropic` |
+| `LlmProvider` | String | `openai` | `openai` / `anthropic` (Gemini đi qua endpoint OpenAI-compatible) |
 | `LlmEndpoint` | String | rỗng | Base URL (tự nối `/chat/completions` hoặc `/messages`) |
 | `LlmModel` | String | rỗng | Tên model |
-| `LlmApiKey` | String | rỗng | `dpapi:<base64>` (DPAPI `CurrentUser`, không entropy) |
-| `CorePort` | DWORD | 47840 | Port Agent Core (bận thì thử 47840–47849) |
+| `LlmApiKey` | String | rỗng | `dpapi:<base64>` (DPAPI `CurrentUser`, không entropy; Linux: libsecret hoặc plaintext trong `config.json` 0600) |
+| `TavilyApiKey` | String | rỗng | Khoá tìm kiếm web cho tool `tavily_search` (lưu `dpapi:` như trên) |
+| `LlmFallbackModels` | String | rỗng | Model dự phòng cùng provider, phân cách `,`/`;`/xuống dòng |
+| `LlmContextWindow` | DWORD | 0 | Cửa sổ ngữ cảnh khi provider không khai (Ollama/LM Studio); 0 = theo provider |
+| `CorePort` | DWORD | 47840 | Port Agent Core (bận thì thử 47840–47849; Core Go giữ luôn listener đã bind được) |
 | `CoreEnabled` | DWORD | 1 | 0 = pane luôn chạy agent in-process |
 | `MemoryEnabled` / `MemoryAutoExtract` | DWORD | 1 / 1 | Ghi nhớ dài hạn / tự trích xuất sau lượt |
 | `MemoryModel` | String | = `LlmModel` | Model cho trích xuất memory |
 | `EmbeddingModel` / `EmbeddingEndpoint` | String | rỗng | Tìm memory theo ngữ nghĩa (tuỳ chọn) |
 | `SkillDirs` | String | rỗng | Thư mục skill của tổ chức, phân cách `;` |
-| `LlmRequestTimeoutSeconds` | DWORD | 120 | Hết giờ mỗi request tới model (Core) |
+| `LlmRequestTimeoutSeconds` | DWORD | 120 | Hết giờ mỗi request ngắn (test LLM, tóm tắt, trích xuất); lượt agent không dùng trần này |
 | `ConfirmTimeoutSeconds` | DWORD | 120 | Chờ người dùng xác nhận; hết giờ = từ chối |
-| `VisualQaEnabled` | DWORD | 0 | Cho model xem ảnh chụp cửa sổ (tốn token) |
+| `VisualQaEnabled` | DWORD | 0 | Cho model xem ảnh trang/slide (tốn token) |
+| `VerifyWorkEnabled` | DWORD | 1 | Agent tự đọc lại sau khi sửa trước khi trả lời |
+| `LlmShowReasoning` | DWORD | 0 | Hiện phần suy nghĩ của model (tốn token) |
 
 Core đọc lại cấu hình mỗi lượt chạy (đổi model/bật tắt trong Cài đặt có hiệu lực ngay). Biến môi
-trường `AXIOM_*` ghi đè cho test (`AXIOM_CORE_DATA_DIR`, `AXIOM_LLM_*`, `AXIOM_SKILL_DIRS`,
-`AXIOM_MEMORY_*`, `AXIOM_CONFIRM_TIMEOUT`, `AXIOM_VISUAL_QA`...).
+trường `AXIOM_*` ghi đè cho test (`AXIOM_CORE_DATA_DIR`, `AXIOM_CORE_PORT`, `AXIOM_SESSION_DIR`,
+`AXIOM_TOKEN`, `AXIOM_LLM_PROVIDER/ENDPOINT/MODEL/API_KEY/FALLBACK_MODELS/CONTEXT_WINDOW`,
+`AXIOM_MEMORY_*`, `AXIOM_SKILL_DIRS`, `AXIOM_CONFIRM_TIMEOUT`, `AXIOM_VISUAL_QA`,
+`AXIOM_TAVILY_API_KEY`...). Trên Linux, `AXIOM_*` → `config.json` → mặc định.
 
 ### 19.2 Đăng ký COM và add-in (do `install.ps1` ghi)
 
@@ -1083,11 +1163,15 @@ flowchart LR
 | Đường dẫn | Nội dung |
 |---|---|
 | `%LOCALAPPDATA%\AxiomOffice\bridge.log` | Log chung add-in và Host, có `[pid N]` từng dòng |
-| `%LOCALAPPDATA%\AxiomOffice\sessions\{pid}.json` | Session registry (mục 16) |
+| `%LOCALAPPDATA%\AxiomOffice\sessions\{pid}.json` | Session registry (mục 16); LibreOffice: `{pid}-{kind}.json`; WPS Linux: `<pid Core>-wps.json` |
 | `%LOCALAPPDATA%\AxiomOffice\core.json` | Core đang chạy: `pid`, `port`, `version`, `protocol` (xoá khi Core thoát) |
-| `%LOCALAPPDATA%\AxiomOffice\core.log` | Log của Core (xoay 10MB × 3) |
-| `%LOCALAPPDATA%\AxiomOffice\core\core.db` | SQLite (WAL): hội thoại, lượt chạy, audit, memory (mục 22.7) |
+| `%LOCALAPPDATA%\AxiomOffice\core.log` | Log của Core |
+| `%LOCALAPPDATA%\AxiomOffice\core\core.db` | SQLite (WAL, schema 2): hội thoại, lượt chạy, audit, memory (mục 22.7) |
 | `%LOCALAPPDATA%\AxiomOffice\skills\`, `mcp.json` | Skill của người dùng; cấu hình MCP server ngoài |
+
+Trên Linux theo XDG: cấu hình `~/.config/axiom-office/config.json` (0600), dữ liệu
+`~/.local/share/axiom-office/` (`core.db`, `skills/`, `mcp.json`, log), trạng thái sống
+`$XDG_RUNTIME_DIR/axiom-office/` (`core.json`, `sessions/`).
 
 ## 20. Build, cài đặt, đóng gói
 
@@ -1097,10 +1181,12 @@ flowchart TD
     rm -->|"không"| csc1
     src1["src/AxiomOffice/**/*.cs"] --> csc1["csc /target:library<br/>/platform:x64 /langversion:7.3"]
     src1 --> csc2
-    src2["src/AxiomOffice.Host/**/*.cs"] --> csc2["csc /target:exe<br/>+ System.IO.Compression, System.Xml.Linq<br/>+ /resource default.docx, default.pptx"]
+    src2["src/AxiomOffice.Host/**/*.cs"] --> csc2["csc /target:exe"]
+    go["core-go/**/*.go"] --> gobuild["go build (không cgo)<br/>AxiomOffice.Core.exe ~12MB"]
     csc1 --> stage["bin\\Release\\.stage"]
     csc2 --> stage
-    stage -->|"chép đè (lỗi thì giữ bản cũ)"| out["bin\\Release\\AxiomOffice.dll<br/>bin\\Release\\AxiomOffice.Host.exe"]
+    gobuild --> stage
+    stage -->|"chép đè (lỗi thì giữ bản cũ)"| out["bin\\Release\\AxiomOffice.dll<br/>bin\\Release\\AxiomOffice.Host.exe<br/>bin\\Release\\AxiomOffice.Core.exe + skills\\"]
     out --> install["scripts\\install.ps1<br/>đăng ký HKCU, sinh token, in cấu hình MCP"]
     out --> package["scripts\\package.ps1<br/>dist\\AxiomOffice-version-ngày-commit[-dirty].zip"]
 ```
@@ -1115,9 +1201,11 @@ flowchart TD
 - **Gói** (`package.ps1 [-NoBuild] [-Kill] [-OutDir]`): DLL, EXE, script cài/gỡ, `legacy.ps1`,
   `install.cmd`/`uninstall.cmd`, `HUONG-DAN-CAI-DAT.txt`, `THIRD-PARTY-NOTICES.md`; entry zip dùng
   `/`; hậu tố `-dirty` khi code chưa commit.
-- **Agent Core**: `build.ps1` tắt Core đang chạy (`/v1/admin/shutdown`), `dotnet publish` single-file tự
-  chứa (`EnableCompressionInSingleFile`, `IncludeNativeLibrariesForSelfExtract` cho `e_sqlite3.dll`) với
-  version khớp DLL, chép `skills\` cạnh exe; thiếu .NET SDK thì bỏ qua Core (pane chạy in-process).
+- **Agent Core (Go)**: `build.ps1` tắt Core đang chạy (`/v1/admin/shutdown`), `go build`
+  (cần Go 1.26+, không cgo nhờ `modernc.org/sqlite` nên build chéo được) thành
+  `AxiomOffice.Core.exe` (~12MB sau `-s -w`) với version từ `VERSION`, chép `skills\` cạnh exe;
+  thiếu Go thì bỏ qua Core (pane chạy in-process). Linux: `scripts/linux/package.sh` đóng tarball
+  (`core/AxiomOffice.Core` ELF + `.oxt` + `wps-addin/`).
 - Script `.ps1` giữ ASCII không BOM (PowerShell 5.1 đọc sai UTF-8 không BOM).
 
 ## 21. Thiết kế kiểm thử
@@ -1125,13 +1213,15 @@ flowchart TD
 | Bộ test | Chạy trên | Kiểm tra |
 |---|---|---|
 | `tests/live/test_live_commands.py` | Word/Excel/PowerPoint thật (`--wps`: WPS) | Mọi lệnh bridge và lỗi tham số; bảo mật HTTP (401/403/415); `--ai`: `ai.ask` thật trên 3 app, không tự lưu/xuất; offline: `office_action` từ chối lệnh ngoài danh sách (reflection vào DLL); `--record` / `--compare`: so kết quả từng lệnh với bản ghi golden |
-| `tests/mcp-host/test_mcp_host.py` | Offline | Giao thức MCP qua client chính thức; so kết quả 50 tool với bản Python cũ trên cùng file; mở lại file C# ghi bằng python-docx / openpyxl / python-pptx; README khớp `commands --markdown`; mô tả `*_command` đủ lệnh |
-| `tests/mcp-host/office_roundtrip.ps1` | Office thật | File do Office tạo đọc được bằng C# và ngược lại |
-| `tests/oracle/*-mcp/tests` | Offline | Unit test của 3 gói oracle (chạy trong `make test-oracle`) |
-| `tests/core/AxiomOffice.Core.Tests` (xUnit, chạy invariant globalization như Core) | Offline | Config, vòng đời, codec, thử lại, SSE, SQLite, skill (frontmatter, nguồn, chặn `..`), memory (FTS bỏ dấu, hash, link, chấm điểm, extractor, lọc nhạy cảm), policy + xác nhận, MCP config, QA thị giác |
-| `tests/core/test_core_e2e.py` | Core thật + LLM giả + bridge giả (`--office`: Excel thật) | SSE, hội thoại, allowlist, hủy, trần token, skill, memory 3 phiên + khởi động lại Core, xác nhận (đồng ý/từ chối/hết giờ), MCP server mẫu, QA thị giác, audit |
-| `test_core_e2e.py --real-llm` | LLM thật trong HKCU (thủ công) | Model tự chọn đúng skill cho yêu cầu mẫu, không nạp skill cho sửa nhỏ |
-| `tests/core/CoreClientHarness.cs` | Excel + Core + LLM thật | Đường pane → Core bằng code C# của add-in |
+| `tests/live/test_live_libreoffice.py` | LibreOffice thật (headless `--ui` có cửa sổ) | Mọi lệnh bridge LO như Office/WPS, hoàn tác cả lượt ở Writer/Calc/Impress, QA cấu trúc, `app.screenshot` |
+| `tests/mcp-host/test_mcp_host.py` | Offline (+ live khi có app mở) | Giao thức MCP qua client chính thức; so kết quả tool với bản Python cũ trên cùng file; mở lại file Go ghi bằng python-docx / openpyxl / python-pptx; README khớp `commands --markdown` |
+| `tests/mcp-host/test_mcp_portable.py` | Offline, 2 nền tảng, không cần thư viện ngoài | Giao thức + 50 tool + tool file + `.xls` + tool live khi có app mở (nhắm vào `Core mcp` hoặc `Host.exe mcp`) |
+| `tests/mcp-host/oracle_diff.py` | Offline | Cùng kịch bản trên bản Go và bản C# cũ, so từng bước phát hiện lệch |
+| `tests/mcp-host/office_roundtrip.ps1` | Office thật | File do Office tạo đọc được bằng Go và ngược lại |
+| `tests/lo/test_extension.py`, `test_checks.py`, `test_chat.py` | Không cần LO / LO thật | Giải mã tham số, registry lệnh khớp bản C#, logic pane, QA checks |
+| `tests/wps/` | Core + Node + WPS thật | Bridge WPS Linux e2e (35) + add-in Node (13+21+15) + live dưới Xvfb (24) |
+| `core-go`: `go test ./...` | Offline, 2 nền tảng | Unit test 18+ gói (agent guard, codec, truncate, skills, memory, policy, MCP...) |
+| `tests/core/test_core_e2e.py` (14 phần) | Core thật + LLM giả + bridge giả (`--office`: Excel thật; `--real-llm`: LLM thật) | SSE, hội thoại, allowlist, hủy, trần token, skill, memory 3 phiên + khởi động lại Core, xác nhận (đồng ý/từ chối/hết giờ), MCP (stdio + HTTP), QA thị giác, audit, setup, shutdown, Anthropic, embedding, tóm tắt |
 
 - **Cách ly**: test live chỉ chạy trên app do chính nó mở; port đã có bridge của app người dùng
   thì dừng (test gọi `writer.closeAll`); chạy xong đóng app bằng WM_CLOSE, quá 20s mới kill.
@@ -1140,87 +1230,124 @@ flowchart TD
   đổi hành vi.
 - **Độ phủ**: test đọc `commands --json`; lệnh nào trong registry chưa được gọi thì báo lỗi.
 
-## 22. Agent Core
+## 22. Agent Core (bản Go: `core-go/`)
 
-Đặc tả đầy đủ và lý do từng lựa chọn: [New_arch.md](New_arch.md). Mục này mô tả bản đã làm.
+Đặc tả đầy đủ và lý do từng lựa chọn: [New_arch.md](New_arch.md) (thiết kế ban đầu cho bản .NET);
+bản Go giữ nguyên hợp đồng ngoài (Core API v1, `core.json`, `core.db` schema 2, nguồn cấu hình,
+tên mutex) nên add-in/extension/MCP không phải đổi gì. Chi tiết cài đặt Go:
+[core-go/README.md](core-go/README.md). Mục này mô tả bản Go đang chạy.
 
 ### 22.1 Process, tìm Core, bảo mật
 
-- `Program.cs` đọc cấu hình (HKCU + `AXIOM_*`), giữ mutex một bản mỗi người dùng, mở Kestrel trên
-  `127.0.0.1:47840` (bận thì 47840–47849), ghi `core.json` khi sẵn sàng.
-- `CoreApiGuard`: chặn request có `Origin` (403), thiếu/sai `X-Auth-Token` (401, dùng chung token với
-  bridge), body không phải JSON (415). `/health` không cần token.
-- Log `core.log`: khởi động/thoát, mỗi lượt (vòng, tool call, token, thời gian), lỗi provider, memory, MCP.
+- `cmd/axiom-core/main.go` đọc cấu hình (`internal/config`: `AXIOM_*` → HKCU / `config.json` →
+  mặc định), giữ mutex một bản mỗi người dùng (Windows: `Local\AxiomOffice.Core`; Linux: `flock`
+  trong `$XDG_RUNTIME_DIR/axiom-office`), mở HTTP server trên `127.0.0.1:47840` (**giữ luôn
+  listener đã bind được**, bận thì thử 47841–47849), ghi `core.json` khi sẵn sàng. Subcommand `mcp`
+  được chặn trước mutex (Core tự sinh tiến trình con bằng chính binary của nó).
+- `internal/api/guard.go`: chặn request có `Origin` (403), thiếu/sai `X-Auth-Token` (401, dùng chung
+  token với bridge), body không phải JSON (415). `/health` không cần token. Dừng êm khi nhận
+  SIGTERM; khi shutdown thì **hủy lượt đang chạy trước khi đóng HTTP server** để pane còn nhận
+  được `run.cancelled`.
+- Log `core.log`: khởi động/thoát, mỗi lượt (vòng, tool call, token billable/raw/cache, thời gian,
+  self-verified), lỗi provider, memory, MCP.
 
 ### 22.2 API (v1)
 
 | Method | Path | Mô tả |
 |---|---|---|
 | `GET` | `/health` | `pid`, `port`, `version`, `protocol`, `memory` (`on`/`off`/`unavailable`) |
-| `POST` | `/v1/runs` | Bắt đầu lượt chạy → `runId`, `conversationId`; `options.interactive=false` cho `ai.ask` |
-| `GET` | `/v1/runs/{id}` · `/events` | Kết quả · SSE (kết nối lại được với `?after=`) |
+| `POST` | `/v1/runs` | Bắt đầu lượt chạy → `runId`, `conversationId` (chờ tối đa 10s để có hội thoại); `options.interactive=false` cho `ai.ask`, `options.mode="plan"` cho plan mode |
+| `GET` | `/v1/runs/{id}` · `/events` | Kết quả · SSE (kết nối lại được với `?after=` hoặc `Last-Event-ID`) |
 | `POST` | `/v1/runs/{id}/cancel` · `/confirm` | Hủy · trả lời xác nhận `{confirmationId, approved}` |
 | `GET/DELETE` | `/v1/conversations[/{id}]` | Hội thoại theo tài liệu (`?documentKey=`) |
 | `GET/POST` | `/v1/skills` · `/v1/skills/reload` | Skill theo app + lỗi nạp · quét lại |
-| `GET/POST/PATCH/DELETE` | `/v1/memory[/{id}]`, `/restore`, `/history` | Ghi nhớ (người dùng) |
+| `GET/POST/PATCH/DELETE` | `/v1/memory[/{id}]`, `/restore`, `/history` | Ghi nhớ (người dùng); `?scope=` cho xoá theo phạm vi |
 | `GET` | `/v1/audit?runId=&limit=` | Nhật ký tool call |
 | `GET` | `/v1/mcp` | MCP server: tool, tin cậy, lỗi khởi động |
+| `GET/POST` | `/v1/setup`, `/v1/llm/test`, `/v1/llm/models` | Wizard thiết lập (câu chữ từ `catalog/setup.json`): kiểm tra máy, thử kết nối, tải model |
 | `POST` | `/v1/admin/shutdown` | Thoát êm |
+| `*` | `/wps/...` | Kênh song song cho add-in WPS Linux (runs, events, confirm...) — xem `internal/api/wps.go` |
 
-Sự kiện SSE: `run.started`, `skill.loaded`, `tool.started`, `tool.finished`, `confirm.required`,
-`confirm.resolved`, `memory.written`, `run.completed` / `failed` / `cancelled` / `timedout` / `stopped`, `ping`.
+Sự kiện SSE: `run.started` (kèm `mode`), `skill.loaded`, `tool.started`, `tool.finished` (kèm
+`resultBytes`), `confirm.required`, `run.reasoning` (khi bật `LlmShowReasoning`),
+`run.reasoning.live` + `run.progress` (trạng thái đang tới), `run.model_switched`,
+`memory.written`, `run.completed` (kèm `billableTokens`, `verified`, `model`) / `failed` /
+`cancelled` / `timedout` / `stopped` (hết ngân sách), `ping`.
 
-### 22.3 Một lượt chạy (Orchestrator)
+### 22.3 Một lượt chạy (`internal/agent/orchestrator.go`)
 
 ```mermaid
 flowchart TD
     a["POST /v1/runs"] --> b["Session registry: port còn sống? /health đúng pid?"]
     b --> c["Hội thoại (mới / tiếp theo tài liệu) · lưu tin user"]
-    c --> d["GET /commands → office_action (allowlist theo app)"]
-    d --> e["Tool: + load_skill/read_skill_file (có skill hợp app)<br/>+ remember/recall (MemoryEnabled)<br/>+ look_at_document (VisualQaEnabled)<br/>+ mcp__* (McpManager)"]
-    e --> f["Prompt: quy tắc + chống injection · chỉ mục skill · memory · tài liệu · hội thoại"]
-    f --> g["ModelClient.RunAgentAsync (ModelSource: cấu hình mỗi lượt)"]
+    c --> d["GET /commands → office_action (allowlist theo app; plan mode: chỉ lệnh đọc)"]
+    d --> e["Tool: + load_skill/read_skill_file (có skill hợp app)<br/>+ slides_from_template (wpp, có sourceManifest) + docDesign (wps)<br/>+ write_todos + remember/recall (MemoryEnabled)<br/>+ tavily_search (có Tavily key) + look_at_document (VisualQaEnabled)<br/>+ mcp__* (Manager; plan mode: chỉ tool đọc)"]
+    e --> f["Prompt: Base (Recon/Plan/Check/Undo/Chunk...) + tài liệu + view + chỉ mục skill + memory + hội thoại"]
+    f --> g["Client.RunAgent (model.Source: cấu hình mỗi lượt; FitWindow theo context window)"]
     g --> h{"tool call?"}
-    h -->|"có"| i["Policy → (xác nhận) → tool → audit tool_calls → SSE tool.finished"]
+    h -->|"có"| i["overwrite guard → Policy → (xác nhận) → tool → audit tool_calls → SSE tool.finished"]
     i --> g
-    h -->|"không"| j["run.completed · lưu câu trả lời · runs.Finish"]
-    j --> k["Nền: trích xuất memory · tóm tắt hội thoại · tăng hits"]
+    h -->|"không"| j["verify guard (đọc lại nếu đã sửa) → run.completed · lưu câu trả lời · runs.Finish"]
+    j --> k["Nền: trích xuất memory · tóm tắt hội thoại (mỗi 20 tin) · tăng hits"]
 ```
 
-- Một lượt đang chạy cho mỗi port; **không trần thời gian** (kiểm soát bằng 100 vòng + 200k token + nút Dừng).
-- `ContextAssembler`: các lượt gần nhất trong ~8.000 token, vượt thì dùng tóm tắt (cập nhật mỗi 20 tin).
+- Một lượt đang chạy cho mỗi port; **không trần thời gian mặc định** (`DefaultMaxSeconds = 0`;
+  kiểm soát bằng `DefaultMaxRounds = 100` + nút Dừng; bên gọi vẫn đặt `maxSeconds`/`maxTokens` được).
+- `ContextAssembler`: các lượt gần nhất trong ngân sách, vượt mốc 20 tin thì tóm tắt bằng LLM.
+- Vòng `RunAgent` (`internal/model/agent.go`) chỉ gọi model → chạy tool → hỏi chuỗi guard
+  (`internal/model/guards.go`, 4 móc `onReply/beforeCall/afterTools/recover`): trả lời rỗng (nhắc 1 lần),
+  tự kiểm chứng, chặn lệnh y hệt (lần thứ 5), `write_todos` một lần/reply, tool báo xong (`Final`) thì
+  kết thúc ngay, app sập (`Abort`) thì dừng, dọn ngữ cảnh (> 40k token, giữ 3 kết quả gần nhất),
+  lặp một lỗi (3 lần y hệt thì dừng), ngân sách 3 mức (80% nhắc tiết kiệm, 90% tắt tool, 100% dừng),
+  provider không hỗ trợ tool, tràn cửa sổ ngữ cảnh (dọn mạnh giữ 1, thử lại tối đa 2 lần),
+  model dự phòng (trừ lỗi cấu hình 400/401).
 
-### 22.4 Model gateway
+### 22.4 Model gateway (`internal/model/`)
 
-- `IProviderCodec`: `OpenAiCodec` (`/chat/completions`, tool `function`, kết quả `role=tool`, ảnh gửi bằng
-  tin `user` `image_url`) và `AnthropicCodec` (`/messages`, `tool_use`/`tool_result`, ảnh là khối `image`).
-  Tin assistant gửi lại nguyên văn (giữ `extra_content` như thought signature của Gemini 3).
-- Provider không hỗ trợ tools → tắt tools, chạy chat thường. 429/500/502/503/504/rớt mạng → thử lại 3
-  lần (1s→2s→4s, `Retry-After` ≤ 10s); hết giờ request (120s, chỉnh được) và hủy thì không thử lại.
-- Trả lời rỗng giữa chừng → nhắc một lần; `<thought>`/`<think>` bị lọc khỏi câu trả lời cuối.
-- `ModelSource`: đọc lại cấu hình LLM mỗi lượt, cache client khi không đổi.
+- Codec `openai.go` (`/chat/completions`, tool `function`, kết quả `role=tool`, ảnh gửi bằng
+  tin `user` `image_url`) và `anthropic.go` (`/messages`, `tool_use`/`tool_result`, ảnh là khối `image`,
+  prompt caching cho phần system ổn định). Tin assistant gửi lại nguyên văn. Quy tắc nối endpoint
+  giống bản in-process (không nối lặp hậu tố).
+- `max_tokens` mặc định 65536 mỗi phản hồi (model reasoning đốt vào phần suy nghĩ trước khi viết tool
+  call nên 4096 hay chết `finish_reason=length`); `FitWindow()` hạ ngưỡng theo cửa sổ ngữ cảnh khi
+  provider khai (`GET /models`) hoặc `LlmContextWindow` (Ollama/LM Studio) — không nâng ngưỡng cho
+  model cửa sổ lớn.
+- Lỗi tạm thời (429/5xx/rớt mạng) → thử lại 3 lần (1s→2s→4s, theo `Retry-After`); hỏng mà thử lại
+  không qua (402/403/404/408/409/429, 5xx, mất kết nối, trả lời rỗng) → chuyển model dự phòng
+  (`LlmFallbackModels`, sự kiện `run.model_switched`); 400/401 (lỗi cấu hình) không chuyển.
+  Tràn cửa sổ ngữ cảnh → dọn mạnh rồi gọi lại (tối đa 2 lần/lượt).
+- Trả lời rỗng giữa chừng → nhắc một lần (bị cắt `finish_reason=length` thì nhắc viết gọn lại một lần);
+  `<thought>`/`<think>` bị lọc khỏi câu trả lời cuối. Token billable = input − cache + output.
+- `model.Source`: đọc lại cấu hình LLM mỗi lượt, cache client khi không đổi; nhớ provider đã từ chối
+  `thinking` để không gửi lại.
 
-### 22.5 Tool registry
+### 22.5 Tool registry (`internal/tools/`, `ITool` + `Registry`)
 
 | Tool | Nguồn | Ghi chú |
 |---|---|---|
-| `office_action` | `/commands` của bridge | Allowlist `agent=true` theo app; sửa tên lệnh viết sai nhẹ; params chuỗi JSON → object; policy trước khi gọi |
-| `load_skill` / `read_skill_file` | `SkillIndex` | Tầng 2/3 của Agent Skills; chặn `..`, symlink, phần mở rộng lạ; ≤ 64KB |
-| `remember` / `recall` | `MemoryService` | Chỉ ADD qua bộ chống trùng; phát `memory.written` |
+| `office_action` | `/commands` của bridge | Allowlist `agent=true` theo app; sửa tên lệnh viết sai nhẹ; alias `cell_range→range`; params chuỗi JSON hỏng thì báo rõ; guard chống ghi đè + policy trước khi gọi; cắt response đọc lớn trước khi vào turns |
+| `load_skill` / `read_skill_file` | `SkillIndex` | Tầng 2/3 của Agent Skills; chặn `..`, symlink, phần mở rộng lạ; ≤ 64KB; file nhị phân trả đường dẫn tuyệt đối (dùng với `writer.open`) |
+| `remember` / `recall` | `MemoryService` | Chỉ ADD qua bộ chống trùng; phát `memory.written` (plan mode bỏ `remember`) |
+| `write_todos` | built-in | Danh sách việc cho task ≥ 3 bước (không có trong plan mode; một lần mỗi reply) |
+| `slides_from_template` | built-in | Dựng lại cả bài theo mẫu theo lô 25 slide (chỉ PowerPoint có `sourceManifest`; báo `Final` để kết thúc ngay khi xong) |
 | `look_at_document` | bridge `app.screenshot` | Chỉ khi `VisualQaEnabled`; ảnh gửi cho model, không vào audit |
-| `mcp__<server>__<tool>` | `McpManager` | Server ngoài cần xác nhận trừ khi `trusted`; làn file `office` hỏi khi ghi vào file đã có |
+| `tavily_search` | Tavily REST | Chỉ khi có `TavilyApiKey`; có cả trong plan mode (chỉ đọc web) |
+| `mcp__<server>__<tool>` | `Manager` + `WrapMCPTools` | Server ngoài cần xác nhận trừ khi `trusted`; làn file `office` hỏi khi ghi vào file đã có (plan mode chỉ còn tool đọc) |
 
-### 22.6 Skills
+### 22.6 Skills (`internal/skills/`)
 
-- Nguồn (sau thắng trước khi trùng tên): `skills\` cạnh exe → `SkillDirs` → `%LOCALAPPDATA%\AxiomOffice\skills`;
-  thư mục `_*` là gói tài nguyên dùng chung (vd `_design/tokens.json`). `FileSystemWatcher` debounce 2s.
-- `SkillLoader` validate frontmatter theo chuẩn (tên ≤ 64 `a-z0-9-`, không `anthropic`/`claude`; mô tả
-  ≤ 1024, không thẻ XML; field lạ bỏ qua; `apps` tuỳ chọn). Lỗi → bỏ skill đó, hiện ở `/v1/skills`.
+- Nguồn (sau thắng trước khi trùng tên): `skills\` cạnh exe → `SkillDirs` → `%LOCALAPPDATA%\AxiomOffice\skills`
+  (Linux: `~/.local/share/axiom-office/...`); thư mục `_*` là gói tài nguyên dùng chung
+  (vd `_design/tokens.json`). Quét lại theo nhịp 2s (`Watch`) + `POST /v1/skills/reload`.
+- `loader.go` validate frontmatter theo chuẩn (tên ≤ 64 `a-z0-9-`, không `anthropic`/`claude`; mô tả
+  ≤ 1024, không thẻ XML, ngôi thứ ba + từ khoá tiếng Việt; field lạ bỏ qua; `apps` tuỳ chọn).
+  Lỗi → bỏ skill đó, hiện ở `/v1/skills`. Chỉ mục tầng 1 cắt ở 300 rune (`skillDescriptionLimit`).
 - Skill dựng sẵn: tầng thiết kế (`thiet-ke-van-phong`, `trinh-bay-chuyen-nghiep`, `the-thuc-van-ban`,
-  `bao-cao-du-lieu`) và tầng triển khai (`bao-cao-thang`, `bang-diem`, `van-ban-hanh-chinh`); checklist
-  kết thúc bằng lệnh QA cấu trúc `wpp.checkLayout` / `et.checkRange` / `writer.checkTables`.
+  `bao-cao-du-lieu`) và tầng triển khai (`bao-cao-thang`, `bang-diem`, `mo-hinh-nhieu-sheet`,
+  `van-ban-hanh-chinh`); checklist kết thúc bằng lệnh QA cấu trúc `wpp.checkLayout` /
+  `et.checkRange` / `writer.checkTables`. Không chạy script trong skill.
 
-### 22.7 Memory dài hạn
+### 22.7 Memory dài hạn (`internal/memory/` + `internal/store/`)
 
 ```mermaid
 erDiagram
@@ -1233,46 +1360,54 @@ erDiagram
 ```
 
 - Schema 2 (`PRAGMA user_version`); migration lỗi → memory `unavailable`, Core vẫn chạy agent.
-- Phạm vi `user` (mọi tài liệu) và `document` (một file đã lưu). Chuẩn hoá bỏ dấu bằng bảng tiếng Việt
-  tường minh (Core chạy invariant globalization), hash SHA-256 chống trùng trong lô và với memory cũ.
-- **Ghi**: người dùng (API/form), tool `remember`, trích xuất nền sau lượt `completed` (bỏ qua lệnh thao
-  tác thuần; id tạm chống bịa id; lọc confidence < 0,6, > 300 ký tự, thông tin nhạy cảm). Model chỉ ADD.
-- **Đọc**: keyword (FTS5 + số từ khớp, sigmoid theo độ dài truy vấn) + thực thể (0,5 giảm theo độ phổ
-  biến) + semantic nếu có embedding; ngưỡng 0,1 chặn tín hiệu chính; ngữ cảnh = ghim + ≤ 20 memory tài
-  liệu + ≤ 8 memory user, ≤ ~1.500 token, bản mới trước khi bằng điểm.
+- Phạm vi `user` (mọi tài liệu) và `document` (một file đã lưu; `document_key` chỉ chuẩn hoá case/`\`
+  trên Windows). Chuẩn hoá bỏ dấu bằng bảng tiếng Việt tường minh (giống bản .NET), hash SHA-256
+  chống trùng trong lô và với memory cũ, gần-trùng bằng cosine ≥ 0.96 khi có vector.
+- **Ghi**: người dùng (API/form, `source=user`, confidence 1), tool `remember`, trích xuất nền sau
+  lượt `completed` (prompt `prompts/extract.txt` nhúng bằng `go:embed`; bỏ qua lệnh thao tác thuần;
+  id tạm chống bịa id; lọc confidence < 0,6, > 300 ký tự, thông tin nhạy cảm). Model chỉ ADD;
+  ghi song song có retry khi SQLite bận. Xung đột xử lý lúc đọc: bản mới ghi rõ chuyển đổi và
+  liên kết bản cũ, bằng điểm thì bản mới trước.
+- **Đọc** (`retriever.go`): keyword (FTS5 `unicode61 remove_diacritics` + số từ khớp, sigmoid theo
+  độ dài truy vấn) + thực thể (0,5 giảm theo độ phổ biến) + semantic nếu có embedding; ngưỡng 0,1
+  chặn tín hiệu chính; ngữ cảnh = ghim + ≤ 20 memory tài liệu + ≤ 8 memory user, ≤ ~1.500 token.
 
-### 22.8 Policy và xác nhận
+### 22.8 Policy và xác nhận (`internal/policy/` + `internal/agent/confirm.go`)
 
-`PolicyEngine` cho `office_action`: lưu/xuất khi prompt không có ý lưu/xuất; `saveAs`/`exportPdf` ghi
-đè file đã có; `wpp.deleteSlide`; `writer.replaceAll` khi tài liệu > 20.000 ký tự. `McpTool`: server không
-tin cậy, hoặc làn file ghi vào file đã có. `ConfirmationBroker` (mỗi run) phát `confirm.required`, chờ
-`/confirm` tối đa `ConfirmTimeoutSeconds`; hết giờ/hủy = từ chối; lượt `interactive=false` từ chối ngay.
+`policy.Evaluate` cho `office_action`: lưu/xuất khi prompt không có ý lưu/xuất (parser mệnh đề
+tiếng Việt/Anh, trừ từ ghép và phủ định); `saveAs`/`exportPdf` ghi đè file đã có; `wpp.deleteSlide`;
+`writer.replaceAll`/`replaceMany` khi tài liệu > 20.000 ký tự. Thêm guard chống ghi đè
+(`tools/overwrite.go`): ghi vào ô sheet đã có dữ liệu từ trước thì hỏi. `ConfirmationBroker`
+(mỗi run) phát `confirm.required`, chờ `/confirm` tối đa `ConfirmTimeoutSeconds`; hết giờ/hủy =
+từ chối; lượt `interactive=false` từ chối ngay. Mọi tool call vào audit (`tool_calls`).
 
-### 22.9 MCP client
+### 22.9 MCP client (`internal/mcp/`)
 
-- `McpManager` đọc `mcp.json` (`{"mcpServers": {name: {command, args, env | url, headers, trusted, disabled}}}`)
-  cộng server built-in `office` = `AxiomOffice.Host.exe mcp` (tin cậy, **chỉ tool làn file**; tool live
-  bị lọc vì đi vòng allowlist/policy). Khởi động lười ở lượt đầu, timeout 20s, lỗi → ẩn tool + log;
-  `mcp.json` đổi → nạp lại ở lượt sau.
+- `Manager` đọc `mcp.json` (`{"mcpServers": {name: {command, args, env | url, headers, trusted, disabled}}}`)
+  cộng server built-in `office` = `AxiomOffice.Core mcp` (Windows: `Host.exe mcp`; Linux: chính binary
+  Core — tin cậy, **chỉ tool làn file**; tool live bị lọc vì đi vòng allowlist/policy). Khởi động
+  lười ở lượt đầu, timeout 20s, lỗi → ẩn tool + log; `mcp.json` đổi → nạp lại ở lượt sau.
 - Transport: stdio (JSON-RPC mỗi dòng) và Streamable HTTP (JSON hoặc SSE, giữ `Mcp-Session-Id`).
 
 ### 22.10 QA hai mức
 
 - **Cấu trúc** (luôn có, lệnh bridge chỉ đọc): `wpp.checkLayout` (tràn khung, ra ngoài slide, chồng
   shape, chữ < 12pt, slide quá nhiều chữ), `et.checkRange` (tiêu đề trống, kiểu lẫn lộn, số dạng chữ,
-  thiếu number format, ô lỗi, dữ liệu lạc ngoài bảng), `writer.checkTables` (ô trống, ô tiêu đề lẫn
-  đoạn văn).
-- **Thị giác** (tuỳ chọn): `app.screenshot` (`PrintWindow`, thu nhỏ ≤ 1280px) → `look_at_document`.
+  thiếu number format, ô lỗi, dữ liệu lạc ngoài bảng; response lớn được cắt gọn giữ `issueCount`),
+  `writer.checkTables` (ô trống, ô tiêu đề lẫn đoạn văn; bảng dàn trang gắn tem thì miễn `empty-cells`).
+- **Thị giác** (tuỳ chọn): PowerPoint xuất thẳng slide đang mở (`Slide.Export`), Word/Excel chụp cửa
+  sổ (`PrintWindow`), thu nhỏ ≤ 1280px → `look_at_document`.
 
-### 22.11 Tích hợp add-in
+### 22.11 Tích hợp add-in (`Ai/CoreClient.cs`, `CoreAdmin.cs`)
 
 - `CoreClient.Run`: `EnsureBaseUrl` (đọc `core.json`, `/health`, khởi động exe nếu cần) → `POST /v1/runs`
-  (gửi pid của bridge theo session file) → đọc SSE tới sự kiện kết thúc. **Chỉ trả null (dự phòng
-  in-process) khi Core chưa nhận lượt chạy**; mọi lý do dự phòng ghi `bridge.log`.
-- Pane hiện dòng tiến trình (`{"action": …}` như chế độ in-process), "Dùng kỹ năng", thẻ xác nhận, dòng
-  "Đã ghi nhớ" + Xoá (kể cả memory trích xuất nền: hỏi lại `/v1/memory?runId=` sau 8s và 25s).
-- `ai.ask` (lệnh bridge) chạy qua Core ở chế độ không tương tác, trên thread riêng của bridge; response
-  giữ hình dạng cũ, thêm `viaCore`.
+  (gửi pid của bridge theo session file, kèm `document.view` + tệp đính kèm) → đọc SSE tới sự kiện
+  kết thúc. **Chỉ trả null (dự phòng in-process) khi Core chưa nhận lượt chạy**; mọi lý do dự phòng
+  ghi `bridge.log`.
+- Pane hiện dòng tiến trình (`look_at_document`/`recall`/tool MCP đều có dòng riêng; `load_skill`/
+  `remember` đã có dòng riêng nên ẩn), "Dùng kỹ năng", thẻ xác nhận (đồng ý/từ chối, 120s), thẻ kế
+  hoạch (plan mode), dòng "Đã ghi nhớ" + Xoá (kể cả memory trích xuất nền: hỏi lại
+  `/v1/memory?runId=` sau 8s và 25s), "Hoàn tác lượt này" (Word qua `writer.undo` nhiều bước).
 
 ---
 
