@@ -59,6 +59,8 @@ type Config struct {
 	LlmApiKey         string
 	// TavilyApiKey: khoa tim kiem web (tool tavily_search); rong = khong co tool. Windows luu "dpapi:" nhu LlmApiKey.
 	TavilyApiKey             string
+	// TavilyEnabled: cho AI tim kiem web (toggle tren ribbon). Tat thi khong dang ky tool du co khoa.
+	TavilyEnabled            bool
 	MemoryModel              string
 	EmbeddingModel           string
 	EmbeddingEndpoint        string
@@ -112,6 +114,7 @@ func From(env Env, source Source) Config {
 		VisualQaEnabled:          flag(env, "AXIOM_VISUAL_QA", source, "VisualQaEnabled", false),
 		LlmApiKey:                Unprotect(text(env, "AXIOM_LLM_API_KEY", source, "LlmApiKey")),
 		TavilyApiKey:             Unprotect(text(env, "AXIOM_TAVILY_API_KEY", source, "TavilyApiKey")),
+		TavilyEnabled:            flag(env, "AXIOM_TAVILY_ENABLED", source, "TavilyEnabled", true),
 		MemoryModel:              text(env, "AXIOM_MEMORY_MODEL", source, "MemoryModel"),
 		EmbeddingModel:           text(env, "AXIOM_EMBEDDING_MODEL", source, "EmbeddingModel"),
 		EmbeddingEndpoint:        text(env, "AXIOM_EMBEDDING_ENDPOINT", source, "EmbeddingEndpoint"),

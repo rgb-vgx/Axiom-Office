@@ -1107,6 +1107,7 @@ giữ port) → idle. Ctrl+C dừng bridge và `Quit` app.
 | `LlmModel` | String | rỗng | Tên model |
 | `LlmApiKey` | String | rỗng | `dpapi:<base64>` (DPAPI `CurrentUser`, không entropy; Linux: libsecret hoặc plaintext trong `config.json` 0600) |
 | `TavilyApiKey` | String | rỗng | Khoá tìm kiếm web cho tool `tavily_search` (lưu `dpapi:` như trên) |
+| `TavilyEnabled` | DWORD | 1 | Cho AI tìm trên web (toggle ribbon); tắt thì không đăng ký tool dù đã có khoá |
 | `LlmFallbackModels` | String | rỗng | Model dự phòng cùng provider, phân cách `,`/`;`/xuống dòng |
 | `LlmContextWindow` | DWORD | 0 | Cửa sổ ngữ cảnh khi provider không khai (Ollama/LM Studio); 0 = theo provider |
 | `CorePort` | DWORD | 47840 | Port Agent Core (bận thì thử 47840–47849; Core Go giữ luôn listener đã bind được) |
@@ -1331,7 +1332,7 @@ flowchart TD
 | `write_todos` | built-in | Danh sách việc cho task ≥ 3 bước (không có trong plan mode; một lần mỗi reply) |
 | `slides_from_template` | built-in | Dựng lại cả bài theo mẫu theo lô 25 slide (chỉ PowerPoint có `sourceManifest`; báo `Final` để kết thúc ngay khi xong) |
 | `look_at_document` | bridge `app.screenshot` | Chỉ khi `VisualQaEnabled`; ảnh gửi cho model, không vào audit |
-| `tavily_search` | Tavily REST | Chỉ khi có `TavilyApiKey`; có cả trong plan mode (chỉ đọc web) |
+| `tavily_search` | Tavily REST | Chỉ khi `TavilyEnabled` và có `TavilyApiKey`; có cả trong plan mode (chỉ đọc web) |
 | `mcp__<server>__<tool>` | `Manager` + `WrapMCPTools` | Server ngoài cần xác nhận trừ khi `trusted`; làn file `office` hỏi khi ghi vào file đã có (plan mode chỉ còn tool đọc) |
 
 ### 22.6 Skills (`internal/skills/`)

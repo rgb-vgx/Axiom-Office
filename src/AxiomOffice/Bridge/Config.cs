@@ -75,6 +75,13 @@ namespace AxiomOffice.Bridge
             get { return ReadSecret("TavilyApiKey"); }
         }
 
+        // Cho AI tìm kiếm web (toggle trên ribbon; Core đọc lại mỗi lượt). Tắt thì không đăng ký
+        // tool dù đã có khoá — khác xoá khoá (xoá là mất, bật lại phải nhập lại).
+        public static bool TavilyEnabled
+        {
+            get { return ReadInt("TavilyEnabled", 1) != 0; }
+        }
+
         // Khoá lưu "dpapi:<base64>" (WriteSecret) hoặc chữ thường (cấu hình cũ / nhập tay).
         private static string ReadSecret(string name)
         {

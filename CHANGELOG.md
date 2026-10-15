@@ -5,6 +5,14 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Bật/tắt tìm web (Tavily) một chạm trên ribbon (15/10/2026)
+- Cờ riêng `TavilyEnabled` (HKCU, mặc định bật; `AXIOM_TAVILY_ENABLED` ghi đè): Core chỉ đăng ký
+  tool `web_search` khi cờ bật và đã có khoá — khác xoá khoá (xoá là mất, bật lại phải nhập lại).
+  `GET /v1/setup` thêm `tavilyEnabled` để nút hiện trạng thái thật của Core.
+- Ribbon nhóm Kiểm tra thêm toggle **Tìm trên web** (cạnh Nhìn tài liệu, cùng pattern xác nhận
+  Core ở luồng nền): bật mà chưa có khoá thì mở thẳng wizard để nhập; Core đọc lại mỗi lượt nên
+  có hiệu lực ngay, không cần khởi động lại.
+
 ### Added — Dialog Công cụ ngoài (MCP) trên ribbon (15/10/2026)
 - Nhóm Quản lý thêm nút **Công cụ ngoài…** (`Ai/McpForm.cs`, cạnh Kỹ năng…): gộp `mcp.json`
   trên đĩa (kể cả server đang tắt) với `GET /v1/mcp` (tool đang nạp, lỗi khởi động); bật/tắt,

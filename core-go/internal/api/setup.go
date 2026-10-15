@@ -222,6 +222,7 @@ func currentJSON(cfg config.Config) map[string]any {
 		"model":             cfg.LlmModel,
 		"hasKey":            cfg.LlmApiKey != "",
 		"hasTavilyKey":      cfg.TavilyApiKey != "",
+		"tavilyEnabled":     cfg.TavilyEnabled,
 		"memoryEnabled":     cfg.MemoryEnabled,
 		"memoryAutoExtract": cfg.MemoryAutoExtract,
 		"visualQaEnabled":   cfg.VisualQaEnabled,

@@ -255,9 +255,12 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 		}
 		list = append(list, tools.NewRecallTool(o.Memory, memoryDocumentKey))
 	}
-	// Tim kiem web (Tavily): chi khi nguoi dung nhap khoa trong Thiet lap; chi doc web nen co ca trong plan mode.
-	if key := o.Config().TavilyApiKey; key != "" {
-		list = append(list, tools.NewWebSearchTool(key))
+	// Tim kiem web (Tavily): chi khi co khoa trong Thiet lap VA bat TavilyEnabled (toggle tren ribbon);
+	// chi doc web nen co ca trong plan mode.
+	if cfg := o.Config(); cfg.TavilyEnabled {
+		if key := cfg.TavilyApiKey; key != "" {
+			list = append(list, tools.NewWebSearchTool(key))
+		}
 	}
 	// QA thi giac (muc 8.4.6): chi khi nguoi dung bat VisualQaEnabled (doc lai moi luot qua cau hinh).
 	if o.Config().VisualQaEnabled {

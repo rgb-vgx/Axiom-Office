@@ -13,6 +13,7 @@ namespace AxiomOffice.Ribbon
     internal static class RibbonUi
     {
         private const string VisualQaId = "tglVisualQa";
+        private const string TavilyId = "tglTavily";
 
         // Nút soát hiện theo app (getVisible); host bỏ qua getVisible thì nút lạ báo "dùng cho …" khi bấm.
         public const string RibbonXml =
@@ -28,6 +29,10 @@ namespace AxiomOffice.Ribbon
             " getPressed=\"GetPressed\" getEnabled=\"GetEnabled\" onAction=\"OnToggleAction\" tag=\"visualQa\"" +
             " screentip=\"Cho AI nhìn tài liệu\" supertip=\"Bật: AI xem ảnh trang tài liệu để soát bố cục. Tốn nhiều token hơn" +
             " và cần model đọc được ảnh. Có hiệu lực từ lượt hỏi kế tiếp.\"/>" +
+            "<toggleButton id=\"" + TavilyId + "\" label=\"Tìm trên web\" size=\"large\" imageMso=\"Research\"" +
+            " getPressed=\"GetPressed\" getEnabled=\"GetEnabled\" onAction=\"OnToggleAction\" tag=\"tavilySearch\"" +
+            " screentip=\"Cho AI tìm trên web\" supertip=\"Bật: AI tra cứu internet khi làm việc (cần khoá Tavily ở Thiết lập…," +
+            " bước Tính năng). Tắt: AI chỉ dùng tài liệu đang mở. Có hiệu lực từ lượt hỏi kế tiếp.\"/>" +
             "<button id=\"btnCheckLayout\" label=\"Soát bố cục\" size=\"large\" imageMso=\"SlideShowFromCurrent\" getVisible=\"GetVisible\"" +
             " onAction=\"OnButtonAction\" tag=\"checkLayout\" screentip=\"Soát bố cục\"" +
             " supertip=\"Tìm chữ tràn khung, khung ra ngoài slide, khung chồng nhau, chữ quá nhỏ. Chỉ đọc, không dùng AI.\"/>" +
@@ -163,6 +168,7 @@ namespace AxiomOffice.Ribbon
         // Trạng thái Core báo lại sau lần bấm gần nhất (null = chưa hỏi): nút hiện trạng thái thật của Core,
         // không chỉ giá trị vừa ghi HKCU (biến môi trường AXIOM_VISUAL_QA của Core đè được HKCU).
         private static bool? _coreVisualQa;
+        private static bool? _coreTavily;
         private static int _checkRunning;
 
         public static void OnLoad(object ribbon)
@@ -203,22 +209,32 @@ namespace AxiomOffice.Ribbon
 
         public static bool GetEnabled(string tag)
         {
-            // Agent in-process không dùng ảnh: tắt Core thì nút này không có tác dụng.
-            return tag != "visualQa" || Config.CoreEnabled;
+            // Agent in-process không có QA thị giác lẫn tìm web: tắt Core thì hai nút này không tác dụng.
+            return (tag != "visualQa" && tag != "tavilySearch") || Config.CoreEnabled;
         }
 
         public static bool GetPressed(string tag)
         {
-            if (tag != "visualQa")
+            if (tag == "visualQa")
             {
-                return false;
+                bool? core = _coreVisualQa;
+                return core.HasValue ? core.Value : Config.VisualQaEnabled;
             }
-            bool? core = _coreVisualQa;
-            return core.HasValue ? core.Value : Config.VisualQaEnabled;
+            if (tag == "tavilySearch")
+            {
+                bool? core = _coreTavily;
+                return core.HasValue ? core.Value : Config.TavilyEnabled;
+            }
+            return false;
         }
 
         public static void HandleToggle(Connect connect, string tag, bool pressed)
         {
+            if (tag == "tavilySearch")
+            {
+                HandleTavilyToggle(connect, pressed);
+                return;
+            }
             if (tag != "visualQa")
             {
                 Logger.Info("Ribbon: unknown toggle tag '" + tag + "'");
@@ -271,6 +287,72 @@ namespace AxiomOffice.Ribbon
             }
         }
 
+        private static void HandleTavilyToggle(Connect connect, bool pressed)
+        {
+            if (!Config.WriteDword("TavilyEnabled", pressed ? 1 : 0))
+            {
+                // Ghi hỏng thì vẽ lại theo HKCU: nút không được hiện trạng thái chưa lưu.
+                Invalidate(connect, TavilyId);
+                MessageBox.Show(Ui.T("Không lưu được thiết lập \"Tìm trên web\" (HKCU\\Software\\AxiomOffice)."),
+                    "Axiom Office", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            _coreTavily = null;
+            Logger.Info("Ribbon: TavilyEnabled=" + (pressed ? 1 : 0));
+            if (pressed && Config.TavilyApiKey.Length == 0)
+            {
+                // Bật mà chưa có khoá thì tool vẫn vắng: mở thẳng wizard để nhập khoá.
+                Invalidate(connect, TavilyId);
+                DialogResult answer = MessageBox.Show(
+                    Ui.T("Đã bật \"Tìm trên web\" nhưng chưa có khoá Tavily nên AI vẫn chưa tra cứu được.\n\nMở Thiết lập… để nhập khoá ngay?"),
+                    "Axiom Office", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+                if (answer == DialogResult.Yes)
+                {
+                    using (var form = new Ai.SetupWizardForm(connect))
+                    {
+                        form.ShowDialog();
+                    }
+                    RefreshAfterSettings(connect);
+                    return;
+                }
+            }
+            // Hỏi lại Core ở luồng nền (có thể phải khởi động Core): đọc trạng thái thật, không đoán.
+            var thread = new Thread(() => ConfirmTavily(connect, pressed)) { IsBackground = true, Name = "AxiomRibbonTavily" };
+            thread.Start();
+        }
+
+        private static void ConfirmTavily(Connect connect, bool wanted)
+        {
+            try
+            {
+                string error;
+                Ai.SetupInfo info = Ai.CoreClient.Instance.Setup(out error);
+                if (info == null || !info.Current.ContainsKey("tavilyEnabled"))
+                {
+                    // Core chưa chạy được: lượt hỏi kế tiếp Core khởi động và đọc HKCU vừa ghi.
+                    Logger.Info("Ribbon: Tavily not confirmed by Core (" + error + ")");
+                    return;
+                }
+                bool actual = Ai.SetupInfo.Flag("tavilyEnabled", info.Current, wanted);
+                _coreTavily = actual;
+                if (actual == wanted)
+                {
+                    Logger.Info("Ribbon: Core confirmed tavilyEnabled=" + actual);
+                    return;
+                }
+                Logger.Info("Ribbon: Core reports tavilyEnabled=" + actual + ", wrote " + wanted);
+                Invalidate(connect, TavilyId);
+                connect.OnUiThread(() => MessageBox.Show(
+                    Ui.T("Đã lưu thiết lập nhưng Agent Core vẫn đang ") + (actual ? Ui.T("BẬT") : Ui.T("TẮT")) + Ui.T(" \"Tìm trên web\".\n\n")
+                    + Ui.T("Thường do biến môi trường AXIOM_TAVILY_ENABLED đang đặt cho Core; bỏ biến đó rồi bấm lại."),
+                    "Axiom Office", MessageBoxButtons.OK, MessageBoxIcon.Warning));
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Ribbon: confirm Tavily failed", ex);
+            }
+        }
+
         private static void Invalidate(Connect connect, string controlId)
         {
             object ribbon = _ribbon;
@@ -305,11 +387,13 @@ namespace AxiomOffice.Ribbon
             }
         }
 
-        // Wizard / cài đặt có thể đổi VisualQaEnabled, CoreEnabled: vẽ lại để nút toggle khớp HKCU.
+        // Wizard / cài đặt có thể đổi VisualQaEnabled, TavilyEnabled, CoreEnabled: vẽ lại để nút toggle khớp HKCU.
         private static void RefreshAfterSettings(Connect connect)
         {
             _coreVisualQa = null;
+            _coreTavily = null;
             Invalidate(connect, VisualQaId);
+            Invalidate(connect, TavilyId);
         }
 
         // Lệnh soát chạy ở luồng nền như lệnh /cmd: luồng UI rảnh để host trả lời các cuộc gọi COM.
