@@ -28,7 +28,11 @@ func (t *DocDesignTool) Name() string { return "doc_design" }
 const maxDesignBlocks = 30
 
 func (t *DocDesignTool) Description() string {
-	return "Redesign the open Word document in a clean modern style (headings with a thin accent line, two-level " +
+	return "Call this FIRST when the user wants a whole Word document redesigned or made professional, before reading " +
+		"it: the first call asks the user which style they want (pass `style` only if their request already says: full " +
+		"= restyle + highlight boxes, basic = restyle only, keep = keep the current look; or `custom` when they describe " +
+		"their own colours/font). " +
+		"Redesign the open Word document in a clean modern style (headings with a thin accent line, two-level " +
 		"bullets, light tables, page numbers) WITHOUT changing its words, then add a few soft rounded boxes for the " +
 		"parts worth highlighting. Step 1: call with no arguments - the tool restyles the whole document and returns " +
 		"its numbered outline. Step 2: call again with `blocks` (or blocks: [] for none): each block replaces source " +
@@ -44,6 +48,12 @@ func (t *DocDesignTool) Description() string {
 
 func (t *DocDesignTool) Parameters() json.RawMessage {
 	return json.RawMessage(`{"type":"object","properties":{` +
+		`"style":{"type":"string","enum":["full","basic","keep"],"description":"only when the user already said which ` +
+		`style; otherwise omit and the tool asks them"},` +
+		`"custom":{"type":"object","properties":{"accent":{"type":"string","description":"heading colour #RRGGBB"},` +
+		`"font":{"type":"string"},"size":{"type":"number","description":"body text size, 9-20"},"boxes":{"type":"boolean",` +
+		`"description":"add highlight boxes (default false)"}},"description":"the style the user described in their own ` +
+		`words, as options (omit what they did not mention)"},` +
 		`"blocks":{"type":"array","items":{"type":"object"},"description":"step 2: highlight boxes, e.g. ` +
 		`{\"type\":\"note\",\"replace\":\"12-14\",\"tone\":\"blue\",\"title\":\"Mục tiêu\",\"lines\":[\"- ...\"]}"}}}`)
 }
@@ -128,17 +138,66 @@ func (t *DocDesignTool) Invoke(ctx context.Context, arguments map[string]any, ru
 		}
 		return Result{JSON: ErrorJSON(problem), Mutating: mutating}
 	}
+	if run.docStyle == "" {
+		style, wish, problem := chooseDocStyle(arguments, run)
+		if problem != "" {
+			return Result{JSON: ErrorJSON(problem)}
+		}
+		if style == "" {
+			return Result{JSON: OKJSON(map[string]any{"done": "the user did not pick a style - nothing changed"}), OK: true,
+				Final: true, FinalText: "Bạn chưa chọn kiểu trình bày nên tài liệu chưa đổi gì. Gửi lại yêu cầu khi muốn làm tiếp."}
+		}
+		run.docStyle = style
+		if style == "keep" {
+			return Result{JSON: OKJSON(map[string]any{"style": "keep", "how": "The user wants to keep the document's " +
+				"current look: do not restyle it or add boxes, do not call doc_design again. Do only the rest of their " +
+				"request (content edits with office_action), or answer."}), OK: true}
+		}
+		// Nguoi dung tu go kieu (16/10/2026): model doi loi mo ta thanh tham so roi goi lai.
+		if style == "custom" && wish != "" {
+			run.docWish = wish
+			return Result{JSON: OKJSON(map[string]any{"style": "custom", "userWish": wish, "how": "The user described " +
+				"the style they want (userWish). Call doc_design again with custom: {accent: \"#RRGGBB\" heading colour, " +
+				"font, size (body, 9-20), boxes: true|false} - only what they asked for; the rest keeps this tool's clean " +
+				"defaults. If they want something these options cannot do, apply it with office_action after that call, " +
+				"or instead of doc_design if none of it fits."}), OK: true}
+		}
+	}
+	if run.docStyle == "keep" {
+		return Result{JSON: ErrorJSON("the user chose to keep the current look - do not use doc_design in this request")}
+	}
+	if run.docStyle == "custom" {
+		raw, given := arguments["custom"]
+		if !given {
+			return Result{JSON: ErrorJSON("the user asked for their own style (\"" + run.docWish + "\"): call doc_design " +
+				"with custom {accent, font, size, boxes}, or apply it with office_action")}
+		}
+		options, boxes, problem := customStyle(raw)
+		if problem != "" {
+			return Result{JSON: ErrorJSON(problem)}
+		}
+		run.docOptions = options
+		run.docStyle = "basic"
+		if boxes {
+			run.docStyle = "full"
+		}
+	}
 	rawBlocks, hasBlocks := arguments["blocks"]
 	if !run.docRestyled || !hasBlocks {
 		// Buoc 1 (mot lan moi luot): nen chung roi dan bai. Goi lai buoc 1 sau khi da restyle -> chi tra dan bai.
 		restyled := map[string]any{}
 		if !run.docRestyled {
-			stats, problem := bridge("writer.restyle", map[string]any{})
+			stats, problem := bridge("writer.restyle", copyOptions(run.docOptions))
 			if problem != "" {
 				return failed(problem, false)
 			}
 			run.docRestyled = true
 			restyled = stats
+			if run.docStyle == "basic" {
+				return Result{JSON: OKJSON(map[string]any{"restyled": stats}), OK: true, Mutating: true, Final: true,
+					FinalText: "Đã trình bày lại tài liệu (tiêu đề, gạch đầu dòng, bảng, số trang), không thêm khối nhấn - nội " +
+						"dung giữ nguyên. Nếu chưa ưng, bấm Hoàn tác (Ctrl+Z)."}
+			}
 		}
 		outline, problem := bridge("writer.outline", map[string]any{"maxChars": 140})
 		if problem != "" {
@@ -178,7 +237,10 @@ func (t *DocDesignTool) Invoke(ctx context.Context, arguments map[string]any, ru
 	if len(errs) > 0 {
 		return Result{JSON: model.MarshalRelaxed(map[string]any{"ok": false, "error": "fix these blocks and call again with ALL blocks", "problems": errs})}
 	}
-	result, problem := bridge("writer.insertBlocks", map[string]any{"blocks": bridgeBlocks})
+	params := copyOptions(run.docOptions)
+	delete(params, "size")
+	params["blocks"] = bridgeBlocks
+	result, problem := bridge("writer.insertBlocks", params)
 	if problem != "" {
 		return failed(problem, false)
 	}
@@ -586,4 +648,77 @@ func designWords(text string) map[string]bool {
 		}
 	}
 	return words
+}
+
+// docStyleChoices: ba kieu cho nguoi dung chon (nguoi dung 15/10/2026: "co nguoi khong thich style nay").
+var docStyleChoices = []Choice{
+	{ID: "full", Label: "Hiện đại, có khối nhấn", Detail: "Định dạng lại tiêu đề, gạch đầu dòng, bảng và thêm vài khối bo tròn nền nhạt cho chỗ quan trọng"},
+	{ID: "basic", Label: "Chỉ định dạng gọn", Detail: "Tiêu đề, gạch đầu dòng, bảng, số trang - không thêm khối"},
+	{ID: "keep", Label: "Giữ kiểu hiện tại", Detail: "Không áp mẫu này, chỉ sửa theo yêu cầu"},
+	{ID: "custom", Label: "Kiểu khác (tự gõ)", Detail: "Ví dụ: tiêu đề màu xanh lá, font Arial, không khối", Input: true},
+}
+
+// chooseDocStyle: kieu nguoi dung da noi trong yeu cau (tham so style) hoac hoi bang the nhieu lua chon. Khong co ai
+// de hoi (agent khac goi ai.ask) thi dung kieu day du nhu truoc.
+// Tra (kieu, chu nguoi dung go, loi). Model da dua `custom` (yeu cau tu mo ta kieu) thi khong hoi.
+func chooseDocStyle(arguments map[string]any, run *RunContext) (string, string, string) {
+	if _, given := arguments["custom"]; given {
+		return "custom", "", ""
+	}
+	switch style := strings.ToLower(stringArg(arguments, "style")); style {
+	case "full", "basic", "keep":
+		return style, "", ""
+	case "":
+	default:
+		return "", "", "style must be full, basic or keep (or pass custom)"
+	}
+	if run.Choose == nil {
+		return "full", "", ""
+	}
+	choice, wish, err := run.Choose("doc_design", "Bạn muốn trình bày lại tài liệu theo kiểu nào?", docStyleChoices)
+	if err != nil {
+		return "", "", err.Error()
+	}
+	return choice, wish, ""
+}
+
+var designColor = regexp.MustCompile(`^#?([0-9A-Fa-f]{6})$`)
+
+// customStyle: tham so kieu nguoi dung tu mo ta -> tham so writer.restyle (accent, font, size) va co them khoi khong.
+func customStyle(raw any) (map[string]any, bool, string) {
+	custom, ok := raw.(map[string]any)
+	if !ok {
+		return nil, false, "custom must be an object {accent, font, size, boxes}"
+	}
+	options := map[string]any{}
+	if accent := strings.TrimSpace(fmt.Sprint(custom["accent"])); custom["accent"] != nil && accent != "" {
+		match := designColor.FindStringSubmatch(accent)
+		if match == nil {
+			return nil, false, "custom.accent must be a colour like #2E7D32"
+		}
+		options["accent"] = "#" + strings.ToUpper(match[1])
+	}
+	if font, _ := custom["font"].(string); strings.TrimSpace(font) != "" {
+		if utf8.RuneCountInString(font) > 40 {
+			return nil, false, "custom.font is too long - give a font name"
+		}
+		options["font"] = strings.TrimSpace(font)
+	}
+	if value, given := custom["size"]; given && value != nil {
+		size, ok := value.(float64)
+		if !ok || size < 9 || size > 20 {
+			return nil, false, "custom.size must be a number from 9 to 20"
+		}
+		options["size"] = size
+	}
+	boxes, _ := custom["boxes"].(bool)
+	return options, boxes, ""
+}
+
+func copyOptions(options map[string]any) map[string]any {
+	params := map[string]any{}
+	for key, value := range options {
+		params[key] = value
+	}
+	return params
 }

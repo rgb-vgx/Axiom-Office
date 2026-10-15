@@ -25,6 +25,8 @@ namespace AxiomOffice.Ai
         public string Reason;
         public bool Approved;
         public string By;               // confirm.resolved: user | timeout | cancelled
+        public List<string[]> Choices;  // confirm.required nhiều lựa chọn: {id, label, detail, "1" = ô tự gõ}
+        public string Choice;           // confirm.resolved: id lựa chọn người dùng bấm
         public string Action;
         public string ParamsPreview;
         public string ResultPreview;
@@ -608,6 +610,23 @@ namespace AxiomOffice.Ai
                 {
                     item.Approved = Convert.ToBoolean(data["approved"]);
                 }
+                item.Choice = Read(data, "choice");
+                // Deserialize<Dictionary<...>> đọc mảng lồng thành ArrayList, không phải object[] (bản thử 16/10/2026: thẻ chọn
+                // kiểu hiện thành Đồng ý/Từ chối vì ép kiểu ra null).
+                var choices = data.ContainsKey("choices") ? data["choices"] as System.Collections.IEnumerable : null;
+                if (choices != null && !(choices is string))
+                {
+                    item.Choices = new List<string[]>();
+                    foreach (object raw in choices)
+                    {
+                        var choice = raw as Dictionary<string, object>;
+                        if (choice != null && !string.IsNullOrEmpty(Read(choice, "id")))
+                        {
+                            bool input = string.Equals(Read(choice, "input"), "true", StringComparison.OrdinalIgnoreCase);
+                            item.Choices.Add(new[] { Read(choice, "id"), Read(choice, "label"), Read(choice, "detail"), input ? "1" : "" });
+                        }
+                    }
+                }
                 item.Action = Read(data, "action");
                 item.ParamsPreview = Read(data, "paramsPreview");
                 item.ResultPreview = Read(data, "resultPreview");
@@ -842,6 +861,17 @@ namespace AxiomOffice.Ai
         public bool ConfirmRun(string runId, string confirmationId, bool approved, out string error)
         {
             var body = new Dictionary<string, object> { { "confirmationId", confirmationId }, { "approved", approved } };
+            return MemoryCall("POST", "/v1/runs/" + Uri.EscapeDataString(runId) + "/confirm", body, out error) != null;
+        }
+
+        // Trả lời thẻ nhiều lựa chọn: POST /v1/runs/{id}/confirm {"confirmationId", "choice", "text"?} (text: ô tự gõ).
+        public bool ChooseRun(string runId, string confirmationId, string choice, string text, out string error)
+        {
+            var body = new Dictionary<string, object> { { "confirmationId", confirmationId }, { "choice", choice } };
+            if (!string.IsNullOrEmpty(text))
+            {
+                body["text"] = text;
+            }
             return MemoryCall("POST", "/v1/runs/" + Uri.EscapeDataString(runId) + "/confirm", body, out error) != null;
         }
 

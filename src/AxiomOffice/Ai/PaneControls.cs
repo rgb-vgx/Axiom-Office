@@ -1263,17 +1263,37 @@ namespace AxiomOffice.Ai
         private readonly Label _message;
         private readonly LinkLabel _approve;
         private readonly LinkLabel _reject;
+        // Thẻ nhiều lựa chọn (doc_design hỏi kiểu trình bày): mỗi lựa chọn một link đậm + dòng mô tả nhỏ.
+        private readonly List<string[]> _choices = new List<string[]>();
+        private readonly List<LinkLabel> _choiceLinks = new List<LinkLabel>();
+        private readonly List<Label> _choiceDetails = new List<Label>();
+        // Lựa chọn "Kiểu khác (tự gõ)": ô nhập + link Gửi (null khi thẻ không có lựa chọn tự gõ).
+        private TextBox _input;
+        private LinkLabel _send;
+        private string _inputId;
 
         public event EventHandler<bool> Answered;
+        // Chosen: {id lựa chọn, chữ người dùng gõ hoặc null}.
+        public event EventHandler<string[]> Chosen;
 
         public ConfirmCard(string confirmationId, string action, string reason, string preview)
+            : this(confirmationId, action, reason, preview, null)
         {
+        }
+
+        public ConfirmCard(string confirmationId, string action, string reason, string preview, IList<string[]> choices)
+        {
+            if (choices != null)
+            {
+                _choices.AddRange(choices);
+            }
+            bool choosing = _choices.Count > 0;
             ConfirmationId = confirmationId;
             BackColor = PaneTheme.ChipHover;
             AccessibleRole = AccessibleRole.Alert;
-            AccessibleName = "Cần bạn xác nhận: " + reason;
+            AccessibleName = (choosing ? "Cần bạn chọn: " : "Cần bạn xác nhận: ") + reason;
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
-            _title = PaneTheme.MakeLabel("Cần bạn xác nhận: " + ToolLine.LabelFor(action ?? ""), PaneTheme.SmallBold, PaneTheme.AccentFg);
+            _title = PaneTheme.MakeLabel((choosing ? "Cần bạn chọn: " : "Cần bạn xác nhận: ") + ToolLine.LabelFor(action ?? ""), PaneTheme.SmallBold, PaneTheme.AccentFg);
             string detail = reason ?? "";
             if (!string.IsNullOrEmpty(preview) && preview != "{}")
             {
@@ -1281,14 +1301,104 @@ namespace AxiomOffice.Ai
             }
             _message = PaneTheme.MakeLabel(detail, PaneTheme.Small, PaneTheme.TextPrimary);
             _approve = PaneTheme.MakeLink("Đồng ý", PaneTheme.SmallBold);
-            _reject = PaneTheme.MakeLink("Từ chối", PaneTheme.SmallBold);
-            foreach (Control control in new Control[] { _title, _message, _approve, _reject })
+            _reject = PaneTheme.MakeLink(choosing ? "Bỏ qua" : "Từ chối", PaneTheme.SmallBold);
+            _approve.Visible = !choosing;
+            var controls = new List<Control> { _title, _message, _approve, _reject };
+            foreach (string[] choice in _choices)
+            {
+                string id = choice[0];
+                if (choice.Length > 3 && choice[3] == "1" && _input == null)
+                {
+                    // Ô tự gõ: nhãn đậm (không bấm), ô nhập với gợi ý là dòng mô tả, link Gửi; Enter cũng gửi.
+                    _inputId = id;
+                    var heading = PaneTheme.MakeLabel(string.IsNullOrEmpty(choice[1]) ? id : choice[1], PaneTheme.SmallBold, PaneTheme.TextPrimary);
+                    var hint = PaneTheme.MakeLabel(choice[2] ?? "", PaneTheme.Small, PaneTheme.TextSecondary);
+                    _input = new TextBox { Font = PaneTheme.Small, BorderStyle = BorderStyle.FixedSingle };
+                    _input.AccessibleName = heading.Text;
+                    _input.KeyDown += delegate(object sender, KeyEventArgs e)
+                    {
+                        if (e.KeyCode == Keys.Enter)
+                        {
+                            e.SuppressKeyPress = true;
+                            SendTyped();
+                        }
+                    };
+                    _send = PaneTheme.MakeLink("Gửi", PaneTheme.SmallBold);
+                    _send.LinkClicked += delegate { SendTyped(); };
+                    _choiceLinks.Add(null);
+                    _choiceDetails.Add(hint);
+                    controls.Add(heading);
+                    controls.Add(hint);
+                    _inputHeading = heading;
+                    continue;
+                }
+                var link = PaneTheme.MakeLink(string.IsNullOrEmpty(choice[1]) ? id : choice[1], PaneTheme.SmallBold);
+                link.AccessibleName = link.Text + (string.IsNullOrEmpty(choice[2]) ? "" : ": " + choice[2]);
+                link.LinkClicked += delegate { Choose(id); };
+                var note = PaneTheme.MakeLabel(choice[2] ?? "", PaneTheme.Small, PaneTheme.TextSecondary);
+                _choiceLinks.Add(link);
+                _choiceDetails.Add(note);
+                controls.Add(link);
+                controls.Add(note);
+            }
+            foreach (Control control in controls)
             {
                 control.BackColor = PaneTheme.ChipHover;
                 Controls.Add(control);
             }
+            if (_input != null)
+            {
+                _send.BackColor = PaneTheme.ChipHover;
+                Controls.Add(_input);
+                Controls.Add(_send);
+            }
             _approve.LinkClicked += delegate { Answer(true); };
             _reject.LinkClicked += delegate { Answer(false); };
+        }
+
+        private Label _inputHeading;
+
+        private void SendTyped()
+        {
+            string text = (_input.Text ?? "").Trim();
+            if (text.Length == 0)
+            {
+                _input.Focus();
+                return;
+            }
+            Choose(_inputId, text);
+        }
+
+        private void Choose(string id)
+        {
+            Choose(id, null);
+        }
+
+        private void Choose(string id, string text)
+        {
+            DisableChoices();
+            EventHandler<string[]> handler = Chosen;
+            if (handler != null)
+            {
+                handler(this, new[] { id, text });
+            }
+        }
+
+        private void DisableChoices()
+        {
+            foreach (LinkLabel link in _choiceLinks)
+            {
+                if (link != null)
+                {
+                    link.Enabled = false;
+                }
+            }
+            if (_input != null)
+            {
+                _input.Enabled = false;
+                _send.Enabled = false;
+            }
+            _reject.Enabled = false;
         }
 
         public string ConfirmationId { get; private set; }
@@ -1296,7 +1406,7 @@ namespace AxiomOffice.Ai
         private void Answer(bool approved)
         {
             _approve.Enabled = false;
-            _reject.Enabled = false;
+            DisableChoices();
             EventHandler<bool> handler = Answered;
             if (handler != null)
             {
@@ -1304,12 +1414,54 @@ namespace AxiomOffice.Ai
             }
         }
 
-        // confirm.resolved: by = user | timeout | cancelled.
+        // confirm.resolved: by = user | timeout | cancelled; choice = id lựa chọn đã bấm (thẻ nhiều lựa chọn).
         public void SetResolved(bool approved, string by)
+        {
+            SetResolved(approved, by, null, null);
+        }
+
+        public void SetResolved(bool approved, string by, string choice, string text)
         {
             _approve.Visible = false;
             _reject.Visible = false;
-            _title.Text = approved ? "Đã đồng ý" : by == "timeout" ? "Hết giờ chờ xác nhận — đã từ chối" : by == "cancelled" ? "Đã dừng — không thực hiện" : "Đã từ chối";
+            string chosen = null;
+            foreach (string[] item in _choices)
+            {
+                // Khung chat cũ bấm "Đồng ý" (không có choice) = lựa chọn đầu.
+                if (item[0] == choice || (string.IsNullOrEmpty(choice) && approved && chosen == null))
+                {
+                    chosen = item[1];
+                }
+            }
+            foreach (LinkLabel link in _choiceLinks)
+            {
+                if (link != null)
+                {
+                    link.Visible = false;
+                }
+            }
+            foreach (Label detail in _choiceDetails)
+            {
+                detail.Visible = false;
+            }
+            if (_input != null)
+            {
+                _input.Visible = false;
+                _send.Visible = false;
+                _inputHeading.Visible = false;
+                if (choice == _inputId && !string.IsNullOrEmpty(text))
+                {
+                    chosen = (chosen ?? "Kiểu khác") + ": " + text;
+                }
+            }
+            if (_choices.Count > 0)
+            {
+                _title.Text = chosen != null ? "Đã chọn: " + chosen : by == "timeout" ? "Hết giờ chờ — chưa chọn kiểu nào" : by == "cancelled" ? "Đã dừng" : "Đã bỏ qua";
+            }
+            else
+            {
+                _title.Text = approved ? "Đã đồng ý" : by == "timeout" ? "Hết giờ chờ xác nhận — đã từ chối" : by == "cancelled" ? "Đã dừng — không thực hiện" : "Đã từ chối";
+            }
             _title.ForeColor = approved ? PaneTheme.Success : PaneTheme.TextSecondary;
             if (Parent != null)
             {
@@ -1329,11 +1481,54 @@ namespace AxiomOffice.Ai
             h = PaneTheme.MeasureHeight(_message.Text, _message.Font, inner);
             _message.SetBounds(left, y, inner, h);
             y += h + PaneTheme.Px(6);
+            for (int i = 0; i < _choiceLinks.Count; i++)
+            {
+                if (_choiceLinks[i] == null)
+                {
+                    // Ô tự gõ: nhãn, gợi ý, rồi ô nhập + Gửi trên một hàng.
+                    if (_input == null || !_input.Visible)
+                    {
+                        continue;
+                    }
+                    h = PaneTheme.MeasureHeight(_inputHeading.Text, _inputHeading.Font, inner);
+                    _inputHeading.SetBounds(left, y, inner, h);
+                    y += h;
+                    if (_choiceDetails[i].Text.Length > 0)
+                    {
+                        h = PaneTheme.MeasureHeight(_choiceDetails[i].Text, _choiceDetails[i].Font, inner);
+                        _choiceDetails[i].SetBounds(left, y, inner, h);
+                        y += h + PaneTheme.Px(2);
+                    }
+                    int sendWidth = _send.PreferredWidth;
+                    _input.SetBounds(left, y, Math.Max(PaneTheme.Px(60), inner - sendWidth - PaneTheme.Px(8)), _input.PreferredHeight);
+                    _send.Location = new Point(_input.Right + PaneTheme.Px(8), y + Math.Max(0, (_input.Height - _send.Height) / 2));
+                    y += _input.Height + PaneTheme.Px(6);
+                    continue;
+                }
+                if (!_choiceLinks[i].Visible)
+                {
+                    continue;
+                }
+                _choiceLinks[i].Location = new Point(left, y);
+                y += _choiceLinks[i].Height;
+                if (_choiceDetails[i].Text.Length > 0)
+                {
+                    h = PaneTheme.MeasureHeight(_choiceDetails[i].Text, _choiceDetails[i].Font, inner);
+                    _choiceDetails[i].SetBounds(left, y, inner, h);
+                    y += h;
+                }
+                y += PaneTheme.Px(6);
+            }
             if (_approve.Visible)
             {
                 _approve.Location = new Point(left, y);
                 _reject.Location = new Point(_approve.Right + PaneTheme.Px(16), y);
                 y += Math.Max(_approve.Height, _reject.Height) + PaneTheme.Px(8);
+            }
+            else if (_reject.Visible)
+            {
+                _reject.Location = new Point(left, y);
+                y += _reject.Height + PaneTheme.Px(8);
             }
             Size = new Size(width, y);
         }

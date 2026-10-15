@@ -10,6 +10,7 @@ import (
 	"axiomoffice/core/internal/office"
 	"axiomoffice/core/internal/skills"
 	"axiomoffice/core/internal/store"
+	"axiomoffice/core/internal/tools"
 )
 
 func TestEventStreamPublishWaitAndReplay(t *testing.T) {
@@ -390,5 +391,54 @@ func TestParseRequestKeepsAgentGuards(t *testing.T) {
 	}
 	if options.MaxRounds != 7 || options.MaxTokens != DefaultMaxTokens {
 		t.Fatalf("gioi han ben goi: %+v", options)
+	}
+}
+
+// The nhieu lua chon: pane gui id lua chon; khung chat cu chi bam Dong y -> lua chon dau; Tu choi -> "".
+func TestConfirmationsChoose(t *testing.T) {
+	run, _ := NewManager().TryStart(47841)
+	choices := []tools.Choice{{ID: "full", Label: "Đầy đủ"}, {ID: "basic", Label: "Gọn"}, {ID: "keep", Label: "Giữ"},
+		{ID: "custom", Label: "Tự gõ", Input: true}}
+	typed := ""
+	answer := func(reply func(id string)) string {
+		before := len(run.Events.Since(0))
+		result := make(chan string, 1)
+		go func() {
+			choice, text := run.Confirmations.Choose(context.Background(), run.Events, "doc_design", "Kiểu nào?", choices, 2*time.Second)
+			typed = text
+			result <- choice
+		}()
+		id := ""
+		for deadline := time.Now().Add(2 * time.Second); id == "" && time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+			for _, item := range run.Events.Since(0)[before:] {
+				if item.Type == "confirm.required" {
+					if _, ok := item.Data["choices"].([]tools.Choice); !ok {
+						t.Fatalf("confirm.required phai kem choices: %+v", item.Data)
+					}
+					id, _ = item.Data["confirmationId"].(string)
+				}
+			}
+		}
+		reply(id)
+		return <-result
+	}
+	if got := answer(func(id string) { run.Confirmations.ResolveChoice(id, "basic") }); got != "basic" {
+		t.Fatalf("chon basic -> %q", got)
+	}
+	if got := answer(func(id string) { run.Confirmations.Resolve(id, true) }); got != "full" {
+		t.Fatalf("Dong y (khung chat cu) -> lua chon dau, duoc %q", got)
+	}
+	if got := answer(func(id string) { run.Confirmations.Resolve(id, false) }); got != "" {
+		t.Fatalf("Tu choi -> rong, duoc %q", got)
+	}
+	if got := answer(func(id string) { run.Confirmations.ResolveChoice(id, "la") }); got != "" {
+		t.Fatalf("id la -> rong, duoc %q", got)
+	}
+	// O tu go: tra kem chu; de trong = chua chon.
+	if got := answer(func(id string) { run.Confirmations.ResolveAnswer(id, "custom", "  tiêu đề xanh lá  ") }); got != "custom" || typed != "tiêu đề xanh lá" {
+		t.Fatalf("tu go -> %q %q", got, typed)
+	}
+	if got := answer(func(id string) { run.Confirmations.ResolveAnswer(id, "custom", " ") }); got != "" {
+		t.Fatalf("tu go de trong -> rong, duoc %q", got)
 	}
 }

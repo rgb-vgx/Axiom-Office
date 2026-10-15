@@ -5,12 +5,14 @@
  *   options = { fetch, EventSource, base: "<...>/wps/v1/", onChange(state) }
  *   state   = { messages: [{role: "user"|"assistant"|"error", text}],
  *               running, steps: [{action, ok}],
- *               confirmation: null | {id, action, reason}, conversationId }
+ *               confirmation: null | {id, action, reason, choices?: [{id, label, detail, input?}]}, conversationId }
  *
  * controller.send(prompt)    -> POST base+"runs" {prompt, conversationId?} roi mo
  *                               EventSource(base+"runs/<id>/events"); dang chay thi bo qua (tra false).
  *                               409 (add-in chua ket noi) -> message "error" tieng Viet.
  * controller.confirm(ok)     -> POST base+"runs/<id>/confirm" {confirmationId, approved: ok}
+ * controller.choose(id, text?) -> POST base+"runs/<id>/confirm" {confirmationId, choice: id, text?} (the nhieu lua
+ *                               chon; text = chu nguoi dung go o lua chon input)
  * controller.stop()          -> POST base+"runs/<id>/cancel"
  * controller.newConversation() -> xoa conversationId va messages.
  *
@@ -182,6 +184,21 @@
             action: safeString(p.action),
             reason: safeString(p.reason)
           };
+          // The nhieu lua chon (doc_design hoi kieu trinh bay).
+          try {
+            if (p.choices && p.choices.length) {
+              var choices = [];
+              for (var ci = 0; ci < p.choices.length; ci++) {
+                var c = p.choices[ci] || {};
+                if (c.id) {
+                  var item = { id: safeString(c.id), label: safeString(c.label || c.id), detail: safeString(c.detail || "") };
+                  if (c.input) { item.input = true; }
+                  choices.push(item);
+                }
+              }
+              if (choices.length) { state.confirmation.choices = choices; }
+            }
+          } catch (eChoices) {}
         } else if (type === "confirm.resolved") {
           state.confirmation = null;
         } else if (type === "run.completed") {
@@ -406,14 +423,29 @@
     }
 
     function confirm(approved) {
+      return answer({ approved: !!approved });
+    }
+
+    function choose(choiceId, text) {
+      var reply = { choice: safeString(choiceId) };
+      var typed = "";
+      try { typed = trimText(text); } catch (e) { typed = ""; }
+      if (typed) { reply.text = typed; }
+      return answer(reply);
+    }
+
+    function answer(reply) {
       try {
         var cid = null;
         try { cid = state.confirmation ? state.confirmation.id : null; } catch (e) { cid = null; }
         if (!runId || !cid) { return resolved(false); }
         var req = null;
         try {
-          req = postJson(fetchFn, base + "runs/" + safeString(runId) + "/confirm",
-            { confirmationId: cid, approved: !!approved });
+          var body = { confirmationId: cid };
+          for (var key in reply) {
+            if (Object.prototype.hasOwnProperty.call(reply, key)) { body[key] = reply[key]; }
+          }
+          req = postJson(fetchFn, base + "runs/" + safeString(runId) + "/confirm", body);
         } catch (e2) { req = null; }
         if (!req || typeof req.then !== "function") {
           pushError(NET_ERROR);
@@ -476,6 +508,7 @@
     return {
       send: send,
       confirm: confirm,
+      choose: choose,
       stop: stop,
       newConversation: newConversation,
       getState: getState

@@ -179,12 +179,27 @@ func serveConfirmRun(w http.ResponseWriter, deps *Deps, runID string, body map[s
 	}
 	id, hasID := body["confirmationId"].(string)
 	approved, hasApproved := body["approved"].(bool)
-	if !hasID || !hasApproved || strings.TrimSpace(id) == "" {
-		Error(w, http.StatusBadRequest, "'confirmationId' and 'approved' (true|false) are required")
+	// The nhieu lua chon: {"confirmationId", "choice": "<id>"}.
+	choice, hasChoice := body["choice"].(string)
+	hasChoice = hasChoice && strings.TrimSpace(choice) != ""
+	if !hasID || (!hasApproved && !hasChoice) || strings.TrimSpace(id) == "" {
+		Error(w, http.StatusBadRequest, "'confirmationId' and 'approved' (true|false) or 'choice' are required")
 		return
 	}
-	if !run.Confirmations.Resolve(id, approved) {
+	resolved := false
+	if hasChoice {
+		// O tu go ("Kieu khac"): {"choice": "custom", "text": "..."}.
+		text, _ := body["text"].(string)
+		resolved = run.Confirmations.ResolveAnswer(id, strings.TrimSpace(choice), text)
+	} else {
+		resolved = run.Confirmations.Resolve(id, approved)
+	}
+	if !resolved {
 		Error(w, http.StatusNotFound, "no pending confirmation: "+id)
+		return
+	}
+	if hasChoice {
+		OK(w, map[string]any{"confirmationId": id, "choice": strings.TrimSpace(choice)})
 		return
 	}
 	OK(w, map[string]any{"confirmationId": id, "approved": approved})

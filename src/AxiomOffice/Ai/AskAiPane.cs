@@ -850,8 +850,19 @@ namespace AxiomOffice.Ai
 
         private void ShowConfirmCard(CoreEvent request)
         {
-            var card = new ConfirmCard(request.ConfirmationId, request.Action, request.Reason, request.ParamsPreview);
+            var card = new ConfirmCard(request.ConfirmationId, request.Action, request.Reason, request.ParamsPreview, request.Choices);
             string runId = request.RunId;
+            card.Chosen += delegate(object sender, string[] picked)
+            {
+                ThreadPool.QueueUserWorkItem(delegate
+                {
+                    string error;
+                    if (!CoreClient.Instance.ChooseRun(runId, card.ConfirmationId, picked[0], picked[1], out error))
+                    {
+                        Logger.Info("AskAiPane: choose failed: " + error);
+                    }
+                });
+            };
             card.Answered += delegate(object sender, bool approved)
             {
                 ThreadPool.QueueUserWorkItem(delegate
@@ -865,8 +876,9 @@ namespace AxiomOffice.Ai
             };
             _confirmCards[request.ConfirmationId] = card;
             _chat.AddBlock(card);
-            SetStatus("Đang chờ bạn xác nhận…", false);
-            Announce("Cần bạn xác nhận: " + (request.Reason ?? ""));
+            bool choosing = request.Choices != null && request.Choices.Count > 0;
+            SetStatus(choosing ? "Đang chờ bạn chọn…" : "Đang chờ bạn xác nhận…", false);
+            Announce((choosing ? "Cần bạn chọn: " : "Cần bạn xác nhận: ") + (request.Reason ?? ""));
         }
 
         private void ResolveConfirmCard(CoreEvent resolved)
@@ -874,7 +886,7 @@ namespace AxiomOffice.Ai
             ConfirmCard card;
             if (_confirmCards.TryGetValue(resolved.ConfirmationId, out card))
             {
-                card.SetResolved(resolved.Approved, resolved.By);
+                card.SetResolved(resolved.Approved, resolved.By, resolved.Choice, resolved.Text);
                 _confirmCards.Remove(resolved.ConfirmationId);
             }
         }

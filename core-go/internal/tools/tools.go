@@ -73,6 +73,9 @@ type RunContext struct {
 	// Confirm hoi nguoi dung truoc lenh rui ro (confirm.required -> POST /v1/runs/{id}/confirm).
 	// nil = khong co ai de hoi (ai.ask cua agent ben ngoai) -> coi nhu tu choi.
 	Confirm func(action, reason, paramsPreview string) (bool, error)
+	// Choose hoi nguoi dung chon mot trong vai lua chon (the nhieu lua chon trong khung chat); tra id lua chon va chu
+	// nguoi dung go neu lua chon do la o nhap; "" = khong tra loi (het gio, huy). nil = khong co ai de hoi.
+	Choose func(action, question string, choices []Choice) (choice, text string, err error)
 	// CreatedSheets: ten sheet da tao thanh cong trong luot nay (et.addSheet) - ghi de len
 	// sheet do luot tao thi khong hoi. Log 11/10/2026: agent ghi de 25 o du lieu goc ma khong hoi.
 	CreatedSheets map[string]bool
@@ -96,6 +99,20 @@ type RunContext struct {
 	templateBuilt int
 	// docRestyled: doc_design da trinh bay lai nen chung trong luot (so doan cua dan bai da doi theo).
 	docRestyled bool
+	// docStyle: kieu trinh bay nguoi dung chon cho doc_design trong luot (full | basic | keep | custom; "" = chua hoi).
+	docStyle string
+	// docWish: kieu nguoi dung tu go (docStyle custom); docOptions: accent/font/size cho writer.restyle va insertBlocks.
+	docWish    string
+	docOptions map[string]any
+}
+
+// Choice: mot lua chon cua the hoi nguoi dung (RunContext.Choose).
+type Choice struct {
+	ID     string `json:"id"`
+	Label  string `json:"label"`
+	Detail string `json:"detail,omitempty"`
+	// Input: lua chon nay la o nguoi dung tu go (vd "Kieu khac") - cau tra loi kem chu.
+	Input bool `json:"input,omitempty"`
 }
 
 func (c *RunContext) ConfirmOrDecline(action, reason, paramsPreview string) (bool, error) {

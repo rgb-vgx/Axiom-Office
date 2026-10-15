@@ -124,6 +124,34 @@ test("the xac nhan: confirm.required -> confirm(false) POST /confirm; confirm.re
   assert.equal(h.state.confirmation, null);
 });
 
+test("the nhieu lua chon: choices -> state; choose(id) POST {confirmationId, choice}", async () => {
+  const h = harness({ "/runs": [200, { ok: true, result: { runId: "r9", conversationId: "c9" } }] });
+  await h.pane.send("Trình bày lại giáo án");
+  await tick();
+  FakeSource.last.emit("confirm.required", { data: { confirmationId: "cf_9", action: "doc_design", reason: "Kiểu nào?",
+    choices: [{ id: "full", label: "Có khối", detail: "Định dạng + khối" }, { id: "keep", label: "Giữ kiểu" }] } });
+  await tick();
+  assert.deepEqual(h.state.confirmation.choices, [
+    { id: "full", label: "Có khối", detail: "Định dạng + khối" }, { id: "keep", label: "Giữ kiểu", detail: "" }]);
+  await h.pane.choose("keep");
+  const call = h.calls.find((c) => c.url === BASE + "runs/r9/confirm");
+  assert.ok(call, "phai POST runs/<id>/confirm");
+  assert.deepEqual(call.body, { confirmationId: "cf_9", choice: "keep" });
+});
+
+test("the nhieu lua chon: o tu go -> choose(id, text) gui kem chu", async () => {
+  const h = harness({ "/runs": [200, { ok: true, result: { runId: "r10", conversationId: "c10" } }] });
+  await h.pane.send("Trình bày lại giáo án");
+  await tick();
+  FakeSource.last.emit("confirm.required", { data: { confirmationId: "cf_10", action: "doc_design", reason: "Kiểu nào?",
+    choices: [{ id: "full", label: "Có khối" }, { id: "custom", label: "Kiểu khác (tự gõ)", detail: "Ví dụ…", input: true }] } });
+  await tick();
+  assert.equal(h.state.confirmation.choices[1].input, true);
+  await h.pane.choose("custom", "  tiêu đề xanh lá  ");
+  const call = h.calls.find((c) => c.url === BASE + "runs/r10/confirm");
+  assert.deepEqual(call.body, { confirmationId: "cf_10", choice: "custom", text: "tiêu đề xanh lá" });
+});
+
 test("stop -> POST /cancel; run.cancelled -> het chay + loi", async () => {
   const h = harness({ "/runs": [200, { ok: true, result: { runId: "r3", conversationId: "c3" } }] });
   await h.pane.send("Làm lâu");

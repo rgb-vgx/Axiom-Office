@@ -623,9 +623,11 @@ button:focus,
     try { card.className = "confirmCard"; } catch (e) {}
     var label = "";
     try { label = AxiomPaneCore.labelFor(confirmation ? confirmation.action : ""); } catch (e2) {}
+    var choices = null;
+    try { choices = confirmation && confirmation.choices && confirmation.choices.length ? confirmation.choices : null; } catch (eC) { choices = null; }
     var title = document.createElement("div");
     try { title.id = "confirmTitle"; } catch (e3) {}
-    addText(title, "Cần bạn xác nhận: " + label);
+    addText(title, (choices ? "Cần bạn chọn: " : "Cần bạn xác nhận: ") + label);
     card.appendChild(title);
     var reason = document.createElement("p");
     try { reason.className = "confirmReason"; } catch (e4) {}
@@ -633,6 +635,66 @@ button:focus,
     try { rtext = String((confirmation && confirmation.reason) || ""); } catch (e5) {}
     addText(reason, rtext);
     card.appendChild(reason);
+    if (choices) {
+      // Thẻ nhiều lựa chọn: mỗi lựa chọn một nút + dòng mô tả, cuối cùng "Bỏ qua".
+      for (var ci = 0; ci < choices.length; ci++) {
+        if (choices[ci].input) {
+          // Ô tự gõ: nhãn, ô nhập (gợi ý = mô tả) và nút Gửi.
+          var head = document.createElement("div");
+          try { head.className = "confirmChoiceTitle"; head.style.marginTop = "8px"; head.style.fontWeight = "600"; } catch (eH) {}
+          addText(head, choices[ci].label);
+          card.appendChild(head);
+          var typeRow = document.createElement("div");
+          try { typeRow.className = "btnRow"; } catch (eR) {}
+          var field = document.createElement("input");
+          try {
+            field.type = "text";
+            field.id = "choiceText";
+            field.setAttribute("placeholder", choices[ci].detail || "");
+            field.setAttribute("aria-label", choices[ci].label);
+            field.style.flex = "1";
+          } catch (eF) {}
+          typeRow.appendChild(field);
+          var send = document.createElement("button");
+          try {
+            send.type = "button";
+            send.className = "btnSecondary";
+            send.setAttribute("data-act", "chooseText");
+            send.setAttribute("data-value", choices[ci].id);
+          } catch (eB) {}
+          addText(send, "Gửi");
+          typeRow.appendChild(send);
+          card.appendChild(typeRow);
+          continue;
+        }
+        var pick = document.createElement("button");
+        try {
+          pick.type = "button";
+          pick.className = ci === 0 ? "btnPrimary" : "btnSecondary";
+          pick.setAttribute("data-act", "choose");
+          pick.setAttribute("data-value", choices[ci].id);
+          pick.style.display = "block";
+          pick.style.marginTop = "6px";
+        } catch (eP) {}
+        addText(pick, choices[ci].label);
+        card.appendChild(pick);
+        if (choices[ci].detail) {
+          var note = document.createElement("p");
+          try { note.className = "confirmReason"; } catch (eN) {}
+          addText(note, choices[ci].detail);
+          card.appendChild(note);
+        }
+      }
+      var skip = document.createElement("button");
+      try {
+        skip.type = "button";
+        skip.className = "link";
+        skip.setAttribute("data-act", "deny");
+      } catch (eS) {}
+      addText(skip, "Bỏ qua");
+      card.appendChild(skip);
+      return card;
+    }
     var row = document.createElement("div");
     try { row.className = "btnRow"; } catch (e6) {}
     var ok = document.createElement("button");
@@ -861,6 +923,18 @@ button:focus,
             try { if (ctl) { ctl.confirm(true); } } catch (e4) {}
           } else if (found.act === "deny") {
             try { if (ctl) { ctl.confirm(false); } } catch (e5) {}
+          } else if (found.act === "choose") {
+            try { if (ctl) { ctl.choose(found.value); } } catch (eChoose) {}
+          } else if (found.act === "chooseText") {
+            try {
+              var typed = $("choiceText");
+              var value = typed ? String(typed.value || "") : "";
+              if (value.replace(/\s+/g, "") === "") {
+                if (typed) { typed.focus(); }
+              } else if (ctl) {
+                ctl.choose(found.value, value);
+              }
+            } catch (eTyped) {}
           } else if (found.act === "suggestion") {
             try {
               var input = $("input");

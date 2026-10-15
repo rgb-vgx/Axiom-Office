@@ -30,8 +30,11 @@ lệnh (màu `#RRGGBB`, cỡ chữ, number format). Không tự chế màu mới
 ## Quy trình
 
 **Word, trình bày lại cả tài liệu có sẵn**: có tool `doc_design` thì dùng nó thay cho mọi bước dưới đây
-(không định dạng từng đoạn). Gọi một lần không tham số để nhận dàn bài, rồi gọi lại với `blocks` chỉ cho
-vài chỗ đáng nhấn (mục tiêu, lưu ý, so sánh); phần lớn các mục để nguyên, không cần khối.
+(không định dạng từng đoạn). Gọi nó **ngay đầu tiên**, trước khi đọc tài liệu: lần gọi đầu hỏi người dùng
+chọn kiểu (có khối nhấn / chỉ định dạng / giữ kiểu hiện tại / tự gõ). Chỉ truyền `style` khi yêu cầu đã nói rõ
+kiểu; người dùng tự mô tả màu, font, cỡ chữ thì đổi thành `custom` {accent, font, size, boxes}.
+Chọn "giữ kiểu" thì không trình bày lại nữa, chỉ làm phần còn lại của yêu cầu. Kiểu có khối: tool trả dàn
+bài, gọi lại với `blocks` chỉ cho vài chỗ đáng nhấn (mục tiêu, lưu ý, so sánh); phần lớn các mục để nguyên.
 
 - [ ] Đọc tài liệu hiện tại trước (getText / readRange / listSlides) để biết đang có gì.
 - [ ] Viết ra **spec ngắn** trước lệnh đầu tiên — font, 2–3 màu, cỡ chữ từng cấp — rồi bám đúng spec đó

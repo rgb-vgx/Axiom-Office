@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -116,5 +117,79 @@ func TestPlanBlocksRejectsRepeatsAndInventedNumbers(t *testing.T) {
 		{"type":"note","before":5,"tone":"green","title":"Mẹo","lines":["- Mở đầu 8-10’: ôn nhanh động tác, ngày 10/10"]}]`
 	if _, problems = planBlocks(blocksFrom(t, ok), outline, 5, doc); len(problems) != 0 {
 		t.Fatalf("khoi thay dung va meo ngan phai qua: %+v", problems)
+	}
+}
+
+// Nguoi dung 15/10/2026: co nguoi khong thich kieu nay -> lan goi dau hoi chon kieu; "keep" thi khong dong vao tai lieu.
+func TestDocDesignAsksStyleFirst(t *testing.T) {
+	asked := 0
+	run := &RunContext{Choose: func(action, question string, choices []Choice) (string, string, error) {
+		asked++
+		if action != "doc_design" || len(choices) != 4 || choices[0].ID != "full" || !choices[3].Input {
+			t.Fatalf("the hoi: %s %v", action, choices)
+		}
+		return "keep", "", nil
+	}}
+	tool := NewDocDesignTool()
+	first := tool.Invoke(context.Background(), map[string]any{}, run)
+	if !first.OK || first.Final || first.Mutating || !strings.Contains(first.JSON, "keep the document") {
+		t.Fatalf("giu kieu cu: %+v", first)
+	}
+	again := tool.Invoke(context.Background(), map[string]any{"blocks": []any{}}, run)
+	if again.OK || asked != 1 || !strings.Contains(again.JSON, "keep the current look") {
+		t.Fatalf("goi lai sau khi chon giu kieu: %+v (hoi %d lan)", again, asked)
+	}
+
+	silent := &RunContext{Choose: func(string, string, []Choice) (string, string, error) { return "", "", nil }}
+	if result := tool.Invoke(context.Background(), map[string]any{}, silent); !result.Final || result.Mutating {
+		t.Fatalf("khong tra loi -> dung, khong doi gi: %+v", result)
+	}
+
+	// Yeu cau da noi ro kieu thi khong hoi; khong co ai de hoi thi dung kieu day du.
+	run = &RunContext{Choose: func(string, string, []Choice) (string, string, error) {
+		t.Fatal("khong duoc hoi")
+		return "", "", nil
+	}}
+	if style, _, problem := chooseDocStyle(map[string]any{"style": "basic"}, run); style != "basic" || problem != "" {
+		t.Fatalf("style=basic: %q %q", style, problem)
+	}
+	if style, _, _ := chooseDocStyle(map[string]any{"custom": map[string]any{"font": "Arial"}}, run); style != "custom" {
+		t.Fatalf("yeu cau da mo ta kieu -> custom, khong hoi: %q", style)
+	}
+	if style, _, _ := chooseDocStyle(map[string]any{}, &RunContext{}); style != "full" {
+		t.Fatalf("khong co ai de hoi: %q", style)
+	}
+	if _, _, problem := chooseDocStyle(map[string]any{"style": "fancy"}, run); problem == "" {
+		t.Fatal("style la phai bao loi")
+	}
+}
+
+// Nguoi dung 16/10/2026: them lua chon tu go kieu -> tool tra lai loi mo ta, model goi lai voi custom.
+func TestDocDesignCustomStyle(t *testing.T) {
+	run := &RunContext{Choose: func(string, string, []Choice) (string, string, error) {
+		return "custom", "tiêu đề màu xanh lá, font Arial", nil
+	}}
+	tool := NewDocDesignTool()
+	first := tool.Invoke(context.Background(), map[string]any{}, run)
+	if !first.OK || first.Mutating || !strings.Contains(first.JSON, "xanh lá") || !strings.Contains(first.JSON, "custom") {
+		t.Fatalf("phai tra loi mo ta cho model: %+v", first)
+	}
+	if again := tool.Invoke(context.Background(), map[string]any{}, run); again.OK || !strings.Contains(again.JSON, "xanh lá") {
+		t.Fatalf("goi lai khong co custom -> nhac lai loi mo ta: %+v", again)
+	}
+	if bad := tool.Invoke(context.Background(), map[string]any{"custom": map[string]any{"accent": "green"}}, run); bad.OK ||
+		!strings.Contains(bad.JSON, "#2E7D32") {
+		t.Fatalf("mau khong dung #RRGGBB phai bao loi: %+v", bad)
+	}
+
+	options, boxes, problem := customStyle(map[string]any{"accent": "2e7d32", "font": " Arial ", "size": float64(14)})
+	if problem != "" || boxes || options["accent"] != "#2E7D32" || options["font"] != "Arial" || options["size"] != float64(14) {
+		t.Fatalf("custom: %v %v %q", options, boxes, problem)
+	}
+	if _, boxes, _ := customStyle(map[string]any{"boxes": true}); !boxes {
+		t.Fatal("boxes true -> co khoi")
+	}
+	if _, _, problem := customStyle(map[string]any{"size": float64(40)}); problem == "" {
+		t.Fatal("co chu 40 phai bao loi")
 	}
 }

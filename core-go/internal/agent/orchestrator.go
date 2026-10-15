@@ -277,10 +277,15 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 	registry := tools.NewRegistry(list)
 
 	var confirm func(string, string, string) (bool, error)
+	var choose func(string, string, []tools.Choice) (string, string, error)
 	if request.Interactive {
 		timeout := time.Duration(o.Config().ConfirmTimeoutSeconds) * time.Second
 		confirm = func(action, reason, preview string) (bool, error) {
 			return run.Confirmations.Request(ctx, run.Events, action, reason, preview, timeout), nil
+		}
+		choose = func(action, question string, choices []tools.Choice) (string, string, error) {
+			choice, text := run.Confirmations.Choose(ctx, run.Events, action, question, choices, timeout)
+			return choice, text, nil
 		}
 	}
 
@@ -294,6 +299,7 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 			run.Events.Publish(eventType, data)
 		},
 		Confirm: confirm,
+		Choose:  choose,
 	}
 	if request.Document != nil {
 		runContext.FocusSlide = request.Document.Slide
