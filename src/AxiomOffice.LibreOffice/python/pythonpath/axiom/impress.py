@@ -326,13 +326,15 @@ command("wpp.setShapeText", "wpp", _template_unsupported,
         agent=True, undo=True)
 command("wpp.deleteShapes", "wpp", _template_unsupported,
         "Xoá các shape theo tên (mục lặp thừa của slide mẫu); không xoá ảnh nền",
-        req("shapes", "array of shape names"), opt("slide"), opt("presentation", "full path of the presentation to work on; default: the active one"), agent=True, undo=True)
+        opt("shapes", "array of shape names"), opt("slide"), opt("emptyPlaceholders", "true: also delete every placeholder without text (the 'Click to add text' boxes)"), opt("presentation", "full path of the presentation to work on; default: the active one"), agent=True, undo=True)
 command("wpp.copyPicture", "wpp", _template_unsupported,
         "Chép ảnh từ slide của bài khác (vd bài cũ) vào slide của bài đang làm, co vừa khung, giữ tỉ lệ",
         req("from", "path of the source presentation"), req("fromSlide"), opt("shape", "picture name; default: largest picture"),
         opt("slide"), opt("left"), opt("top"), opt("width"), opt("height"),
         opt("overlays", "true: also copy the labels/arrows drawn over the picture"),
-        opt("format", "png (default) or jpg (much smaller for photos and scans)"), opt("presentation", "full path of the presentation to work on; default: the active one"), agent=True, undo=True)
+        opt("format", "png (default) or jpg (much smaller for photos and scans)"),
+        opt("region", "[left, top, width, height] of the source slide to copy as one picture (a diagram or table drawn with shapes); replaces shape"),
+        opt("presentation", "full path of the presentation to work on; default: the active one"), agent=True, undo=True)
 command("wpp.addParagraphs", "wpp", _template_unsupported,
         "Khung chữ nhiều đoạn giữ phân cấp (cấp thụt lề, đậm, nghiêng, số thứ tự, gạch đầu dòng); tự chọn cỡ chữ lớn nhất vừa khung",
         req("paragraphs", "array of {t: text, l: level 1-5, b: bold, i: italic, n: number prefix like '1.', u: bullet}"),
@@ -340,6 +342,20 @@ command("wpp.addParagraphs", "wpp", _template_unsupported,
         opt("fontSize", "largest size to try (default 24)"), opt("minFontSize", "smallest size (default 16)"),
         opt("color", "#RRGGBB body text"), opt("accent", "#RRGGBB bold (heading) paragraphs"), opt("font", "font name"),
         opt("anchor", "top (default) or middle"),
+        opt("box", "rounded or rect: draw a filled box (card, callout) instead of a plain text box"),
+        opt("fill", "#RRGGBB box fill"), opt("line", "#RRGGBB box border (none when omitted)"),
+        opt("highlight", "#RRGGBB colour of **emphasised** words (default: accent)"),
+        opt("presentation", "full path of the presentation to work on; default: the active one"), undo=True)
+command("wpp.addGrid", "wpp", _template_unsupported,
+        "Bảng có định dạng: dòng đầu là tiêu đề (nền màu, chữ trắng đậm), dòng xen kẽ nền nhạt, cột rộng theo nội dung, tự chọn cỡ chữ vừa khung",
+        req("values", "2D array; first row = header"), opt("slide"), opt("left"), opt("top"), opt("width"), opt("height"),
+        opt("fontSize", "largest size to try (default 18)"), opt("minFontSize", "smallest size (default 11)"),
+        opt("header", "#RRGGBB header fill"), opt("band", "#RRGGBB fill of every second row"),
+        opt("color", "#RRGGBB text"), opt("font", "font name"),
+        opt("presentation", "full path of the presentation to work on; default: the active one"), undo=True)
+command("wpp.deleteTagged", "wpp", _template_unsupported,
+        "Xoá các slide do công cụ dựng (có tag nguồn) mà tag bắt đầu trong [first, last] - dựng lại một lô theo bố cục mới",
+        req("first"), req("last"),
         opt("presentation", "full path of the presentation to work on; default: the active one"), undo=True)
 
 command("wpp.closeAll", "wpp", lambda env, p: documents.close_all(env.ctx, "wpp"), "**Đóng mọi bài trình bày, không lưu**")

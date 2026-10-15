@@ -392,8 +392,9 @@
     { name: "wpp.deleteShapes", kind: "wpp", agent: true,
       summary: "Xoá các shape theo tên (mục lặp thừa của slide mẫu); không xoá ảnh nền",
       params: [
-        { name: "shapes", required: true, hint: "array of shape names" },
+        { name: "shapes", required: false, hint: "array of shape names" },
         { name: "slide", required: false, hint: null },
+        { name: "emptyPlaceholders", required: false, hint: "true: also delete every placeholder without text (the 'Click to add text' boxes)" },
         { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
       ] },
     { name: "wpp.copyPicture", kind: "wpp", agent: true,
@@ -409,6 +410,7 @@
         { name: "height", required: false, hint: null },
         { name: "overlays", required: false, hint: "true: also copy the labels/arrows drawn over the picture" },
         { name: "format", required: false, hint: "png (default) or jpg (much smaller for photos and scans)" },
+        { name: "region", required: false, hint: "[left, top, width, height] of the source slide to copy as one picture (a diagram or table drawn with shapes); replaces shape" },
         { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
       ] },
     { name: "wpp.addParagraphs", kind: "wpp", agent: false,
@@ -426,6 +428,34 @@
         { name: "accent", required: false, hint: "#RRGGBB bold (heading) paragraphs" },
         { name: "font", required: false, hint: "font name" },
         { name: "anchor", required: false, hint: "top (default) or middle" },
+        { name: "box", required: false, hint: "rounded or rect: draw a filled box (card, callout) instead of a plain text box" },
+        { name: "fill", required: false, hint: "#RRGGBB box fill" },
+        { name: "line", required: false, hint: "#RRGGBB box border (none when omitted)" },
+        { name: "highlight", required: false, hint: "#RRGGBB colour of **emphasised** words (default: accent)" },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
+      ] },
+    { name: "wpp.addGrid", kind: "wpp", agent: false,
+      summary: "Bảng có định dạng: dòng đầu là tiêu đề (nền màu, chữ trắng đậm), dòng xen kẽ nền nhạt, cột rộng theo nội dung, tự chọn cỡ chữ vừa khung",
+      params: [
+        { name: "values", required: true, hint: "2D array; first row = header" },
+        { name: "slide", required: false, hint: null },
+        { name: "left", required: false, hint: null },
+        { name: "top", required: false, hint: null },
+        { name: "width", required: false, hint: null },
+        { name: "height", required: false, hint: null },
+        { name: "fontSize", required: false, hint: "largest size to try (default 18)" },
+        { name: "minFontSize", required: false, hint: "smallest size (default 11)" },
+        { name: "header", required: false, hint: "#RRGGBB header fill" },
+        { name: "band", required: false, hint: "#RRGGBB fill of every second row" },
+        { name: "color", required: false, hint: "#RRGGBB text" },
+        { name: "font", required: false, hint: "font name" },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
+      ] },
+    { name: "wpp.deleteTagged", kind: "wpp", agent: false,
+      summary: "Xoá các slide do công cụ dựng (có tag nguồn) mà tag bắt đầu trong [first, last] - dựng lại một lô theo bố cục mới",
+      params: [
+        { name: "first", required: true, hint: null },
+        { name: "last", required: true, hint: null },
         { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
       ] },
     { name: "wpp.closeAll", kind: "wpp", agent: false,

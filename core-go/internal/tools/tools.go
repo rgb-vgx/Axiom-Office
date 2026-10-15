@@ -83,6 +83,12 @@ type RunContext struct {
 	FocusSlide int
 	// Todos: danh sach viec model ghi gan nhat (write_todos).
 	Todos []Todo
+	// lastTemplate, lastSource, lastTarget: tham so slides_from_template lan truoc trong luot (model hay bo o lan sau).
+	lastTemplate, lastSource, lastTarget string
+	// droppedPictures: anh bo co chu dich trong che do bien soan (bao trong cau tra loi cuoi).
+	droppedPictures []string
+	// webSources: link web_search da tra trong luot (url -> tieu de) - slide "Cap nhat" chi duoc trich nhung link nay.
+	webSources map[string]string
 	// calls: so lan goi tung tool/lenh trong luot (CallLimit).
 	calls map[string]int
 	// templateBuilt: so slide slides_from_template da dung trong CA luot (cac lo truoc + lo nay) - cau tra loi cuoi
@@ -145,4 +151,31 @@ var utf8BOM = string([]byte{0xEF, 0xBB, 0xBF})
 func stringArg(arguments map[string]any, name string) string {
 	value, _ := arguments[name].(string)
 	return strings.TrimSpace(value)
+}
+
+// noteWebSource: ghi lai mot link web_search vua tra (run nil: tool goi ngoai luot chay, vd test).
+func (c *RunContext) noteWebSource(url, title string) {
+	if c == nil || strings.TrimSpace(url) == "" {
+		return
+	}
+	if c.webSources == nil {
+		c.webSources = map[string]string{}
+	}
+	c.webSources[normalizeURL(url)] = strings.TrimSpace(title)
+}
+
+// WebSource: link nay co phai do web_search tra trong luot khong.
+func (c *RunContext) WebSource(url string) bool {
+	if c == nil || c.webSources == nil {
+		return false
+	}
+	_, ok := c.webSources[normalizeURL(url)]
+	return ok
+}
+
+func normalizeURL(url string) string {
+	url = strings.TrimSpace(url)
+	url = strings.TrimPrefix(strings.TrimPrefix(url, "https://"), "http://")
+	url = strings.TrimPrefix(url, "www.")
+	return strings.TrimRight(url, "/")
 }

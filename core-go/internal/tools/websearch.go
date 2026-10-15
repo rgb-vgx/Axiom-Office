@@ -99,6 +99,7 @@ func (t *WebSearchTool) Invoke(ctx context.Context, arguments map[string]any, ru
 	}
 	results := []map[string]any{}
 	for _, item := range reply.Results {
+		run.noteWebSource(item.URL, item.Title)
 		results = append(results, map[string]any{
 			"title": item.Title, "url": item.URL, "snippet": model.Truncate(strings.TrimSpace(item.Content), webSnippetChars),
 		})

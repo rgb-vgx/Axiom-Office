@@ -298,7 +298,7 @@ func TestSlidesFromTemplateBuildsAndReportsNeedsPlan(t *testing.T) {
 	run := &RunContext{Office: &office.Session{App: "wpp", Port: port}, Bridge: office.NewBridgeClient(server.Client(), "")}
 
 	result := NewSlidesFromTemplateTool().Invoke(context.Background(), map[string]any{
-		"template": template, "source": source}, run)
+		"template": template, "source": source, "mode": "copy"}, run)
 	if !result.OK || !result.Mutating {
 		t.Fatalf("ket qua: %s", result.JSON)
 	}
@@ -344,7 +344,7 @@ func TestSlidesFromTemplateBuildsAndReportsNeedsPlan(t *testing.T) {
 
 	// Model viet dong cho slide 4 -> moi slide nguon da co slide dich, da luu: tool bao xong, luot ket thuc.
 	final := NewSlidesFromTemplateTool().Invoke(context.Background(), map[string]any{
-		"template": template, "source": source,
+		"template": template, "source": source, "mode": "copy",
 		"plan": []any{map[string]any{"src": float64(4), "title": "So sánh", "text": "Siêu âm: rẻ\nCLVT: nhanh"}}}, run)
 	if !final.Final || !strings.Contains(final.FinalText, "toàn bộ 4 slide") || !strings.Contains(final.FinalText, "bai cu - mau moi.pptx") {
 		t.Fatalf("phai bao xong ca bai: final=%t %q\n%s", final.Final, final.FinalText, final.JSON)

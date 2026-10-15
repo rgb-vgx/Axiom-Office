@@ -7,6 +7,7 @@ import (
 	_ "image/jpeg" // giai ma anh nen .jpg/.jpeg cua mau
 	_ "image/png"  // giai ma anh nen .png cua mau
 	"math"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -54,8 +55,11 @@ type shapeInfo struct {
 	color  string
 	font   string
 	ph     string
+	idx    string
 	embed  string
 	geom   string
+	// sizeSet: co chu doc duoc that (lan chu / kieu cua khung / ke thua) - khong thi size la mac dinh 18.
+	sizeSet bool
 }
 
 func readShape(element *ooxml.Element) shapeInfo {
@@ -68,6 +72,7 @@ func readShape(element *ooxml.Element) shapeInfo {
 		if info.ph == "" {
 			info.ph = "body"
 		}
+		info.idx = ph.AttrValue("", "idx")
 	}
 	xfrm := firstDescendant(element, A, "xfrm")
 	if element.Local == "graphicFrame" {
@@ -95,7 +100,7 @@ func readShape(element *ooxml.Element) shapeInfo {
 		if body != nil {
 			if run := firstRunProps(body); run != nil {
 				if sz, err := strconv.Atoi(run.AttrValue("", "sz")); err == nil && sz > 0 {
-					info.size = float64(sz) / 100
+					info.size, info.sizeSet = float64(sz)/100, true
 				}
 				info.bold = run.AttrValue("", "b") == "1"
 				if fill := run.Child(A, "solidFill"); fill != nil {
@@ -240,15 +245,18 @@ func slideKinds(pkg *ooxml.Package, slideParts []string, width, height float64) 
 		for _, element := range shapeElements(spTree) {
 			shapes = append(shapes, readShape(element))
 		}
+		inheritPlaceholders(pkg, slidePart, shapes)
 		kind := describeKind(pkg, slidePart, shapes, slide)
 		kind.Kind = index + 1
-		kind.Use = kindUse(index, len(slideParts), kind)
+		kind.Use = kindUse(index, len(slideParts), kind, slide)
 		kinds = append(kinds, kind)
 	}
 	return kinds
 }
 
-func kindUse(index, count int, kind Kind) string {
+// kindUse: cong dung cua kieu - cover, list (muc lap I/II/III), closing, compare (hai o noi dung canh nhau), section
+// (tieu de lon giua slide: "PHAN 1. ..."), agenda (tieu de "Muc tieu / Noi dung / Agenda"), con lai content.
+func kindUse(index, count int, kind Kind, slide rect) string {
 	switch {
 	case index == 0:
 		return "cover"
@@ -257,7 +265,42 @@ func kindUse(index, count int, kind Kind) string {
 	case index == count-1 && count >= 3:
 		return "closing"
 	}
+	bodies := kind.Bodies()
+	if len(bodies) == 2 && len(bodies[0].Box) == 4 && len(bodies[1].Box) == 4 {
+		a, b := bodies[0].Box, bodies[1].Box
+		if a[1] < b[1]+b[3] && b[1] < a[1]+a[3] && (a[0]+a[2] <= b[0]+4 || b[0]+b[2] <= a[0]+4) {
+			return "compare"
+		}
+	}
+	if title := kind.Title(); title != nil {
+		if agendaTitle.MatchString(title.Text) {
+			return "agenda"
+		}
+		if len(title.Box) == 4 && title.Box[1]+title.Box[3]/2 > slide.H*0.25 && title.Size >= 32 {
+			return "section"
+		}
+	}
 	return "content"
+}
+
+// agendaTitle: tieu de mau cua slide muc tieu / noi dung chinh.
+var agendaTitle = regexp.MustCompile(`(?i)^\s*(m[uụ]c ti[eê]u|n[oộ]i dung ch[ií]nh|m[uụ]c l[uụ]c|agenda|objectives|outline)`)
+
+// Bodies: o noi dung (placeholder than chu, khong phai tieu de, khong thuoc muc lap), trai sang phai.
+func (k Kind) Bodies() []Slot {
+	bodies := []Slot{}
+	for _, slot := range k.Slots {
+		if slot.Role == "body" {
+			bodies = append(bodies, slot)
+		}
+	}
+	sort.SliceStable(bodies, func(i, j int) bool {
+		if len(bodies[i].Box) == 4 && len(bodies[j].Box) == 4 {
+			return bodies[i].Box[0] < bodies[j].Box[0]
+		}
+		return false
+	})
+	return bodies
 }
 
 // describeKind: nen co dinh, o chu (kem suc chua), muc lap, vung an toan va o dat anh.
@@ -316,6 +359,8 @@ func describeKind(pkg *ooxml.Package, slidePart string, shapes []shapeInfo, slid
 		slot := Slot{Shape: shape.name, Size: shape.size, Bold: shape.bold, Color: shape.color, Font: shape.font, Item: itemOf[shape.name]}
 		if shape.name == title {
 			slot.Role = "title"
+		} else if shape.ph != "" && !isTitlePh(shape.ph) && slot.Item == 0 && shape.ph != "dt" && shape.ph != "ftr" && shape.ph != "sldNum" {
+			slot.Role = "body"
 		}
 		slot.ItemBody = slot.Item > 0 && bodyOf[slot.Item] == shape.name
 		if shape.text != "" {
@@ -334,6 +379,22 @@ func describeKind(pkg *ooxml.Package, slidePart string, shapes []shapeInfo, slid
 	}
 	if pictureTop < safe.bottom()-60 {
 		kind.PictureBox = rect{safe.X, pictureTop, safe.W, safe.bottom() - pictureTop}.points()
+	}
+	// Mau co placeholder noi dung: vung noi dung la khung cua no (hop cac o neu hai cot) - tranh dai mau, logo cua
+	// layout/master ma vung an toan tinh tu anh nen khong thay.
+	if bodies := kind.Bodies(); len(bodies) > 0 && len(bodies[0].Box) == 4 {
+		area := rect{bodies[0].Box[0], bodies[0].Box[1], bodies[0].Box[2], bodies[0].Box[3]}
+		for _, body := range bodies[1:] {
+			if len(body.Box) == 4 {
+				right := math.Max(area.right(), body.Box[0]+body.Box[2])
+				bottom := math.Max(area.bottom(), body.Box[1]+body.Box[3])
+				area.X, area.Y = math.Min(area.X, body.Box[0]), math.Min(area.Y, body.Box[1])
+				area.W, area.H = right-area.X, bottom-area.Y
+			}
+		}
+		if area.H >= 60 {
+			kind.PictureBox = area.points()
+		}
 	}
 	return kind
 }

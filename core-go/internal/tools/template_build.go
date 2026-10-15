@@ -33,8 +33,14 @@ func (t *SlidesFromTemplateTool) Name() string { return "slides_from_template" }
 const BatchSize = 25
 
 func (t *SlidesFromTemplateTool) Description() string {
-	return "Rebuild an existing presentation (source, e.g. the old .ppt) into a NEW presentation made from a template " +
-		"file, in batches of " + strconv.Itoa(BatchSize) + " source slides. The tool reads the source itself and builds " +
+	return "Redesign an existing presentation (source, e.g. the old .ppt) into a NEW presentation made from a template " +
+		"file, part by part. Default mode \"compose\": call with template + source (first=1) and you get the first " +
+		"part of the source (numbered paragraphs and pictures of " + strconv.Itoa(DesignBatch) + " slides), an outline of " +
+		"the whole lecture and how to answer: you write the new slides (short points, cards, tables, captions, callouts, " +
+		"section / objectives / summary slides), each naming the source paragraphs it is based on - the tool checks " +
+		"nothing is lost, puts the original text in the notes, builds, saves and sends the next part. Mode \"design\" " +
+		"keeps the original words (only re-layout). Mode \"copy\" (only when the user asks to keep " +
+		"every slide as it is): one new slide per source slide, in batches of " + strconv.Itoa(BatchSize) + "; the tool builds " +
 		"every slide it can decide alone (cover, slides with pictures keep their title and pictures, short bullet " +
 		"slides); slides it cannot decide come back in needsPlan with their text: write one plan row for each and " +
 		"call again with the same first/last. Then call with next.first until done. Plan row: {\"src\": source slide " +
@@ -53,7 +59,10 @@ func (t *SlidesFromTemplateTool) Parameters() json.RawMessage {
 		`"first":{"type":"integer","description":"first source slide of this batch (default 1)"},` +
 		`"last":{"type":"integer","description":"last source slide of this batch (default first+` + strconv.Itoa(BatchSize-1) + `)"},` +
 		`"plan":{"type":"array","items":{"type":"object"},"description":"plan rows for slides listed in needsPlan, or to redo a slide"},` +
-		`"closing":{"type":"boolean","description":"also add the template's closing slide at the end (on the last batch)"}},` +
+		`"closing":{"type":"boolean","description":"copy mode: also add the template's closing slide at the end (on the last batch)"},` +
+		`"mode":{"type":"string","enum":["compose","design","copy"],"description":"compose (default): rewrite as a professional lecture part by part (short points, cards, tables, captions; the original text goes to the notes); design: keep the original words, only re-layout; copy: one new slide per source slide"},` +
+		`"drop":{"type":"array","items":{"type":"string"},"description":"compose mode: pictures left out on purpose (near-duplicates), e.g. [\"9:i2\"]"},` +
+		`"slides":{"type":"array","items":{"type":"object"},"description":"design mode: the new slides of this part, in order: {layout, title, use} or {layout: compare, title, left, right}"}},` +
 		`"required":["template","source"]}`)
 }
 
@@ -111,6 +120,8 @@ type sourcePara struct {
 	I bool   `json:"i,omitempty"`
 	N string `json:"n,omitempty"`
 	U bool   `json:"u,omitempty"`
+	// A: "center" - can giua (tieu de the, chu thich anh).
+	A string `json:"a,omitempty"`
 }
 
 // line: doan nhu nguoi xem thay (so tu dong + chu) - dung de do suc chua.
@@ -194,6 +205,22 @@ type sourcePicture struct {
 	Overlays int
 	// W, H: kich thuoc tren slide nguon (pt) - de chia luoi theo ti le anh.
 	W, H float64
+	// Slide: slide nguon chua anh khi khac slide dang dung (che do thiet ke gom anh cua nhieu slide nguon).
+	Slide int
+	// Region: vung so do / bang ve bang shape tren slide nguon [l, t, w, h] - chep ca vung thanh mot anh.
+	Region []float64
+}
+
+// copyParams: tham so wpp.copyPicture cho mot anh nguon (anh that, hoac vung so do).
+func copyParams(sourcePath string, fromSlide int, picture sourcePicture, slide int, box [4]float64) map[string]any {
+	params := map[string]any{"from": sourcePath, "fromSlide": fromSlide, "slide": slide,
+		"left": box[0], "top": box[1], "width": box[2], "height": box[3], "format": "jpg"}
+	if len(picture.Region) == 4 {
+		params["region"] = picture.Region
+	} else {
+		params["shape"], params["overlays"] = picture.Shape, picture.Overlays > 0
+	}
+	return params
 }
 
 // templateRoles: kieu nao dung cho viec gi (theo use + pictureBox cua ppt_profile).
@@ -216,7 +243,14 @@ func rolesOf(template *pptx.Template) templateRoles {
 		if len(kind.Items) > 0 && roles.list == nil {
 			roles.list = kind
 		}
-		if len(kind.PictureBox) == 4 && kind.Use != "cover" && kind.Use != "closing" && roles.picture == nil {
+		if len(kind.PictureBox) == 4 && kind.Use == "content" && roles.picture == nil {
+			roles.picture = kind
+		}
+	}
+	// Mau khong co kieu "content" rieng: lay kieu dau tien co vung noi dung (tru bia, ket thuc, chuyen phan).
+	for i := range template.Kinds {
+		kind := &template.Kinds[i]
+		if roles.picture == nil && len(kind.PictureBox) == 4 && kind.Use != "cover" && kind.Use != "closing" && kind.Use != "section" {
 			roles.picture = kind
 		}
 	}
@@ -226,8 +260,19 @@ func rolesOf(template *pptx.Template) templateRoles {
 func (t *SlidesFromTemplateTool) Invoke(ctx context.Context, arguments map[string]any, run *RunContext) Result {
 	templatePath := stringArg(arguments, "template")
 	sourcePath := stringArg(arguments, "source")
+	// Lan goi sau trong cung luot: model hay bo template/source (luot that 14/10/2026 mat mot vong) - dung lai lan truoc.
+	if templatePath == "" {
+		templatePath = run.lastTemplate
+	}
+	if sourcePath == "" {
+		sourcePath = run.lastSource
+	}
 	if templatePath == "" || sourcePath == "" {
 		return Result{JSON: ErrorJSON("'template' and 'source' are required (full paths)")}
+	}
+	run.lastTemplate, run.lastSource = templatePath, sourcePath
+	if stringArg(arguments, "target") == "" && run.lastTarget != "" {
+		arguments["target"] = run.lastTarget
 	}
 	template, err := pptx.ReadTemplate(templatePath)
 	if err != nil {
@@ -242,6 +287,7 @@ func (t *SlidesFromTemplateTool) Invoke(ctx context.Context, arguments map[strin
 		base := strings.TrimSuffix(filepath.Base(sourcePath), filepath.Ext(sourcePath))
 		targetPath = filepath.Join(filepath.Dir(sourcePath), base+" - mau moi.pptx")
 	}
+	run.lastTarget = targetPath
 	first := max(intArg(arguments, "first", 1), 1)
 	last := intArg(arguments, "last", first+BatchSize-1)
 
@@ -266,6 +312,11 @@ func (t *SlidesFromTemplateTool) Invoke(ctx context.Context, arguments map[strin
 	created := false
 	if problem := ensureTarget(bridge, templatePath, targetPath, &created); problem != "" {
 		return Result{JSON: ErrorJSON(problem)}
+	}
+
+	// compose (mac dinh): bien soan lai co kiem soat; design: giu nguyen van, chi bo cuc lai; copy: moi slide cu mot slide.
+	if mode := strings.ToLower(stringArg(arguments, "mode")); mode != "copy" {
+		return t.design(ctx, arguments, run, template, roles, templatePath, sourcePath, targetPath, created, bridge, mode != "design")
 	}
 
 	// Doc them toi da 15 slide truoc lo: slide "tiep theo" khong co tieu de lay tieu de cua muc dang trinh bay.
@@ -411,7 +462,7 @@ func (t *SlidesFromTemplateTool) Invoke(ctx context.Context, arguments map[strin
 var targetActions = map[string]bool{
 	"wpp.addSlideFromTemplate": true, "wpp.setShapeText": true, "wpp.deleteShapes": true, "wpp.copyPicture": true,
 	"wpp.setNotes": true, "wpp.checkLayout": true, "wpp.listSlides": true, "wpp.addText": true, "wpp.save": true,
-	"wpp.addParagraphs": true,
+	"wpp.addParagraphs": true, "wpp.deleteTagged": true,
 }
 
 // ensureTarget: bai moi phai dang MO (cac lenh sau dich danh no qua `presentation`, khong can no dang hoat dong).
@@ -457,8 +508,14 @@ func parseManifest(manifest map[string]any) []sourceSlide {
 					shape, _ := value["shape"].(string)
 					width, _ := value["w"].(float64)
 					height, _ := value["h"].(float64)
-					slide.Pictures = append(slide.Pictures, sourcePicture{N: asInt(value["n"]), Shape: shape,
-						Overlays: asInt(value["overlays"]), W: width, H: height})
+					picture := sourcePicture{N: asInt(value["n"]), Shape: shape, Overlays: asInt(value["overlays"]), W: width, H: height}
+					if region, ok := value["region"].([]any); ok && len(region) == 4 {
+						for _, number := range region {
+							coordinate, _ := number.(float64)
+							picture.Region = append(picture.Region, coordinate)
+						}
+					}
+					slide.Pictures = append(slide.Pictures, picture)
 				}
 			}
 		}
@@ -999,13 +1056,22 @@ func buildSlide(bridge func(string, map[string]any) (map[string]any, string), te
 			return index, nil, problem
 		}
 	}
-	if extra := []string{}; len(kind.Items) > keep {
+	extra := []string{}
+	if len(kind.Items) > keep {
 		for _, item := range kind.Items[keep:] {
 			extra = append(extra, item...)
 		}
-		if _, problem := bridge("wpp.deleteShapes", map[string]any{"slide": index, "shapes": extra}); problem != "" {
-			return index, nil, problem
+	}
+	// O noi dung (placeholder) khong dien: xoa, khong thi chu mau con nguyen ("Muc tieu thu nhat / thu hai" tren 49/50
+	// slide - luot that 13/10/2026 23:10, mau truong Y Ha Noi). Chu cua slide dung trong khung rieng (addParagraphs).
+	for _, body := range kind.Bodies() {
+		if _, filled := row.Texts[body.Shape]; !filled {
+			extra = append(extra, body.Shape)
 		}
+	}
+	// emptyPlaceholders: PowerPoint doi ten o khi chen slide mau ("Content Placeholder 2" -> "4"), xoa theo ten bo sot.
+	if _, problem := bridge("wpp.deleteShapes", map[string]any{"slide": index, "shapes": extra, "emptyPlaceholders": true}); problem != "" {
+		return index, nil, problem
 	}
 	sizes := [][2]float64{}
 	for _, number := range pictures {
@@ -1034,9 +1100,11 @@ func buildSlide(bridge func(string, map[string]any) (map[string]any, string), te
 	}
 	for i, box := range boxes {
 		picture := slide.Pictures[pictures[i]-1]
-		if _, problem := bridge("wpp.copyPicture", map[string]any{"from": sourcePath, "fromSlide": slide.N, "shape": picture.Shape,
-			"slide": index, "left": box[0], "top": box[1], "width": box[2], "height": box[3],
-			"overlays": picture.Overlays > 0, "format": "jpg"}); problem != "" {
+		fromSlide := slide.N
+		if picture.Slide > 0 {
+			fromSlide = picture.Slide
+		}
+		if _, problem := bridge("wpp.copyPicture", copyParams(sourcePath, fromSlide, picture, index, box)); problem != "" {
 			return index, nil, problem
 		}
 	}

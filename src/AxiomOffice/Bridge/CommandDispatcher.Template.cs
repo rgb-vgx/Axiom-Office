@@ -44,13 +44,15 @@ namespace AxiomOffice.Bridge
                     Opt("presentation", "full path of the presentation to work on; default: the active one")).ForAgent(),
                 Command("wpp.deleteShapes", "wpp", WppDeleteShapes,
                     "Xoá các shape theo tên (mục lặp thừa của slide mẫu); không xoá ảnh nền",
-                    Req("shapes", "array of shape names"), Opt("slide"), Opt("presentation", "full path of the presentation to work on; default: the active one")).ForAgent(),
+                    Opt("shapes", "array of shape names"), Opt("slide"),
+                    Opt("emptyPlaceholders", "true: also delete every placeholder without text (the 'Click to add text' boxes)"), Opt("presentation", "full path of the presentation to work on; default: the active one")).ForAgent(),
                 Command("wpp.copyPicture", "wpp", WppCopyPicture,
                     "Chép ảnh từ slide của bài khác (vd bài cũ) vào slide của bài đang làm, co vừa khung, giữ tỉ lệ",
                     Req("from", "path of the source presentation"), Req("fromSlide"), Opt("shape", "picture name; default: largest picture"),
                     Opt("slide"), Opt("left"), Opt("top"), Opt("width"), Opt("height"),
                     Opt("overlays", "true: also copy the labels/arrows drawn over the picture"),
                     Opt("format", "png (default) or jpg (much smaller for photos and scans)"),
+                    Opt("region", "[left, top, width, height] of the source slide to copy as one picture (a diagram or table drawn with shapes); replaces shape"),
                     Opt("presentation", "full path of the presentation to work on; default: the active one")).ForAgent(),
                 Command("wpp.addParagraphs", "wpp", WppAddParagraphs,
                     "Khung chữ nhiều đoạn giữ phân cấp (cấp thụt lề, đậm, nghiêng, số thứ tự, gạch đầu dòng); tự chọn cỡ chữ lớn nhất vừa khung",
@@ -59,6 +61,20 @@ namespace AxiomOffice.Bridge
                     Opt("fontSize", "largest size to try (default 24)"), Opt("minFontSize", "smallest size (default 16)"),
                     Opt("color", "#RRGGBB body text"), Opt("accent", "#RRGGBB bold (heading) paragraphs"), Opt("font", "font name"),
                     Opt("anchor", "top (default) or middle"),
+                    Opt("box", "rounded or rect: draw a filled box (card, callout) instead of a plain text box"),
+                    Opt("fill", "#RRGGBB box fill"), Opt("line", "#RRGGBB box border (none when omitted)"),
+                    Opt("highlight", "#RRGGBB colour of **emphasised** words (default: accent)"),
+                    Opt("presentation", "full path of the presentation to work on; default: the active one")),
+                Command("wpp.addGrid", "wpp", WppAddGrid,
+                    "Bảng có định dạng: dòng đầu là tiêu đề (nền màu, chữ trắng đậm), dòng xen kẽ nền nhạt, cột rộng theo nội dung, tự chọn cỡ chữ vừa khung",
+                    Req("values", "2D array; first row = header"), Opt("slide"), Opt("left"), Opt("top"), Opt("width"), Opt("height"),
+                    Opt("fontSize", "largest size to try (default 18)"), Opt("minFontSize", "smallest size (default 11)"),
+                    Opt("header", "#RRGGBB header fill"), Opt("band", "#RRGGBB fill of every second row"),
+                    Opt("color", "#RRGGBB text"), Opt("font", "font name"),
+                    Opt("presentation", "full path of the presentation to work on; default: the active one")),
+                Command("wpp.deleteTagged", "wpp", WppDeleteTagged,
+                    "Xoá các slide do công cụ dựng (có tag nguồn) mà tag bắt đầu trong [first, last] - dựng lại một lô theo bố cục mới",
+                    Req("first"), Req("last"),
                     Opt("presentation", "full path of the presentation to work on; default: the active one"))
             };
         }
@@ -177,6 +193,138 @@ namespace AxiomOffice.Bridge
         // trùng khi một lô bị dừng giữa chừng rồi chạy lại); slide mới chèn sau slide cuối có tag nhỏ hơn để giữ thứ tự.
         internal const string SourceTag = "AXIOM_SRC";
 
+        // Bảng dựng theo mẫu: dòng đầu tiêu đề (nền màu nhấn, chữ trắng đậm), dòng chẵn nền nhạt, cột rộng theo độ dài chữ,
+        // cỡ chữ giảm dần tới khi bảng vừa chiều cao cho phép (bảng PowerPoint tự giãn cao theo chữ).
+        private static Dictionary<string, object> WppAddGrid(IAppHost host, Dictionary<string, object> p)
+        {
+            List<IList> valueRows = ParamMatrix(p, "values", true);
+            int rows = valueRows.Count;
+            int cols = valueRows.Max(row => row.Count);
+            if (rows < 2 || cols < 1)
+            {
+                throw new ArgumentException("'values' needs a header row and at least one data row");
+            }
+            double left = ParamDouble(p, "left", 60);
+            double top = ParamDouble(p, "top", 120);
+            double width = ParamDouble(p, "width", 600);
+            double height = ParamDouble(p, "height", 300);
+            int maxSize = Math.Max(8, ParamInt(p, "fontSize", 18));
+            int minSize = Math.Max(8, Math.Min(maxSize, ParamInt(p, "minFontSize", 11)));
+            int? header = ParseBgrColor(ParamString(p, "header", "#1F4E79"));
+            int? band = ParseBgrColor(ParamString(p, "band", "#EEF2F7"));
+            int? color = ParseBgrColor(ParamString(p, "color", "#262626"));
+            string font = ParamString(p, "font", null);
+            dynamic app = host.Application;
+            dynamic pres = TargetPresentation(app, p);
+            dynamic slide = WppGetSlide(pres, ParamInt(p, "slide", 0));
+            dynamic shape = slide.Shapes.AddTable(rows, cols, left, top, width, Math.Min(height, rows * 24));
+            dynamic table = shape.Table;
+            var weights = new double[cols];
+            for (int r = 0; r < rows; r++)
+            {
+                IList row = valueRows[r];
+                for (int c = 0; c < cols; c++)
+                {
+                    string text = c < row.Count ? Convert.ToString(row[c]) : "";
+                    weights[c] = Math.Max(weights[c], Math.Min(60, text.Length));
+                    dynamic cell = table.Cell(r + 1, c + 1).Shape;
+                    cell.TextFrame.TextRange.Text = text;
+                    dynamic font2 = cell.TextFrame.TextRange.Font;
+                    if (!string.IsNullOrWhiteSpace(font))
+                    {
+                        font2.Name = font;
+                    }
+                    font2.Bold = r == 0 ? -1 : 0;
+                    font2.Color.RGB = r == 0 ? 0xFFFFFF : (color ?? 0x262626);
+                    cell.Fill.Visible = -1;
+                    cell.Fill.Solid();
+                    cell.Fill.ForeColor.RGB = r == 0 ? (header ?? 0x794E1F) : (r % 2 == 0 ? (band ?? 0xF7F2EE) : 0xFFFFFF);
+                    cell.TextFrame.MarginLeft = 6;
+                    cell.TextFrame.MarginRight = 6;
+                    cell.TextFrame.MarginTop = 3;
+                    cell.TextFrame.MarginBottom = 3;
+                }
+            }
+            double total = weights.Sum(w => Math.Max(w, 8));
+            for (int c = 0; c < cols; c++)
+            {
+                table.Columns(c + 1).Width = (float)(width * Math.Max(weights[c], 8) / total);
+            }
+            int chosen = minSize;
+            bool overflow = true;
+            for (int size = maxSize; size >= minSize; size--)
+            {
+                for (int r = 1; r <= rows; r++)
+                {
+                    table.Rows(r).Height = 1;
+                    for (int c = 1; c <= cols; c++)
+                    {
+                        table.Cell(r, c).Shape.TextFrame.TextRange.Font.Size = size;
+                    }
+                }
+                if (Convert.ToDouble(shape.Height) <= height + LayoutTolerance)
+                {
+                    chosen = size;
+                    overflow = false;
+                    break;
+                }
+            }
+            return new Dictionary<string, object>
+            {
+                { "slide", Convert.ToInt32(slide.SlideIndex) },
+                { "shape", Convert.ToString(shape.Name) },
+                { "fontSize", chosen },
+                { "height", Math.Round(Convert.ToDouble(shape.Height), 1) },
+                { "overflow", overflow }
+            };
+        }
+
+        // Tag nguồn: "9" (slide nguồn 9), "9.2" (phần thứ hai của slide 9), "3-9.2" (slide thứ 2 của lô nguồn 3-9 dựng
+        // theo bố cục mới). Khoá sắp xếp = (đầu lô, số thứ tự) - so như số thực thì "9.10" đứng trước "9.2".
+        private static readonly Regex TagPattern = new Regex(@"^(\d+)(?:-(\d+))?(?:\.(\d+))?$");
+
+        internal static bool TagKey(string tag, out int start, out int sub)
+        {
+            start = 0;
+            sub = 0;
+            Match match = tag == null ? Match.Empty : TagPattern.Match(tag.Trim());
+            if (!match.Success)
+            {
+                return false;
+            }
+            start = int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
+            if (match.Groups[3].Success)
+            {
+                sub = int.Parse(match.Groups[3].Value, CultureInfo.InvariantCulture);
+            }
+            return true;
+        }
+
+        private static Dictionary<string, object> WppDeleteTagged(IAppHost host, Dictionary<string, object> p)
+        {
+            dynamic app = host.Application;
+            dynamic pres = TargetPresentation(app, p);
+            int first = ParamInt(p, "first", 1);
+            int last = ParamInt(p, "last", first);
+            var doomed = new List<dynamic>();
+            var tags = new List<string>();
+            foreach (dynamic slide in pres.Slides)
+            {
+                string tag = SlideTag(slide);
+                int start, sub;
+                if (tag != null && TagKey(tag, out start, out sub) && start >= first && start <= last)
+                {
+                    doomed.Add(slide);
+                    tags.Add(tag);
+                }
+            }
+            foreach (dynamic slide in doomed)
+            {
+                slide.Delete();
+            }
+            return new Dictionary<string, object> { { "deleted", doomed.Count }, { "tags", tags } };
+        }
+
         internal static string SlideTag(dynamic slide)
         {
             try
@@ -249,8 +397,8 @@ namespace AxiomOffice.Bridge
                     return position - 1;
                 }
             }
-            double number;
-            bool numeric = double.TryParse(tag, NumberStyles.Float, CultureInfo.InvariantCulture, out number);
+            int start, sub;
+            bool keyed = TagKey(tag, out start, out sub);
             int after = 0;
             bool anyTag = false;
             for (int i = 0; i < tags.Count; i++)
@@ -261,9 +409,9 @@ namespace AxiomOffice.Bridge
                     continue;
                 }
                 anyTag = true;
-                double otherNumber;
-                bool earlier = numeric && double.TryParse(other, NumberStyles.Float, CultureInfo.InvariantCulture, out otherNumber)
-                    ? otherNumber < number
+                int otherStart, otherSub;
+                bool earlier = keyed && TagKey(other, out otherStart, out otherSub)
+                    ? otherStart < start || (otherStart == start && otherSub < sub)
                     : string.CompareOrdinal(other, tag) < 0;
                 if (earlier)
                 {
@@ -360,6 +508,95 @@ namespace AxiomOffice.Bridge
             }
         }
 
+        // ParamDoubles: mảng số (vd region [l, t, w, h]); null khi không có hoặc sai dạng.
+        private static List<double> ParamDoubles(Dictionary<string, object> p, string name)
+        {
+            object value;
+            if (p == null || !p.TryGetValue(name, out value) || value == null)
+            {
+                return null;
+            }
+            var list = new List<double>();
+            var items = value as IEnumerable;
+            if (items == null || value is string)
+            {
+                return null;
+            }
+            foreach (object item in items)
+            {
+                try
+                {
+                    list.Add(Convert.ToDouble(item, CultureInfo.InvariantCulture));
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+            return list;
+        }
+
+        // DrawingRegion: vùng sơ đồ của slide - nhóm, biểu đồ, bảng, SmartArt, hoặc từ 3 hình vẽ không chữ (hình chữ nhật,
+        // đường, hình tự do) trở lên, không kể nhãn đè lên ảnh và hình nền phủ cả slide.
+        private static bool DrawingRegion(dynamic slide, HashSet<string> skip, out System.Drawing.RectangleF region)
+        {
+            region = System.Drawing.RectangleF.Empty;
+            double slideWidth = Convert.ToDouble(slide.Parent.PageSetup.SlideWidth);
+            double slideHeight = Convert.ToDouble(slide.Parent.PageSetup.SlideHeight);
+            int complex = 0, drawn = 0;
+            int count = Convert.ToInt32(slide.Shapes.Count);
+            for (int s = 1; s <= count; s++)
+            {
+                dynamic shape = slide.Shapes[s];
+                try
+                {
+                    if (IsFooterPlaceholder(shape) || IsPicture(shape) || skip.Contains(Convert.ToString(shape.Name)))
+                    {
+                        continue;
+                    }
+                    System.Drawing.RectangleF box = Box(shape);
+                    if (box.Width * box.Height >= 0.8 * slideWidth * slideHeight)
+                    {
+                        continue;
+                    }
+                    int type = Convert.ToInt32(shape.Type);
+                    bool hasText = false;
+                    try
+                    {
+                        hasText = Convert.ToInt32(shape.HasTextFrame) == -1 && Convert.ToInt32(shape.TextFrame.HasText) == -1;
+                    }
+                    catch
+                    {
+                    }
+                    bool part = false;
+                    if (type == 6 || type == 3 || type == 19 || type == 24 || type == 12)
+                    {
+                        complex++;
+                        part = true;
+                    }
+                    else if (!hasText && (type == 1 || type == 5 || type == 9 || type == 17))
+                    {
+                        drawn++;
+                        part = true;
+                    }
+                    if (part)
+                    {
+                        box.Inflate(box.Width < 1 ? 1 : 0, box.Height < 1 ? 1 : 0);
+                        region = region.IsEmpty ? box : System.Drawing.RectangleF.Union(region, box);
+                    }
+                }
+                catch
+                {
+                }
+            }
+            if (complex == 0 && drawn < 3)
+            {
+                return false;
+            }
+            region.Intersect(new System.Drawing.RectangleF(0, 0, (float)slideWidth, (float)slideHeight));
+            return region.Width >= 40 && region.Height >= 40;
+        }
+
         // Hình vẽ ĐÈ lên ảnh (nhãn, mũi tên, đường chỉ, khung chú thích) - phần của hình y khoa, không phải chữ của
         // slide. Bài Y4.4-GAN slide 5: ảnh phân thuỳ + 17 đường kẻ/khung nhãn vẽ đè; chỉ chép ảnh là mất nhãn.
         private static List<dynamic> Overlays(dynamic slide, dynamic picture)
@@ -416,15 +653,54 @@ namespace AxiomOffice.Bridge
         {
             List<dynamic> pictureShapes = SourcePictures(slide);
             var overlayNames = new HashSet<string>();
-            var pictures = new List<object>();
-            int number = 1;
+            var overlaysOf = new Dictionary<string, List<dynamic>>();
             foreach (dynamic picture in pictureShapes)
             {
                 List<dynamic> overlays = Overlays(slide, picture);
+                overlaysOf[Convert.ToString(picture.Name)] = overlays;
                 foreach (dynamic overlay in overlays)
                 {
                     overlayNames.Add(Convert.ToString(overlay.Name));
                 }
+            }
+            // Sơ đồ / bảng vẽ bằng shape (Y4.3-CCB slide 26: các lớp thành ruột vẽ bằng hình chữ nhật + nhãn chữ): chép
+            // cả vùng thành MỘT ảnh. Không làm vậy thì chỉ còn các nhãn "Tăng / Giảm / Niêm mạc" thành gạch đầu dòng vô nghĩa.
+            System.Drawing.RectangleF drawing;
+            bool hasDrawing = DrawingRegion(slide, overlayNames, out drawing);
+            var inDrawing = new HashSet<string>();
+            if (hasDrawing)
+            {
+                int count = Convert.ToInt32(slide.Shapes.Count);
+                for (int s = 1; s <= count; s++)
+                {
+                    dynamic shape = slide.Shapes[s];
+                    try
+                    {
+                        if (IsFooterPlaceholder(shape))
+                        {
+                            continue;
+                        }
+                        System.Drawing.RectangleF box = Box(shape);
+                        System.Drawing.RectangleF inside = System.Drawing.RectangleF.Intersect(box, drawing);
+                        if (!inside.IsEmpty && inside.Width * inside.Height >= 0.5 * Math.Max(box.Width * box.Height, 1))
+                        {
+                            inDrawing.Add(Convert.ToString(shape.Name));
+                        }
+                    }
+                    catch
+                    {
+                    }
+                }
+            }
+            var pictures = new List<object>();
+            int number = 1;
+            foreach (dynamic picture in pictureShapes)
+            {
+                if (inDrawing.Contains(Convert.ToString(picture.Name)))
+                {
+                    continue;
+                }
+                List<dynamic> overlays = overlaysOf[Convert.ToString(picture.Name)];
                 var entry = new Dictionary<string, object>
                 {
                     { "n", number++ },
@@ -438,6 +714,18 @@ namespace AxiomOffice.Bridge
                 }
                 pictures.Add(entry);
             }
+            if (hasDrawing)
+            {
+                pictures.Add(new Dictionary<string, object>
+                {
+                    { "n", number++ },
+                    { "shape", "" },
+                    { "region", new[] { Math.Round(drawing.X, 1), Math.Round(drawing.Y, 1), Math.Round(drawing.Width, 1), Math.Round(drawing.Height, 1) } },
+                    { "w", Math.Round(drawing.Width) },
+                    { "h", Math.Round(drawing.Height) },
+                    { "drawing", true }
+                });
+            }
 
             var texts = new List<KeyValuePair<double, string>>();
             var paragraphs = new Dictionary<string, List<object>>();
@@ -448,7 +736,8 @@ namespace AxiomOffice.Bridge
                 dynamic shape = slide.Shapes[s];
                 try
                 {
-                    if (IsFooterPlaceholder(shape) || IsPicture(shape) || overlayNames.Contains(Convert.ToString(shape.Name)))
+                    if (IsFooterPlaceholder(shape) || IsPicture(shape) || overlayNames.Contains(Convert.ToString(shape.Name))
+                        || inDrawing.Contains(Convert.ToString(shape.Name)))
                     {
                         continue;
                     }
@@ -630,8 +919,56 @@ namespace AxiomOffice.Bridge
             dynamic app = host.Application;
             dynamic pres = TargetPresentation(app, p);
             dynamic slide = WppGetSlide(pres, ParamInt(p, "slide", 0));
-            dynamic shape = slide.Shapes.AddTextbox(1, left, top, width, height);
+            // Thẻ / ô lưu ý: hình chữ nhật (bo góc) có nền thay cho khung chữ trơn.
+            string box = ParamString(p, "box", "");
+            int? fill = ParseBgrColor(ParamString(p, "fill", null));
+            int? lineColor = ParseBgrColor(ParamString(p, "line", null));
+            bool boxed = box == "rounded" || box == "rect" || fill.HasValue;
+            dynamic shape = boxed
+                ? slide.Shapes.AddShape(box == "rect" ? 1 : 5, left, top, width, height)
+                : slide.Shapes.AddTextbox(1, left, top, width, height);
+            if (boxed)
+            {
+                if (fill.HasValue)
+                {
+                    shape.Fill.Visible = -1;
+                    shape.Fill.Solid();
+                    shape.Fill.ForeColor.RGB = fill.Value;
+                }
+                else
+                {
+                    shape.Fill.Visible = 0;
+                }
+                if (lineColor.HasValue)
+                {
+                    shape.Line.Visible = -1;
+                    shape.Line.ForeColor.RGB = lineColor.Value;
+                    shape.Line.Weight = 1;
+                }
+                else
+                {
+                    shape.Line.Visible = 0;
+                }
+                try
+                {
+                    shape.Shadow.Visible = 0;
+                    if (box != "rect")
+                    {
+                        shape.Adjustments[1] = 0.06f;
+                    }
+                }
+                catch
+                {
+                }
+            }
             dynamic frame = shape.TextFrame;
+            if (boxed)
+            {
+                frame.MarginLeft = 10;
+                frame.MarginRight = 10;
+                frame.MarginTop = 8;
+                frame.MarginBottom = 8;
+            }
             try
             {
                 frame.AutoSize = 0;
@@ -654,12 +991,36 @@ namespace AxiomOffice.Bridge
                 return Math.Max(1, Math.Min(5, level));
             };
             var lines = new List<string>();
-            foreach (var entry in items)
+            // Từ khoá **…**: bỏ dấu, nhớ vị trí (đoạn, vị trí 1-based trong đoạn, độ dài) để in đậm + tô màu sau.
+            var emphasis = new List<int[]>();
+            for (int k = 0; k < items.Count; k++)
             {
+                var entry = items[k];
                 object number;
                 string prefix = entry.TryGetValue("n", out number) ? Convert.ToString(number).Trim() : "";
                 string text = Convert.ToString(entry["t"]).Trim().Replace("\r\n", "\n").Replace("\r", "\n").Replace("\n", "\v");
-                lines.Add(prefix.Length > 0 ? prefix + " " + text : text);
+                string head = prefix.Length > 0 ? prefix + " " : "";
+                var plain = new System.Text.StringBuilder(head);
+                int cursor = 0;
+                while (true)
+                {
+                    int open = text.IndexOf("**", cursor, StringComparison.Ordinal);
+                    int close = open < 0 ? -1 : text.IndexOf("**", open + 2, StringComparison.Ordinal);
+                    if (open < 0 || close < 0)
+                    {
+                        plain.Append(text.Substring(cursor));
+                        break;
+                    }
+                    plain.Append(text, cursor, open - cursor);
+                    string word = text.Substring(open + 2, close - open - 2);
+                    if (word.Length > 0)
+                    {
+                        emphasis.Add(new[] { k + 1, plain.Length + 1, word.Length });
+                    }
+                    plain.Append(word);
+                    cursor = close + 2;
+                }
+                lines.Add(plain.ToString());
             }
             dynamic range = frame.TextRange;
             range.Text = string.Join("\r", lines);
@@ -673,6 +1034,11 @@ namespace AxiomOffice.Bridge
             if (color.HasValue)
             {
                 range.Font.Color.RGB = color.Value;
+            }
+            else if (boxed)
+            {
+                // Hình khối của PowerPoint mặc định chữ trắng (thử thật 14/10/2026): chữ trên nền nhạt phải tối.
+                range.Font.Color.RGB = 0x262626;
             }
             range.Font.Bold = 0;
             range.Font.Italic = 0;
@@ -696,6 +1062,11 @@ namespace AxiomOffice.Bridge
                 {
                     paragraph.Font.Italic = -1;
                 }
+                object align;
+                if (entry.TryGetValue("a", out align) && string.Equals(Convert.ToString(align), "center", StringComparison.OrdinalIgnoreCase))
+                {
+                    paragraph.ParagraphFormat.Alignment = 2;
+                }
                 dynamic bullet = paragraph.ParagraphFormat.Bullet;
                 if (flag(entry, "u"))
                 {
@@ -706,6 +1077,23 @@ namespace AxiomOffice.Bridge
                 else
                 {
                     bullet.Visible = 0;
+                }
+            }
+
+            int? highlight = ParseBgrColor(ParamString(p, "highlight", null)) ?? accent;
+            foreach (int[] mark in emphasis)
+            {
+                try
+                {
+                    dynamic run = range.Paragraphs(mark[0]).Characters(mark[1], mark[2]);
+                    run.Font.Bold = -1;
+                    if (highlight.HasValue)
+                    {
+                        run.Font.Color.RGB = highlight.Value;
+                    }
+                }
+                catch
+                {
                 }
             }
 
@@ -753,16 +1141,21 @@ namespace AxiomOffice.Bridge
         // và nhãn. 3 điểm ảnh mỗi pt (slide 720 pt -> 2160 px), trần 4000 px.
         private static void ExportRegion(dynamic presentation, dynamic slide, dynamic picture, List<dynamic> overlays, string path, bool jpeg)
         {
-            double slideWidth = Convert.ToDouble(presentation.PageSetup.SlideWidth);
-            double slideHeight = Convert.ToDouble(presentation.PageSetup.SlideHeight);
-            double scale = Math.Min(2.5, 4000.0 / Math.Max(slideWidth, slideHeight));
-            int widthPx = (int)Math.Round(slideWidth * scale);
-            int heightPx = (int)Math.Round(slideHeight * scale);
             System.Drawing.RectangleF region = Box(picture);
             foreach (dynamic overlay in overlays)
             {
                 region = System.Drawing.RectangleF.Union(region, Box(overlay));
             }
+            ExportRect(presentation, slide, region, path, jpeg);
+        }
+
+        private static void ExportRect(dynamic presentation, dynamic slide, System.Drawing.RectangleF region, string path, bool jpeg)
+        {
+            double slideWidth = Convert.ToDouble(presentation.PageSetup.SlideWidth);
+            double slideHeight = Convert.ToDouble(presentation.PageSetup.SlideHeight);
+            double scale = Math.Min(2.5, 4000.0 / Math.Max(slideWidth, slideHeight));
+            int widthPx = (int)Math.Round(slideWidth * scale);
+            int heightPx = (int)Math.Round(slideHeight * scale);
             region.Inflate(2, 2);
             region.Intersect(new System.Drawing.RectangleF(0, 0, (float)slideWidth, (float)slideHeight));
             string whole = Path.Combine(Path.GetTempPath(), "axiom-slide-" + Guid.NewGuid().ToString("N") + ".png");
@@ -1123,7 +1516,12 @@ namespace AxiomOffice.Bridge
 
         private static Dictionary<string, object> WppDeleteShapes(IAppHost host, Dictionary<string, object> p)
         {
-            List<string> names = ParamNames(p, "shapes");
+            bool emptyPlaceholders = ParamBool(p, "emptyPlaceholders", false);
+            List<string> names = p != null && p.ContainsKey("shapes") ? ParamNames(p, "shapes") : new List<string>();
+            if (names.Count == 0 && !emptyPlaceholders)
+            {
+                throw new ArgumentException("'shapes' is required (or emptyPlaceholders: true)");
+            }
             dynamic app = host.Application;
             dynamic pres = TargetPresentation(app, p);
             dynamic slide = WppGetSlide(pres, ParamInt(p, "slide", 0));
@@ -1147,6 +1545,32 @@ namespace AxiomOffice.Bridge
                 }
                 deleted.Add(Convert.ToString(shape.Name));
                 shape.Delete();
+            }
+            // Ô placeholder trống ("Click to add text"): PowerPoint đổi tên ô khi chèn slide mẫu sang bài khác ("Content
+            // Placeholder 2" thành "Content Placeholder 4" - lượt thật 14/10/2026 còn 25 ô trên 133 slide) nên xoá theo
+            // tên không đủ; xoá mọi placeholder không có chữ.
+            if (emptyPlaceholders)
+            {
+                var empty = new List<dynamic>();
+                foreach (dynamic shape in slide.Shapes)
+                {
+                    try
+                    {
+                        if (Convert.ToInt32(shape.Type) == 14 && Convert.ToInt32(shape.HasTextFrame) == -1
+                            && Convert.ToInt32(shape.TextFrame.HasText) == 0)
+                        {
+                            empty.Add(shape);
+                        }
+                    }
+                    catch
+                    {
+                    }
+                }
+                foreach (dynamic shape in empty)
+                {
+                    deleted.Add(Convert.ToString(shape.Name));
+                    shape.Delete();
+                }
             }
             var result = new Dictionary<string, object>
             {
@@ -1225,7 +1649,13 @@ namespace AxiomOffice.Bridge
             dynamic sourceSlide = source.Slides[fromSlide];
             string name = ParamString(p, "shape", null);
             dynamic picture = null;
-            if (!string.IsNullOrWhiteSpace(name))
+            List<double> regionValues = ParamDoubles(p, "region");
+            bool byRegion = regionValues != null && regionValues.Count == 4 && regionValues[2] > 0 && regionValues[3] > 0;
+            if (byRegion)
+            {
+                // Vùng sơ đồ (sourceManifest "region"): không cần shape.
+            }
+            else if (!string.IsNullOrWhiteSpace(name))
             {
                 picture = FindShape(sourceSlide, name);
                 if (picture == null)
@@ -1270,8 +1700,13 @@ namespace AxiomOffice.Bridge
             dynamic added;
             try
             {
-                List<dynamic> overlays = ParamBool(p, "overlays", false) ? Overlays(sourceSlide, picture) : new List<dynamic>();
-                if (overlays.Count > 0)
+                List<dynamic> overlays = !byRegion && ParamBool(p, "overlays", false) ? Overlays(sourceSlide, picture) : new List<dynamic>();
+                if (byRegion)
+                {
+                    ExportRect(source, sourceSlide, new System.Drawing.RectangleF((float)regionValues[0], (float)regionValues[1],
+                        (float)regionValues[2], (float)regionValues[3]), temp, jpeg);
+                }
+                else if (overlays.Count > 0)
                 {
                     ExportRegion(source, sourceSlide, picture, overlays, temp, jpeg);
                 }
@@ -1301,7 +1736,7 @@ namespace AxiomOffice.Bridge
             {
                 { "slide", Convert.ToInt32(slide.SlideIndex) },
                 { "shape", Convert.ToString(added.Name) },
-                { "source", Convert.ToString(picture.Name) },
+                { "source", byRegion ? "region" : Convert.ToString(picture.Name) },
                 { "box", new[] { Math.Round(Convert.ToDouble(added.Left), 1), Math.Round(Convert.ToDouble(added.Top), 1),
                     Math.Round(Convert.ToDouble(added.Width), 1), Math.Round(Convert.ToDouble(added.Height), 1) } }
             };

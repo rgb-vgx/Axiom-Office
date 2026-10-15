@@ -18,19 +18,30 @@ chữ chờ `[...]`: ô nào không có nội dung mới thì xoá, đừng đ�
 Khi có tool `slides_from_template`, **dùng nó** cho mọi yêu cầu làm lại từ vài slide trở lên; không gọi từng
 lệnh `wpp.*` ở mục 2 cho các slide đó.
 
+Mặc định tool **biên soạn lại** bài (chế độ `compose`) như một người thiết kế bài giảng chuyên nghiệp:
+
 1. `slides_from_template {template, source}` — `source` = đường dẫn bài cũ (dòng "Open document … full path").
-   Tool tự tạo bài mới cạnh bài cũ, tự đọc bài cũ, tự dựng mọi slide nó quyết được (bìa, slide ảnh giữ tiêu đề +
-   ảnh, slide gạch đầu dòng ngắn) theo lô 25 slide.
-2. Kết quả có `needsPlan` (slide cần bạn viết, kèm chữ của slide cũ và `reason`) và `errors` (dòng kế hoạch sai, ghi
-   rõ trường + giới hạn). Viết **một dòng kế hoạch cho mỗi mục đó** rồi gọi lại **cùng `first`/`last`**:
-   `{"src": 14, "title": "…", "items": ["…", "…"], "notes": "…"}` hoặc với ảnh
-   `{"src": 15, "title": "…", "imgs": [1, 2], "notes": "…"}`. Giữ chữ trong `limits` (ký tự tiêu đề, số mục, ký tự
-   mỗi mục, số ảnh mỗi slide). Không vừa thì rút gọn chữ và chuyển phần thừa vào `notes` (mỗi slide cũ thành đúng
-   một slide mới).
-3. Không còn `needsPlan`/`errors` → gọi tiếp với `first` = `next.first`. Hết bài → gọi một lần `closing: true`.
-4. Slide đã dựng mang dấu số slide nguồn: gọi lại không tạo trùng; gửi dòng kế hoạch cho slide đã dựng = dựng lại
-   slide đó.
-5. Xong: báo người dùng số slide đã dựng, slide nào còn `layoutIssues`, và nhắc lưu (Ctrl+S).
+   Tool tạo bài mới cạnh bài cũ và trả phần đầu của bài cũ (`source`: đoạn `p` và ảnh `i` đánh số của 15 slide),
+   `outline` (đề mục cả bài), `layouts` và `how` (cách trả lời).
+2. Viết các slide MỚI của phần đó rồi gọi lại **cùng `first`/`last`** với `slides` (và `drop` nếu bỏ ảnh gần trùng):
+   - `title` ngắn, đủ nghĩa ("XQUANG BKCB – TƯ THẾ ĐỨNG THẲNG"); `from` = đoạn gốc slide dựa vào (`"7"`, `"7:p2-4"`).
+   - `content`: `points` ý ngắn (< 15 từ, `**từ khoá**`, ý con bắt đầu bằng `"- "`), `imgs` 1–4 ảnh (`"7:i1"`),
+     `caption` dưới ảnh ("Trái: … • Phải: …"), `callout` một lưu ý / cạm bẫy.
+   - `cards`: 2–4 thẻ `{title, points}` — Ưu điểm / Hạn chế / Chỉ định. `table`: `[[tiêu đề…], [dòng…]]` ≤ 8 dòng × 5
+     cột — bệnh cảnh × kỹ thuật. `compare`: `left`/`right` `{title, points, imgs}` — bình thường / bệnh lý.
+   - `section` (mở mỗi phần lớn, `subtitle`), `agenda` (mục tiêu học tập, nội dung bài), `cover`, `update`.
+   - **Mỗi đoạn của phần phải nằm trong `from` của một slide**: nguyên văn tự chép xuống ghi chú slide đó — không
+     chép đoạn dài lên slide. Mỗi ảnh đặt lên slide hoặc nằm trong `drop`.
+   - Chỉ dùng kiến thức của bài gốc; thông tin mới chỉ trên slide `update` với link `web_search` đã trả.
+   - Phần đầu: bìa, "MỤC TIÊU HỌC TẬP" (3 mục tiêu), nội dung bài (theo `outline`). Phần cuối: slide "TỔNG KẾT".
+3. Có `errors` → sửa đúng các slide được nêu và gửi lại cả danh sách. Không lỗi → tool dựng, lưu, trả phần kế tiếp.
+4. Hết bài tool tự thêm slide cảm ơn và kết thúc lượt.
+
+`mode: "design"` khi người dùng muốn **giữ nguyên văn** (chỉ bố cục lại: `use` trỏ đoạn/ảnh gốc, tool đặt nguyên văn).
+
+Chỉ khi người dùng muốn **giữ nguyên từng slide** mới dùng `mode: "copy"` (mỗi slide cũ thành một slide mới; tool
+trả `needsPlan` cho slide nó không tự quyết được — viết một dòng `{"src", "title", "items"|"imgs", "notes"}` cho mỗi
+mục rồi gọi lại cùng `first`/`last`; hết bài gọi `closing: true`).
 
 Mục 1–3 dưới đây dành cho sửa vài slide lẻ bằng tay.
 
@@ -41,7 +52,7 @@ Mục 1–3 dưới đây dành cho sửa vài slide lẻ bằng tay.
 | Trường | Nghĩa |
 |---|---|
 | `kind` | số slide trong mẫu — truyền cho `wpp.addSlideFromTemplate` |
-| `use` | `cover` bìa · `list` slide có mục lặp · `content` · `closing` slide cuối |
+| `use` | `cover` bìa · `agenda` mục tiêu · `section` chuyển phần · `content` · `compare` hai cột · `list` slide có mục lặp · `closing` slide cuối |
 | `fixed` | ảnh nền (logo, dải màu) — không bao giờ xoá |
 | `slots` | khung chữ: `shape` (tên), `role: title`, `maxChars`, `maxLines`, `item` (thuộc mục lặp số mấy) |
 | `items` | các mục lặp (vd I / II / III), mỗi mục là danh sách tên shape |
