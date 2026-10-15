@@ -44,6 +44,8 @@ namespace AxiomOffice.Ribbon
             " screentip=\"Bộ nhớ AI\" supertip=\"Xem, sửa, ghim, đặt hạn dùng, xoá những điều AI đã ghi nhớ về bạn và tài liệu.\"/>" +
             "<button id=\"btnSkills\" label=\"Kỹ năng…\" size=\"large\" imageMso=\"SmartArtInsert\" onAction=\"OnButtonAction\" tag=\"skills\"" +
             " screentip=\"Kỹ năng\" supertip=\"Các kỹ năng AI đang có cho ứng dụng này; nạp lại sau khi thêm hoặc sửa kỹ năng.\"/>" +
+            "<button id=\"btnMcp\" label=\"Công cụ ngoài…\" size=\"large\" imageMso=\"HyperlinkInsert\" onAction=\"OnButtonAction\" tag=\"mcp\"" +
+            " screentip=\"Công cụ ngoài (MCP)\" supertip=\"Máy chủ công cụ ngoài cho AI (tìm web, đọc file…): thêm, tắt, đặt tin cậy.\"/>" +
             "</group>" +
             "<group id=\"axiomSystemGroup\" label=\"Hệ thống\">" +
             "<button id=\"btnSetup\" label=\"Thiết lập…\" size=\"large\" imageMso=\"ControlWizards\" onAction=\"OnButtonAction\" tag=\"setup\"/>" +
@@ -279,6 +281,12 @@ namespace AxiomOffice.Ribbon
                     break;
                 case "skills":
                     using (var form = new Ai.SkillsForm(connect.AppKind))
+                    {
+                        form.ShowDialog();
+                    }
+                    break;
+                case "mcp":
+                    using (var form = new Ai.McpForm())
                     {
                         form.ShowDialog();
                     }

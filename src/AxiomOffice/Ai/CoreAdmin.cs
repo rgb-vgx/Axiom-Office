@@ -21,6 +21,17 @@ namespace AxiomOffice.Ai
             return MemoryCall("POST", "/v1/skills/reload", new Dictionary<string, object>(), out error) != null;
         }
 
+        // GET /v1/mcp: server đã cấu hình (không in env/headers) + tool đang nạp + lỗi khởi động.
+        public List<Dictionary<string, object>> McpServers(out string error)
+        {
+            Dictionary<string, object> result = MemoryCall("GET", "/v1/mcp", null, out error);
+            if (result == null)
+            {
+                return null;
+            }
+            return AdminText.List(result, "servers");
+        }
+
         // GET /v1/audit: các lệnh AI đã gọi, mới nhất trước.
         public List<Dictionary<string, object>> Audit(int limit, out string error)
         {

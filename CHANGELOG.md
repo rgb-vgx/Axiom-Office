@@ -5,6 +5,14 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Dialog Công cụ ngoài (MCP) trên ribbon (15/10/2026)
+- Nhóm Quản lý thêm nút **Công cụ ngoài…** (`Ai/McpForm.cs`, cạnh Kỹ năng…): gộp `mcp.json`
+  trên đĩa (kể cả server đang tắt) với `GET /v1/mcp` (tool đang nạp, lỗi khởi động); bật/tắt,
+  đặt tin cậy, thêm (lệnh stdio hoặc URL HTTP)/sửa/xoá server; ghi thẳng `mcp.json` (UTF-8
+  không BOM, giữ khoá lạ), Core nạp lại ở lượt AI sau. Server sẵn có `office` chỉ tắt được.
+  Kèm `CoreClient.McpServers()` và test `tests/win/check_mcp_form.ps1` (form + round-trip
+  mcp.json + `/v1/mcp`, chạy không cần mở Office).
+
 ### Added — Vòng lặp agent theo guard, model dự phòng, cứu lượt khi tràn ngữ cảnh, danh sách việc (13/10/2026)
 Học từ LangChain 1.4.5 (`agents/middleware`):
 - **Sửa lỗi**: lượt thật không có ba cơ chế chống làm thừa của §6.6 (dọn kết quả tool cũ, chặn lệnh y hệt lần 5, dừng
