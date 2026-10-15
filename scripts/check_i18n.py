@@ -1,8 +1,9 @@
 """Kiem tra ban dich giao dien add-in Windows (src/AxiomOffice/Localization/Ui.cs).
 
 Gom moi chuoi goc tieng Viet can dich - Ui.T("..."), bang nhan buoc (PaneControls.Labels/SuffixLabels),
-ten loi cua nut Soat (RibbonChecks.Labels, CheckInfo.Title) va nhan ribbon (label/screentip/supertip trong
-RibbonUi.RibbonXml) - roi bao khoa con thieu / thua trong src/AxiomOffice/lang/*.json.
+ten loi cua nut Soat (RibbonChecks.Labels, CheckInfo.Title), nhan ribbon (label/screentip/supertip trong
+RibbonUi.RibbonXml) va chu hien thi trong catalog/setup.json (title, subtitle, label, description, help...) -
+roi bao khoa con thieu / thua trong src/AxiomOffice/lang/*.json.
 
     python scripts/check_i18n.py            # bao thieu/thua, ma thoat 1 neu thieu
     python scripts/check_i18n.py --keys     # in danh sach khoa (JSON) de dich ngon ngu moi
@@ -15,6 +16,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, 'src', 'AxiomOffice')
 LANG = os.path.join(SRC, 'lang')
+CATALOG = os.path.join(ROOT, 'catalog', 'setup.json')
 
 CALL = re.compile(r'Ui\.T\("((?:[^"\\]|\\.)*)"\)')
 LABEL_ROW = re.compile(r'^\s*\{ "[^"]+", "((?:[^"\\]|\\.)*)" \},?')
@@ -55,6 +57,35 @@ def source_keys():
                     keys.add(xml_unescape(unescape(value)))
     # Tieng Viet ma khong co chu cai co dau (vd "Ask AI", "Axiom Office") thi khong can dich nhung van giu cho day du.
     keys.discard('')
+    keys.update(catalog_keys())
+    return keys
+
+
+# Chuoi hien thi trong catalog/setup.json (title, subtitle, label, description, help...).
+# Bo qua cac truong ky thuat (id, URL, ten model...). Wizard dich luc hien thi (Ui.T(...))
+# chu khong sua setup.json hay cac tep sinh tu no.
+CATALOG_KEYS = {'title', 'subtitle', 'label', 'description', 'help', 'fixLabel'}
+
+
+def catalog_keys():
+    keys = set()
+    try:
+        data = json.load(open(CATALOG, encoding='utf-8-sig'))
+    except (OSError, ValueError):
+        return keys
+
+    def walk(node):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key in CATALOG_KEYS and isinstance(value, str) and value.strip():
+                    keys.add(value)
+                else:
+                    walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(data)
     return keys
 
 

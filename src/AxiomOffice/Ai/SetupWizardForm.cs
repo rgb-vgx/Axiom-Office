@@ -29,12 +29,15 @@ namespace AxiomOffice.Ai
         private readonly Label _subtitleLabel = new Label();
         private readonly Panel _footer = new Panel();
         private readonly Panel _footerDivider = new Panel();
-        private readonly ChipButton _back = new ChipButton("← Quay lại");
-        private readonly ChipButton _later = new ChipButton("Để sau");
+        private readonly ChipButton _back = new ChipButton(Ui.T("← Quay lại"));
+        private readonly ChipButton _later = new ChipButton(Ui.T("Để sau"));
         private readonly SendButton _next = new SendButton();
 
         private readonly List<Panel> _panels = new List<Panel>();
         private int _step;
+
+        // Da dung xong lan dau: dung lai cac buoc khi doi ngon ngu thi khong gan lai xu ly nut (an hai lan).
+        private bool _built;
 
         // Buoc 3: lua chon nha cung cap + cac o nhap.
         private readonly List<ChipButton> _providerChips = new List<ChipButton>();
@@ -52,9 +55,9 @@ namespace AxiomOffice.Ai
         private readonly FieldBox _apiKeyBox;
         private readonly FieldBox _modelBox;
         private readonly Label _probe = new Label();
-        private readonly ChipButton _test = new ChipButton("Kiểm tra kết nối");
-        private readonly ChipButton _loadModels = new ChipButton("Tải danh sách model");
-        private readonly ChipButton _showKey = new ChipButton("Xem khoá");
+        private readonly ChipButton _test = new ChipButton(Ui.T("Kiểm tra kết nối"));
+        private readonly ChipButton _loadModels = new ChipButton(Ui.T("Tải danh sách model"));
+        private readonly ChipButton _showKey = new ChipButton(Ui.T("Xem khoá"));
         private bool _saved;
 
         // Buoc 2: danh sach kiem tra (nhan + ket qua + nut Sua).
@@ -67,13 +70,13 @@ namespace AxiomOffice.Ai
         private readonly ToggleBox _verify = new ToggleBox();
         private readonly ToggleBox _reasoning = new ToggleBox();
         private readonly ToggleBox _visualQa = new ToggleBox();
-        private readonly ChipButton _advanced = new ChipButton("Tuỳ chọn nâng cao…");
-        private readonly ChipButton _again = new ChipButton("Kiểm tra lại");
+        private readonly ChipButton _advanced = new ChipButton(Ui.T("Tuỳ chọn nâng cao…"));
+        private readonly ChipButton _again = new ChipButton(Ui.T("Kiểm tra lại"));
 
         // Buoc 5: thu ngay.
         private readonly Panel _summaryPanel = new Panel();
         private readonly CardBox _tryResultCard = new CardBox();
-        private readonly ChipButton _tryNow = new ChipButton("Thử ngay trên tài liệu đang mở");
+        private readonly ChipButton _tryNow = new ChipButton(Ui.T("Thử ngay trên tài liệu đang mở"));
         private readonly Label _tryResult = new Label();
 
         public SetupWizardForm(Connect host)
@@ -83,7 +86,7 @@ namespace AxiomOffice.Ai
             _info = CoreClient.Instance.Setup(out error);
             _catalogProblem = error;
 
-            Text = "Thiết lập Axiom Office";
+            Text = Ui.T("Thiết lập Axiom Office");
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
@@ -112,9 +115,100 @@ namespace AxiomOffice.Ai
             BuildConnect();
             BuildFeatures();
             BuildDone();
+            _built = true;
+            Ui.Changed += OnUiLanguageChanged;
             // Luon mo o buoc 1/5 (Chao mung): may da thiet lap thi nguoi dung van bam "Tiep tuc" de sang buoc
             // kiem tra. Truoc day nhay thang buoc 2/5 khien nguoi dung khong ro vi sao minh o do.
             ShowStep(0);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                Ui.Changed -= OnUiLanguageChanged;
+            }
+            base.Dispose(disposing);
+        }
+
+        // Doi ngon ngu khi wizard dang mo: dung lai cac buoc bang chu moi nhung giu buoc dang dung va du
+        // lieu da nhap (endpoint, khoa, model, Tavily, cac o tick, nha cung cap). Cac o nhap la field nen
+        // van giu chu; chi can chup lai truoc khi dung (BuildConnect tu dien lai theo catalog).
+        private void OnUiLanguageChanged(object sender, EventArgs e)
+        {
+            if (IsDisposed || Disposing)
+            {
+                return;
+            }
+            if (InvokeRequired)
+            {
+                BeginInvoke((MethodInvoker)RebuildForLanguage);
+                return;
+            }
+            RebuildForLanguage();
+        }
+
+        private void RebuildForLanguage()
+        {
+            if (IsDisposed || Disposing || !_built)
+            {
+                return;
+            }
+            string endpoint = _endpoint.Text;
+            string apiKey = _apiKey.Text;
+            string model = _model.Text;
+            string tavily = _tavilyKey.Text;
+            string providerId = _providerId;
+            bool[] toggles = { _memory.Checked, _autoExtract.Checked, _verify.Checked, _reasoning.Checked, _visualQa.Checked };
+            int step = _step;
+
+            _content.Controls.Clear();
+            _panels.Clear();
+            _providerChips.Clear();
+            _checkLines.Clear();
+            BuildWelcome();
+            BuildChecks();
+            BuildConnect();
+            BuildFeatures();
+            BuildDone();
+
+            _providerId = providerId;
+            _endpoint.Text = endpoint;
+            _apiKey.Text = apiKey;
+            _model.Text = model;
+            _tavilyKey.Text = tavily;
+            _memory.Checked = toggles[0];
+            _autoExtract.Checked = toggles[1];
+            _verify.Checked = toggles[2];
+            _reasoning.Checked = toggles[3];
+            _visualQa.Checked = toggles[4];
+            PaintProviderChips();
+            PaintStaticButtons();
+            Text = Ui.T("Thiết lập Axiom Office");
+            ShowStep(step);
+            // Vao lai buoc 2 doc lai khoa da luu (ShowStep): tra lai chu nguoi dung vua go.
+            _apiKey.Text = apiKey;
+        }
+
+        // Ve lai nhan chip nha cung cap theo lua chon hien tai (khong dung den o nhap nhu SelectProvider).
+        private void PaintProviderChips()
+        {
+            for (int i = 0; i < _providerChips.Count && i < SetupCatalog.Providers.Count; i++)
+            {
+                string label = Ui.T(SetupCatalog.Providers[i].Label);
+                _providerChips[i].Text = SetupCatalog.Providers[i].Id == _providerId ? "● " + label : label;
+            }
+        }
+
+        // Nut tinh tao mot lan (field) nhung chu phu thuoc ngon ngu: ve lai sau khi dung buoc.
+        private void PaintStaticButtons()
+        {
+            _test.Text = Ui.T("Kiểm tra kết nối");
+            _loadModels.Text = Ui.T("Tải danh sách model");
+            _showKey.Text = _apiKey.UseSystemPasswordChar ? Ui.T("Xem khoá") : Ui.T("Ẩn khoá");
+            _advanced.Text = Ui.T("Tuỳ chọn nâng cao…");
+            _again.Text = Ui.T("Kiểm tra lại");
+            _tryNow.Text = Ui.T("Thử ngay trên tài liệu đang mở");
         }
 
         // Da co endpoint + model (dung de doi tieu de buoc kiem tra khi may da thiet lap).
@@ -215,21 +309,21 @@ namespace AxiomOffice.Ai
             }
 
             SetupStepInfo step = SetupCatalog.Steps[index];
-            string title = step.Title;
+            string title = Ui.T(step.Title);
             if (Configured() && index == 1)
             {
-                title = "Kiểm tra Axiom Office";
+                title = Ui.T("Kiểm tra Axiom Office");
             }
 
             _titleLabel.Text = title;
-            _subtitleLabel.Text = step.Subtitle;
+            _subtitleLabel.Text = Ui.T(step.Subtitle);
             _stepBar.Step = index;
-            _stepLabel.Text = "bước " + (index + 1) + "/5";
+            _stepLabel.Text = string.Format(Ui.T("bước {0}/5"), index + 1);
 
             _back.Visible = index > 0 && index < 4;
             _later.Visible = index < 4;
-            _later.Text = index == 0 ? "Để sau" : "Đóng";
-            _next.Text = index == 4 ? "Hoàn tất" : "Tiếp tục →";
+            _later.Text = index == 0 ? Ui.T("Để sau") : Ui.T("Đóng");
+            _next.Text = index == 4 ? Ui.T("Hoàn tất") : Ui.T("Tiếp tục →");
 
             if (index == 1)
             {
@@ -285,8 +379,8 @@ namespace AxiomOffice.Ai
                 Size = new Size(Width0 - 48, 46),
                 Font = PaneTheme.DialogSubtitle,
                 ForeColor = PaneTheme.TextSecondary,
-                Text = "AI đọc và sửa trực tiếp tài liệu đang mở trong Word, Excel hoặc PowerPoint. "
-                    + "Axiom Office sẽ hỏi bạn ba việc:"
+                Text = Ui.T("AI đọc và sửa trực tiếp tài liệu đang mở trong Word, Excel hoặc PowerPoint. ")
+                    + Ui.T("Axiom Office sẽ hỏi bạn ba việc:")
             });
             y += 56;
 
@@ -294,9 +388,9 @@ namespace AxiomOffice.Ai
             // nhau, dong thu ba khong thang hang voi hai dong dau.
             string[] items =
             {
-                "Kiểm tra máy đã sẵn sàng chưa",
-                "Kết nối tới máy chủ AI (máy chủ công ty hoặc tài khoản riêng)",
-                "Chọn những gì AI được làm thêm",
+                Ui.T("Kiểm tra máy đã sẵn sàng chưa"),
+                Ui.T("Kết nối tới máy chủ AI (máy chủ công ty hoặc tài khoản riêng)"),
+                Ui.T("Chọn những gì AI được làm thêm"),
             };
             for (int index = 0; index < items.Length; index++)
             {
@@ -325,15 +419,15 @@ namespace AxiomOffice.Ai
                 Size = new Size(Width0 - 48, 46),
                 Font = PaneTheme.Small,
                 ForeColor = PaneTheme.TextMuted,
-                Text = "Mở lại mục \"Thiết lập…\" trong thẻ Axiom Office bất cứ lúc nào."
+                Text = Ui.T("Mở lại mục \"Thiết lập…\" trong thẻ Axiom Office bất cứ lúc nào.")
             };
             if (_info != null && _info.Version.Length > 0)
             {
-                note.Text += "  ·  Phiên bản " + _info.Version;
+                note.Text += Ui.T("  ·  Phiên bản ") + _info.Version;
             }
             else if (!string.IsNullOrEmpty(_catalogProblem))
             {
-                note.Text += "\r\n(Chưa đọc được Agent Core — dùng bản thiết lập có sẵn trong ứng dụng.)";
+                note.Text += Ui.T("\r\n(Chưa đọc được Agent Core — dùng bản thiết lập có sẵn trong ứng dụng.)");
             }
 
             panel.Controls.Add(note);
@@ -391,11 +485,14 @@ namespace AxiomOffice.Ai
 
             _again.Location = new Point(24, 0);          // dat lai sau khi ve xong danh sach (xem RefreshChecks)
             _again.Size = new Size(130, 30);
-            _again.Click += delegate
+            if (!_built)
             {
-                CoreClient.Instance.RestartCore(out _);
-                RefreshChecks();
-            };
+                _again.Click += delegate
+                {
+                    CoreClient.Instance.RestartCore(out _);
+                    RefreshChecks();
+                };
+            }
 
             panel.Controls.AddRange(new Control[] { _checks, _again });
         }
@@ -490,15 +587,15 @@ namespace AxiomOffice.Ai
             {
                 Id = "core",
                 Icon = running ? "✓" : "✗",
-                Title = running ? "Agent Core đang chạy" : "Agent Core chưa chạy",
+                Title = running ? Ui.T("Agent Core đang chạy") : Ui.T("Agent Core chưa chạy"),
                 // Dong chi tiet phai la cau nguoi dung hieu duoc: truoc day in nguyen van loi ky thuat cua Core
                 // (vd "khong thay"), khong noi len duoc phai lam gi. Loi goc van nam trong core.log.
                 Detail = running
-                    ? "Bộ não chạy nền của Axiom Office (cổng " + SetupInfo.Text("port", info.Core, "?") + ")."
-                    : "Bấm \"Khởi động Core\" để Axiom Office tự chạy lại (chi tiết kỹ thuật ở core.log).",
+                    ? string.Format(Ui.T("Bộ não chạy nền của Axiom Office (cổng {0})."), SetupInfo.Text("port", info.Core, "?"))
+                    : Ui.T("Bấm \"Khởi động Core\" để Axiom Office tự chạy lại (chi tiết kỹ thuật ở core.log)."),
                 Danger = !running,
                 Fixable = !running,
-                FixLabel = "Khởi động Core"
+                FixLabel = Ui.T("Khởi động Core")
             };
         }
 
@@ -509,13 +606,13 @@ namespace AxiomOffice.Ai
             {
                 Id = "config",
                 Icon = ready ? "✓" : "!",
-                Title = ready ? "Đã có cấu hình AI" : "Chưa cấu hình AI",
+                Title = ready ? Ui.T("Đã có cấu hình AI") : Ui.T("Chưa cấu hình AI"),
                 Detail = ready
                     ? Config.LlmModel + " tại " + Config.LlmEndpoint
-                    : "Cần địa chỉ máy chủ AI và tên model.",
+                    : Ui.T("Cần địa chỉ máy chủ AI và tên model."),
                 Warn = !ready,
                 Fixable = !ready,
-                FixLabel = "Thiết lập ngay"
+                FixLabel = Ui.T("Thiết lập ngay")
             };
         }
 
@@ -526,13 +623,13 @@ namespace AxiomOffice.Ai
             {
                 Id = "token",
                 Icon = ready ? "✓" : "!",
-                Title = ready ? "Đã có khoá bảo vệ" : "Chưa có khoá bảo vệ",
+                Title = ready ? Ui.T("Đã có khoá bảo vệ") : Ui.T("Chưa có khoá bảo vệ"),
                 Detail = ready
-                    ? "Khoá chỉ đi trên máy này, để ứng dụng khác không điều khiển được Agent Core."
-                    : "Nên tạo khoá mới để Agent Core không bị ứng dụng khác điều khiển.",
+                    ? Ui.T("Khoá chỉ đi trên máy này, để ứng dụng khác không điều khiển được Agent Core.")
+                    : Ui.T("Nên tạo khoá mới để Agent Core không bị ứng dụng khác điều khiển."),
                 Warn = !ready,
                 Fixable = !ready,
-                FixLabel = "Tạo khoá mới"
+                FixLabel = Ui.T("Tạo khoá mới")
             };
         }
 
@@ -553,16 +650,17 @@ namespace AxiomOffice.Ai
                 }
 
                 SetupCheckInfo meta = SetupCatalog.FindCheck(id);
+                // Nhan/huong dan do Core tra ve (cung cau chu trong catalog/setup.json) nen dich luc hien thi.
                 rows.Add(new CheckRow
                 {
                     Id = id,
                     Icon = SetupInfo.Text("severity", problem, "warning") == "error" ? "✗" : "!",
-                    Title = SetupInfo.Text("label", problem, id),
-                    Detail = SetupInfo.Text("hint", problem, ""),
+                    Title = Ui.T(SetupInfo.Text("label", problem, id)),
+                    Detail = Ui.T(SetupInfo.Text("hint", problem, "")),
                     Danger = SetupInfo.Text("severity", problem, "warning") == "error",
                     Warn = true,
                     Fixable = false,
-                    FixLabel = meta != null ? meta.FixLabel : ""
+                    FixLabel = meta != null ? Ui.T(meta.FixLabel) : ""
                 });
             }
 
@@ -595,8 +693,8 @@ namespace AxiomOffice.Ai
             }
 
             MessageBox.Show(this,
-                "Dòng này cần sửa bằng tay, xem hướng dẫn trong tệp cài đặt.",
-                "Thiết lập Axiom Office", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                Ui.T("Dòng này cần sửa bằng tay, xem hướng dẫn trong tệp cài đặt."),
+                Ui.T("Thiết lập Axiom Office"), MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         // ---------- B3: ket noi may chu AI ----------
@@ -608,7 +706,7 @@ namespace AxiomOffice.Ai
 
             // Nha cung cap: luoi 2 cot, be rong theo chu (truoc day chip co dinh 140px nen "May chu cua cong ty"
             // bi cat thanh "May chu cua co..." - nguoi dung khong doc duoc lua chon cua chinh minh).
-            panel.Controls.Add(FieldLabel("AI của bạn nằm ở đâu?", 24, y));
+            panel.Controls.Add(FieldLabel(Ui.T("AI của bạn nằm ở đâu?"), 24, y));
             y += 26;
 
             // O rong bang nhau theo cot (luoi 2x3 gon gan, khong con chip ngang ngan khac nhau). Nhan dai nhat
@@ -627,20 +725,23 @@ namespace AxiomOffice.Ai
             }
 
             y = 26 + ((SetupCatalog.Providers.Count + 1) / 2) * 36 + 8;
-            panel.Controls.Add(FieldLabel("Địa chỉ máy chủ", 24, y));
+            panel.Controls.Add(FieldLabel(Ui.T("Địa chỉ máy chủ"), 24, y));
             y += 20;
             _endpointBox.Location = new Point(24, y);
             _endpointBox.Size = new Size(Width0 - 48, 30);
             panel.Controls.Add(_endpointBox);
 
             y += 38;
-            panel.Controls.Add(FieldLabel("Khoá truy cập", 24, y));
+            panel.Controls.Add(FieldLabel(Ui.T("Khoá truy cập"), 24, y));
             _keyLink.AutoSize = true;
-            _keyLink.Location = new Point(24 + TextRenderer.MeasureText("Khoá truy cập", PaneTheme.FieldLabel).Width + 10, y + 1);
+            _keyLink.Location = new Point(24 + TextRenderer.MeasureText(Ui.T("Khoá truy cập"), PaneTheme.FieldLabel).Width + 10, y + 1);
             _keyLink.Font = PaneTheme.Small;
             _keyLink.ForeColor = PaneTheme.AccentFg;
             _keyLink.Cursor = Cursors.Hand;
-            _keyLink.Click += delegate { OpenKeyPage(); };
+            if (!_built)
+            {
+                _keyLink.Click += delegate { OpenKeyPage(); };
+            }
             panel.Controls.Add(_keyLink);
 
             y += 20;
@@ -650,15 +751,18 @@ namespace AxiomOffice.Ai
 
             _showKey.Location = new Point(24 + Width0 - 48 - 120, y);
             _showKey.Size = new Size(120, 30);
-            _showKey.Click += delegate
+            if (!_built)
             {
-                _apiKey.UseSystemPasswordChar = !_apiKey.UseSystemPasswordChar;
-                _showKey.Text = _apiKey.UseSystemPasswordChar ? "Xem khoá" : "Ẩn khoá";
-            };
+                _showKey.Click += delegate
+                {
+                    _apiKey.UseSystemPasswordChar = !_apiKey.UseSystemPasswordChar;
+                    _showKey.Text = _apiKey.UseSystemPasswordChar ? Ui.T("Xem khoá") : Ui.T("Ẩn khoá");
+                };
+            }
             panel.Controls.Add(_showKey);
 
             y += 38;
-            panel.Controls.Add(FieldLabel("Model", 24, y));
+            panel.Controls.Add(FieldLabel(Ui.T("Model"), 24, y));
             y += 20;
             _modelBox.Location = new Point(24, y);
             _modelBox.Size = new Size(Width0 - 48 - 150, 30);
@@ -666,7 +770,10 @@ namespace AxiomOffice.Ai
 
             _loadModels.Location = new Point(24 + Width0 - 48 - 142, y);
             _loadModels.Size = new Size(142, 30);
-            _loadModels.Click += delegate { LoadModels(); };
+            if (!_built)
+            {
+                _loadModels.Click += delegate { LoadModels(); };
+            }
             panel.Controls.Add(_loadModels);
 
             // Enter o bat ky o nao cung = "Kiem tra ket noi" (truoc day Enter khong lam gi).
@@ -679,14 +786,20 @@ namespace AxiomOffice.Ai
                     TestConnection();
                 }
             };
-            _endpoint.KeyDown += submit;
-            _apiKey.KeyDown += submit;
-            _model.KeyDown += submit;
+            if (!_built)
+            {
+                _endpoint.KeyDown += submit;
+                _apiKey.KeyDown += submit;
+                _model.KeyDown += submit;
+            }
 
             y += 38;
             _test.Location = new Point(24, y);
             _test.Size = new Size(170, 32);
-            _test.Click += delegate { TestConnection(); };
+            if (!_built)
+            {
+                _test.Click += delegate { TestConnection(); };
+            }
             panel.Controls.Add(_test);
 
             // Ket qua/thong bao nam trong the ngay duoi cac o nhap (khong con nam canh nut o day khung).
@@ -703,7 +816,8 @@ namespace AxiomOffice.Ai
             _probeCard.Controls.Add(_probe);
             panel.Controls.Add(_probeCard);
 
-            SelectProvider(_info != null && _info.ProviderId.Length > 0 ? _info.ProviderId : "company");
+            // Lan dau mo theo lua chon da luu trong Core; dung lai khi doi ngon ngu thi giu lua chon dang dung.
+            SelectProvider(!_built && _info != null && _info.ProviderId.Length > 0 ? _info.ProviderId : _providerId);
         }
 
         private static Label FieldLabel(string text, int x, int y)
@@ -739,20 +853,10 @@ namespace AxiomOffice.Ai
                 chip.Enabled = true;
             }
 
-            for (int i = 0; i < _providerChips.Count && i < SetupCatalog.Providers.Count; i++)
-            {
-                if (SetupCatalog.Providers[i].Id == provider.Id)
-                {
-                    _providerChips[i].Text = "● " + provider.Label;
-                }
-                else
-                {
-                    _providerChips[i].Text = SetupCatalog.Providers[i].Label;
-                }
-            }
+            PaintProviderChips();
 
             _endpoint.Text = provider.Endpoint.Length > 0 ? provider.Endpoint : ConfigEndpointFallback();
-            _keyLink.Text = provider.KeyUrl.Length > 0 ? "Lấy khoá ở đâu?" : "";
+            _keyLink.Text = provider.KeyUrl.Length > 0 ? Ui.T("Lấy khoá ở đâu?") : "";
             _apiKey.Enabled = true;
 
             _model.Items.Clear();
@@ -771,7 +875,7 @@ namespace AxiomOffice.Ai
                 _model.SelectedIndex = 0;
             }
 
-            SetProbe(provider.Description, "neutral");
+            SetProbe(Ui.T(provider.Description), "neutral");
         }
 
         // Nha cung cap "may chu cua cong ty" khong dien san dia chi: giu gia tri dang dung neu co.
@@ -797,7 +901,7 @@ namespace AxiomOffice.Ai
             }
             catch (Exception ex)
             {
-                MessageBox.Show(this, "Không mở được trình duyệt: " + ex.Message, "Thiết lập Axiom Office",
+                MessageBox.Show(this, Ui.T("Không mở được trình duyệt: ") + ex.Message, Ui.T("Thiết lập Axiom Office"),
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
@@ -807,7 +911,7 @@ namespace AxiomOffice.Ai
             SetupProviderInfo provider = SetupCatalog.FindProvider(_providerId);
             string codec = provider != null ? provider.Codec : "openai";
             _loadModels.Enabled = false;
-            SetProbe("Đang tải danh sách model…", "neutral");
+            SetProbe(Ui.T("Đang tải danh sách model…"), "neutral");
 
             string endpoint = _endpoint.Text.Trim();
             string key = _apiKey.Text.Trim();
@@ -822,9 +926,9 @@ namespace AxiomOffice.Ai
                     _loadModels.Enabled = true;
                     if (models == null)
                     {
-                        SetProbe((error ?? "Không lấy được danh sách model.")
+                        SetProbe((error ?? Ui.T("Không lấy được danh sách model."))
                             + (string.IsNullOrEmpty(hint) ? "" : " " + hint)
-                            + " Vẫn có thể tự gõ tên model ở ô trên.", "danger");
+                            + Ui.T(" Vẫn có thể tự gõ tên model ở ô trên."), "danger");
                         return;
                     }
 
@@ -835,7 +939,7 @@ namespace AxiomOffice.Ai
                         _model.Items.Add(name);
                     }
 
-                    SetProbe("Đã tải " + models.Count + " model. Chọn một model ở ô trên.", "neutral");
+                    SetProbe(string.Format(Ui.T("Đã tải {0} model. Chọn một model ở ô trên."), models.Count), "neutral");
                     if (!string.IsNullOrEmpty(chosen))
                     {
                         _model.Text = chosen;
@@ -858,12 +962,12 @@ namespace AxiomOffice.Ai
 
             if (endpoint.Length == 0 || model.Length == 0)
             {
-                SetProbe("Điền đủ Địa chỉ máy chủ và Model rồi thử lại.", "danger");
+                SetProbe(Ui.T("Điền đủ Địa chỉ máy chủ và Model rồi thử lại."), "danger");
                 return;
             }
 
             _test.Enabled = false;
-            SetProbe("Đang kiểm tra kết nối…", "neutral");
+            SetProbe(Ui.T("Đang kiểm tra kết nối…"), "neutral");
 
             var form = this;
             Task.Factory.StartNew(delegate
@@ -874,11 +978,12 @@ namespace AxiomOffice.Ai
                     _test.Enabled = true;
                     if (probe.Ok)
                     {
-                        SetProbe("Kết nối tốt (" + probe.Seconds.ToString("0.0") + " giây) — máy chủ trả lời \""
-                            + Shorten(probe.Reply, 40) + "\".", "success");
+                        SetProbe(string.Format(Ui.T("Kết nối tốt ({0} giây) — máy chủ trả lời \"{1}\"."),
+                            probe.Seconds.ToString("0.0"), Shorten(probe.Reply, 40)), "success");
                         return;
                     }
 
+                    // Loi tu Core (tieng Viet) giu nguyen van: noi dung dong nen khong co ban dich san.
                     SetProbe(probe.Message + (string.IsNullOrEmpty(probe.Hint) ? "" : " " + probe.Hint), "danger");
                 });
             });
@@ -904,7 +1009,7 @@ namespace AxiomOffice.Ai
             {
                 if (showMessage)
                 {
-                    MessageBox.Show(this, "Điền đủ Địa chỉ máy chủ và Model rồi tiếp tục.", "Thiết lập Axiom Office",
+                    MessageBox.Show(this, Ui.T("Điền đủ Địa chỉ máy chủ và Model rồi tiếp tục."), Ui.T("Thiết lập Axiom Office"),
                         MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
 
@@ -925,7 +1030,7 @@ namespace AxiomOffice.Ai
 
             if (!ok)
             {
-                MessageBox.Show(this, "Không ghi được cấu hình (kiểm tra quyền với HKCU).", "Thiết lập Axiom Office",
+                MessageBox.Show(this, Ui.T("Không ghi được cấu hình (kiểm tra quyền với HKCU)."), Ui.T("Thiết lập Axiom Office"),
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return false;
             }
@@ -948,8 +1053,8 @@ namespace AxiomOffice.Ai
                 ToggleBox box = FeatureBox(feature.Key);
                 box.Location = new Point(24, y);
                 box.Size = new Size(Width0 - 48, 46);
-                box.Text = feature.Label;
-                box.Hint = feature.Description;
+                box.Text = Ui.T(feature.Label);
+                box.Hint = Ui.T(feature.Description);
                 box.Checked = FeatureValue(feature.Key);
                 panel.Controls.Add(box);
                 y += 50;
@@ -964,7 +1069,7 @@ namespace AxiomOffice.Ai
                 Size = new Size(Width0 - 48, 20),
                 Font = PaneTheme.SmallBold,
                 ForeColor = PaneTheme.TextPrimary,
-                Text = "Tìm kiếm web (Tavily) - tuỳ chọn"
+                Text = Ui.T("Tìm kiếm web (Tavily) - tuỳ chọn")
             });
             y += 22;
             _tavilyKeyBox.Location = new Point(24, y);
@@ -972,7 +1077,7 @@ namespace AxiomOffice.Ai
             _tavilyLoaded = Config.TavilyApiKey;
             _tavilyKey.Text = _tavilyLoaded;
             panel.Controls.Add(_tavilyKeyBox);
-            var tavilyHelp = PaneTheme.MakeLink("Lấy khoá miễn phí tại tavily.com", PaneTheme.Small);
+            var tavilyHelp = PaneTheme.MakeLink(Ui.T("Lấy khoá miễn phí tại tavily.com"), PaneTheme.Small);
             tavilyHelp.Location = new Point(24 + 300 + 12, y + 7);
             tavilyHelp.LinkClicked += delegate
             {
@@ -990,19 +1095,22 @@ namespace AxiomOffice.Ai
 
             _advanced.Location = new Point(24, y);
             _advanced.Size = new Size(190, 32);
-            _advanced.Click += delegate
+            if (!_built)
             {
-                using (var form = new SettingsForm())
+                _advanced.Click += delegate
                 {
-                    form.ShowDialog(this);
-                }
+                    using (var form = new SettingsForm())
+                    {
+                        form.ShowDialog(this);
+                    }
 
-                _memory.Checked = Config.MemoryEnabled;
-                _autoExtract.Checked = Config.MemoryAutoExtract;
-                _verify.Checked = Config.VerifyWorkEnabled;
-                _reasoning.Checked = Config.LlmShowReasoning;
-                _visualQa.Checked = Config.VisualQaEnabled;
-            };
+                    _memory.Checked = Config.MemoryEnabled;
+                    _autoExtract.Checked = Config.MemoryAutoExtract;
+                    _verify.Checked = Config.VerifyWorkEnabled;
+                    _reasoning.Checked = Config.LlmShowReasoning;
+                    _visualQa.Checked = Config.VisualQaEnabled;
+                };
+            }
             panel.Controls.Add(_advanced);
 
             panel.Controls.Add(new Label
@@ -1012,7 +1120,7 @@ namespace AxiomOffice.Ai
                 Size = new Size(Width0 - 48 - 190 - 12, 40),
                 Font = PaneTheme.Small,
                 ForeColor = PaneTheme.TextMuted,
-                Text = "Mở để đổi cổng Agent Core, hạn giờ, model ghi nhớ."
+                Text = Ui.T("Mở để đổi cổng Agent Core, hạn giờ, model ghi nhớ.")
             });
         }
 
@@ -1076,7 +1184,7 @@ namespace AxiomOffice.Ai
                 & SaveTavilyKey();
             if (!ok && showMessage)
             {
-                MessageBox.Show(this, "Không ghi được tuỳ chọn tính năng.", "Thiết lập Axiom Office",
+                MessageBox.Show(this, Ui.T("Không ghi được tuỳ chọn tính năng."), Ui.T("Thiết lập Axiom Office"),
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
 
@@ -1118,7 +1226,10 @@ namespace AxiomOffice.Ai
 
             _tryNow.Location = new Point(24, y);
             _tryNow.Size = new Size(Width0 - 48, 34);
-            _tryNow.Click += delegate { TryNow(); };
+            if (!_built)
+            {
+                _tryNow.Click += delegate { TryNow(); };
+            }
             panel.Controls.Add(_tryNow);
 
             y += 42;
@@ -1142,7 +1253,7 @@ namespace AxiomOffice.Ai
                 Size = new Size(Width0 - 48, 40),
                 Font = PaneTheme.Small,
                 ForeColor = PaneTheme.TextMuted,
-                Text = "Mở lại \"Ask AI\" trong thẻ Axiom Office để bắt đầu."
+                Text = Ui.T("Mở lại \"Ask AI\" trong thẻ Axiom Office để bắt đầu.")
             });
         }
 
@@ -1152,12 +1263,12 @@ namespace AxiomOffice.Ai
             _summaryPanel.Controls.Clear();
             string model = _model.Text.Trim();
             string endpoint = _endpoint.Text.Trim();
-            string core = _info != null ? "cổng " + SetupInfo.Text("port", _info.Core, "?") : "chưa chạy";
+            string core = _info != null ? string.Format(Ui.T("cổng {0}"), SetupInfo.Text("port", _info.Core, "?")) : Ui.T("chưa chạy");
             string[][] rows =
             {
-                new[] { "Model", model.Length > 0 ? model : "(chưa chọn)" },
-                new[] { "Máy chủ AI", endpoint.Length > 0 ? endpoint : "(chưa có địa chỉ)" },
-                new[] { "Ghi nhớ dài hạn", _memory.Checked ? "bật" : "tắt" },
+                new[] { Ui.T("Model"), model.Length > 0 ? model : Ui.T("(chưa chọn)") },
+                new[] { Ui.T("Máy chủ AI"), endpoint.Length > 0 ? endpoint : Ui.T("(chưa có địa chỉ)") },
+                new[] { Ui.T("Ghi nhớ dài hạn"), _memory.Checked ? Ui.T("bật") : Ui.T("tắt") },
                 // Trang thai Core la mot su that rieng, khong duoc dan vao gia tri cua dong tren: gop lai thi
                 // nguoi dung doc thanh "ghi nho: bat, core chua chay" nhu the hai thu lien quan voi nhau.
                 new[] { "Agent Core", core },
@@ -1202,12 +1313,12 @@ namespace AxiomOffice.Ai
         {
             if (_host == null)
             {
-                SetTryResult("Không có tài liệu đang mở để thử. Mở một tài liệu rồi bấm Thử ngay.", "danger");
+                SetTryResult(Ui.T("Không có tài liệu đang mở để thử. Mở một tài liệu rồi bấm Thử ngay."), "danger");
                 return;
             }
 
             _tryNow.Enabled = false;
-            SetTryResult("Đang chạy thử…", "neutral");
+            SetTryResult(Ui.T("Đang chạy thử…"), "neutral");
 
             var form = this;
             Task.Factory.StartNew(delegate
@@ -1243,12 +1354,12 @@ namespace AxiomOffice.Ai
                     _tryNow.Enabled = true;
                     if (reply != null)
                     {
-                        SetTryResult("Xong: " + Shorten(reply, 160), "success");
+                        SetTryResult(Ui.T("Xong: ") + Shorten(reply, 160), "success");
                         return;
                     }
 
-                    SetTryResult("Chưa chạy được: " + (error ?? "không rõ lỗi")
-                        + " — kiểm tra lại bước Kết nối máy chủ AI.", "danger");
+                    SetTryResult(Ui.T("Chưa chạy được: ") + (error ?? Ui.T("không rõ lỗi"))
+                        + Ui.T(" — kiểm tra lại bước Kết nối máy chủ AI."), "danger");
                 });
             });
         }

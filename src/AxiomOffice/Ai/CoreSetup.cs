@@ -98,14 +98,14 @@ namespace AxiomOffice.Ai
                 var root = serializer.Deserialize<Dictionary<string, object>>(text);
                 if (root == null || !root.ContainsKey("result") || root["result"] == null)
                 {
-                    error = "Core tra ve du lieu la";
+                    error = Ui.T("Core trả về dữ liệu lạ");
                     return null;
                 }
 
                 var result = root["result"] as Dictionary<string, object>;
                 if (result == null)
                 {
-                    error = "Core tra ve du lieu la";
+                    error = Ui.T("Core trả về dữ liệu lạ");
                     return null;
                 }
 
@@ -129,12 +129,12 @@ namespace AxiomOffice.Ai
         // POST /v1/llm/test: thu ket noi voi gia tri NGUOI DUNG VUA NHAP (chua luu). apiKey rong = dung khoa da luu.
         public LlmProbe TestLlm(string providerId, string codec, string endpoint, string model, string apiKey, CancellationToken cancel)
         {
-            var probe = new LlmProbe { Kind = "internal", Message = "Không kiểm tra được kết nối." };
+            var probe = new LlmProbe { Kind = "internal", Message = Ui.T("Không kiểm tra được kết nối.") };
             string baseUrl = EnsureBaseUrl();
             if (baseUrl == null)
             {
-                probe.Message = "Agent Core chưa chạy.";
-                probe.Hint = "Mở lại ứng dụng hoặc bấm \"Khởi động lại Core\" rồi thử lại.";
+                probe.Message = Ui.T("Agent Core chưa chạy.");
+                probe.Hint = Ui.T("Mở lại ứng dụng hoặc bấm \"Khởi động lại Core\" rồi thử lại.");
                 probe.Detail = LastError;
                 return probe;
             }
@@ -152,7 +152,7 @@ namespace AxiomOffice.Ai
             string text = PostJson(baseUrl + "/v1/llm/test", Serialize(body), LlmTestTimeoutMs, cancel, out error);
             if (text == null)
             {
-                probe.Message = "Không gọi được Agent Core.";
+                probe.Message = Ui.T("Không gọi được Agent Core.");
                 probe.Detail = error;
                 return probe;
             }
@@ -178,7 +178,7 @@ namespace AxiomOffice.Ai
                 }
 
                 probe.Kind = SetupInfo.Text("kind", result, "internal");
-                probe.Message = SetupInfo.Text("message", result, "Không kiểm tra được kết nối.");
+                probe.Message = SetupInfo.Text("message", result, Ui.T("Không kiểm tra được kết nối."));
                 probe.Hint = SetupInfo.Text("hint", result, "");
                 probe.Detail = SetupInfo.Text("detail", result, "");
                 return probe;
@@ -198,7 +198,7 @@ namespace AxiomOffice.Ai
             string baseUrl = EnsureBaseUrl();
             if (baseUrl == null)
             {
-                error = "Agent Core chưa chạy.";
+                error = Ui.T("Agent Core chưa chạy.");
                 return null;
             }
 
@@ -217,13 +217,13 @@ namespace AxiomOffice.Ai
                 var result = MapOf(serializer.Deserialize<Dictionary<string, object>>(text), "result");
                 if (result == null)
                 {
-                    error = "Core tra ve du lieu la";
+                    error = Ui.T("Core trả về dữ liệu lạ");
                     return null;
                 }
 
                 if (result.ContainsKey("kind"))
                 {
-                    error = SetupInfo.Text("message", result, "Không lấy được danh sách model.");
+                    error = SetupInfo.Text("message", result, Ui.T("Không lấy được danh sách model."));
                     hint = SetupInfo.Text("hint", result, "");
                     return null;
                 }

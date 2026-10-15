@@ -5,6 +5,18 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Wizard Thiết lập dịch theo ngôn ngữ đang chọn (16/10/2026)
+- `SetupWizardForm` + `CoreSetup`: mọi chuỗi hiển thị bọc `Ui.T`; chữ lấy từ `catalog/setup.json`
+  (tiêu đề/mô tả bước, nhà cung cấp, tên tính năng, dòng kiểm tra) dịch lúc hiển thị — không sửa
+  `setup.json` và ba tệp sinh.
+- Đổi ngôn ngữ ngay trong wizard (ô chọn ở bước Chào mừng): dựng lại 5 bước, giữ đúng bước đang
+  đứng và dữ liệu đã nhập (endpoint, khoá, model, khoá Tavily, ô tick, nhà cung cấp); chặn gắn
+  handler hai lần bằng cờ `_built`; gỡ đăng ký `Ui.Changed` khi đóng form.
+- `scripts/check_i18n.py` gom thêm 47 chuỗi `catalog/setup.json`; `lang/en.json` +121 bản dịch
+  (kể cả 5 khoá nút Tavily còn thiếu) — báo thiếu 0/thừa 0.
+- `tests/win/check_wizard_i18n.ps1`: test reflection không cần Office — đổi sang English giữa
+  chừng, kiểm tra chữ đổi và dữ liệu còn nguyên (13/13 PASS).
+
 ### Added — Bật/tắt tìm web (Tavily) một chạm trên ribbon (15/10/2026)
 - Cờ riêng `TavilyEnabled` (HKCU, mặc định bật; `AXIOM_TAVILY_ENABLED` ghi đè): Core chỉ đăng ký
   tool `web_search` khi cờ bật và đã có khoá — khác xoá khoá (xoá là mất, bật lại phải nhập lại).
