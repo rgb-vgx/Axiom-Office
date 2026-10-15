@@ -52,6 +52,7 @@ func TestRunAgentTurnsToolsOffNearBudget(t *testing.T) {
 	client := NewClient(server.Client(), "openai", server.URL, "", "m")
 	options := DefaultAgentOptions()
 	options.Verify = false
+	options.MaxTokens = 200_000 // mac dinh khong tran: ben goi dat tran thi ngan sach ba muc moi chay
 	result := client.RunAgent(context.Background(), "s", nil, "u", mutatingTools(),
 		func(ctx context.Context, call ToolCall) ToolResult {
 			return ToolResult{CallID: call.ID, Name: call.Name, OK: true, ResultJSON: `{"ok":true}`}

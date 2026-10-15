@@ -297,7 +297,7 @@ func TestParseRequestValidatesAndClamps(t *testing.T) {
 		"prompt": "x", "office": map[string]any{"port": float64(1)},
 		"options": map[string]any{"maxTokens": float64(99999999)},
 	})
-	if !fallback.Interactive || fallback.Options.Deadline != 0 || fallback.Options.MaxTokens != 1_000_000 {
+	if !fallback.Interactive || fallback.Options.Deadline != 0 || fallback.Options.MaxTokens != 99999999 {
 		t.Fatalf("mac dinh phai la khong tran thoi gian: %+v", fallback)
 	}
 

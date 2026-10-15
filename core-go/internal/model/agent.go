@@ -24,7 +24,7 @@ const DefaultMaxResponseTokens = 65536
 
 type AgentOptions struct {
 	MaxRounds         int           // 0 = khong gioi han so vong
-	MaxTokens         int           // tran token ca luot (mac dinh 200000)
+	MaxTokens         int           // tran token ca luot; 0 = khong tran (mac dinh)
 	Deadline          time.Duration // 0 = khong tran thoi gian (mac dinh); > 0 moi dat
 	MaxResponseTokens int           // mac dinh DefaultMaxResponseTokens
 	// MaxIdenticalFailures: dung han khi model lap lai Y HET mot tool call da hong bay nhieu vong lien
@@ -78,7 +78,6 @@ func (o AgentOptions) FitWindow() AgentOptions {
 
 func DefaultAgentOptions() AgentOptions {
 	return AgentOptions{
-		MaxTokens:            200_000,
 		MaxResponseTokens:    DefaultMaxResponseTokens,
 		Verify:               true,
 		MaxIdenticalFailures: DefaultMaxIdenticalFailures,

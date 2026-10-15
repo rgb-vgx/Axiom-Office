@@ -186,7 +186,9 @@ namespace AxiomOffice.Ai
             request["document"] = document;
             // Khong dat maxSeconds: luot chay do so vong, ngan sach token va nut Dung kiem soat.
             // Pane di theo SSE va co nut Dung nen khong can tran dong ho (giong opencode/goclaw).
-            var options = new Dictionary<string, object> { { "maxTokens", 200000 }, { "interactive", interactive } };
+            // Không gửi maxTokens: lượt không có trần token (người dùng 14/10/2026: "cứ để tự do"); trần 200k cũ cắt lượt dựng
+            // bài 140 slide ở 106/140.
+            var options = new Dictionary<string, object> { { "interactive", interactive } };
             if (!string.IsNullOrEmpty(mode))
             {
                 options["mode"] = mode;

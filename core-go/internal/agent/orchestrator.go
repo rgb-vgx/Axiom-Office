@@ -49,8 +49,11 @@ const (
 	DefaultMaxRounds = 100
 	MaxMaxRounds     = 1_000
 
-	DefaultMaxTokens = 200_000
-	MaxMaxTokens     = 1_000_000
+	// DefaultMaxTokens = 0: khong tran token cho mot luot (nguoi dung 13/10/2026: "fix cung ngan sach a, cu de tu do").
+	// Luot van duoc chan bang so vong, chan lenh y het, dung khi lap mot loi va nut Dung; ben goi van dat tran duoc
+	// (options.maxTokens, toi thieu MinMaxTokens) - vd agent khac goi ai.ask.
+	DefaultMaxTokens = 0
+	MinMaxTokens     = 1_000
 )
 
 // ParseRequest doc body JSON thanh Request (loi -> mo ta tieng cho client).
@@ -70,7 +73,10 @@ func ParseRequest(body map[string]any) (*Request, string) {
 
 	maxSeconds := clamp(intOfDefault(tryMap(body["options"])["maxSeconds"], DefaultMaxSeconds), 0, MaxMaxSeconds)
 	maxRounds := clamp(intOfDefault(tryMap(body["options"])["maxRounds"], DefaultMaxRounds), 1, MaxMaxRounds)
-	maxTokens := clamp(intOfDefault(tryMap(body["options"])["maxTokens"], DefaultMaxTokens), 1_000, MaxMaxTokens)
+	maxTokens := max(intOfDefault(tryMap(body["options"])["maxTokens"], DefaultMaxTokens), 0)
+	if maxTokens > 0 && maxTokens < MinMaxTokens {
+		maxTokens = MinMaxTokens
+	}
 
 	var document *DocumentContext
 	if raw, ok := body["document"].(map[string]any); ok {

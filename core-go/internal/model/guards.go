@@ -196,7 +196,9 @@ func (g *verifyGuard) afterTools(_ *agentLoop, _ *Turn, results []ToolResult) *v
 }
 
 func (g *verifyGuard) onReply(loop *agentLoop, turn *Turn, _ string) *verdict {
-	if !g.mutated || g.asked {
+	// Tool da tat (het ngan sach, provider khong ho tro tool): khong doc lai duoc - nhac kiem chung chi lam model viet
+	// "khong the kiem tra" (luot that 14/10/2026).
+	if !g.mutated || g.asked || !loop.toolsEnabled {
 		return nil
 	}
 	g.asked, loop.result.Verified = true, true
