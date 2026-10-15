@@ -203,8 +203,23 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 		raw = TruncateBridgeResult(action, result.Result, raw, run.FocusSlide)
 	}
 	// Lenh that bai thi tai lieu khong doi -> khong tinh la da sua.
-	return Result{JSON: raw, OK: result.OK, Action: action,
-		Mutating: result.OK && ChangesDocument(action)}
+	output := Result{JSON: raw, OK: result.OK, Action: action, Mutating: result.OK && ChangesDocument(action)}
+	if !result.OK && AppGone(result.Error) {
+		output.Abort = appGoneMessage
+	}
+	return output
+}
+
+// appGoneMessage: ung dung Office da dong / sap giua luot - dung luot thay vi de model goi lai mai (luot that
+// 14/10/2026: Word sap sau writer.replaceAll chuoi dai, model goi writer.getText vao bridge da chet nhieu vong).
+const appGoneMessage = "Ứng dụng Office đã đóng hoặc bị sập giữa chừng nên không làm tiếp được. Hãy mở lại tài liệu " +
+	"(Word/Excel/PowerPoint có thể đã tự khôi phục bản đang sửa), kiểm tra nội dung rồi gửi lại yêu cầu."
+
+// AppGone: loi ket noi toi bridge cho thay ung dung Office khong con chay (khong ai nghe o cong).
+func AppGone(errorText string) bool {
+	text := strings.ToLower(errorText)
+	return strings.Contains(text, "actively refused") || strings.Contains(text, "connection refused") ||
+		strings.Contains(text, "no connection could be made")
 }
 
 // CanonicalAction: ten lenh viet sai nhe ("et_writeRange"; hoa/thuong khac) thi quy ve ten dung trong

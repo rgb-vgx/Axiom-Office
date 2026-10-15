@@ -215,3 +215,12 @@ func TestChangesDocumentClassification(t *testing.T) {
 		}
 	}
 }
+
+func TestAppGoneDetectsDeadBridge(t *testing.T) {
+	if !AppGone(`HttpRequestException: Post "http://127.0.0.1:47831/cmd": dial tcp 127.0.0.1:47831: connectex: No connection could be made because the target machine actively refused it.`) {
+		t.Fatal("cong khong ai nghe = ung dung da dong")
+	}
+	if AppGone("COMException: String parameter too long.") {
+		t.Fatal("loi lenh thuong khong phai ung dung da dong")
+	}
+}

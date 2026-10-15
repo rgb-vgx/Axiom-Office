@@ -96,3 +96,16 @@ func TestClearOldToolResultsKeepsRecentAndNeedsEnoughGain(t *testing.T) {
 		t.Fatal("thu hoi qua it thi khong don (giu cache)")
 	}
 }
+
+// Ung dung Office da dong / sap: tool bao Abort -> dung luot ngay voi loi do, khong goi model them.
+func TestRunAgentStopsWhenOfficeAppIsGone(t *testing.T) {
+	server, bodies := verifyServer(t, []string{replyToolCall})
+	client := NewClient(server.Client(), "openai", server.URL, "", "m")
+	result := client.RunAgent(context.Background(), "s", nil, "u", mutatingTools(),
+		func(ctx context.Context, call ToolCall) ToolResult {
+			return ToolResult{CallID: call.ID, Name: call.Name, ResultJSON: `{"ok":false}`, Abort: "Word đã đóng"}
+		}, DefaultAgentOptions(), AgentCallbacks{})
+	if result.OK || result.ErrorKind != "office" || result.Error != "Word đã đóng" || len(bodies()) != 1 {
+		t.Fatalf("phai dung sau vong 1: %+v (%d request)", result, len(bodies()))
+	}
+}

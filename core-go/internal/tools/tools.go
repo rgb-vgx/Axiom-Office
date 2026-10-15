@@ -25,6 +25,8 @@ type Result struct {
 	// khong goi model them (model.ToolResult.Final).
 	Final     bool
 	FinalText string
+	// Abort: khong lam tiep duoc (ung dung Office da dong / sap) - luot dung voi thong bao nay.
+	Abort string
 }
 
 // noDocumentChange: cac lenh KHONG doi noi dung tai lieu dang mo - doc de tra loi, chay chan doan,

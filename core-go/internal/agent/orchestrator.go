@@ -547,7 +547,7 @@ func executeTool(ctx context.Context, registry *tools.Registry, call model.ToolC
 	return model.ToolResult{
 		CallID: call.ID, Name: call.Name, ResultJSON: output.JSON, OK: output.OK,
 		ImageDataURL: output.ImageDataURL, Mutating: output.Mutating,
-		Final: output.Final, FinalText: output.FinalText,
+		Final: output.Final, FinalText: output.FinalText, Abort: output.Abort,
 	}
 }
 

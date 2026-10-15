@@ -40,6 +40,8 @@ type ToolResult struct {
 	// model con chay 25 vong kiem lai roi het ngan sach.
 	Final     bool
 	FinalText string
+	// Abort: khong the lam tiep (vd ung dung Office da dong / sap) - luot dung ngay voi loi nay.
+	Abort string
 }
 
 // Turn: mot luot tra loi cua model (co tool call hoac cau tra loi cuoi). Raw giu nguyen phan assistant

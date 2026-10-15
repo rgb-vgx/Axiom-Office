@@ -87,7 +87,7 @@ func newGuards(options AgentOptions) guardChain {
 	if len(options.OncePerReply) > 0 {
 		chain = append(chain, &oncePerReplyGuard{names: options.OncePerReply})
 	}
-	chain = append(chain, finalGuard{})
+	chain = append(chain, finalGuard{}, abortGuard{})
 	if options.ContextClearAt > 0 {
 		chain = append(chain, contextClearGuard{})
 	}
@@ -263,6 +263,19 @@ func (finalGuard) afterTools(loop *agentLoop, _ *Turn, results []ToolResult) *ve
 			loop.result.Verified = true
 			loop.addLine("(" + result.Name + " bao da xong toan bo - ket thuc, khong goi model them)")
 			return &verdict{end: true, ok: true, text: result.FinalText}
+		}
+	}
+	return nil
+}
+
+// abortGuard: tool bao khong the lam tiep (ung dung Office da dong / sap) -> dung luot voi loi do, khong goi model them.
+type abortGuard struct{}
+
+func (abortGuard) afterTools(loop *agentLoop, _ *Turn, results []ToolResult) *verdict {
+	for _, result := range results {
+		if result.Abort != "" {
+			loop.addLine("(" + result.Name + ": " + result.Abort + ")")
+			return &verdict{end: true, kind: "office", err: result.Abort}
 		}
 	}
 	return nil
