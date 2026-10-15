@@ -15,7 +15,7 @@ var CallLimits = map[string]int{
 	"wpp.checkLayout":           20,
 	"wpp.setNotes":              20,
 	"slides_from_template":      40,
-	"web_search":                8,
+	"tavily_search":             8,
 	"write_todos":               30,
 	"doc_design":                8,
 	"mcp__office__ppt_get_text": 4,

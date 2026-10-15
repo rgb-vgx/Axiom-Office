@@ -20,7 +20,7 @@ import (
 //     bao cao;
 //   - bo cuc giau hon: the (cards), bang (table), chu thich anh (caption), o luu y (callout); muc tieu / dan bai /
 //     tong ket rut tu bai (khong can "from");
-//   - thong tin moi chi tren slide "update" voi link web_search that (checkUpdate).
+//   - thong tin moi chi tren slide "update" voi link tavily_search that (checkUpdate).
 
 // composeRow: mot slide moi do model bien soan.
 type composeRow struct {
@@ -724,7 +724,7 @@ const composeHow = "Compose the NEW slides for the source slides in `source` lik
 	"based on: \"7\", \"7:p2-4\"), plus by layout: content {points, imgs, caption, callout}; cards {cards: [{title, points}] " +
 	"2-4 cards, e.g. Ưu điểm / Hạn chế / Chỉ định}; table {table: [[header...], [row...]...] up to 8 rows x 5 columns, e.g. " +
 	"bệnh cảnh × kỹ thuật}; compare {left/right: {title, points, imgs}} for normal vs abnormal or two techniques; section " +
-	"{subtitle}; agenda {points} for objectives / outline; update {points, sources} only with urls web_search returned; " +
+	"{subtitle}; agenda {points} for objectives / outline; update {points, sources} only with urls tavily_search returned; " +
 	"cover {subtitle}. Points: short (under 15 words), \"**key term**\" for emphasis, level 2 with a leading \"- \". " +
 	"Pictures: imgs \"7:i1\"; 1-4 per slide with a caption (\"Trái: … • Phải: …\"); put near-duplicate pictures in drop " +
 	"(\"9:i2\") and keep the clearest. callout: one warning or pitfall (⚠). Rules: every paragraph of the part must be in " +

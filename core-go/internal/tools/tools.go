@@ -87,7 +87,7 @@ type RunContext struct {
 	lastTemplate, lastSource, lastTarget string
 	// droppedPictures: anh bo co chu dich trong che do bien soan (bao trong cau tra loi cuoi).
 	droppedPictures []string
-	// webSources: link web_search da tra trong luot (url -> tieu de) - slide "Cap nhat" chi duoc trich nhung link nay.
+	// webSources: link tavily_search da tra trong luot (url -> tieu de) - slide "Cap nhat" chi duoc trich nhung link nay.
 	webSources map[string]string
 	// calls: so lan goi tung tool/lenh trong luot (CallLimit).
 	calls map[string]int
@@ -155,7 +155,7 @@ func stringArg(arguments map[string]any, name string) string {
 	return strings.TrimSpace(value)
 }
 
-// noteWebSource: ghi lai mot link web_search vua tra (run nil: tool goi ngoai luot chay, vd test).
+// noteWebSource: ghi lai mot link tavily_search vua tra (run nil: tool goi ngoai luot chay, vd test).
 func (c *RunContext) noteWebSource(url, title string) {
 	if c == nil || strings.TrimSpace(url) == "" {
 		return
@@ -166,7 +166,7 @@ func (c *RunContext) noteWebSource(url, title string) {
 	c.webSources[normalizeURL(url)] = strings.TrimSpace(title)
 }
 
-// WebSource: link nay co phai do web_search tra trong luot khong.
+// WebSource: link nay co phai do tavily_search tra trong luot khong.
 func (c *RunContext) WebSource(url string) bool {
 	if c == nil || c.webSources == nil {
 		return false

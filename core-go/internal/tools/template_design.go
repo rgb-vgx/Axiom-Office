@@ -31,7 +31,7 @@ type designRow struct {
 	Right  []string
 	// Notes: ghi chu thuyet trinh model viet them (vd thong tin cap nhat kem nguon) - khong len slide.
 	Notes string
-	// Points, Sources: slide "update" - y model viet tu ket qua web_search va link nguon (phai do web_search tra).
+	// Points, Sources: slide "update" - y model viet tu ket qua tavily_search va link nguon (phai do tavily_search tra).
 	Points  []string
 	Sources []string
 }
@@ -529,7 +529,7 @@ func checkDesign(rows []designRow, views []sourceView, byUse map[string]*pptx.Ki
 // updateMarker: slide do model viet phai ghi ro la phan cap nhat (nguoi dung chon giu nguyen van bai goc).
 var updateMarker = regexp.MustCompile(`(?i)c[aậ]p nh[aậ]t|b[oổ] sung|update`)
 
-// checkUpdate: slide "update" - y moi tu web_search (model viet), moi link nguon phai la link web_search da tra trong
+// checkUpdate: slide "update" - y moi tu tavily_search (model viet), moi link nguon phai la link tavily_search da tra trong
 // luot (khong bia nguon); tieu de luon co chu "Cap nhat"; cuoi slide ghi ten trang nguon, ghi chu ghi du link.
 func checkUpdate(row designRow, kind *pptx.Kind, slot int, webSource func(string) bool, errors *[]rowError) (string, []sourcePara, string) {
 	title := strings.TrimSpace(row.Title)
@@ -553,13 +553,13 @@ func checkUpdate(row designRow, kind *pptx.Kind, slot int, webSource func(string
 	}
 	if len(row.Sources) == 0 {
 		*errors = append(*errors, rowError{Src: slot, Field: "sources", Error: "MISSING",
-			Allowed: "the url of each web_search result the points come from"})
+			Allowed: "the url of each tavily_search result the points come from"})
 	}
 	domains := []string{}
 	for _, url := range row.Sources {
 		if webSource == nil || !webSource(url) {
 			*errors = append(*errors, rowError{Src: slot, Field: "sources", Error: "NOT_FROM_WEB_SEARCH", Allowed: url +
-				" was not returned by web_search in this request: search first and cite only urls it returned"})
+				" was not returned by tavily_search in this request: search first and cite only urls it returned"})
 			continue
 		}
 		domain := strings.SplitN(normalizeURL(url), "/", 2)[0]
@@ -725,8 +725,8 @@ const designHow = "Design the NEW slides for the source slides in `source` and c
 	"them, use compare for two things side by side (normal vs abnormal, two techniques, and pictures labelled with opposite words such as \"Có / Không\", \"Tăng âm / Giảm âm\": each picture with its label in its own column), split a slide that is too long " +
 	"into two with the same title + \" (tiếp theo)\". First part: begin with a cover slide (use \"1\"). Optional " +
 	"\"notes\" on any slide: speaker notes you write. ONLY if the user asked to update or enrich the content: search " +
-	"with web_search first, then add {\"layout\": \"update\", \"title\": \"Cập nhật: ...\", \"points\": [short new " +
-	"points], \"sources\": [urls web_search returned]} after the slides of that topic - new information never " +
+	"with tavily_search first, then add {\"layout\": \"update\", \"title\": \"Cập nhật: ...\", \"points\": [short new " +
+	"points], \"sources\": [urls tavily_search returned]} after the slides of that topic - new information never " +
 	"replaces the source text."
 
 // design: mot luot che do thiet ke - doc phan bai, kiem bo cuc model gui, dung.

@@ -57,7 +57,7 @@ type Config struct {
 	VerifyWorkEnabled bool
 	VisualQaEnabled   bool
 	LlmApiKey         string
-	// TavilyApiKey: khoa tim kiem web (tool web_search); rong = khong co tool. Windows luu "dpapi:" nhu LlmApiKey.
+	// TavilyApiKey: khoa tim kiem web (tool tavily_search); rong = khong co tool. Windows luu "dpapi:" nhu LlmApiKey.
 	TavilyApiKey             string
 	MemoryModel              string
 	EmbeddingModel           string

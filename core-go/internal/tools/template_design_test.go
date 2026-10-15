@@ -134,7 +134,7 @@ func TestDesignModeChecksCoverageThenBuilds(t *testing.T) {
 	}
 }
 
-// Slide "update": link nguon phai do web_search tra trong luot; tieu de luon ghi ro "Cap nhat"; nguon len slide + ghi chu.
+// Slide "update": link nguon phai do tavily_search tra trong luot; tieu de luon ghi ro "Cap nhat"; nguon len slide + ghi chu.
 func TestUpdateSlideNeedsRealWebSources(t *testing.T) {
 	_, roles := testRoles(t)
 	run := &RunContext{}

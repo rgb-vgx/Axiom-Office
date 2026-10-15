@@ -438,7 +438,8 @@ namespace AxiomOffice.Ai
             { "wpp.checkLayout", "Kiểm tra bố cục slide" },
             // Công cụ của Agent Core ngoài office_action (AskAiPane.ProgressLine đưa tên tool vào chỗ action).
             { "look_at_document", "Nhìn ảnh trang/slide" },
-            { "web_search", "Tìm trên web" },
+            { "tavily_search", "Tìm trên web (Tavily)" },
+            { "web_search", "Tìm trên web" }, // tên cũ (trước 16/10/2026) - lịch sử hội thoại cũ
             { "recall", "Tra ghi nhớ" },
         };
 

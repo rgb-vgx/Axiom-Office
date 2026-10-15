@@ -32,7 +32,7 @@ Mặc định tool **biên soạn lại** bài (chế độ `compose`) như mộ
    - `section` (mở mỗi phần lớn, `subtitle`), `agenda` (mục tiêu học tập, nội dung bài), `cover`, `update`.
    - **Mỗi đoạn của phần phải nằm trong `from` của một slide**: nguyên văn tự chép xuống ghi chú slide đó — không
      chép đoạn dài lên slide. Mỗi ảnh đặt lên slide hoặc nằm trong `drop`.
-   - Chỉ dùng kiến thức của bài gốc; thông tin mới chỉ trên slide `update` với link `web_search` đã trả.
+   - Chỉ dùng kiến thức của bài gốc; thông tin mới chỉ trên slide `update` với link `tavily_search` đã trả.
    - Phần đầu: bìa, "MỤC TIÊU HỌC TẬP" (3 mục tiêu), nội dung bài (theo `outline`). Phần cuối: slide "TỔNG KẾT".
 3. Có `errors` → sửa đúng các slide được nêu và gửi lại cả danh sách. Không lỗi → tool dựng, lưu, trả phần kế tiếp.
 4. Hết bài tool tự thêm slide cảm ơn và kết thúc lượt.

@@ -12,7 +12,7 @@ import (
 	"axiomoffice/core/internal/model"
 )
 
-// WebSearchTool: web_search - tim tren web qua Tavily (REST API, khong can CLI/MCP). Chi dang ky khi nguoi dung
+// WebSearchTool: tavily_search - tim tren web qua Tavily (REST API, khong can CLI/MCP). Chi dang ky khi nguoi dung
 // nhap khoa Tavily trong Thiet lap (TavilyApiKey). Chi doc web, khong dung toi tai lieu -> dung duoc ca trong
 // che do lap ke hoach. Ket qua cat gon (cau tra loi + vai ket qua co link): model free ngu canh nho.
 type WebSearchTool struct {
@@ -22,7 +22,7 @@ type WebSearchTool struct {
 }
 
 const (
-	WebSearchToolName = "web_search"
+	WebSearchToolName = "tavily_search"
 	TavilyEndpoint    = "https://api.tavily.com"
 	webSearchMax      = 8
 	webSnippetChars   = 500
