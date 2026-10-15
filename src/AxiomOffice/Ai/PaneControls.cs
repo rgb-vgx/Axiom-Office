@@ -1447,6 +1447,8 @@ namespace AxiomOffice.Ai
         private readonly LinkLabel _toggle;
         private string _full = "";
         private bool _expanded;
+        // _live: suy luận đang tới (run.reasoning.live) - thu gọn thì hiện đoạn CUỐI mới nhất, không phải đoạn đầu.
+        private bool _live;
 
         public ReasoningBlock(string text, int round)
         {
@@ -1468,11 +1470,26 @@ namespace AxiomOffice.Ai
         public void Update(string text, int round)
         {
             bool first = _full.Length == 0;
+            _live = false;
             _full = text ?? "";
             _title.Text = round > 0 ? "Suy luận · vòng " + round : "Suy luận";
             if (first)
             {
                 _expanded = _full.Length <= InlineLimit;
+            }
+            Apply();
+        }
+
+        // Phần suy luận đang tới: mặc định thu gọn (một dòng đuôi, tự chạy), người dùng mở thì xem cả đoạn.
+        public void UpdateLive(string text, int round)
+        {
+            bool first = _full.Length == 0;
+            _live = true;
+            _full = text ?? "";
+            _title.Text = (round > 0 ? "Đang suy luận · vòng " + round : "Đang suy luận") + "…";
+            if (first)
+            {
+                _expanded = false;
             }
             Apply();
         }
@@ -1485,7 +1502,7 @@ namespace AxiomOffice.Ai
 
         private void Apply()
         {
-            _text.Text = _expanded ? _full : Preview(_full);
+            _text.Text = _expanded ? _full : (_live ? PreviewTail(_full) : Preview(_full));
             _toggle.Text = _expanded ? "Ẩn" : "Hiện";
             _toggle.AccessibleName = _expanded ? "Thu gọn phần suy luận" : "Xem đầy đủ phần suy luận";
             if (Parent != null)
@@ -1496,6 +1513,21 @@ namespace AxiomOffice.Ai
         }
 
         // Một dòng mờ khi thu gọn. Cắt theo ký tự nhưng không cắt đôi một cặp surrogate.
+        public static string PreviewTail(string text)
+        {
+            string flat = Regex.Replace(text ?? "", @"\s+", " ").Trim();
+            if (flat.Length <= InlineLimit)
+            {
+                return flat;
+            }
+            int start = flat.Length - (InlineLimit - 1);
+            if (start < flat.Length && char.IsLowSurrogate(flat[start]))
+            {
+                start++;
+            }
+            return "…" + flat.Substring(start);
+        }
+
         public static string Preview(string text)
         {
             string flat = Regex.Replace(text ?? "", @"\s+", " ").Trim();
@@ -1616,6 +1648,26 @@ namespace AxiomOffice.Ai
             }
             Realign();
             ScrollToBottom();
+        }
+
+        // Xoá sạch danh sách (Trò chuyện mới): trước đây chỉ thêm dòng "Bắt đầu cuộc trò chuyện mới" dưới hội thoại cũ.
+        public void ClearAll()
+        {
+            RemoveTyping();
+            var items = new List<Control>();
+            foreach (Control control in Controls)
+            {
+                items.Add(control);
+            }
+            SuspendLayout();
+            Controls.Clear();
+            foreach (Control control in items)
+            {
+                control.Dispose();
+            }
+            ResumeLayout();
+            AutoScrollPosition = new Point(0, 0);
+            Realign();
         }
 
         public void RemoveItem(Control control)

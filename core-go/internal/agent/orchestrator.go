@@ -301,6 +301,7 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 		systemPrompt += "\n\n" + PlanModeRule
 	}
 
+	liveReasoning, liveStatus := "", ""
 	callbacks := model.AgentCallbacks{
 		Transcript: func(line string) { run.Transcript = append(run.Transcript, line) },
 		// Suy luan cua model hien cho nguoi dung xem (muc 7.4): chi co khi nguoi dung bat
@@ -309,6 +310,20 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 			run.Events.Publish("run.reasoning", map[string]any{
 				"round": round, "text": text, "model": client.Model,
 			})
+		},
+		// Phan hoi dang toi (nguoi dung 14/10/2026: khung chat dung yen 1-2 phut moi phan bai): suy luan hien dan vao khoi
+		// suy luan, dong trang thai noi model dang lam gi ("Dang thiet ke phan 1-15: 7 slide...").
+		Live: func(round int, update model.LiveUpdate) {
+			if update.Reasoning != "" && update.Reasoning != liveReasoning {
+				liveReasoning = update.Reasoning
+				run.Events.Publish("run.reasoning.live", map[string]any{
+					"round": round, "text": tailText(update.Reasoning, liveReasoningChars), "model": client.Model,
+				})
+			}
+			if text := liveProgress(update); text != "" && text != liveStatus {
+				liveStatus = text
+				run.Events.Publish("run.progress", map[string]any{"round": round, "text": text})
+			}
 		},
 		ModelSwitched: func(from, to, reason string) {
 			corelog.Info("run %s: model %s failed (%s) - switching to fallback %s", run.ID, from, reason, to)

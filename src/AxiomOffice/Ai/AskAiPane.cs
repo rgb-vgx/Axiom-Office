@@ -655,6 +655,26 @@ namespace AxiomOffice.Ai
                     PostToUi(delegate { ShowMemoryNote(memoryId, memoryText); });
                     return;
                 }
+                if (item.Type == "run.reasoning.live" && !string.IsNullOrEmpty(item.Text))
+                {
+                    string live = item.Text;
+                    int liveRound = item.Round;
+                    PostToUi(delegate { ShowReasoning(live, liveRound, true); });
+                    return;
+                }
+                // Dòng trạng thái khi model đang viết dài ("Đang thiết kế phần 1–15: 7 slide…") - trước đây đứng yên 1-2 phút.
+                if (item.Type == "run.progress" && !string.IsNullOrEmpty(item.Text))
+                {
+                    string status = item.Text;
+                    PostToUi(delegate
+                    {
+                        if (_busy)
+                        {
+                            SetStatus(status, false);
+                        }
+                    });
+                    return;
+                }
                 if (item.Type == "run.reasoning" && !string.IsNullOrEmpty(item.Text))
                 {
                     string reasoning = item.Text;
@@ -809,6 +829,18 @@ namespace AxiomOffice.Ai
 
             _conversationId = null;
             _freshConversation = true;
+            // Xoá khung chat cũ (người dùng 13/10/2026: bấm "Trò chuyện mới" mà hội thoại cũ vẫn nằm đó) và mọi tham
+            // chiếu tới thẻ của hội thoại cũ.
+            _chat.ClearAll();
+            _empty = null;
+            _planCard = null;
+            _reasoningBlock = null;
+            _confirmCards.Clear();
+            _lastReply = "";
+            _lastPrompt = "";
+            _lastPlan = false;
+            _undoLink.Visible = false;
+            AddGreeting();
             _chat.AddInfo("Bắt đầu cuộc trò chuyện mới cho tài liệu này.");
             Logger.Info("AskAiPane: new conversation requested");
             _prompt.Focus();
@@ -853,13 +885,24 @@ namespace AxiomOffice.Ai
 
         private void ShowReasoning(string text, int round)
         {
+            ShowReasoning(text, round, false);
+        }
+
+        private void ShowReasoning(string text, int round, bool live)
+        {
             if (_reasoningBlock == null)
             {
-                _reasoningBlock = new ReasoningBlock(text, round);
+                _reasoningBlock = new ReasoningBlock(live ? "" : text, round);
                 _chat.AddBlock(_reasoningBlock);
-                return;
             }
-            _reasoningBlock.Update(text, round);
+            if (live)
+            {
+                _reasoningBlock.UpdateLive(text, round);
+            }
+            else
+            {
+                _reasoningBlock.Update(text, round);
+            }
         }
 
         // Memory đã hiện trong pane (không hiện lại khi hỏi lại kết quả trích xuất nền).

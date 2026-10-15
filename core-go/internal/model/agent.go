@@ -109,6 +109,8 @@ type AgentCallbacks struct {
 	// Reasoning: phan suy nghi cua model cho mot vong (rong khi model khong suy luan hoac da tat).
 	// Goi mot lan moi vong co suy luan, voi TOAN BO phan suy luan cua vong do.
 	Reasoning func(round int, text string)
+	// Live: phan hoi dang toi cua vong `round` (suy luan, chu, tool call dang viet) - toi da ~2 lan/giay.
+	Live func(round int, update LiveUpdate)
 	// ModelSwitched: luot chuyen sang model du phong (from -> to) vi model dang dung hong (reason).
 	ModelSwitched func(from, to, reason string)
 }
@@ -292,7 +294,12 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 func (l *agentLoop) ask(runCtx, userCtx context.Context, tools []Tool) (*Turn, *modelFailure) {
 	c := l.client
 	body := c.Codec.BuildRequest(l.model, l.systemPrompt, l.turns, tools, l.toolsEnabled, l.options.MaxResponseTokens)
-	responseText, errText, status := c.post(runCtx, userCtx, body, c.Stream)
+	var live *liveStream
+	if c.Stream && l.callbacks.Live != nil {
+		round := l.result.Rounds
+		live = newLiveStream(c.Codec.Name(), func(update LiveUpdate) { l.callbacks.Live(round, update) })
+	}
+	responseText, errText, status := c.post(runCtx, userCtx, body, c.Stream, live)
 	if responseText == nil {
 		detail := Truncate(errText, 300)
 		if status > 0 {

@@ -168,7 +168,7 @@ func (c *Client) Chat(ctx context.Context, systemPrompt, userPrompt string, maxT
 		[]Message{map[string]any{"role": "user", "content": userPrompt}}, nil, false, maxTokens)
 	// Loi goi ngan: khong stream, va vi body khong phai SSE nen Parse thường dung duoc.
 	body["stream"] = false
-	text, errText, status := c.post(callCtx, ctx, body, false)
+	text, errText, status := c.post(callCtx, ctx, body, false, nil)
 	if text == nil {
 		if status > 0 {
 			return "", fmt.Sprintf("HTTP %d: %s", status, Truncate(errText, 300)), false
@@ -204,7 +204,8 @@ func IsTransient(status int, errText string) bool {
 
 // post gui body, thu lai khi loi tam thoi. userCtx de phan biet nguoi dung huy voi het gio.
 // stream = true thi bat SSE va xin kem usage (chi OpenAI hieu stream_options).
-func (c *Client) post(ctx, userCtx context.Context, body map[string]any, stream bool) ([]byte, string, int) {
+// live != nil: doc phan hoi trong luc no toi (LiveUpdate) - chi cho luot agent co stream.
+func (c *Client) post(ctx, userCtx context.Context, body map[string]any, stream bool, live *liveStream) ([]byte, string, int) {
 	if stream {
 		body["stream"] = true
 		if c.Codec.Name() == "openai" {
@@ -227,7 +228,7 @@ func (c *Client) post(ctx, userCtx context.Context, body map[string]any, stream 
 	}
 	droppedThinking := false
 	for attempt := 0; ; attempt++ {
-		text, errText, status, retryAfter := c.postOnce(ctx, userCtx, payload)
+		text, errText, status, retryAfter := c.postOnce(ctx, userCtx, payload, live)
 		// Bo `thinking` roi thanh cong thi moi nho: 400 vi ly do khac khong duoc tat vinh vien tham so nay.
 		if text != nil && droppedThinking {
 			c.thinkingRejected.Store(true)
@@ -265,7 +266,10 @@ func (c *Client) post(ctx, userCtx context.Context, body map[string]any, stream 
 	}
 }
 
-func (c *Client) postOnce(ctx, userCtx context.Context, payload []byte) ([]byte, string, int, time.Duration) {
+func (c *Client) postOnce(ctx, userCtx context.Context, payload []byte, live *liveStream) ([]byte, string, int, time.Duration) {
+	if live != nil {
+		live.Reset()
+	}
 	// Khong dat tran thoi gian tong: ben goi quyet dinh (Chat dat 120s, luot agent khong dat).
 	// Ket noi treo bi chan bang watchdog "khong nhan duoc byte nao" ben duoi.
 	requestCtx, cancel := context.WithCancel(ctx)
@@ -282,7 +286,11 @@ func (c *Client) postOnce(ctx, userCtx context.Context, payload []byte) ([]byte,
 	}
 	defer response.Body.Close()
 	reader := newIdleReader(response.Body, c.IdleTimeout, cancel)
-	text, err := io.ReadAll(reader)
+	var source io.Reader = reader
+	if live != nil && response.StatusCode >= 200 && response.StatusCode < 300 {
+		source = io.TeeReader(reader, live)
+	}
+	text, err := io.ReadAll(source)
 	if err != nil {
 		if reader.Stalled() {
 			return nil, fmt.Sprintf("provider sent nothing for %ds", int(c.IdleTimeout.Seconds())), 0, 0
