@@ -441,6 +441,9 @@ namespace AxiomOffice.Ai
             { "tavily_search", "Tìm trên web (Tavily)" },
             { "web_search", "Tìm trên web" }, // tên cũ (trước 16/10/2026) - lịch sử hội thoại cũ
             { "recall", "Tra ghi nhớ" },
+            { "doc_design", "Trình bày lại tài liệu" },
+            { "slides_from_template", "Dựng slide theo mẫu" },
+            { "writer.replaceMany", "Thay thế nhiều chỗ" },
         };
 
         private static readonly Dictionary<string, string> SuffixLabels = new Dictionary<string, string>
@@ -500,6 +503,11 @@ namespace AxiomOffice.Ai
             if (!FailPattern.IsMatch(outcome))
             {
                 return new ToolLine(label, actionId, ToolState.Ok);
+            }
+            // doc_design trả lỗi cho model ("fix these blocks...") - người dùng chỉ cần biết model đang chọn lại khối.
+            if (actionId == "doc_design")
+            {
+                return new ToolLine(label + ": khối chưa qua kiểm tra, đang chọn lại", actionId, ToolState.Error);
             }
             Match error = ErrorPattern.Match(outcome);
             if (error.Success)

@@ -31,7 +31,7 @@ func TestPlanBlocksBuildsNoteAndCards(t *testing.T) {
 		{"type":"note","replace":"3-4","tone":"goal","title":"Mục tiêu","lines":["- Nắm định lí **Pitago** (45 phút, 3 bài tập)","- Rèn kĩ năng vẽ hình, trình bày lời giải"]},
 		{"type":"cards","before":30,"cards":[{"title":"Sai","lines":["Bỏ đơn vị"]},{"title":"Đúng","lines":["Ghi đơn vị"]}]}
 	]`)
-	out, problems := planBlocks(list, designOutline(), 40)
+	out, problems := planBlocks(list, designOutline(), 40, "")
 	if len(problems) > 0 {
 		t.Fatalf("problems: %+v", problems)
 	}
@@ -64,7 +64,7 @@ func TestPlanBlocksRejectsLostNumbersTablesAndOverlaps(t *testing.T) {
 		`[{"type":"note","lines":["x"]}]`:                         "replace",
 	}
 	for input, want := range cases {
-		_, problems := planBlocks(blocksFrom(t, input), designOutline(), 40)
+		_, problems := planBlocks(blocksFrom(t, input), designOutline(), 40, "")
 		joined := ""
 		for _, problem := range problems {
 			joined += problem.Error + "; "
@@ -88,5 +88,33 @@ func TestOutlineViewShowsTablesOnOneLine(t *testing.T) {
 	view := outlineView(designOutline())
 	if !strings.Contains(view, "6| [table 5x3: ND | ĐL | Hoạt động]") || !strings.Contains(view, "2| I. MỤC TIÊU") {
 		t.Fatalf("view:\n%s", view)
+	}
+}
+
+// Luot muse-spark 15/10/2026: bi tu choi "replace" thi model chen "before" - khung tieu de va khoi "Ket thuc" lap lai
+// nguyen doan ben duoi, khung tieu de con them "45 phut" giao an khong co.
+func TestPlanBlocksRejectsRepeatsAndInventedNumbers(t *testing.T) {
+	outline := []outlineItem{
+		{N: 1, Kind: "p", Text: "Ngày soạn: 10/10/2026   Họ tên giáo viên: Trần Thị Dương"},
+		{N: 2, Kind: "p", Text: "CHỦ ĐỀ 3: KĨ THUẬT ĐÁNH CẦU THẤP TAY (13 tiết)"},
+		{N: 3, Kind: "p", Text: "BÀI 1: CÁCH CẦM VỢT, CẦU, TƯ THẾ CHUẨN BỊ VÀ KĨ THUẬT ĐÁNH CẦU THẤP THUẬN TAY (4 tiết)"},
+		{N: 4, Kind: "p", Text: "Tiết 4: HOÀN THIỆN KĨ THUẬT ĐÁNH CẦU THẤP THUẬN TAY"},
+		{N: 5, Kind: "p", Text: "I. MỤC TIÊU"},
+	}
+	doc := "Ngày soạn: 10/10/2026\rCHỦ ĐỀ 3 (13 tiết)\rBÀI 1 (4 tiết)\rTiết 4\rHOẠT ĐỘNG MỞ ĐẦU (8-10’)"
+	repeat := `[{"type":"title","before":2,"title":"CHỦ ĐỀ 3: KĨ THUẬT ĐÁNH CẦU THẤP TAY (13 tiết)","lines":["Bài 1: Cách cầm vợt, cầu, tư thế chuẩn bị và kĩ thuật đánh cầu thấp thuận tay (4 tiết)","Tiết 4: Hoàn thiện kĩ thuật đánh cầu thấp thuận tay"]}]`
+	_, problems := planBlocks(blocksFrom(t, repeat), outline, 5, doc)
+	if len(problems) != 1 || !strings.Contains(problems[0].Error, `"replace": "2-4"`) {
+		t.Fatalf("khung lap lai doan 2-4 phai bi tu choi, goi y replace: %+v", problems)
+	}
+	invented := `[{"type":"title","replace":"2-4","title":"CHỦ ĐỀ 3: KĨ THUẬT ĐÁNH CẦU THẤP TAY (13 tiết)","lines":["Bài 1: Cách cầm vợt, cầu, tư thế chuẩn bị và kĩ thuật đánh cầu thấp thuận tay (4 tiết)","Tiết 4: Hoàn thiện kĩ thuật đánh cầu thấp thuận tay - 45 phút"]}]`
+	_, problems = planBlocks(blocksFrom(t, invented), outline, 5, doc)
+	if len(problems) != 1 || !strings.Contains(problems[0].Error, "not in the document: 45") {
+		t.Fatalf("so 45 tu nghi ra phai bi tu choi: %+v", problems)
+	}
+	ok := `[{"type":"title","replace":"2-4","title":"CHỦ ĐỀ 3: KĨ THUẬT ĐÁNH CẦU THẤP TAY (13 tiết)","lines":["Bài 1: Cách cầm vợt, cầu, tư thế chuẩn bị và kĩ thuật đánh cầu thấp thuận tay (4 tiết)","Tiết 4: Hoàn thiện kĩ thuật đánh cầu thấp thuận tay"]},
+		{"type":"note","before":5,"tone":"green","title":"Mẹo","lines":["- Mở đầu 8-10’: ôn nhanh động tác, ngày 10/10"]}]`
+	if _, problems = planBlocks(blocksFrom(t, ok), outline, 5, doc); len(problems) != 0 {
+		t.Fatalf("khoi thay dung va meo ngan phai qua: %+v", problems)
 	}
 }

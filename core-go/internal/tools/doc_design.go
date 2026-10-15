@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	"axiomoffice/core/internal/model"
@@ -35,7 +36,9 @@ func (t *DocDesignTool) Description() string {
 		"{title, lines, tone}, cards {cards: [{title, lines, tone}], 2-4 side by side}, title {title, lines} (document " +
 		"title box), scores {items: [{value, label}]} (2-5 key numbers). Lines starting with \"- \" are bullets, " +
 		"**bold** marks key words. Tones: blue (goal/info), amber (warning/note), green (tip/right), red " +
-		"(mistake), violet, gray. Keep every fact and number of the paragraphs you replace. Use this instead of " +
+		"(mistake), violet, gray. Keep every fact and number of the paragraphs you replace and add no number the " +
+		"document lacks. To box text that is already there, replace its paragraphs; \"before\" is only for a short " +
+		"NEW box (summary, tip) that does not repeat the paragraphs below it. Use this instead of " +
 		"formatting paragraph by paragraph."
 }
 
@@ -166,7 +169,12 @@ func (t *DocDesignTool) Invoke(ctx context.Context, arguments map[string]any, ru
 		return failed(problem, false)
 	}
 	items, total := parseOutline(outline)
-	bridgeBlocks, errs := planBlocks(list, items, total)
+	// Toan van (ca bang) de kiem so lieu khoi viet them: khong doc duoc thi bo qua buoc nay, khong chan ca luot.
+	docText := ""
+	if full, problem := bridge("writer.getText", map[string]any{}); problem == "" {
+		docText, _ = full["text"].(string)
+	}
+	bridgeBlocks, errs := planBlocks(list, items, total, docText)
 	if len(errs) > 0 {
 		return Result{JSON: model.MarshalRelaxed(map[string]any{"ok": false, "error": "fix these blocks and call again with ALL blocks", "problems": errs})}
 	}
@@ -188,7 +196,8 @@ type blockProblem struct {
 }
 
 // planBlocks: khoi cua model -> khoi cua writer.insertBlocks, kiem so doan, chong nhau va giu so lieu.
-func planBlocks(list []any, items []outlineItem, total int) ([]map[string]any, []blockProblem) {
+// docText (toan van, "" = khong kiem): so trong khoi phai co trong tai lieu.
+func planBlocks(list []any, items []outlineItem, total int, docText string) ([]map[string]any, []blockProblem) {
 	byN := map[int]outlineItem{}
 	for _, item := range items {
 		byN[item.N] = item
@@ -231,6 +240,12 @@ func planBlocks(list []any, items []outlineItem, total int) ([]map[string]any, [
 			continue
 		}
 		written := cellsText(cells)
+		// Luot muse-spark 15/10/2026: khoi tieu de ghi "Tiet 4 ... - 45 phut", giao an khong co so 45.
+		if invented := inventedNumbers(written, docText); len(invented) > 0 {
+			problems = append(problems, blockProblem{number, "numbers not in the document: " + strings.Join(invented, ", ") +
+				" - use only facts and numbers the document already has"})
+			continue
+		}
 		if from > 0 {
 			if to < from || to > total {
 				problems = append(problems, blockProblem{number, fmt.Sprintf("replace %d-%d is outside the document (1-%d)", from, to, total)})
@@ -275,6 +290,10 @@ func planBlocks(list []any, items []outlineItem, total int) ([]map[string]any, [
 		} else {
 			if before > total+1 {
 				problems = append(problems, blockProblem{number, fmt.Sprintf("before %d is outside the document (1-%d)", before, total)})
+				continue
+			}
+			if repeated := repeatsBelow(written, items, before); repeated != "" {
+				problems = append(problems, blockProblem{number, repeated})
 				continue
 			}
 			befores[before] = number
@@ -486,4 +505,85 @@ func missingNumbers(source, written string) []string {
 		missing = append(missing, number)
 	}
 	return missing
+}
+
+// inventedNumbers: so trong khoi khong co trong tai lieu. "10/10" hop le khi tai lieu co "10/10/2026" (moi phan deu co).
+func inventedNumbers(written, docText string) []string {
+	if strings.TrimSpace(docText) == "" {
+		return nil
+	}
+	whole, parts := map[string]bool{}, map[string]bool{}
+	for _, number := range designNumber.FindAllString(docText, -1) {
+		number = strings.TrimRight(number, ".,/")
+		whole[number] = true
+		for _, part := range strings.FieldsFunc(number, func(r rune) bool { return r == '.' || r == ',' || r == '/' }) {
+			parts[part] = true
+		}
+	}
+	var invented []string
+	seen := map[string]bool{}
+	for _, number := range designNumber.FindAllString(written, -1) {
+		number = strings.TrimRight(number, ".,/")
+		if whole[number] || seen[number] {
+			continue
+		}
+		known := true
+		for _, part := range strings.FieldsFunc(number, func(r rune) bool { return r == '.' || r == ',' || r == '/' }) {
+			known = known && parts[part]
+		}
+		if !known {
+			seen[number] = true
+			invented = append(invented, number)
+		}
+	}
+	return invented
+}
+
+// repeatsBelow: khoi chen them ("before") lap lai cac doan van con nguyen ben duoi -> chu hien hai lan. Luot muse-spark
+// 15/10/2026: bi tu choi "replace" thi model chuyen het sang "before" - khung tieu de trung 85% chu, khoi "Ket thuc"
+// trung 96% voi doan ngay duoi; khoi tom tat/meo that chi trung 10-50%.
+func repeatsBelow(written string, items []outlineItem, before int) string {
+	block := designWords(written)
+	if len(block) < 10 {
+		return ""
+	}
+	below := map[string]bool{}
+	last := 0
+	for _, item := range items {
+		if item.Kind == "table" || item.N < before || item.N > before+15 {
+			continue
+		}
+		shared := false
+		for word := range designWords(item.Text) {
+			below[word] = true
+			shared = shared || block[word]
+		}
+		if shared {
+			last = item.N
+		}
+	}
+	common := 0
+	for word := range block {
+		if below[word] {
+			common++
+		}
+	}
+	if common*10 < len(block)*7 || last == 0 {
+		return ""
+	}
+	return fmt.Sprintf("this box repeats paragraphs %d-%d, which stay right below it (the text would show twice): use "+
+		"\"replace\": \"%d-%d\" and keep their facts, or drop the box", before, last, before, last)
+}
+
+// designWords: cac tieng (>= 2 ky tu, khong phai so) viet thuong.
+func designWords(text string) map[string]bool {
+	words := map[string]bool{}
+	for _, word := range strings.FieldsFunc(strings.ToLower(text), func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+	}) {
+		if utf8.RuneCountInString(word) >= 2 && strings.IndexFunc(word, unicode.IsLetter) >= 0 {
+			words[word] = true
+		}
+	}
+	return words
 }
