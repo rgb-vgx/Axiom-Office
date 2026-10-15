@@ -1,4 +1,4 @@
-$dll = 'C:\Users\ThuyetMT\Documents\work\wps-ai-bridge\src\AxiomOffice\bin\Release\AxiomOffice.dll'
+﻿$dll = 'C:\Users\ThuyetMT\Documents\work\wps-ai-bridge\src\AxiomOffice\bin\Release\AxiomOffice.dll'
 $a = [Reflection.Assembly]::LoadFrom($dll)
 
 # 1. McpForm: dựng được, đủ cột + nút
