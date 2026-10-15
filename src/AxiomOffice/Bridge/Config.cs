@@ -96,6 +96,12 @@ namespace AxiomOffice.Bridge
             return raw;
         }
 
+        // Ngôn ngữ giao diện add-in: "" = tự động theo Windows, "vi", "en"... (Ui.cs).
+        public static string UiLanguage
+        {
+            get { return ReadString("UiLanguage", ""); }
+        }
+
         public static string LlmModel
         {
             get { return ReadString("LlmModel", ""); }

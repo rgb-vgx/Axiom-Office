@@ -337,6 +337,47 @@ namespace AxiomOffice.Ai
             }
 
             panel.Controls.Add(note);
+            AddLanguagePicker(panel, y + 54);
+        }
+
+        // Ngôn ngữ giao diện (16/10/2026): cùng lựa chọn với menu "Ngôn ngữ · Language" trên ribbon, đổi là áp ngay
+        // cho khung chat và ribbon. Nhãn hai thứ tiếng: ai không đọc được ngôn ngữ đang chọn vẫn tìm ra.
+        private static void AddLanguagePicker(Panel panel, int y)
+        {
+            panel.Controls.Add(new Label
+            {
+                AutoSize = false,
+                Location = new Point(24, y + 3),
+                Size = new Size(190, 20),
+                Font = PaneTheme.Body,
+                ForeColor = PaneTheme.TextPrimary,
+                Text = "Ngôn ngữ · Language"
+            });
+            var picker = new ComboBox
+            {
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Location = new Point(24 + 196, y),
+                Width = 220,
+                Font = PaneTheme.Body,
+                AccessibleName = "Ngôn ngữ giao diện · Interface language"
+            };
+            var codes = new List<string> { Ui.Auto };
+            picker.Items.Add(Ui.T("Tự động (theo Windows)"));
+            foreach (KeyValuePair<string, string> language in Ui.Languages())
+            {
+                codes.Add(language.Key);
+                picker.Items.Add(language.Value);
+            }
+            picker.SelectedIndex = Math.Max(0, codes.IndexOf(Ui.Setting));
+            picker.SelectedIndexChanged += delegate
+            {
+                string code = codes[Math.Max(0, picker.SelectedIndex)];
+                if (code != Ui.Setting)
+                {
+                    Ui.Set(code);
+                }
+            };
+            panel.Controls.Add(picker);
         }
 
         // ---------- B2: kiem tra may ----------

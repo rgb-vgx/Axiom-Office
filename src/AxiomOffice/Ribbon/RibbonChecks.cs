@@ -57,21 +57,21 @@ namespace AxiomOffice.Ribbon
             var root = response as IDictionary<string, object>;
             if (root == null)
             {
-                return "Không đọc được kết quả soát.";
+                return Ui.T("Không đọc được kết quả soát.");
             }
             object ok;
             if (!root.TryGetValue("ok", out ok) || !(ok is bool) || !(bool)ok)
             {
                 object error;
                 root.TryGetValue("error", out error);
-                return "Không soát được: " + Convert.ToString(error, CultureInfo.InvariantCulture);
+                return Ui.T("Không soát được: ") + Convert.ToString(error, CultureInfo.InvariantCulture);
             }
             object resultValue;
             root.TryGetValue("result", out resultValue);
             var result = resultValue as IDictionary<string, object>;
             if (result == null)
             {
-                return "Không đọc được kết quả soát.";
+                return Ui.T("Không đọc được kết quả soát.");
             }
 
             var lines = new List<string>();
@@ -82,16 +82,16 @@ namespace AxiomOffice.Ribbon
             }
             else if (tag == "checkTables")
             {
-                scope = "Đã soát " + ToInt(Get(result, "tableCount")) + " bảng.";
+                scope = Ui.T("Đã soát ") + ToInt(Get(result, "tableCount")) + Ui.T(" bảng.");
                 foreach (IDictionary<string, object> issue in Items(Get(result, "issues")))
                 {
                     object table = Get(issue, "table");
-                    lines.Add((table != null ? "Bảng " + ToInt(table) + " · " : "") + IssueText(issue));
+                    lines.Add((table != null ? Ui.T("Bảng ") + ToInt(table) + " · " : "") + IssueText(issue));
                 }
             }
             else
             {
-                scope = "Đã soát vùng " + Convert.ToString(Get(result, "table") ?? Get(result, "range"), CultureInfo.InvariantCulture)
+                scope = Ui.T("Đã soát vùng ") + Convert.ToString(Get(result, "table") ?? Get(result, "range"), CultureInfo.InvariantCulture)
                     + " (trang " + Convert.ToString(Get(result, "sheet"), CultureInfo.InvariantCulture) + ").";
                 foreach (IDictionary<string, object> issue in Items(Get(result, "issues")))
                 {
@@ -105,21 +105,21 @@ namespace AxiomOffice.Ribbon
             if (lines.Count == 0)
             {
                 clean = true;
-                sb.AppendLine("Không thấy lỗi nào.");
+                sb.AppendLine(Ui.T("Không thấy lỗi nào."));
             }
             else
             {
-                sb.AppendLine("Có " + lines.Count + " chỗ cần xem:");
+                sb.AppendLine(Ui.T("Có ") + lines.Count + Ui.T(" chỗ cần xem:"));
                 for (int i = 0; i < lines.Count && i < MaxListed; i++)
                 {
                     sb.AppendLine("• " + lines[i]);
                 }
                 if (lines.Count > MaxListed)
                 {
-                    sb.AppendLine("… và " + (lines.Count - MaxListed) + " chỗ khác.");
+                    sb.AppendLine(Ui.T("… và ") + (lines.Count - MaxListed) + Ui.T(" chỗ khác."));
                 }
                 sb.AppendLine();
-                sb.AppendLine("Muốn AI sửa giúp: mở Ask AI và nhờ \"soát lại và sửa các lỗi trình bày\".");
+                sb.AppendLine(Ui.T("Muốn AI sửa giúp: mở Ask AI và nhờ \"soát lại và sửa các lỗi trình bày\"."));
             }
             return sb.ToString().TrimEnd();
         }
@@ -136,7 +136,7 @@ namespace AxiomOffice.Ribbon
                     lines.Add("Slide " + index + " · " + IssueText(issue));
                 }
             }
-            return "Đã soát " + slides + " slide.";
+            return Ui.T("Đã soát ") + slides + " slide.";
         }
 
         internal static string IssueText(IDictionary<string, object> issue)
@@ -162,22 +162,23 @@ namespace AxiomOffice.Ribbon
             }
             if (shapes.Count > 0)
             {
-                where.Add(string.Join(" và ", shapes));
+                where.Add(string.Join(Ui.T(" và "), shapes));
             }
             Match column = ColumnRef.Match(detail);
             if (column.Success)
             {
-                where.Add("cột " + column.Groups[1].Value);
+                where.Add(Ui.T("cột ") + column.Groups[1].Value);
             }
             Match count = Count.Match(detail);
             if (count.Success && (type == "numbers-as-text" || type == "error-values" || type == "empty-cells"))
             {
-                where.Add(count.Groups[1].Value + " ô");
+                where.Add(count.Groups[1].Value + Ui.T(" ô"));
             }
             else if (count.Success && type == "small-font")
             {
-                where.Add("cỡ " + count.Groups[1].Value + "pt");
+                where.Add(Ui.T("cỡ ") + count.Groups[1].Value + "pt");
             }
+            label = Ui.T(label);
             return where.Count > 0 ? label + ": " + string.Join(", ", where) : label;
         }
 

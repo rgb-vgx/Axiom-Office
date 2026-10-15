@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows.Forms;
 using AxiomOffice.Bridge;
@@ -49,6 +50,7 @@ namespace AxiomOffice.Ribbon
             "</group>" +
             "<group id=\"axiomSystemGroup\" label=\"Hệ thống\">" +
             "<button id=\"btnSetup\" label=\"Thiết lập…\" size=\"large\" imageMso=\"ControlWizards\" onAction=\"OnButtonAction\" tag=\"setup\"/>" +
+            LanguageMenuMarker +
             "<button id=\"btnStatus\" label=\"Trạng thái\" imageMso=\"Info\" onAction=\"OnButtonAction\" tag=\"status\"" +
             " screentip=\"Trạng thái\" supertip=\"Kiểm tra thật: add-in có trả lời không, Agent Core có chạy không, model đang dùng.\"/>" +
             "<button id=\"btnOpenLog\" label=\"Mở nhật ký\" imageMso=\"FileOpen\" onAction=\"OnButtonAction\" tag=\"openLog\"/>" +
@@ -64,6 +66,99 @@ namespace AxiomOffice.Ribbon
             "</tabs></ribbon>" +
             "</customUI>";
 
+        // Chỗ chèn menu ngôn ngữ (danh sách ngôn ngữ lấy lúc nạp ribbon: thêm tệp lang\*.json là có thêm mục).
+        private const string LanguageMenuMarker = "<!--language-->";
+        private const string LanguagePrefix = "lang_";
+
+        // Ngôn ngữ giao diện (16/10/2026): nhãn ribbon qua getLabel/getScreentip/getSupertip để đổi ngôn ngữ là đổi
+        // ngay (Invalidate). WPS có thể không gọi các callback này -> nhận XML nhãn tĩnh đã dịch lúc nạp.
+        // Texts: "id|label" -> chữ gốc tiếng Việt (dịch lúc Office hỏi).
+        private static readonly Dictionary<string, string> Texts = new Dictionary<string, string>(StringComparer.Ordinal);
+        private static readonly Regex Element = new Regex("<(\\w+) id=\"([^\"]+)\"([^>]*)>");
+        private static readonly Regex TextAttribute = new Regex("\\b(label|screentip|supertip)=\"([^\"]*)\"");
+
+        // XML ribbon theo ngôn ngữ đang chọn. dynamicLabels: Office (getLabel...); false: WPS (nhãn tĩnh).
+        public static string Xml(bool dynamicLabels)
+        {
+            string xml = RibbonXml.Replace(LanguageMenuMarker, LanguageMenu());
+            lock (Texts)
+            {
+                Texts.Clear();
+                return Element.Replace(xml, element =>
+                {
+                    string id = element.Groups[2].Value;
+                    string attributes = TextAttribute.Replace(element.Groups[3].Value, attribute =>
+                    {
+                        string kind = attribute.Groups[1].Value;
+                        string text = XmlUnescape(attribute.Groups[2].Value);
+                        // Menu ngôn ngữ giữ nhãn hai thứ tiếng: ai không đọc được ngôn ngữ đang chọn vẫn tìm ra.
+                        if (id == "mnuLanguage")
+                        {
+                            return attribute.Value;
+                        }
+                        if (dynamicLabels)
+                        {
+                            Texts[id + "|" + kind] = text;
+                            string name = char.ToUpperInvariant(kind[0]) + kind.Substring(1);
+                            return "get" + name + "=\"Get" + name + "\"";
+                        }
+                        return kind + "=\"" + XmlEscape(Translate(id, kind, text)) + "\"";
+                    });
+                    return "<" + element.Groups[1].Value + " id=\"" + id + "\"" + attributes + ">";
+                });
+            }
+        }
+
+        // getLabel / getScreentip / getSupertip (Connect): chữ của control theo ngôn ngữ hiện tại.
+        public static string Text(string id, string kind)
+        {
+            string text;
+            lock (Texts)
+            {
+                if (!Texts.TryGetValue(id + "|" + kind, out text))
+                {
+                    return "";
+                }
+            }
+            return Translate(id, kind, text);
+        }
+
+        private static string Translate(string id, string kind, string text)
+        {
+            if (kind == "label" && id.StartsWith(LanguagePrefix, StringComparison.Ordinal))
+            {
+                // Tên ngôn ngữ viết bằng chính ngôn ngữ đó (không dịch); dấu ✓ ở mục đang chọn.
+                string setting = id.Substring(LanguagePrefix.Length);
+                string label = setting == Ui.Auto ? Ui.T(text) : text;
+                bool current = setting == Ui.Setting;
+                return (current ? "✓ " : "    ") + label;
+            }
+            return Ui.T(text);
+        }
+
+        private static string LanguageMenu()
+        {
+            var sb = new StringBuilder("<menu id=\"mnuLanguage\" label=\"Ngôn ngữ · Language\" size=\"large\" imageMso=\"Translate\"" +
+                " screentip=\"Ngôn ngữ · Language\" supertip=\"Ngôn ngữ của nút và khung chat. AI vẫn trả lời theo ngôn ngữ bạn gõ.\">");
+            sb.Append("<button id=\"" + LanguagePrefix + "auto\" label=\"Tự động (theo Windows)\" onAction=\"OnButtonAction\" tag=\"lang:" + Ui.Auto + "\"/>");
+            foreach (KeyValuePair<string, string> language in Ui.Languages())
+            {
+                sb.Append("<button id=\"" + LanguagePrefix + XmlEscape(language.Key) + "\" label=\"" + XmlEscape(language.Value) +
+                    "\" onAction=\"OnButtonAction\" tag=\"lang:" + XmlEscape(language.Key) + "\"/>");
+            }
+            return sb.Append("</menu>").ToString();
+        }
+
+        private static string XmlEscape(string text)
+        {
+            return (text ?? "").Replace("&", "&amp;").Replace("\"", "&quot;").Replace("<", "&lt;").Replace(">", "&gt;");
+        }
+
+        private static string XmlUnescape(string text)
+        {
+            return (text ?? "").Replace("&quot;", "\"").Replace("&lt;", "<").Replace("&gt;", ">").Replace("&amp;", "&");
+        }
+
         private static object _ribbon;
         // Trạng thái Core báo lại sau lần bấm gần nhất (null = chưa hỏi): nút hiện trạng thái thật của Core,
         // không chỉ giá trị vừa ghi HKCU (biến môi trường AXIOM_VISUAL_QA của Core đè được HKCU).
@@ -73,6 +168,27 @@ namespace AxiomOffice.Ribbon
         public static void OnLoad(object ribbon)
         {
             _ribbon = ribbon;
+            // Đổi ngôn ngữ (menu ribbon, wizard - đều trên luồng UI): vẽ lại nhãn.
+            Ui.Changed -= OnLanguageChanged;
+            Ui.Changed += OnLanguageChanged;
+        }
+
+        private static void OnLanguageChanged(object sender, EventArgs e)
+        {
+            object ribbon = _ribbon;
+            if (ribbon == null)
+            {
+                return;
+            }
+            try
+            {
+                dynamic ui = ribbon;
+                ui.Invalidate();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Ribbon refresh failed", ex);
+            }
         }
 
         public static bool GetVisible(Connect connect, string tag)
@@ -112,7 +228,7 @@ namespace AxiomOffice.Ribbon
             {
                 // Ghi hỏng thì vẽ lại theo HKCU: nút không được hiện trạng thái chưa lưu.
                 Invalidate(connect, VisualQaId);
-                MessageBox.Show("Không lưu được thiết lập \"Nhìn tài liệu\" (HKCU\\Software\\AxiomOffice).",
+                MessageBox.Show(Ui.T("Không lưu được thiết lập \"Nhìn tài liệu\" (HKCU\\Software\\AxiomOffice)."),
                     "Axiom Office", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
@@ -145,8 +261,8 @@ namespace AxiomOffice.Ribbon
                 Logger.Info("Ribbon: Core reports visualQaEnabled=" + actual + ", wrote " + wanted);
                 Invalidate(connect, VisualQaId);
                 connect.OnUiThread(() => MessageBox.Show(
-                    "Đã lưu thiết lập nhưng Agent Core vẫn đang " + (actual ? "BẬT" : "TẮT") + " \"Nhìn tài liệu\".\n\n"
-                    + "Thường do biến môi trường AXIOM_VISUAL_QA đang đặt cho Core; bỏ biến đó rồi bấm lại.",
+                    Ui.T("Đã lưu thiết lập nhưng Agent Core vẫn đang ") + (actual ? Ui.T("BẬT") : Ui.T("TẮT")) + Ui.T(" \"Nhìn tài liệu\".\n\n")
+                    + Ui.T("Thường do biến môi trường AXIOM_VISUAL_QA đang đặt cho Core; bỏ biến đó rồi bấm lại."),
                     "Axiom Office", MessageBoxButtons.OK, MessageBoxIcon.Warning));
             }
             catch (Exception ex)
@@ -177,6 +293,18 @@ namespace AxiomOffice.Ribbon
             }
         }
 
+        // Đổi ngôn ngữ giao diện: pane và ribbon đổi qua Ui.Changed (Office đọc lại getLabel); WPS dùng nhãn tĩnh nên
+        // báo mở lại ứng dụng.
+        private static void ChangeLanguage(Connect connect, string setting)
+        {
+            Ui.Set(setting);
+            if (!connect.IsOfficeHost)
+            {
+                MessageBox.Show(Ui.T("Khung chat đã đổi ngôn ngữ. Mở lại ứng dụng để các nút trên ribbon đổi theo."), "Axiom Office",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
         // Wizard / cài đặt có thể đổi VisualQaEnabled, CoreEnabled: vẽ lại để nút toggle khớp HKCU.
         private static void RefreshAfterSettings(Connect connect)
         {
@@ -200,7 +328,7 @@ namespace AxiomOffice.Ribbon
                 {
                     if (connect.AppKind != check.Kind)
                     {
-                        text = "Nút này dùng cho " + KindName(check.Kind) + "; tài liệu đang mở là " + KindName(connect.AppKind) + ".";
+                        text = Ui.T("Nút này dùng cho ") + KindName(check.Kind) + Ui.T("; tài liệu đang mở là ") + KindName(connect.AppKind) + ".";
                     }
                     else
                     {
@@ -211,14 +339,14 @@ namespace AxiomOffice.Ribbon
                 catch (Exception ex)
                 {
                     Logger.Error("Ribbon check failed: " + check.Action, ex);
-                    text = "Không soát được: " + ex.Message;
+                    text = Ui.T("Không soát được: ") + ex.Message;
                 }
                 finally
                 {
                     Interlocked.Exchange(ref _checkRunning, 0);
                 }
                 Logger.Info("Ribbon: " + check.Action + " clean=" + clean);
-                connect.OnUiThread(() => MessageBox.Show(text, "Axiom Office - " + check.Title, MessageBoxButtons.OK,
+                connect.OnUiThread(() => MessageBox.Show(text, "Axiom Office - " + Ui.T(check.Title), MessageBoxButtons.OK,
                     clean ? MessageBoxIcon.Information : MessageBoxIcon.Warning));
             }) { IsBackground = true, Name = "AxiomRibbonCheck" };
             thread.Start();
@@ -228,10 +356,10 @@ namespace AxiomOffice.Ribbon
         {
             switch (kind)
             {
-                case "wps": return "văn bản";
-                case "et": return "bảng tính";
-                case "wpp": return "trình chiếu";
-                default: return "ứng dụng chưa nhận ra";
+                case "wps": return Ui.T("văn bản");
+                case "et": return Ui.T("bảng tính");
+                case "wpp": return Ui.T("trình chiếu");
+                default: return Ui.T("ứng dụng chưa nhận ra");
             }
         }
 
@@ -240,6 +368,11 @@ namespace AxiomOffice.Ribbon
             if (RibbonChecks.Checks.ContainsKey(tag))
             {
                 RunCheck(connect, tag);
+                return;
+            }
+            if (tag.StartsWith("lang:", StringComparison.Ordinal))
+            {
+                ChangeLanguage(connect, tag.Substring(5));
                 return;
             }
             switch (tag)
@@ -328,7 +461,7 @@ namespace AxiomOffice.Ribbon
             {
                 bool healthy;
                 string text = StatusReport(connect, out healthy);
-                connect.OnUiThread(() => MessageBox.Show(text, "Axiom Office - Trạng thái", MessageBoxButtons.OK,
+                connect.OnUiThread(() => MessageBox.Show(text, Ui.T("Axiom Office - Trạng thái"), MessageBoxButtons.OK,
                     healthy ? MessageBoxIcon.Information : MessageBoxIcon.Warning));
             });
         }
@@ -344,18 +477,18 @@ namespace AxiomOffice.Ribbon
             Dictionary<string, object> bridge = GetHealth("http://127.0.0.1:" + port + "/health", out bridgeError);
             if (bridge != null)
             {
-                sb.AppendLine("✓ Add-in: đang trả lời ở cổng " + port + " (phiên bản " + Field(bridge, "version") + ").");
+                sb.AppendLine(Ui.T("✓ Add-in: đang trả lời ở cổng ") + port + Ui.T(" (phiên bản ") + Field(bridge, "version") + ").");
             }
             else
             {
                 healthy = false;
-                sb.AppendLine("✗ Add-in: không trả lời ở cổng " + port + " (" + bridgeError + ").");
-                sb.AppendLine("   AI sẽ không đọc/sửa được tài liệu này. Đóng và mở lại ứng dụng.");
+                sb.AppendLine(Ui.T("✗ Add-in: không trả lời ở cổng ") + port + " (" + bridgeError + ").");
+                sb.AppendLine(Ui.T("   AI sẽ không đọc/sửa được tài liệu này. Đóng và mở lại ứng dụng."));
             }
 
             if (!Config.CoreEnabled)
             {
-                sb.AppendLine("• Agent Core: đang tắt trong cài đặt (CoreEnabled = 0) - AI chạy trong add-in.");
+                sb.AppendLine(Ui.T("• Agent Core: đang tắt trong cài đặt (CoreEnabled = 0) - AI chạy trong add-in."));
             }
             else
             {
@@ -363,28 +496,28 @@ namespace AxiomOffice.Ribbon
                 Dictionary<string, object> core = Ai.CoreClient.Instance.RunningHealth(out coreError);
                 if (core != null)
                 {
-                    sb.AppendLine("✓ Agent Core: đang chạy (phiên bản " + Field(core, "version") + ", pid " + Field(core, "pid")
-                        + ", đã chạy " + Uptime(Field(core, "uptimeSeconds")) + ").");
+                    sb.AppendLine(Ui.T("✓ Agent Core: đang chạy (phiên bản ") + Field(core, "version") + ", pid " + Field(core, "pid")
+                        + Ui.T(", đã chạy ") + Uptime(Field(core, "uptimeSeconds")) + ").");
                     string model = Field(core, "model");
-                    sb.AppendLine("   Model: " + (model.Length > 0 ? model : "(chưa chọn - bấm Thiết lập…)"));
+                    sb.AppendLine("   Model: " + (model.Length > 0 ? model : Ui.T("(chưa chọn - bấm Thiết lập…)")));
                     string memoryError = Field(core, "memoryError");
                     if (memoryError.Length > 0)
                     {
                         healthy = false;
-                        sb.AppendLine("   ✗ Bộ nhớ AI lỗi: " + memoryError);
+                        sb.AppendLine(Ui.T("   ✗ Bộ nhớ AI lỗi: ") + memoryError);
                     }
                 }
                 else
                 {
-                    sb.AppendLine("• Agent Core: chưa chạy. Bình thường nếu chưa hỏi AI lần nào - Core tự khởi động ở lượt hỏi đầu.");
+                    sb.AppendLine(Ui.T("• Agent Core: chưa chạy. Bình thường nếu chưa hỏi AI lần nào - Core tự khởi động ở lượt hỏi đầu."));
                     sb.AppendLine("   (" + coreError + ")");
                 }
             }
 
             List<string> sessions = Sessions();
-            sb.AppendLine("• Ứng dụng Office đang kết nối: " + (sessions.Count == 0 ? "không có" : string.Join(", ", sessions.ToArray())));
+            sb.AppendLine(Ui.T("• Ứng dụng Office đang kết nối: ") + (sessions.Count == 0 ? Ui.T("không có") : string.Join(", ", sessions.ToArray())));
             sb.AppendLine();
-            sb.AppendLine("Nhật ký: " + Logger.LogFilePath);
+            sb.AppendLine(Ui.T("Nhật ký: ") + Logger.LogFilePath);
             return sb.ToString().TrimEnd();
         }
 
@@ -406,7 +539,7 @@ namespace AxiomOffice.Ribbon
                     {
                         return (Dictionary<string, object>)result;
                     }
-                    error = "trả lời không hợp lệ";
+                    error = Ui.T("trả lời không hợp lệ");
                 }
             }
             catch (Exception ex)
@@ -438,7 +571,7 @@ namespace AxiomOffice.Ribbon
                             continue;
                         }
                         string app = KindName(Field(info, "app"));
-                        list.Add(app + " (cổng " + Field(info, "port") + ")");
+                        list.Add(app + Ui.T(" (cổng ") + Field(info, "port") + ")");
                     }
                     catch (Exception)
                     {
@@ -483,8 +616,8 @@ namespace AxiomOffice.Ribbon
                 return "?";
             }
             TimeSpan span = TimeSpan.FromSeconds(value);
-            return span.TotalHours >= 1 ? (int)span.TotalHours + " giờ " + span.Minutes + " phút"
-                : span.TotalMinutes >= 1 ? (int)span.TotalMinutes + " phút" : (int)span.TotalSeconds + " giây";
+            return span.TotalHours >= 1 ? (int)span.TotalHours + Ui.T(" giờ ") + span.Minutes + Ui.T(" phút")
+                : span.TotalMinutes >= 1 ? (int)span.TotalMinutes + Ui.T(" phút") : (int)span.TotalSeconds + Ui.T(" giây");
         }
 
         // Kiểm tra mô hình: gửi thử một câu tới model ĐÃ LƯU (apiKey rỗng = Core dùng khoá đã lưu).
@@ -492,8 +625,8 @@ namespace AxiomOffice.Ribbon
         {
             if (string.IsNullOrEmpty(Config.LlmEndpoint) || string.IsNullOrEmpty(Config.LlmModel))
             {
-                connect.OnUiThread(() => MessageBox.Show("Chưa cấu hình AI. Bấm Thiết lập… để chọn nhà cung cấp và model.",
-                    "Axiom Office - Kiểm tra mô hình", MessageBoxButtons.OK, MessageBoxIcon.Information));
+                connect.OnUiThread(() => MessageBox.Show(Ui.T("Chưa cấu hình AI. Bấm Thiết lập… để chọn nhà cung cấp và model."),
+                    Ui.T("Axiom Office - Kiểm tra mô hình"), MessageBoxButtons.OK, MessageBoxIcon.Information));
                 return;
             }
             string error;
@@ -503,20 +636,20 @@ namespace AxiomOffice.Ribbon
                 CancellationToken.None);
             Logger.Info("Ribbon: test model ok=" + probe.Ok + " kind=" + probe.Kind);
             string text = probe.Ok
-                ? "Kết nối được với " + (string.IsNullOrEmpty(probe.Model) ? Config.LlmModel : probe.Model)
-                    + " (" + probe.Seconds.ToString("0.0") + " giây).\n\nModel trả lời: " + probe.Reply
+                ? Ui.T("Kết nối được với ") + (string.IsNullOrEmpty(probe.Model) ? Config.LlmModel : probe.Model)
+                    + " (" + probe.Seconds.ToString("0.0") + Ui.T(" giây).\n\nModel trả lời: ") + probe.Reply
                 : probe.Message + (string.IsNullOrEmpty(probe.Hint) ? "" : "\n\n" + probe.Hint)
-                    + (string.IsNullOrEmpty(probe.Detail) ? "" : "\n\nChi tiết: " + probe.Detail);
-            connect.OnUiThread(() => MessageBox.Show(text, "Axiom Office - Kiểm tra mô hình", MessageBoxButtons.OK,
+                    + (string.IsNullOrEmpty(probe.Detail) ? "" : Ui.T("\n\nChi tiết: ") + probe.Detail);
+            connect.OnUiThread(() => MessageBox.Show(text, Ui.T("Axiom Office - Kiểm tra mô hình"), MessageBoxButtons.OK,
                 probe.Ok ? MessageBoxIcon.Information : MessageBoxIcon.Warning));
         }
 
         private static void StopCore()
         {
             DialogResult answer = MessageBox.Show(
-                "Tắt Agent Core?\n\nLượt AI đang chạy (nếu có) sẽ bị dừng giữa chừng. Lần hỏi AI sau Core tự khởi động lại.\n"
-                + "Chỉ cần khi Core bị treo hoặc trước khi cập nhật Axiom Office.",
-                "Axiom Office - Tắt Agent Core", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
+                Ui.T("Tắt Agent Core?\n\nLượt AI đang chạy (nếu có) sẽ bị dừng giữa chừng. Lần hỏi AI sau Core tự khởi động lại.\n")
+                + Ui.T("Chỉ cần khi Core bị treo hoặc trước khi cập nhật Axiom Office."),
+                Ui.T("Axiom Office - Tắt Agent Core"), MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
             if (answer != DialogResult.Yes)
             {
                 return;
@@ -524,8 +657,8 @@ namespace AxiomOffice.Ribbon
             string error;
             bool ok = Ai.CoreClient.Instance.ShutdownCore(out error);
             Logger.Info("Ribbon: stop core ok=" + ok + (ok ? "" : " (" + error + ")"));
-            MessageBox.Show(ok ? "Đã yêu cầu Agent Core dừng." : "Không tắt được: " + error,
-                "Axiom Office - Tắt Agent Core", MessageBoxButtons.OK, ok ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
+            MessageBox.Show(ok ? Ui.T("Đã yêu cầu Agent Core dừng.") : Ui.T("Không tắt được: ") + error,
+                Ui.T("Axiom Office - Tắt Agent Core"), MessageBoxButtons.OK, ok ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
         }
 
         private static void CopyUrl(Connect connect)
@@ -536,7 +669,7 @@ namespace AxiomOffice.Ribbon
             {
                 Clipboard.SetText(url);
                 Logger.Info("Ribbon: copied " + url);
-                MessageBox.Show("Đã chép vào clipboard:\n" + url, "Axiom Office", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(Ui.T("Đã chép vào clipboard:\n") + url, "Axiom Office", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
@@ -553,7 +686,7 @@ namespace AxiomOffice.Ribbon
             catch (Exception ex)
             {
                 Logger.Error("Ribbon open log failed", ex);
-                MessageBox.Show("Không mở được file nhật ký:\n" + Logger.LogFilePath, "Axiom Office", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(Ui.T("Không mở được file nhật ký:\n") + Logger.LogFilePath, "Axiom Office", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
     }

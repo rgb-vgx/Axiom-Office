@@ -246,10 +246,10 @@ namespace AxiomOffice.Ai
             Font = PaneTheme.Body;
             TabStop = true;
             AccessibleRole = AccessibleRole.ListItem;
-            AccessibleName = (isUser ? "Bạn: " : "AI: ") + (isUser ? _text : Markdown.ToPlainText(_text));
+            AccessibleName = (isUser ? Ui.T("Bạn: ") : "AI: ") + (isUser ? _text : Markdown.ToPlainText(_text));
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.Selectable, true);
             _menu = new ContextMenuStrip();
-            _menu.Items.Add("Sao chép", null, delegate { CopyText(); });
+            _menu.Items.Add(Ui.T("Sao chép"), null, delegate { CopyText(); });
             ContextMenuStrip = _menu;
         }
 
@@ -465,7 +465,7 @@ namespace AxiomOffice.Ai
             _actionId = actionId ?? "";
             _state = state;
             AccessibleRole = AccessibleRole.ListItem;
-            AccessibleName = _label + (state == ToolState.Ok ? ", xong" : state == ToolState.Error ? ", lỗi" : "");
+            AccessibleName = _label + (state == ToolState.Ok ? ", xong" : state == ToolState.Error ? Ui.T(", lỗi") : "");
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
         }
 
@@ -507,7 +507,7 @@ namespace AxiomOffice.Ai
             // doc_design trả lỗi cho model ("fix these blocks...") - người dùng chỉ cần biết model đang chọn lại khối.
             if (actionId == "doc_design")
             {
-                return new ToolLine(label + ": khối chưa qua kiểm tra, đang chọn lại", actionId, ToolState.Error);
+                return new ToolLine(label + Ui.T(": khối chưa qua kiểm tra, đang chọn lại"), actionId, ToolState.Error);
             }
             Match error = ErrorPattern.Match(outcome);
             if (error.Success)
@@ -534,20 +534,20 @@ namespace AxiomOffice.Ai
             string label;
             if (Labels.TryGetValue(actionId, out label))
             {
-                return label;
+                return Ui.T(label);
             }
             // Tool MCP của Core: mcp__<server>__<tool>.
             if (actionId.StartsWith("mcp__", StringComparison.Ordinal))
             {
                 int cut = actionId.LastIndexOf("__", StringComparison.Ordinal);
-                return "Công cụ ngoài: " + actionId.Substring(cut + 2);
+                return Ui.T("Công cụ ngoài: ") + actionId.Substring(cut + 2);
             }
             int dot = actionId.LastIndexOf('.');
             if (dot >= 0 && SuffixLabels.TryGetValue(actionId.Substring(dot + 1), out label))
             {
-                return label;
+                return Ui.T(label);
             }
-            return "Thao tác trên tài liệu";
+            return Ui.T("Thao tác trên tài liệu");
         }
 
         public void Measure(int width)
@@ -643,7 +643,7 @@ namespace AxiomOffice.Ai
         {
             Size = new Size(PaneTheme.Px(52), PaneTheme.Px(32));
             AccessibleRole = AccessibleRole.Animation;
-            AccessibleName = "AI đang xử lý";
+            AccessibleName = Ui.T("AI đang xử lý");
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
             _timer = new Timer { Interval = 350 };
             _timer.Tick += delegate
@@ -791,7 +791,7 @@ namespace AxiomOffice.Ai
         {
             Text = text;
             Font = PaneTheme.Small;
-            AccessibleDescription = "Điền gợi ý vào ô nhập";
+            AccessibleDescription = Ui.T("Điền gợi ý vào ô nhập");
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -826,7 +826,7 @@ namespace AxiomOffice.Ai
         {
             Text = "Ask";
             Font = PaneTheme.SmallBold;
-            AccessibleDescription = "Gửi yêu cầu cho AI";
+            AccessibleDescription = Ui.T("Gửi yêu cầu cho AI");
             Size = new Size(PaneTheme.Px(PaneTheme.AskW) + 2 * Inset, PaneTheme.Px(PaneTheme.AskH) + 2 * Inset);
         }
 
@@ -1035,7 +1035,7 @@ namespace AxiomOffice.Ai
             AccessibleName = title;
             _title = PaneTheme.MakeLabel(title, PaneTheme.EmptyTitle, PaneTheme.TextPrimary);
             _description = PaneTheme.MakeLabel(description, PaneTheme.Body, PaneTheme.TextSecondary);
-            _section = PaneTheme.MakeLabel("GỢI Ý", PaneTheme.CaptionBold, PaneTheme.TextMuted);
+            _section = PaneTheme.MakeLabel(Ui.T("GỢI Ý"), PaneTheme.CaptionBold, PaneTheme.TextMuted);
             Controls.Add(_title);
             Controls.Add(_description);
             Controls.Add(_section);
@@ -1096,8 +1096,8 @@ namespace AxiomOffice.Ai
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
             _title = PaneTheme.MakeLabel(title, PaneTheme.SmallBold, PaneTheme.DangerFg);
             _message = PaneTheme.MakeLabel(message, PaneTheme.Small, PaneTheme.TextPrimary);
-            _retry = PaneTheme.MakeLink("Thử lại", PaneTheme.SmallBold);
-            _settings = PaneTheme.MakeLink("Mở Cài đặt", PaneTheme.SmallBold);
+            _retry = PaneTheme.MakeLink(Ui.T("Thử lại"), PaneTheme.SmallBold);
+            _settings = PaneTheme.MakeLink(Ui.T("Mở Cài đặt"), PaneTheme.SmallBold);
             foreach (Control control in new Control[] { _title, _message, _retry, _settings })
             {
                 control.BackColor = PaneTheme.DangerBg;
@@ -1174,14 +1174,14 @@ namespace AxiomOffice.Ai
         {
             BackColor = PaneTheme.ChipHover;
             AccessibleRole = AccessibleRole.Grouping;
-            AccessibleName = "Kế hoạch đã sẵn sàng";
+            AccessibleName = Ui.T("Kế hoạch đã sẵn sàng");
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
-            _title = PaneTheme.MakeLabel("Kế hoạch đã sẵn sàng - tài liệu chưa bị sửa", PaneTheme.SmallBold, PaneTheme.AccentFg);
-            _message = PaneTheme.MakeLabel("Trả lời câu hỏi trong kế hoạch (nếu có) hoặc gõ góp ý để AI sửa kế hoạch. "
-                + "Bấm \"Thực hiện kế hoạch\" khi còn câu hỏi chưa trả lời thì AI dùng phương án mặc định đã ghi.",
+            _title = PaneTheme.MakeLabel(Ui.T("Kế hoạch đã sẵn sàng - tài liệu chưa bị sửa"), PaneTheme.SmallBold, PaneTheme.AccentFg);
+            _message = PaneTheme.MakeLabel(Ui.T("Trả lời câu hỏi trong kế hoạch (nếu có) hoặc gõ góp ý để AI sửa kế hoạch. ")
+                + Ui.T("Bấm \"Thực hiện kế hoạch\" khi còn câu hỏi chưa trả lời thì AI dùng phương án mặc định đã ghi."),
                 PaneTheme.Small, PaneTheme.TextPrimary);
-            _run = PaneTheme.MakeLink("Thực hiện kế hoạch", PaneTheme.SmallBold);
-            _run.AccessibleName = "Thực hiện kế hoạch vừa lập";
+            _run = PaneTheme.MakeLink(Ui.T("Thực hiện kế hoạch"), PaneTheme.SmallBold);
+            _run.AccessibleName = Ui.T("Thực hiện kế hoạch vừa lập");
             foreach (Control control in new Control[] { _title, _message, _run })
             {
                 control.BackColor = PaneTheme.ChipHover;
@@ -1291,17 +1291,17 @@ namespace AxiomOffice.Ai
             ConfirmationId = confirmationId;
             BackColor = PaneTheme.ChipHover;
             AccessibleRole = AccessibleRole.Alert;
-            AccessibleName = (choosing ? "Cần bạn chọn: " : "Cần bạn xác nhận: ") + reason;
+            AccessibleName = (choosing ? Ui.T("Cần bạn chọn: ") : Ui.T("Cần bạn xác nhận: ")) + reason;
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
-            _title = PaneTheme.MakeLabel((choosing ? "Cần bạn chọn: " : "Cần bạn xác nhận: ") + ToolLine.LabelFor(action ?? ""), PaneTheme.SmallBold, PaneTheme.AccentFg);
+            _title = PaneTheme.MakeLabel((choosing ? Ui.T("Cần bạn chọn: ") : Ui.T("Cần bạn xác nhận: ")) + ToolLine.LabelFor(action ?? ""), PaneTheme.SmallBold, PaneTheme.AccentFg);
             string detail = reason ?? "";
             if (!string.IsNullOrEmpty(preview) && preview != "{}")
             {
                 detail += Environment.NewLine + preview;
             }
             _message = PaneTheme.MakeLabel(detail, PaneTheme.Small, PaneTheme.TextPrimary);
-            _approve = PaneTheme.MakeLink("Đồng ý", PaneTheme.SmallBold);
-            _reject = PaneTheme.MakeLink(choosing ? "Bỏ qua" : "Từ chối", PaneTheme.SmallBold);
+            _approve = PaneTheme.MakeLink(Ui.T("Đồng ý"), PaneTheme.SmallBold);
+            _reject = PaneTheme.MakeLink(choosing ? Ui.T("Bỏ qua") : Ui.T("Từ chối"), PaneTheme.SmallBold);
             _approve.Visible = !choosing;
             var controls = new List<Control> { _title, _message, _approve, _reject };
             foreach (string[] choice in _choices)
@@ -1323,7 +1323,7 @@ namespace AxiomOffice.Ai
                             SendTyped();
                         }
                     };
-                    _send = PaneTheme.MakeLink("Gửi", PaneTheme.SmallBold);
+                    _send = PaneTheme.MakeLink(Ui.T("Gửi"), PaneTheme.SmallBold);
                     _send.LinkClicked += delegate { SendTyped(); };
                     _choiceLinks.Add(null);
                     _choiceDetails.Add(hint);
@@ -1451,16 +1451,16 @@ namespace AxiomOffice.Ai
                 _inputHeading.Visible = false;
                 if (choice == _inputId && !string.IsNullOrEmpty(text))
                 {
-                    chosen = (chosen ?? "Kiểu khác") + ": " + text;
+                    chosen = (chosen ?? Ui.T("Kiểu khác")) + ": " + text;
                 }
             }
             if (_choices.Count > 0)
             {
-                _title.Text = chosen != null ? "Đã chọn: " + chosen : by == "timeout" ? "Hết giờ chờ — chưa chọn kiểu nào" : by == "cancelled" ? "Đã dừng" : "Đã bỏ qua";
+                _title.Text = chosen != null ? Ui.T("Đã chọn: ") + chosen : by == "timeout" ? Ui.T("Hết giờ chờ — chưa chọn kiểu nào") : by == "cancelled" ? Ui.T("Đã dừng") : Ui.T("Đã bỏ qua");
             }
             else
             {
-                _title.Text = approved ? "Đã đồng ý" : by == "timeout" ? "Hết giờ chờ xác nhận — đã từ chối" : by == "cancelled" ? "Đã dừng — không thực hiện" : "Đã từ chối";
+                _title.Text = approved ? Ui.T("Đã đồng ý") : by == "timeout" ? Ui.T("Hết giờ chờ xác nhận — đã từ chối") : by == "cancelled" ? Ui.T("Đã dừng — không thực hiện") : Ui.T("Đã từ chối");
             }
             _title.ForeColor = approved ? PaneTheme.Success : PaneTheme.TextSecondary;
             if (Parent != null)
@@ -1573,11 +1573,11 @@ namespace AxiomOffice.Ai
             MemoryId = memoryId;
             BackColor = PaneTheme.ChipHover;
             AccessibleRole = AccessibleRole.StaticText;
-            AccessibleName = "Đã ghi nhớ: " + text;
+            AccessibleName = Ui.T("Đã ghi nhớ: ") + text;
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
-            _text = PaneTheme.MakeLabel("Đã ghi nhớ: " + text, PaneTheme.Small, PaneTheme.TextSecondary);
-            _delete = PaneTheme.MakeLink("Xoá", PaneTheme.SmallBold);
-            _delete.AccessibleName = "Xoá ghi nhớ này";
+            _text = PaneTheme.MakeLabel(Ui.T("Đã ghi nhớ: ") + text, PaneTheme.Small, PaneTheme.TextSecondary);
+            _delete = PaneTheme.MakeLink(Ui.T("Xoá"), PaneTheme.SmallBold);
+            _delete.AccessibleName = Ui.T("Xoá ghi nhớ này");
             foreach (Control control in new Control[] { _text, _delete })
             {
                 control.BackColor = PaneTheme.ChipHover;
@@ -1602,7 +1602,7 @@ namespace AxiomOffice.Ai
 
         public void SetDeleted(bool ok)
         {
-            _text.Text = ok ? "Đã xoá ghi nhớ." : _text.Text + " (không xoá được)";
+            _text.Text = ok ? Ui.T("Đã xoá ghi nhớ.") : _text.Text + Ui.T(" (không xoá được)");
             _delete.Visible = !ok;
             _delete.Enabled = !ok;
             if (Parent != null)
@@ -1660,7 +1660,7 @@ namespace AxiomOffice.Ai
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
             _title = PaneTheme.MakeLabel("", PaneTheme.CaptionBold, PaneTheme.TextMuted);
             _text = PaneTheme.MakeLabel("", PaneTheme.Tool, PaneTheme.TextSecondary);
-            _toggle = PaneTheme.MakeLink("Hiện", PaneTheme.CaptionBold);
+            _toggle = PaneTheme.MakeLink(Ui.T("Hiện"), PaneTheme.CaptionBold);
             foreach (Control control in new Control[] { _title, _text, _toggle })
             {
                 control.BackColor = PaneTheme.PaneBg;
@@ -1676,7 +1676,7 @@ namespace AxiomOffice.Ai
             bool first = _full.Length == 0;
             _live = false;
             _full = text ?? "";
-            _title.Text = round > 0 ? "Suy luận · vòng " + round : "Suy luận";
+            _title.Text = round > 0 ? Ui.T("Suy luận · vòng ") + round : Ui.T("Suy luận");
             if (first)
             {
                 _expanded = _full.Length <= InlineLimit;
@@ -1690,7 +1690,7 @@ namespace AxiomOffice.Ai
             bool first = _full.Length == 0;
             _live = true;
             _full = text ?? "";
-            _title.Text = (round > 0 ? "Đang suy luận · vòng " + round : "Đang suy luận") + "…";
+            _title.Text = (round > 0 ? Ui.T("Đang suy luận · vòng ") + round : Ui.T("Đang suy luận")) + "…";
             if (first)
             {
                 _expanded = false;
@@ -1707,8 +1707,8 @@ namespace AxiomOffice.Ai
         private void Apply()
         {
             _text.Text = _expanded ? _full : (_live ? PreviewTail(_full) : Preview(_full));
-            _toggle.Text = _expanded ? "Ẩn" : "Hiện";
-            _toggle.AccessibleName = _expanded ? "Thu gọn phần suy luận" : "Xem đầy đủ phần suy luận";
+            _toggle.Text = _expanded ? Ui.T("Ẩn") : Ui.T("Hiện");
+            _toggle.AccessibleName = _expanded ? Ui.T("Thu gọn phần suy luận") : Ui.T("Xem đầy đủ phần suy luận");
             if (Parent != null)
             {
                 // Đổi chiều cao thì FlowLayoutPanel phải xếp lại; Measure() chạy trong lượt xếp đó.
@@ -1753,7 +1753,7 @@ namespace AxiomOffice.Ai
             int inner = Math.Max(PaneTheme.Px(60), width - pad * 2 - PaneTheme.Px(6));
             int top = pad / 2 + PaneTheme.Px(2);
             int toggleWidth = _toggle.PreferredSize.Width + PaneTheme.Px(8);
-            int titleHeight = PaneTheme.MeasureHeight("Suy luận", _title.Font, inner);
+            int titleHeight = PaneTheme.MeasureHeight(Ui.T("Suy luận"), _title.Font, inner);
             _title.SetBounds(pad + PaneTheme.Px(6), top, Math.Max(PaneTheme.Px(40), inner - toggleWidth), titleHeight);
             _toggle.Location = new Point(pad + PaneTheme.Px(6) + inner - toggleWidth, top + PaneTheme.Px(2));
             int textHeight = PaneTheme.MeasureHeight(_text.Text, _text.Font, inner);
@@ -1799,7 +1799,7 @@ namespace AxiomOffice.Ai
             // AutoScroll của WinForms bỏ qua Padding đáy khi tính vùng cuộn; bù bằng AutoScrollMargin.
             AutoScrollMargin = new Size(0, pad);
             AccessibleRole = AccessibleRole.List;
-            AccessibleName = "Hội thoại";
+            AccessibleName = Ui.T("Hội thoại");
             SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint, true);
         }
 

@@ -30,7 +30,7 @@ namespace AxiomOffice
         public string GetCustomUI(string RibbonID)
         {
             Logger.Info("GetCustomUI called: " + RibbonID);
-            return RibbonUi.RibbonXml;
+            return RibbonUi.Xml(IsOfficeHost);
         }
 
         // Callback ribbon (host gọi qua IDispatch theo tên trong RibbonUi.RibbonXml).
@@ -38,6 +38,36 @@ namespace AxiomOffice
         {
             Logger.Info("OnRibbonLoad");
             RibbonUi.OnLoad(ribbon);
+        }
+
+        // Nhãn ribbon theo ngôn ngữ giao diện (RibbonUi.Xml, chỉ Office).
+        public string GetLabel(object control)
+        {
+            return RibbonText(control, "label");
+        }
+
+        public string GetScreentip(object control)
+        {
+            return RibbonText(control, "screentip");
+        }
+
+        public string GetSupertip(object control)
+        {
+            return RibbonText(control, "supertip");
+        }
+
+        private static string RibbonText(object control, string kind)
+        {
+            try
+            {
+                dynamic c = control;
+                return RibbonUi.Text(Convert.ToString(c.Id), kind);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("Ribbon: cannot read " + kind, ex);
+                return "";
+            }
         }
 
         public bool GetPressed(object control)

@@ -115,7 +115,9 @@ $commonArgs = @(
 
 # Build vao .stage roi moi chep de: loi bien dich hay file dich bi lock deu giu nguyen DLL cu.
 $stagedDll = Join-Path $stage "AxiomOffice.dll"
-& $csc @commonArgs /target:library "/out:$stagedDll" $addinSources
+# Ban dich giao dien (src/AxiomOffice/Localization/Ui.cs): nhung lang\*.json vao DLL (ten AxiomOffice.lang.<ma>.json).
+$langArgs = @(Get-ChildItem -Path (Join-Path $srcDir "lang") -Filter *.json -ErrorAction SilentlyContinue | ForEach-Object { "/resource:$($_.FullName),AxiomOffice.lang.$($_.Name)" })
+& $csc @commonArgs @langArgs /target:library "/out:$stagedDll" $addinSources
 if ($LASTEXITCODE -ne 0) { throw "Add-in build failed with exit code $LASTEXITCODE" }
 
 # Companion: chi con `commands --json` va `llm-test`. MCP server da gom ve Core ban Go, nen khong con

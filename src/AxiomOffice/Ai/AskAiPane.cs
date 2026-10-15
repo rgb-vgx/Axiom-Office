@@ -14,11 +14,13 @@ namespace AxiomOffice.Ai
     [System.Runtime.InteropServices.ClassInterface(System.Runtime.InteropServices.ClassInterfaceType.AutoDispatch)]
     public class AskAiPane : UserControl
     {
-        private const string PromptPlaceholder = "Nhập yêu cầu cho tài liệu này…";
-        private const string PlanPlaceholder = "Mô tả việc cần làm - AI lập kế hoạch trước, chưa sửa gì…";
+        // Chữ giao diện theo ngôn ngữ đang chọn (Ui.T) - thuộc tính, không phải hằng, để đổi ngôn ngữ là đổi ngay.
+        private static string PromptPlaceholder { get { return Ui.T("Nhập yêu cầu cho tài liệu này…"); } }
+        private static string PlanPlaceholder { get { return Ui.T("Mô tả việc cần làm - AI lập kế hoạch trước, chưa sửa gì…"); } }
         // Nói rõ dùng phương án mặc định cho câu hỏi chưa trả lời (Core: PlanModeRule bắt kế hoạch ghi mặc định an
         // toàn). Lượt 13/10/2026 bấm thực hiện khi còn 3 câu hỏi bỏ ngỏ, model tự chọn phạm vi lớn nhất.
-        private const string ExecutePlanPrompt = "Thực hiện kế hoạch ở trên. Câu hỏi nào tôi chưa trả lời thì dùng phương án mặc định đã ghi trong kế hoạch.";
+        // Câu gửi cho AI theo ngôn ngữ giao diện: AI trả lời theo ngôn ngữ của câu hỏi.
+        private static string ExecutePlanPrompt { get { return Ui.T("Thực hiện kế hoạch ở trên. Câu hỏi nào tôi chưa trả lời thì dùng phương án mặc định đã ghi trong kế hoạch."); } }
         private const int MinPaneWidth = 300;
         private const int TargetPaneWidth = 360;
 
@@ -91,12 +93,12 @@ namespace AxiomOffice.Ai
                 Font = PaneTheme.Body,
                 BackColor = PaneTheme.PaneBg,
                 ForeColor = PaneTheme.TextPrimary,
-                AccessibleName = "Yêu cầu cho AI",
+                AccessibleName = Ui.T("Yêu cầu cho AI"),
             };
             _placeholder = PaneTheme.MakeLabel(PromptPlaceholder, PaneTheme.Body, PaneTheme.TextMuted);
             _placeholder.Cursor = Cursors.IBeam;
             _placeholder.AccessibleRole = AccessibleRole.StaticText;
-            _hint = PaneTheme.MakeLabel("Enter để gửi · Shift+Enter xuống dòng", PaneTheme.Caption, PaneTheme.TextMuted);
+            _hint = PaneTheme.MakeLabel(Ui.T("Enter để gửi · Shift+Enter xuống dòng"), PaneTheme.Caption, PaneTheme.TextMuted);
             _hint.AutoEllipsis = true;
             _hint.TextAlign = ContentAlignment.MiddleLeft;
             _send = new SendButton();
@@ -107,9 +109,9 @@ namespace AxiomOffice.Ai
             _planToggle = PaneTheme.MakeLink("", PaneTheme.Caption);
             _composer.Controls.Add(_planToggle);
             _hint.Visible = false;
-            _attachLink = PaneTheme.MakeLink("+ Đính kèm", PaneTheme.Caption);
+            _attachLink = PaneTheme.MakeLink(Ui.T("+ Đính kèm"), PaneTheme.Caption);
             _attachLink.LinkColor = PaneTheme.TextMuted;
-            _attachLink.AccessibleName = "Đính kèm tệp Word, Excel hoặc PowerPoint cho AI đọc";
+            _attachLink.AccessibleName = Ui.T("Đính kèm tệp Word, Excel hoặc PowerPoint cho AI đọc");
             _composer.Controls.Add(_attachLink);
             _attachStrip = new FlowLayoutPanel
             {
@@ -134,12 +136,12 @@ namespace AxiomOffice.Ai
             _status.Dock = DockStyle.Fill;
             _status.AutoEllipsis = true;
             _status.TextAlign = ContentAlignment.MiddleLeft;
-            _status.AccessibleName = "Trạng thái";
+            _status.AccessibleName = Ui.T("Trạng thái");
             _busyDot = new AccentDot(PaneTheme.Px(6)) { Dock = DockStyle.Left, Width = PaneTheme.Px(12), Visible = false };
-            _insertLink = MakeFooterLink("Chèn trả lời");
-            _stopLink = MakeFooterLink("Dừng");
-            _undoLink = MakeFooterLink("Hoàn tác lượt này");
-            _undoLink.AccessibleName = "Hoàn tác toàn bộ thay đổi của lượt AI vừa rồi";
+            _insertLink = MakeFooterLink(Ui.T("Chèn trả lời"));
+            _stopLink = MakeFooterLink(Ui.T("Dừng"));
+            _undoLink = MakeFooterLink(Ui.T("Hoàn tác lượt này"));
+            _undoLink.AccessibleName = Ui.T("Hoàn tác toàn bộ thay đổi của lượt AI vừa rồi");
             footer.Controls.Add(_status);
             footer.Controls.Add(_busyDot);
             footer.Controls.Add(_insertLink);
@@ -154,14 +156,14 @@ namespace AxiomOffice.Ai
             title.Location = new Point(PaneTheme.Px(28), PaneTheme.Px(7));
             _headerSubtitle = PaneTheme.MakeLabel("", PaneTheme.Caption, PaneTheme.TextMuted);
             _headerSubtitle.AutoEllipsis = true;
-            _settingsLink = PaneTheme.MakeLink("Thiết lập", PaneTheme.Caption);
-            _settingsLink.AccessibleName = "Mở wizard thiết lập Axiom Office";
+            _settingsLink = PaneTheme.MakeLink(Ui.T("Thiết lập"), PaneTheme.Caption);
+            _settingsLink.AccessibleName = Ui.T("Mở wizard thiết lập Axiom Office");
             // New_arch.md mục 9.2: link ở header (trước đây ở footer, người dùng không thấy trong Word).
-            _newChatLink = PaneTheme.MakeLink("Trò chuyện mới", PaneTheme.Caption);
-            _newChatLink.AccessibleName = "Bắt đầu cuộc trò chuyện mới cho tài liệu này";
+            _newChatLink = PaneTheme.MakeLink(Ui.T("Trò chuyện mới"), PaneTheme.Caption);
+            _newChatLink.AccessibleName = Ui.T("Bắt đầu cuộc trò chuyện mới cho tài liệu này");
             // Hội thoại trước / nhật ký hoạt động: thuộc về khung chat, không đặt trên ribbon (docs/ribbon-ui.md).
             _moreLink = PaneTheme.MakeLink("⋯", PaneTheme.Caption);
-            _moreLink.AccessibleName = "Hội thoại trước và nhật ký hoạt động";
+            _moreLink.AccessibleName = Ui.T("Hội thoại trước và nhật ký hoạt động");
             header.Controls.Add(dot);
             header.Controls.Add(title);
             header.Controls.Add(_headerSubtitle);
@@ -190,7 +192,8 @@ namespace AxiomOffice.Ai
             _settingsLink.LinkClicked += delegate { OpenSetup(); };
             _planToggle.LinkClicked += delegate { SetPlanMode(!_planMode); };
             _attachLink.LinkClicked += delegate { PickAttachments(); };
-            new ToolTip().SetToolTip(_prompt, "Enter để gửi · Shift+Enter xuống dòng");
+            _promptTip.SetToolTip(_prompt, Ui.T("Enter để gửi · Shift+Enter xuống dòng"));
+            Ui.Changed += OnUiLanguageChanged;
             SetPlanMode(false);
             _moreLink.LinkClicked += delegate { ShowMoreMenu(); };
             _composer.Resize += delegate { LayoutComposer(); };
@@ -209,11 +212,58 @@ namespace AxiomOffice.Ai
 
         protected override void Dispose(bool disposing)
         {
+            if (disposing)
+            {
+                Ui.Changed -= OnUiLanguageChanged;
+            }
             if (disposing && _run != null)
             {
                 _run.Cancel();
             }
             base.Dispose(disposing);
+        }
+
+        private readonly ToolTip _promptTip = new ToolTip();
+
+        // Đổi ngôn ngữ giao diện (ribbon, wizard; có thể từ luồng khác): đặt lại chữ các nút và nhãn cố định. Tin nhắn
+        // đã có trong khung chat giữ nguyên ngôn ngữ lúc hiện.
+        private void OnUiLanguageChanged(object sender, EventArgs e)
+        {
+            PostToUi(ApplyLanguage);
+        }
+
+        private void ApplyLanguage()
+        {
+            _prompt.AccessibleName = Ui.T("Yêu cầu cho AI");
+            _hint.Text = Ui.T("Enter để gửi · Shift+Enter xuống dòng");
+            _promptTip.SetToolTip(_prompt, _hint.Text);
+            _attachLink.AccessibleName = Ui.T("Đính kèm tệp Word, Excel hoặc PowerPoint cho AI đọc");
+            _status.AccessibleName = Ui.T("Trạng thái");
+            SetFooterText(_insertLink, Ui.T("Chèn trả lời"));
+            SetFooterText(_stopLink, Ui.T("Dừng"));
+            SetFooterText(_undoLink, Ui.T("Hoàn tác lượt này"));
+            _undoLink.AccessibleName = Ui.T("Hoàn tác toàn bộ thay đổi của lượt AI vừa rồi");
+            _settingsLink.Text = Ui.T("Thiết lập");
+            _settingsLink.AccessibleName = Ui.T("Mở wizard thiết lập Axiom Office");
+            _newChatLink.Text = Ui.T("Trò chuyện mới");
+            _newChatLink.AccessibleName = Ui.T("Bắt đầu cuộc trò chuyện mới cho tài liệu này");
+            _moreLink.AccessibleName = Ui.T("Hội thoại trước và nhật ký hoạt động");
+            SetPlanMode(_planMode);
+            RefreshAttachments();
+            // Chưa gửi gì (còn màn chào): vẽ lại màn chào và gợi ý bằng ngôn ngữ mới.
+            if (_empty != null)
+            {
+                _chat.ClearAll();
+                AddGreeting();
+            }
+            RefreshState();
+            LayoutComposer();
+        }
+
+        private static void SetFooterText(LinkLabel link, string text)
+        {
+            link.Text = text;
+            link.Width = TextRenderer.MeasureText(text, PaneTheme.Caption).Width + PaneTheme.Px(8);
         }
 
         private LinkLabel MakeFooterLink(string text)
@@ -311,7 +361,7 @@ namespace AxiomOffice.Ai
         {
             string model = (Config.LlmModel ?? "").Trim();
             string endpoint = (Config.LlmEndpoint ?? "").Trim();
-            _headerSubtitle.Text = HostLabel() + " · " + (model.Length > 0 ? model : "Chưa chọn model");
+            _headerSubtitle.Text = HostLabel() + " · " + (model.Length > 0 ? model : Ui.T("Chưa chọn model"));
             _newChatLink.Visible = CoreClient.Instance.Enabled;
             if (_newChatLink.Parent != null)
             {
@@ -321,11 +371,11 @@ namespace AxiomOffice.Ai
             string reason = null;
             if (CurrentHost == null)
             {
-                reason = "Mất kết nối với ứng dụng. Mở lại tài liệu để tiếp tục.";
+                reason = Ui.T("Mất kết nối với ứng dụng. Mở lại tài liệu để tiếp tục.");
             }
             else if (endpoint.Length == 0 || model.Length == 0)
             {
-                reason = "Chưa thiết lập AI — bấm Thiết lập ở trên";
+                reason = Ui.T("Chưa thiết lập AI — bấm Thiết lập ở trên");
             }
             _blockedReason = reason;
             bool blocked = reason != null;
@@ -350,16 +400,16 @@ namespace AxiomOffice.Ai
         private static string HostLabel()
         {
             string kind = HostKind();
-            return kind == "et" ? "Bảng tính" : kind == "wpp" ? "Trình chiếu" : "Văn bản";
+            return kind == "et" ? Ui.T("Bảng tính") : kind == "wpp" ? Ui.T("Trình chiếu") : Ui.T("Văn bản");
         }
 
         private void AddGreeting()
         {
             string kind = HostKind();
-            string noun = kind == "et" ? "bảng tính" : kind == "wpp" ? "bản trình chiếu" : "văn bản";
+            string noun = kind == "et" ? Ui.T("bảng tính") : kind == "wpp" ? Ui.T("bản trình chiếu") : Ui.T("văn bản");
             _empty = new EmptyState(
-                "Bạn muốn làm gì với " + noun + " này?",
-                "Tôi đọc và chỉnh sửa trực tiếp tài liệu đang mở. Thay đổi hiện ngay trên trang khi tôi làm.",
+                Ui.T("Bạn muốn làm gì với ") + noun + Ui.T(" này?"),
+                Ui.T("Tôi đọc và chỉnh sửa trực tiếp tài liệu đang mở. Thay đổi hiện ngay trên trang khi tôi làm."),
                 GetSuggestions(kind));
             _empty.SuggestionClicked += delegate(string suggestion)
             {
@@ -378,13 +428,13 @@ namespace AxiomOffice.Ai
         {
             if (kind == "et")
             {
-                return new[] { "Tạo bảng điểm 5 học sinh, có cột trung bình", "Thêm cột Tổng có công thức cho bảng này", "Tô đậm và kẻ khung dòng tiêu đề" };
+                return new[] { Ui.T("Tạo bảng điểm 5 học sinh, có cột trung bình"), Ui.T("Thêm cột Tổng có công thức cho bảng này"), Ui.T("Tô đậm và kẻ khung dòng tiêu đề") };
             }
             if (kind == "wpp")
             {
-                return new[] { "Tạo 5 slide giới thiệu công ty", "Thêm slide kế hoạch quý 4", "Viết ghi chú thuyết trình cho từng slide" };
+                return new[] { Ui.T("Tạo 5 slide giới thiệu công ty"), Ui.T("Thêm slide kế hoạch quý 4"), Ui.T("Viết ghi chú thuyết trình cho từng slide") };
             }
-            return new[] { "Soạn đơn xin việc vị trí kế toán", "Tóm tắt tài liệu này thành 5 ý", "Chèn bảng lịch họp tuần 3 cột" };
+            return new[] { Ui.T("Soạn đơn xin việc vị trí kế toán"), Ui.T("Tóm tắt tài liệu này thành 5 ý"), Ui.T("Chèn bảng lịch họp tuần 3 cột") };
         }
 
         private void OnPromptKeyDown(object sender, KeyEventArgs e)
@@ -422,8 +472,8 @@ namespace AxiomOffice.Ai
         {
             using (var dialog = new OpenFileDialog
             {
-                Title = "Đính kèm tệp cho AI đọc",
-                Filter = "Tài liệu Office (*.docx;*.xlsx;*.pptx)|*.docx;*.xlsx;*.pptx",
+                Title = Ui.T("Đính kèm tệp cho AI đọc"),
+                Filter = Ui.T("Tài liệu Office (*.docx;*.xlsx;*.pptx)|*.docx;*.xlsx;*.pptx"),
                 Multiselect = true,
                 CheckFileExists = true,
             })
@@ -436,7 +486,7 @@ namespace AxiomOffice.Ai
                 {
                     if (_attachments.Count >= MaxAttachments)
                     {
-                        SetStatus("Tối đa " + MaxAttachments + " tệp mỗi lượt", true);
+                        SetStatus(Ui.T("Tối đa ") + MaxAttachments + Ui.T(" tệp mỗi lượt"), true);
                         break;
                     }
                     if (!_attachments.Contains(path, StringComparer.OrdinalIgnoreCase))
@@ -463,7 +513,7 @@ namespace AxiomOffice.Ai
             {
                 string captured = path;
                 var chip = PaneTheme.MakeLink("📄 " + System.IO.Path.GetFileName(path) + "  ✕", PaneTheme.Caption);
-                chip.AccessibleName = "Bỏ tệp đính kèm " + System.IO.Path.GetFileName(path);
+                chip.AccessibleName = Ui.T("Bỏ tệp đính kèm ") + System.IO.Path.GetFileName(path);
                 chip.Margin = new Padding(0, PaneTheme.Px(4), PaneTheme.Px(10), 0);
                 new ToolTip().SetToolTip(chip, path);
                 chip.LinkClicked += delegate
@@ -475,7 +525,7 @@ namespace AxiomOffice.Ai
             }
             _attachStrip.Visible = _attachments.Count > 0;
             _attachStrip.ResumeLayout(true);
-            _attachLink.Text = _attachments.Count > 0 ? "+ Đính kèm (" + _attachments.Count + ")" : "+ Đính kèm";
+            _attachLink.Text = _attachments.Count > 0 ? Ui.T("+ Đính kèm (") + _attachments.Count + ")" : Ui.T("+ Đính kèm");
         }
 
         // Câu gửi Core: lời người dùng + đường dẫn đầy đủ. Model trước đây gọi ppt_profile bằng tên tệp trần và
@@ -499,9 +549,9 @@ namespace AxiomOffice.Ai
         private void SetPlanMode(bool on)
         {
             _planMode = on;
-            _planToggle.Text = (on ? "● " : "○ ") + "Lập kế hoạch trước";
+            _planToggle.Text = (on ? "● " : "○ ") + Ui.T("Lập kế hoạch trước");
             _planToggle.LinkColor = on ? PaneTheme.AccentFg : PaneTheme.TextMuted;
-            _planToggle.AccessibleName = "Lập kế hoạch trước khi sửa: " + (on ? "đang bật" : "đang tắt");
+            _planToggle.AccessibleName = Ui.T("Lập kế hoạch trước khi sửa: ") + (on ? Ui.T("đang bật") : Ui.T("đang tắt"));
             if (_blockedReason == null)
             {
                 _placeholder.Text = on ? PlanPlaceholder : PromptPlaceholder;
@@ -541,7 +591,7 @@ namespace AxiomOffice.Ai
             string corePrompt = WithAttachments(promptText, files);
             if (_planCard != null && _planCard.IsOpen)
             {
-                _planCard.Close(promptText == ExecutePlanPrompt && !plan ? "Đang thực hiện kế hoạch…" : "Đã gửi yêu cầu mới");
+                _planCard.Close(promptText == ExecutePlanPrompt && !plan ? Ui.T("Đang thực hiện kế hoạch…") : Ui.T("Đã gửi yêu cầu mới"));
             }
             _insertLink.Visible = false;
             _stopLink.Visible = true;
@@ -551,10 +601,10 @@ namespace AxiomOffice.Ai
                 : promptText + "\n📎 " + string.Join(", ", files.Select(f => System.IO.Path.GetFileName(f)).ToArray()), true);
             if (plan)
             {
-                _chat.AddInfo("Lập kế hoạch: AI chỉ đọc tài liệu, chưa sửa gì");
+                _chat.AddInfo(Ui.T("Lập kế hoạch: AI chỉ đọc tài liệu, chưa sửa gì"));
             }
             _chat.AddTyping();
-            SetStatus("Đang xử lý…", false);
+            SetStatus(Ui.T("Đang xử lý…"), false);
             Logger.Info("AskAiPane: prompt=" + promptText + (plan ? " (plan)" : "") + (files.Count > 0 ? " files=" + files.Count : ""));
 
             Action<string> progress = delegate(string line)
@@ -575,15 +625,15 @@ namespace AxiomOffice.Ai
                     {
                         // Agent trong add-in không đọc được tệp ngoài: báo rõ thay vì trả lời như không có tệp.
                         result = new LlmResult();
-                        result.Error = "Đọc tệp đính kèm cần Agent Core, mà Core đang không chạy được ("
-                            + (CoreClient.Instance.LastError ?? "không rõ lý do") + ").";
+                        result.Error = Ui.T("Đọc tệp đính kèm cần Agent Core, mà Core đang không chạy được (")
+                            + (CoreClient.Instance.LastError ?? Ui.T("không rõ lý do")) + ").";
                     }
                     else if (result == null && plan)
                     {
                         // Agent trong add-in không có chế độ chỉ đọc: không được chạy thay (nó sẽ sửa tài liệu).
                         result = new LlmResult();
-                        result.Error = "Lập kế hoạch cần Agent Core, mà Core đang không chạy được ("
-                            + (CoreClient.Instance.LastError ?? "không rõ lý do") + "). Tắt \"Lập kế hoạch trước\" để AI làm ngay.";
+                        result.Error = Ui.T("Lập kế hoạch cần Agent Core, mà Core đang không chạy được (")
+                            + (CoreClient.Instance.LastError ?? Ui.T("không rõ lý do")) + Ui.T("). Tắt \"Lập kế hoạch trước\" để AI làm ngay.");
                     }
                     else if (result == null)
                     {
@@ -715,7 +765,7 @@ namespace AxiomOffice.Ai
             if (item.Type == "skill.loaded")
             {
                 // Dòng thông tin (không có " -> ") - New_arch.md mục 7.4.
-                return "(Dùng kỹ năng: " + (item.Name ?? "?") + ")";
+                return Ui.T("(Dùng kỹ năng: ") + (item.Name ?? "?") + ")";
             }
 
             // load_skill / read_skill_file: đã có dòng "Dùng kỹ năng"; remember: đã có dòng "Đã ghi nhớ".
@@ -765,7 +815,7 @@ namespace AxiomOffice.Ai
                 preview ?? "", "\"error\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)");
             if (!match.Success)
             {
-                return string.IsNullOrEmpty(preview) ? "lỗi" : preview;
+                return string.IsNullOrEmpty(preview) ? Ui.T("lỗi") : preview;
             }
             try
             {
@@ -841,7 +891,7 @@ namespace AxiomOffice.Ai
             _lastPlan = false;
             _undoLink.Visible = false;
             AddGreeting();
-            _chat.AddInfo("Bắt đầu cuộc trò chuyện mới cho tài liệu này.");
+            _chat.AddInfo(Ui.T("Bắt đầu cuộc trò chuyện mới cho tài liệu này."));
             Logger.Info("AskAiPane: new conversation requested");
             _prompt.Focus();
         }
@@ -877,8 +927,8 @@ namespace AxiomOffice.Ai
             _confirmCards[request.ConfirmationId] = card;
             _chat.AddBlock(card);
             bool choosing = request.Choices != null && request.Choices.Count > 0;
-            SetStatus(choosing ? "Đang chờ bạn chọn…" : "Đang chờ bạn xác nhận…", false);
-            Announce((choosing ? "Cần bạn chọn: " : "Cần bạn xác nhận: ") + (request.Reason ?? ""));
+            SetStatus(choosing ? Ui.T("Đang chờ bạn chọn…") : Ui.T("Đang chờ bạn xác nhận…"), false);
+            Announce((choosing ? Ui.T("Cần bạn chọn: ") : Ui.T("Cần bạn xác nhận: ")) + (request.Reason ?? ""));
         }
 
         private void ResolveConfirmCard(CoreEvent resolved)
@@ -1013,7 +1063,7 @@ namespace AxiomOffice.Ai
             if (item.IsToolCall)
             {
                 _toolCount++;
-                SetStatus("Đang xử lý… · bước " + (_toolCount + 1), false);
+                SetStatus(Ui.T("Đang xử lý… · bước ") + (_toolCount + 1), false);
             }
             if (item.Succeeded && IsWordEdit(item.ActionId))
             {
@@ -1063,7 +1113,7 @@ namespace AxiomOffice.Ai
                 string reply = OfficeActionTool.Execute(host, OfficeActionTool.ToolName, serializer.Serialize(arguments));
                 Logger.Info("AskAiPane: undo last run (" + _lastRunEdits + " edits) -> " + Truncate(reply, 200));
                 bool ok = reply.IndexOf("\"ok\":true", StringComparison.Ordinal) >= 0;
-                _chat.AddInfo(ok ? "Đã hoàn tác " + _lastRunEdits + " thao tác của lượt vừa rồi." : "Không hoàn tác được: " + Truncate(reply, 120));
+                _chat.AddInfo(ok ? Ui.T("Đã hoàn tác ") + _lastRunEdits + Ui.T(" thao tác của lượt vừa rồi.") : Ui.T("Không hoàn tác được: ") + Truncate(reply, 120));
                 _undoLink.Visible = !ok;
                 if (ok)
                 {
@@ -1072,7 +1122,7 @@ namespace AxiomOffice.Ai
             }
             catch (Exception ex)
             {
-                SetStatus("Hoàn tác thất bại: " + Truncate(ex.Message, 100), true);
+                SetStatus(Ui.T("Hoàn tác thất bại: ") + Truncate(ex.Message, 100), true);
             }
         }
 
@@ -1123,23 +1173,23 @@ namespace AxiomOffice.Ai
                         }
                     };
                     _chat.AddBlock(card);
-                    SetStatus("Đã lập kế hoạch trong " + seconds + "s · chưa sửa gì", false);
-                    Announce("Đã lập kế hoạch. " + (result.Text ?? ""));
+                    SetStatus(Ui.T("Đã lập kế hoạch trong ") + seconds + Ui.T("s · chưa sửa gì"), false);
+                    Announce(Ui.T("Đã lập kế hoạch. ") + (result.Text ?? ""));
                     UpdateSendEnabled();
                     return;
                 }
-                SetStatus("Xong trong " + seconds + "s · " + _toolCount + " thao tác" + BackendNote(), false);
+                SetStatus("Xong trong " + seconds + "s · " + _toolCount + Ui.T(" thao tác") + BackendNote(), false);
                 Announce("Xong. " + (result.Text ?? ""));
             }
             else if (result.Cancelled)
             {
-                _chat.AddInfo("Đã dừng theo yêu cầu. Các thao tác đã làm vẫn còn trong tài liệu.");
-                SetStatus("Đã dừng · " + _toolCount + " thao tác", false);
-                Announce("Đã dừng");
+                _chat.AddInfo(Ui.T("Đã dừng theo yêu cầu. Các thao tác đã làm vẫn còn trong tài liệu."));
+                SetStatus(Ui.T("Đã dừng · ") + _toolCount + Ui.T(" thao tác"), false);
+                Announce(Ui.T("Đã dừng"));
             }
             else
             {
-                var card = new ErrorCard("Không hoàn thành yêu cầu", DescribeError(result));
+                var card = new ErrorCard(Ui.T("Không hoàn thành yêu cầu"), DescribeError(result));
                 card.RetryClicked += delegate
                 {
                     if (!_busy && _lastPrompt.Length > 0)
@@ -1153,8 +1203,8 @@ namespace AxiomOffice.Ai
                 };
                 card.SettingsClicked += delegate { OpenSetup(); };
                 _chat.AddBlock(card);
-                SetStatus("Không hoàn thành · " + seconds + "s" + BackendNote(), true);
-                Announce("Lỗi: không hoàn thành yêu cầu");
+                SetStatus(Ui.T("Không hoàn thành · ") + seconds + "s" + BackendNote(), true);
+                Announce(Ui.T("Lỗi: không hoàn thành yêu cầu"));
             }
             UpdateSendEnabled();
         }
@@ -1167,7 +1217,7 @@ namespace AxiomOffice.Ai
                 return "";
             }
 
-            return " · chế độ cơ bản";
+            return Ui.T(" · chế độ cơ bản");
         }
 
         private string DescribeError(LlmResult result)
@@ -1177,35 +1227,35 @@ namespace AxiomOffice.Ai
             string message;
             if (result.TimedOut)
             {
-                message = "AI chưa xong sau " + (LlmClient.AgentTimeoutMs / 60000) + " phút nên đã dừng.";
+                message = Ui.T("AI chưa xong sau ") + (LlmClient.AgentTimeoutMs / 60000) + Ui.T(" phút nên đã dừng.");
             }
             else if (result.Stopped)
             {
-                message = "AI đã dùng hết ngân sách token cho lượt này nên dừng lại.";
+                message = Ui.T("AI đã dùng hết ngân sách token cho lượt này nên dừng lại.");
             }
             else if (result.StepLimitReached)
             {
-                message = "AI chưa xong sau " + result.Rounds + " vòng nên đã dừng.";
+                message = Ui.T("AI chưa xong sau ") + result.Rounds + Ui.T(" vòng nên đã dừng.");
             }
             else if (lower.Contains("timed out"))
             {
-                message = "Máy chủ AI không phản hồi sau 60 giây.";
+                message = Ui.T("Máy chủ AI không phản hồi sau 60 giây.");
             }
             else if (lower.Contains("(401)") || lower.Contains("unauthorized"))
             {
-                message = "Máy chủ AI từ chối khoá API. Kiểm tra lại khoá trong Cài đặt.";
+                message = Ui.T("Máy chủ AI từ chối khoá API. Kiểm tra lại khoá trong Cài đặt.");
             }
             else if (lower.Contains("unable to connect") || lower.Contains("actively refused") || lower.Contains("remote name could not be resolved"))
             {
-                message = "Không kết nối được máy chủ AI (" + (Config.LlmEndpoint ?? "") + ").";
+                message = Ui.T("Không kết nối được máy chủ AI (") + (Config.LlmEndpoint ?? "") + ").";
             }
             else
             {
-                message = "Máy chủ AI báo lỗi: " + Truncate(error, 300);
+                message = Ui.T("Máy chủ AI báo lỗi: ") + Truncate(error, 300);
             }
             if (_toolCount > 0)
             {
-                message += " Đã làm xong " + _toolCount + " thao tác, phần đã ghi vẫn còn trong tài liệu.";
+                message += Ui.T(" Đã làm xong ") + _toolCount + Ui.T(" thao tác, phần đã ghi vẫn còn trong tài liệu.");
             }
             return message;
         }
@@ -1219,7 +1269,7 @@ namespace AxiomOffice.Ai
             }
             Logger.Info("AskAiPane: stop requested");
             _stopLink.Visible = false;
-            SetStatus("Đang dừng…", false);
+            SetStatus(Ui.T("Đang dừng…"), false);
             run.Cancel();
         }
 
@@ -1227,7 +1277,7 @@ namespace AxiomOffice.Ai
         private void ShowMoreMenu()
         {
             var menu = new ContextMenuStrip { Font = PaneTheme.Body };
-            menu.Items.Add("Hội thoại trước…", null, delegate
+            menu.Items.Add(Ui.T("Hội thoại trước…"), null, delegate
             {
                 Connect host = CurrentHost;
                 using (var form = new ConversationsForm(host != null ? DocumentKey(host) : null))
@@ -1235,7 +1285,7 @@ namespace AxiomOffice.Ai
                     form.ShowDialog(this);
                 }
             });
-            menu.Items.Add("Nhật ký hoạt động…", null, delegate
+            menu.Items.Add(Ui.T("Nhật ký hoạt động…"), null, delegate
             {
                 using (var form = new AuditForm())
                 {
@@ -1355,11 +1405,11 @@ namespace AxiomOffice.Ai
                     { "params", new System.Collections.Generic.Dictionary<string, object> { { "text", _lastReply } } }
                 };
                 OfficeActionTool.Execute(host, OfficeActionTool.ToolName, serializer.Serialize(arguments));
-                SetStatus("Đã chèn vào tài liệu", false);
+                SetStatus(Ui.T("Đã chèn vào tài liệu"), false);
             }
             catch (Exception ex)
             {
-                SetStatus("Chèn thất bại: " + Truncate(ex.Message, 100), true);
+                SetStatus(Ui.T("Chèn thất bại: ") + Truncate(ex.Message, 100), true);
             }
         }
 
