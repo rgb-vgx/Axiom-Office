@@ -21,6 +21,9 @@ type DocumentContext struct {
 	SlideCount int
 	Sheet      string
 	Range      string
+	// HeadingPath: duong heading quanh con tro Word (pane gui document.view.headingPath).
+	// Rong = pane khong gui (ban cu, LibreOffice/WPS chua gui). Toi da vai muc, cat 300 ky tu.
+	HeadingPath []string
 }
 
 // SelectionLockRule: nguoi dung boi den roi moi hoi -> chi sua trong vung do (bridge chan lenh sua ngoai vung).
@@ -144,6 +147,9 @@ func ViewSection(document *DocumentContext) string {
 		}
 		parts = append(parts, text+": \"this slide\" / \"the current slide\" / \"slide hiện tại\" means slide "+
 			strconv.Itoa(document.Slide)+". Work on that slide in place unless the user asks for new slides or the whole presentation.")
+	}
+	if len(document.HeadingPath) > 0 {
+		parts = append(parts, "The user is editing under headings: "+strings.Join(document.HeadingPath, " > ")+" (\"this section\" means that place).")
 	}
 	if document.Sheet != "" {
 		text := "Active sheet: '" + document.Sheet + "'"

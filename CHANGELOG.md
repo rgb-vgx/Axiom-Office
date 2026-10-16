@@ -5,6 +5,11 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added - Duong heading quanh con tro Word (P0-01, 16/10/2026)
+- Core: DocumentContext them HeadingPath (prompt.go), ParseRequest doc document.view.headingPath (thieu thi bo qua, toi da 6 muc), ViewSection dua vao system prompt; test TestParseRequestHeadingPath.
+- Word: HostProbe.View them headingPath (duyet doan truoc con tro, style co Heading, moi muc 120 ky tu) - WPS thieu thuoc tinh thi bo qua, khong hong luot.
+
+
 ### Added — docs/plans/: lộ trình Agent văn phòng (16/10/2026)
 - 18 tệp kế hoạch: thứ tự làm + nguyên tắc (00-readme), phase P0–P8 (01–09: hiểu tài liệu, duyệt trước khi
   lưu, chuẩn skill, memory, provider, báo cáo định kỳ, audit, UX trong app, LibreOffice parity), nhánh

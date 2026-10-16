@@ -94,6 +94,7 @@ func ParseRequest(body map[string]any) (*Request, string) {
 			document.SlideCount = intOf(view["slideCount"])
 			document.Sheet = strings.TrimSpace(textOf(view["sheet"]))
 			document.Range = strings.TrimSpace(textOf(view["range"]))
+			document.HeadingPath = headingPathOf(view["headingPath"])
 		}
 	}
 
@@ -346,15 +347,19 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 			corelog.Info("run %s: model %s failed (%s) - switching to fallback %s", run.ID, from, reason, to)
 			run.Events.Publish("run.model_switched", map[string]any{"from": from, "to": to, "reason": reason})
 		},
-			AskContinue: func(round, billable int, reason string) bool {
-		if choose == nil { return true }
-		q := "Luot nay " + reason + " (vong " + strconv.Itoa(round) + ", " + strconv.Itoa(billable) + " token billable). Cho chay tiep?"
-		choice, _, err := choose("agent.heavy_run", q, []tools.Choice{{ID: "continue", Label: "Chay tiep"}, {ID: "stop", Label: "Dung lai"}})
-		if err != nil || choice == "" { return true }
-		return choice == "continue"
-	},
-	
-	ToolStarted: func(call model.ToolCall) {
+		AskContinue: func(round, billable int, reason string) bool {
+			if choose == nil {
+				return true
+			}
+			q := "Luot nay " + reason + " (vong " + strconv.Itoa(round) + ", " + strconv.Itoa(billable) + " token billable). Cho chay tiep?"
+			choice, _, err := choose("agent.heavy_run", q, []tools.Choice{{ID: "continue", Label: "Chay tiep"}, {ID: "stop", Label: "Dung lai"}})
+			if err != nil || choice == "" {
+				return true
+			}
+			return choice == "continue"
+		},
+
+		ToolStarted: func(call model.ToolCall) {
 			run.ToolCalls++
 			action, params := readCall(call)
 			actions.put(call.ID, action, params)
@@ -662,6 +667,32 @@ func tryMap(value any) map[string]any {
 		return map[string]any{}
 	}
 	return parsed
+}
+
+func headingPathOf(value any) []string {
+	list, ok := value.([]any)
+	if !ok {
+		return nil
+	}
+	path := []string{}
+	for _, item := range list {
+		text, ok := item.(string)
+		if !ok {
+			continue
+		}
+		text = strings.TrimSpace(text)
+		if text == "" {
+			continue
+		}
+		if runes := []rune(text); len(runes) > 120 {
+			text = string(runes[:120])
+		}
+		path = append(path, text)
+		if len(path) >= 6 {
+			break
+		}
+	}
+	return path
 }
 
 func textOf(value any) string {

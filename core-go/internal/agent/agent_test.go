@@ -241,6 +241,29 @@ func TestDocumentViewReachesPromptEnd(t *testing.T) {
 	}
 }
 
+func TestParseRequestHeadingPath(t *testing.T) {
+	request, problem := ParseRequest(map[string]any{
+		"prompt": "tom tat muc nay", "office": map[string]any{"port": float64(1)},
+		"document": map[string]any{"name": "a.docx", "view": map[string]any{"headingPath": []any{"Giao an", "Tuan 3"}}},
+	})
+	if problem != "" {
+		t.Fatalf("problem = %q", problem)
+	}
+	if len(request.Document.HeadingPath) != 2 || request.Document.HeadingPath[1] != "Tuan 3" {
+		t.Fatalf("headingPath = %+v", request.Document)
+	}
+	if got := ViewSection(request.Document); !strings.Contains(got, "Tuan 3") {
+		t.Fatalf("view thieu heading: %q", got)
+	}
+	legacy, problem := ParseRequest(map[string]any{
+		"prompt": "x", "office": map[string]any{"port": float64(1)},
+		"document": map[string]any{"name": "a.docx"},
+	})
+	if problem != "" || len(legacy.Document.HeadingPath) != 0 {
+		t.Fatalf("request cu phai bo qua: problem=%q doc=%+v", problem, legacy.Document)
+	}
+}
+
 func TestParseRequestMode(t *testing.T) {
 	base := func(mode any) map[string]any {
 		return map[string]any{"prompt": "x", "office": map[string]any{"port": float64(1)}, "options": map[string]any{"mode": mode}}

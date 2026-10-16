@@ -79,6 +79,7 @@ namespace AxiomOffice.Bridge
             }
             else
             {
+                TryPut(view, "headingPath", () => HeadingPath(app));
                 TryPut(view, "selection", () =>
                 {
                     string text = Convert.ToString(app.Selection.Text) ?? "";
@@ -87,6 +88,43 @@ namespace AxiomOffice.Bridge
                 });
             }
             return view;
+        }
+
+        // P0-01 (16/10/2026): duong heading quanh con tro Word - toi da 6 muc.
+        private static object HeadingPath(dynamic app)
+        {
+            try
+            {
+                dynamic doc = app.ActiveDocument;
+                dynamic sel = app.Selection;
+                if (doc == null || sel == null) return null;
+                int cursor = System.Convert.ToInt32(sel.Range.Start);
+                var names = new System.Collections.Generic.List<string>();
+                foreach (dynamic paragraph in doc.Paragraphs)
+                {
+                    int start;
+                    try { start = System.Convert.ToInt32(paragraph.Range.Start); }
+                    catch { continue; }
+                    if (start > cursor) break;
+                    string style;
+                    try { style = System.Convert.ToString(paragraph.Style.NameLocal); }
+                    catch { continue; }
+                    if (style == null || style.IndexOf("Heading") < 0) continue;
+                    string text;
+                    try { text = (System.Convert.ToString(paragraph.Range.Text) ?? "").Trim(); }
+                    catch { continue; }
+                    text = text.TrimEnd('\r', '\a').Trim();
+                    if (text.Length == 0) continue;
+                    if (text.Length > 120) text = text.Substring(0, 120);
+                    string item = style + ": " + text;
+                    if (names.Count == 0 || names[names.Count - 1] != item) names.Add(item);
+                    if (names.Count > 12) names.RemoveAt(0);
+                }
+                if (names.Count == 0) return null;
+                int from = System.Math.Max(0, names.Count - 6);
+                return names.GetRange(from, names.Count - from).ToArray();
+            }
+            catch { return null; }
         }
 
         private static bool TryPut(Dictionary<string, object> map, string key, Func<object> read)
