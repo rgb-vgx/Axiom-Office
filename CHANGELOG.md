@@ -1,9 +1,14 @@
-# Changelog
+﻿# Changelog
 
 Mọi thay đổi đáng chú ý của project được ghi ở đây.
 Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
+
+### Added - Chan loop cung-viec va hoi khi luot nang voi model yeu (17-R0, 16/10/2026)
+- sameTaskGuard (core-go/internal/model/guards.go, MaxSameTaskCalls mac dinh 25): chan vong lap lam cung mot viec voi tham so khac nhau ma identicalCallGuard khong bat duoc (luot that 14/10/2026: 137 lan writer.replaceAll voi find khac nhau, 48 vong, 1,48 trieu token). Dem theo nhom viec; lenh ghi du lieu theo khoi (et.writeRange, writer.typeText...) duoc mien.
+- heavyRunGuard + AgentCallbacks.AskContinue: luot vuot 30 vong hoac 500k token billable thi hoi nguoi dung Chay tiep/Dung lai qua the Choose (agent.heavy_run); Interactive=false hoac het gio the thi chay tiep nhu cu.
+- Test: core-go/internal/model/sametask_test.go (chan loop cung-viec, mien ghi khoi, hoi o vong 30, dong y thi chay tiep); sua agent_deadline_test.go tat guard moi khi thu dong ho.
 
 ### Added — Bôi đen hỏi đáp: AI chỉ sửa vùng chọn; bảng trong vùng được bảo vệ (16/10/2026)
 - Menu chuột phải trong Word (**Hỏi AI về đoạn này** — Text/List/Table, customUI 2009/07): mở khung chat với

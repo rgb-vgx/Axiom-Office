@@ -346,7 +346,15 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 			corelog.Info("run %s: model %s failed (%s) - switching to fallback %s", run.ID, from, reason, to)
 			run.Events.Publish("run.model_switched", map[string]any{"from": from, "to": to, "reason": reason})
 		},
-		ToolStarted: func(call model.ToolCall) {
+			AskContinue: func(round, billable int, reason string) bool {
+		if choose == nil { return true }
+		q := "Luot nay " + reason + " (vong " + strconv.Itoa(round) + ", " + strconv.Itoa(billable) + " token billable). Cho chay tiep?"
+		choice, _, err := choose("agent.heavy_run", q, []tools.Choice{{ID: "continue", Label: "Chay tiep"}, {ID: "stop", Label: "Dung lai"}})
+		if err != nil || choice == "" { return true }
+		return choice == "continue"
+	},
+	
+	ToolStarted: func(call model.ToolCall) {
 			run.ToolCalls++
 			action, params := readCall(call)
 			actions.put(call.ID, action, params)

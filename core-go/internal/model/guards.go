@@ -1,4 +1,4 @@
-package model
+﻿package model
 
 import (
 	"context"
@@ -84,6 +84,9 @@ func newGuards(options AgentOptions) guardChain {
 	if options.MaxIdenticalCalls > 0 {
 		chain = append(chain, &identicalCallGuard{limit: options.MaxIdenticalCalls, counts: map[string]int{}})
 	}
+	if options.MaxSameTaskCalls > 0 {
+		chain = append(chain, &sameTaskGuard{limit: options.MaxSameTaskCalls, counts: map[string]int{}})
+	}
 	if len(options.OncePerReply) > 0 {
 		chain = append(chain, &oncePerReplyGuard{names: options.OncePerReply})
 	}
@@ -91,6 +94,7 @@ func newGuards(options AgentOptions) guardChain {
 	if options.ContextClearAt > 0 {
 		chain = append(chain, contextClearGuard{})
 	}
+	chain = append(chain, &heavyRunGuard{})
 	if options.MaxIdenticalFailures > 0 {
 		chain = append(chain, &repeatedFailureGuard{})
 	}
@@ -226,6 +230,117 @@ func (g *identicalCallGuard) beforeCall(_ *agentLoop, call ToolCall) *ToolResult
 			"use the earlier result, change the arguments, or answer the user", g.limit))}
 }
 
+// sameTaskGuard (MaxSameTaskCalls): chan vong lap "lam cung mot viec, khac tham so" (17-R0 muc 3.3).
+//
+// identicalCallGuard chi bat "y het tool + y het doi so". Luot that 14/10/2026 (deepseek): 137 lan
+// writer.replaceAll voi find khac nhau, 48 vong, 1,48 trieu token - khong lan nao y het nen khong bi
+// chan. Guard nay dem theo NHOM VIEC: cung tool + cung lenh office_action + cung dang viec (replace,
+// read, format). Vuot han muc thi chan, bao model doi cach (doc outline truoc, gom nhieu doi thanh
+// writer.replaceMany, hoac tra loi). Lenh ghi du lieu theo khoi (et.writeRange...) duoc mien: bang
+// lon can goi nhieu lan theo khoi, chan la hong viec (xem tools/limits.go).
+//
+// Luot that 15/10/2026 ("Lam toan bo", deepseek): 59 vong di xoa dau "/" ma tung cho mot - cung roi
+// vao nhom replace nay va bi chan som.
+type sameTaskGuard struct {
+	limit  int
+	counts map[string]int
+}
+
+// sameTaskExempt: nhom viec duoc mien khoi dem - ghi du lieu theo khoi, moi lan la mot phan viec that.
+var sameTaskExempt = map[string]bool{
+	"office_action et.writeRange":   true,
+	"office_action et.writeRanges":  true,
+	"office_action et.fillRange":    true,
+	"office_action et.importCsv":    true,
+	"office_action writer.typeText": true,
+}
+
+func sameTaskKey(call ToolCall) string {
+	if call.Name != "office_action" {
+		return call.Name
+	}
+	action, verb := officeActionTask(call.Arguments)
+	if action == "" {
+		return "office_action ?"
+	}
+	key := "office_action " + action
+	if verb != "" {
+		key += " " + verb
+	}
+	if sameTaskExempt[key] {
+		return ""
+	}
+	return key
+}
+
+// officeActionTask: rut (ten lenh, dong tac) tu arguments JSON cua office_action.
+// Dong tac chi phan loai tho (replace, read, format) de bat loop "sua tung cho mot".
+func officeActionTask(arguments string) (string, string) {
+	action := jsonActionField(arguments)
+	if action == "" {
+		return "", ""
+	}
+	verb := ""
+	switch {
+	case strings.HasSuffix(action, ".replaceAll") || strings.HasSuffix(action, ".replaceMany") ||
+		strings.HasSuffix(action, ".replace"):
+		verb = "replace"
+	case strings.HasSuffix(action, ".readRange") || strings.HasSuffix(action, ".getText") ||
+		strings.HasSuffix(action, ".listSlides") || strings.HasSuffix(action, ".outline") ||
+		strings.HasSuffix(action, ".checkRange") || strings.HasSuffix(action, ".checkTables") ||
+		strings.HasSuffix(action, ".checkLayout") || strings.HasSuffix(action, ".listSheets"):
+		verb = "read"
+	case strings.HasSuffix(action, ".formatRange") || strings.HasSuffix(action, ".formatTable") ||
+		strings.HasSuffix(action, ".restyle") || strings.HasSuffix(action, ".insertBlocks"):
+		verb = "format"
+	}
+	return action, verb
+}
+
+// jsonActionField: doc truong "action" trong arguments JSON ma khong giai ma het
+// (arguments co the rat lon nen chi quet chuoi).
+func jsonActionField(arguments string) string {
+	text := strings.TrimSpace(arguments)
+	if len(text) < 12 || text[0] != 123 {
+		return ""
+	}
+	idx := strings.Index(text, "\"action\"")
+	quote := "\""
+	if idx < 0 {
+		idx = strings.Index(text, "'action'")
+		quote = "'"
+		if idx < 0 {
+			return ""
+		}
+	}
+	rest := text[idx+8:]
+	colon := strings.Index(rest, ":")
+	if colon < 0 {
+		return ""
+	}
+	rest = strings.TrimSpace(rest[colon+1:])
+	if rest == "" || rest[:1] != quote {
+		return ""
+	}
+	end := strings.Index(rest[1:], quote)
+	if end < 0 {
+		return ""
+	}
+	return rest[1 : 1+end]
+}
+
+func (g *sameTaskGuard) beforeCall(_ *agentLoop, call ToolCall) *ToolResult {
+	key := sameTaskKey(call)
+	if key == "" {
+		return nil
+	}
+	g.counts[key]++
+	if g.counts[key] <= g.limit {
+		return nil
+	}
+	return &ToolResult{CallID: call.ID, Name: call.Name, ResultJSON: ErrorJSON("blocked: " + key + " already ran too many times in this request with different arguments - stop repeating the same task one item at a time; read the outline first, batch the changes (e.g. writer.replaceMany instead of many writer.replaceAll), or answer the user")}
+}
+
 // oncePerReplyGuard (OncePerReply): tool thay CA trang thai (write_todos ghi de ca danh sach) chi chay mot lan moi
 // phan hoi - hai lan song song thi khong biet lan nao thang (LangChain TodoListMiddleware).
 type oncePerReplyGuard struct {
@@ -317,6 +432,47 @@ func (g *repeatedFailureGuard) afterTools(loop *agentLoop, turn *Turn, results [
 		"in a row (%s: %s) - stopping instead of repeating", g.count, call.Name, Truncate(results[0].ResultJSON, 200))}
 }
 
+// heavyRunGuard (17-R0 muc 3.3): canh bao khi luot vuot nguong vong/token - hoi tiep hay dung.
+//
+// Luot that 15/10/2026 (deepseek, "Lam toan bo"): 59 vong, 2 trieu token, 20 phut chay im lang.
+// Guard hoi nguoi dung bang the Choose (qua AgentCallbacks.AskContinue): tiep tuc hay dung.
+// Khong co ai de hoi (AskContinue nil, Interactive=false) thi cu chay tiep nhu cu - khong doi
+// hanh vi ai.ask. Moi nguong chi hoi MOT lan de khong spam.
+type heavyRunGuard struct {
+	roundAsked bool
+	tokenAsked bool
+}
+
+// heavyRunRoundAt / heavyRunTokenAt: nguong hoi (vong 30, billable 500k) theo 17-R0 muc 4.
+const (
+	heavyRunRoundAt = 30
+	heavyRunTokenAt = 500_000
+)
+
+func (g *heavyRunGuard) afterTools(loop *agentLoop, _ *Turn, _ []ToolResult) *verdict {
+	ask := loop.callbacks.AskContinue
+	if ask == nil {
+		return nil
+	}
+	result := loop.result
+	if !g.roundAsked && result.Rounds >= heavyRunRoundAt {
+		g.roundAsked = true
+		loop.addLine("(luot da chay toi vong 30 - hoi nguoi dung co chay tiep)")
+		if !ask(result.Rounds, result.BillableTokens(), "run da chay 30 vong") {
+			return &verdict{end: true, kind: "cancelled", err: "cancelled by user at round 30 (heavy run check)"}
+		}
+		loop.addLine("(nguoi dung cho chay tiep sau vong 30)")
+	}
+	if !g.tokenAsked && result.BillableTokens() >= heavyRunTokenAt {
+		g.tokenAsked = true
+		loop.addLine("(luot da dot 500k token billable - hoi nguoi dung co chay tiep)")
+		if !ask(result.Rounds, result.BillableTokens(), "run da dot 500k token") {
+			return &verdict{end: true, kind: "cancelled", err: "cancelled by user at 500k tokens (heavy run check)"}
+		}
+		loop.addLine("(nguoi dung cho chay tiep sau 500k token)")
+	}
+	return nil
+}
 // budgetGuard (MaxTokens): ngan sach ba muc - 80% nhac tiet kiem, 90% tat tool de model viet cau tra loi cuoi,
 // vuot 100% thi dung. Chi dem token phai tra (BillableTokens).
 type budgetGuard struct{ economyNudged bool }

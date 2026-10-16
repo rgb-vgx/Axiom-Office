@@ -1,4 +1,4 @@
-package model
+﻿package model
 
 import (
 	"context"
@@ -43,6 +43,10 @@ type AgentOptions struct {
 	// MaxIdenticalCalls: lan goi thu (n+1) Y HET (cung tool, cung doi so) trong mot luot bi chan, khong chay -
 	// ca khi cac lan truoc thanh cong (doc lai cung mot thu, sua cung mot cho). 0 = khong chan.
 	MaxIdenticalCalls int
+	// MaxSameTaskCalls: chan vong lap 'cung mot viec, khac tham so' (17-R0 muc 3.3).
+	// Luot that 14/10/2026: 137 lan writer.replaceAll voi find khac nhau, 48 vong, 1,48 trieu token.
+	// Dem theo nhom viec (tool + lenh + dong tac), khong ke chi tiet doi so. 0 = khong chan.
+	MaxSameTaskCalls int
 	// ContextClearAt: dau vao cua mot vong vuot so token nay thi thay ket qua tool cu bang mot dong tom tat, chi giu
 	// ContextKeepResults ket qua gan nhat (Anthropic context editing / LangChain ClearToolUsesEdit). Chi don khi thu
 	// hoi duoc it nhat contextClearMinChars ky tu - don lam hong cache tien to mot lan nen phai dang. 0 = tat.
@@ -82,6 +86,7 @@ func DefaultAgentOptions() AgentOptions {
 		Verify:               true,
 		MaxIdenticalFailures: DefaultMaxIdenticalFailures,
 		MaxIdenticalCalls:    DefaultMaxIdenticalCalls,
+		MaxSameTaskCalls:    DefaultMaxSameTaskCalls,
 		ContextClearAt:       DefaultContextClearAt,
 		ContextKeepResults:   DefaultContextKeepResults,
 	}
@@ -101,6 +106,10 @@ const (
 // DefaultMaxIdenticalFailures: so vong lap lai y het mot tool call hong truoc khi dung luot chay.
 const DefaultMaxIdenticalFailures = 3
 
+// DefaultMaxSameTaskCalls: nguong chan loop 'cung viec khac tham so' (17-R0).
+// 25 lan du rong cho sua nhieu muc that (vd 20 tieu de), nhung chan duoc 137 lan replaceAll don le.
+const DefaultMaxSameTaskCalls = 25
+
 type AgentCallbacks struct {
 	Transcript   func(line string)
 	RoundStarted func(round int)
@@ -113,6 +122,9 @@ type AgentCallbacks struct {
 	Live func(round int, update LiveUpdate)
 	// ModelSwitched: luot chuyen sang model du phong (from -> to) vi model dang dung hong (reason).
 	ModelSwitched func(from, to, reason string)
+	// AskContinue: hoi nguoi dung co cho luot chay tiep khi vuot nguong (17-R0).
+	// Tra true = chay tiep, false/nil = dung luot. Nhan (vong, billableTokens, lyDo).
+	AskContinue func(round, billable int, reason string) bool
 }
 
 type AgentResult struct {

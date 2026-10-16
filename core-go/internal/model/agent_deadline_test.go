@@ -1,4 +1,4 @@
-package model
+﻿package model
 
 import (
 	"context"
@@ -24,6 +24,7 @@ func TestRunAgentEnforcesDeadline(t *testing.T) {
 	options := DefaultAgentOptions()
 	options.Deadline = 2 * time.Second
 	options.MaxIdenticalCalls = 0 // server gia lap lai mot tool call y het: thu dong ho, khong thu bo chan lap
+	options.MaxSameTaskCalls = 0 // cung tat guard cung-viec (tool t lap 28+ lan) - thu dong ho
 	result := client.RunAgent(context.Background(), "s", nil, "u",
 		[]Tool{{Name: "t", Description: "d", Parameters: json.RawMessage(`{"type":"object"}`)}},
 		func(ctx context.Context, call ToolCall) ToolResult {
