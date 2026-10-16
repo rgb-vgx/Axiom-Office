@@ -74,12 +74,46 @@ func TestSameTaskGuardExemptsChunkedWrites(t *testing.T) {
 	}
 }
 
+// Viet tai lieu tung phan duoc mien: 30 lan writer.heading khac text khong bi chan (luot 16/10/2026
+// bi chan 37 lan giua pha viet lai tai lieu - xem guards.go sameTaskExempt).
+func TestSameTaskGuardExemptsDocumentBuild(t *testing.T) {
+	officeTools := []Tool{{Name: "office_action", Description: "d", Parameters: nil}}
+	makeReply := func(n int) string {
+		args := fmt.Sprintf(`{"action":"writer.heading","params":{"level":1,"text":"PHAN %d"}}`, n)
+		return fmt.Sprintf(`{"choices":[{"message":{"role":"assistant","content":null,"tool_calls":[{"id":"c%d","function":{"name":"office_action","arguments":%q}}]}}],"usage":{"prompt_tokens":10,"completion_tokens":1}}`, n, args)
+	}
+	replies := []string{}
+	for i := 1; i <= 30; i++ {
+		replies = append(replies, makeReply(i))
+	}
+	replies = append(replies, fmt.Sprintf(replyText, "da xong"))
+	server, _ := verifyServer(t, replies)
+	client := NewClient(server.Client(), "openai", server.URL, "", "m")
+	executed := 0
+	options := DefaultAgentOptions()
+	options.MaxRounds = 35
+	options.Verify = false
+	options.MaxSameTaskCalls = 10
+	client.RunAgent(context.Background(), "s", nil, "u", officeTools,
+		func(ctx context.Context, call ToolCall) ToolResult {
+			executed++
+			return ToolResult{CallID: call.ID, Name: call.Name, OK: true, ResultJSON: `{"ok":true}`}
+		}, options, AgentCallbacks{})
+	if executed != 30 {
+		t.Fatalf("viet tai lieu tung phan khong duoc chan (thuc te %d/30)", executed)
+	}
+}
+
 // Tat guard khi MaxSameTaskCalls = 0 (tuong thich cu).
 func TestSameTaskKeyUnit(t *testing.T) {
 	cases := []struct{ args, want string }{
 		{`{"action":"writer.replaceAll","params":{"find":"a"}}`, "office_action writer.replaceAll replace"},
 		{`{"action":"et.readRange","params":{"range":"A1:B2"}}`, "office_action et.readRange read"},
 		{`{"action":"et.writeRange","params":{"range":"A1"}}`, ""},
+		{`{"action":"writer.heading","params":{"text":"PHAN 1"}}`, ""},
+		{`{"action":"writer.appendText","params":{"text":"x"}}`, ""},
+		{`{"action":"writer.insertStyledText","params":{"text":"x"}}`, ""},
+		{`{"action":"wpp.addSlideFromTemplate","params":{"tag":"s1"}}`, ""},
 		{`not-json`, "office_action ?"},
 		{`{}`, "office_action ?"},
 	}

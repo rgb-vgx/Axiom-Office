@@ -246,13 +246,28 @@ type sameTaskGuard struct {
 	counts map[string]int
 }
 
-// sameTaskExempt: nhom viec duoc mien khoi dem - ghi du lieu theo khoi, moi lan la mot phan viec that.
+// sameTaskExempt: nhom viec duoc mien khoi dem - ghi du lieu theo khoi hoac dung bai tung phan,
+// moi lan goi la mot phan viec that (khong phai vong lap "sua tung cho mot").
 var sameTaskExempt = map[string]bool{
 	"office_action et.writeRange":   true,
 	"office_action et.writeRanges":  true,
 	"office_action et.fillRange":    true,
 	"office_action et.importCsv":    true,
+	"office_action et.addSheet":     true,
 	"office_action writer.typeText": true,
+	// Viet tai lieu / dung bai tung phan (16/10/2026): moi tieu de, moi doan, moi bang, moi slide la mot
+	// phan viec that. Luot bao cao chan doan hinh anh 18:19 bi chan 37 lan (writer.heading/appendText/
+	// insertStyledText het han muc 25 giua pha viet lai) nen model khong viet tiep duoc - phai mien nhom
+	// "dung len" nay. Vong sua tung cho mot (replaceAll...), vong doc lai, va lap Y HET van bi chan boi
+	// cac guard khac (identicalCallGuard, heavy-run watchdog).
+	"office_action writer.heading":             true,
+	"office_action writer.appendText":          true,
+	"office_action writer.insertText":          true,
+	"office_action writer.insertStyledText":    true,
+	"office_action writer.insertTable":         true,
+	"office_action writer.insertBlocks format": true,
+	"office_action wpp.addSlide":               true,
+	"office_action wpp.addSlideFromTemplate":   true,
 }
 
 func sameTaskKey(call ToolCall) string {
