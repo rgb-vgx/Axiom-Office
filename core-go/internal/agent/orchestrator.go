@@ -81,12 +81,14 @@ func ParseRequest(body map[string]any) (*Request, string) {
 	var document *DocumentContext
 	if raw, ok := body["document"].(map[string]any); ok {
 		selection := ""
+		locked := false
 		if text, ok := raw["selection"].(map[string]any); ok {
 			selection, _ = text["text"].(string)
+			locked, _ = text["locked"].(bool)
 		}
 		name, _ := raw["name"].(string)
 		fullName, _ := raw["fullName"].(string)
-		document = &DocumentContext{Name: name, FullName: fullName, SelectionText: selection}
+		document = &DocumentContext{Name: name, FullName: fullName, SelectionText: selection, SelectionLocked: locked}
 		if view, ok := raw["view"].(map[string]any); ok {
 			document.Slide = intOf(view["slide"])
 			document.SlideCount = intOf(view["slideCount"])
@@ -230,7 +232,9 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 		list = append(list, tools.NewSlidesFromTemplateTool())
 	}
 	// Trinh bay lai tai lieu Word theo mau (khoi bo tron nen nhat): chi khi sua duoc va bridge co lenh dung khoi.
-	if appKind == "wps" && !request.Plan && catalog.Has("writer.insertBlocks") {
+	// Dang khoa vung boi den thi khong mo (doc_design trinh bay lai ca tai lieu, bridge se tu choi).
+	locked := request.Document != nil && request.Document.SelectionLocked
+	if appKind == "wps" && !request.Plan && !locked && catalog.Has("writer.insertBlocks") {
 		list = append(list, tools.NewDocDesignTool())
 	}
 	// Danh sach viec (write_todos): chi khi lam that - lap ke hoach da tra ve ke hoach bang chu.

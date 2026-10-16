@@ -846,7 +846,12 @@ namespace AxiomOffice.Ai
                 if (view.TryGetValue("selection", out selection))
                 {
                     view.Remove("selection");
-                    document["selection"] = new Dictionary<string, object> { { "text", selection } };
+                    document["selection"] = new Dictionary<string, object>
+                    {
+                        { "text", selection },
+                        // Khung chat đã khoá vùng bôi đen (bridge từ chối lệnh sửa ngoài vùng): Core báo cho model.
+                        { "locked", CommandDispatcher.SelectionLocked }
+                    };
                 }
                 if (view.Count > 0)
                 {

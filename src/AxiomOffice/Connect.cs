@@ -30,7 +30,7 @@ namespace AxiomOffice
         public string GetCustomUI(string RibbonID)
         {
             Logger.Info("GetCustomUI called: " + RibbonID);
-            return RibbonUi.Xml(IsOfficeHost);
+            return RibbonUi.Xml(IsOfficeHost, RibbonID);
         }
 
         // Callback ribbon (host gọi qua IDispatch theo tên trong RibbonUi.RibbonXml).

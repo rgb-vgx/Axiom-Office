@@ -5,6 +5,23 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Bôi đen hỏi đáp: AI chỉ sửa vùng chọn; bảng trong vùng được bảo vệ (16/10/2026)
+- Menu chuột phải trong Word (**Hỏi AI về đoạn này** — Text/List/Table, customUI 2009/07): mở khung chat với
+  vùng đang bôi đen đã khoá; pane gửi `document.selection.locked` để Core biết "chỉ sửa vùng chọn".
+- Khoá vùng chọn (`CommandDispatcher.WriterScope.cs`; lệnh `writer.lockSelection`/`unlockSelection`, không mở
+  cho agent — LibreOffice báo "not supported"): mọi lệnh `writer.*` chỉ được đổi chữ trong vùng; lệnh chạm ra
+  ngoài bị từ chối; con trỏ ngoài vùng được chọn lại; mỗi lệnh ghi kiểm chứng phần ngoài không đổi, đổi thì
+  Undo + báo lỗi cho model.
+- **Bảng nằm trọn trong vùng khoá được bảo vệ**: `typeText`/`insertStyledText`/`heading`/`insertHyperlink` bị
+  từ chối kèm chỉ dẫn (sửa chữ trong ô bằng `replaceAll`/`replaceMany`, restyle bằng `formatTable`);
+  `insertPageBreak` bị từ chối khi đang khoá (Word thay cả vùng chọn bằng dấu ngắt); lưới an toàn đếm lại số
+  bảng sau mỗi lệnh ghi — mất bảng thì Undo + báo lỗi (lượt thật 16/10/2026: `typeText` đè lên bảng giáo án,
+  mất định dạng bảng).
+- Core: `SelectionLockRule` trong prompt (chỉ đường sửa trong ô, dừng lại báo người dùng khi cần đổi cấu trúc);
+  bỏ tool `doc_design` khi đang khoá.
+- Dọn nợ kiểm thử cùng đợt: kỳ vọng registry LibreOffice 71→80; bộ WPS nhận 15 lệnh wpp (gồm 3 lệnh compose);
+  `CHUA_CO_HANDLER` +9 lệnh chưa có handler trong add-in WPS JS; sinh lại bảng lệnh README (77 lệnh).
+
 ### Added — Wizard Thiết lập dịch theo ngôn ngữ đang chọn (16/10/2026)
 - `SetupWizardForm` + `CoreSetup`: mọi chuỗi hiển thị bọc `Ui.T`; chữ lấy từ `catalog/setup.json`
   (tiêu đề/mô tả bước, nhà cung cấp, tên tính năng, dòng kiểm tra) dịch lúc hiển thị — không sửa

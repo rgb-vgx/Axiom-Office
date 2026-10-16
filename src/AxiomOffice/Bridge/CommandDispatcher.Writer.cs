@@ -241,10 +241,21 @@ namespace AxiomOffice.Bridge
             }
             int count = 0;
             int start = 0;
+            int lockStart, lockEnd;
+            // Đang khoá vùng bôi đen: chỉ tìm trong vùng đó (cận cuối tính lại mỗi vòng vì chữ thay có thể dài/ngắn hơn).
+            bool locked = LockBounds((object)doc, out lockStart, out lockEnd);
+            if (locked)
+            {
+                start = lockStart;
+            }
             int lastAt = -1;
             for (int guard = 0; guard < 200; guard++)
             {
                 int end = Convert.ToInt32(doc.Content.End);
+                if (locked && LockBounds((object)doc, out lockStart, out lockEnd))
+                {
+                    end = lockEnd;
+                }
                 if (start >= end)
                 {
                     break;

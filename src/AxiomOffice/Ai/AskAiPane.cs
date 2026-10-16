@@ -215,6 +215,7 @@ namespace AxiomOffice.Ai
             if (disposing)
             {
                 Ui.Changed -= OnUiLanguageChanged;
+                CommandDispatcher.UnlockSelection();
             }
             if (disposing && _run != null)
             {
@@ -602,6 +603,23 @@ namespace AxiomOffice.Ai
             if (plan)
             {
                 _chat.AddInfo(Ui.T("Lập kế hoạch: AI chỉ đọc tài liệu, chưa sửa gì"));
+            }
+            // Đang bôi đen trong Word: AI chỉ được sửa vùng đó tới hết lượt (CommandDispatcher.WriterScope.cs).
+            int locked = 0;
+            if (host.AppKind == "wps")
+            {
+                try
+                {
+                    locked = CommandDispatcher.LockSelection(host);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error("AskAiPane: lock selection failed", ex);
+                }
+            }
+            if (locked > 0)
+            {
+                _chat.AddInfo(Ui.T("Chỉ sửa trong vùng đang bôi đen (") + locked + Ui.T(" ký tự). Muốn AI sửa cả tài liệu thì bỏ bôi đen rồi hỏi lại."));
             }
             _chat.AddTyping();
             SetStatus(Ui.T("Đang xử lý…"), false);
@@ -1134,6 +1152,7 @@ namespace AxiomOffice.Ai
             }
             _run = null;
             run.Dispose();
+            CommandDispatcher.UnlockSelection();
             _busy = false;
             _stopLink.Visible = false;
             _busyDot.Visible = false;

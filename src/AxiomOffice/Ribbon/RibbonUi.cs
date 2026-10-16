@@ -75,7 +75,22 @@ namespace AxiomOffice.Ribbon
             "</group>" +
             "</tab>" +
             "</tabs></ribbon>" +
+            ContextMenuMarker +
             "</customUI>";
+
+        // Menu chuột phải khi bôi đen trong Word (16/10/2026): mở khung chat; gửi yêu cầu lúc vùng còn bôi đen thì AI
+        // chỉ sửa trong vùng đó (khoá ở CommandDispatcher.WriterScope.cs). Mini Toolbar không cho add-in chèn nút.
+        // contextMenus cần schema customUI 2009/07 (Office 2010+); WPS không nhận chắc nên chỉ trả cho Office.
+        private const string ContextMenuMarker = "<!--context-->";
+        private const string ContextMenuXml =
+            "<contextMenus>" +
+            "<contextMenu idMso=\"ContextMenuText\"><button id=\"ctxAskAiText\" label=\"Hỏi AI về đoạn này\" imageMso=\"Help\"" +
+            " onAction=\"OnButtonAction\" tag=\"askAiSelection\" insertBeforeMso=\"Cut\"/></contextMenu>" +
+            "<contextMenu idMso=\"ContextMenuList\"><button id=\"ctxAskAiList\" label=\"Hỏi AI về đoạn này\" imageMso=\"Help\"" +
+            " onAction=\"OnButtonAction\" tag=\"askAiSelection\" insertBeforeMso=\"Cut\"/></contextMenu>" +
+            "<contextMenu idMso=\"ContextMenuTextTable\"><button id=\"ctxAskAiTable\" label=\"Hỏi AI về đoạn này\" imageMso=\"Help\"" +
+            " onAction=\"OnButtonAction\" tag=\"askAiSelection\" insertBeforeMso=\"Cut\"/></contextMenu>" +
+            "</contextMenus>";
 
         // Chỗ chèn menu ngôn ngữ (danh sách ngôn ngữ lấy lúc nạp ribbon: thêm tệp lang\*.json là có thêm mục).
         private const string LanguageMenuMarker = "<!--language-->";
@@ -91,7 +106,19 @@ namespace AxiomOffice.Ribbon
         // XML ribbon theo ngôn ngữ đang chọn. dynamicLabels: Office (getLabel...); false: WPS (nhãn tĩnh).
         public static string Xml(bool dynamicLabels)
         {
+            return Xml(dynamicLabels, null);
+        }
+
+        // ribbonId (GetCustomUI): "Microsoft.Word.Document"... - menu chuột phải chỉ cho Word chạy trên Office.
+        public static string Xml(bool dynamicLabels, string ribbonId)
+        {
             string xml = RibbonXml.Replace(LanguageMenuMarker, LanguageMenu());
+            bool contextMenu = dynamicLabels && string.Equals(ribbonId, "Microsoft.Word.Document", StringComparison.Ordinal);
+            xml = xml.Replace(ContextMenuMarker, contextMenu ? ContextMenuXml : "");
+            if (contextMenu)
+            {
+                xml = xml.Replace("http://schemas.microsoft.com/office/2006/01/customui", "http://schemas.microsoft.com/office/2009/07/customui");
+            }
             lock (Texts)
             {
                 Texts.Clear();
@@ -507,6 +534,7 @@ namespace AxiomOffice.Ribbon
                     OpenLog();
                     break;
                 case "askAi":
+                case "askAiSelection":
                     connect.ShowAskAiPane();
                     break;
                 case "setup":

@@ -36,6 +36,8 @@ var liveCommands = []liveCommand{
 	{Name: "writer.insertHyperlink", Kind: "wps", Params: []liveCommandParam{{Name: "url", Hint: ""}, {Name: "text", Hint: ""}}},
 	{Name: "writer.replaceAll", Kind: "wps", Params: []liveCommandParam{{Name: "find", Hint: ""}, {Name: "replace", Hint: ""}}},
 	{Name: "writer.replaceMany", Kind: "wps", Params: []liveCommandParam{{Name: "edits", Hint: "array of {find, replace}; up to 200"}}},
+	{Name: "writer.lockSelection", Kind: "wps", Params: []liveCommandParam{}},
+	{Name: "writer.unlockSelection", Kind: "wps", Params: []liveCommandParam{}},
 	{Name: "writer.outline", Kind: "wps", Params: []liveCommandParam{{Name: "maxChars", Hint: "characters per paragraph (default 160)"}}},
 	{Name: "writer.restyle", Kind: "wps", Params: []liveCommandParam{{Name: "accent", Hint: "#RRGGBB headings (default #2E5C8A)"}, {Name: "font", Hint: "default Times New Roman"}, {Name: "size", Hint: "body size (default 13)"}}},
 	{Name: "writer.insertBlocks", Kind: "wps", Params: []liveCommandParam{{Name: "blocks", Hint: "array of {before | replaceFrom, replaceTo, kind: box|row, gap, after, cells: [{tone, lines: [{k: title|bullet|text|small|center, t, size, bold}]}]}"}, {Name: "accent", Hint: ""}, {Name: "font", Hint: ""}}},

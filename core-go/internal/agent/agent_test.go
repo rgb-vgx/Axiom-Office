@@ -442,3 +442,22 @@ func TestConfirmationsChoose(t *testing.T) {
 		t.Fatalf("tu go de trong -> rong, duoc %q", got)
 	}
 }
+
+// Khoa vung boi den (16/10/2026): pane gui selection.locked -> prompt noi ro chi sua vung chon.
+func TestParseRequestSelectionLock(t *testing.T) {
+	request, problem := ParseRequest(map[string]any{
+		"prompt": "viết lại cho hay", "office": map[string]any{"port": float64(1)},
+		"document": map[string]any{"name": "a.docx", "selection": map[string]any{"text": "Đoạn đã chọn", "locked": true}},
+	})
+	if problem != "" || request.Document == nil || !request.Document.SelectionLocked {
+		t.Fatalf("phai doc duoc locked: %q %+v", problem, request.Document)
+	}
+	view := ViewSection(request.Document)
+	if !strings.Contains(view, "ONLY it may change") || !strings.Contains(view, "Đoạn đã chọn") {
+		t.Fatalf("prompt phai noi chi sua vung chon: %s", view)
+	}
+	request.Document.SelectionLocked = false
+	if view := ViewSection(request.Document); strings.Contains(view, "ONLY it may change") || !strings.Contains(view, "Current selection") {
+		t.Fatalf("khong khoa thi giu cau cu: %s", view)
+	}
+}

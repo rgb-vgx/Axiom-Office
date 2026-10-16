@@ -627,6 +627,14 @@ def _design_unsupported(env, params):
     raise values.ParamError("not available on LibreOffice yet: format with writer.formatSelection/writer.formatTable")
 
 
+def _lock_unsupported(env, params):
+    # Khoa vung boi den moi co tren Word (CommandDispatcher.WriterScope.cs); ban LibreOffice lam sau.
+    raise values.ParamError("not available on LibreOffice yet")
+
+
+command("writer.lockSelection", "wps", _lock_unsupported,
+        "Khoá vùng đang bôi đen: tới khi mở khoá, lệnh writer.* chỉ được đổi chữ trong vùng đó (chars = 0: không bôi đen, không khoá)")
+command("writer.unlockSelection", "wps", _lock_unsupported, "Mở khoá vùng bôi đen")
 command("writer.outline", "wps", _design_unsupported,
         "Dàn bài tài liệu: các đoạn (số thứ tự toàn tài liệu, chữ rút gọn, số tự động) và bảng (số hàng, cột, hàng tiêu đề)",
         opt("maxChars", "characters per paragraph (default 160)"))

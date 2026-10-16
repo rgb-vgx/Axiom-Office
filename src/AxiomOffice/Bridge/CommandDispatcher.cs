@@ -22,6 +22,7 @@ namespace AxiomOffice.Bridge
         internal static readonly CommandInfo[] Commands = GeneralCommands()
             .Concat(WriterCommands())
             .Concat(WriterDesignCommands())
+            .Concat(WriterScopeCommands())
             .Concat(SpreadsheetCommands())
             .Concat(PresentationCommands())
             .Concat(TemplateCommands())
@@ -95,7 +96,8 @@ namespace AxiomOffice.Bridge
             }
             try
             {
-                return Ok(command.Handler(host, p));
+                // Khoá vùng bôi đen (CommandDispatcher.WriterScope.cs): lệnh writer.* chỉ được đổi chữ trong vùng đã chọn.
+                return Ok(RunInSelectionLock(host, action, command, p));
             }
             catch (CommandRejectedException ex)
             {

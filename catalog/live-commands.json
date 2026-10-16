@@ -415,6 +415,20 @@
     ]
   },
   {
+    "name": "writer.lockSelection",
+    "kind": "wps",
+    "agent": false,
+    "summary": "Khoá vùng đang bôi đen: tới khi mở khoá, lệnh writer.* chỉ được đổi chữ trong vùng đó (chars = 0: không bôi đen, không khoá)",
+    "params": []
+  },
+  {
+    "name": "writer.unlockSelection",
+    "kind": "wps",
+    "agent": false,
+    "summary": "Mở khoá vùng bôi đen",
+    "params": []
+  },
+  {
     "name": "writer.outline",
     "kind": "wps",
     "agent": false,

@@ -404,7 +404,7 @@ công cụ); lệnh khai báo cạnh handler trong `src/AxiomOffice/Bridge/Comma
 | `app.info` | — | Tên/version app, tài liệu đang mở, `state` (tài liệu, cửa sổ, visible) |  |
 | `ai.ask` | `prompt` | Chạy AI agent trên tài liệu đang mở; trả `reply`, `transcript`, `seconds`, `rounds` |  |
 | `ui.askpane` | — | Mở task pane Ask AI |  |
-| `app.screenshot` | `maxWidth?` | Ảnh chụp cửa sổ app (PNG base64, thu nhỏ theo `maxWidth`, mặc định 1280) |  |
+| `app.screenshot` | `maxWidth?` | Ảnh chụp trang/slide hiện tại (PNG base64, thu nhỏ theo `maxWidth`, mặc định 1280) |  |
 | `writer.newDocument` | — | Tạo tài liệu mới |  |
 | `writer.open` | `path` | Mở .docx/.doc |  |
 | `writer.getText` | `maxChars?` | Đọc toàn bộ text | ✓ |
@@ -421,11 +421,17 @@ công cụ); lệnh khai báo cạnh handler trong `src/AxiomOffice/Bridge/Comma
 | `writer.insertImage` | `path`, `width?`, `height?` | Chèn ảnh tại con trỏ (kích thước theo point) | ✓ |
 | `writer.insertHyperlink` | `url`, `text?` | Chèn liên kết | ✓ |
 | `writer.replaceAll` | `find`, `replace?` | Tìm và thay toàn bộ | ✓ |
+| `writer.replaceMany` | `edits` | Thay NHIỀU chỗ trong một lần: `edits` = [{find, replace}] theo thứ tự (mỗi cặp thay mọi chỗ khớp) - dùng thay cho nhiều lần writer.replaceAll; trả số chỗ đã thay của từng cặp | ✓ |
 | `writer.undo` | `count?` | Hoàn tác (mỗi thao tác AI = 1 bước) | ✓ |
 | `writer.exportPdf` | `path` | Xuất PDF | ✓ |
 | `writer.save` | — | Lưu | ✓ |
 | `writer.saveAs` | `path` | Lưu thành file mới | ✓ |
 | `writer.closeAll` | — | **Đóng mọi tài liệu, không lưu** |  |
+| `writer.outline` | `maxChars?` | Dàn bài tài liệu: các đoạn (số thứ tự toàn tài liệu, chữ rút gọn, số tự động) và bảng (số hàng, cột, hàng tiêu đề) |  |
+| `writer.restyle` | `accent?`, `font?`, `size?` | Trình bày lại nền chung KHÔNG đổi chữ: tiêu đề mục (I., A., *), tiêu đề con (1.), nhãn (a. ...:), gạch đầu dòng hai cấp, bỏ dòng trống thừa, bảng (viền mảnh, hàng tiêu đề nhạt lặp lại), lề trang, số trang |  |
+| `writer.insertBlocks` | `blocks`, `accent?`, `font?` | Chèn khối bo tròn nền nhạt (ô ghi chú, cảnh báo, thẻ cạnh nhau) - thay các đoạn [replaceFrom, replaceTo] hoặc chèn trước đoạn `before` |  |
+| `writer.lockSelection` | — | Khoá vùng đang bôi đen: tới khi mở khoá, lệnh writer.* chỉ được đổi chữ trong vùng đó (chars = 0: không bôi đen, không khoá) |  |
+| `writer.unlockSelection` | — | Mở khoá vùng bôi đen |  |
 | `et.newWorkbook` | — | Tạo workbook mới |  |
 | `et.open` | `path` | Mở .xlsx/.xls/.csv |  |
 | `et.listSheets` | — | Danh sách sheet + sheet đang active | ✓ |
@@ -449,20 +455,29 @@ công cụ); lệnh khai báo cạnh handler trong `src/AxiomOffice/Bridge/Comma
 | `et.saveAs` | `path` | Lưu thành file mới | ✓ |
 | `wpp.newPresentation` | — | Tạo bản trình chiếu mới |  |
 | `wpp.open` | `path` | Mở .pptx |  |
-| `wpp.listSlides` | — | Số slide + text từng slide | ✓ |
+| `wpp.listSlides` | `presentation?` | Số slide + text từng slide | ✓ |
 | `wpp.addSlide` | `layout?` | Thêm slide cuối; `layout` mặc định 12 = trống (1 = tiêu đề, 2 = tiêu đề + nội dung, 11 = chỉ tiêu đề) | ✓ |
-| `wpp.addText` | `text`, `slide?`, `left?`, `top?`, `width?`, `height?`, `fontSize?`, `bold?`, `color?`, `align?` | Textbox có định dạng (`color` dạng `#RRGGBB`, `align` left/center/right) | ✓ |
+| `wpp.addText` | `text`, `slide?`, `left?`, `top?`, `width?`, `height?`, `fontSize?`, `bold?`, `color?`, `align?`, `presentation?` | Textbox có định dạng (`color` dạng `#RRGGBB`, `align` left/center/right) | ✓ |
 | `wpp.addTextBox` | `text`, `slide?`, `left?`, `top?`, `width?`, `height?` | Textbox |  |
 | `wpp.addImage` | `path`, `slide?`, `left?`, `top?`, `width?`, `height?` | Chèn ảnh (kích thước gốc nếu bỏ trống `width`/`height`) | ✓ |
 | `wpp.addTable` | `rows?`, `cols?`, `values?`, `slide?`, `left?`, `top?`, `width?`, `height?` | Bảng; `rows`/`cols` tự suy ra/nới theo `values` | ✓ |
-| `wpp.setNotes` | `text`, `slide?` | Ghi chú thuyết trình | ✓ |
+| `wpp.setNotes` | `text`, `slide?`, `presentation?` | Ghi chú thuyết trình | ✓ |
 | `wpp.deleteSlide` | `slide?` | Xoá slide (mặc định slide cuối) | ✓ |
 | `wpp.exportPdf` | `path` | Xuất PDF | ✓ |
-| `wpp.save` | — | Lưu | ✓ |
+| `wpp.save` | `presentation?` | Lưu | ✓ |
 | `wpp.saveAs` | `path` | Lưu thành file mới | ✓ |
+| `wpp.newFromTemplate` | `template`, `path` | Tạo bài MỚI từ tệp mẫu (.pptx/.potx): giữ khổ + master, bỏ hết slide mẫu, lưu ở `path` và mở ra | ✓ |
+| `wpp.addSlideFromTemplate` | `template`, `kind`, `slide?`, `tag?`, `expect?`, `presentation?` | Chèn bản sao slide số `kind` của tệp mẫu (giữ ảnh nền, khung chữ, định dạng); trả tên các khung chữ | ✓ |
+| `wpp.sourceManifest` | `from`, `first?`, `last?` | Đọc bài nguồn (vd bài cũ .ppt) theo slide: tiêu đề, chữ, danh sách ảnh - để dựng lại theo mẫu | ✓ |
+| `wpp.setShapeText` | `shape`, `text`, `slide?`, `presentation?` | Thay chữ của một khung theo TÊN shape, giữ định dạng của khung (font, cỡ, màu) | ✓ |
+| `wpp.deleteShapes` | `shapes?`, `slide?`, `emptyPlaceholders?`, `presentation?` | Xoá các shape theo tên (mục lặp thừa của slide mẫu); không xoá ảnh nền | ✓ |
+| `wpp.copyPicture` | `from`, `fromSlide`, `shape?`, `slide?`, `left?`, `top?`, `width?`, `height?`, `overlays?`, `format?`, `region?`, `presentation?` | Chép ảnh từ slide của bài khác (vd bài cũ) vào slide của bài đang làm, co vừa khung, giữ tỉ lệ | ✓ |
+| `wpp.addParagraphs` | `paragraphs`, `slide?`, `left?`, `top?`, `width?`, `height?`, `fontSize?`, `minFontSize?`, `color?`, `accent?`, `font?`, `anchor?`, `box?`, `fill?`, `line?`, `highlight?`, `presentation?` | Khung chữ nhiều đoạn giữ phân cấp (cấp thụt lề, đậm, nghiêng, số thứ tự, gạch đầu dòng); tự chọn cỡ chữ lớn nhất vừa khung |  |
+| `wpp.addGrid` | `values`, `slide?`, `left?`, `top?`, `width?`, `height?`, `fontSize?`, `minFontSize?`, `header?`, `band?`, `color?`, `font?`, `presentation?` | Bảng có định dạng: dòng đầu là tiêu đề (nền màu, chữ trắng đậm), dòng xen kẽ nền nhạt, cột rộng theo nội dung, tự chọn cỡ chữ vừa khung |  |
+| `wpp.deleteTagged` | `first`, `last`, `presentation?` | Xoá các slide do công cụ dựng (có tag nguồn) mà tag bắt đầu trong [first, last] - dựng lại một lô theo bố cục mới |  |
 | `writer.checkTables` | — | Soát các bảng (chỉ đọc): số dòng/cột, ô trống, ô tiêu đề lẫn đoạn văn | ✓ |
 | `et.checkRange` | `range?`, `sheet?` | Soát bảng dữ liệu (chỉ đọc): tiêu đề trống, kiểu lẫn lộn, số dạng chữ, number format, dữ liệu lạc ngoài bảng | ✓ |
-| `wpp.checkLayout` | `slide?` | Soát bố cục slide (chỉ đọc): chữ tràn khung, shape ra ngoài slide, shape chồng nhau, chữ quá nhỏ | ✓ |
+| `wpp.checkLayout` | `slide?`, `presentation?` | Soát bố cục slide (chỉ đọc): chữ tràn khung, shape ra ngoài slide, shape chồng nhau, chữ quá nhỏ | ✓ |
 
 Lệnh `writer.*` tự kích hoạt tài liệu có cửa sổ hiển thị nếu `ActiveDocument` là tài liệu ẩn.
 App đang bận (dialog mở, đang gõ trong ô Excel) thì bridge tự thử lại lỗi COM "busy" tối đa 10 lần

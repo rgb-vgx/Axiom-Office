@@ -734,8 +734,8 @@ flowchart LR
 | `et.*` | đọc/ghi nhiều vùng, `fillRange`, chart, conditional format, `checkRange` | `open` |
 | `wpp.*` | slide/text/ảnh/bảng/notes, `checkLayout`, `sourceManifest`, `addSlideFromTemplate`... | `newPresentation`, `open`, `addTextBox` |
 
-Tổng registry C# hiện khoảng **71 lệnh** (tăng từ 47 ban đầu sau các đợt template/design/`replaceMany`); danh sách chuẩn
-nằm ở `catalog/live-commands.json` (gồm cả biến thể LibreOffice/WPS, ~78 mục, 57 `agent=true`) và bảng
+Tổng registry C# hiện **77 lệnh** (tăng từ 47 ban đầu sau các đợt template/design/`replaceMany`/khoá vùng chọn); danh sách chuẩn
+nằm ở `catalog/live-commands.json` (gồm cả biến thể LibreOffice/WPS, 80 mục, 57 `agent=true`) và bảng
 *Danh sách lệnh* trong README (sinh bằng `commands --markdown`).
 
 ### 14.2 Luồng thực thi

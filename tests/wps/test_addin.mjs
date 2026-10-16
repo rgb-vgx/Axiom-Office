@@ -252,6 +252,13 @@ const CHUA_CO_HANDLER = {
   "writer.insertImage": "chua co handler trong add-in (agent=true)",
   "writer.insertHyperlink": "chua co handler trong add-in (agent=true)",
   "writer.checkTables": "chua co handler trong add-in (agent=true)",
+  "writer.replaceMany": "chua co handler trong add-in (agent=true: tool nay se loi khi may dang la WPS)",
+  // Ba lenh thiet ke + khoa vung boi den: chi co o add-in Windows (COM); LibreOffice bao not supported.
+  "writer.outline": "chi co trong add-in Windows (lenh thiet ke, doc_design); WPS JS chua viet handler",
+  "writer.restyle": "chi co trong add-in Windows (lenh thiet ke, doc_design); WPS JS chua viet handler",
+  "writer.insertBlocks": "chi co trong add-in Windows (lenh thiet ke, doc_design); WPS JS chua viet handler",
+  "writer.lockSelection": "khoa vung boi den moi co o add-in Windows (COM); WPS JS chua viet handler",
+  "writer.unlockSelection": "khoa vung boi den moi co o add-in Windows (COM); WPS JS chua viet handler",
   // Nam lenh lam bai theo mau (docs/template-design.md muc 6.3): moi co tren PowerPoint (COM InsertFromFile,
   // Shape.Export); WPP chua kiem.
   "wpp.newFromTemplate": "chua co handler trong add-in (chi PowerPoint)",
@@ -260,6 +267,10 @@ const CHUA_CO_HANDLER = {
   "wpp.setShapeText": "chua co handler trong add-in (chi PowerPoint)",
   "wpp.deleteShapes": "chua co handler trong add-in (chi PowerPoint)",
   "wpp.copyPicture": "chua co handler trong add-in (chi PowerPoint)",
+  // Ba lenh sap xep bai (compose) cua duong tao slide tu mau: PowerPoint + LibreOffice compose.
+  "wpp.addParagraphs": "sap xep bai (compose) - chi PowerPoint/LibreOffice; WPS JS chua viet handler",
+  "wpp.addGrid": "sap xep bai (compose) - chi PowerPoint/LibreOffice; WPS JS chua viet handler",
+  "wpp.deleteTagged": "sap xep bai (compose) - chi PowerPoint/LibreOffice; WPS JS chua viet handler",
 };
 
 test("registry LibreOffice: moi lenh deu co handler, hoac nam trong danh sach chua lam (co ly do)", () => {

@@ -68,9 +68,10 @@ function slideOf(app, index) {
   return app.ActivePresentation.Slides.Item(index);
 }
 
-// Lenh lam bai theo mau: chi co handler tren PowerPoint (CHUA_CO_HANDLER cua test_addin.mjs).
+// Lenh lam bai theo mau + sap xep bai (compose): chi co handler tren PowerPoint/LibreOffice/Windows
+// (CHUA_CO_HANDLER cua test_addin.mjs); add-in WPS JS chua viet.
 const TEMPLATE_COMMANDS = ["wpp.newFromTemplate", "wpp.addSlideFromTemplate", "wpp.sourceManifest", "wpp.setShapeText",
-  "wpp.deleteShapes", "wpp.copyPicture"];
+  "wpp.deleteShapes", "wpp.copyPicture", "wpp.addParagraphs", "wpp.addGrid", "wpp.deleteTagged"];
 
 test("registry: du 15 lenh wpp.*, metadata giong het registry LibreOffice", () => {
   const ctx = loadAddin();

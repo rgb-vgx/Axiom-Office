@@ -131,7 +131,7 @@ class CatalogTests(unittest.TestCase):
     def test_registry_rejects_duplicate_name(self):
         """Dang ky trung ten phai nem loi (neu ro ten lenh + module/handler da dang ky truoc)."""
         before = dict(commands.REGISTRY)
-        self.assertEqual(len(before), 71)
+        self.assertEqual(len(before), 80)
         with self.assertRaises(ValueError) as raised:
             commands.command("et.checkRange", "et", lambda env, p: None, "ban trung")
         message = str(raised.exception)
@@ -139,9 +139,9 @@ class CatalogTests(unittest.TestCase):
         self.assertIn("axiom.checks.range_report", message)
         self.assertEqual(dict(commands.REGISTRY), before, "dang ky loi khong duoc doi registry")
 
-    def test_load_all_nap_du_71_lenh(self):
+    def test_load_all_nap_du_80_lenh(self):
         commands.load_all()
-        self.assertEqual(len(commands.REGISTRY), 71)
+        self.assertEqual(len(commands.REGISTRY), 80)
 
     def test_mcp_live_commands_khop_registry(self):
         """`catalog/live-commands.json` phai la dung dau ra cua `commands.catalog()`.

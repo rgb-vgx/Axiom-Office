@@ -51,10 +51,12 @@ def source_keys():
                         keys.add(unescape(match.group(1)))
                 keys.update(unescape(m) for m in TITLE.findall(text))
             if name == 'RibbonUi.cs':
-                start = text.index('public const string RibbonXml')
-                end = text.index('"</customUI>";', start)
-                for value in XML_TEXT.findall(text[start:end]):
-                    keys.add(xml_unescape(unescape(value)))
+                for begin, finish in (('public const string RibbonXml', '"</customUI>";'),
+                                      ('const string ContextMenuXml', '"</contextMenus>";')):
+                    start = text.index(begin)
+                    end = text.index(finish, start)
+                    for value in XML_TEXT.findall(text[start:end]):
+                        keys.add(xml_unescape(unescape(value)))
     # Tieng Viet ma khong co chu cai co dau (vd "Ask AI", "Axiom Office") thi khong can dich nhung van giu cho day du.
     keys.discard('')
     keys.update(catalog_keys())
