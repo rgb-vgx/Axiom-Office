@@ -5,6 +5,29 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Lưu nguồn web tải về: kho core.db + tool web_sources (16/10/2026)
+- Tool chrome-search gắn trailer 1 dòng `<<<AXIOM_WEB v1 ... AXIOM_WEB>>>` cuối kết quả web_search/web_fetch/
+  web_research (kèm url/title/lang/score/nội dung đã đọc). Core tách trailer TRƯỚC khi vào ngữ cảnh model
+  (model không thấy, không tốn token) rồi lưu vào core.db; JSON hỏng thì bỏ qua, kết quả giữ nguyên.
+- Schema v3: `web_sources` (1 dòng/URL, chống trùng: bỏ utm_*/fbclid/fragment/www, giữ bản đọc đầy đủ),
+  `web_source_refs` (lịch sử dùng theo từng lượt: truy vấn, mode lead/full, điểm, lỗi), `web_sources_fts`
+  (FTS5 external content; tìm không dấu qua textutil.Normalize — dùng chung bảng bỏ dấu với memory).
+- Tool mới `web_sources` cho model: search (tìm lại theo từ khoá), get (đọc đầy đủ, tối đa 60k ký tự),
+  list (nguồn dùng gần đây) — khỏi tải lại trang, dùng được khi mạng lỗi; có cả trong plan mode.
+- Vá lỗ hổng nguồn cho slide "Cập nhật": nguồn chrome-search giờ cũng được noteWebSource (trước chỉ tavily).
+- Tavily (tavily_search) cũng lưu nguồn (mode search, snippet 2.000 ký tự). Mặc định giữ mãi (0 ngày);
+  trần 300MB thì xóa nguồn cũ nhất (WebSourceMaxMB, kiểm tra mỗi 250 lần lưu + lúc Core khởi động).
+- Settings: checkbox "Lưu nguồn web đã đọc để trích dẫn lại sau này" (WebSourceStore, bật mặc định).
+- Test: `web_sources_test` (gộp trùng, FTS bỏ dấu, purge theo trần), `webtrailer_test` (tách/hỏng JSON/cắt),
+  `web_sources_test` (tool search/get/list); migrate v2→v3 đã chạy thử trên bản sao core.db thật.
+
+### Fixed — Tài liệu chưa lưu hết "dính" hội thoại cũ cùng tên (16/10/2026)
+- Không dùng tên tài liệu chưa lưu làm khoá hội thoại: `conversationKey` (Core) + `AskAiPane.DocumentKey`
+  (pane) chỉ nhận **đường dẫn thật**. Trước đây mọi file mới đều tên "Document1" nên lượt hỏi mới tra hội
+  thoại theo tên và "resume" hội thoại của một tài liệu KHÁC cùng tên — lượt thật 16/10: hỏi báo cáo chẩn
+  đoán hình ảnh y tế mà model tiếp tục hội thoại *"soạn điều lệ giải bóng bàn"* từ 30/09 (trộn hai việc,
+  viết sai chủ đề vào tài liệu). Test: `TestConversationKeyOnlyForSavedDocuments`.
+
 ### Added - Hoi truoc khi xoa shape/slide mau, chan importCsv ghi de (P1-01, 16/10/2026)
 - policy.Evaluate: wpp.deleteShapes/wpp.deleteTagged hoi truoc khi xoa; wpp.newFromTemplate de file da co hoi ghi de; test TestDeleteShapesAndTaggedAsk + TestNewFromTemplateOverwriteAsks.
 - overwrite guard: et.importCsv co range doc mau 200x50 o tu o goc, vung co du lieu cu thi hoi truoc; khong range (tao sheet moi) thi mien; test TestImportCsvWithRangeAsks/TestImportCsvWithoutRangeSkipsQuestion.

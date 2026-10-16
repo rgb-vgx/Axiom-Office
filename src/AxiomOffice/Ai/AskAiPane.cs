@@ -871,7 +871,15 @@ namespace AxiomOffice.Ai
                         string text = Convert.ToString(value);
                         if (!string.IsNullOrEmpty(text))
                         {
-                            key = text.Trim().Replace('/', '\\').ToLowerInvariant();
+                            string normalized = text.Trim().Replace('/', '\\').ToLowerInvariant();
+                            // Tai lieu CHUA LUU ("Document1", "Presentation1") khong phai duong dan:
+                            // moi file moi trung ten nen tra hoi thoai theo ten se dinh hoi thoai cu
+                            // (loi that 16/10/2026: "Document1" keo hoi thoai "dieu le giai bong ban"
+                            // tu 30/09 vao luot hoi ve chan doan hinh anh y te).
+                            if (normalized.IndexOf('\\') >= 0)
+                            {
+                                key = normalized;
+                            }
                         }
                     }
                     catch (Exception ex)

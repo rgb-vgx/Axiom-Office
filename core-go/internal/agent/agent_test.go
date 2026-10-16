@@ -484,3 +484,20 @@ func TestParseRequestSelectionLock(t *testing.T) {
 		t.Fatalf("khong khoa thi giu cau cu: %s", view)
 	}
 }
+
+// conversationKey (16/10/2026): tai lieu chua luu ("Document1") khong duoc lam khoa hoi thoai -
+// moi file moi cung ten nen se dinh hoi thoai cu cua tai lieu khac (loi that: luot ve chan doan
+// hinh anh y te resume nham hoi thoai "dieu le giai bong ban" tu 30/09).
+func TestConversationKeyOnlyForSavedDocuments(t *testing.T) {
+	for _, name := range []string{"", "document1", "Presentation1", "bao-cao.docx"} {
+		if key := conversationKey(name); key != nil {
+			t.Fatalf("tai lieu chua luu %q phai tra nil, duoc %q", name, *key)
+		}
+	}
+	for _, path := range []string{`c:\users\x\bao-cao.docx`, "/home/an/tai-lieu.docx"} {
+		key := conversationKey(path)
+		if key == nil || *key != path {
+			t.Fatalf("duong dan %q phai giu nguyen lam khoa", path)
+		}
+	}
+}

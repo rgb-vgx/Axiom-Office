@@ -533,11 +533,23 @@ func (o *Orchestrator) conversation(request *Request, appKind string, session *o
 		name = request.Document.Name
 	}
 	var key *string
-	if documentKey != "" {
-		key = &documentKey
+	if saved := conversationKey(documentKey); saved != nil {
+		key = saved
 	}
 	id := o.Conversations.Create(appKind, session.Family, key, optional(name), optional(title(request.Prompt)))
 	return o.Conversations.Get(id)
+}
+
+// conversationKey: chi DUONG DAN that moi lam khoa hoi thoai; tai lieu chua luu ("Document1")
+// tra nil. Moi file moi deu ten "Document1" nen neu lay ten lam khoa thi luot hoi moi se resume
+// nham hoi thoai cu cua mot tai lieu khac (loi that 16/10/2026: luot "chan doan hinh anh y te"
+// keo hoi thoai "soan dieu le giai bong ban" tu 30/09 vao - model yeu tron hai viec).
+func conversationKey(documentKey string) *string {
+	if strings.Contains(documentKey, "\\") || strings.HasPrefix(documentKey, "/") {
+		key := documentKey
+		return &key
+	}
+	return nil
 }
 
 // SummaryEvery: chi tom tat khi hoi thoai vuot qua moc moi (moi 20 tin nhan), khong phai sau MOI luot.
