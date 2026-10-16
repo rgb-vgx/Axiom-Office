@@ -150,22 +150,32 @@ const outlineCharBudget = 6000
 
 func (t Truncation) writerOutline(result map[string]any) bool {
 	items, ok := result["items"].([]any)
-	if !ok || len(items) == 0 { return false }
+	if !ok || len(items) == 0 {
+		return false
+	}
 	total := 0
 	for _, item := range items {
 		if m, ok := item.(map[string]any); ok {
-			if s, ok := m["t"].(string); ok { total += len([]rune(s)) }
+			if s, ok := m["t"].(string); ok {
+				total += len([]rune(s))
+			}
 		}
 	}
-	if total <= outlineCharBudget { return false }
+	if total <= outlineCharBudget {
+		return false
+	}
 	kept := []any{}
 	used := 0
 	for _, item := range items {
 		cost := 0
 		if m, ok := item.(map[string]any); ok {
-			if s, ok := m["t"].(string); ok { cost = len([]rune(s)) }
+			if s, ok := m["t"].(string); ok {
+				cost = len([]rune(s))
+			}
 		}
-		if used+cost > outlineCharBudget { break }
+		if used+cost > outlineCharBudget {
+			break
+		}
 		kept = append(kept, item)
 		used += cost
 	}

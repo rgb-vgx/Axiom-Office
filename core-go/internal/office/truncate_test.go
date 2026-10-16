@@ -104,12 +104,16 @@ func TestCatFormulasCatTypesSongSong(t *testing.T) {
 			ty[r] = []any{"formula"}
 		}
 		body, err := json.Marshal(map[string]any{"ok": true, "result": map[string]any{"range": "A1:A5000", "formulas": f, "types": ty}})
-		if err != nil { t.Fatal(err) }
+		if err != nil {
+			t.Fatal(err)
+		}
 		return string(body)
 	}
 	out := DefaultTruncation.ApplyRaw("et.readRange", make(5000))
 	var body map[string]any
-	if err := json.Unmarshal([]byte(out), &body); err != nil { t.Fatal(err) }
+	if err := json.Unmarshal([]byte(out), &body); err != nil {
+		t.Fatal(err)
+	}
 	res := body["result"].(map[string]any)
 	if res["truncated"] != true || res["nextRange"] != "A201:A5000" {
 		t.Fatalf("thieu truncated/nextRange: %v", res)
@@ -121,11 +125,15 @@ func TestCatFormulasCatTypesSongSong(t *testing.T) {
 
 func TestCatOutlineQuaNganSach(t *testing.T) {
 	items := make([]any, 200)
-	for i := range items { items[i] = map[string]any{"n": i, "t": strings.Repeat("x", 100)} }
+	for i := range items {
+		items[i] = map[string]any{"n": i, "t": strings.Repeat("x", 100)}
+	}
 	body, _ := json.Marshal(map[string]any{"ok": true, "result": map[string]any{"items": items}})
 	out := DefaultTruncation.ApplyRaw("writer.outline", string(body))
 	var parsed map[string]any
-	if err := json.Unmarshal([]byte(out), &parsed); err != nil { t.Fatal(err) }
+	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
+		t.Fatal(err)
+	}
 	res := parsed["result"].(map[string]any)
 	if res["truncated"] != true || len(res["items"].([]any)) != 60 {
 		t.Fatalf("outline 200x100 ky tu phai cat con 60 muc: %v", len(res["items"].([]any)))

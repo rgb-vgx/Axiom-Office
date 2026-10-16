@@ -1,4 +1,4 @@
-﻿package model
+package model
 
 import (
 	"context"
@@ -488,6 +488,7 @@ func (g *heavyRunGuard) afterTools(loop *agentLoop, _ *Turn, _ []ToolResult) *ve
 	}
 	return nil
 }
+
 // budgetGuard (MaxTokens): ngan sach ba muc - 80% nhac tiet kiem, 90% tat tool de model viet cau tra loi cuoi,
 // vuot 100% thi dung. Chi dem token phai tra (BillableTokens).
 type budgetGuard struct{ economyNudged bool }

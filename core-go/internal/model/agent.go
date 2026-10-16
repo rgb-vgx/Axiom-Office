@@ -1,4 +1,4 @@
-﻿package model
+package model
 
 import (
 	"context"
@@ -86,7 +86,7 @@ func DefaultAgentOptions() AgentOptions {
 		Verify:               true,
 		MaxIdenticalFailures: DefaultMaxIdenticalFailures,
 		MaxIdenticalCalls:    DefaultMaxIdenticalCalls,
-		MaxSameTaskCalls:    DefaultMaxSameTaskCalls,
+		MaxSameTaskCalls:     DefaultMaxSameTaskCalls,
 		ContextClearAt:       DefaultContextClearAt,
 		ContextKeepResults:   DefaultContextKeepResults,
 	}

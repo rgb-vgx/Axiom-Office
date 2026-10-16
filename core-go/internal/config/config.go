@@ -63,9 +63,9 @@ type Config struct {
 	TavilyEnabled bool
 	// WebSourceStore: luu nguon web tai ve (trang da doc) vao core.db de trich dan lai / khoi tai lai.
 	// WebSourceKeepDays: so ngay giu nguon; 0 = giu mai (chi don theo tran dung luong WebSourceMaxMB).
-	WebSourceStore    bool
-	WebSourceKeepDays int
-	WebSourceMaxMB    int
+	WebSourceStore           bool
+	WebSourceKeepDays        int
+	WebSourceMaxMB           int
 	MemoryModel              string
 	EmbeddingModel           string
 	EmbeddingEndpoint        string

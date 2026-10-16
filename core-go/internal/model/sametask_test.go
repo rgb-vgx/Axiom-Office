@@ -1,4 +1,4 @@
-﻿package model
+package model
 
 import (
 	"context"
@@ -138,10 +138,16 @@ func TestHeavyRunGuardAsksAtRound30(t *testing.T) {
 	options.MaxSameTaskCalls = 0
 	options.MaxIdenticalCalls = 0
 	cb := AgentCallbacks{AskContinue: func(round, billable int, reason string) bool { asked++; return false }}
-	ex := func(ctx context.Context, call ToolCall) ToolResult { return ToolResult{CallID: call.ID, Name: call.Name, OK: true} }
+	ex := func(ctx context.Context, call ToolCall) ToolResult {
+		return ToolResult{CallID: call.ID, Name: call.Name, OK: true}
+	}
 	result := client.RunAgent(context.Background(), "s", nil, "u", mutatingTools(), ex, options, cb)
-	if result.OK || result.ErrorKind != "cancelled" { t.Fatal("phai dung") }
-	if asked != 1 || result.Rounds != 30 { t.Fatal("phai hoi 1 lan o vong 30") }
+	if result.OK || result.ErrorKind != "cancelled" {
+		t.Fatal("phai dung")
+	}
+	if asked != 1 || result.Rounds != 30 {
+		t.Fatal("phai hoi 1 lan o vong 30")
+	}
 }
 
 // Dong y thi chay tiep het vong; nil thi cu chay nhu cu.
@@ -155,7 +161,11 @@ func TestHeavyRunGuardContinuesWhenApproved(t *testing.T) {
 	options.MaxIdenticalCalls = 0
 	asked := 0
 	cb := AgentCallbacks{AskContinue: func(round, billable int, reason string) bool { asked++; return true }}
-	ex := func(ctx context.Context, call ToolCall) ToolResult { return ToolResult{CallID: call.ID, Name: call.Name, OK: true} }
+	ex := func(ctx context.Context, call ToolCall) ToolResult {
+		return ToolResult{CallID: call.ID, Name: call.Name, OK: true}
+	}
 	result := client.RunAgent(context.Background(), "s", nil, "u", mutatingTools(), ex, options, cb)
-	if result.Rounds != 35 || asked != 1 { t.Fatal("dong y thi chay het") }
+	if result.Rounds != 35 || asked != 1 {
+		t.Fatal("dong y thi chay het")
+	}
 }
