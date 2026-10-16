@@ -36,7 +36,6 @@ func (r rect) contains(o rect, slack float64) bool {
 }
 
 func (r rect) overlapsX(o rect) bool { return r.X < o.right() && o.X < r.right() }
-func (r rect) overlapsY(o rect) bool { return r.Y < o.bottom() && o.Y < r.bottom() }
 
 func (r rect) points() []float64 {
 	return []float64{round1(r.X), round1(r.Y), round1(r.W), round1(r.H)}
