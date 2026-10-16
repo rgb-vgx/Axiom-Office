@@ -222,8 +222,14 @@ func (t *stdioTransport) readLoop(stdout io.Reader) {
 
 func (t *stdioTransport) drainStderr(stderr io.Reader) {
 	scanner := bufio.NewScanner(stderr)
-	for lines := 0; scanner.Scan() && lines < 20; lines++ {
-		corelog.Info("mcp %s stderr: %s", t.name, scanner.Text())
+	lines := 0
+	for scanner.Scan() {
+		if lines < 20 {
+			corelog.Info("mcp %s stderr: %s", t.name, scanner.Text())
+		} else if lines == 20 {
+			corelog.Info("mcp %s stderr: ... (further lines not logged; still draining so the process never blocks)", t.name)
+		}
+		lines++
 	}
 	if err := scanner.Err(); err != nil {
 		corelog.Info("mcp %s stderr error: %v", t.name, err)
