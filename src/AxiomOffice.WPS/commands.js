@@ -1605,7 +1605,25 @@
         }
         fo.push(row);
       }
-      return { sheet: r.name, range: etAddrStr(box.r1, box.c1, box.r2, box.c2), formulas: fo };
+      var types = [];
+      var links = [];
+      for (i = 0; i < fo.length; i++) {
+        var trow = [];
+        for (j = 0; j < fo[i].length; j++) {
+          var ff = fo[i][j];
+          if (typeof ff === "string" && ff.charAt(0) === "=") { trow.push("formula");
+            var mm = /([^A-Za-z0-9_.]+)([^!]+)!/g; var mt;
+            while ((mt = mm.exec(ff)) !== null) {
+              var nm = mt[2].replace(/^'+|'+$/g, "");
+              if (nm && nm !== r.name && links.indexOf(nm) < 0) { links.push(nm); }
+            }
+          } else { trow.push("text"); }
+        }
+        types.push(trow);
+      }
+      var fres = { sheet: r.name, range: etAddrStr(box.r1, box.c1, box.r2, box.c2), formulas: fo, types: types };
+      if (links.length > 0) { fres.linkedSheets = links; }
+      return fres;
     }
     var v = rng.Value2;
     if (typeof v === "function") { v = v.call(rng); }

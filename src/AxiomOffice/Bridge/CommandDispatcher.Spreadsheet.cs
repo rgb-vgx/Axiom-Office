@@ -137,6 +137,9 @@ namespace AxiomOffice.Bridge
             {
                 // Chỉ CÔNG THỨC: ô không có công thức -> null (giống bản LibreOffice).
                 result["formulas"] = ToFormulaMatrix(range.Formula);
+                result["types"] = ToTypeMatrix(range);
+                var links = LinkedSheets(range, sheet);
+                if (links.Count > 0) result["linkedSheets"] = links;
                 return result;
             }
             result["values"] = ToMatrix(range.Value2);
@@ -173,6 +176,77 @@ namespace AxiomOffice.Bridge
                 rows.Add(row);
             }
             return rows;
+        }
+
+        // P0-04 (16/10/2026): kieu o + sheet lien ket khi formulas=true.
+        private static object ToTypeMatrix(dynamic range)
+        {
+            var rows = new System.Collections.Generic.List<System.Collections.Generic.List<object>>();
+            try
+            {
+                object raw = range.Value2;
+                object frm = range.Formula;
+                System.Array vals = raw as System.Array;
+                System.Array frms = frm as System.Array;
+                if (vals == null)
+                {
+                    string f0 = System.Convert.ToString(frm) ?? "";
+                    rows.Add(new System.Collections.Generic.List<object> { f0.StartsWith("=") ? "formula" : CellType(System.Convert.ToString(raw)) });
+                    return rows;
+                }
+                int r0 = vals.GetLowerBound(0), r1 = vals.GetUpperBound(0);
+                int c0 = vals.GetLowerBound(1), c1 = vals.GetUpperBound(1);
+                for (int r = r0; r <= r1; r++)
+                {
+                    var row = new System.Collections.Generic.List<object>();
+                    for (int c = c0; c <= c1; c++)
+                    {
+                        string f = null;
+                        try { f = System.Convert.ToString(frms.GetValue(r, c)); } catch { }
+                        if (f != null && f.StartsWith("=")) row.Add("formula");
+                        else row.Add(CellType(System.Convert.ToString(vals.GetValue(r, c))));
+                    }
+                    rows.Add(row);
+                }
+            }
+            catch { }
+            return rows;
+        }
+
+        private static string CellType(string v)
+        {
+            if (string.IsNullOrEmpty(v)) return "empty";
+            double d;
+            if (double.TryParse(v, out d)) return "number";
+            if (v == "True" || v == "False") return "bool";
+            if (v.StartsWith("#")) return "error";
+            return "text";
+        }
+
+        private static System.Collections.Generic.List<string> LinkedSheets(dynamic range, dynamic sheet)
+        {
+            var links = new System.Collections.Generic.List<string>();
+            try
+            {
+                string self = System.Convert.ToString(sheet.Name);
+                object frm = range.Formula;
+                System.Array arr = frm as System.Array;
+                var formulas = new System.Collections.Generic.List<string>();
+                if (arr == null) formulas.Add(System.Convert.ToString(frm) ?? "");
+                else foreach (object o in arr) formulas.Add(System.Convert.ToString(o) ?? "");
+                var rx = new System.Text.RegularExpressions.Regex("([^A-Za-z0-9_.]+)([^!]+)!");
+                foreach (string f in formulas)
+                {
+                    if (string.IsNullOrEmpty(f) || !f.StartsWith("=")) continue;
+                    foreach (System.Text.RegularExpressions.Match m in rx.Matches(f))
+                    {
+                        string name = m.Groups[2].Value.Trim("'".ToCharArray());
+                        if (name.Length > 0 && name != self && !links.Contains(name)) links.Add(name);
+                    }
+                }
+            }
+            catch { }
+            return links;
         }
 
         private static Dictionary<string, object> EtSheetInfo(IAppHost host, Dictionary<string, object> p)

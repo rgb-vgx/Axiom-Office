@@ -5,6 +5,11 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added - et.readRange formulas kem kieu o va sheet lien ket (P0-04, 16/10/2026)
+- Word/Excel (C#): formulas=true tra them types (empty/number/text/bool/error/formula) + linkedSheets (sheet duoc cong thuc tro toi); build xanh.
+- LibreOffice + WPS: cung contract (calc.py _cell_types/_linked_sheets; commands.js); truncate cat types song song formulas, giu nextRange; test TestCatFormulasCatTypesSongSong; LO 25/25.
+
+
 ### Added - Mo rong writer.outline cho agent (P0-03, 16/10/2026)
 - Word: outline them style heading, bookmark, caption bang; mo ForAgent; build C# xanh.
 - LibreOffice: outline that (duyet body theo thu tu, style ParaStyleName, header bang), mo agent; giu restyle/insertBlocks la stub.

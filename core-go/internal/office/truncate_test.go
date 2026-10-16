@@ -95,6 +95,30 @@ func TestApplyRawKhongCatThiNguyenVan(t *testing.T) {
 	}
 }
 
+func TestCatFormulasCatTypesSongSong(t *testing.T) {
+	make := func(n int) string {
+		f := make([]any, n)
+		ty := make([]any, n)
+		for r := range n {
+			f[r] = []any{"=A"}
+			ty[r] = []any{"formula"}
+		}
+		body, err := json.Marshal(map[string]any{"ok": true, "result": map[string]any{"range": "A1:A5000", "formulas": f, "types": ty}})
+		if err != nil { t.Fatal(err) }
+		return string(body)
+	}
+	out := DefaultTruncation.ApplyRaw("et.readRange", make(5000))
+	var body map[string]any
+	if err := json.Unmarshal([]byte(out), &body); err != nil { t.Fatal(err) }
+	res := body["result"].(map[string]any)
+	if res["truncated"] != true || res["nextRange"] != "A201:A5000" {
+		t.Fatalf("thieu truncated/nextRange: %v", res)
+	}
+	if len(res["formulas"].([]any)) != 200 || len(res["types"].([]any)) != 200 {
+		t.Fatal("formulas/types phai cat song song 200 dong")
+	}
+}
+
 func TestGioiHanTuyChinhNangMaxCells(t *testing.T) {
 	// MCP max_cells=15000 voi 3 cot -> 5000 dong (khong bi chan o 200)
 	limits := Truncation{HeadRows: 15000, CellBudget: 15000, TailRows: 10, IssuesCap: 100}

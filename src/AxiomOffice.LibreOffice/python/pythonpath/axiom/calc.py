@@ -208,8 +208,54 @@ def read_range(env, params):
     name = _active_sheet_name(env, params)
     if values.boolean(params, "formulas", False):
         # Chi CONG THUC: o khong cong thuc -> null (khac chuoi rong - khong co ai nham lan).
-        return {"sheet": name, "range": address, "formulas": _formulas(range_)}
+        out = {"sheet": name, "range": address, "formulas": _formulas(range_)}
+        out["types"] = _cell_types(range_)
+        links = _linked_sheets(range_, name)
+        if links:
+            out["linkedSheets"] = links
+        return out
     return {"sheet": name, "range": address, "values": _to_matrix(range_.getDataArray())}
+
+
+def _cell_types(range_) -> list:
+    try:
+        array = range_.getDataArray()
+    except Exception:
+        return []
+    formulas = _formulas(range_)
+    out = []
+    for r, row in enumerate(array):
+        line = []
+        for c, v in enumerate(row):
+            f = formulas[r][c] if r < len(formulas) and c < len(formulas[r]) else None
+            if isinstance(f, str) and f.startswith("="):
+                line.append("formula")
+            elif v is None or v == "":
+                line.append("empty")
+            elif isinstance(v, bool):
+                line.append("bool")
+            elif isinstance(v, (int, float)):
+                line.append("number")
+            elif isinstance(v, str) and v.startswith("#"):
+                line.append("error")
+            else:
+                line.append("text")
+        out.append(line)
+    return out
+
+
+def _linked_sheets(range_, self_name) -> list:
+    import re
+    links = []
+    for row in _formulas(range_):
+        for f in row:
+            if not isinstance(f, str) or not f.startswith("="):
+                continue
+            for m in re.finditer(r"([^A-Za-z0-9_.]+)([^!]+)!", f):
+                name = m.group(2).strip("'")
+                if name and name != self_name and name not in links:
+                    links.append(name)
+    return links
 
 
 def _formulas(range_) -> list:

@@ -121,6 +121,12 @@ func (t Truncation) readRange(result map[string]any) bool {
 	result[key] = matrix[:head]
 	result["truncated"] = true
 	result["totalRows"] = totalRows
+	// P0-04/P0-07: cat types song song voi values/formulas de khong lech dong.
+	if key == "formulas" {
+		if tm, ok := result["types"].([]any); ok && len(tm) == totalRows {
+			result["types"] = tm[:head]
+		}
+	}
 	if cols > 0 {
 		result["totalCols"] = cols
 	}
