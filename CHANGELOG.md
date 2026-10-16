@@ -5,6 +5,11 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added - Ngan sach muc cau truc + cat writer.outline (P0-02/P0-07, 16/10/2026)
+- office.Truncation: writer.outline vuot ~1500 token (~6000 ky tu) thi cat items tu cuoi, truncated=true + totalItems + note; dung chung agent + MCP.
+- Test TestCatOutlineQuaNganSach (200 muc x 100 ky tu -> con 60 muc); go test agent/tools/office xanh.
+
+
 ### Added - wpp.listSlides detail kem layout/master/notes (P0-05, 16/10/2026)
 - C# + LibreOffice + WPS: detail=true tra them layout/master/notes; mac dinh khong doi; test catalog C# khop (can build lai Host.exe); LO 25/25.
 

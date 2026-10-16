@@ -54,6 +54,8 @@ func (t Truncation) Apply(action string, result map[string]any, raw string) stri
 	switch action {
 	case "et.readRange":
 		changed = t.readRange(result)
+	case "writer.outline":
+		changed = t.writerOutline(result)
 	case "et.checkRange":
 		changed = t.checkRange(result)
 	case "wpp.listSlides":
@@ -76,7 +78,7 @@ func (t Truncation) Apply(action string, result map[string]any, raw string) stri
 // Lenh loi ("ok":false) va body khong phai JSON object -> tra nguyen van.
 func (t Truncation) ApplyRaw(action, raw string) string {
 	switch action {
-	case "et.readRange", "et.checkRange", "wpp.listSlides", "wpp.checkLayout", "wpp.sourceManifest":
+	case "writer.outline", "et.readRange", "et.checkRange", "wpp.listSlides", "wpp.checkLayout", "wpp.sourceManifest":
 	default:
 		return raw
 	}
@@ -140,6 +142,37 @@ func (t Truncation) readRange(result map[string]any) bool {
 			result["nextRange"] = next
 		}
 	}
+	return true
+}
+
+// P0-02/P0-07 (16/10/2026): muc cau truc tai lieu ngan sach rieng ~1500 token (~6000 ky tu).
+const outlineCharBudget = 6000
+
+func (t Truncation) writerOutline(result map[string]any) bool {
+	items, ok := result["items"].([]any)
+	if !ok || len(items) == 0 { return false }
+	total := 0
+	for _, item := range items {
+		if m, ok := item.(map[string]any); ok {
+			if s, ok := m["t"].(string); ok { total += len([]rune(s)) }
+		}
+	}
+	if total <= outlineCharBudget { return false }
+	kept := []any{}
+	used := 0
+	for _, item := range items {
+		cost := 0
+		if m, ok := item.(map[string]any); ok {
+			if s, ok := m["t"].(string); ok { cost = len([]rune(s)) }
+		}
+		if used+cost > outlineCharBudget { break }
+		kept = append(kept, item)
+		used += cost
+	}
+	result["items"] = kept
+	result["truncated"] = true
+	result["totalItems"] = len(items)
+	result["note"] = "Outline shortened (~1500 tokens); use writer.getText for one part."
 	return true
 }
 

@@ -119,6 +119,19 @@ func TestCatFormulasCatTypesSongSong(t *testing.T) {
 	}
 }
 
+func TestCatOutlineQuaNganSach(t *testing.T) {
+	items := make([]any, 200)
+	for i := range items { items[i] = map[string]any{"n": i, "t": strings.Repeat("x", 100)} }
+	body, _ := json.Marshal(map[string]any{"ok": true, "result": map[string]any{"items": items}})
+	out := DefaultTruncation.ApplyRaw("writer.outline", string(body))
+	var parsed map[string]any
+	if err := json.Unmarshal([]byte(out), &parsed); err != nil { t.Fatal(err) }
+	res := parsed["result"].(map[string]any)
+	if res["truncated"] != true || len(res["items"].([]any)) != 60 {
+		t.Fatalf("outline 200x100 ky tu phai cat con 60 muc: %v", len(res["items"].([]any)))
+	}
+}
+
 func TestGioiHanTuyChinhNangMaxCells(t *testing.T) {
 	// MCP max_cells=15000 voi 3 cot -> 5000 dong (khong bi chan o 200)
 	limits := Truncation{HeadRows: 15000, CellBudget: 15000, TailRows: 10, IssuesCap: 100}
