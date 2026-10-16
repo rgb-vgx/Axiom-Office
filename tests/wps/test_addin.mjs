@@ -188,7 +188,17 @@ function wppApp(overrides = {}) {
 function writerApp(overrides = {}) {
   return Object.assign({
     Name: "WPS Writer", Version: "12.0", Build: "probe",
-    ActiveDocument: { Name: "hop-dong.docx", FullName: "/tmp/hop-dong.docx" },
+    // Paragraphs toi thieu: handler writer.outline (P0-03) doc doc.Paragraphs.Count/Item -> Range.Text.
+    ActiveDocument: {
+      Name: "hop-dong.docx",
+      FullName: "/tmp/hop-dong.docx",
+      Paragraphs: {
+        Count: 1,
+        Item: function () {
+          return { Range: { Text: "Hop dong so 12/2026", Tables: null } };
+        },
+      },
+    },
   }, overrides);
 }
 
@@ -254,7 +264,7 @@ const CHUA_CO_HANDLER = {
   "writer.checkTables": "chua co handler trong add-in (agent=true)",
   "writer.replaceMany": "chua co handler trong add-in (agent=true: tool nay se loi khi may dang la WPS)",
   // Ba lenh thiet ke + khoa vung boi den: chi co o add-in Windows (COM); LibreOffice bao not supported.
-  "writer.outline": "chi co trong add-in Windows (lenh thiet ke, doc_design); WPS JS chua viet handler",
+  // (writer.outline da co handler trong WPS JS tu commit P0-03 nen khong con o day.)
   "writer.restyle": "chi co trong add-in Windows (lenh thiet ke, doc_design); WPS JS chua viet handler",
   "writer.insertBlocks": "chi co trong add-in Windows (lenh thiet ke, doc_design); WPS JS chua viet handler",
   "writer.lockSelection": "khoa vung boi den moi co o add-in Windows (COM); WPS JS chua viet handler",
