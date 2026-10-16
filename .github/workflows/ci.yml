@@ -165,7 +165,9 @@ jobs:
           $common = @("/nologo", "/platform:x64", "/langversion:7.3", "/codepage:65001",
                       "/r:$fw\mscorlib.dll", "/r:$fw\System.dll", "/r:$fw\System.Core.dll",
                       "/r:$fw\System.Web.Extensions.dll", "/r:$fw\System.Windows.Forms.dll",
-                      "/r:$fw\System.Drawing.dll", "/r:$fw\System.Security.dll", "/r:$fw\Microsoft.CSharp.dll")
+                      "/r:$fw\System.Drawing.dll", "/r:$fw\System.Security.dll", "/r:$fw\Microsoft.CSharp.dll",
+                      # ZipArchive: wpp.addSlideFromTemplate doc kho slide trong tep mau .pptx (khong chi Host).
+                      "/r:$fw\System.IO.Compression.dll")
           $hostOnly = @("/r:$fw\System.IO.Compression.dll", "/r:$fw\System.IO.Compression.FileSystem.dll",
                         "/r:$fw\System.Xml.dll", "/r:$fw\System.Xml.Linq.dll")
           & $csc @common /target:library "/out:$stage\AxiomOffice.dll" $addin
