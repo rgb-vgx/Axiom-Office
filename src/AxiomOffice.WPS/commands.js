@@ -811,7 +811,6 @@
     var maxChars = paramInt(params, "maxChars", 160);
     if (maxChars < 40) { maxChars = 40; }
     var items = [];
-    var seenTables = {};
     var index = 0;
     var paras = doc.Paragraphs;
     var count = Number(paras.Count);
@@ -820,11 +819,11 @@
       var para = paras.Item(i);
       var range = para.Range;
       var text = "";
+      // \x07 la ky tu ket o cua Word (van ban trong bang): bo de don cac dong bang.
+      // eslint-disable-next-line no-control-regex -- \x07 la ky tu nghiep vu cua Word, khong phai loi
       try { text = String(range.Text || "").replace(/\r/g, "").replace(/\x07/g, "").trim(); } catch (eT) {}
       var style = "";
       try { style = String(para.Style.NameLocal || ""); } catch (eS) {}
-      var inTable = false;
-      try { inTable = !!range.Tables || Number(range.Tables.Count) > 0; } catch (eTb) {}
       if (text === "" && (style === "Normal" || style === "")) { continue; }
       var entry = { n: index, t: text.length > maxChars ? text.substring(0, maxChars) + "..." : text };
       if (style !== "" && style !== "Normal") { entry.style = style; }
