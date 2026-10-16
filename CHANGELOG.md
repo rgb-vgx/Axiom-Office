@@ -5,6 +5,17 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — CI đỏ từ 13/10: ba lỗi độc lập, đã xanh lại (16/10/2026)
+- **Linux/JS**: `tests/wps/test_addin.mjs` còn xếp `writer.outline` vào `CHUA_CO_HANDLER` dù add-in WPS
+  đã có handler (P0-03) → gỡ khỏi danh sách, mock `writerApp` đủ `Paragraphs` để handler chạy;
+  thêm 4 nhãn lệnh mới (`replaceMany`, `outline`, `restyle`, `insertBlocks`) vào `pane-core.js` cho khớp
+  `theme.py`; `cmdWriterOutline` bỏ biến thừa + miễn `no-control-regex` cho ký tự kết ô `\x07` của Word
+- **Windows/build**: CI thiếu `/r:System.IO.Compression.dll` cho add-in (ZipArchive trong
+  `CommandDispatcher.Template` từ 13/10) → thêm reference
+- **Linux/lint**: 4 file Go dính BOM + `config.go` lệch cần lề (gofmt), `rect.overlapsY` không dùng
+  (staticcheck U1000) → chuẩn hoá gofmt toàn cây Go (187 file), xoá helper chết
+- Release v0.1.0: thay asset bằng bản đóng từ commit xanh `108df96` (tên sạch, không `-dirty`)
+
 ### Added — Lưu nguồn web tải về: kho core.db + tool web_sources (16/10/2026)
 - Tool chrome-search gắn trailer 1 dòng `<<<AXIOM_WEB v1 ... AXIOM_WEB>>>` cuối kết quả web_search/web_fetch/
   web_research (kèm url/title/lang/score/nội dung đã đọc). Core tách trailer TRƯỚC khi vào ngữ cảnh model
