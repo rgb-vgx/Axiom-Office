@@ -70,7 +70,7 @@ var liveCommands = []liveCommand{
 	{Name: "et.closeAll", Kind: "et", Params: []liveCommandParam{}},
 	{Name: "wpp.newPresentation", Kind: "wpp", Params: []liveCommandParam{}},
 	{Name: "wpp.open", Kind: "wpp", Params: []liveCommandParam{{Name: "path", Hint: ""}}},
-	{Name: "wpp.listSlides", Kind: "wpp", Params: []liveCommandParam{{Name: "presentation", Hint: "full path of the presentation to work on; default: the active one"}}},
+	{Name: "wpp.listSlides", Kind: "wpp", Params: []liveCommandParam{{Name: "presentation", Hint: "full path of the presentation to work on; default: the active one"}, {Name: "detail", Hint: "true = kem master/notes"}}},
 	{Name: "wpp.addSlide", Kind: "wpp", Params: []liveCommandParam{{Name: "layout", Hint: "number: 1 title, 2 title+content, 11 title only, 12 blank"}}},
 	{Name: "wpp.addText", Kind: "wpp", Params: []liveCommandParam{{Name: "text", Hint: ""}, {Name: "slide", Hint: ""}, {Name: "left", Hint: ""}, {Name: "top", Hint: ""}, {Name: "width", Hint: ""}, {Name: "height", Hint: ""}, {Name: "fontSize", Hint: ""}, {Name: "bold", Hint: ""}, {Name: "color", Hint: ""}, {Name: "align", Hint: ""}, {Name: "presentation", Hint: "full path of the presentation to work on; default: the active one"}}},
 	{Name: "wpp.addTextBox", Kind: "wpp", Params: []liveCommandParam{{Name: "text", Hint: ""}, {Name: "slide", Hint: ""}, {Name: "left", Hint: ""}, {Name: "top", Hint: ""}, {Name: "width", Hint: ""}, {Name: "height", Hint: ""}}},

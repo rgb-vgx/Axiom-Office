@@ -101,7 +101,24 @@ def list_slides(env, params):
             layout = page.Layout
         except Exception:  # noqa: BLE001
             layout = None
-        slides.append({"index": index + 1, "layout": layout, "shapeTexts": texts})
+        entry = {"index": index + 1, "layout": layout, "shapeTexts": texts}
+        if values.boolean(params, "detail", False):
+            try:
+                entry["master"] = str(page.getMasterPage().getName() if hasattr(page, "getMasterPage") else "")
+            except Exception:
+                pass
+            try:
+                notes = page.getNotesPage()
+                lines_ = []
+                for s in range(notes.getCount()):
+                    t = _shape_text(notes.getByIndex(s))
+                    if t:
+                        lines_.append(t)
+                if lines_:
+                    entry["notes"] = lines_
+            except Exception:
+                pass
+        slides.append(entry)
     return {"presentation": doc.getTitle(), "slideCount": count, "slides": slides}
 
 
@@ -281,7 +298,7 @@ def check_layout(env, params):
 
 command("wpp.newPresentation", "wpp", lambda env, p: documents.open_document(env.ctx, "wpp", None), "Tạo bài trình bày mới")
 command("wpp.open", "wpp", lambda env, p: documents.open_document(env.ctx, "wpp", values.string(p, "path")), "Mở .pptx/.ppt/.odp", req("path"))
-command("wpp.listSlides", "wpp", list_slides, "Số slide + text từng slide", opt("presentation", "full path of the presentation to work on; default: the active one"), agent=True)
+command("wpp.listSlides", "wpp", list_slides, "Số slide + text từng slide", opt("presentation", "full path of the presentation to work on; default: the active one"), opt("detail", "true = kem master/notes"), agent=True)
 command("wpp.addSlide", "wpp", add_slide, "Thêm slide cuối; `layout` mặc định 12 = trống (1 = tiêu đề, 2 = tiêu đề + nội dung, 11 = chỉ tiêu đề)",
         opt("layout", "number: 1 title, 2 title+content, 11 title only, 12 blank"), agent=True, undo=True)
 command("wpp.addText", "wpp", add_text, "Textbox có định dạng (`color` dạng `#RRGGBB`, `align` left/center/right)",

@@ -5,6 +5,10 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added - wpp.listSlides detail kem layout/master/notes (P0-05, 16/10/2026)
+- C# + LibreOffice + WPS: detail=true tra them layout/master/notes; mac dinh khong doi; test catalog C# khop (can build lai Host.exe); LO 25/25.
+
+
 ### Added - et.readRange formulas kem kieu o va sheet lien ket (P0-04, 16/10/2026)
 - Word/Excel (C#): formulas=true tra them types (empty/number/text/bool/error/formula) + linkedSheets (sheet duoc cong thuc tro toi); build xanh.
 - LibreOffice + WPS: cung contract (calc.py _cell_types/_linked_sheets; commands.js); truncate cat types song song formulas, giu nextRange; test TestCatFormulasCatTypesSongSong; LO 25/25.

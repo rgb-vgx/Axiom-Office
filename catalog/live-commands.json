@@ -986,6 +986,11 @@
         "name": "presentation",
         "required": false,
         "hint": "full path of the presentation to work on; default: the active one"
+      },
+      {
+        "name": "detail",
+        "required": false,
+        "hint": "true = kem master/notes"
       }
     ]
   },

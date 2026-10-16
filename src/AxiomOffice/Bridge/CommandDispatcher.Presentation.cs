@@ -15,7 +15,7 @@ namespace AxiomOffice.Bridge
             {
                 Command("wpp.newPresentation", "wpp", WppNewPresentation, "Tạo bản trình chiếu mới"),
                 Command("wpp.open", "wpp", WppOpen, "Mở .pptx", Req("path")),
-                Command("wpp.listSlides", "wpp", WppListSlides, "Số slide + text từng slide", Opt("presentation", "full path of the presentation to work on; default: the active one")).ForAgent(),
+                Command("wpp.listSlides", "wpp", WppListSlides, "Số slide + text từng slide", Opt("presentation", "full path of the presentation to work on; default: the active one"), Opt("detail", "true = kem layout/master/notes")).ForAgent(),
                 Command("wpp.addSlide", "wpp", WppAddSlide, "Thêm slide cuối; `layout` mặc định 12 = trống (1 = tiêu đề, 2 = tiêu đề + nội dung, 11 = chỉ tiêu đề)",
                     Opt("layout", "number: 1 title, 2 title+content, 11 title only, 12 blank")).ForAgent(),
                 Command("wpp.addText", "wpp", WppAddText, "Textbox có định dạng (`color` dạng `#RRGGBB`, `align` left/center/right)",
@@ -66,6 +66,22 @@ namespace AxiomOffice.Bridge
                     { "shapeTexts", texts }
                 };
                 // Slide dựng lại từ slide nguồn số này (wpp.addSlideFromTemplate {tag}).
+                if (ParamBool(p, "detail", false))
+                {
+                    try { entry["layout"] = System.Convert.ToString(slide.Layout); } catch { }
+                    try { entry["master"] = System.Convert.ToString(slide.Master.Name); } catch { }
+                    try
+                    {
+                        var notes = new System.Collections.Generic.List<string>();
+                        foreach (dynamic shape in slide.NotesPage.Shapes)
+                        {
+                            try { if (System.Convert.ToInt32(shape.HasTextFrame) == -1) notes.Add(System.Convert.ToString(shape.TextFrame.TextRange.Text)); }
+                            catch { }
+                        }
+                        if (notes.Count > 0) entry["notes"] = notes;
+                    }
+                    catch { }
+                }
                 string tag = SlideTag(slide);
                 if (tag != null)
                 {

@@ -311,7 +311,10 @@
       params: [{ name: "path", required: true, hint: null }] },
     { name: "wpp.listSlides", kind: "wpp", agent: true,
       summary: "Số slide + text từng slide",
-      params: [{ name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }] },
+      params: [
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" },
+        { name: "detail", required: false, hint: "true = kem master/notes" }
+      ] },
     { name: "wpp.addSlide", kind: "wpp", agent: true,
       summary: "Thêm slide cuối; `layout` mặc định 12 = trống (1 = tiêu đề, 2 = tiêu đề + nội dung, 11 = chỉ tiêu đề)",
       params: [{ name: "layout", required: false, hint: "number: 1 title, 2 title+content, 11 title only, 12 blank" }] },
@@ -2543,7 +2546,7 @@
     return { name: info.name, fullName: info.fullName, saved: info.saved, opened: true };
   }
 
-  function cmdWppListSlides(app) {
+  function cmdWppListSlides(app, params) {
     var pres = wppPres(app);
     var count = Number(pres.Slides.Count);
     var slides = [], i, j;
@@ -2557,7 +2560,16 @@
         var t = wppShapeText(slide.Shapes.Item(j));
         if (t) { texts.push(t); }
       }
-      slides.push({ index: i, layout: Number(layout), shapeTexts: texts });
+      var entry = { index: i, layout: Number(layout), shapeTexts: texts };
+      if (paramBool(params, "detail", false)) {
+        try { var mn = slide.Master.Name; if (typeof mn === "function") { mn = mn.call(slide.Master); } entry.master = String(mn || ""); } catch (eM) {}
+        try {
+          var nn = []; var ns = slide.NotesPage.Shapes; var nc = Number(ns.Count);
+          for (var k = 1; k <= nc; k++) { var nt = wppShapeText(ns.Item(k)); if (nt) { nn.push(nt); } }
+          if (nn.length > 0) { entry.notes = nn; }
+        } catch (eN) {}
+      }
+      slides.push(entry);
     }
     var pname = pres.Name;
     if (typeof pname === "function") { pname = pname.call(pres); }
