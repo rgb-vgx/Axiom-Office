@@ -151,7 +151,7 @@
     { name: "writer.unlockSelection", kind: "wps", agent: false,
       summary: "Mở khoá vùng bôi đen",
       params: [] },
-    { name: "writer.outline", kind: "wps", agent: false,
+    { name: "writer.outline", kind: "wps", agent: true,
       summary: "Dàn bài tài liệu: các đoạn (số thứ tự toàn tài liệu, chữ rút gọn, số tự động) và bảng (số hàng, cột, hàng tiêu đề)",
       params: [{ name: "maxChars", required: false, hint: "characters per paragraph (default 160)" }] },
     { name: "writer.restyle", kind: "wps", agent: false,
@@ -801,6 +801,33 @@
     try { name = strProp(doc, "Name"); } catch (e2) {}
     try { fullName = strProp(doc, "FullName"); } catch (e3) {}
     return { name: name, fullName: fullName, totalChars: total, truncated: truncated, text: text };
+  }
+
+  function cmdWriterOutline(app, params) {
+    var doc = app.ActiveDocument;
+    var maxChars = paramInt(params, "maxChars", 160);
+    if (maxChars < 40) { maxChars = 40; }
+    var items = [];
+    var seenTables = {};
+    var index = 0;
+    var paras = doc.Paragraphs;
+    var count = Number(paras.Count);
+    for (var i = 1; i <= count; i++) {
+      index++;
+      var para = paras.Item(i);
+      var range = para.Range;
+      var text = "";
+      try { text = String(range.Text || "").replace(/\r/g, "").replace(/\x07/g, "").trim(); } catch (eT) {}
+      var style = "";
+      try { style = String(para.Style.NameLocal || ""); } catch (eS) {}
+      var inTable = false;
+      try { inTable = !!range.Tables || Number(range.Tables.Count) > 0; } catch (eTb) {}
+      if (text === "" && (style === "Normal" || style === "")) { continue; }
+      var entry = { n: index, t: text.length > maxChars ? text.substring(0, maxChars) + "..." : text };
+      if (style !== "" && style !== "Normal") { entry.style = style; }
+      items.push(entry);
+    }
+    return { paragraphs: index, items: items };
   }
 
   function cmdSelection(app) {
@@ -2831,6 +2858,7 @@
   var HANDLERS = {
     "app.info": cmdAppInfo,
     "writer.getText": cmdGetText,
+    "writer.outline": cmdWriterOutline,
     "writer.selection": cmdSelection,
     "writer.typeText": cmdTypeText,
     "writer.appendText": cmdAppendText,

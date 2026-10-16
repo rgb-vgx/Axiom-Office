@@ -621,6 +621,34 @@ command("writer.replaceAll", "wps", replace_all, "Tìm và thay toàn bộ", req
 command("writer.replaceMany", "wps", replace_many,
         "Thay NHIỀU chỗ trong một lần: `edits` = [{find, replace}] theo thứ tự (mỗi cặp thay mọi chỗ khớp) - dùng thay cho nhiều lần writer.replaceAll; trả số chỗ đã thay của từng cặp",
         req("edits", "array of {find, replace}; up to 200"), agent=True, undo=True)
+def outline(env, params):
+    doc = env.document
+    max_chars = max(40, values.integer(params, "maxChars", 160))
+    items = []
+    index = 0
+    for element in _body_elements(doc):
+        index += 1
+        if _is_table(element):
+            rows = table_rows(element)
+            header = [c[:40] for c in rows[0]] if rows else []
+            items.append({"n": index, "kind": "table", "rows": len(rows),
+                          "cols": len(rows[0]) if rows else 0, "header": header})
+            continue
+        text = (element.getString() or "").strip()
+        if not text:
+            continue
+        short = text if len(text) <= max_chars else text[:max_chars] + "..."
+        entry = {"n": index, "t": short}
+        try:
+            style = str(element.getPropertyValue("ParaStyleName") or "")
+            if style and style.lower() not in ("standard", "text body", "default paragraph style"):
+                entry["style"] = style
+        except Exception:
+            pass
+        items.append(entry)
+    return {"paragraphs": index, "items": items}
+
+
 def _design_unsupported(env, params):
     # Trinh bay lai tai lieu (tool doc_design) moi co tren Word (CommandDispatcher.WriterDesign.cs): khoi bo tron
     # dung bang InsertXML + wps shape. Ban LibreOffice lam sau.
@@ -635,9 +663,9 @@ def _lock_unsupported(env, params):
 command("writer.lockSelection", "wps", _lock_unsupported,
         "Khoá vùng đang bôi đen: tới khi mở khoá, lệnh writer.* chỉ được đổi chữ trong vùng đó (chars = 0: không bôi đen, không khoá)")
 command("writer.unlockSelection", "wps", _lock_unsupported, "Mở khoá vùng bôi đen")
-command("writer.outline", "wps", _design_unsupported,
+command("writer.outline", "wps", outline,
         "Dàn bài tài liệu: các đoạn (số thứ tự toàn tài liệu, chữ rút gọn, số tự động) và bảng (số hàng, cột, hàng tiêu đề)",
-        opt("maxChars", "characters per paragraph (default 160)"))
+        opt("maxChars", "characters per paragraph (default 160)"), agent=True)
 command("writer.restyle", "wps", _design_unsupported,
         "Trình bày lại nền chung KHÔNG đổi chữ: tiêu đề mục (I., A., *), tiêu đề con (1.), nhãn (a. ...:), gạch đầu dòng hai cấp, bỏ dòng trống thừa, bảng (viền mảnh, hàng tiêu đề nhạt lặp lại), lề trang, số trang",
         opt("accent", "#RRGGBB headings (default #2E5C8A)"), opt("font", "default Times New Roman"), opt("size", "body size (default 13)"), undo=True)

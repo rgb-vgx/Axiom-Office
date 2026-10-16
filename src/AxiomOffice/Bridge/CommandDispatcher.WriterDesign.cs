@@ -19,7 +19,7 @@ namespace AxiomOffice.Bridge
             {
                 Command("writer.outline", "wps", WriterOutline,
                     "Dàn bài tài liệu: các đoạn (số thứ tự toàn tài liệu, chữ rút gọn, số tự động) và bảng (số hàng, cột, hàng tiêu đề)",
-                    Opt("maxChars", "characters per paragraph (default 160)")),
+                    Opt("maxChars", "characters per paragraph (default 160)")).ForAgent(),
                 Command("writer.restyle", "wps", WriterRestyle,
                     "Trình bày lại nền chung KHÔNG đổi chữ: tiêu đề mục (I., A., *), tiêu đề con (1.), nhãn (a. ...:), gạch đầu dòng hai cấp, bỏ dòng trống thừa, bảng (viền mảnh, hàng tiêu đề nhạt lặp lại), lề trang, số trang",
                     Opt("accent", "#RRGGBB headings (default #2E5C8A)"), Opt("font", "default Times New Roman"), Opt("size", "body size (default 13)")),
@@ -76,11 +76,14 @@ namespace AxiomOffice.Bridge
                         catch
                         {
                         }
-                        items.Add(new Dictionary<string, object>
+                        string caption = TableCaption(doc, table);
+                        var tentry = new System.Collections.Generic.Dictionary<string, object>
                         {
                             { "n", index }, { "kind", "table" }, { "rows", Convert.ToInt32(table.Rows.Count) },
                             { "cols", Convert.ToInt32(table.Columns.Count) }, { "header", header }
-                        });
+                        };
+                        if (!string.IsNullOrEmpty(caption)) tentry["caption"] = caption;
+                        items.Add(tentry);
                     }
                     continue;
                 }
@@ -110,6 +113,28 @@ namespace AxiomOffice.Bridge
                 {
                     entry["list"] = list;
                 }
+                try
+                {
+                    var marks = new System.Collections.Generic.List<string>();
+                    foreach (dynamic mark in range.Bookmarks)
+                    {
+                        try { marks.Add(System.Convert.ToString(mark.Name)); }
+                        catch { }
+                    }
+                    if (marks.Count > 0) entry["bookmarks"] = marks;
+                }
+                catch
+                {
+                }
+                try
+                {
+                    string style = Convert.ToString(paragraph.Style.NameLocal);
+                    if (!string.IsNullOrEmpty(style) && style != "Normal" && style != "Mặc định")
+                        entry["style"] = style;
+                }
+                catch
+                {
+                }
                 if (hasShape && text.Trim('/', ' ').Length == 0)
                 {
                     string label = "[ảnh]";
@@ -133,6 +158,34 @@ namespace AxiomOffice.Bridge
 
         // Các bảng cấp ngoài, giữ Range (Word tự dời Start/End khi chữ phía trên đổi). Range.Information(wdWithInTable)
         // bắt Word dàn trang lại ở mỗi đoạn (bản thử 14/10/2026: restyle 285 đoạn mất ~100 s).
+        // P0-03 (16/10/2026): caption bang = doan Caption/Bang/Chu thich ke truoc bang.
+        private static string TableCaption(dynamic doc, dynamic table)
+        {
+            try
+            {
+                int start = System.Convert.ToInt32(table.Range.Start);
+                string last = null;
+                foreach (dynamic paragraph in doc.Paragraphs)
+                {
+                    int ps;
+                    try { ps = System.Convert.ToInt32(paragraph.Range.Start); }
+                    catch { continue; }
+                    if (ps >= start) break;
+                    string style;
+                    try { style = System.Convert.ToString(paragraph.Style.NameLocal); }
+                    catch { continue; }
+                    if (style == null) continue;
+                    string slow = style.ToLower();
+                    if (slow.IndexOf("caption") < 0 && slow.IndexOf("bang") < 0) continue;
+                    try { last = (System.Convert.ToString(paragraph.Range.Text) ?? "").Trim(); }
+                    catch { continue; }
+                    if (last != null && last.Length > 160) last = last.Substring(0, 160);
+                }
+                return last;
+            }
+            catch { return null; }
+        }
+
         private static List<dynamic> TableSpans(dynamic doc)
         {
             var spans = new List<dynamic>();

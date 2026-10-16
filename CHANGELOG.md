@@ -5,6 +5,12 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added - Mo rong writer.outline cho agent (P0-03, 16/10/2026)
+- Word: outline them style heading, bookmark, caption bang; mo ForAgent; build C# xanh.
+- LibreOffice: outline that (duyet body theo thu tu, style ParaStyleName, header bang), mo agent; giu restyle/insertBlocks la stub.
+- WPS: catalog agent:true + handler JS (duyet Paragraphs, style; bang lam sau); generate --check khop; test LO 25/25.
+
+
 ### Added - Duong heading quanh con tro Word (P0-01, 16/10/2026)
 - Core: DocumentContext them HeadingPath (prompt.go), ParseRequest doc document.view.headingPath (thieu thi bo qua, toi da 6 muc), ViewSection dua vao system prompt; test TestParseRequestHeadingPath.
 - Word: HostProbe.View them headingPath (duyet doan truoc con tro, style co Heading, moi muc 120 ky tu) - WPS thieu thuoc tinh thi bo qua, khong hong luot.

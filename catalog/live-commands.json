@@ -431,7 +431,7 @@
   {
     "name": "writer.outline",
     "kind": "wps",
-    "agent": false,
+    "agent": true,
     "summary": "Dàn bài tài liệu: các đoạn (số thứ tự toàn tài liệu, chữ rút gọn, số tự động) và bảng (số hàng, cột, hàng tiêu đề)",
     "params": [
       {
