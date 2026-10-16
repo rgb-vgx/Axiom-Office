@@ -438,6 +438,46 @@ func collectFillRangeOverwrites(ctx context.Context, run *RunContext, params map
 	return cells, tooLarge
 }
 
+// collectImportCsvOverwrites: importCsv CO range = ghi de vung dich bat dau o o goc do.
+// Khong biet truoc kich thuoc CSV (nam trong file) nen doc vung mau 200 dong x 50 cot de phat hien
+// du lieu cu; neu vung mau co du lieu thi hoi truoc khi nap. Khong co range (tao sheet moi) thi mien.
+func collectImportCsvOverwrites(ctx context.Context, run *RunContext, params map[string]any) ([]overwriteCell, bool) {
+	rangeText := overwriteStringParam(params, "range")
+	if rangeText == "" {
+		return nil, false
+	}
+	c1, r1, _, _, ok := parseOverwriteRange(rangeText)
+	if !ok {
+		return nil, false
+	}
+	sheet := overwriteStringParam(params, "sheet")
+	if sheet != "" && (run.CreatedSheets[sheet] || run.OverwriteApproved[sheet]) {
+		return nil, false
+	}
+	// Mau 200 dong x 50 cot tu o goc: du de bat du lieu cu ma chi 1 lan doc.
+	area := overwriteAreaRange(c1, r1, c1+49, r1+199)
+	oldMatrix, resolved, ok, tooLarge := readOverwriteArea(ctx, run, sheet, area)
+	if !ok {
+		return nil, false
+	}
+	var cells []overwriteCell
+	for r, line := range oldMatrix {
+		for c, oldValue := range line {
+			if isEmptyOverwriteCell(oldValue) {
+				continue
+			}
+			cell := overwriteCellAddr(c1+c, r1+r)
+			target := effectiveOverwriteSheet(sheet, resolved)
+			cells = append(cells, overwriteCell{sheet: target,
+				cell: cell, old: oldValue, new: "<csv>"})
+		}
+		if len(cells) >= 50 {
+			break
+		}
+	}
+	return cells, tooLarge
+}
+
 // buildOverwriteReason: ly do hoi tieng Viet - ten sheet, tong so o, toi da ~10 vi du, duoi 1200 ky tu.
 func buildOverwriteReason(cells []overwriteCell) string {
 	if len(cells) == 0 {
@@ -514,6 +554,9 @@ func checkOverwriteGuard(ctx context.Context, run *RunContext, action string, pa
 		}
 	case "et.fillRange":
 		found, large := collectFillRangeOverwrites(ctx, run, params)
+		cells, tooLarge = found, large
+	case "et.importCsv":
+		found, large := collectImportCsvOverwrites(ctx, run, params)
 		cells, tooLarge = found, large
 	default:
 		return "", nil

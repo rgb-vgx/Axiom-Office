@@ -115,6 +115,7 @@ func calcCatalog() *office.CommandCatalog {
 		{Name: "et.writeRanges", Kind: "et", Agent: true, Params: []office.CommandParam{{Name: "writes", Required: true}, {Name: "sheet"}}},
 		{Name: "et.fillRange", Kind: "et", Agent: true, Params: []office.CommandParam{{Name: "range", Required: true}, {Name: "formula"}, {Name: "sheet"}}},
 		{Name: "et.addSheet", Kind: "et", Agent: true, Params: []office.CommandParam{{Name: "name", Required: true}}},
+		{Name: "et.importCsv", Kind: "et", Agent: true, Params: []office.CommandParam{{Name: "path", Required: true}, {Name: "range"}, {Name: "sheet"}}},
 	}}
 }
 
@@ -334,5 +335,43 @@ func TestNoReadsForApprovedOrOwnSheets(t *testing.T) {
 	invoke(tool, run, "et.writeRange", map[string]any{"range": "A1", "sheet": "Dashboard", "values": []any{[]any{"x"}}})
 	if book.reads != 0 {
 		t.Fatalf("sheet do luot tao: khong doc, doc %d lan", book.reads)
+	}
+}
+
+func TestImportCsvWithRangeAsks(t *testing.T) {
+	book := newBook()
+	server, port := book.serve(t)
+	defer server.Close()
+	no := false
+	var log []asked
+	run := overwriteRun(port, server, &no, &log)
+	tool := NewOfficeActionTool(calcCatalog(), "et")
+
+	// Co range + vung dich co du lieu cu (Q4) -> phai hoi, tu choi thi khong ghi.
+	result := invoke(tool, run, "et.importCsv", map[string]any{"path": "d:/data.csv", "range": "Q4", "sheet": "ADT"})
+	if len(log) != 1 || !strings.Contains(log[0].reason, "Q4") {
+		t.Fatalf("importCsv co range vao vung co du lieu phai hoi va neu o: %v", log)
+	}
+	if result.OK || len(book.writes) != 0 {
+		t.Fatalf("tu choi thi khong duoc nap CSV: %+v writes=%v", result, book.writes)
+	}
+}
+
+func TestImportCsvWithoutRangeSkipsQuestion(t *testing.T) {
+	book := newBook()
+	server, port := book.serve(t)
+	defer server.Close()
+	yes := true
+	var log []asked
+	run := overwriteRun(port, server, &yes, &log)
+	tool := NewOfficeActionTool(calcCatalog(), "et")
+
+	// Khong co range (tao sheet moi) -> khong hoi, cho nap.
+	result := invoke(tool, run, "et.importCsv", map[string]any{"path": "d:/data.csv"})
+	if len(log) != 0 {
+		t.Fatalf("importCsv tao sheet moi thi khong hoi: %v", log)
+	}
+	if !result.OK || len(book.writes) != 1 {
+		t.Fatalf("tao sheet moi phai cho nap: %+v writes=%v", result, book.writes)
 	}
 }

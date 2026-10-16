@@ -158,3 +158,39 @@ func TestDocumentLengthOnlyForReplaceAll(t *testing.T) {
 		t.Fatalf("writer.replaceAll phai hoi do dai dung mot lan (goi %d lan)", calls)
 	}
 }
+
+func TestDeleteShapesAndTaggedAsk(t *testing.T) {
+	for _, action := range []string{"wpp.deleteShapes", "wpp.deleteTagged"} {
+		if decision := evaluate(action, nil, "lam slide bao cao", nil); !decision.NeedsConfirmation {
+			t.Fatalf("%s phai hoi truoc khi xoa", action)
+		}
+	}
+	// Lenh xoa/tao slide khong duoc hoi do dai tai lieu (chi replaceAll/replaceMany moi can).
+	calls := 0
+	for _, action := range []string{"wpp.deleteShapes", "wpp.deleteTagged", "wpp.newFromTemplate"} {
+		Evaluate(context.Background(), action, nil, "lam slide", func(context.Context) *int {
+			calls++
+			return nil
+		})
+	}
+	if calls != 0 {
+		t.Fatalf("lenh xoa/tao slide khong duoc hoi do dai tai lieu (goi %d lan)", calls)
+	}
+}
+
+func TestNewFromTemplateOverwriteAsks(t *testing.T) {
+	existing := filepath.Join(t.TempDir(), "mau-moi.pptx")
+	if err := os.WriteFile(existing, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	params := map[string]any{"template": "mau.potx", "path": existing}
+	decision := evaluate("wpp.newFromTemplate", params, "dung slide theo mau", nil)
+	if !decision.NeedsConfirmation || !strings.Contains(decision.Reason, "Ghi đè") {
+		t.Fatalf("tao bai tu mau de file da co phai hoi: %+v", decision)
+	}
+	fresh := evaluate("wpp.newFromTemplate",
+		map[string]any{"template": "mau.potx", "path": filepath.Join(t.TempDir(), "moi.pptx")}, "dung slide theo mau", nil)
+	if fresh.NeedsConfirmation {
+		t.Fatalf("tao file moi khong can hoi: %+v", fresh)
+	}
+}

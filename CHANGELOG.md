@@ -5,6 +5,10 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added - Hoi truoc khi xoa shape/slide mau, chan importCsv ghi de (P1-01, 16/10/2026)
+- policy.Evaluate: wpp.deleteShapes/wpp.deleteTagged hoi truoc khi xoa; wpp.newFromTemplate de file da co hoi ghi de; test TestDeleteShapesAndTaggedAsk + TestNewFromTemplateOverwriteAsks.
+- overwrite guard: et.importCsv co range doc mau 200x50 o tu o goc, vung co du lieu cu thi hoi truoc; khong range (tao sheet moi) thi mien; test TestImportCsvWithRangeAsks/TestImportCsvWithoutRangeSkipsQuestion.
+
 ### Added - Ngan sach muc cau truc + cat writer.outline (P0-02/P0-07, 16/10/2026)
 - office.Truncation: writer.outline vuot ~1500 token (~6000 ky tu) thi cat items tu cuoi, truncated=true + totalItems + note; dung chung agent + MCP.
 - Test TestCatOutlineQuaNganSach (200 muc x 100 ky tu -> con 60 muc); go test agent/tools/office xanh.

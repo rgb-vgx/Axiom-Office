@@ -130,6 +130,22 @@ func Evaluate(ctx context.Context, action string, params map[string]any, prompt 
 		return Ask("Xoá slide khỏi bài thuyết trình")
 	}
 
+	if action == "wpp.deleteShapes" {
+		return Ask("Xoá hình/khung khỏi slide")
+	}
+
+	if action == "wpp.deleteTagged" {
+		return Ask("Xoá các slide do công cụ dựng theo mẫu")
+	}
+
+	if action == "wpp.newFromTemplate" {
+		if path, ok := params["path"].(string); ok && strings.TrimSpace(path) != "" {
+			if _, err := os.Stat(strings.TrimSpace(path)); err == nil {
+				return Ask("Ghi đè file đã có: " + strings.TrimSpace(path))
+			}
+		}
+	}
+
 	if action == "writer.replaceAll" || action == "writer.replaceMany" {
 		if length := documentLength(ctx); length != nil && *length > LargeDocumentChars {
 			return Ask("Thay thế toàn bộ trong tài liệu dài (" + groupDigits(*length) + " ký tự)")
