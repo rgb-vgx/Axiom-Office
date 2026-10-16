@@ -26,6 +26,8 @@ const (
 	TavilyEndpoint    = "https://api.tavily.com"
 	webSearchMax      = 8
 	webSnippetChars   = 500
+	// webSourceSnippetChars: doan trich luu vao kho nguon (rong hon phan gui model de tra cuu lai duoc).
+	webSourceSnippetChars = 2000
 )
 
 func NewWebSearchTool(key string) *WebSearchTool {
@@ -98,12 +100,18 @@ func (t *WebSearchTool) Invoke(ctx context.Context, arguments map[string]any, ru
 		return Result{JSON: ErrorJSON("web search: unexpected reply from Tavily"), Action: WebSearchToolName}
 	}
 	results := []map[string]any{}
+	docs := []WebSourceDoc{}
 	for _, item := range reply.Results {
 		run.noteWebSource(item.URL, item.Title)
 		results = append(results, map[string]any{
 			"title": item.Title, "url": item.URL, "snippet": model.Truncate(strings.TrimSpace(item.Content), webSnippetChars),
 		})
+		docs = append(docs, WebSourceDoc{
+			URL: item.URL, Title: item.Title, Mode: "search", OK: true,
+			Snippet: model.Truncate(strings.TrimSpace(item.Content), webSourceSnippetChars),
+		})
 	}
+	run.SaveWebSources("search", query, docs)
 	summary := map[string]any{"query": query, "results": results}
 	if strings.TrimSpace(reply.Answer) != "" {
 		summary["answer"] = strings.TrimSpace(reply.Answer)

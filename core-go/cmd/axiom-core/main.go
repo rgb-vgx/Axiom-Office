@@ -150,6 +150,17 @@ func run() int {
 		Models: models, Skills: skillIndex, Memory: memoryService, MCP: mcpClient,
 		Config: config.Load, Assembler: agent.NewContextAssembler(),
 	}
+	// Kho nguon web (schema v3): nguon tai ve trong cac luot truoc - don luc khoi dong (qua han / qua tran).
+	if stores.Available {
+		orchestrator.WebSources = stores.DB.WebSources()
+		go func() {
+			current := config.Load()
+			if purged := orchestrator.WebSources.Purge(current.WebSourceKeepDays, int64(current.WebSourceMaxMB)<<20); purged > 0 {
+				corelog.Info("web sources: purged %d source(s) at startup (keep %d day(s), max %d MB)",
+					purged, current.WebSourceKeepDays, current.WebSourceMaxMB)
+			}
+		}()
+	}
 
 	server := &http.Server{ReadHeaderTimeout: 10 * time.Second}
 	var stopOnce sync.Once

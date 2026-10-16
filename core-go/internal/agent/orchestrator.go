@@ -144,8 +144,10 @@ type Orchestrator struct {
 	Skills        *skills.Index
 	Memory        *memory.Service
 	MCP           *mcp.Manager
-	Config        func() config.Config
-	Assembler     *ContextAssembler
+	// WebSources: kho nguon web tai ve (nhieu luot). nil = memory/kho khong mo duoc - bo qua tinh nang nay.
+	WebSources *store.WebSources
+	Config     func() config.Config
+	Assembler  *ContextAssembler
 }
 
 func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) {
@@ -267,6 +269,10 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 			list = append(list, tools.NewWebSearchTool(key))
 		}
 	}
+	// Kho nguon web da tai (web_sources): doc lai/trich dan khoi tai lai - chi doc nen co ca plan mode.
+	if o.WebSources != nil {
+		list = append(list, tools.NewWebSourcesTool(o.WebSources))
+	}
 	// QA thi giac (muc 8.4.6): chi khi nguoi dung bat VisualQaEnabled (doc lai moi luot qua cau hinh).
 	if o.Config().VisualQaEnabled {
 		list = append(list, tools.NewVisualTool())
@@ -311,6 +317,12 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 	}
 	if request.Document != nil {
 		runContext.FocusSlide = request.Document.Slide
+	}
+	// Luu nguon web tai ve trong luot (WebSourceStore bat + kho mo duoc): tool web ghi qua RunContext.
+	if o.WebSources != nil {
+		if cfg := o.Config(); cfg.WebSourceStore {
+			runContext.WebSources = newWebSourcesSaver(o.WebSources, o.WebSources.Path(), cfg.WebSourceMaxMB)
+		}
 	}
 
 	systemPrompt := Build(appKind, session, request.Document, appSkills, memoryContext.Lines, assembled.Summary,

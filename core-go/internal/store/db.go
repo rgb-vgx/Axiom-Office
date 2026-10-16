@@ -15,7 +15,7 @@ import (
 	"axiomoffice/core/internal/corelog"
 )
 
-const SchemaVersion = 2
+const SchemaVersion = 3
 
 type DB struct {
 	Path string
@@ -99,6 +99,11 @@ func (d *DB) Migrate() error {
 			return fmt.Errorf("schema v2: %w", err)
 		}
 	}
+	if version < 3 {
+		if _, err := tx.Exec(schemaV3); err != nil {
+			return fmt.Errorf("schema v3: %w", err)
+		}
+	}
 	if _, err := tx.Exec(fmt.Sprintf("PRAGMA user_version = %d", SchemaVersion)); err != nil {
 		return err
 	}
@@ -169,6 +174,54 @@ CREATE TABLE memory_embeddings (
   memory_id TEXT PRIMARY KEY REFERENCES memories(id) ON DELETE CASCADE,
   model TEXT, dim INTEGER, vector BLOB,
   text_hash TEXT, created_at TEXT);
+`
+
+// Schema v3: kho nguon web tai ve (trich dan lai, khoi tai lai — xem CHANGELOG "luu nguon web").
+// web_sources: mot dong / URL; web_source_refs: lich su dung theo tung luot; web_sources_fts: tim lai
+// bang FTS5 external content (khong nhan doi dung luong vi bai viet lon) + trigger dong bo.
+const schemaV3 = `
+CREATE TABLE web_sources (
+  id INTEGER PRIMARY KEY,
+  url TEXT NOT NULL,
+  url_key TEXT NOT NULL UNIQUE,
+  domain TEXT,
+  title TEXT,
+  lang TEXT,
+  content TEXT,
+  content_chars INTEGER NOT NULL DEFAULT 0,
+  search_text TEXT NOT NULL DEFAULT '',
+  fetch_count INTEGER NOT NULL DEFAULT 1,
+  first_seen_at TEXT NOT NULL,
+  fetched_at TEXT NOT NULL);
+CREATE INDEX ix_web_sources_fetched ON web_sources(fetched_at DESC);
+
+CREATE TABLE web_source_refs (
+  id INTEGER PRIMARY KEY,
+  source_id INTEGER NOT NULL REFERENCES web_sources(id) ON DELETE CASCADE,
+  conversation_id TEXT,
+  run_id TEXT,
+  kind TEXT,
+  query TEXT,
+  mode TEXT,
+  score INTEGER,
+  ok INTEGER NOT NULL DEFAULT 1,
+  error TEXT,
+  created_at TEXT NOT NULL);
+CREATE INDEX ix_web_refs_conversation ON web_source_refs(conversation_id, id DESC);
+CREATE INDEX ix_web_refs_run ON web_source_refs(run_id);
+CREATE INDEX ix_web_refs_source ON web_source_refs(source_id);
+
+CREATE VIRTUAL TABLE web_sources_fts USING fts5(search_text, content='web_sources', content_rowid='id', tokenize = 'unicode61');
+CREATE TRIGGER web_sources_ai AFTER INSERT ON web_sources BEGIN
+  INSERT INTO web_sources_fts(rowid, search_text) VALUES (new.id, new.search_text);
+END;
+CREATE TRIGGER web_sources_ad AFTER DELETE ON web_sources BEGIN
+  INSERT INTO web_sources_fts(web_sources_fts, rowid, search_text) VALUES ('delete', old.id, old.search_text);
+END;
+CREATE TRIGGER web_sources_au AFTER UPDATE ON web_sources BEGIN
+  INSERT INTO web_sources_fts(web_sources_fts, rowid, search_text) VALUES ('delete', old.id, old.search_text);
+  INSERT INTO web_sources_fts(rowid, search_text) VALUES (new.id, new.search_text);
+END;
 `
 
 // Stores gom kho du lieu + trang thai cho /health ("on" | "off" | "unavailable").

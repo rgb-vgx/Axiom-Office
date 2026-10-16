@@ -82,6 +82,13 @@ namespace AxiomOffice.Bridge
             get { return ReadInt("TavilyEnabled", 1) != 0; }
         }
 
+        // Lưu nguồn web tải về (trang đã đọc) vào kho Core (core.db): trích dẫn lại, khỏi tải lại trang.
+        // Bật mặc định; tắt = không lưu (các lượt vẫn tìm web bình thường).
+        public static bool WebSourceStore
+        {
+            get { return ReadInt("WebSourceStore", 1) != 0; }
+        }
+
         // Khoá lưu "dpapi:<base64>" (WriteSecret) hoặc chữ thường (cấu hình cũ / nhập tay).
         private static string ReadSecret(string name)
         {

@@ -26,6 +26,7 @@ namespace AxiomOffice.Ai
         private readonly CheckBox _visual;
         private readonly CheckBox _verify;
         private readonly CheckBox _reasoning;
+        private readonly CheckBox _webSources;
         private readonly TextBox _fallback;
         private readonly TextBox _window;
 
@@ -36,7 +37,7 @@ namespace AxiomOffice.Ai
             MaximizeBox = false;
             MinimizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
-            ClientSize = new Size(500, 454);
+            ClientSize = new Size(500, 474);
             Font = SystemFonts.MessageBoxFont;
 
             var lblProvider = new Label { Text = "Provider:", Left = 14, Top = 19, Width = 90 };
@@ -92,15 +93,17 @@ namespace AxiomOffice.Ai
             // QA thị giác (New_arch.md 8.4.6): tắt mặc định vì mỗi ảnh tốn nhiều token; cần model đọc được ảnh.
             // Riêng một dòng: để cạnh nút "Quản lý ghi nhớ" thì nhãn bị cắt cụt.
             _visual = new CheckBox { Text = "Cho AI xem ảnh chụp cửa sổ (tốn token)", Left = 110, Top = 368, Width = 370 };
+            // Lưu nguồn web tải về vào kho Core: lượt sau trích dẫn lại / khỏi tải lại trang (bật mặc định).
+            _webSources = new CheckBox { Text = "Lưu nguồn web đã đọc để trích dẫn lại sau này", Left = 110, Top = 388, Width = 370 };
 
-            _status = new Label { Left = 14, Top = 394, Width = 466, Height = 18, AutoEllipsis = true, ForeColor = SystemColors.GrayText };
+            _status = new Label { Left = 14, Top = 414, Width = 466, Height = 18, AutoEllipsis = true, ForeColor = SystemColors.GrayText };
 
-            _test = new Button { Text = "Test", Left = 110, Top = 418, Width = 80 };
-            var save = new Button { Text = "Save", Left = 312, Top = 418, Width = 80 };
-            var cancel = new Button { Text = "Cancel", Left = 400, Top = 418, Width = 80 };
+            _test = new Button { Text = "Test", Left = 110, Top = 438, Width = 80 };
+            var save = new Button { Text = "Save", Left = 312, Top = 438, Width = 80 };
+            var cancel = new Button { Text = "Cancel", Left = 400, Top = 438, Width = 80 };
 
             Controls.AddRange(new Control[] { lblProvider, _provider, lblEndpoint, _endpoint, lblKey, _apiKey, lblModel, _model, lblFallback, _fallback, lblWindow, _window, windowHint, hint,
-                lblAgent, _core, _memory, _autoExtract, manage, _visual, _verify, _reasoning, _status, _test, save, cancel });
+                lblAgent, _core, _memory, _autoExtract, manage, _visual, _verify, _reasoning, _webSources, _status, _test, save, cancel });
             _memory.CheckedChanged += delegate { _autoExtract.Enabled = _memory.Checked; };
             manage.Click += delegate
             {
@@ -150,6 +153,7 @@ namespace AxiomOffice.Ai
             _visual.Checked = Config.VisualQaEnabled;
             _verify.Checked = Config.VerifyWorkEnabled;
             _reasoning.Checked = Config.LlmShowReasoning;
+            _webSources.Checked = Config.WebSourceStore;
             _fallback.Text = Config.LlmFallbackModels;
             _window.Text = Config.LlmContextWindow > 0 ? Config.LlmContextWindow.ToString() : "";
             if (string.IsNullOrEmpty(_endpoint.Text))
@@ -200,6 +204,7 @@ namespace AxiomOffice.Ai
             saved &= Config.WriteDword("VisualQaEnabled", _visual.Checked ? 1 : 0);
             saved &= Config.WriteDword("VerifyWorkEnabled", _verify.Checked ? 1 : 0);
             saved &= Config.WriteDword("LlmShowReasoning", _reasoning.Checked ? 1 : 0);
+            saved &= Config.WriteDword("WebSourceStore", _webSources.Checked ? 1 : 0);
             saved &= Config.WriteString("LlmFallbackModels", (_fallback.Text ?? "").Trim());
             saved &= Config.WriteDword("LlmContextWindow", window);
             if (!saved)

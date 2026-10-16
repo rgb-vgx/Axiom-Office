@@ -92,6 +92,8 @@ type RunContext struct {
 	droppedPictures []string
 	// webSources: link tavily_search da tra trong luot (url -> tieu de) - slide "Cap nhat" chi duoc trich nhung link nay.
 	webSources map[string]string
+	// WebSources: noi luu nguon web tai ve trong luot (Core ghi core.db); nil = khong luu (chi song trong luot).
+	WebSources WebSourceSaver
 	// calls: so lan goi tung tool/lenh trong luot (CallLimit).
 	calls map[string]int
 	// templateBuilt: so slide slides_from_template da dung trong CA luot (cac lo truoc + lo nay) - cau tra loi cuoi
@@ -172,7 +174,20 @@ func stringArg(arguments map[string]any, name string) string {
 	return strings.TrimSpace(value)
 }
 
-// noteWebSource: ghi lai mot link tavily_search vua tra (run nil: tool goi ngoai luot chay, vd test).
+// WebSourceSaver: cau noi sang kho nguon web (agent adapter -> store.WebSources).
+type WebSourceSaver interface {
+	SaveWebSources(runID, conversationID, kind, query string, docs []WebSourceDoc) int
+}
+
+// SaveWebSources: goi khi tool web tra ve nguon (nil-safe; chua bat luu = bo qua im lang).
+func (c *RunContext) SaveWebSources(kind, query string, docs []WebSourceDoc) {
+	if c == nil || c.WebSources == nil || len(docs) == 0 {
+		return
+	}
+	c.WebSources.SaveWebSources(c.RunID, c.ConversationID, kind, query, docs)
+}
+
+// noteWebSource: ghi lai mot link web vua tra trong luot (run nil: tool goi ngoai luot chay, vd test).
 func (c *RunContext) noteWebSource(url, title string) {
 	if c == nil || strings.TrimSpace(url) == "" {
 		return

@@ -58,9 +58,14 @@ type Config struct {
 	VisualQaEnabled   bool
 	LlmApiKey         string
 	// TavilyApiKey: khoa tim kiem web (tool tavily_search); rong = khong co tool. Windows luu "dpapi:" nhu LlmApiKey.
-	TavilyApiKey             string
+	TavilyApiKey string
 	// TavilyEnabled: cho AI tim kiem web (toggle tren ribbon). Tat thi khong dang ky tool du co khoa.
-	TavilyEnabled            bool
+	TavilyEnabled bool
+	// WebSourceStore: luu nguon web tai ve (trang da doc) vao core.db de trich dan lai / khoi tai lai.
+	// WebSourceKeepDays: so ngay giu nguon; 0 = giu mai (chi don theo tran dung luong WebSourceMaxMB).
+	WebSourceStore    bool
+	WebSourceKeepDays int
+	WebSourceMaxMB    int
 	MemoryModel              string
 	EmbeddingModel           string
 	EmbeddingEndpoint        string
@@ -115,6 +120,9 @@ func From(env Env, source Source) Config {
 		LlmApiKey:                Unprotect(text(env, "AXIOM_LLM_API_KEY", source, "LlmApiKey")),
 		TavilyApiKey:             Unprotect(text(env, "AXIOM_TAVILY_API_KEY", source, "TavilyApiKey")),
 		TavilyEnabled:            flag(env, "AXIOM_TAVILY_ENABLED", source, "TavilyEnabled", true),
+		WebSourceStore:           flag(env, "AXIOM_WEB_SOURCE_STORE", source, "WebSourceStore", true),
+		WebSourceKeepDays:        clamp(intValue(env, "AXIOM_WEB_SOURCE_KEEP_DAYS", source, "WebSourceKeepDays", 0), 0, 3650),
+		WebSourceMaxMB:           clamp(intValue(env, "AXIOM_WEB_SOURCE_MAX_MB", source, "WebSourceMaxMB", 300), 50, 10000),
 		MemoryModel:              text(env, "AXIOM_MEMORY_MODEL", source, "MemoryModel"),
 		EmbeddingModel:           text(env, "AXIOM_EMBEDDING_MODEL", source, "EmbeddingModel"),
 		EmbeddingEndpoint:        text(env, "AXIOM_EMBEDDING_ENDPOINT", source, "EmbeddingEndpoint"),

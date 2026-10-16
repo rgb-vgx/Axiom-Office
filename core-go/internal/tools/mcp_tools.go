@@ -51,6 +51,17 @@ func (t *MCPTool) Invoke(ctx context.Context, arguments map[string]any, run *Run
 	}
 
 	text, ok := t.bound.Call(ctx, arguments)
+	// Trailer AXIOM_WEB (tool chrome-search): tach nguon de luu kho + danh dau nguon cho luot TRUOC khi
+	// ket qua vao ngu canh model. Khong co trailer thi ket qua giu nguyen.
+	if ok {
+		if clean, trailer := ParseWebTrailer(text); trailer != nil {
+			text = clean
+			for _, doc := range trailer.Sources {
+				run.noteWebSource(doc.URL, doc.Title)
+			}
+			run.SaveWebSources(trailer.Kind, trailer.Query, trailer.Sources)
+		}
+	}
 	return Result{JSON: mcp.ResultJSON(text, ok), OK: ok, Action: name,
 		Mutating: ok && MCPChangesState(name)}
 }
