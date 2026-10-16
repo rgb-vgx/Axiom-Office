@@ -70,7 +70,8 @@ $layout = [ordered]@{
     "install.cmd"                                    = Join-Path $PSScriptRoot "dist\install.cmd"
     "uninstall.cmd"                                  = Join-Path $PSScriptRoot "dist\uninstall.cmd"
     "HUONG-DAN-CAI-DAT.txt"                          = Join-Path $PSScriptRoot "dist\HUONG-DAN-CAI-DAT.txt"
-    "THIRD-PARTY-NOTICES.md"                         = Join-Path $root "src\AxiomOffice.Host\Mcp\Templates\NOTICE.md"
+    # NOTICE cua template docx/pptx gio nam trong engine Go (core-go/internal/templates) - ban C# da bo.
+    "THIRD-PARTY-NOTICES.md"                         = Join-Path $root "core-go\internal\templates\NOTICE.md"
 }
 foreach ($entry in $layout.GetEnumerator()) {
     $target = Join-Path $stage $entry.Key
