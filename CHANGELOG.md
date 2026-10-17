@@ -5,6 +5,20 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added - memory Redact + audit an toan (M2, P6-01/02/04, 17/10/2026)
+- `memory.Redact` (core-go/internal/memory/text.go): thay thông tin nhạy cảm bằng `[ẩn]` (email, token
+  `sk-`/JWT/`Bearer`, mật khẩu/PIN/OTP, CCCD/số tài khoản, số thẻ, số điện thoại có dấu cách) mà **không** cắt oan
+  số bình thường (số trang, ngày, số tiền, mã môn). Hàm thuần, không phụ thuộc store. Test `redact_test.go`.
+- Audit ẩn bí mật (P6-01): `tool_calls.params_json` và `paramsPreview` trong SSE đi qua `Redact` trước khi ghi
+  (`agent/orchestrator.go`); test `TestRedactedParamsHidesSecrets`.
+- Hạn lưu audit (P6-02): `Runs.PurgeAudit` + cấu hình `AuditKeepDays` (env `AXIOM_AUDIT_KEEP_DAYS`, mặc định 90);
+  dọn lúc Core khởi động. Test `TestPurgeAuditKeepsRecent`.
+- Nhật ký theo tài liệu (P6-04): `GET /v1/audit?documentKey=…` (`Runs.AuditForDocument`, join `runs` →
+  `conversations.document_key`). Test `TestAuditFilterByDocument`.
+- Trích xuất: fact chỉ có số, không ngữ cảnh thì bị bỏ (`hasDigitsWithoutWords`); `extract.txt` thêm quy tắc 14
+  (số liệu phải kèm nguồn). Ngân sách context memory có log số fact bị cắt (M2-04).
+
+
 ### Docs - docs/plans: đồng bộ trạng thái + tệp task chi tiết (17/10/2026)
 - Đánh dấu P0-01…P0-07 **đã xong** (16/10) trong `01-p0`, `15-p0-tasks-chitiet`; ghi rõ hai chỗ còn lệch phía
   WPS/LibreOffice của `writer.outline` (bảng ở WPS, bookmark/caption ở LibreOffice).

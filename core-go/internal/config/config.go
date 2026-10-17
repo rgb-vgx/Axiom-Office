@@ -66,6 +66,8 @@ type Config struct {
 	WebSourceStore           bool
 	WebSourceKeepDays        int
 	WebSourceMaxMB           int
+	// AuditKeepDays: so ngay giu tool_calls (nhat ky hoat dong). 0 = giu mai. Mac dinh 90 (07-p6).
+	AuditKeepDays            int
 	MemoryModel              string
 	EmbeddingModel           string
 	EmbeddingEndpoint        string
@@ -123,6 +125,7 @@ func From(env Env, source Source) Config {
 		WebSourceStore:           flag(env, "AXIOM_WEB_SOURCE_STORE", source, "WebSourceStore", true),
 		WebSourceKeepDays:        clamp(intValue(env, "AXIOM_WEB_SOURCE_KEEP_DAYS", source, "WebSourceKeepDays", 0), 0, 3650),
 		WebSourceMaxMB:           clamp(intValue(env, "AXIOM_WEB_SOURCE_MAX_MB", source, "WebSourceMaxMB", 300), 50, 10000),
+		AuditKeepDays:            clamp(intValue(env, "AXIOM_AUDIT_KEEP_DAYS", source, "AuditKeepDays", 90), 0, 3650),
 		MemoryModel:              text(env, "AXIOM_MEMORY_MODEL", source, "MemoryModel"),
 		EmbeddingModel:           text(env, "AXIOM_EMBEDDING_MODEL", source, "EmbeddingModel"),
 		EmbeddingEndpoint:        text(env, "AXIOM_EMBEDDING_ENDPOINT", source, "EmbeddingEndpoint"),

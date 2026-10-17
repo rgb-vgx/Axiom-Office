@@ -1,6 +1,9 @@
 package store
 
-import "database/sql"
+import (
+	"database/sql"
+	"strings"
+)
 
 // RunRow: mot luot chay da luu (New_arch.md muc 8.5.2).
 type RunRow struct {
@@ -89,7 +92,43 @@ func (r *Runs) Audit(runID *string, limit int) []AuditRow {
 	}
 	query += " ORDER BY id DESC LIMIT ?"
 	args = append(args, limit)
+	return r.auditQuery(query, args...)
+}
 
+// AuditForDocument: nhat ky cua rieng mot tai lieu (07-p6/P6-04) - tool_calls -> runs -> conversations.document_key.
+func (r *Runs) AuditForDocument(documentKey *string, runID *string, limit int) []AuditRow {
+	query := `SELECT t.id, t.run_id, t.seq, t.tool, t.action, t.params_json, t.ok, t.error, t.ms, t.created_at
+		FROM tool_calls t`
+	args := []any{}
+	where := []string{}
+	if documentKey != nil {
+		query += " JOIN runs r ON r.id = t.run_id JOIN conversations c ON c.id = r.conversation_id"
+		where = append(where, "c.document_key = ?")
+		args = append(args, *documentKey)
+	}
+	if runID != nil {
+		where = append(where, "t.run_id = ?")
+		args = append(args, *runID)
+	}
+	if len(where) > 0 {
+		query += " WHERE " + strings.Join(where, " AND ")
+	}
+	query += " ORDER BY t.id DESC LIMIT ?"
+	args = append(args, limit)
+	return r.auditQuery(query, args...)
+}
+
+// PurgeAudit: xoa tool_calls cu hon `before` (07-p6/P6-02). Tra so dong da xoa.
+func (r *Runs) PurgeAudit(before string) int {
+	result, err := r.db.sql.Exec("DELETE FROM tool_calls WHERE created_at < ?", before)
+	if err != nil {
+		return 0
+	}
+	affected, _ := result.RowsAffected()
+	return int(affected)
+}
+
+func (r *Runs) auditQuery(query string, args ...any) []AuditRow {
 	rows := []AuditRow{}
 	result, err := r.db.sql.Query(query, args...)
 	if err != nil {

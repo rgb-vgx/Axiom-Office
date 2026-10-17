@@ -115,6 +115,21 @@ func BuildUserMessage(input ExtractionInput) (string, map[string]string) {
 
 // ParseFacts kiem tra dau ra cua LLM (muc 8.5.5): bo fact confidence < 0.6, rong, > 300 ky tu, nhay cam;
 // bo moi linkedIds khong nam trong bang id tam (van giu fact); expiresAt phai la YYYY-MM-DD.
+// hasDigitsWithoutWords: fact chi toan chu so/ky hieu, khong co chu nao - vo nghia khi nho lai
+// (M2-03: so lieu phai kem nguon, mot con so tro khong la mot fact).
+func hasDigitsWithoutWords(text string) bool {
+	hasDigit, hasLetter := false, false
+	for _, r := range text {
+		switch {
+		case r >= '0' && r <= '9':
+			hasDigit = true
+		case (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r > 127:
+			hasLetter = true
+		}
+	}
+	return hasDigit && !hasLetter
+}
+
 func ParseFacts(output string, tempIDs map[string]string, documentKey string) ([]NewMemory, string) {
 	// Con tro: phan biet "thieu khoa facts" (loi) voi "facts: []" (khong co gi dang nho).
 	var root struct {
@@ -138,7 +153,8 @@ func ParseFacts(output string, tempIDs map[string]string, documentKey string) ([
 			fallback := 0.7
 			confidence = &fallback
 		}
-		if text == "" || len([]rune(text)) > MaxFactLength || *confidence < MinConfidence || IsSensitive(text) {
+		if text == "" || len([]rune(text)) > MaxFactLength || *confidence < MinConfidence || IsSensitive(text) ||
+			hasDigitsWithoutWords(text) {
 			continue
 		}
 

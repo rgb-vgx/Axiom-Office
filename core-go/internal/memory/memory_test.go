@@ -211,6 +211,7 @@ func TestShouldSkipAndParseFacts(t *testing.T) {
 		{"text":"Người dùng là Trưởng phòng Kế toán","scope":"user","category":"identity","confidence":0.9,"entities":["Kế toán"],"linkedIds":["0","9"]},
 		{"text":"Quá mơ hồ","confidence":0.3},
 		{"text":"Số CCCD 012345678901","confidence":0.9},
+		{"text":"42","confidence":0.9},
 		{"text":"","confidence":1}]}`, tempIDs, "")
 	if problem != "" {
 		t.Fatal(problem)

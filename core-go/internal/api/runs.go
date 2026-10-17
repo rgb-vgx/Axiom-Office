@@ -63,13 +63,20 @@ func mapRuns(mux *http.ServeMux, deps *Deps) {
 
 	mux.HandleFunc("GET /v1/audit", func(w http.ResponseWriter, r *http.Request) {
 		runID := strings.TrimSpace(r.URL.Query().Get("runId"))
+		documentKey := strings.TrimSpace(r.URL.Query().Get("documentKey"))
 		limit := clampLimit(r.URL.Query().Get("limit"), 100)
 		var filter *string
 		if runID != "" {
 			filter = &runID
 		}
 		calls := []any{}
-		for _, row := range deps.Stores.Runs.Audit(filter, limit) {
+		var rows []store.AuditRow
+		if documentKey != "" {
+			rows = deps.Stores.Runs.AuditForDocument(&documentKey, filter, limit)
+		} else {
+			rows = deps.Stores.Runs.Audit(filter, limit)
+		}
+		for _, row := range rows {
 			calls = append(calls, map[string]any{
 				"id": row.ID, "runId": row.RunID, "seq": row.Seq, "tool": row.Tool, "action": row.Action,
 				"params": row.ParamsJSON, "ok": row.OK, "error": row.Error, "ms": row.Ms, "createdAt": row.CreatedAt,

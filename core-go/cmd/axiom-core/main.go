@@ -160,6 +160,15 @@ func run() int {
 					purged, current.WebSourceKeepDays, current.WebSourceMaxMB)
 			}
 		}()
+		// Nhat ky hoat dong (07-p6/P6-02): don tool_calls cu hon AuditKeepDays (mac dinh 90 ngay).
+		go func() {
+			if days := config.Load().AuditKeepDays; days > 0 {
+				before := time.Now().UTC().AddDate(0, 0, -days).Format("2006-01-02T15:04:05.000Z")
+				if purged := stores.Runs.PurgeAudit(before); purged > 0 {
+					corelog.Info("audit: purged %d tool call(s) older than %d day(s)", purged, days)
+				}
+			}
+		}()
 	}
 
 	server := &http.Server{ReadHeaderTimeout: 10 * time.Second}

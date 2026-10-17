@@ -23,6 +23,9 @@ Quy tắc:
 11. expiresAt: "YYYY-MM-DD" nếu fact rõ ràng chỉ đúng tới một ngày (vd hạn nộp), còn lại null.
 12. Tối đa 5 fact. Không có gì đáng nhớ thì trả {"facts": []}.
 13. Viết fact bằng ngôn ngữ của hội thoại (tiếng Việt).
+14. Fact có SỐ LIỆU (số lượng, tiền, ngày, tỉ lệ) phải kèm NGUỒN ngay trong câu: tài liệu/vùng/trang/thời điểm
+    (vd "Bảng điểm sheet Diem có 42 học sinh (theo tài liệu đang mở, 16/10/2026)"). Câu chỉ có con số mà không
+    có ngữ cảnh thì KHÔNG trả về.
 
 Chỉ trả về đúng một đối tượng JSON, không kèm giải thích, theo mẫu:
 {"facts": [{"text": "...", "scope": "user", "category": "contact", "confidence": 0.9, "entities": ["..."], "linkedIds": [], "expiresAt": null}]}

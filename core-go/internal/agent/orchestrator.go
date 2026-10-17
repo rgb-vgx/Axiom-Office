@@ -376,7 +376,7 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 			action, params := readCall(call)
 			actions.put(call.ID, action, params)
 			run.Events.Publish("tool.started", map[string]any{
-				"callId": call.ID, "tool": call.Name, "action": action, "paramsPreview": model.Truncate(params, 200),
+				"callId": call.ID, "tool": call.Name, "action": action, "paramsPreview": model.Truncate(redactedParams(params), 200),
 			})
 		},
 		ToolFinished: func(result model.ToolResult) {
@@ -391,13 +391,13 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 			}
 			run.Events.Publish("tool.finished", map[string]any{
 				"callId": result.CallID, "tool": result.Name, "action": info.action,
-				"paramsPreview": model.Truncate(info.params, 200), "ok": result.OK, "error": errorJSON,
+				"paramsPreview": model.Truncate(redactedParams(info.params), 200), "ok": result.OK, "error": errorJSON,
 				"ms": result.Ms, "resultPreview": model.Truncate(result.ResultJSON, 150),
 				// resultBytes: kich thuoc ket qua DA VAO ngu canh model (sau khi cat) - de soi tool nao hay
 				// tra qua lon (thong le: ghi kich thuoc tung lan goi tool, canh bao khi p95 vuot nguong).
 				"resultBytes": len(result.ResultJSON),
 			})
-			o.Runs.AddToolCall(run.ID, len(run.Transcript), result.Name, optional(info.action), optional(info.params),
+			o.Runs.AddToolCall(run.ID, len(run.Transcript), result.Name, optional(info.action), optional(redactedParams(info.params)),
 				result.OK, optional(errorText), result.Ms)
 			label := info.action
 			if label == "" {
@@ -632,6 +632,13 @@ func readCall(call model.ToolCall) (string, string) {
 		return action, model.MarshalRelaxed(params)
 	}
 	return "", model.MarshalRelaxed(arguments)
+}
+
+// redactedParams: params dua vao SSE/audit - thay thong tin nhay cam (khoa API, PII) truoc khi ghi core.db
+// (P6-01). AddToolCall van cat <= 2KB; day chi lo phan bi mat.
+func redactedParams(params string) string {
+	clean, _ := memory.Redact(params)
+	return clean
 }
 
 func extractError(resultJSON string) string {

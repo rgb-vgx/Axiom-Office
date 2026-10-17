@@ -87,6 +87,52 @@ func IsSensitive(text string) bool {
 		secretWords.MatchString(text) || apiKey.MatchString(text)
 }
 
+// Redact: thay cho nhay cam bang [ẩn] - ban "sua" cua IsSensitive, dung lai duoc cho ca audit (07-p6)
+// va cho bat ky chuoi nao truoc khi ghi log/CSDL. Khong phu thuoc store nen goi duoc tu bat ky dau.
+// Day la ham THUAN: cung dau vao luon cho cung dau ra.
+var (
+	emailAddress = regexp.MustCompile(`[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.(?:[A-Za-z]{2,})`)
+	jwtToken     = regexp.MustCompile(`\beyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{4,}`)
+	bearerToken  = regexp.MustCompile(`(?i)\bBearer\s+[A-Za-z0-9._\-]{16,}`)
+	secretValue  = regexp.MustCompile(`(?i)(mật\s*khẩu|mat\s*khau|password|passwd|\bpin\b|\botp\b)\s*[:=]\s*\S+`)
+	digitRun     = regexp.MustCompile(`\d[\d .,\-]*\d`)
+)
+
+const redacted = "[ẩn]"
+
+func Redact(text string) (string, bool) {
+	hit := false
+	replace := func(pattern *regexp.Regexp) {
+		text = pattern.ReplaceAllStringFunc(text, func(string) string {
+			hit = true
+			return redacted
+		})
+	}
+	// Thu tu: chuoi dai/token truoc, roi toi so - de "sk-..." khong bi cat thanh manh so.
+	replace(apiKey)
+	replace(jwtToken)
+	replace(bearerToken)
+	replace(emailAddress)
+	replace(secretValue)
+	text = digitRun.ReplaceAllStringFunc(text, func(match string) string {
+		digits, separated := 0, false
+		for _, r := range match {
+			switch {
+			case r >= '0' && r <= '9':
+				digits++
+			case r == ' ' || r == '.' || r == ',' || r == '-':
+				separated = true
+			}
+		}
+		if digits >= 13 || (digits >= 9 && (!separated || strings.HasPrefix(match, "0") || strings.HasPrefix(match, "+84"))) {
+			hit = true
+			return redacted
+		}
+		return match
+	})
+	return text, hit
+}
+
 // ValidDate: "YYYY-MM-DD" hop le, con lai -> "".
 func ValidDate(value string) string {
 	trimmed := strings.TrimSpace(value)

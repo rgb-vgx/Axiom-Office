@@ -11,20 +11,22 @@
 - [x] Làn tệp ghi atomic: `core-go/internal/filesafe/filesafe.go`.
 - [x] Hoàn tác Word cả lượt: xem `16-p1`.
 
-## P6-01. Ẩn bí mật trong audit
+## P6-01. Ẩn bí mật trong audit - XONG
 
-- [ ] Phụ thuộc `Redact` của M2 (`21-m2` M2-01) - làm M2 trước.
-- [ ] Chèn redact ở **hai chỗ**: `agent/orchestrator.go` trước `o.Runs.AddToolCall(...)` (để `params_json` sạch) và
-      trước khi publish `tool.finished` (`paramsPreview`).
-- [ ] `store/runs.go` `AddToolCall`: giữ cắt ≤ 2KB như hiện tại; không ghi nội dung file.
-- [ ] Test: chạy lượt có khóa API giả trong tham số → `tool_calls.params_json` không chứa khóa (đọc thẳng `core.db`).
+- [x] Phụ thuộc `Redact` của M2 (`21-m2` M2-01) - đã có.
+- [x] Chèn redact ở **hai chỗ**: `agent/orchestrator.go` `redactedParams` bọc `o.Runs.AddToolCall(...)` (`params_json`
+      sạch) và `paramsPreview` trong `tool.started`/`tool.finished`.
+- [x] `store/runs.go` `AddToolCall`: giữ cắt ≤ 2KB như hiện tại; không ghi nội dung file.
+- [x] Test `TestRedactedParamsHidesSecrets` (`agent/audit_redact_test.go`). Còn: đọc thẳng `core.db` trong một lượt
+      thật làm cùng bộ đo R0.
 
-## P6-02. Hạn lưu audit
+## P6-02. Hạn lưu audit - XONG (Go)
 
-- [ ] `store/runs.go` / `store/db.go`: hàm `PurgeAudit(before)` xóa `tool_calls` (và `runs` nếu cần) cũ hơn N ngày
-      (mặc định 90).
-- [ ] Chạy lúc Core khởi động + định kỳ; nút xóa trong admin (`src/AxiomOffice/Ai/AdminForms.cs`).
-- [ ] Test: audit cũ hơn hạn bị dọn; lượt mới vẫn ghi đủ.
+- [x] `store/runs.go` `PurgeAudit(before)` xóa `tool_calls` cũ hơn mốc; cấu hình `AuditKeepDays` (env
+      `AXIOM_AUDIT_KEEP_DAYS`, mặc định 90) trong `config.go`.
+- [x] Chạy lúc Core khởi động (`cmd/axiom-core/main.go`, khối `stores.Available`).
+- [ ] Còn: nút xóa trong admin (`src/AxiomOffice/Ai/AdminForms.cs`) + chạy định kỳ (hiện chỉ lúc khởi động).
+- [x] Test `TestPurgeAuditKeepsRecent`: audit cũ hơn hạn bị dọn; lượt mới vẫn ghi đủ.
 
 ## P6-03. Khôi phục lượt từ bản chụp
 
@@ -33,16 +35,15 @@
 - [ ] Nút "Hoàn tác lượt này" dùng chung cho mọi app (`AskAiPane.UndoLastRun`).
 - [ ] Không làm riêng "digest trước/sau" - không đủ để khôi phục.
 
-## P6-04. Nhật ký hoạt động lọc theo tài liệu
+## P6-04. Nhật ký hoạt động lọc theo tài liệu - XONG (Core)
 
-- [ ] `GET /v1/audit` thêm lọc theo `documentKey` (join `conversations.document_key`) hoặc lọc theo `run_id` của
-      hội thoại tài liệu đang mở.
-- [ ] `AdminForms.cs`: mặc định lọc theo tài liệu đang mở, có ô bỏ lọc.
+- [x] `GET /v1/audit?documentKey=…` (`Runs.AuditForDocument`, join `runs` → `conversations.document_key`).
+- [ ] Còn: `AdminForms.cs` mặc định lọc theo tài liệu đang mở, có ô bỏ lọc.
 
 ## P6-05. Kiểm thử + changelog
 
-- [ ] `cd core-go && go test ./internal/store/... ./internal/api/...`.
-- [ ] Ghi `CHANGELOG.md [Unreleased]`; cập nhật `07-p6`.
+- [x] `cd core-go && go test ./internal/store/... ./internal/api/...`.
+- [x] Ghi `CHANGELOG.md [Unreleased]`; cập nhật `07-p6`.
 
 ## Không làm
 

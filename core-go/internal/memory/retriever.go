@@ -5,6 +5,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"axiomoffice/core/internal/corelog"
 )
 
 // Hit: mot memory khop truy van kem diem thanh phan.
@@ -243,6 +245,7 @@ func (r *Retriever) BuildContext(prompt, documentKey string, today time.Time, se
 	}
 
 	lines, ids, used, seen := []string{}, []string{}, 0, map[string]bool{}
+	cut := 0
 	for _, item := range chosen {
 		if seen[item.ID] {
 			continue
@@ -253,11 +256,17 @@ func (r *Retriever) BuildContext(prompt, documentKey string, today time.Time, se
 			line += " (tài liệu này)"
 		}
 		if used+len([]rune(line)) > MaxContextChars {
-			break
+			cut++
+			continue
 		}
 		used += len([]rune(line))
 		lines = append(lines, line)
 		ids = append(ids, item.ID)
+	}
+	// M2-04: ngân sách token có log - biết khi nào phải chỉnh MaxContextChars/MaxUserMemories.
+	if cut > 0 {
+		corelog.Info("memory context: %d fact vao prompt, %d bi cat (ngan sach %d ky tu, da dung %d)",
+			len(lines), cut, MaxContextChars, used)
 	}
 	return Context{Lines: lines, IDs: ids}
 }
