@@ -1,7 +1,11 @@
 # 26 / P5 - Task chi tiết (Báo cáo định kỳ)
 
 > Chia nhỏ tới từng hàm. Đối chiếu code 17/10/2026; đọc `06-p5` trước.
-> **Chặn**: chốt mục 2 của `06-p5` (cách chạy khi Office đóng) trước, vì nó quyết định toàn bộ thiết kế dưới đây.
+>
+> **TẠM HOÃN 17/10/2026**: P5 chưa bắt đầu. Đã chốt cơ chế (Task Scheduler gọi `job`, `jobs.db` riêng, nhường Core
+> đang chạy) nhưng vướng câu **Q7** ở `06-p5` mục 6 (job "tính thật trong app" mâu thuẫn "chạy khi Office đóng"). Khi
+> quyết lại Q7 thì làm tiếp, và ghi đè theo các quyết định Q1–Q6: bảng `jobs` nằm ở **`jobs.db`**, **không** bump
+> `SchemaVersion` của `core.db`.
 
 ## P5-00. Chốt thiết kế (làm trước khi viết code)
 

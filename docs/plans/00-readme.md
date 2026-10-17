@@ -24,7 +24,9 @@ trong code: trạng thái có thể đã đổi.
   Còn: nhớ `doc_design` (M3-02), UI `MemoryForm`/`SettingsForm` (M3-05/M4-03), số đo M5-03, bộ đo `17`.
 - **P4 một phần**: P4-01 registry `Profile` xong (`client.go`/`types.go` đọc registry). Còn P4-02 (nhớ quirk qua khởi
   động lại - vướng schema `core.db` dùng chung và quyền ghi HKCU) và P4-03 (admin/wizard, C#).
-- **P5 chưa làm**: `26` vẫn **cần chốt thiết kế** (P5-00) trước khi đụng `SchemaVersion` của `core.db` dùng chung.
+- **P5 tạm hoãn (17/10/2026)**: `26` **TẠM HOÃN** — đã chốt cơ chế (Task Scheduler gọi `job` một lần, `jobs.db` riêng,
+  nhường Core đang chạy) nhưng vướng Q7: job "tính thật trong app" mâu thuẫn "chạy khi Office đóng". Thiết kế đã chốt
+  ghi ở `06-p5` mục 6; phần nhánh memory theo app (Q1–Q3) đã tách sang `12-m3` mục 7.
 - **P6 phần lớn xong (Core)**: P6-01 ẩn bí mật trong audit, P6-02 hạn lưu audit + dọn lúc khởi động, P6-04 lọc nhật
   ký theo tài liệu. Còn P6-02 nút admin + chạy định kỳ, P6-03 (hoàn tác - C#).
 - **P7 một phần**: P7-03 xong (câu trạng thái + thẻ hỏi kiểu trình bày theo ngôn ngữ gửi kèm). Còn dịch wizard/form
@@ -41,7 +43,7 @@ trong code: trạng thái có thể đã đổi.
 | 4 | `03-p2-skill-chuan-van-phong.md` + `19` | Chuẩn nội dung 8 skill, kiểm bằng tiêu chí cấu trúc | Bỏ golden chéo C#/Go |
 | 5 | `04-p3-nho-theo-tai-lieu.md` + `10`–`14`, `20`–`24` | Memory: phần còn thiếu (export/import, org-style, ẩn PII, số đo) | Phần lớn đã có (mốc G4); M1 phần lọc theo tệp đã có |
 | 6 | `05-p4-provider-va-toolset-gon.md` + `25` | Registry provider khai báo | Toolset filter phần lớn đã có (chế độ lập kế hoạch) |
-| — | `06-p5-bao-cao-dinh-ky-toi-gian.md` + `26` | Báo cáo định kỳ | **Cần thiết kế lại**: Core không chạy khi Office đóng |
+| — | `06-p5-bao-cao-dinh-ky-toi-gian.md` + `26` | Báo cáo định kỳ | **TẠM HOÃN 17/10/2026** (vướng Q7, xem `06-p5` mục 6) |
 | 7 | `07-p6-audit-va-an-toan-du-lieu.md` + `27` | Ẩn thông tin nhạy cảm trong audit, bản chụp để khôi phục | Audit đã có; `memory/redact.go` chưa tồn tại (làm ở M2) |
 | 8 | `08-p7-ux-trong-app.md` + `28` | Dịch nốt giao diện, lỗi tiếng Việt dễ hiểu | Phần lớn đã có |
 | 9 | `09-p8-libreoffice-parity.md` + `29` | Các lệnh còn để trống phía LibreOffice | LibreOffice đã chạy 281/281 |

@@ -5,6 +5,14 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Docs - tạm hoãn P5, chốt nhánh memory theo app (17/10/2026)
+- `06-p5`/`26`: P5 (báo cáo định kỳ) **tạm hoãn**. Đã chốt: Task Scheduler gọi `AxiomOffice.Core.exe job <id>` một
+  lần (nhánh `job` trước mutex), định nghĩa job ở **`jobs.db`** riêng (không bump `SchemaVersion` của `core.db`), và
+  tiến trình `job` **nhường Core đang chạy** qua HTTP. Còn vướng Q7: job "tính thật trong app" mâu thuẫn "chạy khi
+  Office đóng".
+- `12-m3` mục 7: chốt nhánh memory theo app (Q1–Q3) — giữ **một** `core.db`, tách `org-style` + scope mới `doc-style`
+  theo app bằng `scope_key` (`et`/`wps`/`wpp`), `user` giữ chung mọi app, **không** bump `SchemaVersion`. Chưa code.
+
 ### Added - memory kieu trinh bay + don audit dinh ky (M3-02, P6-02, 17/10/2026)
 - `doc_design` nhớ kiểu trình bày người dùng đã chọn (`memory` scope `user`) và lần sau xếp lựa chọn đó lên đầu thẻ
   `Choose` (vẫn hỏi, không tự áp) - M3-02.

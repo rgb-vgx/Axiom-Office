@@ -40,3 +40,15 @@
   bằng `AXIOM_ORG_STYLE_ADMIN` (API 403), nhớ kiểu trình bày đã chọn cho `doc_design` (fact `user`, lên đầu thẻ
   `Choose`), test `TestOrgStyleAlwaysInContext`/`TestOrgStyleRequiresAdmin`/`TestDocDesignRemembersChosenStyle`. Còn
   lại: UI `MemoryForm` chia nhóm (M3-05), tiêu chí 5/5 lần cần bộ `17`.
+
+## 7. Ý tưởng đã chốt, chưa làm: nhánh memory theo app (17/10/2026)
+
+- Nảy ra khi chốt thiết kế P5 (báo cáo định kỳ); **độc lập với P5**. Ghi lại để làm riêng khi cần.
+- **Q1:** giữ **một `core.db`**; memory **tách theo nhánh app**; không tách file DB theo app (giữ tương thích bản .NET
+  + lịch sử hội thoại xuyên app).
+- **Q2:** tách theo app cho `org-style` và **kiểu trình bày** (chuẩn trình bày Word ≠ Excel ≠ PowerPoint); `user` giữ
+  **chung** mọi app; `document` vốn đã khoá theo đường dẫn tệp nên thực tế đã per-app sẵn.
+- **Q3:** lưu chiều app bằng **`scope_key`** (`et`/`wps`/`wpp`) cho `org-style` và thêm scope `doc-style`; **không đổi
+  schema, không bump `SchemaVersion`** ⇒ bản .NET không bị ảnh hưởng.
+- Việc phải làm khi bắt tay: sửa bất biến "org-style rỗng `scope_key`" + test cũ cho khớp; thêm scope `doc-style`;
+  chuyển "nhớ kiểu trình bày" (M3-02) từ fact `user` sang `doc-style` khoá theo app; `MemoryForm` chia nhóm theo app.
