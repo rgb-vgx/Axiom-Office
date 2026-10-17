@@ -5,6 +5,11 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added - memory kieu trinh bay + don audit dinh ky (M3-02, P6-02, 17/10/2026)
+- `doc_design` nhớ kiểu trình bày người dùng đã chọn (`memory` scope `user`) và lần sau xếp lựa chọn đó lên đầu thẻ
+  `Choose` (vẫn hỏi, không tự áp) - M3-02.
+- Dọn nhật ký hoạt động lặp lại **hằng ngày** (trước chỉ lúc khởi động); `AXIOM_AUDIT_KEEP_DAYS=0` thì dừng - P6-02.
+
 ### Added - câu trạng thái Core theo ngôn ngữ giao diện (P7-03, 17/10/2026)
 - `POST /v1/runs` nhận `language` (`en*` → English, còn lại → tiếng Việt như cũ; thiếu trường không làm vỡ request).
 - Dòng trạng thái khi đang chạy (`agent/live.go`) và thẻ chọn kiểu trình bày (`tools/doc_design.go`) hiện theo ngôn

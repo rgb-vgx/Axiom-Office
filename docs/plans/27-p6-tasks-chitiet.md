@@ -24,8 +24,9 @@
 
 - [x] `store/runs.go` `PurgeAudit(before)` xóa `tool_calls` cũ hơn mốc; cấu hình `AuditKeepDays` (env
       `AXIOM_AUDIT_KEEP_DAYS`, mặc định 90) trong `config.go`.
-- [x] Chạy lúc Core khởi động (`cmd/axiom-core/main.go`, khối `stores.Available`).
-- [ ] Còn: nút xóa trong admin (`src/AxiomOffice/Ai/AdminForms.cs`) + chạy định kỳ (hiện chỉ lúc khởi động).
+- [x] Chạy lúc Core khởi động + **hằng ngày** (`cmd/axiom-core/main.go`, khối `stores.Available`); `AuditKeepDays = 0`
+      thì dừng vòng lặp.
+- [ ] Còn: nút xóa trong admin (`src/AxiomOffice/Ai/AdminForms.cs`).
 - [x] Test `TestPurgeAuditKeepsRecent`: audit cũ hơn hạn bị dọn; lượt mới vẫn ghi đủ.
 
 ## P6-03. Khôi phục lượt từ bản chụp

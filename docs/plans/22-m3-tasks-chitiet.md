@@ -14,21 +14,23 @@
       nhân/tài liệu.
 - [x] Test `TestOrgStyleAlwaysInContext`: câu hỏi không liên quan vẫn thấy chuẩn chung; fact tài liệu khác không lọt.
 
-## M3-02. Nhớ kiểu trình bày đã chọn (`doc_design`)
+## M3-02. Nhớ kiểu trình bày đã chọn (`doc_design`) - XONG
 
-- [ ] `core-go/internal/tools/doc_design.go` (`chooseDocStyle`, `run.docStyle`): sau khi người dùng chọn (kể cả
-      `custom` tự gõ), ghi một fact `user` hoặc `document` mô tả lựa chọn (dùng `memory.Service.Add`).
-- [ ] Lần sau mở tài liệu/người dùng đó: lựa chọn đã nhớ làm **lựa chọn đầu** trong thẻ `Choose`, vẫn hỏi (không tự
-      áp im lặng).
-- [ ] Test `doc_design_test.go`: chọn `full` → có memory; lượt sau thẻ chọn xếp `full` đầu.
+- [x] `core-go/internal/tools/doc_design.go` (`chooseDocStyle`): sau khi người dùng chọn xong ở thẻ, gọi
+      `run.RememberDocStyle(style, label)`; Core ghi một fact `user` "Kiểu trình bày tài liệu ưa thích: <id> (<label>)"
+      qua `memory.Service.Add` (`agent/orchestrator.go` đặt hook, chỉ khi có memory và không ở plan mode).
+- [x] Lần sau: `agent/docstyle.go` `rememberedDocStyle` đọc lại từ ngữ cảnh memory; `preferChoice` xếp lựa chọn đã nhớ
+      **lên đầu** thẻ `Choose` - vẫn hỏi, không tự áp im lặng.
+- [x] Test `TestDocDesignRemembersChosenStyle` (chọn `full` → gọi ghi lại + kieu đã nhớ lên đầu),
+      `TestRememberedDocStyle`.
 
-## M3-03. Áp chuẩn chung đúng lúc
+## M3-03. Áp chuẩn chung đúng lúc - XONG
 
-- [ ] `core-go/internal/agent/orchestrator.go`: memory context (đã gồm `org-style`) được nạp trước khi model chọn
-      skill trình bày.
-- [ ] `core-go/internal/agent/prompt.go`: danh sách skill + `not_for` (P2-01); chuẩn chung nhắc ở mục riêng để model
-      ưu tiên cho `van-ban-hanh-chinh`, `trinh-bay-chuyen-nghiep`, `thiet-ke-van-phong`.
-- [ ] Không sửa logic chọn skill tự động - chỉ làm input cho model rõ hơn.
+- [x] `core-go/internal/agent/orchestrator.go`: memory context (đã gồm `org-style`) nạp trước khi `Build` prompt
+      (model chọn skill sau khi đọc prompt).
+- [x] `core-go/internal/agent/prompt.go`: danh sách skill + `not_for` (P2-01) và mục "Organisation-wide standards"
+      riêng để model ưu tiên cho `van-ban-hanh-chinh`, `trinh-bay-chuyen-nghiep`, `thiet-ke-van-phong`.
+- [x] Không sửa logic chọn skill tự động - chỉ làm input cho model rõ hơn.
 
 ## M3-04. Phân quyền tối thiểu cho `org-style` - XONG
 

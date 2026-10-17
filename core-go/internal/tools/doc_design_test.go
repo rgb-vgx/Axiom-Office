@@ -188,6 +188,31 @@ func TestDocDesignStyleCardUsesLanguage(t *testing.T) {
 	}
 }
 
+// M3-02: kieu da nho len dau the chon; chon xong ghi lai qua RememberDocStyle.
+func TestDocDesignRemembersChosenStyle(t *testing.T) {
+	remembered, label := "", ""
+	run := &RunContext{DocStyle: "basic", Choose: func(action, question string, choices []Choice) (string, string, error) {
+		if choices[0].ID != "basic" {
+			t.Fatalf("kieu da nho phai len dau: %v", choices)
+		}
+		return "full", "", nil
+	}, RememberDocStyle: func(style, text string) {
+		remembered, label = style, text
+	}}
+	if style, _, problem := chooseDocStyle(map[string]any{}, run); style != "full" || problem != "" {
+		t.Fatalf("style = %q (%q)", style, problem)
+	}
+	if remembered != "full" || label == "" {
+		t.Fatalf("phai ghi lai kieu da chon: %q %q", remembered, label)
+	}
+	// Khong co ham ghi (plan mode / khong co memory): khong vo.
+	if style, _, _ := chooseDocStyle(map[string]any{}, &RunContext{
+		Choose: func(string, string, []Choice) (string, string, error) { return "keep", "", nil },
+	}); style != "keep" {
+		t.Fatalf("style = %q", style)
+	}
+}
+
 func TestDocDesignCustomStyle(t *testing.T) {
 	run := &RunContext{Choose: func(string, string, []Choice) (string, string, error) {
 		return "custom", "tiêu đề màu xanh lá, font Arial", nil

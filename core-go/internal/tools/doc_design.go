@@ -698,11 +698,45 @@ func chooseDocStyle(arguments map[string]any, run *RunContext) (string, string, 
 	if run != nil {
 		language = run.Language
 	}
-	choice, wish, err := run.Choose("doc_design", docStyleQuestion(language), docStyleChoices(language))
+	choices := docStyleChoices(language)
+	// M3-02: kieu da nho (neu con hop le) len dau danh sach - van hoi lai, khong tu ap.
+	if run.DocStyle != "" {
+		choices = preferChoice(choices, run.DocStyle)
+	}
+	choice, wish, err := run.Choose("doc_design", docStyleQuestion(language), choices)
 	if err != nil {
 		return "", "", err.Error()
 	}
+	if choice != "" && run.RememberDocStyle != nil {
+		run.RememberDocStyle(choice, choiceLabel(choices, choice))
+	}
 	return choice, wish, ""
+}
+
+// preferChoice: dua lua chon co id nay len dau (giu nguyen cac lua chon khac).
+func preferChoice(choices []Choice, id string) []Choice {
+	ordered := make([]Choice, 0, len(choices))
+	for _, choice := range choices {
+		if choice.ID == id {
+			ordered = append(ordered, choice)
+		}
+	}
+	for _, choice := range choices {
+		if choice.ID != id {
+			ordered = append(ordered, choice)
+		}
+	}
+	return ordered
+}
+
+// choiceLabel: nhan cua lua chon theo id ("" neu khong co).
+func choiceLabel(choices []Choice, id string) string {
+	for _, choice := range choices {
+		if choice.ID == id {
+			return choice.Label
+		}
+	}
+	return ""
 }
 
 var designColor = regexp.MustCompile(`^#?([0-9A-Fa-f]{6})$`)

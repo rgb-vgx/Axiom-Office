@@ -321,6 +321,19 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 		// Language: ngon ngu giao dien cho cac cau Core tu gui (P7-03).
 		Language: request.Language,
 	}
+	// M3-02: kieu trinh bay da nho (doc tu ngu canh memory) + ghi lai khi nguoi dung chon trong the.
+	runContext.DocStyle = rememberedDocStyle(memoryContext.Lines)
+	if o.Memory != nil && !request.Plan {
+		runContext.RememberDocStyle = func(style, label string) {
+			text := "Kiểu trình bày tài liệu ưa thích: " + style
+			if strings.TrimSpace(label) != "" {
+				text += " (" + label + ")"
+			}
+			o.Memory.Add(context.Background(),
+				[]memory.NewMemory{{Scope: memory.ScopeUser, Text: text, Category: "preference"}},
+				memory.ActorUser, run.ID)
+		}
+	}
 	if request.Document != nil {
 		runContext.FocusSlide = request.Document.Slide
 	}

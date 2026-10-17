@@ -37,5 +37,6 @@
 ## 6. Cập nhật 17/10/2026
 
 - Đã làm (Core): scope `org-style` luôn vào ngữ cảnh + mục riêng trong prompt (`OrgStyleSection`), phân quyền ghi
-  bằng `AXIOM_ORG_STYLE_ADMIN` (API 403), test `TestOrgStyleAlwaysInContext`/`TestOrgStyleRequiresAdmin`. Còn lại:
-  nhớ `doc_design` (M3-02), UI `MemoryForm` chia nhóm (M3-05), tiêu chí 5/5 lần cần bộ `17`.
+  bằng `AXIOM_ORG_STYLE_ADMIN` (API 403), nhớ kiểu trình bày đã chọn cho `doc_design` (fact `user`, lên đầu thẻ
+  `Choose`), test `TestOrgStyleAlwaysInContext`/`TestOrgStyleRequiresAdmin`/`TestDocDesignRemembersChosenStyle`. Còn
+  lại: UI `MemoryForm` chia nhóm (M3-05), tiêu chí 5/5 lần cần bộ `17`.

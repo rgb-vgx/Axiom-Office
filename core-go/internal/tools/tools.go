@@ -108,6 +108,11 @@ type RunContext struct {
 	docOptions map[string]any
 	// Language: ngon ngu giao dien cho cau CORE tu hoi (the chon kieu trinh bay - P7-03). "en" = tieng Anh.
 	Language string
+	// DocStyle: kieu trinh bay tai lieu da nho (M3-02): "full"|"basic"|"keep"|"custom"; "" = chua co. The `Choose`
+	// se xep lua chon nay len dau (van hoi, khong tu ap).
+	DocStyle string
+	// RememberDocStyle: ghi lai kieu nguoi dung vua chon trong the (M3-02). nil = khong ghi (khong co memory/plan mode).
+	RememberDocStyle func(style, label string)
 }
 
 // Choice: mot lua chon cua the hoi nguoi dung (RunContext.Choose).

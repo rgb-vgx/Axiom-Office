@@ -171,13 +171,19 @@ func run() int {
 					purged, current.WebSourceKeepDays, current.WebSourceMaxMB)
 			}
 		}()
-		// Nhat ky hoat dong (07-p6/P6-02): don tool_calls cu hon AuditKeepDays (mac dinh 90 ngay).
+		// Nhat ky hoat dong (07-p6/P6-02): don tool_calls cu hon AuditKeepDays (mac dinh 90 ngay). Chay ngay mot
+		// lan roi lap lai hang ngay; doi AuditKeepDays = 0 trong Cai dat thi lan lap sau dung.
 		go func() {
-			if days := config.Load().AuditKeepDays; days > 0 {
+			for {
+				days := config.Load().AuditKeepDays
+				if days <= 0 {
+					return
+				}
 				before := time.Now().UTC().AddDate(0, 0, -days).Format("2006-01-02T15:04:05.000Z")
 				if purged := stores.Runs.PurgeAudit(before); purged > 0 {
 					corelog.Info("audit: purged %d tool call(s) older than %d day(s)", purged, days)
 				}
+				time.Sleep(24 * time.Hour)
 			}
 		}()
 	}
