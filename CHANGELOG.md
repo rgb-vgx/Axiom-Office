@@ -5,6 +5,11 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added - câu trạng thái Core theo ngôn ngữ giao diện (P7-03, 17/10/2026)
+- `POST /v1/runs` nhận `language` (`en*` → English, còn lại → tiếng Việt như cũ; thiếu trường không làm vỡ request).
+- Dòng trạng thái khi đang chạy (`agent/live.go`) và thẻ chọn kiểu trình bày (`tools/doc_design.go`) hiện theo ngôn
+  ngữ đó; ID lựa chọn không đổi.
+
 ### Changed - skill: front-matter `not_for` (P2-01, 17/10/2026)
 - Cả 8 skill trong `skills/` có thêm khóa `not_for` (khi nào KHÔNG dùng skill này); `thiet-ke-van-phong` bổ sung
   `apps: [wps, et, wpp]`.

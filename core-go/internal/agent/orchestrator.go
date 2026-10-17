@@ -34,6 +34,8 @@ type Request struct {
 	// Plan: che do lap ke hoach (options.mode = "plan") - chi doc tai lieu, tra ve ke hoach, khong sua gi.
 	// Buoc thuc hien la mot luot thuong tiep theo trong CUNG hoi thoai (model thay lai ke hoach trong lich su).
 	Plan bool
+	// Language: ngon ngu giao dien de Core dich cac cau TRANG THAI tu gui (P7-03). "vi" (mac dinh) hoac "en".
+	Language string
 }
 
 const (
@@ -120,6 +122,8 @@ func ParseRequest(body map[string]any) (*Request, string) {
 		Options:        requestOptions(maxRounds, maxTokens, maxSeconds),
 		Interactive:    interactive,
 		Plan:           mode == "plan",
+		// Ngon ngu giao dien (P7-03): thieu truong nay (request cu) -> "vi" nhu truoc.
+		Language: NormalizeLanguage(textOf(body["language"])),
 	}, ""
 }
 
@@ -314,6 +318,8 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 		},
 		Confirm: confirm,
 		Choose:  choose,
+		// Language: ngon ngu giao dien cho cac cau Core tu gui (P7-03).
+		Language: request.Language,
 	}
 	if request.Document != nil {
 		runContext.FocusSlide = request.Document.Slide
@@ -350,7 +356,7 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 					"round": round, "text": tailText(update.Reasoning, liveReasoningChars), "model": client.Model,
 				})
 			}
-			if text := liveProgress(update); text != "" && text != liveStatus {
+			if text := liveProgress(update, request.Language); text != "" && text != liveStatus {
 				liveStatus = text
 				run.Events.Publish("run.progress", map[string]any{"round": round, "text": text})
 			}

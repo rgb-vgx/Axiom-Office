@@ -165,6 +165,29 @@ func TestDocDesignAsksStyleFirst(t *testing.T) {
 }
 
 // Nguoi dung 16/10/2026: them lua chon tu go kieu -> tool tra lai loi mo ta, model goi lai voi custom.
+// P7-03: the chon kieu trinh bay hien theo ngon ngu giao dien; ID lua chon giu nguyen.
+func TestDocDesignStyleCardUsesLanguage(t *testing.T) {
+	run := &RunContext{Language: "en", Choose: func(action, question string, choices []Choice) (string, string, error) {
+		if question != "How would you like the document restyled?" || choices[0].Label != "Modern with highlight boxes" {
+			t.Fatalf("the tieng Anh sai: %q %v", question, choices)
+		}
+		return "basic", "", nil
+	}}
+	if style, _, problem := chooseDocStyle(map[string]any{}, run); style != "basic" || problem != "" {
+		t.Fatalf("style = %q (%q)", style, problem)
+	}
+	// Mac dinh (khong co Language) van la tieng Viet.
+	run = &RunContext{Choose: func(action, question string, choices []Choice) (string, string, error) {
+		if question != "Bạn muốn trình bày lại tài liệu theo kiểu nào?" {
+			t.Fatalf("the tieng Viet sai: %q", question)
+		}
+		return "full", "", nil
+	}}
+	if style, _, _ := chooseDocStyle(map[string]any{}, run); style != "full" {
+		t.Fatalf("style = %q", style)
+	}
+}
+
 func TestDocDesignCustomStyle(t *testing.T) {
 	run := &RunContext{Choose: func(string, string, []Choice) (string, string, error) {
 		return "custom", "tiêu đề màu xanh lá, font Arial", nil

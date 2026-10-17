@@ -650,12 +650,31 @@ func designWords(text string) map[string]bool {
 	return words
 }
 
-// docStyleChoices: ba kieu cho nguoi dung chon (nguoi dung 15/10/2026: "co nguoi khong thich style nay").
-var docStyleChoices = []Choice{
-	{ID: "full", Label: "Hiện đại, có khối nhấn", Detail: "Định dạng lại tiêu đề, gạch đầu dòng, bảng và thêm vài khối bo tròn nền nhạt cho chỗ quan trọng"},
-	{ID: "basic", Label: "Chỉ định dạng gọn", Detail: "Tiêu đề, gạch đầu dòng, bảng, số trang - không thêm khối"},
-	{ID: "keep", Label: "Giữ kiểu hiện tại", Detail: "Không áp mẫu này, chỉ sửa theo yêu cầu"},
-	{ID: "custom", Label: "Kiểu khác (tự gõ)", Detail: "Ví dụ: tiêu đề màu xanh lá, font Arial, không khối", Input: true},
+// docStyleChoices: bon kieu cho nguoi dung chon (nguoi dung 15/10/2026: "co nguoi khong thich style nay"). Chu hien
+// theo ngon ngu giao dien (P7-03) - ID giu nguyen nen lua chon cu khong doi.
+func docStyleChoices(language string) []Choice {
+	if language == "en" {
+		return []Choice{
+			{ID: "full", Label: "Modern with highlight boxes", Detail: "Restyle headings, bullets and tables, and add a few rounded tinted boxes for key points"},
+			{ID: "basic", Label: "Clean formatting only", Detail: "Headings, bullets, tables, page numbers - no added boxes"},
+			{ID: "keep", Label: "Keep the current style", Detail: "Do not apply this template, only change what was asked"},
+			{ID: "custom", Label: "Another style (type it)", Detail: "Example: green headings, Arial font, no boxes", Input: true},
+		}
+	}
+	return []Choice{
+		{ID: "full", Label: "Hiện đại, có khối nhấn", Detail: "Định dạng lại tiêu đề, gạch đầu dòng, bảng và thêm vài khối bo tròn nền nhạt cho chỗ quan trọng"},
+		{ID: "basic", Label: "Chỉ định dạng gọn", Detail: "Tiêu đề, gạch đầu dòng, bảng, số trang - không thêm khối"},
+		{ID: "keep", Label: "Giữ kiểu hiện tại", Detail: "Không áp mẫu này, chỉ sửa theo yêu cầu"},
+		{ID: "custom", Label: "Kiểu khác (tự gõ)", Detail: "Ví dụ: tiêu đề màu xanh lá, font Arial, không khối", Input: true},
+	}
+}
+
+// docStyleQuestion: cau hoi tren the chon kieu trinh bay theo ngon ngu giao dien (P7-03).
+func docStyleQuestion(language string) string {
+	if language == "en" {
+		return "How would you like the document restyled?"
+	}
+	return "Bạn muốn trình bày lại tài liệu theo kiểu nào?"
 }
 
 // chooseDocStyle: kieu nguoi dung da noi trong yeu cau (tham so style) hoac hoi bang the nhieu lua chon. Khong co ai
@@ -675,7 +694,11 @@ func chooseDocStyle(arguments map[string]any, run *RunContext) (string, string, 
 	if run.Choose == nil {
 		return "full", "", ""
 	}
-	choice, wish, err := run.Choose("doc_design", "Bạn muốn trình bày lại tài liệu theo kiểu nào?", docStyleChoices)
+	language := ""
+	if run != nil {
+		language = run.Language
+	}
+	choice, wish, err := run.Choose("doc_design", docStyleQuestion(language), docStyleChoices(language))
 	if err != nil {
 		return "", "", err.Error()
 	}

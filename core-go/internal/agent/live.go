@@ -17,30 +17,32 @@ var (
 	liveLast  = regexp.MustCompile(`"last"\s*:\s*(\d+)`)
 )
 
-// liveProgress: mot dong trang thai cho phan hoi dang toi; rong = khong co gi dang ke.
-func liveProgress(update model.LiveUpdate) string {
+// liveProgress: mot dong trang thai cho phan hoi dang toi; rong = khong co gi dang ke. language theo ngon ngu
+// giao dien da chon (P7-03) - mac dinh tieng Viet nhu truoc.
+func liveProgress(update model.LiveUpdate, language string) string {
 	args := update.ToolArgs
 	switch {
 	case update.ToolName == "slides_from_template":
 		part := ""
 		if first := liveFirst.FindStringSubmatch(args); first != nil {
-			part = " phần " + first[1]
+			part = localized(language, " phần ", " part ") + first[1]
 			if last := liveLast.FindStringSubmatch(args); last != nil {
 				part += "–" + last[1]
 			}
 		}
 		if slides := strings.Count(args, `"layout"`); slides > 0 {
-			return fmt.Sprintf("Đang thiết kế%s: %d slide…", part, slides)
+			return fmt.Sprintf(localized(language, "Đang thiết kế%s: %d slide…", "Designing%s: %d slide(s)…"), part, slides)
 		}
-		return "Đang chuẩn bị dựng slide" + part + "…"
+		return fmt.Sprintf(localized(language, "Đang chuẩn bị dựng slide%s…", "Preparing slides%s…"), part)
 	case update.ToolName != "" && len(args) >= 1500:
-		return fmt.Sprintf("Đang viết lệnh %s (%d KB)…", update.ToolName, (len(args)+512)/1024)
+		return fmt.Sprintf(localized(language, "Đang viết lệnh %s (%d KB)…", "Writing command %s (%d KB)…"),
+			update.ToolName, (len(args)+512)/1024)
 	case update.ToolName != "":
 		return ""
 	case strings.TrimSpace(update.Text) != "":
-		return "Đang viết câu trả lời…"
+		return localized(language, "Đang viết câu trả lời…", "Writing the answer…")
 	case update.Reasoning != "":
-		return "Đang suy nghĩ…"
+		return localized(language, "Đang suy nghĩ…", "Thinking…")
 	}
 	return ""
 }

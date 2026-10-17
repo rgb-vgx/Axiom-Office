@@ -106,6 +106,8 @@ type RunContext struct {
 	// docWish: kieu nguoi dung tu go (docStyle custom); docOptions: accent/font/size cho writer.restyle va insertBlocks.
 	docWish    string
 	docOptions map[string]any
+	// Language: ngon ngu giao dien cho cau CORE tu hoi (the chon kieu trinh bay - P7-03). "en" = tieng Anh.
+	Language string
 }
 
 // Choice: mot lua chon cua the hoi nguoi dung (RunContext.Choose).

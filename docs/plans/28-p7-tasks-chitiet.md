@@ -27,13 +27,17 @@
 - [ ] LibreOffice (`axiom/chat.py`, `chatview.py`): chuỗi hiển thị theo ngôn ngữ đã chọn ở wizard.
 - [ ] Ghi chú: `check_i18n.py` chỉ quét `src/AxiomOffice`, nên hai khung này cần bộ kiểm riêng (đơn giản: đếm khoá).
 
-## P7-03. Câu Core gửi lên khung chat theo ngôn ngữ
+## P7-03. Câu Core gửi lên khung chat theo ngôn ngữ - XONG
 
-- [ ] Core hiện gửi câu trạng thái cố định (tiếng Anh), ví dụ "Bước 1/3…", "Dùng kỹ năng", thẻ hỏi kiểu trình bày
-      (`core-go/internal/tools/doc_design.go`, `agent/orchestrator.go`, `agent/confirm.go`).
-- [ ] Nhận ngôn ngữ giao diện **gửi kèm request** (`Request`/`body`), giữ `Protocol = 1`; dịch câu trạng thái + thẻ
-      hỏi theo ngôn ngữ đó; thiếu thì mặc định như cũ.
-- [ ] Test: gửi `language=en` → thẻ hỏi trả câu tiếng Anh; thiếu trường → không vỡ request cũ.
+- [x] `agent.Request.Language` (`ParseRequest` đọc `body.language`, `NormalizeLanguage`: `en*` → `en`, còn lại →
+      `vi`); giữ `Protocol = 1`, thiếu trường thì như cũ.
+- [x] Câu trạng thái (`agent/live.go` `liveProgress`) dịch theo ngôn ngữ: "Đang suy nghĩ…"/"Thinking…",
+      "Đang viết câu trả lời…"/"Writing the answer…", tiến độ dựng slide, "Đang viết lệnh …".
+- [x] Thẻ hỏi kiểu trình bày (`tools/doc_design.go` `docStyleQuestion`/`docStyleChoices(language)`) có bản tiếng Anh;
+      ID lựa chọn (`full`/`basic`/`keep`/`custom`) không đổi nên lựa chọn cũ vẫn đọc được.
+- [x] Test `TestLiveProgressUsesRequestLanguage`, `TestParseRequestLanguage` (thiếu trường → không vỡ request cũ),
+      `TestDocDesignStyleCardUsesLanguage`.
+- [ ] Còn: chuỗi lỗi trong `Result.JSON` của các tool khác vẫn theo ngôn ngữ model trả - chỉ đổi khi có nhu cầu thật.
 
 ## P7-04. Ba lỗi hay gặp có hướng dẫn sửa ngay
 
