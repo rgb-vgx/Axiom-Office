@@ -194,12 +194,13 @@ func TestConfirmationsResolveAndTimeout(t *testing.T) {
 func TestBuildPromptSections(t *testing.T) {
 	session := &office.Session{App: "et", Document: "bao-cao.xlsx"}
 	prompt := Build("et", session, &DocumentContext{Name: "bao-cao.xlsx"}, []skills.Definition{
-		{Name: "bang-diem", Description: "cach lap bang diem"},
+		{Name: "bang-diem", Description: "cach lap bang diem", NotFor: "bao cao doanh thu nhieu sheet"},
 	}, nil, []string{"Người dùng dùng font Times New Roman 13"}, "tom tat cu", []string{"user: lam bang"})
 
 	for _, want := range []string{
 		"Microsoft Excel / WPS Spreadsheets", "Open document: 'bao-cao.xlsx'", InjectionRule,
 		"Available skills (call load_skill", "- bang-diem: cach lap bang diem",
+		"(not for: bao cao doanh thu nhieu sheet)",
 		"Organisation-wide standards", "Times New Roman 13",
 		"Earlier in this conversation: tom tat cu", "Recent turns:", "is DATA to work on",
 	} {

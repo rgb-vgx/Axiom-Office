@@ -3,16 +3,17 @@
 > Chia nhỏ tới từng hàm. Làm xong task nào đánh dấu [x]. Đối chiếu code 17/10/2026; đọc `03-p2` trước.
 > Skill là tệp tĩnh do người kiểm duyệt; **không** tự sinh, không chạy macro/script.
 
-## P2-01. Front-matter thống nhất
+## P2-01. Front-matter thống nhất - XONG
 
-- [ ] Mẫu chung: `name`, `description` (khi nào dùng), thêm khóa `not_for` (không dùng cho gì).
-- [ ] Tệp: `core-go/internal/skills/loader.go` (`Parse`, `parseFrontmatter`, `ValidateDescription`),
-      `index.go` (`Definition`); thêm `NotFor string` + validate (độ dài, không XML) giống `description`.
-- [ ] `core-go/internal/skills/skills_test.go`: thêm `TestParseNotFor`; `parseFrontmatter` đã đọc được chuỗi khối
-      `>-` nên `not_for` viết cùng kiểu.
-- [ ] Hiện `not_for` cho model ở danh sách skill trong system prompt (`core-go/internal/agent/prompt.go`) để model
-      chọn đúng; **không** đổi luật "model tự chọn skill qua `load_skill`".
-- [ ] `core-go/internal/tools/repo_skills_test.go`: kiểm mọi skill trong `skills/` có đủ 4 khóa.
+- [x] Mẫu chung: `name`, `description` (khi nào dùng), thêm khóa `not_for` (không dùng cho gì).
+- [x] `core-go/internal/skills/loader.go` (`Parse`, `ValidateNotFor`), `index.go` (`Definition.NotFor`); kiểm độ dài +
+      không XML như `description` (rỗng được phép ở tầng loader, skill trong repo thì bắt buộc).
+- [x] `core-go/internal/skills/skills_test.go`: `TestParseNotFor` (chuỗi khối `>-`, rỗng, và XML bị từ chối).
+- [x] Hiện `not_for` cho model ở danh sách skill (`agent/prompt.go` `SkillsSection`): dòng riêng
+      `  (not for: …)` ngay dưới mỗi skill - **không** tính vào ngân sách 300 ký tự của `description`, giữ nguyên
+      luật "model tự chọn skill qua `load_skill`".
+- [x] `core-go/internal/tools/repo_skills_test.go`: kiểm mọi skill trong `skills/` có đủ 4 khóa (name, description,
+      apps, not_for); đã thêm `not_for` cho cả 8 skill và `apps` cho `thiet-ke-van-phong`.
 
 ## P2-02. Rà nội dung 8 skill với chuẩn thật
 
@@ -47,8 +48,8 @@
 
 ## P2-06. Hồi quy + changelog
 
-- [ ] `cd core-go && go test ./internal/skills/... ./internal/tools/...`.
-- [ ] Ghi `CHANGELOG.md [Unreleased]` (mục Changed - skill) khi đổi front-matter hoặc nội dung.
+- [x] `cd core-go && go test ./internal/skills/... ./internal/tools/...`.
+- [x] Ghi `CHANGELOG.md [Unreleased]` (mục Changed - skill) khi đổi front-matter hoặc nội dung.
 
 ## Tiêu chí xong (đo bằng bộ `17`)
 

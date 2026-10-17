@@ -5,6 +5,9 @@ description: >-
   thức, xếp loại, hàng tổng hợp, định dạng điểm một chữ số thập phân. Dùng khi người dùng muốn "bảng
   điểm", "điểm trung bình", "xếp loại học lực", "tổng kết điểm lớp".
 apps: [et]
+not_for: >-
+  Báo cáo doanh thu/KPI nhiều sheet (dùng bao-cao-du-lieu hoặc mo-hinh-nhieu-sheet), bảng tính chỉ sửa một ô, hoặc
+  tài liệu Word/PowerPoint.
 ---
 
 # Bảng điểm

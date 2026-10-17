@@ -5,6 +5,9 @@ description: >-
   30/2020/NĐ-CP): quốc hiệu, số ký hiệu, trích yếu, nơi nhận, người ký. Dùng khi người dùng muốn soạn
   "công văn", "quyết định", "tờ trình", "thông báo", "văn bản hành chính", "giấy mời".
 apps: [wps]
+not_for: >-
+  Báo cáo/tờ trình nội bộ không theo thể thức hành chính (dùng the-thuc-van-ban hoặc thiet-ke-van-phong), hoặc chỉ
+  sửa một câu.
 ---
 
 # Văn bản hành chính

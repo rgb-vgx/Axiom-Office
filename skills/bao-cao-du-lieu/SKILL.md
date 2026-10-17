@@ -5,6 +5,9 @@ description: >-
   công thức thay cho số tính tay, mật độ trình bày. Dùng khi tạo mới hoặc làm đẹp bảng tính,
   bảng số liệu, báo cáo doanh thu, thống kê, KPI trong Excel. Không dùng khi chỉ sửa một ô.
 apps: [et]
+not_for: >-
+  Bảng điểm/xếp loại học lực (dùng bang-diem), mô hình tài chính nhiều sheet (dùng mo-hinh-nhieu-sheet), hoặc chỉ
+  sửa một ô.
 ---
 
 # Trình bày dữ liệu Excel

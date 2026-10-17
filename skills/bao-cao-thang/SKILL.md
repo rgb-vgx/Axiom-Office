@@ -5,6 +5,8 @@ description: >-
   phân tích chênh lệch, vấn đề - rủi ro, việc cần quyết và kế hoạch kỳ tới. Dùng khi người dùng muốn
   làm "slide báo cáo", "báo cáo tháng", "báo cáo quý", "slide tổng kết", "trình bày kết quả công việc".
 apps: [wpp]
+not_for: >-
+  Bài thuyết trình chung (dùng trinh-bay-chuyen-nghiep), tài liệu Word/Excel, hoặc chỉ sửa một slide.
 ---
 
 # Slide báo cáo tháng

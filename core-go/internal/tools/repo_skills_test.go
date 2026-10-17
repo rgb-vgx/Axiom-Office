@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 
 	"axiomoffice/core/internal/skills"
@@ -34,6 +35,13 @@ func TestRepoSkillsLoadAndReferencesResolve(t *testing.T) {
 
 	mentions := 0
 	for _, skill := range all {
+		// P2-01: moi skill trong repo phai co du 4 khoa frontmatter (name, description, apps, not_for).
+		if strings.TrimSpace(skill.NotFor) == "" {
+			t.Errorf("skill %s thieu frontmatter 'not_for'", skill.Name)
+		}
+		if len(skill.Apps) == 0 {
+			t.Errorf("skill %s thieu frontmatter 'apps'", skill.Name)
+		}
 		text, err := os.ReadFile(filepath.Join(skill.Directory, "SKILL.md"))
 		if err != nil {
 			t.Fatalf("%s: %v", skill.Name, err)

@@ -5,6 +5,9 @@ description: >-
   thích bảng, ngắt trang. Dùng khi soạn mới hoặc trình bày lại báo cáo, tờ trình, kế hoạch, biên bản,
   tài liệu Word dài, hay khi người dùng muốn văn bản "đẹp", "chuẩn". Không sửa một câu.
 apps: [wps]
+not_for: >-
+  Công văn/quyết định hành chính (dùng van-ban-hanh-chinh), thiết kế lại toàn bộ (dùng thiet-ke-van-phong), hoặc
+  chỉ sửa một câu.
 ---
 
 # Thể thức trình bày văn bản Word

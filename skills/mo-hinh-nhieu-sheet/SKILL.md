@@ -5,6 +5,8 @@ description: >-
   chính", "FP&A", "ngân sách", "P&L", "dự báo", "độ nhạy", "kịch bản", "Monte Carlo", "danh mục dự
   án", "tiến độ dự án", "tồn kho", "dashboard KPI", "bảng kiểm tra". Không dùng khi chỉ cần một bảng.
 apps: [et]
+not_for: >-
+  Một bảng đơn giản (dùng bao-cao-du-lieu), bảng điểm học sinh (dùng bang-diem), hoặc tài liệu Word/PowerPoint.
 ---
 
 # Mô hình nhiều sheet

@@ -5,6 +5,13 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed - skill: front-matter `not_for` (P2-01, 17/10/2026)
+- Cả 8 skill trong `skills/` có thêm khóa `not_for` (khi nào KHÔNG dùng skill này); `thiet-ke-van-phong` bổ sung
+  `apps: [wps, et, wpp]`.
+- `skills.Definition.NotFor` + `ValidateNotFor` (`loader.go`); `SkillsSection` hiện `not_for` ở dòng riêng dưới mỗi
+  skill trong system prompt (không chiếm ngân sách 300 ký tự của `description`).
+- Test: `TestParseNotFor`, `repo_skills_test` kiểm đủ 4 khóa, `TestBuildPromptSections` kiểm `(not for: …)`.
+
 ### Changed - provider profile registry (P4-01, 17/10/2026)
 - `core-go/internal/model/profile.go`: bảng `Profile` khai báo họ API + cách xác thực + quirk (nhận `thinking`/
   `temperature`). `NewCodec` và `ApplyAuth` đọc registry thay cho `if provider == "anthropic"`; cổng gửi `thinking`

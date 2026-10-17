@@ -5,6 +5,8 @@ description: >-
   mật độ chữ, bảng khi cần so sánh, chi tiết dài đưa vào ghi chú. Dùng khi tạo mới hoặc làm lại bài
   thuyết trình, slide, "làm slide cho đẹp", "thiết kế lại slide". Không dùng khi chỉ sửa một chữ.
 apps: [wpp]
+not_for: >-
+  Báo cáo tháng/quý theo mẫu có bảng điểm chỉ tiêu (dùng bao-cao-thang), tài liệu Word/Excel, hoặc chỉ sửa một chữ.
 ---
 
 # Trình bày slide chuyên nghiệp (Microsoft PowerPoint)

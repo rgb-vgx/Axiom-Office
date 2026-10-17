@@ -29,10 +29,12 @@ type Source struct {
 type Definition struct {
 	Name        string
 	Description string
-	Apps        []string
-	Directory   string
-	Source      string
-	Body        string
+	// NotFor: khi nao KHONG dung skill nay (P2-01) - giup model chon dung khi hai skill gan viec nhau.
+	NotFor    string
+	Apps      []string
+	Directory string
+	Source    string
+	Body      string
 }
 
 func (d Definition) AppliesTo(appKind string) bool {

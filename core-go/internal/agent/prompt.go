@@ -171,14 +171,21 @@ func ViewSection(document *DocumentContext) string {
 // han muc nay (docs/skills-review.md muc 4.9).
 const skillDescriptionLimit = 300
 
-// SkillsSection: tang 1 cua chuan Agent Skills - chi muc ten + mo ta.
+// skillNotForLimit: `not_for` hien o dong rieng ngay duoi (P2-01) - khong tinh vao ngan sach description o tren.
+const skillNotForLimit = 160
+
+// SkillsSection: tang 1 cua chuan Agent Skills - chi muc ten + mo ta (+ dong "khong dung cho" khi co).
 func SkillsSection(list []skills.Definition) string {
 	if len(list) == 0 {
 		return ""
 	}
 	lines := make([]string, 0, len(list))
 	for _, skill := range list {
-		lines = append(lines, "- "+skill.Name+": "+flatten(skill.Description, skillDescriptionLimit))
+		line := "- " + skill.Name + ": " + flatten(skill.Description, skillDescriptionLimit)
+		if notFor := strings.TrimSpace(skill.NotFor); notFor != "" {
+			line += "\n  (not for: " + flatten(notFor, skillNotForLimit) + ")"
+		}
+		lines = append(lines, line)
 	}
 	return "Available skills (call load_skill to read one when it fits the request):\n" + strings.Join(lines, "\n")
 }

@@ -20,6 +20,30 @@ func writeSkill(t *testing.T, root, folder, frontmatter, body string) string {
 	return directory
 }
 
+// P2-01: `not_for` (khi nao KHONG dung skill) doc duoc nhu description, va bi tu choi khi chua XML.
+func TestParseNotFor(t *testing.T) {
+	text := "---\nname: bang-diem\ndescription: >-\n  Lap bang diem\ndescription_x: 0\nnot_for: >-\n  Bao cao doanh thu nhieu sheet\n  hoac chi sua mot o.\n---\n# Bang diem"
+	skill, failure := Parse(text, "/tmp/x", "org")
+	if failure != nil {
+		t.Fatalf("failure = %+v", failure)
+	}
+	if skill.NotFor != "Bao cao doanh thu nhieu sheet hoac chi sua mot o." {
+		t.Fatalf("NotFor = %q", skill.NotFor)
+	}
+
+	// Khong co not_for: van nap duoc (skill nguoi dung), chi skill trong repo moi bat buoc.
+	plain, failure := Parse("---\nname: a\ndescription: Mo ta\n---\nthan", "/tmp/y", "user")
+	if failure != nil || plain.NotFor != "" {
+		t.Fatalf("plain = %+v (%+v)", plain, failure)
+	}
+
+	// not_for co the XML -> loi nhu description.
+	bad, failure := Parse("---\nname: a\ndescription: Mo ta\nnot_for: \"<b>x</b>\"\n---\nthan", "/tmp/z", "user")
+	if failure == nil || bad != nil || !strings.Contains(failure.Error, "not_for") {
+		t.Fatalf("XML trong not_for phai bi tu choi: %+v", failure)
+	}
+}
+
 func TestParseFrontmatterForms(t *testing.T) {
 	// apps dang danh sach "- item", mo ta dang khoi '>'.
 	text := "---\nname: quy-trinh\napps:\n  - et\n  - wps\ndescription: >\n  Dong mot\n  dong hai\n---\n# Buoc\nNoi dung"

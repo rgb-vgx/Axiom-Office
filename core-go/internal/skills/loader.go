@@ -42,11 +42,15 @@ func Parse(text, directory, source string) (*Definition, *Failure) {
 	fields := parseFrontmatter(frontmatter)
 	name := strings.TrimSpace(stringField(fields, "name"))
 	description := strings.TrimSpace(stringField(fields, "description"))
+	notFor := strings.TrimSpace(stringField(fields, "not_for"))
 
 	if problem := ValidateName(name); problem != "" {
 		return fail(problem)
 	}
 	if problem := ValidateDescription(description); problem != "" {
+		return fail(problem)
+	}
+	if problem := ValidateNotFor(notFor); problem != "" {
 		return fail(problem)
 	}
 
@@ -73,7 +77,7 @@ func Parse(text, directory, source string) (*Definition, *Failure) {
 	}
 
 	return &Definition{
-		Name: name, Description: description, Apps: apps, Directory: directory, Source: source,
+		Name: name, Description: description, NotFor: notFor, Apps: apps, Directory: directory, Source: source,
 		Body: strings.TrimSpace(body),
 	}, nil
 }
@@ -103,6 +107,20 @@ func ValidateDescription(description string) string {
 		return "'description' must be at most " + strconv.Itoa(MaxDescriptionLength) + " characters"
 	case xmlTag.MatchString(description):
 		return "'description' must not contain XML tags"
+	}
+	return ""
+}
+
+// ValidateNotFor: `not_for` (khi nào KHÔNG dùng skill này) - tuỳ chọn ở tầng loader (skill do người dùng viết có
+// thể chưa có), nhưng skill trong repo phải có (repo_skills_test). Có thì kiểm độ dài + không XML như `description`.
+func ValidateNotFor(notFor string) string {
+	switch {
+	case notFor == "":
+		return ""
+	case len([]rune(notFor)) > MaxDescriptionLength:
+		return "'not_for' must be at most " + strconv.Itoa(MaxDescriptionLength) + " characters"
+	case xmlTag.MatchString(notFor):
+		return "'not_for' must not contain XML tags"
 	}
 	return ""
 }

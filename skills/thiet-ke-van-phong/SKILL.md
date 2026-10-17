@@ -4,6 +4,10 @@ description: >-
   Thiết kế chung cho tài liệu văn phòng (Word, Excel, PowerPoint): phân cấp chữ, màu theo ngữ nghĩa,
   tương phản, nhất quán, khoảng trắng. Dùng khi người dùng muốn tạo mới hoặc làm lại cho "đẹp", "chuyên
   nghiệp", "trình bày lại", "thiết kế" tài liệu, bảng hay slide. Không dùng cho sửa nhỏ.
+apps: [wps, et, wpp]
+not_for: >-
+  Công văn hành chính (dùng van-ban-hanh-chinh), bảng điểm/báo cáo số liệu (dùng bang-diem/bao-cao-du-lieu), báo
+  cáo tháng dạng slide (dùng bao-cao-thang), hoặc chỉ sửa một chữ.
 ---
 
 # Thiết kế văn phòng
