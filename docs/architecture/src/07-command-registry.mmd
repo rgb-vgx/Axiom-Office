@@ -1,0 +1,21 @@
+---
+title: Axiom Office - Registry lệnh: một khai báo, nhiều nơi dùng
+---
+flowchart LR
+  decl["Command(...) khai báo cạnh handler<br/>CommandDispatcher.Writer / Spreadsheet / Presentation.cs<br/>lệnh chung: CommandDispatcher.cs"]
+  reg["CommandDispatcher.Commands<br/>+ CommandsByName"]
+  d1["Dispatch: tìm handler,<br/>kiểm tra loại app, qua ComGate"]
+  d2["Tool office_action của Ask AI<br/>chỉ lệnh .ForAgent()"]
+  d3["Mô tả tool MCP<br/>word_command / ppt_command / wps_live_command"]
+  d4["Bảng lệnh README<br/>Host.exe commands --markdown"]
+  d5["Test commands --json<br/>lệnh nào chưa được gọi thì báo lỗi"]
+
+  decl --> reg
+  reg --> d1
+  reg --> d2
+  reg --> d3
+  reg --> d4
+  reg --> d5
+
+  classDef src fill:#d5e8d4,stroke:#82b366,color:#1d4d1f
+  class decl,reg src

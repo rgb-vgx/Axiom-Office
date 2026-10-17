@@ -1,0 +1,90 @@
+<mxfile host="Electron">
+  <diagram id="K89EHWM9K4UNrChQYrDO" name="pageWithNumber">
+    <mxGraphModel grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="0" page="0" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <UserObject label="Chuỗi guard (internal/model/guards.go) - 4 móc onReply / beforeCall / afterTools / recover" mermaidId="n:guards" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=1;verticalAlign=top;fillColor=light-dark(#ffffde,#1f2020);strokeColor=light-dark(#aaaa33,#cccccc);fontColor=light-dark(#333333,#cccccc);fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" mermaidBaseValue="Chuỗi guard (internal/model/guards.go) - 4 móc onReply / beforeCall / afterTools / recover" id="2">
+          <mxCell parent="1" style="html=1;whiteSpace=wrap;strokeWidth=1;verticalAlign=top;fillColor=light-dark(#ffffde,#1f2020);strokeColor=light-dark(#aaaa33,#cccccc);fontColor=light-dark(#333333,#cccccc);fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" vertex="1">
+            <mxGeometry height="1263" width="551" x="8" y="181" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="trả lời rỗng, bị cắt length: nhắc viết lại một lần" mermaidId="n:g1" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#7f4f00;fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" mermaidBaseValue="trả lời rỗng, bị cắt length: nhắc viết lại một lần" id="3">
+          <mxCell parent="2" style="html=1;whiteSpace=wrap;strokeWidth=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#7f4f00;fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" vertex="1">
+            <mxGeometry height="54" width="411" x="70" y="45" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="tự kiểm chứng: đọc lại sau khi sửa (verify)" mermaidId="n:g2" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#7f4f00;fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" mermaidBaseValue="tự kiểm chứng: đọc lại sau khi sửa (verify)" id="4">
+          <mxCell parent="2" style="html=1;whiteSpace=wrap;strokeWidth=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#7f4f00;fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" vertex="1">
+            <mxGeometry height="54" width="370" x="91" y="149" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="chặn lệnh y hệt ở lần thứ 5" mermaidId="n:g3" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#7f4f00;fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" mermaidBaseValue="chặn lệnh y hệt ở lần thứ 5" id="5">
+          <mxCell parent="2" style="html=1;whiteSpace=wrap;strokeWidth=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#7f4f00;fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" vertex="1">
+            <mxGeometry height="54" width="260" x="146" y="253" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="write_todos một lần mỗi reply" mermaidId="n:g4" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#7f4f00;fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" mermaidBaseValue="write_todos một lần mỗi reply" id="6">
+          <mxCell parent="2" style="html=1;whiteSpace=wrap;strokeWidth=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#7f4f00;fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" vertex="1">
+            <mxGeometry height="54" width="281" x="135" y="357" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="tool báo Final thì kết thúc ngay" mermaidId="n:g5" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#7f4f00;fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" mermaidBaseValue="tool báo Final thì kết thúc ngay" id="7">
+          <mxCell parent="2" style="html=1;whiteSpace=wrap;strokeWidth=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#7f4f00;fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" vertex="1">
+            <mxGeometry height="54" width="286" x="133" y="461" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="app sập thì Abort, dừng lượt" mermaidId="n:g6" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#7f4f00;fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" mermaidBaseValue="app sập thì Abort, dừng lượt" id="8">
+          <mxCell parent="2" style="html=1;whiteSpace=wrap;strokeWidth=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#7f4f00;fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" vertex="1">
+            <mxGeometry height="54" width="267" x="142" y="565" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="dọn ngữ cảnh khi vượt 40k token" mermaidId="n:g7" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#7f4f00;fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" mermaidBaseValue="dọn ngữ cảnh khi vượt 40k token" id="9">
+          <mxCell parent="2" style="html=1;whiteSpace=wrap;strokeWidth=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#7f4f00;fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" vertex="1">
+            <mxGeometry height="54" width="300" x="126" y="669" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="lặp một lỗi y hệt 3 lần thì dừng" mermaidId="n:g8" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#7f4f00;fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" mermaidBaseValue="lặp một lỗi y hệt 3 lần thì dừng" id="10">
+          <mxCell parent="2" style="html=1;whiteSpace=wrap;strokeWidth=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#7f4f00;fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" vertex="1">
+            <mxGeometry height="54" width="290" x="131" y="773" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="ngân sách token 80 phần trăm nhắc, 90 tắt tool, 100 dừng" mermaidId="n:g9" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#7f4f00;fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" mermaidBaseValue="ngân sách token 80 phần trăm nhắc, 90 tắt tool, 100 dừng" id="11">
+          <mxCell parent="2" style="html=1;whiteSpace=wrap;strokeWidth=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#7f4f00;fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" vertex="1">
+            <mxGeometry height="54" width="481" x="35" y="877" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="provider không hỗ trợ tool thì chạy chat thường" mermaidId="n:g10" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#7f4f00;fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" mermaidBaseValue="provider không hỗ trợ tool thì chạy chat thường" id="12">
+          <mxCell parent="2" style="html=1;whiteSpace=wrap;strokeWidth=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#7f4f00;fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" vertex="1">
+            <mxGeometry height="54" width="407" x="72" y="981" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="tràn cửa sổ ngữ cảnh: dọn mạnh, thử lại tối đa 2 lần" mermaidId="n:g11" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#7f4f00;fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" mermaidBaseValue="tràn cửa sổ ngữ cảnh: dọn mạnh, thử lại tối đa 2 lần" id="13">
+          <mxCell parent="2" style="html=1;whiteSpace=wrap;strokeWidth=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#7f4f00;fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" vertex="1">
+            <mxGeometry height="54" width="446" x="53" y="1085" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="chuyển model dự phòng, trừ lỗi cấu hình 400/401" mermaidId="n:g12" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#7f4f00;fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" mermaidBaseValue="chuyển model dự phòng, trừ lỗi cấu hình 400/401" id="14">
+          <mxCell parent="2" style="html=1;whiteSpace=wrap;strokeWidth=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontColor=#7f4f00;fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" vertex="1">
+            <mxGeometry height="54" width="421" x="65" y="1189" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="RunAgent (internal/model/agent.go)&#xa;chỉ gọi model và chạy tool&#xa;mỗi cơ chế chống lỗi là một guard" mermaidId="n:run" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=1;fillColor=light-dark(#ECECFF,#1f2020);strokeColor=light-dark(#9370DB,#cccccc);fontColor=light-dark(#333333,#cccccc);fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" mermaidBaseValue="RunAgent (internal/model/agent.go)&#xa;chỉ gọi model và chạy tool&#xa;mỗi cơ chế chống lỗi là một guard" id="15">
+          <mxCell parent="1" style="html=1;whiteSpace=wrap;strokeWidth=1;fillColor=light-dark(#ECECFF,#1f2020);strokeColor=light-dark(#9370DB,#cccccc);fontColor=light-dark(#333333,#cccccc);fontFamily=Trebuchet MS,Verdana,Arial,sans-serif;fontSize=16;" vertex="1">
+            <mxGeometry height="93" width="324" x="122" y="38" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" mermaidId="e:run-&gt;guards#0" mermaidBaseStyle="curved=1;startArrow=none;endArrow=block;endSize=7;curved=1;strokeColor=light-dark(#333333,#cccccc);exitX=0.5;exitY=1;entryX=0.5;entryY=0;" mermaidBaseValue="" id="16">
+          <mxCell edge="1" parent="1" source="15" style="curved=1;startArrow=none;endArrow=block;endSize=7;strokeColor=light-dark(#333333,#cccccc);exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="2">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points" />
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <mxCell id="17" parent="1" style="text;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=18;fontColor=light-dark(#333333,#cccccc);fontFamily=trebuchet ms,verdana,arial,sans-serif;" value="Axiom Office - Vòng agent và chuỗi guard" vertex="1">
+          <mxGeometry height="25" width="559" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

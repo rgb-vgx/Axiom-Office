@@ -1,0 +1,32 @@
+---
+title: Axiom Office - Một lượt chạy (K1)
+---
+sequenceDiagram
+  autonumber
+  actor U as Người dùng
+  participant UI as Ask AI pane
+  participant CO as Agent Core (Go)
+  participant LLM as LLM provider
+  participant BR as HTTP bridge + hệ lệnh
+  participant APP as Word / Excel / PowerPoint
+
+  U->>UI: "Tạo bảng điểm 5 học sinh, có cột trung bình"
+  UI->>CO: POST /v1/runs (prompt, office.port, document, conversationId)
+  CO-->>UI: runId, pane đọc SSE /v1/runs/{id}/events
+  CO->>BR: GET /commands (allowlist theo app)
+  CO->>CO: prompt = quy tắc + chỉ mục skill + memory + hội thoại cũ
+  loop tới khi model trả lời xong
+    CO->>LLM: hội thoại + tool (office_action, load_skill, remember, mcp__*)
+    LLM-->>CO: gọi tool, ví dụ load_skill bang-diem rồi office_action et.writeRange
+    opt lệnh rủi ro (lưu, ghi đè, xoá slide, replaceAll dài)
+      CO-->>UI: confirm.required, hiện thẻ Đồng ý / Từ chối
+      UI->>CO: POST /v1/runs/{id}/confirm
+    end
+    CO->>BR: POST /cmd (qua policy xác nhận khi cần)
+    BR->>APP: COM
+    APP-->>U: thay đổi hiện ngay trên màn hình
+    CO-->>UI: tool.finished / skill.loaded / memory.written
+  end
+  CO-->>UI: run.completed (câu trả lời)
+  CO->>CO: nền: trích xuất ghi nhớ, tóm tắt hội thoại
+  Note over UI,CO: Core không nhận được lượt chạy thì pane chạy agent in-process như cũ.

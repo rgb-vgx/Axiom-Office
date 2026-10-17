@@ -1,0 +1,45 @@
+---
+title: Axiom Office - Kiến trúc container
+---
+flowchart TB
+  mcpc(["MCP client"])
+  dev(["Script"])
+
+  subgraph proc["Process Word / Excel / PowerPoint / WPS (mỗi instance một bộ)"]
+    addin["Add-in AxiomOffice.dll<br/>.NET 4.8, COM in-process<br/>Ask AI pane · HTTP bridge · hệ lệnh · agent dự phòng"]
+    om["Object model của app"]
+    addin -->|"COM late-bound"| om
+  end
+
+  core["AxiomOffice.Core.exe<br/>Go thuần, ~12MB, một bản/người dùng<br/>agent · skills · memory · policy · MCP client · MCP server (subcommand mcp)"]
+  hostexe["AxiomOffice.Host.exe<br/>.NET 4.8 console<br/>shim mcp · companion · công cụ dev"]
+  cfg[("Config store<br/>HKCU / Software / AxiomOffice")]
+  rt[("Runtime files<br/>LOCALAPPDATA / AxiomOffice<br/>bridge.log · core.log · core.json · sessions")]
+  db[("core / core.db (SQLite)<br/>hội thoại · memory · audit")]
+  skills[("skills / · mcp.json")]
+  files[("File .docx .xlsx .pptx")]
+  llm["LLM provider"]
+  mcpext["MCP server ngoài"]
+
+  dev -->|"HTTP 127.0.0.1:478xx"| addin
+  mcpc -->|"stdio JSON-RPC"| hostexe
+  hostexe -->|"HTTP - làn live"| addin
+  hostexe -->|"ZipArchive + XLinq - làn file"| files
+  addin -->|"POST /v1/runs + SSE :47840"| core
+  core -->|"GET /commands, POST /cmd"| addin
+  core -->|"stdio MCP - làn file"| hostexe
+  core -->|"stdio / HTTP MCP"| mcpext
+  core -->|"HTTPS"| llm
+  core --> db
+  core --> skills
+  addin --> cfg
+  core --> cfg
+  hostexe --> cfg
+  addin --> rt
+  core --> rt
+  hostexe --> rt
+
+  classDef store fill:#fff2cc,stroke:#d6b656,color:#7f6000
+  classDef proc fill:#dae8fc,stroke:#6c8ebf,color:#1f3d6e
+  class cfg,rt,db,skills,files store
+  class core,hostexe proc

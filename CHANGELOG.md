@@ -5,6 +5,14 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Docs - ARCHITECTURE.html + bộ sơ đồ draw.io (17/10/2026)
+- Thêm `ARCHITECTURE.html` (gốc repo): tài liệu kiến trúc tiếng Việt 15 mục, kèm 13 sơ đồ tham chiếu từ
+  `docs/architecture/img/*.drawio.svg`.
+- Thêm nguồn sơ đồ Mermaid `docs/architecture/src/*.mmd`, bản `.drawio` để mở/sửa trong draw.io, và script dựng lại
+  `docs/architecture/build-diagrams.ps1`.
+- Nội dung đối chiếu trực tiếp mã nguồn; ghi nhận điểm lệch: `ARCHITECTURE.MD` ghi "schema 2" nhưng
+  `internal/store/db.go` đặt `SchemaVersion = 3` (có bảng `web_sources`).
+
 ### Added - nhánh memory theo app: org-style/doc-style khoá bằng scope_key (M3-07, 17/10/2026)
 - `memory.ScopeDocStyle = "doc-style"` + `NormalizeApp` (`word`/`excel`/`powerpoint` → `wps`/`et`/`wpp`); `AddBatch`/
   `Import`/`Active` lọc `org-style`/`doc-style` theo `scope_key` = app (rỗng = dùng chung mọi app). **Không đổi schema,

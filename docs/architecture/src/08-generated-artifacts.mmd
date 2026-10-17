@@ -1,0 +1,33 @@
+---
+title: Axiom Office - File sinh tự động (một nguồn chuẩn)
+---
+flowchart TB
+  subgraph a["Nguồn A - registry lệnh Python"]
+    py["axiom.commands<br/>writer / calc / impress / checks"]
+    gena["scripts/generate_mcp_commands.py"]
+    lcj["catalog/live-commands.json<br/>80 lệnh, 58 agent=true"]
+    gogen["core-go/internal/mcpserver/livecommands_gen.go"]
+    wpsjs["src/AxiomOffice.WPS/commands.js (CATALOG)"]
+  end
+  subgraph b["Nguồn B - catalog/setup.json"]
+    sq["catalog/setup.json<br/>5 bước · 4 provider · 7 check"]
+    genb["scripts/generate_setup_catalog.py"]
+    cs["src/AxiomOffice/Setup/SetupCatalog.cs"]
+    pyc["axiom/setup_catalog.py"]
+    goc["core-go/internal/setup/catalog_gen.go"]
+  end
+  ci["CI: generate_*.py --check + check_version.py"]
+
+  py --> gena
+  gena --> lcj
+  gena --> gogen
+  gena --> wpsjs
+  sq --> genb
+  genb --> cs
+  genb --> pyc
+  genb --> goc
+  lcj --> ci
+  sq --> ci
+
+  classDef gen fill:#ffe6cc,stroke:#d79b00,color:#7f4f00
+  class gena,genb,ci gen

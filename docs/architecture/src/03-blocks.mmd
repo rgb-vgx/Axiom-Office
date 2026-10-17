@@ -1,0 +1,53 @@
+---
+title: Axiom Office - Các khối chức năng
+---
+flowchart TB
+  subgraph ui["Giao diện (add-in)"]
+    ribbon["Ribbon"]
+    pane["Ask AI pane<br/>tiến trình · thẻ xác nhận · Đã ghi nhớ"]
+    settings["Cài đặt · Quản lý ghi nhớ"]
+  end
+  subgraph corebox["Agent Core (Go)"]
+    orch["Orchestrator<br/>prompt · vòng tool-calling · SSE"]
+    gw["Model gateway<br/>codec · thử lại · timeout"]
+    tools["Tool registry<br/>office_action · skill · memory · MCP · QA"]
+    policy["Policy + xác nhận · audit"]
+    mem["Memory dài hạn<br/>store · retriever · extractor"]
+    sk["Skills + token thiết kế"]
+    mcpcl["MCP client"]
+  end
+  subgraph io["Giao tiếp"]
+    http["HTTP bridge"]
+    mcpserver["MCP server<br/>(Core, subcommand mcp)"]
+    discovery["Session registry · SSE"]
+  end
+  subgraph cmd["Hệ lệnh"]
+    registry["Command registry + dispatcher<br/>writer/et/wpp + template/design + QA cấu trúc"]
+  end
+  subgraph integ["Tích hợp host"]
+    gate["COM gate / UnoGate<br/>retry · nhận diện app"]
+    om["Object model Office / WPS / UNO"]
+  end
+  subgraph filecore["Xử lý file"]
+    ooxml["OOXML engine<br/>docx · xlsx · pptx"]
+  end
+
+  pane --> orch
+  orch --> gw
+  orch --> tools
+  tools --> policy
+  tools --> sk
+  tools --> mem
+  tools --> mcpcl
+  mcpcl --> mcpserver
+  tools -->|"office_action"| http
+  http --> registry
+  mcpserver -->|"làn file"| ooxml
+  registry --> gate
+  gate --> om
+  discovery --> gate
+
+  classDef corecls fill:#dae8fc,stroke:#6c8ebf,color:#1f3d6e
+  classDef uicls fill:#d5e8d4,stroke:#82b366,color:#1d4d1f
+  class orch,gw,tools,policy,mem,sk,mcpcl corecls
+  class ribbon,pane,settings uicls

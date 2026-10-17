@@ -1,0 +1,23 @@
+---
+title: Axiom Office - Khởi động & tìm Agent Core
+---
+sequenceDiagram
+  autonumber
+  participant P as Ask AI pane
+  participant CJ as core.json
+  participant CO as AxiomOffice.Core.exe
+  participant B as Bridge trong app
+
+  P->>CJ: đọc core.json (pid, port, version, protocol)
+  alt chưa có hoặc /health lỗi
+    P->>CO: khởi động exe cạnh DLL
+    CO->>CO: giữ mutex một-bản (Local AxiomOffice.Core)
+    CO->>CO: chọn port 47840 (bận thì 47841-47849)
+    CO->>CJ: ghi core.json khi sẵn sàng
+  end
+  P->>CO: GET /health trả pid, port, version, protocol, memory
+  P->>CO: POST /v1/runs (kèm pid của bridge)
+  CO->>B: GET /health để chắc session còn sống, đúng pid
+  B-->>CO: ok
+  CO-->>P: runId, sau đó SSE tiến trình
+  Note over P,CO: Core không nhận lượt chạy thì pane rơi về agent in-process

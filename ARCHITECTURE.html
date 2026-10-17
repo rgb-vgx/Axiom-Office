@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Axiom Office — Tài liệu kiến trúc</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --panel:#fff; --ink:#1e2430; --muted:#5a6373; --line:#e3e7ee;
+    --brand:#2456a6; --accent:#c2410c; --ok:#1d7a46; --code:#0f172a; --codeink:#e9eefb;
+    --maxw:1200px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.62 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif}
+  a{color:var(--brand);text-decoration:none}
+  a:hover{text-decoration:underline}
+  code{font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",Menlo,monospace;font-size:.88em;
+    background:#eef1f6;border:1px solid #e0e5ec;border-radius:4px;padding:.06em .35em}
+  pre{background:var(--code);color:var(--codeink);padding:14px 16px;border-radius:10px;overflow:auto;font-size:.85rem;line-height:1.5}
+  pre code{background:none;border:0;padding:0;color:inherit;font-size:1em}
+  header.top{background:linear-gradient(135deg,#173a72,#2456a6 55%,#2c7a52);color:#fff;padding:40px 24px 32px}
+  header.top .wrap{max-width:var(--maxw);margin:0 auto}
+  header.top h1{margin:0 0 10px;font-size:2rem;letter-spacing:.2px}
+  header.top p{margin:4px 0;color:#dde7f8}
+  .badges{margin-top:16px;display:flex;flex-wrap:wrap;gap:8px}
+  .badge{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:999px;
+    padding:4px 12px;font-size:.8rem;white-space:nowrap}
+  .layout{max-width:var(--maxw);margin:0 auto;display:grid;grid-template-columns:270px 1fr;gap:30px;padding:28px 24px 90px}
+  nav.toc{position:sticky;top:16px;align-self:start;background:var(--panel);border:1px solid var(--line);
+    border-radius:12px;padding:16px;max-height:calc(100vh - 40px);overflow:auto;font-size:.9rem}
+  nav.toc h2{margin:0 0 10px;font-size:.74rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+  nav.toc ol{margin:0;padding-left:1.1em}
+  nav.toc li{margin:5px 0}
+  main{min-width:0}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:26px 28px;margin:0 0 22px}
+  h2.sec{margin:0 0 6px;font-size:1.32rem;border-left:5px solid var(--brand);padding-left:12px}
+  h2.sec .n{color:var(--brand);font-weight:700}
+  h3{margin:26px 0 8px;font-size:1.08rem}
+  h4{margin:18px 0 6px;font-size:.98rem;color:#33405a}
+  p{margin:10px 0}
+  ul,ol{margin:10px 0;padding-left:1.3em}
+  li{margin:5px 0}
+  .lead{color:var(--muted);font-size:1.02rem;margin-top:0}
+  .grid{display:grid;gap:14px}
+  .g2{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+  .g3{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+  .card{background:#fbfcfe;border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+  .card h4{margin-top:0}
+  .callout{border-left:4px solid var(--brand);background:#eef4ff;border-radius:8px;padding:12px 16px;margin:14px 0}
+  .callout.warn{border-color:var(--accent);background:#fff3ec}
+  .callout.ok{border-color:var(--ok);background:#ecfaf1}
+  .callout p{margin:6px 0}
+  figure{margin:18px 0 22px;padding:0}
+  figure .shot{border:1px solid var(--line);border-radius:12px;background:#fff;padding:10px;overflow:auto;text-align:center}
+  figure img{max-width:100%;height:auto;display:block;margin:0 auto}
+  figcaption{color:var(--muted);font-size:.88rem;margin-top:8px}
+  figcaption b{color:var(--ink)}
+  .src{font-size:.82rem;color:var(--muted)}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:.9rem}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:#f1f4f9;font-weight:600}
+  tbody tr:nth-child(even){background:#fafbfd}
+  .kv td:first-child{white-space:nowrap;font-weight:600;color:#33405a;width:34%}
+  .pill{display:inline-block;border-radius:999px;padding:1px 9px;font-size:.76rem;font-weight:600;border:1px solid}
+  .pill.go{color:var(--ok);border-color:#b7e3c8;background:#eafaf0}
+  .pill.pend{color:var(--accent);border-color:#f4cdb8;background:#fff1e9}
+  .pill.info{color:var(--brand);border-color:#c6d8f5;background:#eef4ff}
+  .pill.mut{color:var(--muted);border-color:#dfe4ec;background:#f3f5f9}
+  footer{max-width:var(--maxw);margin:0 auto;padding:0 24px 60px;color:var(--muted);font-size:.86rem}
+  .anchor{scroll-margin-top:18px}
+  @media (max-width:900px){
+    .layout{grid-template-columns:1fr;padding:18px 14px 70px}
+    nav.toc{position:static;max-height:none}
+    section{padding:20px 16px}
+  }
+  @media print{
+    nav.toc{display:none}
+    .layout{grid-template-columns:1fr;padding:0}
+    section{border:0;page-break-inside:avoid}
+    header.top{background:#2456a6}
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <h1>Axiom Office — Tài liệu kiến trúc</h1>
+    <p>Add-in tự động hoá Microsoft Office / WPS / LibreOffice bằng trợ lý AI tiếng Việt, chạy trong nước (local-first).</p>
+    <p>Bản mô tả kèm sơ đồ draw.io, đối chiếu trực tiếp với mã nguồn tại thời điểm <b>17/10/2026</b> · phiên bản <b>0.1.0</b>.</p>
+    <div class="badges">
+      <span class="badge">Agent Core: Go thuần</span>
+      <span class="badge">Add-in: C# .NET 4.8 (COM)</span>
+      <span class="badge">LibreOffice: Python + UNO</span>
+      <span class="badge">WPS: JS add-in</span>
+      <span class="badge">SQLite (schema 3)</span>
+      <span class="badge">MCP server: 50 công cụ</span>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+<nav class="toc">
+  <h2>Nội dung</h2>
+  <ol>
+    <li><a href="#s1">Giới thiệu &amp; phạm vi</a></li>
+    <li><a href="#s2">Bối cảnh &amp; container</a></li>
+    <li><a href="#s3">Các khối chức năng</a></li>
+    <li><a href="#s4">Luồng chạy &amp; khởi động</a></li>
+    <li><a href="#s5">Triển khai &amp; cổng</a></li>
+    <li><a href="#s6">Bên trong Agent Core</a></li>
+    <li><a href="#s7">Hệ lệnh &amp; file sinh</a></li>
+    <li><a href="#s8">MCP: làn live &amp; làn file</a></li>
+    <li><a href="#s9">Dữ liệu &amp; bộ nhớ</a></li>
+    <li><a href="#s10">Kiểm thử &amp; CI</a></li>
+    <li><a href="#s11">Build, cài đặt, đóng gói</a></li>
+    <li><a href="#s12">Quyết định kiến trúc</a></li>
+    <li><a href="#s13">Rủi ro &amp; giới hạn</a></li>
+    <li><a href="#s14">Cấu trúc mã nguồn</a></li>
+    <li><a href="#s15">Thuật ngữ</a></li>
+  </ol>
+  <p class="src" style="margin-top:12px">Nguồn: đọc trực tiếp <code>core-go/</code>, <code>src/AxiomOffice*/</code>, <code>scripts/</code>, <code>catalog/</code>, <code>skills/</code>, <code>tests/</code>.</p>
+</nav>
+
+<main>
+
+<section id="s1" class="anchor">
+  <h2 class="sec"><span class="n">1.</span> Giới thiệu &amp; phạm vi</h2>
+  <p class="lead">Axiom Office là một add-in nằm trong Word/Excel/PowerPoint (và các bản tương thích WPS, LibreOffice). Người dùng gõ yêu cầu tiếng Việt trong khung chat; một trợ lý AI sẽ đọc tài liệu đang mở, gọi các <b>lệnh thao tác</b> để sửa tài liệu trực tiếp, rồi hiển thị tiến trình và kết quả ngay trong khung chat.</p>
+
+  <div class="grid g3">
+    <div class="card"><h4>Ba cách dùng</h4>
+      <ul style="margin:8px 0 0">
+        <li><b>Khung chat</b> trong app — dành cho người dùng cuối.</li>
+        <li><b>HTTP bridge</b> trên <code>127.0.0.1</code> — script/agent tuỳ ý.</li>
+        <li><b>MCP server</b> (stdio) — Claude Desktop, Claude Code…</li>
+      </ul>
+    </div>
+    <div class="card"><h4>Nguyên tắc cốt lõi</h4>
+      <ul style="margin:8px 0 0">
+        <li>Chỉ chạy trong máy; mô hình LLM là điểm ra duy nhất ra Internet.</li>
+        <li>Thao tác lên tài liệu đi qua <b>hệ lệnh</b> có kiểm tra và xác nhận.</li>
+        <li>Rõ ràng, dễ kiểm: mỗi thao tác ghi audit.</li>
+      </ul>
+    </div>
+    <div class="card"><h4>Ngoài phạm vi (hiện tại)</h4>
+      <ul style="margin:8px 0 0">
+        <li>Không có tiến trình nền “job” (<code>axiom-core job</code> chưa có).</li>
+        <li>Chưa ký số chứng thư (code signing) các nhị phân.</li>
+        <li>Tính năng WPS chỉ WPS Office thật; P8 tạm hoãn.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3>Tác nhân</h3>
+  <table>
+    <thead><tr><th>Tác nhân</th><th>Mong muốn</th><th>Cách tiếp cận hệ thống</th></tr></thead>
+    <tbody>
+      <tr><td>Người dùng văn phòng</td><td>Nhờ AI thao tác tài liệu bằng tiếng Việt</td><td>Khung chat trong app (ribbon → “Hỏi AI”)</td></tr>
+      <tr><td>Developer / script</td><td>Điều khiển app đang mở từ code</td><td>HTTP JSON <code>POST /cmd</code> trên cổng bridge</td></tr>
+      <tr><td>AI agent ngoài</td><td>Dùng tài liệu như một bộ công cụ</td><td>MCP qua stdio (<code>AxiomOffice.Host.exe mcp</code> → Core)</td></tr>
+      <tr><td>Quản trị máy</td><td>Cài/gỡ một lần, sao lưu cấu hình</td><td><code>install.ps1</code>/<code>uninstall.ps1</code>, khôi phục trong <code>%LOCALAPPDATA%</code></td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <p><b>Số liệu nhanh (đối chiếu code):</b> 2 tệp thực thi Windows (add-in + Core) · hệ lệnh C# khai báo <b>77 lệnh</b> · catalog chung <b>80 lệnh</b> (58 dành cho agent) · MCP server <b>50 công cụ</b> chia 3 nhóm word/excel/ppt · <b>8 skill</b> đóng gói sẵn · <b>6 tệp sinh tự động</b> từ 2 nguồn chuẩn · SQLite <b>schema 3</b> với <b>12 bảng</b>.</p>
+  </div>
+</section>
+
+<section id="s2" class="anchor">
+  <h2 class="sec"><span class="n">2.</span> Bối cảnh &amp; container</h2>
+  <p>Axiom Office chỉ gồm <b>hai tệp thực thi</b> phải triển khai trên Windows: thư viện add-in trong lòng tiến trình Office/WPS, và một tiến trình Go dùng chung tên Agent Core. Phần còn lại của hệ sinh thái (MCP, LibreOffice, WPS Linux) là các lớp mỏng gọi vào cùng một giao thức bridge.</p>
+
+  <figure>
+    <div class="shot"><img src="docs/architecture/img/01-context.drawio.svg" alt="Sơ đồ bối cảnh hệ thống Axiom Office"></div>
+    <figcaption><b>Hình 1 — Bối cảnh hệ thống.</b> Ai/cái gì tương tác với Axiom Office, và Axiom Office nói chuyện với những hệ thống ngoài nào. Nguồn: <span class="src">docs/architecture/src/01-context.mmd</span></figcaption>
+  </figure>
+
+  <figure>
+    <div class="shot"><img src="docs/architecture/img/02-containers.drawio.svg" alt="Sơ đồ container Axiom Office"></div>
+    <figcaption><b>Hình 2 — Kiến trúc container.</b> Hai tệp thực thi, các kho dữ liệu, và các luồng giữa add-in ↔ Core ↔ Host ↔ mô hình. Nguồn: <span class="src">docs/architecture/src/02-containers.mmd</span></figcaption>
+  </figure>
+
+  <h3>Các container</h3>
+  <table>
+    <thead><tr><th>Container</th><th>Công nghệ</th><th>Trách nhiệm</th></tr></thead>
+    <tbody>
+      <tr><td><code>AxiomOffice.dll</code></td><td>C# .NET Framework 4.8, COM in-process, x64</td><td>Ribbon, khung chat, HTTP bridge, hệ lệnh thao tác app, agent dự phòng chạy trong tiến trình</td></tr>
+      <tr><td><code>AxiomOffice.Core.exe</code></td><td>Go thuần (một tệp ~12 MB)</td><td>Agent, prompt, gateway mô hình, tool, policy, bộ nhớ, skills, MCP client, và MCP server (subcommand <code>mcp</code>)</td></tr>
+      <tr><td><code>AxiomOffice.Host.exe</code></td><td>C# .NET 4.8 console</td><td>Shim <code>mcp</code> (chuyển tiếp sang Core), trình duyệt lệnh (<code>commands</code>), <code>llm-test</code>, chế độ <code>companion</code> không cần app</td></tr>
+      <tr><td>Extension LibreOffice</td><td>Python + UNO, đóng gói <code>.oxt</code></td><td>Bridge HTTP (47851–47853), chat pane, hệ lệnh tương đương, cổng UNO</td></tr>
+      <tr><td>WPS JS add-in</td><td>JavaScript ES5 (CEF)</td><td>Long-poll về Core, catalog lệnh, khung chat; Core đóng vai bridge trên cổng 47861</td></tr>
+      <tr><td>MCP server ngoài</td><td>stdio hoặc Streamable HTTP</td><td>Công cụ tuỳ chọn người dùng khai trong <code>mcp.json</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Kho dữ liệu &amp; cấu hình</h3>
+  <table class="kv">
+    <tbody>
+      <tr><td><code>HKCU\Software\AxiomOffice</code></td><td>Cấu hình người dùng: cổng, token, provider mô hình, API key (DPAPI), cờ tính năng, ngôn ngữ UI</td></tr>
+      <tr><td><code>%LOCALAPPDATA%\AxiomOffice\</code></td><td><code>bridge.log</code>, <code>core.log</code>, <code>core.json</code> (pid/port/version), <code>sessions\&lt;pid&gt;.json</code>, <code>mcp.json</code>, <code>core\core.db</code></td></tr>
+      <tr><td><code>core\core.db</code></td><td>SQLite: hội thoại, tin nhắn, lượt chạy, audit tool, bộ nhớ dài hạn, bản lưu nguồn web. Dùng chung cho cả bản Go lẫn phần C#</td></tr>
+      <tr><td><code>skills\</code></td><td>8 skill đóng gói kèm, mỗi skill một thư mục có <code>SKILL.md</code> và tài nguyên tham chiếu</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout ok">
+    <p><b>Vì sao tách Core ra khỏi add-in?</b> Một tiến trình Go dùng chung cho mọi app: sửa một chỗ, tất cả cùng hưởng; tiến trình người dùng riêng không cần quyền quản trị; và tệp Go dễ kiểm bằng <code>go test</code> mà không cần mở Office. Khi Core không khởi động được, add-in tự rơi về agent in-process nên vẫn dùng được tính năng cơ bản.</p>
+  </div>
+</section>
+
+<section id="s3" class="anchor">
+  <h2 class="sec"><span class="n">3.</span> Các khối chức năng</h2>
+  <p>Bản đồ dưới đây gom hệ thống theo khối chức năng thay vì theo tiến trình, để thấy rõ chỗ nào làm gì.</p>
+
+  <figure>
+    <div class="shot"><img src="docs/architecture/img/03-blocks.drawio.svg" alt="Sơ đồ các khối chức năng"></div>
+    <figcaption><b>Hình 3 — Khối chức năng.</b> Giao diện → Agent Core (orchestrator, gateway mô hình, tool registry, policy, bộ nhớ, skills, MCP client) → hệ lệnh → tích hợp host → engine xử lý file OOXML. Nguồn: <span class="src">docs/architecture/src/03-blocks.mmd</span></figcaption>
+  </figure>
+
+  <table>
+    <thead><tr><th>Khối</th><th>Việc chính</th><th>Nằm ở</th></tr></thead>
+    <tbody>
+      <tr><td>Giao diện</td><td>Ribbon, khung chat (tiến trình, thẻ xác nhận, ghi chú bộ nhớ), form cài đặt/quản trị</td><td><code>src/AxiomOffice/Ribbon/</code>, <code>Ai/</code></td></tr>
+      <tr><td>Orchestrator</td><td>Dựng prompt, vòng gọi mô hình + chạy tool, phát sự kiện SSE, xác nhận, tự kiểm chứng</td><td><code>core-go/internal/agent</code></td></tr>
+      <tr><td>Gateway mô hình</td><td>Codec OpenAI/Anthropic, cửa sổ ngữ cảnh, thử lại, mô hình dự phòng, chuỗi guard</td><td><code>core-go/internal/model</code></td></tr>
+      <tr><td>Tool registry</td><td>Công cụ agent gọi được: <code>office_action</code>, skill, bộ nhớ, todo, template, web, MCP</td><td><code>core-go/internal/tools</code></td></tr>
+      <tr><td>Policy + xác nhận</td><td>Quyết định lệnh nào phải hỏi người dùng trước khi ghi/xoá</td><td><code>internal/policy</code>, <code>agent/confirm.go</code></td></tr>
+      <tr><td>Bộ nhớ dài hạn</td><td>Lưu/khôi phục ghi nhớ theo người dùng, tài liệu, phong cách; trích xuất tự động</td><td><code>core-go/internal/memory</code></td></tr>
+      <tr><td>Hệ lệnh</td><td>Một khai báo lệnh, phân phối tới bridge/agent/MCP/tài liệu</td><td><code>Bridge/CommandDispatcher*.cs</code></td></tr>
+      <tr><td>Tích hợp host</td><td>Cổng nối tiếp COM/UNO, thử lại khi app bận, nhận diện loại app</td><td><code>Bridge/ComGate.cs</code>, LO <code>gate.py</code></td></tr>
+      <tr><td>Xử lý file</td><td>Đọc/ghi <code>.docx</code> <code>.xlsx</code> <code>.pptx</code> (và <code>.xls</code>) không cần mở app</td><td><code>core-go/internal/{ooxml,xlsx,docx,pptx,sheet,cfb}</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Ba đường thực thi cùng đích</h3>
+  <div class="grid g3">
+    <div class="card"><h4>Đường 1 — Chat trong app</h4><p>Khung chat → Core (<code>/v1/runs</code> + SSE) → <code>office_action</code> → <code>POST /cmd</code> → COM/UNO. Sửa tài liệu hiện ngay trên màn hình.</p></div>
+    <div class="card"><h4>Đường 2 — MCP</h4><p>Claude/agent ngoài → <code>Host.exe mcp</code> → Core <code>axiom-core mcp</code> → làn live (bridge) hoặc làn file (OOXML thuần Go).</p></div>
+    <div class="card"><h4>Đường 3 — Script/HTTP</h4><p>Chương trình bất kỳ → <code>POST /cmd</code> trên cổng bridge của app với <code>X-Auth-Token</code>.</p></div>
+  </div>
+</section>
+
+<section id="s4" class="anchor">
+  <h2 class="sec"><span class="n">4.</span> Luồng chạy &amp; khởi động</h2>
+  <p>Đây là kịch bản quan trọng nhất: người dùng gõ một câu, phần mềm biến nó thành thay đổi thật trên tài liệu.</p>
+
+  <figure>
+    <div class="shot"><img src="docs/architecture/img/04-run-sequence.drawio.svg" alt="Sơ đồ tuần tự một lượt chạy"></div>
+    <figcaption><b>Hình 4 — Một lượt chạy (K1).</b> Từ prompt tới <code>run.completed</code>, kèm nhánh xác nhận và ghi nhớ nền. Nguồn: <span class="src">docs/architecture/src/04-run-sequence.mmd</span></figcaption>
+  </figure>
+
+  <h3>Diễn giải từng bước</h3>
+  <ol>
+    <li><b>Nhận yêu cầu.</b> Khung chat gọi <code>POST /v1/runs</code> kèm prompt, thông tin tài liệu, cổng bridge và <code>conversationId</code>; Core trả về <code>runId</code>.</li>
+    <li><b>Theo dõi tiến trình.</b> Khung chat mở SSE <code>GET /v1/runs/{id}/events</code> và cập nhật từng bước (đang suy nghĩ, đang gọi tool…).</li>
+    <li><b>Nạp allowlist.</b> Core hỏi bridge <code>GET /commands</code> để chỉ cho mô hình thấy những lệnh hợp lệ với loại app đang mở (chỉ lệnh <code>.ForAgent()</code>).</li>
+    <li><b>Dựng prompt.</b> Ghép quy tắc + chỉ mục skill + bộ nhớ liên quan + hội thoại gần đây + tình trạng tài liệu thành một prompt duy nhất.</li>
+    <li><b>Vòng tool-calling.</b> Mô hình trả lời hoặc xin gọi tool (ví dụ <code>load_skill bang-diem</code>, rồi <code>office_action</code> với <code>et.writeRange</code>).</li>
+    <li><b>Xác nhận.</b> Lệnh rủi ro (lưu, ghi đè, xoá slide, thay thế hàng loạt) bị chặn lại; UI hiện thẻ Đồng ý / Từ chối và chờ <code>POST /v1/runs/{id}/confirm</code>.</li>
+    <li><b>Thực thi.</b> Core gọi <code>POST /cmd</code> tới bridge; bridge qua cổng nối tiếp (COM gate) rồi chạm object model; người dùng thấy thay đổi ngay.</li>
+    <li><b>Kết thúc.</b> Core phát <code>run.completed</code>, rồi chạy nền trích xuất ghi nhớ và tóm tắt hội thoại.</li>
+  </ol>
+
+  <figure>
+    <div class="shot"><img src="docs/architecture/img/11-core-startup.drawio.svg" alt="Sơ đồ khởi động và tìm Agent Core"></div>
+    <figcaption><b>Hình 5 — Khởi động &amp; tìm Agent Core.</b> Khung chat đọc <code>core.json</code>, khởi động Core khi cần, xác thực session bridge, và cơ chế dự phòng in-process. Nguồn: <span class="src">docs/architecture/src/11-core-startup.mmd</span></figcaption>
+  </figure>
+
+  <div class="callout">
+    <p><b>Một bản Core cho mỗi người dùng.</b> Core giữ mutex có tên <code>\Local\AxiomOffice.Core</code> để không chạy trùng; chọn cổng <code>47840</code> (bận thì 47841–47849); ghi <code>core.json</code> ngay khi sẵn sàng để lần sau khởi động nhanh. Nếu Core không phản hồi, khung chat dùng lại agent C# trong tiến trình — đây là “cầu chì” chứ không phải đường chính.</p>
+  </div>
+</section>
+
+<section id="s5" class="anchor">
+  <h2 class="sec"><span class="n">5.</span> Triển khai &amp; cổng</h2>
+  <p>Mọi thứ chạy trong một tài khoản người dùng. Chỉ có một cửa ra Internet (nhà cung cấp mô hình). Mỗi app mở cổng bridge riêng trên <code>127.0.0.1</code> để tra cứu chính xác instance nào đang chạy.</p>
+
+  <figure>
+    <div class="shot"><img src="docs/architecture/img/05-deployment.drawio.svg" alt="Sơ đồ triển khai và cổng"></div>
+    <figcaption><b>Hình 6 — Triển khai &amp; cổng.</b> Các tiến trình app, Core, kho cấu hình, và đường ra Internet. Nguồn: <span class="src">docs/architecture/src/05-deployment.mmd</span></figcaption>
+  </figure>
+
+  <h3>Bảng cổng mặc định</h3>
+  <table>
+    <thead><tr><th>Host</th><th>AppKind</th><th>family</th><th>Cổng</th></tr></thead>
+    <tbody>
+      <tr><td>WPS Writer</td><td><code>wps</code></td><td><code>wps</code></td><td>47821</td></tr>
+      <tr><td>WPS Spreadsheets</td><td><code>et</code></td><td><code>wps</code></td><td>47822</td></tr>
+      <tr><td>WPS Presentation</td><td><code>wpp</code></td><td><code>wps</code></td><td>47823</td></tr>
+      <tr><td>Microsoft Word</td><td><code>wps</code></td><td><code>office</code></td><td>47831</td></tr>
+      <tr><td>Microsoft Excel</td><td><code>et</code></td><td><code>office</code></td><td>47832</td></tr>
+      <tr><td>Microsoft PowerPoint</td><td><code>wpp</code></td><td><code>office</code></td><td>47833</td></tr>
+      <tr><td>LibreOffice Writer / Calc / Impress</td><td><code>wps</code>/<code>et</code>/<code>wpp</code></td><td><code>libreoffice</code></td><td>47851 / 47852 / 47853</td></tr>
+      <tr><td>WPS Linux (Core đóng vai bridge)</td><td>—</td><td>—</td><td>47861</td></tr>
+      <tr><td>Agent Core (HTTP API)</td><td>—</td><td>—</td><td>47840 (+47841–47849)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Cổng vào &amp; hàng rào</h3>
+  <p>Mọi cửa vào đều là loopback và đều bị kiểm tra. Chi tiết guard của bridge add-in (thứ tự đánh giá):</p>
+  <table>
+    <thead><tr><th>Điều kiện</th><th>Kết quả</th></tr></thead>
+    <tbody>
+      <tr><td>Có header <code>Origin</code> (khác rỗng) → chặn</td><td><code>403</code> — chống lời gọi từ trình duyệt</td></tr>
+      <tr><td>Thiếu/sai <code>X-Auth-Token</code> (khi token đã đặt)</td><td><code>401</code></td></tr>
+      <tr><td><code>POST /cmd</code> mà Content-Type không phải JSON</td><td><code>415</code></td></tr>
+      <tr><td>Thân JSON hỏng / thiếu <code>action</code></td><td><code>400</code></td></tr>
+    </tbody>
+  </table>
+  <p class="src">Riêng Core (Go) áp cùng kiểu guard: chặn <code>Origin</code> (403), yêu cầu <code>X-Auth-Token</code> cho mọi đường trừ <code>GET /health</code> (401), và bắt buộc <code>application/json</code> cho request có thân (415). Kênh <code>/wps/*</code> có luật xác thực riêng trong <code>wpsbridge.DecideWPSAuth</code>.</p>
+
+  <h3>Khoá cấu hình chính</h3>
+  <table class="kv">
+    <tbody>
+      <tr><td><code>Port</code> / <code>PortOffice</code></td><td>Cổng bridge cho WPS (47821) và Office (47831); các app còn lại cộng 1 và 2</td></tr>
+      <tr><td><code>CorePort</code>, <code>CoreEnabled</code></td><td>Cổng Agent Core (47840) và cờ bật/tắt Core</td></tr>
+      <tr><td><code>Token</code></td><td>Chuỗi 32 hex sinh khi cài; dùng cho mọi request bridge và Core</td></tr>
+      <tr><td><code>Provider</code>, <code>Endpoint</code>, <code>Model</code>, <code>ApiKey</code></td><td>Cấu hình nhà cung cấp mô hình; API key mã hoá bằng DPAPI</td></tr>
+      <tr><td><code>MemoryEnabled</code>, <code>AutoExtract</code>, <code>Verify</code>, <code>VisualQa</code>, <code>Reasoning</code>, <code>UiLanguage</code></td><td>Cờ tính năng chat/bộ nhớ/kiểm tra</td></tr>
+    </tbody>
+  </table>
+  <p class="src">Thứ tự nạp cấu hình trong Core: biến môi trường <code>AXIOM_*</code> &gt; nguồn nền tảng (HKCU trên Windows, <code>~/.config/axiom-office/config.json</code> trên Linux) &gt; giá trị mặc định.</p>
+</section>
+
+<section id="s6" class="anchor">
+  <h2 class="sec"><span class="n">6.</span> Bên trong Agent Core</h2>
+  <p>Core là một mô-đun Go <code>axiomoffice/core</code>. Toàn bộ logic “nặng” nằm ở đây; add-in chỉ lo giao diện và chạm app.</p>
+
+  <figure>
+    <div class="shot"><img src="docs/architecture/img/06-agent-core.drawio.svg" alt="Sơ đồ bên trong Agent Core"></div>
+    <figcaption><b>Hình 7 — Bên trong Agent Core.</b> Tầng API/guard → orchestrator → gateway mô hình, tool, policy, bộ nhớ, MCP; cùng các engine định dạng và hạ tầng. Nguồn: <span class="src">docs/architecture/src/06-agent-core.mmd</span></figcaption>
+  </figure>
+
+  <h3>Bản đồ gói</h3>
+  <table>
+    <thead><tr><th>Gói</th><th>Trách nhiệm</th></tr></thead>
+    <tbody>
+      <tr><td><code>cmd/axiom-core</code></td><td>Khởi động/dừng, mutex một-bản, chọn cổng, nhánh con <code>mcp</code> và <code>doctor</code></td></tr>
+      <tr><td><code>internal/api</code></td><td>HTTP API v1 + kênh WPS, guard, SSE, phong bì <code>{"ok":…}</code></td></tr>
+      <tr><td><code>internal/agent</code></td><td>Manager/Orchestrator, dựng prompt, vòng chạy, sự kiện, xác nhận, verify, phong cách tài liệu, ngôn ngữ</td></tr>
+      <tr><td><code>internal/model</code></td><td>Codec OpenAI/Anthropic, SSE, cửa sổ ngữ cảnh, profile model, <b>chuỗi guard</b></td></tr>
+      <tr><td><code>internal/tools</code></td><td>Registry tool + <code>office_action</code>, skill, bộ nhớ, todo, template, web, visual, MCP; giới hạn gọi, chống ghi đè, cắt ngắn kết quả</td></tr>
+      <tr><td><code>internal/policy</code></td><td>Quyết định xác nhận cho lệnh rủi ro (bản dịch <code>PolicyEngine</code>)</td></tr>
+      <tr><td><code>internal/memory</code></td><td>Service ghi nhớ: trích xuất, truy hồi (BM25 + entity boost + embedding), lịch sử, chuẩn hoá theo app</td></tr>
+      <tr><td><code>internal/store</code></td><td>SQLite + migration (schema 1→3) và repository hội thoại/lượt chạy/audit/nguồn web</td></tr>
+      <tr><td><code>internal/skills</code></td><td>Chỉ mục &amp; nạp <code>SKILL.md</code>, quét lại mỗi 2 giây, kiểm tra tên/mô tả/not_for</td></tr>
+      <tr><td><code>internal/mcp</code></td><td>MCP client: khởi động server con, bắt tay, liệt kê/gọi tool, server <code>office</code> tích hợp</td></tr>
+      <tr><td><code>internal/mcpserver</code></td><td>MCP server do Core cung cấp (stdio), 50 công cụ chia nhóm</td></tr>
+      <tr><td><code>internal/office</code></td><td>Client bridge, thư mục session, cắt ngắn kết quả đọc lớn</td></tr>
+      <tr><td><code>internal/{ooxml,xlsx,docx,pptx,sheet,cfb}</code></td><td>Engine OOXML thuần Go: zip/XML, bảng tính, văn bản, trình chiếu, tiện ích ô, đọc container OLE2</td></tr>
+      <tr><td><code>internal/{config,corefile,corelog,doctor,filesafe,instance,setup,templates,textutil,wpsbridge}</code></td><td>Hạ tầng: cấu hình/khoá, <code>core.json</code>, log, chẩn đoán, ghi tệp an toàn, mutex, dữ liệu wizard, mẫu nhúng, tiện ích chuỗi, bridge WPS</td></tr>
+    </tbody>
+  </table>
+
+  <h3>HTTP API của Core</h3>
+  <table>
+    <thead><tr><th>Nhóm</th><th>Đường dẫn</th></tr></thead>
+    <tbody>
+      <tr><td>Sức khoẻ</td><td><code>GET /health</code> (không cần token)</td></tr>
+      <tr><td>Lượt chạy</td><td><code>POST /v1/runs</code> · <code>GET /v1/runs/{id}</code> · <code>GET /v1/runs/{id}/events</code> (SSE) · <code>POST /v1/runs/{id}/cancel</code> · <code>POST /v1/runs/{id}/confirm</code></td></tr>
+      <tr><td>Hội thoại</td><td><code>GET /v1/conversations</code> · <code>GET /v1/conversations/{id}</code> · <code>DELETE /v1/conversations/{id}</code></td></tr>
+      <tr><td>Bộ nhớ</td><td><code>GET/POST /v1/memory</code> · <code>PATCH/DELETE /v1/memory/{id}</code> · <code>POST /v1/memory/{id}/restore</code> · <code>GET /v1/memory/{id}/history</code> · <code>DELETE /v1/memory</code> · <code>GET /v1/memory/export</code> · <code>POST /v1/memory/import</code></td></tr>
+      <tr><td>Skills / MCP / Audit</td><td><code>GET /v1/skills</code> · <code>POST /v1/skills/reload</code> · <code>GET /v1/mcp</code> · <code>GET /v1/audit</code></td></tr>
+      <tr><td>Setup / LLM</td><td><code>GET /v1/setup</code> · <code>POST /v1/llm/test</code> · <code>GET /v1/llm/models</code></td></tr>
+      <tr><td>Quản trị</td><td><code>POST /v1/admin/shutdown</code></td></tr>
+      <tr><td>Kênh WPS</td><td><code>POST /wps/addin/</code> · <code>POST /wps/v1/poll</code> · <code>POST /wps/v1/result</code> · <code>/wps/v1/runs…</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Sự kiện SSE</h3>
+  <p>Giao thức SSE dùng <code>id:</code>, <code>event:</code>, <code>data:</code>; có thể nối lại bằng <code>?after=</code> hoặc <code>Last-Event-ID</code>; giữ nhịp <code>ping</code> mỗi 15 giây.</p>
+  <table>
+    <thead><tr><th>Nhóm</th><th>Sự kiện</th></tr></thead>
+    <tbody>
+      <tr><td>Vòng chạy</td><td><code>run.started</code>, <code>run.reasoning</code>, <code>run.reasoning.live</code>, <code>run.progress</code>, <code>run.model_switched</code>, <code>run.todos</code></td></tr>
+      <tr><td>Tool</td><td><code>tool.started</code>, <code>tool.finished</code>, <code>skill.loaded</code>, <code>memory.written</code></td></tr>
+      <tr><td>Xác nhận</td><td><code>confirm.required</code>, <code>confirm.resolved</code></td></tr>
+      <tr><td>Kết thúc</td><td><code>run.completed</code>, <code>run.cancelled</code>, <code>run.failed</code>, <code>run.timedout</code>, <code>run.stopped</code></td></tr>
+      <tr><td>Khác</td><td><code>ping</code> (giữ kết nối)</td></tr>
+    </tbody>
+  </table>
+  <h3>Vòng agent &amp; chuỗi guard</h3>
+  <p>Phần dễ lỗi nhất của một agent là vòng lặp: mô hình có thể trả lời rỗng, lặp lệnh, vượt ngân sách, hoặc gặp app sập. Vì vậy <code>RunAgent</code> được giữ <b>mỏng</b> — chỉ gọi mô hình và chạy tool; mọi cơ chế chống lỗi là một <b>guard</b> độc lập, mắc vào 4 móc <code>onReply</code> / <code>beforeCall</code> / <code>afterTools</code> / <code>recover</code>.</p>
+
+  <figure>
+    <div class="shot"><img src="docs/architecture/img/12-guard-chain.drawio.svg" alt="Sơ đồ vòng agent và chuỗi guard"></div>
+    <figcaption><b>Hình 8 — Vòng agent &amp; chuỗi guard.</b> Mười bốn guard đăng ký theo thứ tự; thêm cơ chế mới chỉ cần thêm một guard. Nguồn: <span class="src">docs/architecture/src/12-guard-chain.mmd</span></figcaption>
+  </figure>
+
+  <table>
+    <thead><tr><th>#</th><th>Guard</th><th>Xử lý tình huống</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td><code>emptyReplyGuard</code></td><td>Trả lời rỗng hoặc bị cắt vì <code>length</code> → nhắc viết lại một lần</td></tr>
+      <tr><td>2</td><td><code>verifyGuard</code></td><td>Sau khi sửa tài liệu, tự đọc lại để kiểm chứng</td></tr>
+      <tr><td>3</td><td><code>identicalCallGuard</code></td><td>Phát hiện lệnh y hệt lặp nhiều lần → dừng</td></tr>
+      <tr><td>4</td><td><code>sameTaskGuard</code></td><td>Phát hiện mô hình làm lại cùng một việc</td></tr>
+      <tr><td>5</td><td><code>oncePerReplyGuard</code></td><td>Giới hạn <code>write_todos</code> một lần mỗi lượt trả lời</td></tr>
+      <tr><td>6</td><td><code>finalGuard</code></td><td>Tool báo “Final” thì kết thúc ngay, không gọi model thêm</td></tr>
+      <tr><td>7</td><td><code>abortGuard</code></td><td>App sập (<code>AppGone</code>) → dừng lượt chạy</td></tr>
+      <tr><td>8</td><td><code>contextClearGuard</code></td><td>Dọn ngữ cảnh khi vượt khoảng 40k token</td></tr>
+      <tr><td>9</td><td><code>heavyRunGuard</code></td><td>Lượt chạy “nặng” (≥30 vòng hoặc ≥500k token) → siết lại</td></tr>
+      <tr><td>10</td><td><code>repeatedFailureGuard</code></td><td>Một lỗi lặp y hệt 3 lần → dừng</td></tr>
+      <tr><td>11</td><td><code>budgetGuard</code></td><td>Ngân sách token: 80% nhắc nhở, 90% tắt tool, 100% dừng</td></tr>
+      <tr><td>12</td><td><code>toolsUnsupportedGuard</code></td><td>Provider không hỗ trợ tool → chạy chế độ chat thường</td></tr>
+      <tr><td>13</td><td><code>contextOverflowGuard</code></td><td>Tràn cửa sổ ngữ cảnh → dọn mạnh và thử lại (tối đa 2 lần)</td></tr>
+      <tr><td>14</td><td><code>fallbackGuard</code></td><td>Chuyển sang model dự phòng, trừ lỗi cấu hình 400/401</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="s7" class="anchor">
+  <h2 class="sec"><span class="n">7.</span> Hệ lệnh &amp; file sinh tự động</h2>
+  <p>Hệ lệnh là “điểm hẹp” giữa mô hình và app: mô hình chỉ có thể yêu cầu những hành động đã được khai báo. Một lệnh khai báo một lần, rồi tự động xuất hiện ở mọi nơi cần.</p>
+
+  <figure>
+    <div class="shot"><img src="docs/architecture/img/07-command-registry.drawio.svg" alt="Sơ đồ registry lệnh"></div>
+    <figcaption><b>Hình 9 — Registry lệnh: một khai báo, nhiều nơi dùng.</b> Từ <code>Command(...)</code> tới dispatch, tool <code>office_action</code>, mô tả MCP, README và test đối chiếu. Nguồn: <span class="src">docs/architecture/src/07-command-registry.mmd</span></figcaption>
+  </figure>
+
+  <h3>Nhóm lệnh (khai báo trong C#)</h3>
+  <table>
+    <thead><tr><th>Nhóm</th><th>Số lệnh</th><th>Loại app</th><th>Ví dụ</th></tr></thead>
+    <tbody>
+      <tr><td>Chung</td><td>4</td><td>mọi app</td><td><code>app.info</code>, <code>ai.ask</code>, <code>ui.askpane</code>, <code>app.screenshot</code></td></tr>
+      <tr><td><code>writer.*</code></td><td>28</td><td><code>wps</code> (Word/WPS)</td><td><code>writer.insertTable</code>, <code>writer.outline</code>, <code>writer.restyle</code>, <code>writer.lockSelection</code>, <code>writer.checkTables</code></td></tr>
+      <tr><td><code>et.*</code></td><td>22</td><td><code>et</code> (Excel/ET)</td><td><code>et.writeRange</code>, <code>et.readRange</code>, <code>et.checkRange</code></td></tr>
+      <tr><td><code>wpp.*</code></td><td>23</td><td><code>wpp</code> (PowerPoint/WPP)</td><td><code>wpp.addSlideFromTemplate</code>, <code>wpp.setShapeText</code>, <code>wpp.checkLayout</code></td></tr>
+      <tr><td><b>Tổng</b></td><td><b>77</b></td><td colspan="2">Trong đó catalog chung <code>catalog/live-commands.json</code> có <b>80 mục</b>, <b>58</b> đánh dấu <code>agent:true</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>Thêm một lệnh mới</h3>
+  <ol>
+    <li>Khai báo <code>Command(...)</code> cùng handler (ví dụ trong <code>CommandDispatcher.Writer.cs</code>), ghi rõ <code>kind</code>, tham số, và <code>.ForAgent()</code> nếu muốn AI gọi được.</li>
+    <li>Cập nhật registry Python tương ứng (<code>src/AxiomOffice.LibreOffice/.../axiom/commands.py</code>) để giữ tương đương đa host.</li>
+    <li>Chạy <code>python scripts/generate_mcp_commands.py</code> để sinh lại catalog, Go, và JS.</li>
+    <li>Viết test — CI bắt buộc mọi lệnh phải được test gọi tới.</li>
+  </ol>
+
+  <figure>
+    <div class="shot"><img src="docs/architecture/img/08-generated-artifacts.drawio.svg" alt="Sơ đồ file sinh tự động"></div>
+    <figcaption><b>Hình 10 — File sinh tự động từ một nguồn chuẩn.</b> Hai generator, sáu tệp đầu ra, và bước kiểm tra trong CI. Nguồn: <span class="src">docs/architecture/src/08-generated-artifacts.mmd</span></figcaption>
+  </figure>
+
+  <table>
+    <thead><tr><th>Nguồn chuẩn</th><th>Generator</th><th>Tệp sinh ra</th></tr></thead>
+    <tbody>
+      <tr><td rowspan="3">Registry lệnh Python (<code>axiom.commands</code>)</td><td rowspan="3"><code>scripts/generate_mcp_commands.py</code></td><td><code>catalog/live-commands.json</code></td></tr>
+      <tr><td><code>core-go/internal/mcpserver/livecommands_gen.go</code></td></tr>
+      <tr><td><code>src/AxiomOffice.WPS/commands.js</code> (chỉ mảng <code>CATALOG</code>)</td></tr>
+      <tr><td rowspan="3"><code>catalog/setup.json</code></td><td rowspan="3"><code>scripts/generate_setup_catalog.py</code></td><td><code>src/AxiomOffice/Setup/SetupCatalog.cs</code></td></tr>
+      <tr><td><code>axiom/setup_catalog.py</code> (LibreOffice)</td></tr>
+      <tr><td><code>core-go/internal/setup/catalog_gen.go</code></td></tr>
+    </tbody>
+  </table>
+  <div class="callout warn">
+    <p><b>Bất biến quan trọng:</b> sáu tệp sinh tự động <b>không được sửa tay</b>. CI chạy <code>generate_mcp_commands.py --check</code> và <code>generate_setup_catalog.py --check</code>; nếu lệch nguồn, build đỏ. Ngoài ra <code>check_version.py</code> bắt phiên bản trong <code>VERSION</code> khớp 4 bản sao, và <code>check_i18n.py</code> bắt bảng dịch phủ hết chuỗi UI.</p>
+  </div>
+</section>
+
+<section id="s8" class="anchor">
+  <h2 class="sec"><span class="n">8.</span> MCP: làn live &amp; làn file</h2>
+  <p>Cùng một bộ công cụ tài liệu, nhưng có <b>hai làn</b> tuỳ vào việc app có đang mở hay không. Làn live đi qua bridge tới app đang chạy (thấy thay đổi trên màn hình); làn file sửa trực tiếp tệp OOXML mà không cần mở app.</p>
+
+  <figure>
+    <div class="shot"><img src="docs/architecture/img/09-mcp-lanes.drawio.svg" alt="Sơ đồ hai làn MCP"></div>
+    <figcaption><b>Hình 11 — Hai làn MCP.</b> Làn live (BridgeClient → app) và làn file (engine OOXML), chung một giao diện <code>tools/call</code>. Nguồn: <span class="src">docs/architecture/src/09-mcp-lanes.mmd</span></figcaption>
+  </figure>
+
+  <h3>Nhóm công cụ</h3>
+  <table>
+    <thead><tr><th>Nhóm</th><th>Tổng</th><th>Làn file</th><th>Làn live</th></tr></thead>
+    <tbody>
+      <tr><td><b>word</b> (server <code>word-tools</code>)</td><td>19</td><td>5 (<code>doc_profile</code>, <code>doc_get_text</code>, <code>doc_find_text</code>, <code>doc_extract_table</code>, <code>doc_create</code>)</td><td>14 (<code>word_health</code>, <code>word_command</code>, <code>word_insert_table</code>, <code>word_replace_all</code>, <code>word_export_pdf</code>, <code>word_undo</code>, <code>word_save</code>, …)</td></tr>
+      <tr><td><b>excel</b> (server <code>excel-tools</code>)</td><td>15</td><td>11 (<code>excel_read</code>, <code>excel_write</code>, <code>excel_create</code>, <code>excel_convert</code>, <code>excel_format_range</code>, …)</td><td>4 (<code>wps_health</code>, <code>wps_live_command</code>, <code>wps_live_read_range</code>, <code>wps_live_write_range</code>)</td></tr>
+      <tr><td><b>ppt</b> (server <code>ppt-tools</code>)</td><td>15</td><td>4 (<code>ppt_profile</code>, <code>ppt_get_text</code>, <code>ppt_create</code>, <code>ppt_add_slide_file</code>)</td><td>11 (<code>ppt_command</code>, <code>ppt_add_slide</code>, <code>ppt_add_text</code>, <code>ppt_add_table</code>, <code>ppt_set_notes</code>, <code>ppt_delete_slide</code>, <code>ppt_export_pdf</code>, <code>ppt_save</code>, …)</td></tr>
+      <tr><td>Chung</td><td>1</td><td colspan="2"><code>office_sessions</code> — liệt kê các instance app đang mở (luôn thêm cuối)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Chi tiết đáng nhớ</h3>
+  <ul>
+    <li><b>Cách gọi:</b> <code>axiom-core mcp [all|word|excel|ppt] [--list]</code>. Tên server: <code>office-tools</code> khi <code>all</code>, ngược lại <code>&lt;nhóm&gt;-tools</code>.</li>
+    <li><b>Phiên bản giao thức</b> ưu tiên: <code>2025-11-25</code> → <code>2025-06-18</code> → <code>2025-03-26</code> → <code>2024-11-05</code>. Một thông điệp JSON-RPC mỗi dòng.</li>
+    <li><b>Chuyển tiếp:</b> <code>AxiomOffice.Host.exe mcp</code> chỉ tìm <code>AxiomOffice.Core.exe</code> cạnh nó rồi bơm stdin/stdout/stderr nguyên byte — toàn bộ MCP nằm ở Go.</li>
+    <li><b>Công cụ MCP ngoài</b> (người dùng khai trong <code>mcp.json</code>) xuất hiện trong agent với tên <code>mcp__&lt;server&gt;__&lt;tool&gt;</code>.</li>
+    <li><b>Xác nhận:</b> server không tin cậy → luôn hỏi; server <code>office</code> tích hợp → chỉ hỏi khi ghi vào tệp đã tồn tại trên đĩa.</li>
+    <li><b>Kết quả:</b> lỗi kết nối app vẫn trả <code>{"ok":false,"error":…}</code> như một kết quả bình thường để mô hình đọc được và xử lý.</li>
+  </ul>
+</section>
+
+<section id="s9" class="anchor">
+  <h2 class="sec"><span class="n">9.</span> Dữ liệu &amp; bộ nhớ</h2>
+  <p>Tất cả nằm trong một tệp SQLite <code>core.db</code>, dùng chung giữa bản Go và phần C#. Ghi theo WAL, khoá ngoại bật, thử lại khi bận.</p>
+
+  <figure>
+    <div class="shot"><img src="docs/architecture/img/10-data-er.drawio.svg" alt="Sơ đồ ER core.db"></div>
+    <figcaption><b>Hình 12 — Lược đồ dữ liệu <code>core.db</code> (PRAGMA user_version = 3).</b> Hội thoại, lượt chạy, audit, bộ nhớ + lịch sử + liên kết + embedding, và bản lưu nguồn web. Nguồn: <span class="src">docs/architecture/src/10-data-er.mmd</span></figcaption>
+  </figure>
+
+  <h3>Mười hai bảng theo phiên bản schema</h3>
+  <table>
+    <thead><tr><th>Schema</th><th>Bảng</th><th>Nội dung</th></tr></thead>
+    <tbody>
+      <tr><td>v1</td><td><code>conversations</code></td><td>Hội thoại: app, family, khoá tài liệu, tiêu đề, tóm tắt</td></tr>
+      <tr><td>v1</td><td><code>messages</code></td><td>Tin nhắn theo thứ tự trong hội thoại</td></tr>
+      <tr><td>v1</td><td><code>runs</code></td><td>Lượt chạy: trạng thái, model, số vòng, token vào/ra</td></tr>
+      <tr><td>v1</td><td><code>tool_calls</code></td><td>Audit mọi lần gọi tool (tool, action, ok, lỗi, thời gian)</td></tr>
+      <tr><td>v2</td><td><code>memories</code></td><td>Ghi nhớ dài hạn: scope, khoá scope, text, hash, category, độ tin cậy, ghim, hết hạn, xoá mềm</td></tr>
+      <tr><td>v2</td><td><code>memories_fts</code></td><td>Chỉ mục FTS5 (<code>unicode61 remove_diacritics 2</code>) cho tìm kiếm tiếng Việt</td></tr>
+      <tr><td>v2</td><td><code>memory_links</code></td><td>Liên kết bản ghi nhớ mới với bản cũ bị thay thế</td></tr>
+      <tr><td>v2</td><td><code>memory_history</code></td><td>Lịch sử ADD / UPDATE / DELETE / RESTORE / PIN / EXPIRES</td></tr>
+      <tr><td>v2</td><td><code>memory_embeddings</code></td><td>Vector tuỳ chọn phục vụ truy hồi ngữ nghĩa</td></tr>
+      <tr><td>v3</td><td><code>web_sources</code></td><td>Kho nguồn web đã tải (URL, domain, tiêu đề, nội dung, số lần lấy)</td></tr>
+      <tr><td>v3</td><td><code>web_source_refs</code></td><td>Nguồn nào được dẫn trong lượt nào</td></tr>
+      <tr><td>v3</td><td><code>web_sources_fts</code></td><td>FTS5 + trigger đồng bộ cho kho nguồn web</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Phạm vi bộ nhớ</h3>
+  <table>
+    <thead><tr><th>Scope</th><th>Ý nghĩa</th></tr></thead>
+    <tbody>
+      <tr><td><code>user</code></td><td>Áp dụng cho mọi tài liệu (sở thích, cách xưng hô…)</td></tr>
+      <tr><td><code>document</code></td><td>Chỉ tài liệu đang mở (khoá theo <code>document_key</code>)</td></tr>
+      <tr><td><code>org-style</code></td><td>Phong cách chung của tổ chức (font, bố cục, giọng văn)</td></tr>
+      <tr><td><code>doc-style</code></td><td>Phong cách riêng của một tài liệu</td></tr>
+      <tr><td><code>skill</code></td><td>Ghi nhớ gắn với một skill</td></tr>
+    </tbody>
+  </table>
+  <p>Ngoài <b>scope</b>, ghi nhớ còn có chiều <b>app</b> (<code>wps</code>/<code>et</code>/<code>wpp</code>) để cùng một người dùng vẫn giữ ưu tiên khác nhau cho Word/Excel/PowerPoint. Hằng số đáng lưu ý: xoá mềm giữ 30 ngày · coi là gần trùng khi cosine ≥ 0.96 · độ dài fact tối đa 300 ký tự · trích xuất chỉ nhận độ tin cậy ≥ 0.6, tối đa 5 fact, prompt tối thiểu 15 ký tự.</p>
+
+  <div class="callout warn">
+    <p><b>Điểm lệch tài liệu:</b> <code>ARCHITECTURE.MD</code> ghi “schema 2”, nhưng mã nguồn (<code>internal/store/db.go</code>) đặt <code>SchemaVersion = 3</code> với bảng <code>web_sources</code> bổ sung. Cập nhật này có từ nhánh bộ nhớ; tài liệu MD cần sửa lại cho khớp.</p>
+  </div>
+</section>
+
+<section id="s10" class="anchor">
+  <h2 class="sec"><span class="n">10.</span> Kiểm thử &amp; CI</h2>
+  <p>Độ tin cậy đến từ một hệ kiểm thử nhiều tầng: unit Go/JS/Python, e2e với LLM giả, đối chiếu “oracle”, và test trên app thật. CI chạy trên cả Linux lẫn Windows.</p>
+
+  <figure>
+    <div class="shot"><img src="docs/architecture/img/13-testing.drawio.svg" alt="Sơ đồ các bộ kiểm thử"></div>
+    <figcaption><b>Hình 13 — Các bộ kiểm thử.</b> Từ unit tới app thật, cùng hai job CI. Nguồn: <span class="src">docs/architecture/src/13-testing.mmd</span></figcaption>
+  </figure>
+
+  <table>
+    <thead><tr><th>Bộ</th><th>Kiểm gì</th><th>Chạy ở đâu</th></tr></thead>
+    <tbody>
+      <tr><td><code>core-go</code> (<code>go test</code>)</td><td>Unit cho toàn bộ gói Go</td><td>Mọi nơi</td></tr>
+      <tr><td><code>tests/core</code></td><td>e2e Core thật + LLM giả + bridge giả, chia 17 phần (guards, skills, confirm, memory, mcp, cancel, verify…)</td><td>Mọi nơi</td></tr>
+      <tr><td><code>tests/lo</code></td><td>Extension LibreOffice: param, chức năng chat/SSE, wizard, Calc, dialog… không cần LibreOffice</td><td>Mọi nơi (unittest)</td></tr>
+      <tr><td><code>tests/wps</code></td><td>Add-in JS: registry, poll, probe, logic pane, theme; thêm e2e và live</td><td>Node <code>--test</code> / Xvfb</td></tr>
+      <tr><td><code>tests/mcp-host</code></td><td>Giao thức MCP, 50 tool, đối chiếu oracle, và diff Go ↔ C#</td><td>Cả hai binary</td></tr>
+      <tr><td><code>tests/oracle</code></td><td>Server Python tham chiếu word/excel/ppt (20/17/16 tool) để so parity</td><td>CI</td></tr>
+      <tr><td><code>tests/live</code></td><td>App thật (Office/WPS/LibreOffice), ghi/so “golden”</td><td>Máy có app</td></tr>
+      <tr><td><code>tests/linux</code>, <code>tests/bench</code></td><td>Cài/đóng gói Linux; benchmark Calc so với Claude Code</td><td>Linux</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Hai job CI (<code>.github/workflows/ci.yml</code>)</h3>
+  <div class="grid g2">
+    <div class="card"><h4>Job <code>linux</code> (ubuntu-24.04)</h4>
+      <p>Unit extension → <code>npm ci</code> + test add-in WPS → <code>go vet</code>/<code>go test</code> + build Core → e2e Core (fake LLM) → WPS e2e → MCP portable → cài LibreOffice + Xvfb chạy test live (continue-on-error) → đóng gói <code>.tar.gz</code> và upload artifact.</p>
+      <p>Kèm bước <b>“file sinh không được lệch nguồn”</b>: <code>generate_*.py --check</code> + <code>check_version.py</code>.</p>
+    </div>
+    <div class="card"><h4>Job <code>windows</code> (windows-latest)</h4>
+      <p>Unit extension → <code>go test</code> → build add-in + Host bằng Roslyn <code>csc</code> (<code>/platform:x64 /langversion:7.3</code>) → e2e Core đầy đủ → MCP portable trên <code>axiom-core.exe</code>.</p>
+    </div>
+  </div>
+  <p class="src">Số liệu công bố trong <code>STATUS.md</code>/<code>README.md</code> (chưa chạy tại đây): e2e Core Go 155/155, .NET 155/155, LibreOffice thật 159/159, MCP portable 61/61, oracle diff 61/62. Nên xem số liệu là “tuyên bố kèm tài liệu”, không phải kết quả vừa đo.</p>
+</section>
+
+<section id="s11" class="anchor">
+  <h2 class="sec"><span class="n">11.</span> Build, cài đặt, đóng gói</h2>
+  <p>Không phụ thuộc .NET SDK hay Visual Studio: build dùng <code>csc</code> (Roslyn đi kèm VS2022, hoặc <code>csc.exe</code> của .NET Framework) và Go toolchain.</p>
+
+  <h3>Script chính</h3>
+  <table>
+    <thead><tr><th>Script</th><th>Việc</th></tr></thead>
+    <tbody>
+      <tr><td><code>scripts/build.ps1</code></td><td>Biên dịch <code>AxiomOffice.dll</code> + <code>AxiomOffice.Host.exe</code> (x64, langversion 7.3), nhúng bảng dịch, build Core Go; dùng Restart Manager để phát hiện tệp bị khoá</td></tr>
+      <tr><td><code>scripts/install.ps1</code></td><td>Đăng ký COM add-in trong HKCU (không cần admin), seed cấu hình, sinh token 32 hex, in cấu hình MCP; kèm migrate từ bản <code>WpsAiBridge</code> cũ</td></tr>
+      <tr><td><code>scripts/uninstall.ps1</code></td><td>Gỡ đăng ký; <code>-Purge</code> xoá cả HKCU và <code>%LOCALAPPDATA%\AxiomOffice</code></td></tr>
+      <tr><td><code>scripts/package.ps1</code></td><td>Đóng <code>dist\AxiomOffice-&lt;version&gt;-&lt;ngày&gt;.zip</code> gồm DLL, Host, Core, skills, script cài/gỡ, và hướng dẫn</td></tr>
+      <tr><td><code>scripts/libreoffice.ps1</code> / <code>.sh</code></td><td>Đóng gói &amp; cài <code>.oxt</code> qua <code>unopkg</code>, xem trạng thái/port/log</td></tr>
+      <tr><td><code>scripts/package_oxt.py</code></td><td>Packer <code>.oxt</code> thuần Python (chỉ stdlib)</td></tr>
+      <tr><td><code>scripts/linux/package.sh</code> / <code>install.sh</code></td><td>Bản Linux: tarball (Core + skills + .oxt + WPS add-in) và cài không cần root, có tuỳ chọn systemd --user</td></tr>
+      <tr><td><code>scripts/wps/install_jsaddon.py</code></td><td>Đăng ký JS add-in WPS trên Linux vào <code>publish.xml</code></td></tr>
+      <tr><td><code>scripts/check_version.py</code> / <code>check_i18n.py</code></td><td>Kiểm phiên bản (5 nơi) và độ phủ bản dịch UI (418 khoá)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Định vị sản phẩm</h3>
+  <div class="grid g3">
+    <div class="card"><h4>Windows</h4><p>Add-in COM + Core Go. Cài bằng <code>install.cmd</code> trong zip; không cần quyền admin.</p></div>
+    <div class="card"><h4>Linux</h4><p>Core Go (CGO tắt) + extension <code>.oxt</code> cho LibreOffice; cấu hình trong <code>~/.config/axiom-office/</code>; WPS qua JS add-in.</p></div>
+    <div class="card"><h4>Đa ngôn ngữ</h4><p>Chuỗi gốc tiếng Việt; bảng dịch JSON (<code>lang/*.json</code>) nhúng vào DLL hoặc đặt cạnh DLL để ghi đè; đổi ngôn ngữ ngay trong ribbon.</p></div>
+  </div>
+</section>
+
+<section id="s12" class="anchor">
+  <h2 class="sec"><span class="n">12.</span> Quyết định kiến trúc</h2>
+  <p>Các quyết định dưới đây (AD-1…AD-18) là “hợp đồng” của dự án; sửa một cái thường kéo theo nhiều chỗ khác.</p>
+  <table>
+    <thead><tr><th>Mã</th><th>Quyết định</th><th>Lý do</th><th>Đánh đổi</th></tr></thead>
+    <tbody>
+      <tr><td>AD-1</td><td>COM add-in .NET Framework 4.8, C# 7.3, không NuGet</td><td>Có sẵn trên mọi Windows 10/11; Office và WPS đều nạp qua <code>mscoree</code></td><td>Không dùng .NET hiện đại, thư viện ngoài</td></tr>
+      <tr><td>AD-2</td><td>Late-bound <code>dynamic</code>, không PIA</td><td>Một DLL cho cả Office và WPS, không phụ thuộc phiên bản Office</td><td>Không kiểm tra kiểu lúc biên dịch</td></tr>
+      <tr><td>AD-3</td><td><code>Dispinterface</code> cho mỗi interface host gọi</td><td>Office/WPS gọi qua <code>IDispatch</code>; khai báo <code>IUnknown</code> làm host crash</td><td>Phải khai báo <code>DispId</code> thủ công</td></tr>
+      <tr><td>AD-4</td><td>HTTP loopback làm cửa vào chung</td><td>Ngôn ngữ nào cũng gọi được, debug bằng <code>curl</code></td><td>Tự lo token, chặn <code>Origin</code></td></tr>
+      <tr><td>AD-5</td><td>Một cổng COM toàn cục (<code>ComGate</code>)</td><td>Object model Office không an toàn đa luồng (từng crash Word)</td><td>Lệnh chạy tuần tự</td></tr>
+      <tr><td>AD-6</td><td>SSE bằng poll-diff 500&nbsp;ms</td><td>Chạy giống nhau trên Office và WPS, không cần COM event sink</td><td>Trễ tải 500&nbsp;ms</td></tr>
+      <tr><td>AD-7</td><td>Agent chỉ có một tool <code>office_action</code></td><td>Prompt gọn; thêm lệnh không đổi schema tool</td><td>Model phải đọc danh sách lệnh trong mô tả</td></tr>
+      <tr><td>AD-8</td><td>Registry lệnh khai báo cạnh handler</td><td>Một chỗ sửa; dispatcher, agent, MCP, README không lệch nhau</td><td>Mô tả tiếng Việt và gợi ý tiếng Anh nằm cùng dòng</td></tr>
+      <tr><td>AD-9</td><td>MCP server là subcommand <code>mcp</code> của Core Go (cùng hợp đồng 50 tool); <code>Host.exe mcp</code> chỉ forward byte</td><td>Một bản duy nhất cho Windows + Linux, không lệch hợp đồng</td><td>Shim giữ để cấu hình MCP client cũ không phải đổi</td></tr>
+      <tr><td>AD-10</td><td>Mọi đăng ký trong HKCU</td><td>Không cần admin</td><td>Chỉ cài cho từng người dùng</td></tr>
+      <tr><td>AD-11</td><td>Agent Core là process riêng viết bằng Go (một file ~12&nbsp;MB, không runtime, không cgo)</td><td>SQLite thuần Go; một agent cho mọi app; không làm nặng process Office; build chéo Windows/Linux</td><td>Thêm một process và giao thức HTTP nội bộ</td></tr>
+      <tr><td>AD-12</td><td>Core chỉ thao tác tài liệu qua bridge (<code>/cmd</code>), không gọi COM</td><td>Một đường thực thi lệnh duy nhất (allowlist, ComGate, Undo); Core không phụ thuộc Office</td><td>Mỗi lệnh thêm một vòng HTTP loopback</td></tr>
+      <tr><td>AD-13</td><td>Pane thử Core trước, dự phòng agent in-process; đã có <code>runId</code> thì không chạy lại</td><td>Pane không bao giờ bị khoá vì Core; không sửa tài liệu hai lần</td><td>Hai bản agent phải giữ hành vi gần nhau</td></tr>
+      <tr><td>AD-14</td><td>Skill theo chuẩn Agent Skills (thư mục + <code>SKILL.md</code>), nạp 3 tầng</td><td>Hệ sinh thái sẵn có; prompt gọn (chỉ mục ~100 token/skill)</td><td>Không chạy script trong skill</td></tr>
+      <tr><td>AD-15</td><td>Memory tự làm theo ý tưởng mem0 2.2.1 (chỉ-ADD)</td><td>Dữ liệu ở lại máy, không Python/Docker; model không tự sửa/xoá memory</td><td>Tự bảo trì thuật toán chấm điểm; embedding tuỳ chọn</td></tr>
+      <tr><td>AD-16</td><td>Policy xác nhận trong Core, trả lời qua pane</td><td>Người dùng quyết định thao tác rủi ro; audit đầy đủ</td><td>Lượt chạy có thể dừng chờ tới 120&nbsp;s</td></tr>
+      <tr><td>AD-17</td><td>QA hai mức: cấu trúc bằng số (mặc định) + thị giác (tuỳ chọn)</td><td>Agent “mù” vẫn soát được tràn chữ/chồng shape/dữ liệu lạc với chi phí thấp</td><td>QA thị giác tốn token, cần model đọc ảnh</td></tr>
+      <tr><td>AD-18</td><td>Vòng agent chạy qua chuỗi guard; <code>RunAgent</code> chỉ gọi model + chạy tool, mỗi cơ chế chống lỗi là một guard</td><td>Thêm cơ chế mới không sửa vòng lặp</td><td>Thứ tự guard có nghĩa, phải giữ khi thêm guard mới</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="s13" class="anchor">
+  <h2 class="sec"><span class="n">13.</span> Rủi ro &amp; giới hạn</h2>
+  <table>
+    <thead><tr><th>Rủi ro / giới hạn</th><th>Ảnh hưởng</th><th>Hướng xử lý</th></tr></thead>
+    <tbody>
+      <tr><td>Exe Core (~12 MB, Go) và DLL chưa ký số</td><td>Máy có chính sách chỉ nạp add-in đã ký sẽ không nạp; diệt virus có thể chặn exe</td><td>Ký bằng certificate của tổ chức</td></tr>
+      <tr><td>Lệnh WPS Spreadsheets/Presentation chưa chạy test live</td><td>Có thể có khác biệt object model chưa phát hiện</td><td>Chạy <code>test_live_commands.py --wps</code></td></tr>
+      <tr><td>Bridge xử lý HTTP tuần tự</td><td>Request tới cùng app chờ nhau (trừ <code>ai.ask</code> và SSE chạy thread riêng)</td><td>Lệnh COM vẫn tuần tự qua ComGate; <code>ai.ask</code> tách thread để Core gọi ngược <code>/cmd</code> không kẹt</td></tr>
+      <tr><td>Model free/chậm</td><td>Lượt dài, có lúc &gt; 60&nbsp;s mỗi request</td><td>Timeout 120&nbsp;s, thử lại, nhắc khi trả lời rỗng; model hỏng thì chuyển dự phòng</td></tr>
+      <tr><td>WPS có thể đăng ký đè <code>Word/Excel/PowerPoint.Application</code></td><td>Companion <code>word|excel|ppt</code> tạo ra WPS</td><td>Mở app Office trực tiếp (add-in tự nạp)</td></tr>
+      <tr><td>Token và key đọc được bởi mọi process cùng tài khoản</td><td>Mô hình tin cậy là tài khoản Windows</td><td>Chấp nhận (giống mọi app desktop)</td></tr>
+      <tr><td>Excel: <code>#N/A</code> đọc ra <code>null</code>; <code>.xls</code> chỉ đọc; <code>et.undo</code> không hoàn tác thay đổi qua COM</td><td>Giới hạn của COM/Excel</td><td>Ghi rõ trong tài liệu</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="s14" class="anchor">
+  <h2 class="sec"><span class="n">14.</span> Cấu trúc mã nguồn</h2>
+<pre><code>wps-ai-bridge/
+├─ ARCHITECTURE.MD              tài liệu kiến trúc HLD+LLD
+├─ ARCHITECTURE.html            &lt;- tài liệu này (kèm sơ đồ draw.io)
+├─ README.md / STATUS.md / CHANGELOG.md
+├─ VERSION                      nguồn chuẩn phiên bản (0.1.0)
+├─ catalog/                     live-commands.json, setup.json   (đầu ra sinh)
+├─ docs/
+│  ├─ architecture/             sơ đồ: src/*.mmd, img/*.drawio, img/*.drawio.svg
+│  └─ plans/                    30 tệp kế hoạch theo phase
+├─ skills/                      8 skill đóng gói + _design/tokens.json
+├─ scripts/                     build/install/package/generate/check, Linux, WPS
+├─ src/
+│  ├─ AxiomOffice/              add-in C# (Bridge, Ai, Ribbon, Localization, Setup)
+│  ├─ AxiomOffice.Host/         HostProgram.cs, Mcp/McpHost.cs
+│  ├─ AxiomOffice.LibreOffice/  extension Python + UNO (.oxt)
+│  └─ AxiomOffice.WPS/          JS add-in (main/commands/pane-core/probe)
+├─ core-go/                     Agent Core (Go)
+│  ├─ cmd/axiom-core/           main + subcommand mcp, doctor
+│  └─ internal/                 agent, model, tools, policy, memory, store,
+│                               skills, mcp, mcpserver, office, ooxml, xlsx,
+│                               docx, pptx, sheet, cfb, config, setup, …
+└─ tests/                       core, lo, wps, mcp-host, oracle, live, linux, bench, ui, win</code></pre>
+</section>
+
+<section id="s15" class="anchor">
+  <h2 class="sec"><span class="n">15.</span> Thuật ngữ</h2>
+  <table>
+    <thead><tr><th>Thuật ngữ</th><th>Nghĩa</th></tr></thead>
+    <tbody>
+      <tr><td><b>Add-in</b></td><td>Thư viện nạp vào tiến trình Office/WPS; bản này do <code>AxiomOffice.dll</code> đảm nhiệm</td></tr>
+      <tr><td><b>Agent Core</b></td><td>Tiến trình Go dùng chung chạy agent, bộ nhớ, MCP</td></tr>
+      <tr><td><b>Bridge</b></td><td>HTTP loopback trong app cho phép thực thi lệnh</td></tr>
+      <tr><td><b>ComGate / UnoGate</b></td><td>Cổng nối tiếp mọi lệnh vào object model, tránh đa luồng</td></tr>
+      <tr><td><b>Hệ lệnh / registry</b></td><td>Danh sách hành động khai báo một lần, dùng ở nhiều nơi</td></tr>
+      <tr><td><b><code>office_action</code></b></td><td>Tool duy nhất để agent gọi lệnh thao tác tài liệu</td></tr>
+      <tr><td><b>Skill</b></td><td>Thư mục + <code>SKILL.md</code> mô tả cách làm một việc (Agent Skills)</td></tr>
+      <tr><td><b>Guard</b></td><td>Một cơ chế chống lỗi mắc vào vòng agent</td></tr>
+      <tr><td><b>Làn live / làn file</b></td><td>Thao tác qua app đang mở / thao tác trực tiếp tệp OOXML</td></tr>
+      <tr><td><b>Scope (bộ nhớ)</b></td><td>Phạm vi áp dụng ghi nhớ: <code>user</code>, <code>document</code>, <code>org-style</code>, <code>doc-style</code>, <code>skill</code></td></tr>
+      <tr><td><b>AppKind</b></td><td>Loại app logic: <code>wps</code> (văn bản), <code>et</code> (bảng tính), <code>wpp</code> (trình chiếu)</td></tr>
+      <tr><td><b>OOXML</b></td><td>Định dạng tệp Office (<code>.docx</code>/<code>.xlsx</code>/<code>.pptx</code>) là một gói zip + XML</td></tr>
+      <tr><td><b>SSE</b></td><td>Server-Sent Events — kênh một chiều đẩy tiến trình về khung chat</td></tr>
+      <tr><td><b>MCP</b></td><td>Model Context Protocol — chuẩn cho agent ngoài gọi công cụ</td></tr>
+    </tbody>
+  </table>
+</section>
+
+</main>
+</div>
+
+<footer>
+  <p><b>Axiom Office</b> — tài liệu kiến trúc mô tả trạng thái mã nguồn tại 17/10/2026. Sơ đồ là tệp <code>.drawio</code> (nguồn) và <code>.drawio.svg</code> (bản xuất) trong <code>docs/architecture/</code>; mở tệp <code>.drawio</code> bằng draw.io để chỉnh sửa.</p>
+</footer>
+</body>
+</html>

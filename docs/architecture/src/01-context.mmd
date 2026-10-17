@@ -1,0 +1,31 @@
+---
+title: Axiom Office - Bối cảnh hệ thống
+---
+flowchart LR
+  user(["Người dùng văn phòng"])
+  dev(["Developer / Script"])
+  mcpc(["AI agent bên ngoài<br/>Claude Desktop, Claude Code"])
+  installer(["Người cài đặt"])
+
+  ax(["Axiom Office"])
+
+  office["Microsoft Office / WPS / LibreOffice<br/>tài liệu đang mở"]
+  llm["LLM provider<br/>OpenAI-compatible / Anthropic"]
+  mcpext["MCP server ngoài (tuỳ chọn)"]
+  fs[("File Office trên đĩa")]
+  win[("Windows<br/>HKCU + LOCALAPPDATA")]
+
+  user -->|"yêu cầu bằng tiếng Việt"| ax
+  dev -->|"HTTP JSON localhost"| ax
+  mcpc -->|"MCP qua stdio"| ax
+  installer -->|"install.cmd"| ax
+  ax -->|"COM / UNO automation"| office
+  ax -->|"HTTPS, tool-calling"| llm
+  ax -->|"MCP stdio / HTTP"| mcpext
+  ax -->|"đọc/ghi OOXML"| fs
+  ax -->|"cấu hình, log, session"| win
+
+  classDef external fill:#e8f0fe,stroke:#4285f4,color:#1a3d7c
+  classDef system fill:#d5e8d4,stroke:#82b366,color:#1d4d1f
+  class office,llm,mcpext,fs,win external
+  class ax system

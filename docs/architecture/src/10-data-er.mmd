@@ -1,0 +1,95 @@
+---
+title: Axiom Office - Dữ liệu core.db (SQLite, PRAGMA user_version = 3)
+---
+erDiagram
+  conversations ||--o{ messages : "1-n"
+  runs ||--o{ tool_calls : "audit"
+  memories ||--o{ memory_links : "liên kết bản cũ"
+  memories ||--o{ memory_history : "ADD / UPDATE / DELETE / RESTORE / PIN / EXPIRES"
+  memories ||--o| memory_embeddings : "vector tuỳ chọn"
+  web_sources ||--o{ web_source_refs : "được dẫn trong lượt"
+
+  conversations {
+    text id PK
+    text app
+    text family
+    text document_key
+    text document_name
+    text title
+    text summary
+  }
+  messages {
+    integer id PK
+    text conversation_id FK
+    integer seq
+    text role
+    text content
+  }
+  runs {
+    text id PK
+    text conversation_id FK
+    text status
+    text model
+    integer rounds
+    integer input_tokens
+    integer output_tokens
+    text memory_status
+  }
+  tool_calls {
+    integer id PK
+    text run_id FK
+    integer seq
+    text tool
+    text action
+    integer ok
+  }
+  memories {
+    integer id PK
+    text scope
+    text scope_key
+    text text
+    text hash
+    text category
+    text entities_json
+    text expires_at
+    text source
+    real confidence
+    integer pinned
+    integer hits
+    text deleted_at
+  }
+  memory_history {
+    integer id PK
+    integer memory_id FK
+    text event
+    text old_text
+    text new_text
+    text actor
+    text run_id
+  }
+  memory_links {
+    integer memory_id FK
+    integer linked_memory_id FK
+  }
+  memory_embeddings {
+    integer memory_id FK
+    text model
+    integer dim
+    blob vector
+  }
+  web_sources {
+    integer id PK
+    text url
+    text url_key
+    text domain
+    text title
+    text content
+    integer fetch_count
+  }
+  web_source_refs {
+    integer id PK
+    integer source_id FK
+    text conversation_id FK
+    text run_id FK
+    text kind
+  }

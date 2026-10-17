@@ -1,0 +1,38 @@
+---
+title: Axiom Office - Bên trong Agent Core (core-go)
+---
+flowchart TB
+  api["internal/api<br/>/health · /v1/runs · /v1/memory · /v1/skills · /v1/mcp<br/>/v1/setup · /v1/audit · /v1/conversations · /v1/admin/shutdown · /wps"]
+  guard["guard.go<br/>Origin 403 · token 401 · JSON 415"]
+  orch["internal/agent<br/>Orchestrator · RunManager · PromptBuilder<br/>ContextAssembler · confirm · verify · docstyle · lang"]
+  model["internal/model<br/>Client · codec openai/anthropic · RunAgent + guards<br/>window (FitWindow) · fallback · profile registry"]
+  tools["internal/tools<br/>office_action · skill · memory · todo · doc_design<br/>template_build/compose/design · tavily/web · visual · overwrite"]
+  policy["internal/policy<br/>PolicyEngine"]
+  memory["internal/memory<br/>Store · Retriever · Extractor · text (Redact)"]
+  store["internal/store<br/>db · conversations · runs · web_sources"]
+  skills["internal/skills<br/>Loader · Index · files"]
+  mcp["internal/mcp<br/>Manager · transport · tool"]
+  mcsrv["internal/mcpserver<br/>server · catalog · livetools · filetools_word/excel/ppt"]
+  office["internal/office<br/>BridgeClient · SessionDirectory · truncate"]
+  ooxml["internal/ooxml · xlsx · docx · pptx · sheet · cfb<br/>engine OOXML thuần Go"]
+  cfg["internal/... hạ tầng<br/>config · corefile · corelog · doctor · setup<br/>instance · filesafe · templates · textutil · wpsbridge"]
+
+  api --> guard
+  api --> orch
+  orch --> model
+  orch --> tools
+  tools --> policy
+  tools --> memory
+  tools --> skills
+  tools --> mcp
+  tools --> office
+  orch --> store
+  memory --> store
+  mcp --> mcsrv
+  mcsrv --> ooxml
+  api --> cfg
+
+  classDef corecls fill:#dae8fc,stroke:#6c8ebf,color:#1f3d6e
+  classDef datacls fill:#fff2cc,stroke:#d6b656,color:#7f6000
+  class orch,model,tools,policy,memory,skills,mcp,mcsrv,office corecls
+  class store,ooxml,cfg datacls

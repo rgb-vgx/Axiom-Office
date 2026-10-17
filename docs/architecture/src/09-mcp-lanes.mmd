@@ -1,0 +1,28 @@
+---
+title: Axiom Office - MCP server: làn live và làn file
+---
+sequenceDiagram
+  autonumber
+  participant C as MCP client
+  participant M as McpServer (Go)
+  participant LT as LiveTools / FileTools
+  participant BC as BridgeClient
+  participant B as HttpBridge trong app
+  participant F as File trên đĩa
+
+  C->>M: tools/call word_insert_table (rows, cols, values)
+  alt Làn live (cần app đang mở)
+    M->>LT: handler(ToolArgs)
+    LT->>BC: Command(app=word, writer.insertTable, params)
+    BC->>BC: ResolvePort: port tường minh hoặc app tới Config.PortForKind
+    BC->>B: POST /cmd + X-Auth-Token (timeout 330s)
+    B-->>BC: {ok:true, result:...}
+    BC-->>M: JSON nguyên văn
+  else Làn file (không cần app)
+    M->>LT: handler(ToolArgs)
+    LT->>F: đọc/ghi .docx/.xlsx/.pptx/.xls, lưu atomic
+    F-->>LT: ok
+    LT-->>M: JSON
+  end
+  M-->>C: content text, isError=false
+  Note over M,C: Lỗi kết nối app vẫn trả {ok:false, error} như kết quả bình thường để model đọc được

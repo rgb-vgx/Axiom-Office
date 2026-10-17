@@ -1,0 +1,52 @@
+---
+title: Axiom Office - Triển khai & port
+---
+flowchart LR
+  subgraph machine["Máy người dùng (một tài khoản Windows)"]
+    subgraph office["Microsoft Office x64"]
+      word["WINWORD.EXE<br/>bridge :47831"]
+      excel["EXCEL.EXE<br/>bridge :47832"]
+      ppt["POWERPNT.EXE<br/>bridge :47833"]
+    end
+    subgraph wpsbox["WPS Office 12"]
+      wpsexe["wps.exe (một process cho cả 3)<br/>Writer :47821 · Spreadsheets :47822 · Presentation :47823"]
+    end
+    subgraph lobox["LibreOffice"]
+      loexe["soffice (một process)<br/>:47851 / :47852 / :47853"]
+    end
+    subgraph wpslinux["WPS Linux (JS add-in)"]
+      wpsjs["long-poll về Core<br/>bridge :47861"]
+    end
+    mcphost["AxiomOffice.Host.exe mcp<br/>forward sang Core"]
+    core["AxiomOffice.Core.exe :47840 (Go)<br/>một bản / người dùng"]
+    reg[("HKCU / Software / AxiomOffice")]
+    local[("LOCALAPPDATA / AxiomOffice")]
+  end
+  cloud[("LLM provider (HTTPS)")]
+
+  word --> reg
+  excel --> reg
+  ppt --> reg
+  wpsexe --> reg
+  loexe --> reg
+  word --> local
+  excel --> local
+  ppt --> local
+  wpsexe --> local
+  loexe --> local
+  mcphost -->|"HTTP 127.0.0.1 - làn live"| word
+  mcphost --> local
+  word -->|"HTTP 127.0.0.1"| core
+  excel --> core
+  ppt --> core
+  wpsexe --> core
+  loexe --> core
+  wpsjs --> core
+  core -->|"HTTP 127.0.0.1 /cmd"| word
+  core --> local
+  core -->|"HTTPS"| cloud
+
+  classDef store fill:#fff2cc,stroke:#d6b656,color:#7f6000
+  classDef corecls fill:#dae8fc,stroke:#6c8ebf,color:#1f3d6e
+  class reg,local,cloud store
+  class core,mcphost corecls

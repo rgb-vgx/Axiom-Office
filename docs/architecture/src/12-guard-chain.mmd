@@ -1,0 +1,23 @@
+---
+title: Axiom Office - Vòng agent và chuỗi guard
+---
+flowchart TB
+  run["RunAgent (internal/model/agent.go)<br/>chỉ gọi model và chạy tool<br/>mỗi cơ chế chống lỗi là một guard"]
+  subgraph guards["Chuỗi guard (internal/model/guards.go) - 4 móc onReply / beforeCall / afterTools / recover"]
+    g1["trả lời rỗng, bị cắt length: nhắc viết lại một lần"]
+    g2["tự kiểm chứng: đọc lại sau khi sửa (verify)"]
+    g3["chặn lệnh y hệt ở lần thứ 5"]
+    g4["write_todos một lần mỗi reply"]
+    g5["tool báo Final thì kết thúc ngay"]
+    g6["app sập thì Abort, dừng lượt"]
+    g7["dọn ngữ cảnh khi vượt 40k token"]
+    g8["lặp một lỗi y hệt 3 lần thì dừng"]
+    g9["ngân sách token 80 phần trăm nhắc, 90 tắt tool, 100 dừng"]
+    g10["provider không hỗ trợ tool thì chạy chat thường"]
+    g11["tràn cửa sổ ngữ cảnh: dọn mạnh, thử lại tối đa 2 lần"]
+    g12["chuyển model dự phòng, trừ lỗi cấu hình 400/401"]
+  end
+  run --> guards
+
+  classDef guardcls fill:#ffe6cc,stroke:#d79b00,color:#7f4f00
+  class g1,g2,g3,g4,g5,g6,g7,g8,g9,g10,g11,g12 guardcls

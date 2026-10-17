@@ -1,0 +1,18 @@
+---
+title: Axiom Office - Các bộ kiểm thử
+---
+flowchart LR
+  suites["Bộ kiểm thử Axiom"]
+  suites --> live["tests/live<br/>app thật Office/WPS/LibreOffice<br/>golden record/compare"]
+  suites --> lo["tests/lo<br/>extension LibreOffice (unittest)"]
+  suites --> wps["tests/wps<br/>add-in JS (node --test) + e2e + live"]
+  suites --> mcph["tests/mcp-host<br/>MCP protocol, 50 tool, oracle parity, Go vs C#"]
+  suites --> oracle["tests/oracle<br/>server Python tham chiếu (word/excel/ppt)"]
+  suites --> core["tests/core<br/>e2e Core (LLM giả + bridge giả)"]
+  suites --> linux["tests/linux<br/>install.sh / package.sh"]
+  suites --> bench["tests/bench<br/>benchmark Calc so với Claude Code"]
+  suites --> gotest["core-go go test<br/>unit 18+ gói"]
+  suites --> ci["CI: workflow job linux + job windows"]
+
+  classDef suite fill:#d5e8d4,stroke:#82b366,color:#1d4d1f
+  class live,lo,wps,mcph,oracle,core,linux,bench,gotest,ci suite
