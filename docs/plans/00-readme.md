@@ -6,7 +6,7 @@ Rà soát 16/10/2026: các phase được viết lại thành **danh sách phầ
 "Đã có" dẫn tới code thật, để không làm lại thứ đang chạy. Trước khi làm một phase, đọc mục đó rồi kiểm lại
 trong code: trạng thái có thể đã đổi.
 
-## Tiến độ (đối chiếu code 17/10/2026)
+## Tiến độ (đối chiếu code 17/10/2026, cập nhật cuối ngày)
 
 - **P0 gần xong**: P0-01…P0-07 đã làm (heading path, ngân sách mục cấu trúc, mở `writer.outline`, `et.readRange`
   types/linkedSheets, `wpp.listSlides detail`, cắt outline). Còn P0-09 (đo bằng bộ `17`) và hai chỗ lệch phía
@@ -15,8 +15,21 @@ trong code: trạng thái có thể đã đổi.
   và 3.2 (bộ chạy) — tức chính cái thước đo vẫn chưa có.
 - **M1 một phần**: lọc hội thoại theo tài liệu đang mở đã có (`GET /v1/conversations?documentKey=…`,
   `ConversationsForm`); còn nối theo vân tay khi đổi tên và kịch bản "không lẫn".
-- Các phase P1, P2, P4–P8: giữ nguyên như bản 16/10, trừ P1 đã thêm hai chỗ hỏi trước
-  (`wpp.deleteShapes`/`deleteTagged`, `et.importCsv` ghi đè).
+- **P1 một phần**: P1-01 thêm hai chỗ hỏi trước (`wpp.deleteShapes`/`deleteTagged`, `et.importCsv` ghi đè); hoàn tác
+  cả lượt + chụp vùng còn kiểm bằng tay trên Office thật.
+- **P2 một phần**: P2-01 xong (`not_for` cho 8 skill + hiện cho model; loader/prompt/test). P2-02…05 (rà nội dung,
+  vùng cấm, kịch bản, đo bằng bộ `17`) còn.
+- **P3/memory (M2–M5) phần lớn xong**: M2 `Redact` + ẩn PII trong fact; M3 `org-style` + phân quyền ghi + prompt
+  riêng; M4 export/import JSON, xóa mềm theo tài liệu, tắt riêng scope; M5 job dọn định kỳ (gộp gần trùng, hết hạn).
+  Còn: nhớ `doc_design` (M3-02), UI `MemoryForm`/`SettingsForm` (M3-05/M4-03), số đo M5-03, bộ đo `17`.
+- **P4 một phần**: P4-01 registry `Profile` xong (`client.go`/`types.go` đọc registry). Còn P4-02 (nhớ quirk qua khởi
+  động lại - vướng schema `core.db` dùng chung và quyền ghi HKCU) và P4-03 (admin/wizard, C#).
+- **P5 chưa làm**: `26` vẫn **cần chốt thiết kế** (P5-00) trước khi đụng `SchemaVersion` của `core.db` dùng chung.
+- **P6 phần lớn xong (Core)**: P6-01 ẩn bí mật trong audit, P6-02 hạn lưu audit + dọn lúc khởi động, P6-04 lọc nhật
+  ký theo tài liệu. Còn P6-02 nút admin + chạy định kỳ, P6-03 (hoàn tác - C#).
+- **P7 một phần**: P7-03 xong (câu trạng thái + thẻ hỏi kiểu trình bày theo ngôn ngữ gửi kèm). Còn dịch wizard/form
+  (P7-01), khung chat WPS/LibreOffice (P7-02), lỗi hay gặp (P7-04), nhãn Core trên ribbon (P7-05/06), thử người thật.
+- **P8 không nằm trong phạm vi** đợt này (chỉ kiểm trên Microsoft Office máy này).
 
 ## Thứ tự làm
 
