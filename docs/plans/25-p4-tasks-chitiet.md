@@ -13,22 +13,24 @@
 - [x] Lỗi cấu hình dịch tiếng Việt: `core-go/internal/setup/llmerrors.go`.
 - [x] Lọc tool theo chế độ đã có: `request.Plan` (chỉ đọc), `Interactive=false` (từ chối lệnh cần xác nhận).
 
-## P4-01. Registry quirk
+## P4-01. Registry quirk - XONG
 
-- [ ] Tệp: `core-go/internal/model/profile.go` (mới) + `config.go`: `ProviderProfile`/`ModelProfile` (tên, họ API,
-      nhận `thinking`/`temperature` không, cửa sổ, stream usage, giới hạn tool).
-- [ ] `client.go` và `types.go` đọc registry thay cho `if provider == "anthropic"` (đang có **2 chỗ**:
-      `client.go:145` `ApplyAuth`, `types.go:98` `NewCodec`).
-- [ ] `catalog.go`: `GET /models` gắn profile/quirk của từng model cho add-in hiện.
-- [ ] Test: thêm một profile giả vào bảng + `go test ./internal/model/...` không phải sửa `client.go`.
+- [x] Tệp `core-go/internal/model/profile.go`: `Profile` (Name, Family, AuthHeader/AuthPrefix, ExtraHeaders,
+      SupportsThinking/SupportsTemperature) + bảng `profiles` + `ProfileFor`/`RegisterProfile`.
+- [x] `types.go` `NewCodec` và `client.go` `ApplyAuth` đọc registry (hết `if provider == "anthropic"`); cổng gửi
+      `thinking` theo `ProfileFor(...).SupportsThinking`.
+- [x] Test `TestProfileRegistryDrivesCodecAndAuth` (khai báo profile mới → codec + header đúng, không sửa
+      client.go/types.go), `TestProfileDefaultsAndThinking`.
+- [ ] Còn: `catalog.go` `GET /models` gắn profile/quirk cho add-in hiện (P4-03).
 
 ## P4-02. Nhớ quirk qua các lượt
 
-- [ ] Quirk phát hiện lúc chạy ("từ chối `thinking`", phải bỏ `temperature`…) phải **bền vững**, không chỉ
-      `atomic.Bool` trong phiên: ghi vào cấu hình người dùng (HKCU/`config.json`) hoặc bảng nhỏ trong `core.db`
-      (cân nhắc `SchemaVersion`, xem `store/db.go`).
-- [ ] `client.go`: đọc quirk đã nhớ trước khi gửi, khỏi mất một request thử.
-- [ ] Test: chạy hai "phiên" (dựng client mới) → phiên sau **không** gửi `thinking` (đếm request).
+- [ ] Ghi quirk ("từ chối `thinking`") vào nơi bền vững (HKCU/config.json **hoặc** bảng trong `core.db`).
+      **Chưa làm có lý do**: `core.db` dùng CHUNG với bản .NET nên tăng `SchemaVersion` ở Go có thể làm bản .NET
+      đọc hụt schema; còn ghi HKCU/config.json thì Go hiện chỉ *đọc* (add-in sở hữu phần ghi) - làm một mình dễ đè
+      cấu hình người dùng. Cần thống nhất với phía add-in trước.
+- [ ] `client.go`: đọc quirk đã nhớ trước khi gửi (chờ bước trên).
+- [ ] Test hai "phiên" (dựng client mới) phiên sau không gửi `thinking` (chờ bước trên).
 
 ## P4-03. Admin/wizard hiện model và quirk
 
@@ -38,8 +40,8 @@
 
 ## P4-04. Hồi quy + changelog
 
-- [ ] `cd core-go && go test ./internal/model/... ./internal/config/...`.
-- [ ] Ghi `CHANGELOG.md [Unreleased]`; cập nhật `05-p4`.
+- [x] `cd core-go && go test ./internal/model/... ./internal/config/...`.
+- [x] Ghi `CHANGELOG.md [Unreleased]`; cập nhật `05-p4`.
 
 ## Tiêu chí xong
 

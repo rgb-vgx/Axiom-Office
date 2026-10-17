@@ -137,17 +137,21 @@ func BuildURL(endpoint, suffix string) string {
 	return base + suffix
 }
 
-// ApplyAuth: Anthropic dung x-api-key + anthropic-version, con lai Bearer (dung chung voi ListModels).
+// ApplyAuth: cach gui khoa theo profile cua provider (anthropic: x-api-key + anthropic-version; con lai Bearer).
+// Dung chung voi ListModels.
 func ApplyAuth(request *http.Request, provider, apiKey string) {
 	if apiKey == "" {
 		return
 	}
-	if provider == "anthropic" {
-		request.Header.Set("x-api-key", apiKey)
-		request.Header.Set("anthropic-version", "2023-06-01")
-		return
+	profile := ProfileFor(provider)
+	header := profile.AuthHeader
+	if header == "" {
+		header = "Authorization"
 	}
-	request.Header.Set("Authorization", "Bearer "+apiKey)
+	request.Header.Set(header, profile.AuthPrefix+apiKey)
+	for name, value := range profile.ExtraHeaders {
+		request.Header.Set(name, value)
+	}
 }
 
 // Chat goi mot lan, khong tool (tom tat hoi thoai, kiem tra cau hinh). ok = false khi loi HOAC model
@@ -214,8 +218,9 @@ func (c *Client) post(ctx, userCtx context.Context, body map[string]any, stream 
 		}
 	}
 	// Tat suy luan cho model reasoning: khong co cai nay thi prompt lon bi dot het max_tokens vao
-	// phan nghi va content tra ve rong. Chi gui cho codec OpenAI (Anthropic co `thinking` khac dang).
-	if c.Codec.Name() == "openai" && !c.thinkingRejected.Load() {
+	// phan nghi va content tra ve rong. Chi gui khi profile cua provider nhan `thinking` kieu OpenAI
+	// (Anthropic co `thinking` khac dang -> profile SupportsThinking = false).
+	if ProfileFor(c.Codec.Name()).SupportsThinking && !c.thinkingRejected.Load() {
 		mode := "disabled"
 		if c.ShowReasoning {
 			mode = "enabled"

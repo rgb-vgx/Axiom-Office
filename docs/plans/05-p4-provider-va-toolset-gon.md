@@ -44,3 +44,11 @@
 ## 6. Không làm
 
 - Không OAuth phức tạp, không pool khóa, không màn hình chi phí kiểu Hermes.
+
+## 7. Cập nhật 17/10/2026
+
+- Đã làm: `model/profile.go` (`Profile` + `ProfileFor`/`RegisterProfile`); `NewCodec`/`ApplyAuth` và cổng gửi
+  `thinking` đọc registry (hết `if provider == "anthropic"`); test `TestProfileRegistryDrivesCodecAndAuth`,
+  `TestProfileDefaultsAndThinking`. Tiêu chí "thêm model chỉ khai báo profile" đã đạt.
+- Còn: nhớ quirk bền vững qua khởi động lại (P4-02) - vướng schema `core.db` dùng chung với bản .NET và quyền ghi
+  HKCU/config.json thuộc add-in; hiện chỉ admin/wizard (P4-03, C#).

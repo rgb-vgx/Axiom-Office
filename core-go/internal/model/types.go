@@ -95,7 +95,7 @@ type Codec interface {
 }
 
 func NewCodec(provider string) Codec {
-	if provider == "anthropic" {
+	if ProfileFor(provider).Family == FamilyAnthropic {
 		return anthropicCodec{}
 	}
 	return openAICodec{}

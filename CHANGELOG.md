@@ -5,6 +5,11 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed - provider profile registry (P4-01, 17/10/2026)
+- `core-go/internal/model/profile.go`: bảng `Profile` khai báo họ API + cách xác thực + quirk (nhận `thinking`/
+  `temperature`). `NewCodec` và `ApplyAuth` đọc registry thay cho `if provider == "anthropic"`; cổng gửi `thinking`
+  cũng theo profile. Thêm nhà cung cấp mới chỉ cần `RegisterProfile` (không sửa `client.go`).
+
 ### Added - quan ly memory + chuan chung don vi (M3, M4, M5, 17/10/2026)
 - Scope `org-style` (chuẩn chung của đơn vị): luôn vào ngữ cảnh, tách riêng trong system prompt
   ("Organisation-wide standards"), không gắn theo tài liệu, không tự hết hạn (M3-01). Ghi scope này cần quyền quản
