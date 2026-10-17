@@ -19,12 +19,14 @@ type Hit struct {
 }
 
 // Context: ket qua dua vao prompt - cac dong "- [id ngan] text" + id da dung (tang hits sau run).
+// OrgLines: chuan chung cua don vi (org-style) - prompt hien thanh nhom rieng (12-m3).
 type Context struct {
-	Lines []string
-	IDs   []string
+	Lines    []string
+	IDs      []string
+	OrgLines []string
 }
 
-func EmptyContext() Context { return Context{Lines: []string{}, IDs: []string{}} }
+func EmptyContext() Context { return Context{Lines: []string{}, IDs: []string{}, OrgLines: []string{}} }
 
 const (
 	KeywordWeight       = 1.0
@@ -33,6 +35,8 @@ const (
 	Threshold           = 0.1 // chan tin hieu chinh TRUOC khi cong
 	MaxDocumentMemories = 20
 	MaxUserMemories     = 8
+	// MaxOrgStyleMemories: tran rieng cho chuan chung cua don vi - khong chiem het cho cua fact tai lieu (12-m3).
+	MaxOrgStyleMemories = 12
 	MaxContextChars     = 6000 // ~1.500 token
 	// RawPerMatchedTerm: diem keyword tho cong them cho moi tu truy van khop (ly do ghi trong ban .NET).
 	RawPerMatchedTerm = 4.0
@@ -200,16 +204,55 @@ func KeywordScore(item Item, terms map[string]bool, bm25 map[int64]float64, term
 	return NormalizeBm25(raw, termCount)
 }
 
-// BuildContext: ngu canh cho prompt - moi memory ghim; <= 20 memory tai lieu; <= 8 memory user tren nguong;
-// <= ~1.500 token.
-func (r *Retriever) BuildContext(prompt, documentKey string, today time.Time, semantic map[string]float64) Context {
+// ScopeFilter: scope nao duoc dua vao ngu canh (M4-04: tat rieng memory tai lieu / ca nhan, co hieu luc ngay,
+// khong xoa du lieu). org-style (chuan chung) luon duoc giu.
+type ScopeFilter struct {
+	Document bool
+	User     bool
+}
+
+// AllScopes: mac dinh - bat ca hai.
+func AllScopes() ScopeFilter { return ScopeFilter{Document: true, User: true} }
+
+// BuildContext: ngu canh cho prompt - moi memory ghim + org-style; <= 20 memory tai lieu; <= 8 memory user tren
+// nguong; <= ~1.500 token. filter bo trong = AllScopes().
+func (r *Retriever) BuildContext(prompt, documentKey string, today time.Time, semantic map[string]float64, filter ...ScopeFilter) Context {
+	allowed := AllScopes()
+	if len(filter) > 0 {
+		allowed = filter[0]
+	}
 	candidates := r.store.Active(documentKey, today)
+	filtered := candidates[:0]
+	for _, item := range candidates {
+		if item.Scope == ScopeDocument && !allowed.Document {
+			continue
+		}
+		if item.Scope == ScopeUser && !allowed.User {
+			continue
+		}
+		filtered = append(filtered, item)
+	}
+	candidates = filtered
 	if len(candidates) == 0 {
 		return EmptyContext()
 	}
 
 	ranked := r.Score(candidates, prompt, semantic, 0)
+
+	// Chuan chung cua don vi: luon vao ngu canh (nhu ghim), co tran rieng, xep truoc de duoc uu tien ngan sach.
+	orgs := []Item{}
+	for _, item := range candidates {
+		if item.Scope == ScopeOrgStyle {
+			orgs = append(orgs, item)
+		}
+	}
+	sort.SliceStable(orgs, func(a, b int) bool { return orgs[a].CreatedAt > orgs[b].CreatedAt })
+	if len(orgs) > MaxOrgStyleMemories {
+		orgs = orgs[:MaxOrgStyleMemories]
+	}
+
 	chosen := []Item{}
+	chosen = append(chosen, orgs...)
 	for _, item := range candidates {
 		if item.Pinned {
 			chosen = append(chosen, item)
@@ -244,7 +287,7 @@ func (r *Retriever) BuildContext(prompt, documentKey string, today time.Time, se
 		chosen = append(chosen, hit.Item)
 	}
 
-	lines, ids, used, seen := []string{}, []string{}, 0, map[string]bool{}
+	lines, orgLines, ids, used, seen := []string{}, []string{}, []string{}, 0, map[string]bool{}
 	cut := 0
 	for _, item := range chosen {
 		if seen[item.ID] {
@@ -260,15 +303,19 @@ func (r *Retriever) BuildContext(prompt, documentKey string, today time.Time, se
 			continue
 		}
 		used += len([]rune(line))
-		lines = append(lines, line)
+		if item.Scope == ScopeOrgStyle {
+			orgLines = append(orgLines, line)
+		} else {
+			lines = append(lines, line)
+		}
 		ids = append(ids, item.ID)
 	}
 	// M2-04: ngân sách token có log - biết khi nào phải chỉnh MaxContextChars/MaxUserMemories.
 	if cut > 0 {
-		corelog.Info("memory context: %d fact vao prompt, %d bi cat (ngan sach %d ky tu, da dung %d)",
-			len(lines), cut, MaxContextChars, used)
+		corelog.Info("memory context: %d fact vao prompt (%d chuan chung), %d bi cat (ngan sach %d ky tu, da dung %d)",
+			len(lines)+len(orgLines), len(orgLines), cut, MaxContextChars, used)
 	}
-	return Context{Lines: lines, IDs: ids}
+	return Context{Lines: lines, IDs: ids, OrgLines: orgLines}
 }
 
 func ShortID(id string) string {

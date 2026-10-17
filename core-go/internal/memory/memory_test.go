@@ -304,6 +304,30 @@ func TestServiceExtractsInBackground(t *testing.T) {
 	}
 }
 
+// M3-01: chuan chung cua don vi luon vao ngu canh du cau hoi khong lien quan, va khong gan theo tai lieu.
+func TestOrgStyleAlwaysInContext(t *testing.T) {
+	repo := newTestStore(t)
+	repo.AddBatch([]NewMemory{{Scope: ScopeOrgStyle, Text: "Văn bản của đơn vị dùng Times New Roman 13, lề trái 3 cm"}},
+		ActorUser, "", nil, "")
+	repo.AddBatch([]NewMemory{{Scope: ScopeDocument, ScopeKey: `C:\a.docx`, Text: "Bảng điểm lớp 4A có 35 học sinh"}},
+		ActorUser, "", nil, "")
+
+	ctx := NewRetriever(repo).BuildContext("thời tiết hôm nay thế nào", `C:\b.docx`, Today(), nil)
+	if len(ctx.OrgLines) != 1 || !strings.Contains(ctx.OrgLines[0], "Times New Roman 13") {
+		t.Fatalf("org-style phai luon co trong ngu canh: %+v", ctx)
+	}
+	for _, line := range ctx.Lines {
+		if strings.Contains(line, "Bảng điểm lớp 4A") {
+			t.Fatalf("fact cua tai lieu khac khong duoc lot vao: %+v", ctx.Lines)
+		}
+	}
+	for _, item := range repo.List(ScopeOrgStyle, "", false, "", 10) {
+		if item.ScopeKey != nil && *item.ScopeKey != "" {
+			t.Fatalf("org-style khong duoc co scope_key: %+v", item)
+		}
+	}
+}
+
 // fakeChatServer: may chu chat gia tra ve dung noi dung cho truoc (khong can mang).
 func fakeChatServer(t *testing.T, content string) *httptest.Server {
 	t.Helper()

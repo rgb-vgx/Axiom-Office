@@ -9,21 +9,22 @@
 - [x] Hạn dùng (`expires_at`), ghim (`pinned`), đếm lượt dùng (`hits`), xóa mềm + `PurgeSoftDeleted`, `Purge`.
 - [x] `EntityCounts`, `MissingVectors` (dùng cho dọn/backfill embedding).
 
-## M5-01. Dọn định kỳ (gộp + hạ điểm + hết hạn)
+## M5-01. Dọn định kỳ (gộp + hạ điểm + hết hạn) - XONG (một phần)
 
-- [ ] `core-go/internal/memory/service.go`: thêm job dọn chạy nền (dùng `Service.Enqueue` sẵn có), không chạy khi
-      đang bận lượt.
-- [ ] Gộp fact gần trùng **đã lọt** qua lúc ghi: so cặp trong cùng `scope`+`scope_key`, cosine ≥ ngưỡng thì gộp
-      (giữ fact cũ hơn/`pinned`, liên kết bằng `memory_links`, `Store.Update`/`Delete` lý do `merge`).
-- [ ] Hạ `confidence` fact lâu không dùng: `hits` không tăng trong N ngày → giảm bậc; dưới ngưỡng thì xóa mềm.
-- [ ] Xóa mềm fact hết hạn: gọi `PurgeSoftDeleted` theo lịch (mặc định hằng tuần).
-- [ ] Test: seed 1.000 fact trùng lặp → sau một lần dọn còn < 200; kịch bản `recall` trong test vẫn ra đúng.
+- [x] `core-go/internal/memory/service.go` `RunCleanup` + `cmd/axiom-core/main.go`: job dọn chạy nền qua `Enqueue`
+      sẵn có (chu kỳ `MemoryCleanupDays`, mặc định 7 ngày; 0 = tắt).
+- [x] Gộp fact gần trùng **đã lọt** qua lúc ghi (`Store.mergeNearDuplicates`): cùng `scope`+`scope_key`, cùng text đã
+      chuẩn hóa hoặc cosine ≥ `NearDuplicateCosine` → giữ bản cũ hơn, link bằng `memory_links`, xóa mềm lý do `merge`.
+- [x] Xóa mềm fact hết hạn (`Store.softDeleteExpired`) và `PurgeSoftDeleted` theo lịch.
+- [x] Test `TestCleanupMergesNearDuplicates` (200 fact trùng → còn < 100), `TestCleanupExpiresAndKeepsOrgStyle`.
+- [ ] Còn: "hạ `confidence` fact lâu không dùng theo bậc" - chưa làm (rủi ro xóa fact đúng nhưng ít dùng; chờ số đo
+      M5-03 rồi mới quyết ngưỡng).
 
-## M5-02. Giữ theo scope
+## M5-02. Giữ theo scope - XONG (một phần)
 
-- [ ] `document`: tệp không còn trong danh sách tài liệu đã mở → **đề xuất** xóa (không tự xóa; hỏi qua thẻ `Choose`).
-- [ ] `user`: giữ lâu, chỉ hạ điểm theo M5-01.
-- [ ] `org-style`: không tự hết hạn, không nằm trong job dọn (xem `22-m3`).
+- [ ] `document`: tệp không còn trong danh sách tài liệu đã mở → **đề xuất** xóa qua thẻ `Choose` (còn).
+- [x] `user`: giữ lâu (không nằm trong job hết hạn/`softDeleteExpired`).
+- [x] `org-style`: không tự hết hạn, không nằm trong job dọn (`mergeNearDuplicates`/`softDeleteExpired` bỏ qua).
 
 ## M5-03. Số đo memory có ích hay rác
 

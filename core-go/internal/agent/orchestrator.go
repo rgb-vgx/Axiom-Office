@@ -325,8 +325,8 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 		}
 	}
 
-	systemPrompt := Build(appKind, session, request.Document, appSkills, memoryContext.Lines, assembled.Summary,
-		assembled.RecentActionLines)
+	systemPrompt := Build(appKind, session, request.Document, appSkills, memoryContext.Lines, memoryContext.OrgLines,
+		assembled.Summary, assembled.RecentActionLines)
 	if request.Plan {
 		systemPrompt += "\n\n" + PlanModeRule
 	}

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 	"time"
 
@@ -20,6 +21,9 @@ const (
 	ScopeUser     = "user"
 	ScopeDocument = "document"
 	ScopeSkill    = "skill"
+	// ScopeOrgStyle: chuan chung cua don vi (font/le/cach xung ho da duyet). Luon vao ngu canh, khong tu het han
+	// va khong gan theo tai lieu (12-m3). Chi quan tri vien ghi duoc (M3-04).
+	ScopeOrgStyle = "org-style"
 )
 
 // Tac nhan ghi memory.
@@ -37,7 +41,7 @@ const (
 )
 
 func IsValidScope(scope string) bool {
-	return scope == ScopeUser || scope == ScopeDocument || scope == ScopeSkill
+	return scope == ScopeUser || scope == ScopeDocument || scope == ScopeSkill || scope == ScopeOrgStyle
 }
 
 // NewMemory: mot fact can ghi.
@@ -186,7 +190,8 @@ func (s *Store) addBatchOnce(items []NewMemory, actor, runID string, vectors map
 		}
 
 		scopeKey := raw.ScopeKey
-		if raw.Scope == ScopeUser {
+		// user va org-style khong gan theo tai lieu.
+		if raw.Scope == ScopeUser || raw.Scope == ScopeOrgStyle {
 			scopeKey = ""
 		}
 		hash := Hash(text)
@@ -340,12 +345,13 @@ func (s *Store) List(scope, scopeKey string, includeDeleted bool, runID string, 
 	return readItems(s.db.SQL(), query, args...)
 }
 
-// Active: ung vien cho ngu canh - chua xoa, chua het han (expires_at > hom qua), thuoc user + document hien tai.
+// Active: ung vien cho ngu canh - chua xoa, chua het han (expires_at > hom qua), thuoc user + document hien tai
+// + chuan chung cua don vi (org-style, luon co mat - 12-m3).
 func (s *Store) Active(documentKey string, today time.Time) []Item {
 	yesterday := today.AddDate(0, 0, -1).Format("2006-01-02")
 	return readItems(s.db.SQL(), "SELECT "+memoryColumns+" FROM memories WHERE deleted_at IS NULL"+
 		" AND (expires_at IS NULL OR expires_at > ?)"+
-		" AND (scope = 'user' OR (scope = 'document' AND scope_key = ?))",
+		" AND (scope = 'user' OR scope = 'org-style' OR (scope = 'document' AND scope_key = ?))",
 		yesterday, nullText(documentKey))
 }
 
@@ -619,6 +625,303 @@ func (s *Store) PurgeSoftDeleted(now time.Time) int {
 	}
 	removed, _ := result.RowsAffected()
 	return int(removed)
+}
+
+// ExportRow: mot memory xuat ra JSON (M4-01) - giu id, ghim, han dung, lien ket de import lai nguyen trang.
+type ExportRow struct {
+	ID         string   `json:"id"`
+	Scope      string   `json:"scope"`
+	ScopeKey   string   `json:"scopeKey,omitempty"`
+	Text       string   `json:"text"`
+	Category   string   `json:"category,omitempty"`
+	Entities   []string `json:"entities,omitempty"`
+	ExpiresAt  string   `json:"expiresAt,omitempty"`
+	Source     string   `json:"source,omitempty"`
+	Confidence float64  `json:"confidence"`
+	Pinned     bool     `json:"pinned"`
+	Hits       int      `json:"hits"`
+	CreatedAt  string   `json:"createdAt,omitempty"`
+	UpdatedAt  string   `json:"updatedAt,omitempty"`
+	Links      []string `json:"links,omitempty"`
+}
+
+// Export: toan bo memory chua xoa (M4-01).
+func (s *Store) Export() []ExportRow {
+	rows := []ExportRow{}
+	for _, item := range s.List("", "", false, "", 1_000_000) {
+		scopeKey := ""
+		if item.ScopeKey != nil {
+			scopeKey = *item.ScopeKey
+		}
+		confidence := 0.0
+		if item.Confidence != nil {
+			confidence = *item.Confidence
+		}
+		rows = append(rows, ExportRow{
+			ID: item.ID, Scope: item.Scope, ScopeKey: scopeKey, Text: item.Text, Category: textOrEmpty(item.Category),
+			Entities: item.Entities, ExpiresAt: textOrEmpty(item.ExpiresAt), Source: item.Source,
+			Confidence: confidence, Pinned: item.Pinned, Hits: item.Hits, CreatedAt: item.CreatedAt,
+			UpdatedAt: item.UpdatedAt, Links: item.Links,
+		})
+	}
+	return rows
+}
+
+// ImportResult: so lieu mot lan import.
+type ImportResult struct {
+	Added   int
+	Skipped int
+	Links   int
+}
+
+// Import: ghi lai memory tu Export (M4-01), giu id/pinned/hits/han dung; chong trung theo hash; lien ket chi toi
+// memory ton tai. Embedding tinh lai sau (Service.QueueEmbeddingBackfill). Ban trung/khong hop le bi bo qua.
+func (s *Store) Import(rows []ExportRow) (ImportResult, error) {
+	result := ImportResult{}
+	tx, err := s.db.BeginWrite()
+	if err != nil {
+		return result, err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+
+	now := Now()
+	for _, row := range rows {
+		text := strings.TrimSpace(row.Text)
+		if text == "" || len([]rune(text)) > MaxFactLength || !IsValidScope(row.Scope) {
+			result.Skipped++
+			continue
+		}
+		scopeKey := row.ScopeKey
+		if row.Scope == ScopeUser || row.Scope == ScopeOrgStyle {
+			scopeKey = ""
+		}
+		hash := Hash(text)
+		if findByHash(tx, row.Scope, scopeKey, hash) != nil {
+			result.Skipped++
+			continue
+		}
+		id := row.ID
+		if id == "" {
+			id = NewID()
+		}
+		created := row.CreatedAt
+		if created == "" {
+			created = now
+		}
+		updated := row.UpdatedAt
+		if updated == "" {
+			updated = created
+		}
+		source := row.Source
+		if source == "" {
+			source = "import"
+		}
+		if _, err := tx.Exec(`INSERT INTO memories (id, scope, scope_key, text, hash, category, entities_json, expires_at, source,
+			  confidence, pinned, hits, created_at, updated_at, created_run_id)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+			id, row.Scope, nullText(scopeKey), text, hash, nullText(row.Category), entitiesJSON(row.Entities),
+			nullText(ValidDate(row.ExpiresAt)), source, row.Confidence, boolInt(row.Pinned), row.Hits,
+			created, updated); err != nil {
+			if isBusyError(err) {
+				return result, err
+			}
+			result.Skipped++
+			continue
+		}
+		var rowID int64
+		if err := tx.QueryRow("SELECT last_insert_rowid()").Scan(&rowID); err != nil {
+			return result, err
+		}
+		if err := indexText(tx, rowID, text); err != nil {
+			return result, err
+		}
+		for _, linked := range distinct(row.Links) {
+			if !exists(tx, linked) {
+				continue
+			}
+			if _, err := tx.Exec("INSERT OR IGNORE INTO memory_links (memory_id, linked_memory_id, created_at) VALUES (?, ?, ?)",
+				id, linked, now); err != nil {
+				return result, err
+			}
+			result.Links++
+		}
+		if err := addHistory(tx, id, "IMPORT", "", text, ActorUser, "", "import"); err != nil {
+			return result, err
+		}
+		result.Added++
+	}
+	if err := tx.Commit(); err != nil {
+		return result, err
+	}
+	committed = true
+	return result, nil
+}
+
+// SoftDeleteByScopeKey: xoa mem moi memory cua mot tai lieu (M4-02) - khong dung cham memory khac.
+func (s *Store) SoftDeleteByScopeKey(scopeKey, reason string) int {
+	tx, err := s.db.BeginWrite()
+	if err != nil {
+		return 0
+	}
+	defer func() { _ = tx.Rollback() }()
+	items := readItems(tx, "SELECT "+memoryColumns+" FROM memories WHERE deleted_at IS NULL AND scope_key = ?",
+		nullText(scopeKey))
+	now := Now()
+	for _, item := range items {
+		if _, err := tx.Exec("UPDATE memories SET deleted_at = ?, updated_at = ? WHERE id = ?", now, now, item.ID); err != nil {
+			return 0
+		}
+		if _, err := tx.Exec("DELETE FROM memories_fts WHERE rowid = ?", item.RowID); err != nil {
+			return 0
+		}
+		if err := addHistory(tx, item.ID, "DELETE", item.Text, "", ActorUser, "", reason); err != nil {
+			return 0
+		}
+	}
+	if tx.Commit() != nil {
+		return 0
+	}
+	return len(items)
+}
+
+// CleanupStats: so lieu mot lan don dinh ky (M5-01).
+type CleanupStats struct {
+	Merged  int
+	Expired int
+	Purged  int
+}
+
+// Cleanup: don dinh ky - gop fact gan trung da lot qua luc ghi, xoa mem fact het han, don ban xoa mem cu.
+// Khong dung cham org-style (chuan chung cua don vi - M5-02).
+func (s *Store) Cleanup(now time.Time) CleanupStats {
+	return CleanupStats{
+		Merged:  s.mergeNearDuplicates(now),
+		Expired: s.softDeleteExpired(now),
+		Purged:  s.PurgeSoftDeleted(now),
+	}
+}
+
+// vectors: embedding hien co cua moi memory chua xoa (de so cap trong cung nhom).
+func (s *Store) vectors() map[string][]float32 {
+	result := map[string][]float32{}
+	rows, err := s.db.SQL().Query("SELECT e.memory_id, e.vector FROM memory_embeddings e " +
+		"JOIN memories m ON m.id = e.memory_id WHERE m.deleted_at IS NULL")
+	if err != nil {
+		return result
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		var blob []byte
+		if rows.Scan(&id, &blob) == nil {
+			result[id] = fromBlob(blob)
+		}
+	}
+	return result
+}
+
+// mergeNearDuplicates: trong cung (scope, scope_key), fact giong cung hash hoac cosine >= NearDuplicateCosine thi
+// gop vao ban CU hon (hoac ban ghim): giu ban cu, link ban sau vao ban cu, xoa mem ban sau (ly do "merge").
+func (s *Store) mergeNearDuplicates(now time.Time) int {
+	items := s.List("", "", false, "", 1_000_000)
+	vectors := s.vectors()
+	groups := map[string][]Item{}
+	order := []string{}
+	for _, item := range items {
+		if item.Scope == ScopeOrgStyle {
+			continue
+		}
+		key := item.Scope + "|" + textOrEmpty(item.ScopeKey)
+		if _, seen := groups[key]; !seen {
+			order = append(order, key)
+		}
+		groups[key] = append(groups[key], item)
+	}
+
+	tx, err := s.db.BeginWrite()
+	if err != nil {
+		return 0
+	}
+	defer func() { _ = tx.Rollback() }()
+	merged := 0
+	for _, key := range order {
+		group := groups[key]
+		sort.SliceStable(group, func(a, b int) bool { return group[a].CreatedAt < group[b].CreatedAt })
+		kept := []Item{}
+		for _, item := range group {
+			target := ""
+			for _, old := range kept {
+				if Normalize(old.Text) == Normalize(item.Text) {
+					target = old.ID
+					break
+				}
+				oldVector, hasOld := vectors[old.ID]
+				vector, hasNew := vectors[item.ID]
+				if hasOld && hasNew && Cosine(oldVector, vector) >= NearDuplicateCosine {
+					target = old.ID
+					break
+				}
+			}
+			if target == "" {
+				kept = append(kept, item)
+				continue
+			}
+			if _, err := tx.Exec("INSERT OR IGNORE INTO memory_links (memory_id, linked_memory_id, created_at) VALUES (?, ?, ?)",
+				item.ID, target, now); err != nil {
+				return 0
+			}
+			if _, err := tx.Exec("UPDATE memories SET deleted_at = ?, updated_at = ? WHERE id = ?", now, now, item.ID); err != nil {
+				return 0
+			}
+			if _, err := tx.Exec("DELETE FROM memories_fts WHERE rowid = ?", item.RowID); err != nil {
+				return 0
+			}
+			if err := addHistory(tx, item.ID, "DELETE", item.Text, "", ActorAgent, "", "merge"); err != nil {
+				return 0
+			}
+			merged++
+		}
+	}
+	if tx.Commit() != nil {
+		return 0
+	}
+	return merged
+}
+
+// softDeleteExpired: fact da qua han (expires_at <= hom qua) thi xoa mem; treo lai de cuu bang restore.
+func (s *Store) softDeleteExpired(now time.Time) int {
+	yesterday := now.AddDate(0, 0, -1).Format("2006-01-02")
+	items := readItems(s.db.SQL(), "SELECT "+memoryColumns+" FROM memories WHERE deleted_at IS NULL "+
+		"AND scope <> 'org-style' AND expires_at IS NOT NULL AND expires_at <= ?", yesterday)
+	if len(items) == 0 {
+		return 0
+	}
+	tx, err := s.db.BeginWrite()
+	if err != nil {
+		return 0
+	}
+	defer func() { _ = tx.Rollback() }()
+	stamp := Now()
+	for _, item := range items {
+		if _, err := tx.Exec("UPDATE memories SET deleted_at = ?, updated_at = ? WHERE id = ?", stamp, stamp, item.ID); err != nil {
+			return 0
+		}
+		if _, err := tx.Exec("DELETE FROM memories_fts WHERE rowid = ?", item.RowID); err != nil {
+			return 0
+		}
+		if err := addHistory(tx, item.ID, "DELETE", item.Text, "", ActorAgent, "", "expired"); err != nil {
+			return 0
+		}
+	}
+	if tx.Commit() != nil {
+		return 0
+	}
+	return len(items)
 }
 
 // Cosine: do giong nhau giua hai vector (0 khi khac so chieu hoac vector rong).

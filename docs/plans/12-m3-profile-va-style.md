@@ -33,3 +33,9 @@
 ## 5. Không làm
 
 - Không suy đoán chân dung người dùng, không đồng bộ cloud.
+
+## 6. Cập nhật 17/10/2026
+
+- Đã làm (Core): scope `org-style` luôn vào ngữ cảnh + mục riêng trong prompt (`OrgStyleSection`), phân quyền ghi
+  bằng `AXIOM_ORG_STYLE_ADMIN` (API 403), test `TestOrgStyleAlwaysInContext`/`TestOrgStyleRequiresAdmin`. Còn lại:
+  nhớ `doc_design` (M3-02), UI `MemoryForm` chia nhóm (M3-05), tiêu chí 5/5 lần cần bộ `17`.

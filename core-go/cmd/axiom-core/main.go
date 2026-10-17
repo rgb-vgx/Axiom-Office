@@ -134,6 +134,17 @@ func run() int {
 			return nil
 		})
 		memoryService.QueueEmbeddingBackfill()
+		// Don memory dinh ky (M5-01): chay ngay mot lan roi lap lai moi MemoryCleanupDays ngay (0 = tat).
+		go func() {
+			for {
+				days := config.Load().MemoryCleanupDays
+				if days <= 0 {
+					return
+				}
+				memoryService.RunCleanup()
+				time.Sleep(time.Duration(days) * 24 * time.Hour)
+			}
+		}()
 	}
 
 	// MCP client (muc 8.7): server built-in "office" (lan file) + mcp.json. Xem officeMcpHost.

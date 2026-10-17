@@ -3,15 +3,16 @@
 > Chia nhỏ tới từng hàm. Làm xong task nào đánh dấu [x]. Đối chiếu code 17/10/2026; đọc `12-m3` trước.
 > Đích: soạn văn bản mới đúng font/heading/cách xưng hô đã duyệt mà không phải nhắc lại trong câu lệnh.
 
-## M3-01. Scope `org-style` (chuẩn chung của đơn vị)
+## M3-01. Scope `org-style` (chuẩn chung của đơn vị) - XONG
 
-- [ ] `core-go/internal/memory/store.go`: thêm `ScopeOrgStyle = "org-style"` và nhận trong `IsValidScope`; trong
-      `AddBatch` không gán `scope_key` theo tài liệu cho scope này.
-- [ ] `core-go/internal/memory/retriever.go` `BuildContext`: luôn đưa fact `org-style` vào context (như `pinned`),
-      không phụ thuộc điểm keyword; có ngân sách riêng để không chiếm hết chỗ của fact tài liệu.
-- [ ] `core-go/internal/memory/service.go` `Active`: `org-style` không tự hết hạn, không bị dọn theo tệp.
-- [ ] `core-go/internal/agent/prompt.go`: hiện nhóm "Chuẩn chung của đơn vị" tách khỏi memory cá nhân/tài liệu.
-- [ ] Test: thêm `org-style` rồi hỏi một câu không liên quan → vẫn thấy trong context.
+- [x] `core-go/internal/memory/store.go`: `ScopeOrgStyle = "org-style"`, nhận trong `IsValidScope`; `AddBatch` không gán
+      `scope_key` cho scope này.
+- [x] `core-go/internal/memory/retriever.go` `BuildContext`: luôn đưa fact `org-style` vào context (như `pinned`), tách
+      vào `Context.OrgLines` với trần riêng `MaxOrgStyleMemories = 12`.
+- [x] `core-go/internal/memory/store.go` `Active`: `org-style` luôn có mặt, không gắn theo tệp.
+- [x] `core-go/internal/agent/prompt.go`: mục "Organisation-wide standards" (`OrgStyleSection`) tách khỏi memory cá
+      nhân/tài liệu.
+- [x] Test `TestOrgStyleAlwaysInContext`: câu hỏi không liên quan vẫn thấy chuẩn chung; fact tài liệu khác không lọt.
 
 ## M3-02. Nhớ kiểu trình bày đã chọn (`doc_design`)
 
@@ -29,12 +30,12 @@
       ưu tiên cho `van-ban-hanh-chinh`, `trinh-bay-chuyen-nghiep`, `thiet-ke-van-phong`.
 - [ ] Không sửa logic chọn skill tự động - chỉ làm input cho model rõ hơn.
 
-## M3-04. Phân quyền tối thiểu cho `org-style`
+## M3-04. Phân quyền tối thiểu cho `org-style` - XONG
 
-- [ ] `core-go/internal/config/config.go`: thêm khóa kiểu `OrgStyleAdmin` (env `AXIOM_ORG_STYLE_ADMIN` + HKCU) hoặc
-      đọc tệp chuẩn chung trong thư mục chung **chỉ đọc**; người dùng thường không ghi được `org-style`.
-- [ ] `core-go/internal/api/memory.go`: POST/PATCH/DELETE với scope `org-style` từ phiên không phải Admin → 403.
-- [ ] Test API: `TestOrgStyleRequiresAdmin`.
+- [x] `core-go/internal/config/config.go`: cờ `OrgStyleAdmin` (env `AXIOM_ORG_STYLE_ADMIN`, mặc định false).
+- [x] `core-go/internal/api/memory.go`: POST/PATCH/DELETE với scope `org-style` từ phiên không phải Admin → 403;
+      `?scope=all` của người thường không đụng `org-style`.
+- [x] Test `TestOrgStyleRequiresAdmin`.
 
 ## M3-05. UI `MemoryForm`
 
@@ -44,8 +45,8 @@
 
 ## M3-06. Hồi quy + changelog
 
-- [ ] `cd core-go && go test ./internal/memory/... ./internal/api/... ./internal/tools/...`.
-- [ ] Ghi `CHANGELOG.md [Unreleased]`; cập nhật `12-m3`.
+- [x] `cd core-go && go test ./internal/memory/... ./internal/api/... ./internal/tools/...`.
+- [x] Ghi `CHANGELOG.md [Unreleased]`; cập nhật `12-m3`.
 
 ## Tiêu chí xong
 

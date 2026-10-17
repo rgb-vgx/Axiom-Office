@@ -34,3 +34,10 @@
 ## 6. Không làm
 
 - Không tự viết lại skill từ memory, không lịch dọn phức tạp.
+
+## 7. Cập nhật 17/10/2026
+
+- Đã làm (Core): job dọn định kỳ `Store.Cleanup` (gộp gần trùng, xóa mềm hết hạn, dọn bản xóa mềm cũ), chu kỳ
+  `AXIOM_MEMORY_CLEANUP_DAYS` (mặc định 7); `org-style` không bị đụng. Test: `TestCleanupMergesNearDuplicates`,
+  `TestCleanupExpiresAndKeepsOrgStyle`. Còn lại: hạ `confidence` theo bậc (chờ số đo M5-03), đề xuất xóa tài liệu qua
+  thẻ `Choose`, test hiệu năng 10.000 fact.

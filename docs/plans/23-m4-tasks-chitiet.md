@@ -11,38 +11,39 @@
 - [x] `Store.Update/Delete/Restore/History/Purge` (`internal/memory/store.go`); lịch sử `memory_history`.
 - [x] UI `src/AxiomOffice/Ai/MemoryForm.cs` (xem, sửa, ghim, hạn dùng, xóa); pane hiện "Đã ghi nhớ: …" kèm link Xóa.
 
-## M4-01. Export / import JSON
+## M4-01. Export / import JSON - XONG (Core)
 
-- [ ] API mới `GET /v1/memory/export` (trả `{items, links, history}` hoặc chỉ `{items, links}`) và
-      `POST /v1/memory/import`; giữ `id`, `pinned`, `expires_at`; embedding tính lại sau khi import
-      (`service.QueueEmbeddingBackfill`).
-- [ ] Chống trùng khi import: dùng `findByHash`/`findNearDuplicate` sẵn có (`store.go`), báo số mục bỏ qua.
-- [ ] Test round-trip: DB trống → import → cùng số mục, ghim/hạn dùng, tìm được bằng keyword.
+- [x] API `GET /v1/memory/export` (`{count, items}`) và `POST /v1/memory/import`; giữ `id`, `pinned`, `expires_at`,
+      `hits`; embedding tính lại sau khi import (`service.QueueEmbeddingBackfill`).
+- [x] Chống trùng khi import: `findByHash` (`store.go`), trả `added`/`skipped`/`links`.
+- [x] Test `TestExportImportRoundTrip` (DB trống → import → cùng số mục, ghim/hạn dùng, tìm bằng keyword) và
+      `TestMemoryExportImportAPI`.
+- [ ] Còn: nút Export/Import trong `MemoryForm.cs`.
 
-## M4-02. Xóa theo tệp
+## M4-02. Xóa theo tệp - XONG (Core)
 
-- [ ] `DELETE /v1/memory?documentKey=…&confirm=true` trong `internal/api/memory.go` (mở rộng nhánh `scope=…` sẵn
-      có); xóa mềm theo `scope_key`.
-- [ ] `src/AxiomOffice/Ai/MemoryForm.cs`: nút "Quên mọi thứ về tài liệu này" khi đang mở tài liệu.
-- [ ] Test `TestPurgeByDocumentKey`.
+- [x] `DELETE /v1/memory?documentKey=…&confirm=true` (`Store.SoftDeleteByScopeKey` - xóa mềm theo `scope_key`).
+- [x] Test `TestSoftDeleteByScopeKey`, `TestMemoryDeleteByDocumentAPI`.
+- [ ] Còn: nút "Quên mọi thứ về tài liệu này" trong `MemoryForm.cs` khi đang mở tài liệu.
 
 ## M4-03. Lịch sử sửa trong UI
 
 - [ ] `MemoryForm.cs`: hiện `GET /v1/memory/{id}/history` của mục đang chọn (actor, run, lý do, trước/sau).
 - [ ] Chữ mới vào `src/AxiomOffice/lang/en.json`.
 
-## M4-04. Tắt memory theo scope
+## M4-04. Tắt memory theo scope - XONG (Core)
 
-- [ ] `core-go/internal/config/config.go`: cờ tắt riêng memory tài liệu / cá nhân (đọc lại mỗi lượt như
-      `MemoryEnabled` - xem `service.go` `config()`, `Enabled()`).
-- [ ] `service.Context`/`BuildContext`: scope bị tắt thì không đưa vào context, nhưng **không** xóa dữ liệu; có hiệu
-      lực ngay không cần khởi động lại.
-- [ ] UI: hai ô trong Cài đặt nâng cao (`SettingsForm.cs`) hoặc `MemoryForm`.
+- [x] `core-go/internal/config/config.go`: `MemoryDocumentEnabled`, `MemoryUserEnabled` (env
+      `AXIOM_MEMORY_DOCUMENT_ENABLED`, `AXIOM_MEMORY_USER_ENABLED`).
+- [x] `Service.Context` → `Retriever.BuildContext(..., ScopeFilter{...})`: scope bị tắt không vào context, **không**
+      xóa dữ liệu; đọc lại mỗi lượt nên có hiệu lực ngay.
+- [x] Test `TestScopeFilterDisablesScopes`.
+- [ ] Còn: hai ô trong Cài đặt nâng cao (`SettingsForm.cs`).
 
 ## M4-05. Hồi quy + changelog
 
-- [ ] `cd core-go && go test ./internal/api/... ./internal/memory/...`.
-- [ ] Ghi `CHANGELOG.md [Unreleased]`; cập nhật `13-m4`.
+- [x] `cd core-go && go test ./internal/api/... ./internal/memory/...`.
+- [x] Ghi `CHANGELOG.md [Unreleased]`; cập nhật `13-m4`.
 
 ## Tiêu chí xong
 

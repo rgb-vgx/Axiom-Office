@@ -198,6 +198,19 @@ func MemorySection(memories []string) string {
 		strings.Join(lines, "\n")
 }
 
+// OrgStyleSection: chuan chung cua don vi (M3-01) - tach khoi memory ca nhan/tai lieu de model uu tien ap dung.
+func OrgStyleSection(orgLines []string) string {
+	if len(orgLines) == 0 {
+		return ""
+	}
+	lines := make([]string, 0, len(orgLines))
+	for _, memory := range orgLines {
+		lines = append(lines, "- "+memory)
+	}
+	return "Organisation-wide standards (apply these unless the user says otherwise in this request):\n" +
+		strings.Join(lines, "\n")
+}
+
 func ConversationSection(summary string, recentLines []string) string {
 	if strings.TrimSpace(summary) == "" && len(recentLines) == 0 {
 		return ""
@@ -214,10 +227,11 @@ func ConversationSection(summary string, recentLines []string) string {
 
 // Build: ghep system prompt theo thu tu on dinh de cache duoc (muc 8.8).
 func Build(appKind string, session *office.Session, document *DocumentContext, appSkills []skills.Definition,
-	memories []string, summary string, recentLines []string) string {
+	memories []string, orgLines []string, summary string, recentLines []string) string {
 	sections := []string{Base(AppName(appKind)), DocumentSection(session, document)}
 	for _, section := range []string{
 		SkillsSection(appSkills),
+		OrgStyleSection(orgLines),
 		MemorySection(memories),
 		ConversationSection(summary, recentLines),
 		ViewSection(document),

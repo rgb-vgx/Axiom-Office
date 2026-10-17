@@ -92,7 +92,9 @@ func (s *Service) Context(ctx context.Context, prompt, documentKey string) Conte
 		corelog.Error("memory context failed: %s", problem)
 		return EmptyContext()
 	}
-	return s.retriever.BuildContext(prompt, documentKey, Today(), semantic)
+	cfg := s.config()
+	return s.retriever.BuildContext(prompt, documentKey, Today(), semantic,
+		ScopeFilter{Document: cfg.MemoryDocumentEnabled, User: cfg.MemoryUserEnabled})
 }
 
 func (s *Service) Search(ctx context.Context, query, documentKey, scope string, limit int) []Hit {
@@ -130,6 +132,17 @@ func (s *Service) TouchHits(ids []string) {
 	}
 	s.Enqueue(func(context.Context) error {
 		s.store.TouchHits(ids)
+		return nil
+	})
+}
+
+// RunCleanup: xep job don dinh ky vao hang doi nen (M5-01) - chay sau cac viec khac, khong chen ngang luot dang chay.
+func (s *Service) RunCleanup() {
+	s.Enqueue(func(context.Context) error {
+		stats := s.store.Cleanup(Today())
+		if stats.Merged+stats.Expired+stats.Purged > 0 {
+			corelog.Info("memory cleanup: gop %d, het han %d, don xoa mem %d", stats.Merged, stats.Expired, stats.Purged)
+		}
 		return nil
 	})
 }

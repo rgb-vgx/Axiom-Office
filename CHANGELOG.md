@@ -5,6 +5,18 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added - quan ly memory + chuan chung don vi (M3, M4, M5, 17/10/2026)
+- Scope `org-style` (chuẩn chung của đơn vị): luôn vào ngữ cảnh, tách riêng trong system prompt
+  ("Organisation-wide standards"), không gắn theo tài liệu, không tự hết hạn (M3-01). Ghi scope này cần quyền quản
+  trị (`AXIOM_ORG_STYLE_ADMIN`, mặc định tắt) - API trả 403 nếu không phải admin (M3-04).
+- Export/import memory JSON: `GET /v1/memory/export`, `POST /v1/memory/import` (giữ id/pinned/hạn dùng, chống trùng
+  theo hash, tính lại embedding sau) (M4-01); xóa mềm theo tài liệu `DELETE /v1/memory?documentKey=…&confirm=true`
+  (M4-02).
+- Tắt riêng ngữ cảnh memory tài liệu / cá nhân: `AXIOM_MEMORY_DOCUMENT_ENABLED`, `AXIOM_MEMORY_USER_ENABLED`, có
+  hiệu lực ngay, không xóa dữ liệu (M4-04).
+- Dọn định kỳ: gộp fact gần trùng đã lọt, xóa mềm fact hết hạn, dọn bản xóa mềm cũ; chu kỳ `AXIOM_MEMORY_CLEANUP_DAYS`
+  (mặc định 7 ngày, 0 = tắt); `org-style` không bị đụng tới (M5-01/M5-02).
+
 ### Added - memory Redact + audit an toan (M2, P6-01/02/04, 17/10/2026)
 - `memory.Redact` (core-go/internal/memory/text.go): thay thông tin nhạy cảm bằng `[ẩn]` (email, token
   `sk-`/JWT/`Bearer`, mật khẩu/PIN/OTP, CCCD/số tài khoản, số thẻ, số điện thoại có dấu cách) mà **không** cắt oan

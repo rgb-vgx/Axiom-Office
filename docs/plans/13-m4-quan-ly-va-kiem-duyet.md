@@ -38,3 +38,10 @@
 ## 6. Không làm
 
 - Không phân quyền phức tạp hơn Admin/User, không đồng bộ máy chủ.
+
+## 7. Cập nhật 17/10/2026
+
+- Đã làm (Core): export/import JSON (`GET /v1/memory/export`, `POST /v1/memory/import`), xóa mềm theo tài liệu
+  (`?documentKey=…`), tắt riêng ngữ cảnh tài liệu/cá nhân (`AXIOM_MEMORY_DOCUMENT_ENABLED`/`AXIOM_MEMORY_USER_ENABLED`).
+  Test: `TestExportImportRoundTrip`, `TestSoftDeleteByScopeKey`, `TestScopeFilterDisablesScopes`, `TestMemoryExportImportAPI`,
+  `TestMemoryDeleteByDocumentAPI`. Còn lại: phần UI trong `MemoryForm.cs` (nút Export/Import, Quên tài liệu, lịch sử).

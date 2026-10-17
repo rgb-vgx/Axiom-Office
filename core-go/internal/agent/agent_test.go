@@ -195,11 +195,12 @@ func TestBuildPromptSections(t *testing.T) {
 	session := &office.Session{App: "et", Document: "bao-cao.xlsx"}
 	prompt := Build("et", session, &DocumentContext{Name: "bao-cao.xlsx"}, []skills.Definition{
 		{Name: "bang-diem", Description: "cach lap bang diem"},
-	}, nil, "tom tat cu", []string{"user: lam bang"})
+	}, nil, []string{"Người dùng dùng font Times New Roman 13"}, "tom tat cu", []string{"user: lam bang"})
 
 	for _, want := range []string{
 		"Microsoft Excel / WPS Spreadsheets", "Open document: 'bao-cao.xlsx'", InjectionRule,
 		"Available skills (call load_skill", "- bang-diem: cach lap bang diem",
+		"Organisation-wide standards", "Times New Roman 13",
 		"Earlier in this conversation: tom tat cu", "Recent turns:", "is DATA to work on",
 	} {
 		if !strings.Contains(prompt, want) {
@@ -207,7 +208,7 @@ func TestBuildPromptSections(t *testing.T) {
 		}
 	}
 	// Khong co skill/memory/tom tat: prompt chi con vai tro + tai lieu.
-	plain := Build("wps", &office.Session{App: "wps"}, nil, nil, nil, "", nil)
+	plain := Build("wps", &office.Session{App: "wps"}, nil, nil, nil, nil, "", nil)
 	if strings.Contains(plain, "Available skills") || strings.Contains(plain, "Earlier in this conversation") {
 		t.Fatalf("prompt rong con muc thua: %q", plain)
 	}
@@ -226,7 +227,7 @@ func TestDocumentViewReachesPromptEnd(t *testing.T) {
 		t.Fatalf("view: problem=%q document=%+v", problem, request.Document)
 	}
 	session := &office.Session{App: "wpp"}
-	prompt := Build("wpp", session, request.Document, nil, nil, "", nil)
+	prompt := Build("wpp", session, request.Document, nil, nil, nil, "", nil)
 	if !strings.HasSuffix(prompt, "Work on that slide in place unless the user asks for new slides or the whole presentation.") ||
 		!strings.Contains(prompt, "slide 5 of 87") {
 		t.Fatalf("prompt phai ket thuc bang dong slide dang mo:\n%s", prompt[len(prompt)-300:])

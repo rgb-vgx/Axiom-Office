@@ -51,14 +51,17 @@ func mapMemory(mux *http.ServeMux, deps *Deps) {
 		}
 		text := textOf(body["text"])
 		if !memory.IsValidScope(scope) || strings.TrimSpace(text) == "" {
-			Error(w, http.StatusBadRequest, "'scope' (user|document|skill) and 'text' are required")
+			Error(w, http.StatusBadRequest, "'scope' (user|document|skill|org-style) and 'text' are required")
+			return
+		}
+		if denyOrgStyle(w, deps, scope) {
 			return
 		}
 		scopeKey := textOf(body["scopeKey"])
 		if scopeKey == "" {
 			scopeKey = textOf(body["documentKey"])
 		}
-		if scope != memory.ScopeUser && strings.TrimSpace(scopeKey) == "" {
+		if scope != memory.ScopeUser && scope != memory.ScopeOrgStyle && strings.TrimSpace(scopeKey) == "" {
 			Error(w, http.StatusBadRequest, "'scopeKey' is required for scope "+scope)
 			return
 		}
@@ -82,6 +85,9 @@ func mapMemory(mux *http.ServeMux, deps *Deps) {
 	})
 
 	mux.HandleFunc("PATCH /v1/memory/{id}", func(w http.ResponseWriter, r *http.Request) {
+		if existing := service.Store().Get(r.PathValue("id")); existing != nil && denyOrgStyle(w, deps, existing.Scope) {
+			return
+		}
 		body, _ := readJSON(r)
 		_, hasExpires := body["expiresAt"]
 		var pinned *bool
@@ -102,6 +108,9 @@ func mapMemory(mux *http.ServeMux, deps *Deps) {
 
 	mux.HandleFunc("DELETE /v1/memory/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
+		if existing := service.Store().Get(id); existing != nil && denyOrgStyle(w, deps, existing.Scope) {
+			return
+		}
 		if !service.Store().Delete(id, queryValue(r.URL.Query().Get("reason"))) {
 			Error(w, http.StatusNotFound, "unknown memory: "+id)
 			return
@@ -129,20 +138,110 @@ func mapMemory(mux *http.ServeMux, deps *Deps) {
 		OK(w, map[string]any{"history": list})
 	})
 
-	// Xoa cung toan bo: phai co ?scope=all&confirm=true (UI hoi lai truoc).
+	// Xoa cung: ?scope=all|user|document|skill|org-style&confirm=true, hoac xoa mem theo tai lieu
+	// ?documentKey=…&confirm=true (M4-02). org-style chi quan tri vien (M3-04).
 	mux.HandleFunc("DELETE /v1/memory", func(w http.ResponseWriter, r *http.Request) {
 		query := r.URL.Query()
-		scope := queryValue(query.Get("scope"))
-		if query.Get("confirm") != "true" || scope == "" || (scope != "all" && !memory.IsValidScope(scope)) {
-			Error(w, http.StatusBadRequest, "use ?scope=all|user|document&confirm=true")
+		if query.Get("confirm") != "true" {
+			Error(w, http.StatusBadRequest, "confirm=true is required")
 			return
 		}
-		purgeScope := scope
-		if scope == "all" {
-			purgeScope = ""
+		if documentKey := queryValue(query.Get("documentKey")); documentKey != "" {
+			OK(w, map[string]any{"removed": service.Store().SoftDeleteByScopeKey(documentKey, "forget document")})
+			return
 		}
-		OK(w, map[string]any{"removed": service.Store().Purge(purgeScope)})
+		scope := queryValue(query.Get("scope"))
+		if scope == "" || (scope != "all" && !memory.IsValidScope(scope)) {
+			Error(w, http.StatusBadRequest, "use ?scope=all|user|document|skill|org-style&confirm=true or ?documentKey=…&confirm=true")
+			return
+		}
+		if denyOrgStyle(w, deps, scope) {
+			return
+		}
+		if scope == "all" {
+			if deps.Live().OrgStyleAdmin {
+				OK(w, map[string]any{"removed": service.Store().Purge("")})
+				return
+			}
+			// Nguoi thuong: "all" la toan bo memory cua ho, khong dung cham chuan chung cua don vi.
+			removed := service.Store().Purge(memory.ScopeUser) + service.Store().Purge(memory.ScopeDocument) +
+				service.Store().Purge(memory.ScopeSkill)
+			OK(w, map[string]any{"removed": removed})
+			return
+		}
+		OK(w, map[string]any{"removed": service.Store().Purge(scope)})
 	})
+
+	// M4-01: xuat / nhap JSON. Export giu id/pinned/han dung; import chong trung theo hash roi tinh lai embedding.
+	mux.HandleFunc("GET /v1/memory/export", func(w http.ResponseWriter, r *http.Request) {
+		if !service.Available() {
+			Error(w, http.StatusServiceUnavailable, "memory unavailable")
+			return
+		}
+		items := service.Store().Export()
+		OK(w, map[string]any{"count": len(items), "items": items})
+	})
+
+	mux.HandleFunc("POST /v1/memory/import", func(w http.ResponseWriter, r *http.Request) {
+		if !service.Available() {
+			Error(w, http.StatusServiceUnavailable, "memory unavailable")
+			return
+		}
+		body, _ := readJSON(r)
+		raw, _ := body["items"].([]any)
+		rows := make([]memory.ExportRow, 0, len(raw))
+		for _, entry := range raw {
+			object, ok := entry.(map[string]any)
+			if !ok {
+				continue
+			}
+			rows = append(rows, memory.ExportRow{
+				ID: textOf(object["id"]), Scope: textOf(object["scope"]), ScopeKey: textOf(object["scopeKey"]),
+				Text: textOf(object["text"]), Category: textOf(object["category"]), ExpiresAt: textOf(object["expiresAt"]),
+				Source: textOf(object["source"]), Confidence: numberOf(object["confidence"]),
+				Pinned: object["pinned"] == true, Hits: int(numberOf(object["hits"])),
+				CreatedAt: textOf(object["createdAt"]), UpdatedAt: textOf(object["updatedAt"]),
+				Entities: stringList(object["entities"]), Links: stringList(object["links"]),
+			})
+		}
+		result, err := service.Store().Import(rows)
+		if err != nil {
+			Error(w, http.StatusInternalServerError, "import failed: "+err.Error())
+			return
+		}
+		// Embedding tinh lai o hang doi nen (khong chan cau tra loi).
+		service.QueueEmbeddingBackfill()
+		OK(w, map[string]any{"added": result.Added, "skipped": result.Skipped, "links": result.Links})
+	})
+}
+
+// denyOrgStyle: chan ghi chuan chung cua don vi khi khong phai quan tri vien (M3-04).
+func denyOrgStyle(w http.ResponseWriter, deps *Deps, scope string) bool {
+	if scope == memory.ScopeOrgStyle && !deps.Live().OrgStyleAdmin {
+		Error(w, http.StatusForbidden, "scope org-style requires admin (AXIOM_ORG_STYLE_ADMIN=1)")
+		return true
+	}
+	return false
+}
+
+// stringList: mang chuoi trong body JSON (bo qua phan tu khong phai chuoi).
+func stringList(value any) []string {
+	raw, ok := value.([]any)
+	if !ok {
+		return nil
+	}
+	list := []string{}
+	for _, entry := range raw {
+		if text, ok := entry.(string); ok && text != "" {
+			list = append(list, text)
+		}
+	}
+	return list
+}
+
+func numberOf(value any) float64 {
+	number, _ := value.(float64)
+	return number
 }
 
 func memoryJSON(item memory.Item) map[string]any {

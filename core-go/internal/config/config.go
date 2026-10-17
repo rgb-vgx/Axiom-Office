@@ -32,6 +32,14 @@ type Config struct {
 	CoreEnabled       bool
 	MemoryEnabled     bool
 	MemoryAutoExtract bool
+	// MemoryDocumentEnabled / MemoryUserEnabled: tat rieng ngu canh memory tai lieu / ca nhan (M4-04) - doc lai moi
+	// luot nhu MemoryEnabled, khong xoa du lieu.
+	MemoryDocumentEnabled bool
+	MemoryUserEnabled     bool
+	// OrgStyleAdmin: cho phep ghi chuan chung cua don vi (scope org-style); nguoi dung thuong chi doc (M3-04).
+	OrgStyleAdmin bool
+	// MemoryCleanupDays: chu ky don memory dinh ky (M5-01). 0 = tat. Mac dinh 7 ngay.
+	MemoryCleanupDays int
 	LlmProvider       string
 	LlmEndpoint       string
 	LlmModel          string
@@ -63,9 +71,9 @@ type Config struct {
 	TavilyEnabled bool
 	// WebSourceStore: luu nguon web tai ve (trang da doc) vao core.db de trich dan lai / khoi tai lai.
 	// WebSourceKeepDays: so ngay giu nguon; 0 = giu mai (chi don theo tran dung luong WebSourceMaxMB).
-	WebSourceStore           bool
-	WebSourceKeepDays        int
-	WebSourceMaxMB           int
+	WebSourceStore    bool
+	WebSourceKeepDays int
+	WebSourceMaxMB    int
 	// AuditKeepDays: so ngay giu tool_calls (nhat ky hoat dong). 0 = giu mai. Mac dinh 90 (07-p6).
 	AuditKeepDays            int
 	MemoryModel              string
@@ -109,6 +117,10 @@ func From(env Env, source Source) Config {
 		CoreEnabled:              flag(env, "AXIOM_CORE_ENABLED", source, "CoreEnabled", true),
 		MemoryEnabled:            flag(env, "AXIOM_MEMORY_ENABLED", source, "MemoryEnabled", true),
 		MemoryAutoExtract:        flag(env, "AXIOM_MEMORY_AUTO_EXTRACT", source, "MemoryAutoExtract", true),
+		MemoryDocumentEnabled:    flag(env, "AXIOM_MEMORY_DOCUMENT_ENABLED", source, "MemoryDocumentEnabled", true),
+		MemoryUserEnabled:        flag(env, "AXIOM_MEMORY_USER_ENABLED", source, "MemoryUserEnabled", true),
+		OrgStyleAdmin:            flag(env, "AXIOM_ORG_STYLE_ADMIN", source, "OrgStyleAdmin", false),
+		MemoryCleanupDays:        clamp(intValue(env, "AXIOM_MEMORY_CLEANUP_DAYS", source, "MemoryCleanupDays", 7), 0, 3650),
 		LlmProvider:              provider,
 		LlmEndpoint:              text(env, "AXIOM_LLM_ENDPOINT", source, "LlmEndpoint"),
 		LlmModel:                 text(env, "AXIOM_LLM_MODEL", source, "LlmModel"),
