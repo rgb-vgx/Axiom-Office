@@ -5,6 +5,15 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed - giao diện ARCHITECTURE.html theo hướng tài liệu kỹ thuật (17/10/2026)
+- Dựng lại phần trình bày theo design system "Minimalism / Swiss — technical documentation": token màu sáng/tối,
+  cặp font **JetBrains Mono + IBM Plex Sans**, nút **chuyển sáng/tối** (nhớ trong `localStorage`, tôn trọng
+  `prefers-color-scheme`).
+- Thêm topbar dính, hero có số liệu nhanh, mục lục dính **tô sáng mục đang đọc**, thanh tiến trình đọc, nút về đầu trang.
+- Hình: bấm để **phóng to** (lightbox) và liên kết "Mở SVG"; bảng tự bọc khung cuộn ngang; khối mã có nút "Sao chép".
+- A11y: skip link, `:focus-visible`, `aria-pressed`/`aria-expanded` cho nút giao diện và mục lục, tôn trọng
+  `prefers-reduced-motion`; bản in/PDF gọn. Nội dung không đổi (13 hình, 21 bảng, 15 mục).
+
 ### Docs - ARCHITECTURE.html + bộ sơ đồ draw.io (17/10/2026)
 - Thêm `ARCHITECTURE.html` (gốc repo): tài liệu kiến trúc tiếng Việt 15 mục, kèm 13 sơ đồ tham chiếu từ
   `docs/architecture/img/*.drawio.svg`.

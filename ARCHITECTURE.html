@@ -4,124 +4,433 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Axiom Office — Tài liệu kiến trúc</title>
+<meta name="description" content="Tài liệu kiến trúc Axiom Office: add-in tự động hoá Microsoft Office, WPS và LibreOffice bằng trợ lý AI tiếng Việt chạy local. Kèm 13 sơ đồ draw.io.">
+<meta name="author" content="Axiom Office">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#0b1220" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f4f7fb" media="(prefers-color-scheme: light)">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232563eb'/%3E%3Cpath d='M16 6l8 4.6v8.8L16 24l-8-4.6v-8.8z' fill='none' stroke='%23ffffff' stroke-width='2'/%3E%3Cpath d='M12 15.5l2.6 2.6L20 12.7' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;600;700&amp;display=swap">
+<script>
+/* Áp giao diện trước khi vẽ để tránh nháy sáng/tối */
+(function(){try{var k="ax-th",t=localStorage.getItem(k);
+if(t!=="dark"&&t!=="light"){t=(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";}
+document.documentElement.setAttribute("data-theme",t);}catch(e){}})();
+</script>
 <style>
-  :root{
-    --bg:#f6f7f9; --panel:#fff; --ink:#1e2430; --muted:#5a6373; --line:#e3e7ee;
-    --brand:#2456a6; --accent:#c2410c; --ok:#1d7a46; --code:#0f172a; --codeink:#e9eefb;
-    --maxw:1200px;
-  }
-  *{box-sizing:border-box}
-  html{scroll-behavior:smooth}
-  body{margin:0;background:var(--bg);color:var(--ink);
-    font:16px/1.62 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif}
-  a{color:var(--brand);text-decoration:none}
-  a:hover{text-decoration:underline}
-  code{font-family:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",Menlo,monospace;font-size:.88em;
-    background:#eef1f6;border:1px solid #e0e5ec;border-radius:4px;padding:.06em .35em}
-  pre{background:var(--code);color:var(--codeink);padding:14px 16px;border-radius:10px;overflow:auto;font-size:.85rem;line-height:1.5}
-  pre code{background:none;border:0;padding:0;color:inherit;font-size:1em}
-  header.top{background:linear-gradient(135deg,#173a72,#2456a6 55%,#2c7a52);color:#fff;padding:40px 24px 32px}
-  header.top .wrap{max-width:var(--maxw);margin:0 auto}
-  header.top h1{margin:0 0 10px;font-size:2rem;letter-spacing:.2px}
-  header.top p{margin:4px 0;color:#dde7f8}
-  .badges{margin-top:16px;display:flex;flex-wrap:wrap;gap:8px}
-  .badge{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:999px;
-    padding:4px 12px;font-size:.8rem;white-space:nowrap}
-  .layout{max-width:var(--maxw);margin:0 auto;display:grid;grid-template-columns:270px 1fr;gap:30px;padding:28px 24px 90px}
-  nav.toc{position:sticky;top:16px;align-self:start;background:var(--panel);border:1px solid var(--line);
-    border-radius:12px;padding:16px;max-height:calc(100vh - 40px);overflow:auto;font-size:.9rem}
-  nav.toc h2{margin:0 0 10px;font-size:.74rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
-  nav.toc ol{margin:0;padding-left:1.1em}
-  nav.toc li{margin:5px 0}
-  main{min-width:0}
-  section{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:26px 28px;margin:0 0 22px}
-  h2.sec{margin:0 0 6px;font-size:1.32rem;border-left:5px solid var(--brand);padding-left:12px}
-  h2.sec .n{color:var(--brand);font-weight:700}
-  h3{margin:26px 0 8px;font-size:1.08rem}
-  h4{margin:18px 0 6px;font-size:.98rem;color:#33405a}
-  p{margin:10px 0}
-  ul,ol{margin:10px 0;padding-left:1.3em}
-  li{margin:5px 0}
-  .lead{color:var(--muted);font-size:1.02rem;margin-top:0}
-  .grid{display:grid;gap:14px}
-  .g2{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
-  .g3{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
-  .card{background:#fbfcfe;border:1px solid var(--line);border-radius:10px;padding:14px 16px}
-  .card h4{margin-top:0}
-  .callout{border-left:4px solid var(--brand);background:#eef4ff;border-radius:8px;padding:12px 16px;margin:14px 0}
-  .callout.warn{border-color:var(--accent);background:#fff3ec}
-  .callout.ok{border-color:var(--ok);background:#ecfaf1}
-  .callout p{margin:6px 0}
-  figure{margin:18px 0 22px;padding:0}
-  figure .shot{border:1px solid var(--line);border-radius:12px;background:#fff;padding:10px;overflow:auto;text-align:center}
-  figure img{max-width:100%;height:auto;display:block;margin:0 auto}
-  figcaption{color:var(--muted);font-size:.88rem;margin-top:8px}
-  figcaption b{color:var(--ink)}
-  .src{font-size:.82rem;color:var(--muted)}
-  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:.9rem}
-  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
-  th{background:#f1f4f9;font-weight:600}
-  tbody tr:nth-child(even){background:#fafbfd}
-  .kv td:first-child{white-space:nowrap;font-weight:600;color:#33405a;width:34%}
-  .pill{display:inline-block;border-radius:999px;padding:1px 9px;font-size:.76rem;font-weight:600;border:1px solid}
-  .pill.go{color:var(--ok);border-color:#b7e3c8;background:#eafaf0}
-  .pill.pend{color:var(--accent);border-color:#f4cdb8;background:#fff1e9}
-  .pill.info{color:var(--brand);border-color:#c6d8f5;background:#eef4ff}
-  .pill.mut{color:var(--muted);border-color:#dfe4ec;background:#f3f5f9}
-  footer{max-width:var(--maxw);margin:0 auto;padding:0 24px 60px;color:var(--muted);font-size:.86rem}
-  .anchor{scroll-margin-top:18px}
-  @media (max-width:900px){
-    .layout{grid-template-columns:1fr;padding:18px 14px 70px}
-    nav.toc{position:static;max-height:none}
-    section{padding:20px 16px}
-  }
-  @media print{
-    nav.toc{display:none}
-    .layout{grid-template-columns:1fr;padding:0}
-    section{border:0;page-break-inside:avoid}
-    header.top{background:#2456a6}
-  }
+/* =========================================================================
+   Axiom Office — design tokens (ui-ux-pro-max)
+   Style: Minimalism / Swiss — technical documentation
+   Fonts: JetBrains Mono (headings, code, labels) + IBM Plex Sans (body)
+   Themes: light (default) + dark, tự chuyển theo [data-theme]
+   ========================================================================= */
+:root{
+  --font-sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",Arial,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",Menlo,monospace;
+
+  /* light — Knowledge Base / Documentation */
+  --bg:#f4f7fb;
+  --bg-2:#eef2f8;
+  --surface:#ffffff;
+  --surface-2:#f8fafc;
+  --ink:#0f172a;
+  --ink-2:#334155;
+  --muted:#5d6b80;
+  --line:#e2e8f0;
+  --line-2:#cbd5e1;
+  --brand:#2563eb;
+  --brand-soft:#eef4ff;
+  --brand-ring:#c7d9fb;
+  --ok:#15803d;
+  --ok-soft:#ecfdf3;
+  --ok-ring:#bbf7d0;
+  --warn:#b45309;
+  --warn-soft:#fff7ed;
+  --warn-ring:#fed7aa;
+  --code-bg:#0d1526;
+  --code-ink:#dbe6fb;
+  --code-ring:#24314a;
+  --shadow-1:0 1px 2px rgba(15,23,42,.05);
+  --shadow-2:0 1px 2px rgba(15,23,42,.05),0 14px 30px -22px rgba(15,23,42,.45);
+  --ico-info:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232563eb' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 16v-5M12 8h.01'/%3E%3C/svg%3E");
+  --ico-warn:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23b45309' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z'/%3E%3Cpath d='M12 9v4M12 17h.01'/%3E%3C/svg%3E");
+  --ico-ok:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2315803d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='m9 12 2 2 4-4'/%3E%3C/svg%3E");
+  --measure:76ch;
+  --radius:16px;
+  color-scheme:light;
+}
+:root[data-theme="dark"]{
+  --bg:#070b16;
+  --bg-2:#0a1120;
+  --surface:#0f172a;
+  --surface-2:#131d33;
+  --ink:#e9eefb;
+  --ink-2:#c6d2e6;
+  --muted:#93a3ba;
+  --line:#233150;
+  --line-2:#33456a;
+  --brand:#7cb0fb;
+  --brand-soft:#12233f;
+  --brand-ring:#26456f;
+  --ok:#5ee08c;
+  --ok-soft:#0d2a1e;
+  --ok-ring:#1d5136;
+  --warn:#fbbf24;
+  --warn-soft:#2a1f0c;
+  --warn-ring:#5a4318;
+  --code-bg:#05090f;
+  --code-ink:#dbe6fb;
+  --code-ring:#1e2b45;
+  --shadow-1:0 1px 2px rgba(0,0,0,.5);
+  --shadow-2:0 1px 2px rgba(0,0,0,.5),0 18px 40px -24px rgba(0,0,0,.9);
+  --ico-info:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237cb0fb' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 16v-5M12 8h.01'/%3E%3C/svg%3E");
+  --ico-warn:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fbbf24' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z'/%3E%3Cpath d='M12 9v4M12 17h.01'/%3E%3C/svg%3E");
+  --ico-ok:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235ee08c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='m9 12 2 2 4-4'/%3E%3C/svg%3E");
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;padding-top:56px;background:var(--bg);color:var(--ink);
+  font:400 16px/1.68 var(--font-sans);
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+}
+::selection{background:var(--brand);color:#fff}
+a{color:var(--brand);text-decoration:none}
+a:hover{text-decoration:underline;text-underline-offset:.18em}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:4px}
+.ico{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* ---------- skip link + progress ---------- */
+.skip-link{position:absolute;left:-9999px;top:8px;z-index:80;background:var(--surface);color:var(--ink);
+  border:1px solid var(--line-2);border-radius:8px;padding:10px 14px;box-shadow:var(--shadow-2)}
+.skip-link:focus{left:12px}
+.read-progress{position:fixed;inset:0 0 auto 0;height:3px;z-index:60;background:transparent;pointer-events:none}
+.read-progress>span{display:block;height:100%;width:0;
+  background:linear-gradient(90deg,var(--brand),#22c55e);transition:width .1s linear}
+
+/* ---------- topbar ---------- */
+.topbar{position:fixed;top:0;left:0;right:0;height:56px;z-index:50;
+  background:var(--surface);
+  background:color-mix(in srgb,var(--surface) 86%,transparent);
+  -webkit-backdrop-filter:saturate(180%) blur(10px);backdrop-filter:saturate(180%) blur(10px);
+  border-bottom:1px solid var(--line)}
+.topbar-in{max-width:1280px;height:100%;margin:0 auto;display:flex;align-items:center;gap:10px;padding:0 20px}
+.brand{display:flex;align-items:center;gap:10px;color:var(--ink);text-decoration:none}
+.brand:hover{text-decoration:none}
+.brand-mark{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;color:#eaf1ff;
+  background:linear-gradient(140deg,#1d3a6b,#2563eb 55%,#1f9d63);box-shadow:var(--shadow-1)}
+.brand-text{display:flex;flex-direction:column;line-height:1.15}
+.brand-text b{font:600 .98rem/1.15 var(--font-sans);letter-spacing:-.01em}
+.brand-text small{font:500 .68rem/1.15 var(--font-mono);color:var(--muted);text-transform:uppercase;letter-spacing:.09em}
+.topbar-spacer{flex:1}
+.chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;font:500 .72rem/1 var(--font-mono);
+  letter-spacing:.02em;padding:6px 10px;border:1px solid var(--line-2);color:var(--ink-2);background:var(--surface-2)}
+.chip-link:hover{text-decoration:none;border-color:var(--brand);color:var(--brand)}
+.iconbtn{display:inline-grid;place-items:center;width:38px;height:38px;border-radius:10px;cursor:pointer;
+  background:var(--surface-2);border:1px solid var(--line-2);color:var(--ink-2);transition:background .18s,color .18s,border-color .18s}
+.iconbtn:hover{color:var(--brand);border-color:var(--brand);background:var(--brand-soft)}
+.btn-ghost{display:inline-flex;align-items:center;gap:7px;height:38px;padding:0 12px;border-radius:10px;cursor:pointer;
+  background:var(--surface-2);border:1px solid var(--line-2);color:var(--ink-2);font:500 .85rem/1 var(--font-sans);
+  transition:background .18s,color .18s,border-color .18s}
+.btn-ghost:hover{color:var(--brand);border-color:var(--brand);background:var(--brand-soft)}
+:root[data-theme="dark"] .ico-sun{display:none}
+:root:not([data-theme="dark"]) .ico-moon{display:none}
+.only-mobile{display:none}
+
+/* ---------- hero ---------- */
+.hero{position:relative;overflow:hidden;color:#e8eefc;border-bottom:1px solid var(--line);
+  background:
+    radial-gradient(900px 380px at 10% -30%,rgba(37,99,235,.62),transparent 62%),
+    radial-gradient(720px 320px at 88% -10%,rgba(34,197,94,.34),transparent 60%),
+    linear-gradient(140deg,#0a1120 0%,#111d33 55%,#0b2a21 100%)}
+.hero::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:.5;
+  background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);
+  background-size:44px 44px;-webkit-mask-image:linear-gradient(180deg,#000,transparent 78%);mask-image:linear-gradient(180deg,#000,transparent 78%)}
+@supports not ((mask-image:linear-gradient(#000,#fff)) or (-webkit-mask-image:linear-gradient(#000,#fff))){
+  .hero::after{display:none}
+}
+.hero-in{position:relative;max-width:1280px;margin:0 auto;padding:52px 24px 44px}
+.eyebrow{margin:0 0 10px;font:500 .74rem/1 var(--font-mono);text-transform:uppercase;letter-spacing:.16em;color:#9dc0f5}
+.hero h1{margin:0 0 12px;font:600 clamp(2rem,1.4rem+2.6vw,3rem)/1.06 var(--font-mono);letter-spacing:-.02em;color:#fff}
+.hero-lead{margin:0;max-width:72ch;font-size:clamp(1rem,.96rem+.3vw,1.14rem);color:#d6e2f7}
+.hero-meta{margin:12px 0 0;font:500 .82rem/1.5 var(--font-mono);color:#a8bcda}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:20px 0 0;padding:0;list-style:none}
+.chips .chip{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.22);color:#e6eefb}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:26px 0 0}
+.stat{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:13px 15px}
+.stat b{display:block;font:600 1.65rem/1 var(--font-mono);color:#fff}
+.stat span{display:block;margin-top:5px;font-size:.8rem;color:#c3d3ea}
+
+/* ---------- layout ---------- */
+.layout{max-width:1280px;margin:0 auto;display:grid;grid-template-columns:288px minmax(0,1fr);
+  gap:34px;padding:30px 24px 96px;align-items:start}
+main{min-width:0;grid-column:2}
+
+/* ---------- toc ---------- */
+.toc{grid-column:1;position:sticky;top:74px;align-self:start;max-height:calc(100vh - 96px);overflow:auto;
+  background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 14px 16px;
+  box-shadow:var(--shadow-1);scrollbar-width:thin}
+.toc::-webkit-scrollbar{width:9px}
+.toc::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:9px;border:2px solid var(--surface)}
+.toc-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 4px 10px;
+  border-bottom:1px solid var(--line);margin-bottom:8px}
+.toc-title{font:600 .72rem/1 var(--font-mono);text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
+.toc-list{list-style:none;margin:0;padding:0;counter-reset:toc}
+.toc-list li{counter-increment:toc}
+.toc-list a{display:flex;gap:10px;align-items:baseline;padding:7px 9px;border-radius:8px;color:var(--ink-2);
+  font-size:.9rem;line-height:1.35;transition:background .16s,color .16s}
+.toc-list a::before{content:counter(toc,decimal-leading-zero);font:500 .74rem/1 var(--font-mono);color:var(--muted);flex:none;padding-top:2px}
+.toc-list a:hover{background:var(--surface-2);color:var(--brand);text-decoration:none}
+.toc-list a.active{background:var(--brand-soft);color:var(--brand);font-weight:600}
+.toc-list a.active::before{color:var(--brand)}
+.toc-src{margin:12px 4px 0;padding-top:10px;border-top:1px solid var(--line);font-size:.76rem;line-height:1.5;color:var(--muted)}
+
+/* ---------- sections ---------- */
+section{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+  padding:28px 30px 34px;margin:0 0 22px;box-shadow:var(--shadow-2);scroll-margin-top:80px}
+h2.sec{display:flex;align-items:center;gap:12px;margin:0 0 16px;padding-bottom:14px;border-bottom:1px solid var(--line);
+  font:600 clamp(1.16rem,1.05rem+.5vw,1.4rem)/1.3 var(--font-sans);letter-spacing:-.012em;color:var(--ink)}
+h2.sec .n{flex:none;min-width:2.5em;text-align:center;font:600 .78rem/1 var(--font-mono);color:var(--brand);
+  background:var(--brand-soft);border:1px solid var(--brand-ring);border-radius:9px;padding:7px 9px}
+h3{margin:30px 0 10px;font:600 1.06rem/1.4 var(--font-sans);letter-spacing:-.006em;color:var(--ink)}
+h3+h4,h3+p,h3+ul,h3+ol,h3+figure,h3+table{margin-top:0}
+h4{margin:20px 0 6px;font:600 .95rem/1.4 var(--font-sans);color:var(--ink-2)}
+p{margin:11px 0}
+ul,ol{margin:11px 0;padding-left:1.35em}
+li{margin:6px 0}
+li::marker{color:var(--muted)}
+strong,b{font-weight:600}
+section>p,section>ul,section>ol,section>.callout,section>.lead{max-width:var(--measure)}
+.lead{color:var(--muted);font-size:1.02rem;margin-top:0}
+.src{font-size:.82rem;color:var(--muted)}
+
+/* ---------- code ---------- */
+code{font-family:var(--font-mono);font-size:.855em;background:var(--surface-2);border:1px solid var(--line);
+  border-radius:5px;padding:.08em .36em;color:var(--ink-2);overflow-wrap:anywhere}
+pre{position:relative;background:var(--code-bg);color:var(--code-ink);border:1px solid var(--code-ring);
+  border-radius:12px;padding:16px 18px;margin:16px 0;overflow:auto;font-size:.84rem;line-height:1.62;
+  box-shadow:var(--shadow-1)}
+pre code{background:none;border:0;padding:0;color:inherit;font-size:1em;overflow-wrap:normal}
+.copybtn{position:absolute;top:10px;right:10px;display:inline-flex;align-items:center;gap:6px;cursor:pointer;
+  font:500 .72rem/1 var(--font-mono);color:#c3d3ea;background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:6px 9px;transition:background .18s,color .18s}
+.copybtn:hover{background:rgba(255,255,255,.18);color:#fff}
+
+/* ---------- callouts ---------- */
+.callout{position:relative;margin:16px 0;padding:14px 16px 14px 46px;border-radius:12px;
+  border:1px solid var(--brand-ring);background:var(--brand-soft);color:var(--ink-2)}
+.callout::before{content:"";position:absolute;left:15px;top:14px;width:19px;height:19px;
+  background:var(--ico-info) center/19px no-repeat}
+.callout.warn{border-color:var(--warn-ring);background:var(--warn-soft)}
+.callout.warn::before{background:var(--ico-warn) center/19px no-repeat}
+.callout.ok{border-color:var(--ok-ring);background:var(--ok-soft)}
+.callout.ok::before{background:var(--ico-ok) center/19px no-repeat}
+.callout>p{margin:6px 0}
+.callout>p:first-child{margin-top:0}
+.callout>p:last-child{margin-bottom:0}
+
+/* ---------- figures ---------- */
+figure{margin:18px 0 24px}
+.shot{position:relative;border:1px solid var(--line-2);border-radius:14px;background:#fff;padding:12px;
+  overflow:auto;text-align:center;box-shadow:var(--shadow-2);transition:border-color .2s,box-shadow .2s}
+.shot img{max-width:100%;height:auto;display:block;margin:0 auto;cursor:zoom-in;border-radius:6px}
+.shot:hover{border-color:var(--brand)}
+.shot::after{content:"phóng to";position:absolute;top:10px;right:10px;pointer-events:none;opacity:0;
+  font:500 .66rem/1 var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:#334155;
+  background:rgba(255,255,255,.92);border:1px solid #cbd5e1;border-radius:999px;padding:5px 9px;transition:opacity .18s}
+.shot:hover::after{opacity:1}
+figcaption{margin-top:10px;color:var(--muted);font-size:.86rem;line-height:1.55}
+figcaption b{color:var(--ink-2)}
+figcaption .src{display:inline-block}
+
+/* ---------- tables ---------- */
+.tablewrap{margin:16px 0;border:1px solid var(--line);border-radius:12px;overflow:auto;background:var(--surface);
+  scrollbar-width:thin}
+.tablewrap::-webkit-scrollbar{height:10px}
+.tablewrap::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:9px;border:2px solid var(--surface)}
+table{width:100%;border-collapse:collapse;margin:0;font-size:.9rem}
+th,td{border-bottom:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+th{position:relative;background:var(--surface-2);font:600 .74rem/1.3 var(--font-mono);
+  text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);white-space:nowrap}
+td code{white-space:nowrap}
+tbody tr:nth-child(even){background:var(--surface-2);background:color-mix(in srgb,var(--surface-2) 55%,transparent)}
+tbody tr:hover{background:var(--brand-soft)}
+tbody tr:last-child td{border-bottom:0}
+.kv td:first-child{width:34%;color:var(--ink-2);font-weight:600;white-space:normal}
+td[colspan],th[colspan]{}
+
+/* ---------- cards / grids ---------- */
+.grid{display:grid;gap:14px;margin:16px 0}
+.g2{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(215px,1fr))}
+.card{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:15px 17px}
+.card h4{margin:0 0 8px;font:600 .92rem/1.35 var(--font-mono);color:var(--brand);letter-spacing:0}
+.card p{margin:8px 0;font-size:.92rem}
+.card ul{margin:8px 0 0;padding-left:1.15em;font-size:.92rem}
+.card li{margin:5px 0}
+
+/* ---------- pills ---------- */
+.pill{display:inline-block;border-radius:999px;padding:2px 10px;font:600 .74rem/1.6 var(--font-mono);border:1px solid;white-space:nowrap}
+.pill.go{color:var(--ok);border-color:var(--ok-ring);background:var(--ok-soft)}
+.pill.pend{color:var(--warn);border-color:var(--warn-ring);background:var(--warn-soft)}
+.pill.info{color:var(--brand);border-color:var(--brand-ring);background:var(--brand-soft)}
+.pill.mut{color:var(--muted);border-color:var(--line-2);background:var(--surface-2)}
+
+/* ---------- back to top + lightbox ---------- */
+.totop{position:fixed;right:22px;bottom:22px;z-index:55;width:44px;height:44px;border-radius:12px;cursor:pointer;
+  display:grid;place-items:center;color:#fff;background:var(--brand);border:1px solid var(--brand);
+  box-shadow:0 10px 24px -12px rgba(37,99,235,.8);transition:opacity .2s,transform .2s}
+.totop:hover{transform:translateY(-2px)}
+.scrim{position:fixed;inset:0;z-index:45;background:rgba(8,12,22,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
+.lightbox{position:fixed;inset:0;z-index:70;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:12px;padding:40px 20px;background:rgba(6,10,18,.92);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+.lightbox img{max-width:96vw;max-height:84vh;background:#fff;border-radius:10px;padding:10px}
+.lb-cap{margin:0;max-width:90vw;color:#cfdcf0;font-size:.85rem;text-align:center}
+.lb-close{position:fixed;top:16px;right:18px;width:42px;height:42px;border-radius:11px;cursor:pointer;display:grid;place-items:center;
+  color:#eaf1ff;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.28)}
+.lb-close:hover{background:rgba(255,255,255,.22)}
+
+/* ---------- footer ---------- */
+footer{max-width:1280px;margin:0 auto;padding:0 24px 64px;color:var(--muted);font-size:.86rem}
+footer code{font-size:.82em}
+
+/* ---------- responsive ---------- */
+@media (max-width:1040px){
+  .layout{grid-template-columns:1fr;padding:22px 16px 80px;gap:0}
+  main{grid-column:1}
+  .only-mobile{display:inline-grid}
+  .only-desktop{display:none}
+  .toc{position:fixed;top:56px;left:0;bottom:0;width:min(86vw,320px);max-height:none;border-radius:0 14px 14px 0;
+    border-left:0;transform:translateX(-104%);transition:transform .24s ease;z-index:46;padding-top:16px}
+  .toc.open{transform:none;box-shadow:0 20px 40px -10px rgba(0,0,0,.5)}
+  .hero-in{padding:40px 20px 34px}
+  section{padding:22px 18px 26px;border-radius:14px}
+  .topbar-in{padding:0 14px}
+  .brand-text small{display:none}
+}
+@media (max-width:560px){
+  .stats{grid-template-columns:1fr 1fr;gap:10px}
+  .brand-text b{font-size:.9rem}
+  h2.sec{gap:9px}
+  h2.sec .n{min-width:2.2em;padding:6px 7px}
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *{transition-duration:.001ms!important;animation-duration:.001ms!important}
+}
+
+/* ---------- print ---------- */
+@media print{
+  body{padding-top:0;background:#fff;font-size:11pt}
+  .topbar,.toc,.totop,.lightbox,.skip-link,.read-progress,.copybtn,.scrim{display:none!important}
+  .hero{background:#fff;color:#000;border-bottom:2px solid #000}
+  .hero::after{display:none}
+  .hero h1,.hero-lead,.hero-meta,.stat b,.stat span,.eyebrow{color:#000}
+  .chips .chip,.stat{background:#fff;border-color:#999;color:#000}
+  .layout{display:block;max-width:none;padding:0}
+  main{grid-column:auto}
+  section{break-inside:avoid;border:1px solid #ccc;box-shadow:none;margin:0 0 12px;padding:14px 16px}
+  .shot{overflow:visible;box-shadow:none;break-inside:avoid}
+  .shot::after{display:none}
+  figure,table,.callout,.card{break-inside:avoid}
+  .tablewrap{overflow:visible;border-color:#ccc}
+  th{background:#f2f2f2}
+  pre{background:#f7f7f7;color:#111;border-color:#ccc}
+  .copybtn{display:none}
+  a{color:#000;text-decoration:underline}
+}
+
 </style>
 </head>
+
 <body>
-<header class="top">
-  <div class="wrap">
-    <h1>Axiom Office — Tài liệu kiến trúc</h1>
-    <p>Add-in tự động hoá Microsoft Office / WPS / LibreOffice bằng trợ lý AI tiếng Việt, chạy trong nước (local-first).</p>
-    <p>Bản mô tả kèm sơ đồ draw.io, đối chiếu trực tiếp với mã nguồn tại thời điểm <b>17/10/2026</b> · phiên bản <b>0.1.0</b>.</p>
-    <div class="badges">
-      <span class="badge">Agent Core: Go thuần</span>
-      <span class="badge">Add-in: C# .NET 4.8 (COM)</span>
-      <span class="badge">LibreOffice: Python + UNO</span>
-      <span class="badge">WPS: JS add-in</span>
-      <span class="badge">SQLite (schema 3)</span>
-      <span class="badge">MCP server: 50 công cụ</span>
-    </div>
+<a class="skip-link" href="#s1">Bỏ qua tới nội dung</a>
+<div class="read-progress" aria-hidden="true"><span id="readbar"></span></div>
+
+<header class="topbar" id="top">
+  <div class="topbar-in">
+    <button class="iconbtn only-mobile" id="navToggle" type="button" aria-expanded="false" aria-controls="toc" aria-label="Mở mục lục">
+      <svg viewBox="0 0 24 24" class="ico" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
+
+    <a class="brand" href="#top">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" class="ico"><path d="M12 2.7 3.6 7.5v9L12 21.3l8.4-4.8v-9z"/><path d="m8.2 12.1 2.7 2.7 4.9-5"/></svg>
+      </span>
+      <span class="brand-text"><b>Axiom Office</b><small>Kiến trúc</small></span>
+    </a>
+
+    <span class="topbar-spacer"></span>
+    <span class="chip" title="Phiên bản tài liệu đối chiếu">v0.1.0</span>
+    <a class="chip chip-link only-desktop" href="#s14" title="Cấu trúc mã nguồn">src/</a>
+    <button class="iconbtn" id="themeToggle" type="button" aria-pressed="false" aria-label="Đổi giao diện sáng/tối" title="Giao diện sáng / tối">
+      <svg viewBox="0 0 24 24" class="ico ico-sun" aria-hidden="true"><circle cx="12" cy="12" r="4.1"/><path d="M12 2v2.2M12 19.8V22M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M2 12h2.2M19.8 12H22M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6"/></svg>
+      <svg viewBox="0 0 24 24" class="ico ico-moon" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+    </button>
+    <button class="btn-ghost only-desktop" type="button" onclick="window.print()" title="In hoặc lưu PDF">
+      <svg viewBox="0 0 24 24" class="ico" aria-hidden="true"><path d="M6 9V3h12v6M6 18H4v-6h16v6h-2M8 14h8v7H8z"/></svg>
+      <span>In</span>
+    </button>
   </div>
 </header>
 
+<section class="hero">
+  <div class="hero-in">
+    <p class="eyebrow">Kiến trúc hệ thống · HLD + LLD</p>
+    <h1>Axiom Office</h1>
+    <p class="hero-lead">Trợ lý AI tiếng Việt chạy ngay trên máy, tự động hoá Microsoft Office, WPS và LibreOffice. Người dùng gõ yêu cầu, trợ lý đọc tài liệu đang mở, gọi <b>hệ lệnh</b> có kiểm tra và xác nhận để sửa tài liệu trực tiếp.</p>
+    <p class="hero-meta">Đối chiếu trực tiếp mã nguồn · 17/10/2026 · phiên bản 0.1.0</p>
+    <ul class="chips">
+      <li class="chip">Agent Core: Go thuần</li>
+      <li class="chip">Add-in: C# .NET 4.8 (COM)</li>
+      <li class="chip">LibreOffice: Python + UNO</li>
+      <li class="chip">WPS: JS add-in</li>
+      <li class="chip">SQLite · schema 3</li>
+      <li class="chip">MCP server: 50 công cụ</li>
+    </ul>
+    <div class="stats">
+      <div class="stat"><b>2</b><span>tệp thực thi Windows</span></div>
+      <div class="stat"><b>77</b><span>lệnh khai báo</span></div>
+      <div class="stat"><b>50</b><span>công cụ MCP</span></div>
+      <div class="stat"><b>13</b><span>sơ đồ kèm tài liệu</span></div>
+    </div>
+  </div>
+</section>
+
 <div class="layout">
-<nav class="toc">
-  <h2>Nội dung</h2>
-  <ol>
-    <li><a href="#s1">Giới thiệu &amp; phạm vi</a></li>
-    <li><a href="#s2">Bối cảnh &amp; container</a></li>
-    <li><a href="#s3">Các khối chức năng</a></li>
-    <li><a href="#s4">Luồng chạy &amp; khởi động</a></li>
-    <li><a href="#s5">Triển khai &amp; cổng</a></li>
-    <li><a href="#s6">Bên trong Agent Core</a></li>
-    <li><a href="#s7">Hệ lệnh &amp; file sinh</a></li>
-    <li><a href="#s8">MCP: làn live &amp; làn file</a></li>
-    <li><a href="#s9">Dữ liệu &amp; bộ nhớ</a></li>
-    <li><a href="#s10">Kiểm thử &amp; CI</a></li>
-    <li><a href="#s11">Build, cài đặt, đóng gói</a></li>
-    <li><a href="#s12">Quyết định kiến trúc</a></li>
-    <li><a href="#s13">Rủi ro &amp; giới hạn</a></li>
-    <li><a href="#s14">Cấu trúc mã nguồn</a></li>
-    <li><a href="#s15">Thuật ngữ</a></li>
-  </ol>
-  <p class="src" style="margin-top:12px">Nguồn: đọc trực tiếp <code>core-go/</code>, <code>src/AxiomOffice*/</code>, <code>scripts/</code>, <code>catalog/</code>, <code>skills/</code>, <code>tests/</code>.</p>
-</nav>
+  <nav class="toc" id="toc" aria-label="Mục lục">
+    <div class="toc-head">
+      <span class="toc-title">Nội dung</span>
+      <button class="iconbtn only-mobile" id="navClose" type="button" aria-label="Đóng mục lục">
+        <svg viewBox="0 0 24 24" class="ico" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <ol class="toc-list">
+      <li><a href="#s1">Giới thiệu &amp; phạm vi</a></li>
+      <li><a href="#s2">Bối cảnh &amp; container</a></li>
+      <li><a href="#s3">Các khối chức năng</a></li>
+      <li><a href="#s4">Luồng chạy &amp; khởi động</a></li>
+      <li><a href="#s5">Triển khai &amp; cổng</a></li>
+      <li><a href="#s6">Bên trong Agent Core</a></li>
+      <li><a href="#s7">Hệ lệnh &amp; file sinh</a></li>
+      <li><a href="#s8">MCP: làn live &amp; làn file</a></li>
+      <li><a href="#s9">Dữ liệu &amp; bộ nhớ</a></li>
+      <li><a href="#s10">Kiểm thử &amp; CI</a></li>
+      <li><a href="#s11">Build, cài đặt, đóng gói</a></li>
+      <li><a href="#s12">Quyết định kiến trúc</a></li>
+      <li><a href="#s13">Rủi ro &amp; giới hạn</a></li>
+      <li><a href="#s14">Cấu trúc mã nguồn</a></li>
+      <li><a href="#s15">Thuật ngữ</a></li>
+    </ol>
+    <p class="toc-src">Nguồn: đọc trực tiếp <code>core-go/</code>, <code>src/AxiomOffice*/</code>, <code>scripts/</code>, <code>catalog/</code>, <code>skills/</code>, <code>tests/</code>.</p>
+  </nav>
+  <div class="scrim" id="scrim" hidden></div>
+
 
 <main>
 
@@ -701,5 +1010,163 @@
 <footer>
   <p><b>Axiom Office</b> — tài liệu kiến trúc mô tả trạng thái mã nguồn tại 17/10/2026. Sơ đồ là tệp <code>.drawio</code> (nguồn) và <code>.drawio.svg</code> (bản xuất) trong <code>docs/architecture/</code>; mở tệp <code>.drawio</code> bằng draw.io để chỉnh sửa.</p>
 </footer>
+<button class="totop" id="toTop" type="button" aria-label="Về đầu trang" hidden>
+  <svg viewBox="0 0 24 24" class="ico" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+</button>
+
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Xem sơ đồ" hidden>
+  <button class="lb-close" id="lbClose" type="button" aria-label="Đóng">
+    <svg viewBox="0 0 24 24" class="ico" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+  </button>
+  <img id="lbImg" alt="">
+  <p class="lb-cap" id="lbCap"></p>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var root = document.documentElement;
+
+  /* 1. Bọc bảng để cuộn ngang gọn trên màn nhỏ */
+  document.querySelectorAll("main table").forEach(function(t){
+    if (t.parentElement && t.parentElement.classList.contains("tablewrap")) return;
+    var w = document.createElement("div");
+    w.className = "tablewrap";
+    t.parentNode.insertBefore(w, t);
+    w.appendChild(t);
+  });
+
+  /* 2. Khối mã: nút sao chép */
+  document.querySelectorAll("main pre").forEach(function(pre){
+    var code = pre.querySelector("code");
+    if (!code) return;
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "copybtn";
+    btn.textContent = "Sao chép";
+    btn.addEventListener("click", function(){
+      var text = code.innerText;
+      var done = function(){ btn.textContent = "Đã chép"; setTimeout(function(){ btn.textContent = "Sao chép"; }, 1400); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, done);
+      } else {
+        var ta = document.createElement("textarea");
+        ta.value = text; document.body.appendChild(ta); ta.select();
+        try { document.execCommand("copy"); } catch (e) {}
+        document.body.removeChild(ta); done();
+      }
+    });
+    pre.appendChild(btn);
+  });
+
+  /* 3. Hình: bấm để phóng to + liên kết mở SVG */
+  var lb = document.getElementById("lightbox");
+  var lbImg = document.getElementById("lbImg");
+  var lbCap = document.getElementById("lbCap");
+  var lastFocus = null;
+  function openLb(img, cap){
+    lastFocus = document.activeElement;
+    lbImg.src = img.getAttribute("src");
+    lbImg.alt = img.getAttribute("alt") || "";
+    lbCap.textContent = cap || "";
+    lb.hidden = false;
+    document.body.style.overflow = "hidden";
+    document.getElementById("lbClose").focus();
+  }
+  function closeLb(){
+    lb.hidden = true;
+    lbImg.src = "";
+    document.body.style.overflow = "";
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }
+  document.getElementById("lbClose").addEventListener("click", closeLb);
+  lb.addEventListener("click", function(e){ if (e.target === lb) closeLb(); });
+  document.addEventListener("keydown", function(e){ if (e.key === "Escape" && !lb.hidden) closeLb(); });
+
+  document.querySelectorAll("main figure").forEach(function(fig){
+    var img = fig.querySelector("img");
+    if (!img) return;
+    var cap = fig.querySelector("figcaption");
+    var capText = cap ? cap.textContent.trim().replace(/\s+/g, " ") : (img.getAttribute("alt") || "");
+    var shot = img.closest(".shot") || img.parentElement;
+    img.setAttribute("title", "Bấm để phóng to");
+    shot.setAttribute("role", "button");
+    shot.tabIndex = 0;
+    shot.addEventListener("click", function(){ openLb(img, capText); });
+    shot.addEventListener("keydown", function(e){
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openLb(img, capText); }
+    });
+    if (cap && !cap.querySelector(".openfile")) {
+      var a = document.createElement("a");
+      a.className = "openfile";
+      a.href = img.getAttribute("src");
+      a.target = "_blank";
+      a.rel = "noopener";
+      a.textContent = "Mở SVG";
+      cap.appendChild(document.createTextNode(" · "));
+      cap.appendChild(a);
+    }
+  });
+
+  /* 4. Giao diện sáng / tối */
+  var tgl = document.getElementById("themeToggle");
+  function syncToggle(){
+    tgl.setAttribute("aria-pressed", root.getAttribute("data-theme") === "dark" ? "true" : "false");
+  }
+  syncToggle();
+  tgl.addEventListener("click", function(){
+    var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    try { localStorage.setItem("ax-th", next); } catch (e) {}
+    syncToggle();
+  });
+
+  /* 5. Mục lục trên di động */
+  var toc = document.getElementById("toc");
+  var scrim = document.getElementById("scrim");
+  var navBtn = document.getElementById("navToggle");
+  function setNav(open){
+    toc.classList.toggle("open", open);
+    scrim.hidden = !open;
+    navBtn.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+  navBtn.addEventListener("click", function(){ setNav(!toc.classList.contains("open")); });
+  document.getElementById("navClose").addEventListener("click", function(){ setNav(false); });
+  scrim.addEventListener("click", function(){ setNav(false); });
+  toc.addEventListener("click", function(e){ if (e.target.closest("a")) setNav(false); });
+  document.addEventListener("keydown", function(e){ if (e.key === "Escape") setNav(false); });
+
+  /* 6. Thanh tiến trình, nút về đầu trang, mục lục đang xem */
+  var bar = document.getElementById("readbar");
+  var toTop = document.getElementById("toTop");
+  var links = Array.prototype.slice.call(document.querySelectorAll(".toc-list a"));
+  var secs = links.map(function(a){ return document.querySelector(a.getAttribute("href")); });
+  function onScroll(){
+    var h = document.documentElement;
+    var max = h.scrollHeight - h.clientHeight;
+    var top = window.pageYOffset || h.scrollTop || 0;
+    bar.style.width = (max > 0 ? (top / max) * 100 : 0).toFixed(2) + "%";
+    toTop.hidden = top < 600;
+  }
+  window.addEventListener("scroll", onScroll, { passive: true });
+  window.addEventListener("resize", onScroll);
+  onScroll();
+  toTop.addEventListener("click", function(){ window.scrollTo({ top: 0, behavior: "smooth" }); });
+
+  if ("IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if (!en.isIntersecting) return;
+        var i = secs.indexOf(en.target);
+        if (i < 0) return;
+        links.forEach(function(l){ l.classList.remove("active"); });
+        links[i].classList.add("active");
+      });
+    }, { rootMargin: "-72px 0px -70% 0px", threshold: 0 });
+    secs.forEach(function(s){ if (s) io.observe(s); });
+  }
+})();
+</script>
+
 </body>
 </html>
