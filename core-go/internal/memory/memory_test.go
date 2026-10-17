@@ -173,7 +173,7 @@ func TestRetrieverRanksChangeBeforeOld(t *testing.T) {
 		Text: "Chức vụ người dùng đổi từ Trưởng phòng Kế toán sang Phó giám đốc từ 10/2026"}}, ActorExtract, "", nil, "")
 
 	retriever := NewRetriever(repo)
-	contextResult := retriever.BuildContext("Chức vụ trưởng phòng của tôi hiện nay còn đúng không?", "", Today(), nil)
+	contextResult := retriever.BuildContext("Chức vụ trưởng phòng của tôi hiện nay còn đúng không?", "", "", Today(), nil)
 	joined := strings.Join(contextResult.Lines, "\n")
 	change := strings.Index(joined, "đổi từ Trưởng phòng")
 	old := strings.Index(joined, "Người dùng là Trưởng phòng Kế toán")
@@ -185,7 +185,7 @@ func TestRetrieverRanksChangeBeforeOld(t *testing.T) {
 	}
 
 	// Cau hoi khong lien quan: khong keo memory user vao ngu canh (duoi nguong).
-	unrelated := retriever.BuildContext("Viết một câu chào ngắn", "", Today(), nil)
+	unrelated := retriever.BuildContext("Viết một câu chào ngắn", "", "", Today(), nil)
 	if len(unrelated.Lines) != 0 {
 		t.Fatalf("khong nen co memory nao: %v", unrelated.Lines)
 	}
@@ -299,7 +299,7 @@ func TestServiceExtractsInBackground(t *testing.T) {
 	if service.Enabled() {
 		t.Fatal("MemoryEnabled=false -> Enabled phai false")
 	}
-	if lines := service.Context(context.Background(), "x", "").Lines; len(lines) != 0 {
+	if lines := service.Context(context.Background(), "x", "", "").Lines; len(lines) != 0 {
 		t.Fatalf("khong duoc dua memory vao ngu canh: %v", lines)
 	}
 }
@@ -312,7 +312,7 @@ func TestOrgStyleAlwaysInContext(t *testing.T) {
 	repo.AddBatch([]NewMemory{{Scope: ScopeDocument, ScopeKey: `C:\a.docx`, Text: "Bảng điểm lớp 4A có 35 học sinh"}},
 		ActorUser, "", nil, "")
 
-	ctx := NewRetriever(repo).BuildContext("thời tiết hôm nay thế nào", `C:\b.docx`, Today(), nil)
+	ctx := NewRetriever(repo).BuildContext("thời tiết hôm nay thế nào", "wps", `C:\b.docx`, Today(), nil)
 	if len(ctx.OrgLines) != 1 || !strings.Contains(ctx.OrgLines[0], "Times New Roman 13") {
 		t.Fatalf("org-style phai luon co trong ngu canh: %+v", ctx)
 	}
@@ -323,7 +323,57 @@ func TestOrgStyleAlwaysInContext(t *testing.T) {
 	}
 	for _, item := range repo.List(ScopeOrgStyle, "", false, "", 10) {
 		if item.ScopeKey != nil && *item.ScopeKey != "" {
-			t.Fatalf("org-style khong duoc co scope_key: %+v", item)
+			t.Fatalf("org-style khong gan app thi scope_key phai rong: %+v", item)
+		}
+	}
+}
+
+// 12-m3 muc 7: chuan trinh bay tach theo app - chuan cua Excel khong lot vao ngu canh Word, va nguoc lai; chuan
+// khong gan app thi dung cho moi app.
+func TestStyleMemoriesSplitByApp(t *testing.T) {
+	repo := newTestStore(t)
+	repo.AddBatch([]NewMemory{
+		{Scope: ScopeOrgStyle, ScopeKey: "et", Text: "Bảng tính của đơn vị dùng định dạng số 1.234,56"},
+		{Scope: ScopeOrgStyle, ScopeKey: "wps", Text: "Văn bản của đơn vị dùng Times New Roman 13"},
+		{Scope: ScopeOrgStyle, Text: "Chuẩn chung: xưng hô anh/chị"},
+		{Scope: ScopeDocStyle, ScopeKey: "wps", Text: "Kiểu trình bày tài liệu ưa thích: full (Hiện đại, có khối nhấn)"},
+		{Scope: ScopeDocStyle, ScopeKey: "et", Text: "Kiểu trình bày tài liệu ưa thích: basic"},
+	}, ActorUser, "", nil, "")
+
+	word := NewRetriever(repo).BuildContext("soạn công văn", "wps", `C:\b.docx`, Today(), nil)
+	orgText := strings.Join(word.OrgLines, "\n")
+	if !strings.Contains(orgText, "Times New Roman 13") || !strings.Contains(orgText, "xưng hô anh/chị") {
+		t.Fatalf("chuan Word + chuan khong gan app phai co trong Word: %+v", word.OrgLines)
+	}
+	if strings.Contains(orgText, "định dạng số") {
+		t.Fatalf("chuan cua Excel khong duoc lot vao Word: %+v", word.OrgLines)
+	}
+	if !strings.Contains(orgText, "ưa thích: full") || strings.Contains(orgText, "ưa thích: basic") {
+		t.Fatalf("kieu trinh bay phai theo dung app Word: %+v", word.OrgLines)
+	}
+
+	excel := NewRetriever(repo).BuildContext("tính tổng cột", "et", `C:\b.xlsx`, Today(), nil)
+	excelText := strings.Join(excel.OrgLines, "\n")
+	if !strings.Contains(excelText, "định dạng số") || !strings.Contains(excelText, "xưng hô anh/chị") ||
+		!strings.Contains(excelText, "ưa thích: basic") {
+		t.Fatalf("chuan Excel + chuan khong gan app phai co trong ngu canh Excel: %+v", excel.OrgLines)
+	}
+	if strings.Contains(excelText, "Times New Roman 13") || strings.Contains(excelText, "ưa thích: full") {
+		t.Fatalf("chuan/kieu cua Word khong duoc lot vao Excel: %+v", excel.OrgLines)
+	}
+}
+
+// NormalizeApp: nhan ten tieng Anh/duoi tep, tra "" khi khong ro.
+func TestNormalizeApp(t *testing.T) {
+	cases := map[string]string{
+		"wps": "wps", "Word": "wps", "WINWORD": "wps", "docx": "wps",
+		"et": "et", "Excel": "et", "xlsx": "et",
+		"wpp": "wpp", "powerpoint": "wpp", "pptx": "wpp",
+		"": "", "notepad": "", "  et  ": "et",
+	}
+	for input, want := range cases {
+		if got := NormalizeApp(input); got != want {
+			t.Fatalf("NormalizeApp(%q) = %q, want %q", input, got, want)
 		}
 	}
 }

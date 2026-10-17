@@ -22,7 +22,9 @@ type ExtractionJob struct {
 	ConversationID string
 	Prompt         string
 	Reply          string
-	DocumentKey    string
+	// App: app kind dang mo (`wps`/`et`/`wpp`) - de loc chuan trinh bay theo app (12-m3 muc 7).
+	App         string
+	DocumentKey string
 }
 
 // Service: cua vao memory dai han cho Orchestrator, tool va API (muc 8.5). Doc lai MemoryEnabled /
@@ -82,8 +84,8 @@ func Today() time.Time {
 	return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
 }
 
-// Context: ngu canh cho prompt (muc 8.5.7, 8.8 phan 3).
-func (s *Service) Context(ctx context.Context, prompt, documentKey string) Context {
+// Context: ngu canh cho prompt (muc 8.5.7, 8.8 phan 3). app = app dang mo (`wps`/`et`/`wpp`) de loc chuan trinh bay.
+func (s *Service) Context(ctx context.Context, prompt, app, documentKey string) Context {
 	if !s.Enabled() {
 		return EmptyContext()
 	}
@@ -93,13 +95,13 @@ func (s *Service) Context(ctx context.Context, prompt, documentKey string) Conte
 		return EmptyContext()
 	}
 	cfg := s.config()
-	return s.retriever.BuildContext(prompt, documentKey, Today(), semantic,
+	return s.retriever.BuildContext(prompt, app, documentKey, Today(), semantic,
 		ScopeFilter{Document: cfg.MemoryDocumentEnabled, User: cfg.MemoryUserEnabled})
 }
 
-func (s *Service) Search(ctx context.Context, query, documentKey, scope string, limit int) []Hit {
+func (s *Service) Search(ctx context.Context, query, app, documentKey, scope string, limit int) []Hit {
 	semantic, _ := s.semanticScores(ctx, query)
-	return s.retriever.Search(query, documentKey, Today(), semantic, scope, limit)
+	return s.retriever.Search(query, app, documentKey, Today(), semantic, scope, limit)
 }
 
 // Add: ghi fact qua bo chong trung (muc 8.5.6): nguoi dung (API), agent (remember) hoac extract.
@@ -201,10 +203,10 @@ func (s *Service) extract(ctx context.Context, job ExtractionJob) {
 	// Lien quan theo tu khoa, lap them bang memory gan nhat cung pham vi: "toi da len pho giam doc" khong trung
 	// tu nao voi "truong phong Ke toan" nhung extractor can thay ban cu de ghi su chuyen doi + link.
 	related := []Item{}
-	for _, hit := range s.retriever.Search(job.Prompt, job.DocumentKey, Today(), nil, "", MaxRelatedMemories) {
+	for _, hit := range s.retriever.Search(job.Prompt, job.App, job.DocumentKey, Today(), nil, "", MaxRelatedMemories) {
 		related = append(related, hit.Item)
 	}
-	actives := s.store.Active(job.DocumentKey, Today())
+	actives := s.store.Active(job.App, job.DocumentKey, Today())
 	sort.SliceStable(actives, func(a, b int) bool { return actives[a].CreatedAt > actives[b].CreatedAt })
 	for _, item := range actives {
 		if len(related) >= MaxRelatedMemories {

@@ -259,12 +259,12 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 	}
 	memoryContext := memory.EmptyContext()
 	if o.Memory != nil && o.Memory.Enabled() {
-		memoryContext = o.Memory.Context(ctx, request.Prompt, memoryDocumentKey)
+		memoryContext = o.Memory.Context(ctx, request.Prompt, appKind, memoryDocumentKey)
 		// Lap ke hoach khong ghi nho (remember la ghi): chi tra cuu.
 		if !request.Plan {
 			list = append(list, tools.NewRememberTool(o.Memory, memoryDocumentKey))
 		}
-		list = append(list, tools.NewRecallTool(o.Memory, memoryDocumentKey))
+		list = append(list, tools.NewRecallTool(o.Memory, appKind, memoryDocumentKey))
 	}
 	// Tim kiem web (Tavily): chi khi co khoa trong Thiet lap VA bat TavilyEnabled (toggle tren ribbon);
 	// chi doc web nen co ca trong plan mode.
@@ -321,8 +321,9 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 		// Language: ngon ngu giao dien cho cac cau Core tu gui (P7-03).
 		Language: request.Language,
 	}
-	// M3-02: kieu trinh bay da nho (doc tu ngu canh memory) + ghi lai khi nguoi dung chon trong the.
-	runContext.DocStyle = rememberedDocStyle(memoryContext.Lines)
+	// M3-02 + 12-m3 muc 7: kieu trinh bay da nho cho APP NAY (scope doc-style, scope_key = app) + ghi lai khi nguoi
+	// dung chon trong the.
+	runContext.DocStyle = rememberedDocStyle(memoryContext.Lines, memoryContext.OrgLines)
 	if o.Memory != nil && !request.Plan {
 		runContext.RememberDocStyle = func(style, label string) {
 			text := "Kiểu trình bày tài liệu ưa thích: " + style
@@ -330,7 +331,7 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 				text += " (" + label + ")"
 			}
 			o.Memory.Add(context.Background(),
-				[]memory.NewMemory{{Scope: memory.ScopeUser, Text: text, Category: "preference"}},
+				[]memory.NewMemory{{Scope: memory.ScopeDocStyle, ScopeKey: appKind, Text: text, Category: "preference"}},
 				memory.ActorUser, run.ID)
 		}
 	}
@@ -498,7 +499,7 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 		if result.OK && !request.Plan {
 			o.Memory.QueueExtraction(memory.ExtractionJob{
 				RunID: run.ID, ConversationID: conversation.ID, Prompt: request.Prompt,
-				Reply: result.Text, DocumentKey: memoryDocumentKey,
+				Reply: result.Text, App: appKind, DocumentKey: memoryDocumentKey,
 			})
 		} else {
 			o.Runs.SetMemoryStatus(run.ID, "skipped")

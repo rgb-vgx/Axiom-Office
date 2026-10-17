@@ -76,11 +76,12 @@ func (t *RememberTool) Invoke(ctx context.Context, arguments map[string]any, run
 // RecallTool: recall {query, scope?, limit?} -> memory lien quan (cung retriever voi ngu canh prompt, muc 8.5.7).
 type RecallTool struct {
 	memory      *memory.Service
+	app         string
 	documentKey string
 }
 
-func NewRecallTool(service *memory.Service, documentKey string) *RecallTool {
-	return &RecallTool{memory: service, documentKey: documentKey}
+func NewRecallTool(service *memory.Service, app, documentKey string) *RecallTool {
+	return &RecallTool{memory: service, app: app, documentKey: documentKey}
 }
 
 func (t *RecallTool) Name() string { return "recall" }
@@ -112,7 +113,7 @@ func (t *RecallTool) Invoke(ctx context.Context, arguments map[string]any, run *
 		limit = 20
 	}
 
-	hits := t.memory.Search(ctx, query, t.documentKey, scope, limit)
+	hits := t.memory.Search(ctx, query, t.app, t.documentKey, scope, limit)
 	list := make([]any, 0, len(hits))
 	for _, hit := range hits {
 		list = append(list, map[string]any{

@@ -205,7 +205,8 @@ func MemorySection(memories []string) string {
 		strings.Join(lines, "\n")
 }
 
-// OrgStyleSection: chuan chung cua don vi (M3-01) - tach khoi memory ca nhan/tai lieu de model uu tien ap dung.
+// OrgStyleSection: chuan trinh bay - chuan chung cua don vi (M3-01) va kieu nguoi dung da chon cho app nay (M3-02,
+// 12-m3 muc 7); tach khoi memory ca nhan/tai lieu de model uu tien ap dung.
 func OrgStyleSection(orgLines []string) string {
 	if len(orgLines) == 0 {
 		return ""
@@ -214,8 +215,8 @@ func OrgStyleSection(orgLines []string) string {
 	for _, memory := range orgLines {
 		lines = append(lines, "- "+memory)
 	}
-	return "Organisation-wide standards (apply these unless the user says otherwise in this request):\n" +
-		strings.Join(lines, "\n")
+	return "Organisation-wide standards and this user's saved style for this app (apply these unless the user says " +
+		"otherwise in this request):\n" + strings.Join(lines, "\n")
 }
 
 func ConversationSection(summary string, recentLines []string) string {

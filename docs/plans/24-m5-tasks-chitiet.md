@@ -24,7 +24,8 @@
 
 - [ ] `document`: tệp không còn trong danh sách tài liệu đã mở → **đề xuất** xóa qua thẻ `Choose` (còn).
 - [x] `user`: giữ lâu (không nằm trong job hết hạn/`softDeleteExpired`).
-- [x] `org-style`: không tự hết hạn, không nằm trong job dọn (`mergeNearDuplicates`/`softDeleteExpired` bỏ qua).
+- [x] `org-style`/`doc-style`: không tự hết hạn, không nằm trong job dọn (`mergeNearDuplicates`/`softDeleteExpired` bỏ
+      qua).
 
 ## M5-03. Số đo memory có ích hay rác
 

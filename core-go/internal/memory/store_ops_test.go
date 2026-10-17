@@ -45,7 +45,7 @@ func TestExportImportRoundTrip(t *testing.T) {
 	if !foundPinned || !foundExpiry {
 		t.Fatalf("thieu ghim/han dung sau import: %+v", after)
 	}
-	if hits := NewRetriever(target).Search("trưởng phòng kế toán", "", Today(), nil, ScopeUser, 5); len(hits) == 0 {
+	if hits := NewRetriever(target).Search("trưởng phòng kế toán", "", "", Today(), nil, ScopeUser, 5); len(hits) == 0 {
 		t.Fatal("khong tim lai duoc bang keyword sau import")
 	}
 
@@ -73,6 +73,26 @@ func TestSoftDeleteByScopeKey(t *testing.T) {
 	}
 }
 
+// 12-m3 muc 7: xoa mem theo tai lieu chi dong scope `document`, khong dung toi chuan trinh bay khoa bang app (du
+// chuoi scope_key trung nhau, vd documentKey "et").
+func TestSoftDeleteByScopeKeyIgnoresStyleScopes(t *testing.T) {
+	repo := newTestStore(t)
+	repo.AddBatch([]NewMemory{{Scope: ScopeOrgStyle, ScopeKey: "et", Text: "Bảng tính dùng định dạng số 1.234,56"}},
+		ActorUser, "", nil, "")
+	repo.AddBatch([]NewMemory{{Scope: ScopeDocument, ScopeKey: "et", Text: "Bảng điểm lớp 4A có 35 học sinh"}},
+		ActorUser, "", nil, "")
+
+	if removed := repo.SoftDeleteByScopeKey("et", "test"); removed != 1 {
+		t.Fatalf("removed = %d, want 1 (chi memory tai lieu)", removed)
+	}
+	if items := repo.List(ScopeOrgStyle, "et", false, "", 10); len(items) != 1 {
+		t.Fatalf("org-style khoa bang app khong duoc bi xoa: %+v", items)
+	}
+	if items := repo.List(ScopeDocument, "et", false, "", 10); len(items) != 0 {
+		t.Fatalf("memory tai lieu phai bi xoa mem: %+v", items)
+	}
+}
+
 // M4-04: tat rieng memory tai lieu / ca nhan co hieu luc ngay, khong xoa du lieu.
 func TestScopeFilterDisablesScopes(t *testing.T) {
 	repo := newTestStore(t)
@@ -81,16 +101,16 @@ func TestScopeFilterDisablesScopes(t *testing.T) {
 	retriever := NewRetriever(repo)
 	query := "Trưởng phòng Kế toán báo cáo tháng 10"
 
-	if all := retriever.BuildContext(query, `C:\a.docx`, Today(), nil); len(all.Lines) != 2 {
+	if all := retriever.BuildContext(query, "", `C:\a.docx`, Today(), nil); len(all.Lines) != 2 {
 		t.Fatalf("du 2 fact: %+v", all.Lines)
 	}
-	noDoc := retriever.BuildContext(query, `C:\a.docx`, Today(), nil, ScopeFilter{User: true})
+	noDoc := retriever.BuildContext(query, "", `C:\a.docx`, Today(), nil, ScopeFilter{User: true})
 	for _, line := range noDoc.Lines {
 		if strings.Contains(line, "Báo cáo tháng 10") {
 			t.Fatalf("tat tai lieu ma van con: %+v", noDoc.Lines)
 		}
 	}
-	noUser := retriever.BuildContext(query, `C:\a.docx`, Today(), nil, ScopeFilter{Document: true})
+	noUser := retriever.BuildContext(query, "", `C:\a.docx`, Today(), nil, ScopeFilter{Document: true})
 	for _, line := range noUser.Lines {
 		if strings.Contains(line, "Trưởng phòng Kế toán") {
 			t.Fatalf("tat ca nhan ma van con: %+v", noUser.Lines)

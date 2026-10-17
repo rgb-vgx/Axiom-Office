@@ -19,7 +19,8 @@ type Hit struct {
 }
 
 // Context: ket qua dua vao prompt - cac dong "- [id ngan] text" + id da dung (tang hits sau run).
-// OrgLines: chuan chung cua don vi (org-style) - prompt hien thanh nhom rieng (12-m3).
+// OrgLines: chuan trinh bay (org-style cua don vi + doc-style nguoi dung da chon cho app nay) - prompt hien thanh
+// nhom rieng (12-m3).
 type Context struct {
 	Lines    []string
 	IDs      []string
@@ -35,7 +36,8 @@ const (
 	Threshold           = 0.1 // chan tin hieu chinh TRUOC khi cong
 	MaxDocumentMemories = 20
 	MaxUserMemories     = 8
-	// MaxOrgStyleMemories: tran rieng cho chuan chung cua don vi - khong chiem het cho cua fact tai lieu (12-m3).
+	// MaxOrgStyleMemories: tran rieng cho chuan trinh bay (org-style + doc-style) - khong chiem het cho cua fact tai
+	// lieu (12-m3).
 	MaxOrgStyleMemories = 12
 	MaxContextChars     = 6000 // ~1.500 token
 	// RawPerMatchedTerm: diem keyword tho cong them cho moi tu truy van khop (ly do ghi trong ban .NET).
@@ -76,10 +78,10 @@ func EntityBoost(memoriesWithEntity int) float64 {
 	return EntityWeight * (1.0 / (1.0 + 0.001*math.Pow(float64(n-1), 2)))
 }
 
-// Search: semantic = cosine theo memory id (nil = khong co embedding).
-func (r *Retriever) Search(query, documentKey string, today time.Time, semantic map[string]float64, scope string, limit int) []Hit {
+// Search: semantic = cosine theo memory id (nil = khong co embedding). app = app dang mo (`wps`/`et`/`wpp`).
+func (r *Retriever) Search(query, app, documentKey string, today time.Time, semantic map[string]float64, scope string, limit int) []Hit {
 	candidates := []Item{}
-	for _, item := range r.store.Active(documentKey, today) {
+	for _, item := range r.store.Active(app, documentKey, today) {
 		if scope != "" && item.Scope != scope {
 			continue
 		}
@@ -214,14 +216,14 @@ type ScopeFilter struct {
 // AllScopes: mac dinh - bat ca hai.
 func AllScopes() ScopeFilter { return ScopeFilter{Document: true, User: true} }
 
-// BuildContext: ngu canh cho prompt - moi memory ghim + org-style; <= 20 memory tai lieu; <= 8 memory user tren
-// nguong; <= ~1.500 token. filter bo trong = AllScopes().
-func (r *Retriever) BuildContext(prompt, documentKey string, today time.Time, semantic map[string]float64, filter ...ScopeFilter) Context {
+// BuildContext: ngu canh cho prompt - moi memory ghim + chuan trinh bay (org-style/doc-style cua app nay); <= 20
+// memory tai lieu; <= 8 memory user tren nguong; <= ~1.500 token. filter bo trong = AllScopes().
+func (r *Retriever) BuildContext(prompt, app, documentKey string, today time.Time, semantic map[string]float64, filter ...ScopeFilter) Context {
 	allowed := AllScopes()
 	if len(filter) > 0 {
 		allowed = filter[0]
 	}
-	candidates := r.store.Active(documentKey, today)
+	candidates := r.store.Active(app, documentKey, today)
 	filtered := candidates[:0]
 	for _, item := range candidates {
 		if item.Scope == ScopeDocument && !allowed.Document {
@@ -239,10 +241,11 @@ func (r *Retriever) BuildContext(prompt, documentKey string, today time.Time, se
 
 	ranked := r.Score(candidates, prompt, semantic, 0)
 
-	// Chuan chung cua don vi: luon vao ngu canh (nhu ghim), co tran rieng, xep truoc de duoc uu tien ngan sach.
+	// Chuan trinh bay (org-style + doc-style): luon vao ngu canh (nhu ghim), co tran rieng, xep truoc de duoc uu
+	// tien ngan sach.
 	orgs := []Item{}
 	for _, item := range candidates {
-		if item.Scope == ScopeOrgStyle {
+		if item.Scope == ScopeOrgStyle || item.Scope == ScopeDocStyle {
 			orgs = append(orgs, item)
 		}
 	}
@@ -303,7 +306,7 @@ func (r *Retriever) BuildContext(prompt, documentKey string, today time.Time, se
 			continue
 		}
 		used += len([]rune(line))
-		if item.Scope == ScopeOrgStyle {
+		if item.Scope == ScopeOrgStyle || item.Scope == ScopeDocStyle {
 			orgLines = append(orgLines, line)
 		} else {
 			lines = append(lines, line)

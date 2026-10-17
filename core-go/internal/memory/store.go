@@ -23,8 +23,35 @@ const (
 	ScopeSkill    = "skill"
 	// ScopeOrgStyle: chuan chung cua don vi (font/le/cach xung ho da duyet). Luon vao ngu canh, khong tu het han
 	// va khong gan theo tai lieu (12-m3). Chi quan tri vien ghi duoc (M3-04).
+	//
+	// Tu 17/10/2026 (12-m3 muc 7): tach theo APP bang scope_key (`et`/`wps`/`wpp`); scope_key rong = chuan dung
+	// chung cho moi app. Khong doi schema nen ban .NET khong bi anh huong.
 	ScopeOrgStyle = "org-style"
+	// ScopeDocStyle: kieu trinh bay NGUOI DUNG da chon cho mot app (doc_design nho lua chon - M3-02), cung tach
+	// theo app bang scope_key. Khac org-style: day la so thich ca nhan, khong can quyen quan tri.
+	ScopeDocStyle = "doc-style"
 )
+
+// App kind chuan (trung Session.App cua bridge): Word = wps, Excel = et, PowerPoint = wpp.
+const (
+	AppWord       = "wps"
+	AppExcel      = "et"
+	AppPowerPoint = "wpp"
+)
+
+// NormalizeApp: app kind chuan hoa ve `wps`/`et`/`wpp`, nhan them ten tieng Anh/duoi tep cho API/nguoi go tay.
+// "" = khong ro app (chuan chung dung chung moi app).
+func NormalizeApp(app string) string {
+	switch strings.ToLower(strings.TrimSpace(app)) {
+	case "wps", "word", "winword", "writer", "docx":
+		return AppWord
+	case "et", "excel", "excel.exe", "xlsx", "spreadsheet":
+		return AppExcel
+	case "wpp", "ppt", "powerpoint", "powerpnt", "pptx", "presentation":
+		return AppPowerPoint
+	}
+	return ""
+}
 
 // Tac nhan ghi memory.
 const (
@@ -41,7 +68,8 @@ const (
 )
 
 func IsValidScope(scope string) bool {
-	return scope == ScopeUser || scope == ScopeDocument || scope == ScopeSkill || scope == ScopeOrgStyle
+	return scope == ScopeUser || scope == ScopeDocument || scope == ScopeSkill ||
+		scope == ScopeOrgStyle || scope == ScopeDocStyle
 }
 
 // NewMemory: mot fact can ghi.
@@ -190,9 +218,12 @@ func (s *Store) addBatchOnce(items []NewMemory, actor, runID string, vectors map
 		}
 
 		scopeKey := raw.ScopeKey
-		// user va org-style khong gan theo tai lieu.
-		if raw.Scope == ScopeUser || raw.Scope == ScopeOrgStyle {
+		// user khong gan theo tai lieu; org-style/doc-style gan theo APP (rong = dung chung moi app).
+		switch raw.Scope {
+		case ScopeUser:
 			scopeKey = ""
+		case ScopeOrgStyle, ScopeDocStyle:
+			scopeKey = NormalizeApp(scopeKey)
 		}
 		hash := Hash(text)
 		batchKey := raw.Scope + "|" + scopeKey + "|" + hash
@@ -345,14 +376,17 @@ func (s *Store) List(scope, scopeKey string, includeDeleted bool, runID string, 
 	return readItems(s.db.SQL(), query, args...)
 }
 
-// Active: ung vien cho ngu canh - chua xoa, chua het han (expires_at > hom qua), thuoc user + document hien tai
-// + chuan chung cua don vi (org-style, luon co mat - 12-m3).
-func (s *Store) Active(documentKey string, today time.Time) []Item {
+// Active: ung vien cho ngu canh - chua xoa, chua het han (expires_at > hom qua), gom: memory cua nguoi dung (user,
+// dung chung moi app), chuan trinh bay cua APP nay (org-style + doc-style: scope_key = app, hoac rong = dung chung
+// moi app), va memory cua TAI LIEU hien tai (document) (12-m3).
+func (s *Store) Active(app, documentKey string, today time.Time) []Item {
 	yesterday := today.AddDate(0, 0, -1).Format("2006-01-02")
 	return readItems(s.db.SQL(), "SELECT "+memoryColumns+" FROM memories WHERE deleted_at IS NULL"+
 		" AND (expires_at IS NULL OR expires_at > ?)"+
-		" AND (scope = 'user' OR scope = 'org-style' OR (scope = 'document' AND scope_key = ?))",
-		yesterday, nullText(documentKey))
+		" AND (scope = 'user'"+
+		" OR ((scope = 'org-style' OR scope = 'doc-style') AND (scope_key IS NULL OR scope_key = ?))"+
+		" OR (scope = 'document' AND scope_key = ?))",
+		yesterday, NormalizeApp(app), nullText(documentKey))
 }
 
 // KeywordScores: bm25 cua FTS5 cho cac rowid khop truy van (diem cang THAP cang khop).
@@ -697,8 +731,11 @@ func (s *Store) Import(rows []ExportRow) (ImportResult, error) {
 			continue
 		}
 		scopeKey := row.ScopeKey
-		if row.Scope == ScopeUser || row.Scope == ScopeOrgStyle {
+		switch row.Scope {
+		case ScopeUser:
 			scopeKey = ""
+		case ScopeOrgStyle, ScopeDocStyle:
+			scopeKey = NormalizeApp(scopeKey)
 		}
 		hash := Hash(text)
 		if findByHash(tx, row.Scope, scopeKey, hash) != nil {
@@ -762,15 +799,16 @@ func (s *Store) Import(rows []ExportRow) (ImportResult, error) {
 	return result, nil
 }
 
-// SoftDeleteByScopeKey: xoa mem moi memory cua mot tai lieu (M4-02) - khong dung cham memory khac.
+// SoftDeleteByScopeKey: xoa mem moi memory cua mot TAI LIEU (M4-02) - chi scope `document`, khong dung cham memory
+// khac (org-style/doc-style khoa bang app cung khong bi dong toi du trung chuoi).
 func (s *Store) SoftDeleteByScopeKey(scopeKey, reason string) int {
 	tx, err := s.db.BeginWrite()
 	if err != nil {
 		return 0
 	}
 	defer func() { _ = tx.Rollback() }()
-	items := readItems(tx, "SELECT "+memoryColumns+" FROM memories WHERE deleted_at IS NULL AND scope_key = ?",
-		nullText(scopeKey))
+	items := readItems(tx, "SELECT "+memoryColumns+" FROM memories WHERE deleted_at IS NULL AND scope = ? AND scope_key = ?",
+		ScopeDocument, nullText(scopeKey))
 	now := Now()
 	for _, item := range items {
 		if _, err := tx.Exec("UPDATE memories SET deleted_at = ?, updated_at = ? WHERE id = ?", now, now, item.ID); err != nil {
@@ -797,7 +835,7 @@ type CleanupStats struct {
 }
 
 // Cleanup: don dinh ky - gop fact gan trung da lot qua luc ghi, xoa mem fact het han, don ban xoa mem cu.
-// Khong dung cham org-style (chuan chung cua don vi - M5-02).
+// Khong dung cham org-style/doc-style (chuan chung + kieu trinh bay do nguoi dat - M5-02).
 func (s *Store) Cleanup(now time.Time) CleanupStats {
 	return CleanupStats{
 		Merged:  s.mergeNearDuplicates(now),
@@ -833,7 +871,8 @@ func (s *Store) mergeNearDuplicates(now time.Time) int {
 	groups := map[string][]Item{}
 	order := []string{}
 	for _, item := range items {
-		if item.Scope == ScopeOrgStyle {
+		if item.Scope == ScopeOrgStyle || item.Scope == ScopeDocStyle {
+			// chuan chung / kieu trinh bay do nguoi dat: khong gop tu dong.
 			continue
 		}
 		key := item.Scope + "|" + textOrEmpty(item.ScopeKey)
@@ -893,11 +932,12 @@ func (s *Store) mergeNearDuplicates(now time.Time) int {
 	return merged
 }
 
-// softDeleteExpired: fact da qua han (expires_at <= hom qua) thi xoa mem; treo lai de cuu bang restore.
+// softDeleteExpired: fact da qua han (expires_at <= hom qua) thi xoa mem; treo lai de cuu bang restore. Bo qua
+// org-style/doc-style (chuan trinh bay do nguoi dat khong tu het han).
 func (s *Store) softDeleteExpired(now time.Time) int {
 	yesterday := now.AddDate(0, 0, -1).Format("2006-01-02")
 	items := readItems(s.db.SQL(), "SELECT "+memoryColumns+" FROM memories WHERE deleted_at IS NULL "+
-		"AND scope <> 'org-style' AND expires_at IS NOT NULL AND expires_at <= ?", yesterday)
+		"AND scope NOT IN ('org-style','doc-style') AND expires_at IS NOT NULL AND expires_at <= ?", yesterday)
 	if len(items) == 0 {
 		return 0
 	}

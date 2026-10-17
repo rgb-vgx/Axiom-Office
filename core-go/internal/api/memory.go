@@ -27,7 +27,7 @@ func mapMemory(mux *http.ServeMux, deps *Deps) {
 
 		if q := queryValue(query.Get("q")); q != "" {
 			found := []any{}
-			for _, hit := range service.Search(r.Context(), q, scopeKey, scope, 50) {
+			for _, hit := range service.Search(r.Context(), q, queryValue(query.Get("app")), scopeKey, scope, 50) {
 				item := memoryJSON(hit.Item)
 				item["score"] = math.Round(hit.Score*10000) / 10000
 				found = append(found, item)
@@ -51,7 +51,7 @@ func mapMemory(mux *http.ServeMux, deps *Deps) {
 		}
 		text := textOf(body["text"])
 		if !memory.IsValidScope(scope) || strings.TrimSpace(text) == "" {
-			Error(w, http.StatusBadRequest, "'scope' (user|document|skill|org-style) and 'text' are required")
+			Error(w, http.StatusBadRequest, "'scope' (user|document|skill|org-style|doc-style) and 'text' are required")
 			return
 		}
 		if denyOrgStyle(w, deps, scope) {
@@ -61,7 +61,12 @@ func mapMemory(mux *http.ServeMux, deps *Deps) {
 		if scopeKey == "" {
 			scopeKey = textOf(body["documentKey"])
 		}
-		if scope != memory.ScopeUser && scope != memory.ScopeOrgStyle && strings.TrimSpace(scopeKey) == "" {
+		// org-style/doc-style tach theo app (12-m3 muc 7): `app` la khoa, de trong = dung chung moi app.
+		if scopeKey == "" && (scope == memory.ScopeOrgStyle || scope == memory.ScopeDocStyle) {
+			scopeKey = textOf(body["app"])
+		}
+		if scope != memory.ScopeUser && scope != memory.ScopeOrgStyle && scope != memory.ScopeDocStyle &&
+			strings.TrimSpace(scopeKey) == "" {
 			Error(w, http.StatusBadRequest, "'scopeKey' is required for scope "+scope)
 			return
 		}
@@ -138,8 +143,8 @@ func mapMemory(mux *http.ServeMux, deps *Deps) {
 		OK(w, map[string]any{"history": list})
 	})
 
-	// Xoa cung: ?scope=all|user|document|skill|org-style&confirm=true, hoac xoa mem theo tai lieu
-	// ?documentKey=…&confirm=true (M4-02). org-style chi quan tri vien (M3-04).
+	// Xoa cung: ?scope=all|user|document|skill|org-style|doc-style&confirm=true, hoac xoa mem theo tai lieu
+	// ?documentKey=…&confirm=true (M4-02). org-style chi quan tri vien (M3-04); doc-style la so thich ca nhan.
 	mux.HandleFunc("DELETE /v1/memory", func(w http.ResponseWriter, r *http.Request) {
 		query := r.URL.Query()
 		if query.Get("confirm") != "true" {
@@ -152,7 +157,7 @@ func mapMemory(mux *http.ServeMux, deps *Deps) {
 		}
 		scope := queryValue(query.Get("scope"))
 		if scope == "" || (scope != "all" && !memory.IsValidScope(scope)) {
-			Error(w, http.StatusBadRequest, "use ?scope=all|user|document|skill|org-style&confirm=true or ?documentKey=…&confirm=true")
+			Error(w, http.StatusBadRequest, "use ?scope=all|user|document|skill|org-style|doc-style&confirm=true or ?documentKey=…&confirm=true")
 			return
 		}
 		if denyOrgStyle(w, deps, scope) {
@@ -163,9 +168,10 @@ func mapMemory(mux *http.ServeMux, deps *Deps) {
 				OK(w, map[string]any{"removed": service.Store().Purge("")})
 				return
 			}
-			// Nguoi thuong: "all" la toan bo memory cua ho, khong dung cham chuan chung cua don vi.
+			// Nguoi thuong: "all" la toan bo memory cua ho (ke ca kieu trinh bay da chon), khong dung cham chuan chung
+			// cua don vi.
 			removed := service.Store().Purge(memory.ScopeUser) + service.Store().Purge(memory.ScopeDocument) +
-				service.Store().Purge(memory.ScopeSkill)
+				service.Store().Purge(memory.ScopeSkill) + service.Store().Purge(memory.ScopeDocStyle)
 			OK(w, map[string]any{"removed": removed})
 			return
 		}

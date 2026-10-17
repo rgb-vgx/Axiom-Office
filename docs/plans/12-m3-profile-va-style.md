@@ -12,8 +12,8 @@
 
 - **Scope `org-style`**: chuẩn chung của đơn vị (mẫu công văn, mẫu báo cáo, mẫu slide), chỉ Admin sửa. Cần cơ
   chế phân quyền tối thiểu (ví dụ giá trị HKCU do quản trị đặt, hoặc tệp trong thư mục chung chỉ đọc).
-- **Nhớ kiểu trình bày đã chọn**: lựa chọn ở thẻ `doc_design` (kể cả kiểu tự gõ) lưu thành memory `user` hoặc
-  `document`; lần sau đưa làm lựa chọn đầu, vẫn hỏi.
+- **Nhớ kiểu trình bày đã chọn**: lựa chọn ở thẻ `doc_design` (kể cả kiểu tự gõ) lưu thành memory **`doc-style`** khoá
+  theo **app** (12-m3 mục 7); lần sau đưa làm lựa chọn đầu, vẫn hỏi.
 - **Áp đúng lúc**: chuẩn chung đọc trước khi model chọn skill trình bày (`van-ban-hanh-chinh`,
   `trinh-bay-chuyen-nghiep`, `thiet-ke-van-phong`).
 - **UI**: `MemoryForm.cs` chia nhóm Tài liệu | Cá nhân | Chuẩn chung.
@@ -41,14 +41,15 @@
   `Choose`), test `TestOrgStyleAlwaysInContext`/`TestOrgStyleRequiresAdmin`/`TestDocDesignRemembersChosenStyle`. Còn
   lại: UI `MemoryForm` chia nhóm (M3-05), tiêu chí 5/5 lần cần bộ `17`.
 
-## 7. Ý tưởng đã chốt, chưa làm: nhánh memory theo app (17/10/2026)
+## 7. Nhánh memory theo app - ĐÃ LÀM 17/10/2026 (Core)
 
-- Nảy ra khi chốt thiết kế P5 (báo cáo định kỳ); **độc lập với P5**. Ghi lại để làm riêng khi cần.
-- **Q1:** giữ **một `core.db`**; memory **tách theo nhánh app**; không tách file DB theo app (giữ tương thích bản .NET
-  + lịch sử hội thoại xuyên app).
-- **Q2:** tách theo app cho `org-style` và **kiểu trình bày** (chuẩn trình bày Word ≠ Excel ≠ PowerPoint); `user` giữ
-  **chung** mọi app; `document` vốn đã khoá theo đường dẫn tệp nên thực tế đã per-app sẵn.
-- **Q3:** lưu chiều app bằng **`scope_key`** (`et`/`wps`/`wpp`) cho `org-style` và thêm scope `doc-style`; **không đổi
-  schema, không bump `SchemaVersion`** ⇒ bản .NET không bị ảnh hưởng.
-- Việc phải làm khi bắt tay: sửa bất biến "org-style rỗng `scope_key`" + test cũ cho khớp; thêm scope `doc-style`;
-  chuyển "nhớ kiểu trình bày" (M3-02) từ fact `user` sang `doc-style` khoá theo app; `MemoryForm` chia nhóm theo app.
+- Bối cảnh: nảy ra khi chốt thiết kế P5; **độc lập với P5**. Quyết định Q1–Q3:
+  - **Q1:** giữ **một `core.db`**; memory **tách theo nhánh app**; không tách file DB theo app.
+  - **Q2:** tách theo app cho `org-style` và **kiểu trình bày**; `user` giữ **chung** mọi app; `document` đã per-app sẵn
+    (khoá theo đường dẫn tệp).
+  - **Q3:** lưu chiều app bằng **`scope_key`** (`et`/`wps`/`wpp`); **không đổi schema, không bump `SchemaVersion`** ⇒
+    bản .NET không bị ảnh hưởng.
+- Đã làm (Core): scope `doc-style` + `NormalizeApp`; `AddBatch`/`Import`/`Active`/`Retriever`/`Service`/`RecallTool`/
+  `orchestrator` nhận `app`; `doc_design` ghi kiểu đã chọn vào `doc-style` (khoá app) thay vì fact `user`; API nhận
+  `app`. Test: `TestStyleMemoriesSplitByApp`, `TestNormalizeApp`, `TestSoftDeleteByScopeKeyIgnoresStyleScopes`.
+- Còn lại: `MemoryForm` hiển thị/nhóm theo app (M3-05); số đo trong bộ `17`.

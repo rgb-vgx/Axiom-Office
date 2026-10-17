@@ -20,8 +20,9 @@ trong code: trạng thái có thể đã đổi.
 - **P2 một phần**: P2-01 xong (`not_for` cho 8 skill + hiện cho model; loader/prompt/test). P2-02…05 (rà nội dung,
   vùng cấm, kịch bản, đo bằng bộ `17`) còn.
 - **P3/memory (M2–M5) phần lớn xong**: M2 `Redact` + ẩn PII trong fact; M3 `org-style` + phân quyền ghi + prompt
-  riêng; M4 export/import JSON, xóa mềm theo tài liệu, tắt riêng scope; M5 job dọn định kỳ (gộp gần trùng, hết hạn).
-  Còn: nhớ `doc_design` (M3-02), UI `MemoryForm`/`SettingsForm` (M3-05/M4-03), số đo M5-03, bộ đo `17`.
+  riêng + **nhánh memory theo app** (17/10, M3-07: `org-style`/`doc-style` khoá bằng `scope_key`); M4 export/import
+  JSON, xóa mềm theo tài liệu, tắt riêng scope; M5 job dọn định kỳ (gộp gần trùng, hết hạn).
+  Còn: UI `MemoryForm`/`SettingsForm` (M3-05/M4-03), số đo M5-03, bộ đo `17`.
 - **P4 một phần**: P4-01 registry `Profile` xong (`client.go`/`types.go` đọc registry). Còn P4-02 (nhớ quirk qua khởi
   động lại - vướng schema `core.db` dùng chung và quyền ghi HKCU) và P4-03 (admin/wizard, C#).
 - **P5 tạm hoãn (17/10/2026)**: `26` **TẠM HOÃN** — đã chốt cơ chế (Task Scheduler gọi `job` một lần, `jobs.db` riêng,
