@@ -13,6 +13,8 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 - Hình: bấm để **phóng to** (lightbox) và liên kết "Mở SVG"; bảng tự bọc khung cuộn ngang; khối mã có nút "Sao chép".
 - A11y: skip link, `:focus-visible`, `aria-pressed`/`aria-expanded` cho nút giao diện và mục lục, tôn trọng
   `prefers-reduced-motion`; bản in/PDF gọn. Nội dung không đổi (13 hình, 21 bảng, 15 mục).
+- Sửa lỗi hiển thị: thuộc tính `hidden` của hộp phóng to và nút về đầu trang bị khai báo `display` ghi đè
+  nên hiện sẵn khi vừa mở trang (thấy nút X to ở góc phải) — thêm `[hidden]{display:none!important}`.
 
 ### Docs - ARCHITECTURE.html + bộ sơ đồ draw.io (17/10/2026)
 - Thêm `ARCHITECTURE.html` (gốc repo): tài liệu kiến trúc tiếng Việt 15 mục, kèm 13 sơ đồ tham chiếu từ
