@@ -19,6 +19,10 @@ lại → hoàn tác được.
   - `core-go/internal/tools/overwrite.go`: ghi vào ô có dữ liệu khác thì hỏi; sheet do chính lượt tạo
     (`CreatedSheets`) thì miễn; đã đồng ý một lần cho sheet thì không hỏi lại trong lượt.
   - `office_action.go`: từ chối find chỉ một dấu câu lẻ (`loneSymbolFind`).
+  - Thêm 16/10/2026 (P1-01): `wpp.deleteShapes`/`wpp.deleteTagged` hỏi trước khi xoá; `wpp.newFromTemplate` hỏi
+    khi tệp đích đã tồn tại; `et.importCsv` có `range` trùm vùng đã có dữ liệu thì hỏi (không `range` = tạo sheet
+    mới thì miễn). Test: `TestDeleteShapesAndTaggedAsk`, `TestNewFromTemplateOverwriteAsks`,
+    `TestImportCsvWithRangeAsks`/`TestImportCsvWithoutRangeSkipsQuestion`.
 - Thẻ hỏi: `core-go/internal/agent/confirm.go`: `Request` (Đồng ý/Từ chối), `Choose` (nhiều lựa chọn, có ô tự gõ),
   hết giờ/hủy trả rỗng. Khung chat Windows và WPS hiện thẻ. `Interactive=false` (agent khác gọi `ai.ask`) thì từ chối.
 - Chỉ đọc: chế độ lập kế hoạch (`request.Plan`, tool chỉ đọc, `ReadOnlyMCP`).

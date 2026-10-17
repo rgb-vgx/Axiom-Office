@@ -25,7 +25,7 @@
 
 | Tệp | Phần còn thiếu |
 |---|---|
-| `10-m1` | Đổi tên/di chuyển tệp vẫn nối được `documentKey`; lịch sử theo tệp trong pane |
+| `10-m1` | Đổi tên/di chuyển tệp vẫn nối được `documentKey` (lịch sử theo tệp đã có 17/10) |
 | `11-m2` | Ẩn thông tin nhạy cảm trước khi lưu; số liệu phải kèm nguồn; ngân sách token có log |
 | `12-m3` | Scope `org-style` (chuẩn chung, chỉ Admin sửa) |
 | `13-m4` | Export/import JSON; xóa theo tệp; nhật ký sửa tay hiện trong UI |

@@ -21,6 +21,10 @@ Mỗi lần đều sửa sau khi người dùng gặp. Thiếu một bộ đo ch
 - Chặn: giới hạn 100 vòng, chặn lệnh y hệt chạy quá 4 lần, dừng khi lặp một lỗi (`MaxIdenticalFailures`), hạn mức
   theo tool (`tools/limits.go`), guard kiểm chứng, dừng khi Office đóng. **Không có trần token mặc định** (bỏ từ
   13/10/2026 theo yêu cầu người dùng).
+- **3.3 đã làm 16/10/2026**: `sameTaskGuard` (`MaxSameTaskCalls` mặc định 25) chặn vòng lặp "cùng việc, khác tham
+  số" (16/10 trên `guards.go`, `model.go`); `heavyRunGuard` + `AgentCallbacks.AskContinue` hỏi Chạy tiếp/Dừng khi
+  vượt 30 vòng hoặc 500k token billable (thẻ `Choose`, `agent.heavy_run`); `Interactive=false`/hết giờ thì chạy
+  tiếp như cũ. Test: `internal/model/sametask_test.go`.
 - `tests/bench/`: đối chiếu Claude Code với Axiom trên bài Calc (đọc transcript, so giá trị) - chưa phải bộ đo hồi quy.
 
 ## 3. Việc cần làm
@@ -41,11 +45,13 @@ Mỗi lần đều sửa sau khi người dùng gặp. Thiếu một bộ đo ch
 - Mỗi kịch bản chạy N lần (mặc định 3) với mỗi model trong danh sách (mimo, deepseek flash, một model mạnh làm mốc).
 - Xuất bảng so với lần chạy trước (CSV/Markdown); không cần dashboard.
 
-### 3.3 Chặn đốt token (dùng số đo để chỉnh)
+### 3.3 Chặn đốt token (dùng số đo để chỉnh) - **đã làm 16/10/2026, chờ số đo kiểm lại**
 
-- Phát hiện vòng lặp "làm cùng một việc khác tham số" (vd 40 lệnh `replaceAll` một ký tự) chứ không chỉ "y hệt".
-- Cảnh báo người dùng khi lượt vượt ngưỡng vòng/token (ví dụ 30 vòng hoặc 500k token): hỏi tiếp hay dừng (dùng
-  thẻ `Choose`), thay vì im lặng chạy 20 phút.
+- Phát hiện vòng lặp "làm cùng một việc khác tham số" (vd 40 lệnh `replaceAll` một ký tự) chứ không chỉ "y hệt":
+  `sameTaskGuard` đếm theo nhóm việc, `MaxSameTaskCalls = 25`; lệnh ghi dữ liệu theo khối được miễn.
+- Cảnh báo khi lượt vượt ngưỡng: `heavyRunGuard` hỏi người dùng khi vượt 30 vòng hoặc 500k token billable, dùng
+  thẻ `Choose` (`agent.heavy_run`) thay vì im lặng chạy 20 phút.
+- Còn lại: chỉnh ngưỡng theo số đo thật của 3.1/3.2 (chưa có bộ chạy nên chưa chốt được ngưỡng).
 
 ## 4. Tiêu chí xong
 

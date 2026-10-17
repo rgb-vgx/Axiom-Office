@@ -7,19 +7,22 @@
 - `documentKey` gắn vào hội thoại (`conversations.document_key`) và memory scope `document` (`scope_key`).
 - Pane Windows mở lại hội thoại gần nhất của tài liệu (`CoreClient.FindConversationForDocument`).
 - Truy hồi lọc theo `documentKey` (`retriever.go`, `Search(query, documentKey, …)`).
+- **Lịch sử theo tệp đã có (17/10/2026)**: `GET /v1/conversations?documentKey=…` (`internal/api/runs.go`,
+  `Conversations.List(documentKey *string, limit)`); pane gắn `documentKey` của tài liệu đang mở
+  (`AskAiPane.DocumentKey` → `ConversationsForm(documentKey)`), form có ô "Chỉ tài liệu đang mở".
 - Menu "⋯" của khung chat: hội thoại trước, nhật ký hoạt động.
+- Đã sửa 16/10/2026: tài liệu chưa lưu không dùng tên làm khóa (`conversationKey` chỉ nhận đường dẫn thật),
+  `TestConversationKeyOnlyForSavedDocuments`.
 
 ## 2. Còn thiếu - việc cần làm
 
 - **Đổi tên/di chuyển tệp**: hiện khóa theo đường dẫn nên đổi tên là mất nhớ. Thêm dấu vân tay nội dung (ví dụ
   hash vài trăm ký tự đầu + số trang/sheet/slide) để gợi ý nối; nối thì hỏi người dùng, không tự nối.
-- **Lịch sử theo tệp**: menu "⋯" lọc hội thoại theo tài liệu đang mở (`GET /v1/conversations?documentKey=…`),
-  mở lại được hội thoại cũ.
 - **Kiểm không lẫn**: kịch bản trong bộ `17`.
 
 ## 3. Tệp sẽ sửa
 
-- `core-go/internal/store/conversations.go`, `core-go/internal/api/` (lọc theo `documentKey`)
+- `core-go/internal/store/conversations.go`, `core-go/internal/api/` (lọc theo `documentKey`: **xong 17/10**)
 - `core-go/internal/memory/retriever.go` (nếu thêm nối theo vân tay)
 - `src/AxiomOffice/Ai/AskAiPane.cs` (menu "⋯"), `CoreClient.cs`
 

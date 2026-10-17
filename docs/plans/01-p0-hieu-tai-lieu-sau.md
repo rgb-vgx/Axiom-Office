@@ -24,30 +24,39 @@
   `internal/agent/verify_scope_test.go`.
 - Catalog: 78 lệnh, 57 lệnh cho agent (không phải 47).
 
+**Cập nhật 17/10/2026**: P0-01…P0-07 đã làm (commit 16/10 trong `CHANGELOG.md [Unreleased]`):
+`HeadingPath` + ngân sách mục cấu trúc; `writer.outline` thêm style/bookmark/caption và mở cho agent; `et.readRange
+formulas=true` thêm `types` + `linkedSheets`; `wpp.listSlides detail` thêm layout/master/notes; cắt outline quá
+~1.500 token. Việc còn lại chỉ là các nhánh chưa làm hết ở WPS/LibreOffice và phép đo (P0-09).
+
 ## 3. Còn thiếu - việc cần làm
 
-### 3.1 Mở rộng lệnh có sẵn thay vì viết lệnh mới
+### 3.1 Lệnh đọc: xong trên Word, còn lệch ở WPS/LibreOffice
 
-Không viết `writer.getStructure`, `et.getFormulaMap`, `wpp.getOutline` (trùng lệnh có sẵn, mỗi lệnh phải làm ở 3
-nền tảng C#/WPS JS/Python UNO). Thay vào đó:
+Đã bỏ ý viết lệnh mới (`writer.getStructure`, `et.getFormulaMap`, `wpp.getOutline`) - dùng lệnh có sẵn. Phần đã
+xong và phần còn lại:
 
-- `writer.outline`: thêm style của heading, bookmark, caption bảng; mở cho agent (`ForAgent()`), có `maxChars`.
-- `et.readRange formulas=true`: trả kèm kiểu dữ liệu và sheet liên kết khi công thức trỏ sheet khác; giữ phân
-  trang `nextRange` của truncate.
-- `wpp.listSlides`: thêm tên layout/master và ghi chú khi `detail=true` (hoặc dùng `wpp.sourceManifest`).
-- Mỗi thay đổi: C# trước, rồi WPS JS (`src/AxiomOffice.WPS/commands.js`) và Python UNO (`axiom/*.py`) ở mức có thể;
-  phía chưa làm thì để stub báo rõ, giống `_design_unsupported`.
+- `writer.outline` - **xong C#** (style heading, bookmark, caption bảng), **LibreOffice** đọc body theo thứ tự +
+  style (`ParaStyleName`) + hàng tiêu đề bảng, **WPS** mới đọc đoạn + style. Còn: bookmark/caption ở LibreOffice,
+  bảng ở WPS (`src/AxiomOffice.WPS/commands.js` `cmdWriterOutline`).
+- `et.readRange formulas=true` - **xong cả 3 nền tảng** (`types` + `linkedSheets`, `truncate` cắt song song, giữ
+  `nextRange`).
+- `wpp.listSlides detail=true` - **xong cả 3 nền tảng** (layout/master/notes).
+- Nguyên tắc cũ vẫn giữ: C# trước, rồi WPS JS và Python UNO; phía chưa làm thì để stub báo rõ, giống
+  `_design_unsupported`.
 
-### 3.2 Giàu DocumentContext có ngân sách
+### 3.2 DocumentContext có ngân sách - **xong (P0-01, P0-02)**
 
-- Thêm `HeadingPath` (đường heading quanh con trỏ) cho Word; pane gửi trong `document.view`.
+- `HeadingPath` (đường heading quanh con trỏ) đã đọc trong `orchestrator.go` (`view["headingPath"]`, tối đa 6 mục)
+  và đưa vào `prompt.go`; HostProbe gửi từ Word, WPS thiếu thuộc tính thì bỏ qua.
 - `ContextAssembler.Assemble` (`internal/agent/context.go`): mục cấu trúc tài liệu có ngân sách token riêng, quá
   thì cắt bằng truncate có sẵn.
 
-### 3.3 Đo bằng bộ `17`
+### 3.3 Đo bằng bộ `17` - **còn lại (P0-09)**
 
 - Kịch bản: tóm tắt giáo án 20k+ ký tự, sửa bảng điểm có công thức, sửa slide giữ layout.
 - Tiêu chí xong tính bằng số đo, không bằng cảm nhận.
+- Chưa có mốc trước P0 lẫn bộ chạy; nằm chung việc với `18-r0-tasks-chitiet.md` (bộ `17` là hạ tầng của R0).
 
 ## 4. Tệp sẽ sửa
 

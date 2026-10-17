@@ -13,7 +13,8 @@
 ## 2. Còn thiếu - việc cần làm
 
 - **Ẩn bí mật trong audit**: `params_json` đang lưu thô (có thể chứa khóa API trong lệnh MCP, nội dung nhạy cảm
-  trong `replaceMany`). Lọc như M2 (`memory/redact.go` dùng chung) trước khi ghi; cắt chuỗi dài.
+  trong `replaceMany`). Lọc trước khi ghi bằng đúng phần sẽ tạo ở M2 (`core-go/internal/memory/redact.go` - **chưa
+  tồn tại**, 17/10/2026 kiểm lại không thấy); M2 làm trước rồi P6 dùng lại; cắt chuỗi dài.
 - **Hạn lưu audit**: `tool_calls` hiện giữ mãi; thêm giữ N ngày (mặc định 90) + nút xóa trong admin.
 - **Khôi phục**: bản chụp từ `02-p1` (Excel/PowerPoint) gắn với `run_id`; `POST /v1/runs/{id}/revert` khi còn
   bản chụp. Digest trước/sau không đủ để khôi phục nên không làm riêng.

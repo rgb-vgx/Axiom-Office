@@ -5,6 +5,17 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Docs - docs/plans: đồng bộ trạng thái + tệp task chi tiết (17/10/2026)
+- Đánh dấu P0-01…P0-07 **đã xong** (16/10) trong `01-p0`, `15-p0-tasks-chitiet`; ghi rõ hai chỗ còn lệch phía
+  WPS/LibreOffice của `writer.outline` (bảng ở WPS, bookmark/caption ở LibreOffice).
+- R0: ghi nhận mục 3.3 đã có (`sameTaskGuard`, `heavyRunGuard`/`AskContinue`); còn 3.1 (bộ kịch bản) và 3.2 (bộ chạy).
+- Sửa chỗ lỗi thời: memory **đã có** lọc nhạy cảm `IsSensitive` (`memory/text.go`) - không còn câu "chưa có chỗ nào
+  redact"; `07-p6` bỏ tham chiếu `memory/redact.go` (chưa tồn tại).
+- M1: lịch sử hội thoại theo tài liệu đang mở đã có (`GET /v1/conversations?documentKey=…`, `ConversationsForm`).
+- Thêm 12 tệp task chi tiết `18`–`29` (R0, P2, M1–M5, P4–P8) theo mẫu `15`/`16`; cập nhật bảng và tiến độ ở
+  `00-readme.md`.
+
+
 ### Fixed — CI đỏ từ 13/10: ba lỗi độc lập, đã xanh lại (16/10/2026)
 - **Linux/JS**: `tests/wps/test_addin.mjs` còn xếp `writer.outline` vào `CHUA_CO_HANDLER` dù add-in WPS
   đã có handler (P0-03) → gỡ khỏi danh sách, mock `writerApp` đủ `Paragraphs` để handler chạy;
