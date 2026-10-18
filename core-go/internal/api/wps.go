@@ -32,6 +32,7 @@ func mapWPS(mux *http.ServeMux, deps *Deps) {
 		deps.WPS.ServeResult(w, r)
 	})
 	mapWPSRuns(mux, deps)
+	mapWPSAdmin(mux, deps)
 	// Duong dan la duoi /wps/* (vd ".." da duoc server chuan hoa): tra 404 truc tiep, khong lo
 	// vo guard 401. /wps/v1/* la van ap dung xac thuc kenh (Origin la -> 403).
 	mux.HandleFunc("/wps/v1/", func(w http.ResponseWriter, r *http.Request) {
@@ -47,7 +48,7 @@ func mapWPS(mux *http.ServeMux, deps *Deps) {
 // Xac thuc kenh add-in (DecideWPSAuth + doi body JSON); /v1/runs giu guard cu.
 func mapWPSRuns(mux *http.ServeMux, deps *Deps) {
 	mux.HandleFunc("POST /wps/v1/runs", func(w http.ResponseWriter, r *http.Request) {
-		if !checkWPSRunAuth(w, r, deps) {
+		if !checkWPSAuth(w, r, deps) {
 			return
 		}
 		if !deps.Stores.Available {
@@ -87,28 +88,28 @@ func mapWPSRuns(mux *http.ServeMux, deps *Deps) {
 	})
 
 	mux.HandleFunc("GET /wps/v1/runs/{runId}", func(w http.ResponseWriter, r *http.Request) {
-		if !checkWPSRunAuth(w, r, deps) {
+		if !checkWPSAuth(w, r, deps) {
 			return
 		}
 		serveGetRun(w, deps, r.PathValue("runId"))
 	})
 
 	mux.HandleFunc("GET /wps/v1/runs/{runId}/events", func(w http.ResponseWriter, r *http.Request) {
-		if !checkWPSRunAuth(w, r, deps) {
+		if !checkWPSAuth(w, r, deps) {
 			return
 		}
 		serveRunEvents(w, r, deps, r.PathValue("runId"))
 	})
 
 	mux.HandleFunc("POST /wps/v1/runs/{runId}/cancel", func(w http.ResponseWriter, r *http.Request) {
-		if !checkWPSRunAuth(w, r, deps) {
+		if !checkWPSAuth(w, r, deps) {
 			return
 		}
 		serveCancelRun(w, deps, r.PathValue("runId"))
 	})
 
 	mux.HandleFunc("POST /wps/v1/runs/{runId}/confirm", func(w http.ResponseWriter, r *http.Request) {
-		if !checkWPSRunAuth(w, r, deps) {
+		if !checkWPSAuth(w, r, deps) {
 			return
 		}
 		body, parsed := readJSON(r)
@@ -119,11 +120,11 @@ func mapWPSRuns(mux *http.ServeMux, deps *Deps) {
 	})
 }
 
-// checkWPSRunAuth: xac thuc kenh add-in cho /wps/v1/runs (giong wpsbridge.checkWPSAuth: Origin dung
+// checkWPSAuth: xac thuc kenh add-in cho moi endpoint /wps/v1/* (giong wpsbridge.checkWPSAuth: Origin dung
 // bang origin cua Core thi qua, Origin la -> 403, khong Origin thi doi token -> 401, body JSON -> 415).
 // Trinh duyet khong gui Origin cho GET cung origin nen EventSource cua pane bi 401 (11/10/2026):
 // GET/HEAD khong Origin ma co Sec-Fetch-Site: same-origin thi cho qua; POST van doi token.
-func checkWPSRunAuth(w http.ResponseWriter, r *http.Request, deps *Deps) bool {
+func checkWPSAuth(w http.ResponseWriter, r *http.Request, deps *Deps) bool {
 	if code, ok := wpsbridge.DecideWPSAuth(r.Header.Get("Origin"), r.Header.Get("X-Auth-Token"), deps.Config.Token, deps.Runtime.Port, r.Method, r.Header.Get("Sec-Fetch-Site")); !ok {
 		if code == http.StatusForbidden {
 			Error(w, code, "requests with an Origin header are not allowed")

@@ -10,12 +10,12 @@ import (
 
 // GET /v1/skills?app=wps|et|wpp, POST /v1/skills/reload (New_arch.md muc 7.3, 8.4.4).
 func mapSkills(mux *http.ServeMux, deps *Deps) {
-	mux.HandleFunc("GET /v1/skills", func(w http.ResponseWriter, r *http.Request) {
+	routeBoth(mux, deps, "GET /v1/skills", func(w http.ResponseWriter, r *http.Request) {
 		appKind := strings.TrimSpace(r.URL.Query().Get("app"))
 		OK(w, skillListing(deps.Skills, appKind))
 	})
 
-	mux.HandleFunc("POST /v1/skills/reload", func(w http.ResponseWriter, r *http.Request) {
+	routeBoth(mux, deps, "POST /v1/skills/reload", func(w http.ResponseWriter, r *http.Request) {
 		deps.Skills.Reload()
 		OK(w, skillListing(deps.Skills, ""))
 	})

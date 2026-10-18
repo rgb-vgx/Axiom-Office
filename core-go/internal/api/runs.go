@@ -61,7 +61,7 @@ func mapRuns(mux *http.ServeMux, deps *Deps) {
 		serveConfirmRun(w, deps, r.PathValue("runId"), body)
 	})
 
-	mux.HandleFunc("GET /v1/audit", func(w http.ResponseWriter, r *http.Request) {
+	routeBoth(mux, deps, "GET /v1/audit", func(w http.ResponseWriter, r *http.Request) {
 		runID := strings.TrimSpace(r.URL.Query().Get("runId"))
 		limit := clampLimit(r.URL.Query().Get("limit"), 100)
 		var filter *string
@@ -82,7 +82,7 @@ func mapRuns(mux *http.ServeMux, deps *Deps) {
 		serveRunEvents(w, r, deps, r.PathValue("runId"))
 	})
 
-	mux.HandleFunc("GET /v1/conversations", func(w http.ResponseWriter, r *http.Request) {
+	routeBoth(mux, deps, "GET /v1/conversations", func(w http.ResponseWriter, r *http.Request) {
 		documentKey := strings.TrimSpace(r.URL.Query().Get("documentKey"))
 		limit := clampLimit(r.URL.Query().Get("limit"), 20)
 		var key *string
@@ -96,7 +96,7 @@ func mapRuns(mux *http.ServeMux, deps *Deps) {
 		OK(w, map[string]any{"conversations": list})
 	})
 
-	mux.HandleFunc("GET /v1/conversations/{id}", func(w http.ResponseWriter, r *http.Request) {
+	routeBoth(mux, deps, "GET /v1/conversations/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
 		row := deps.Stores.Convs.Get(id)
 		if row == nil {
@@ -114,7 +114,7 @@ func mapRuns(mux *http.ServeMux, deps *Deps) {
 		OK(w, payload)
 	})
 
-	mux.HandleFunc("DELETE /v1/conversations/{id}", func(w http.ResponseWriter, r *http.Request) {
+	routeBoth(mux, deps, "DELETE /v1/conversations/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
 		if !deps.Stores.Convs.Delete(id) {
 			Error(w, http.StatusNotFound, "unknown conversation: "+id)

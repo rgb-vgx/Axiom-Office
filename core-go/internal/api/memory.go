@@ -12,7 +12,7 @@ import (
 func mapMemory(mux *http.ServeMux, deps *Deps) {
 	service := deps.Memory
 
-	mux.HandleFunc("GET /v1/memory", func(w http.ResponseWriter, r *http.Request) {
+	routeBoth(mux, deps, "GET /v1/memory", func(w http.ResponseWriter, r *http.Request) {
 		if !service.Available() {
 			Error(w, http.StatusServiceUnavailable, "memory unavailable")
 			return
@@ -43,7 +43,7 @@ func mapMemory(mux *http.ServeMux, deps *Deps) {
 		OK(w, map[string]any{"memories": list})
 	})
 
-	mux.HandleFunc("POST /v1/memory", func(w http.ResponseWriter, r *http.Request) {
+	routeBoth(mux, deps, "POST /v1/memory", func(w http.ResponseWriter, r *http.Request) {
 		body, _ := readJSON(r)
 		scope := textOf(body["scope"])
 		if scope == "" {
@@ -81,7 +81,7 @@ func mapMemory(mux *http.ServeMux, deps *Deps) {
 		OK(w, map[string]any{"event": result[0].Event, "memory": item})
 	})
 
-	mux.HandleFunc("PATCH /v1/memory/{id}", func(w http.ResponseWriter, r *http.Request) {
+	routeBoth(mux, deps, "PATCH /v1/memory/{id}", func(w http.ResponseWriter, r *http.Request) {
 		body, _ := readJSON(r)
 		_, hasExpires := body["expiresAt"]
 		var pinned *bool
@@ -100,7 +100,7 @@ func mapMemory(mux *http.ServeMux, deps *Deps) {
 		}
 	})
 
-	mux.HandleFunc("DELETE /v1/memory/{id}", func(w http.ResponseWriter, r *http.Request) {
+	routeBoth(mux, deps, "DELETE /v1/memory/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
 		if !service.Store().Delete(id, queryValue(r.URL.Query().Get("reason"))) {
 			Error(w, http.StatusNotFound, "unknown memory: "+id)
@@ -109,7 +109,7 @@ func mapMemory(mux *http.ServeMux, deps *Deps) {
 		OK(w, map[string]any{"deleted": id})
 	})
 
-	mux.HandleFunc("POST /v1/memory/{id}/restore", func(w http.ResponseWriter, r *http.Request) {
+	routeBoth(mux, deps, "POST /v1/memory/{id}/restore", func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
 		if !service.Store().Restore(id) {
 			Error(w, http.StatusNotFound, "not a deleted memory: "+id)
@@ -118,7 +118,7 @@ func mapMemory(mux *http.ServeMux, deps *Deps) {
 		OK(w, map[string]any{"restored": id})
 	})
 
-	mux.HandleFunc("GET /v1/memory/{id}/history", func(w http.ResponseWriter, r *http.Request) {
+	routeBoth(mux, deps, "GET /v1/memory/{id}/history", func(w http.ResponseWriter, r *http.Request) {
 		list := []any{}
 		for _, entry := range service.Store().History(r.PathValue("id")) {
 			list = append(list, map[string]any{
@@ -130,7 +130,7 @@ func mapMemory(mux *http.ServeMux, deps *Deps) {
 	})
 
 	// Xoa cung toan bo: phai co ?scope=all&confirm=true (UI hoi lai truoc).
-	mux.HandleFunc("DELETE /v1/memory", func(w http.ResponseWriter, r *http.Request) {
+	routeBoth(mux, deps, "DELETE /v1/memory", func(w http.ResponseWriter, r *http.Request) {
 		query := r.URL.Query()
 		scope := queryValue(query.Get("scope"))
 		if query.Get("confirm") != "true" || scope == "" || (scope != "all" && !memory.IsValidScope(scope)) {

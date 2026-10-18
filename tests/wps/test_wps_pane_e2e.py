@@ -156,7 +156,11 @@ def main() -> int:
         "AXIOM_LLM_PROVIDER": "openai", "AXIOM_LLM_ENDPOINT": "http://127.0.0.1:%d/v1" % llm.port,
         "AXIOM_LLM_MODEL": "fake-model", "AXIOM_LLM_API_KEY": "fake-key", "AXIOM_VERIFY_WORK": "0",
         "AXIOM_MEMORY_ENABLED": "0", "AXIOM_CONFIRM_TIMEOUT": "20",
+        # Cau hinh ghi tu pane di vao $XDG_CONFIG_HOME/axiom-office/config.json - de rieng, khong dung
+        # vao cau hinh that cua may chay test.
+        "XDG_CONFIG_HOME": os.path.join(work, "xdg"),
     })
+    config_path = os.path.join(work, "xdg", "axiom-office", "config.json")
     own = {"Origin": core.origin}
     addin = None
     try:
@@ -176,6 +180,55 @@ def main() -> int:
         check(status == 401, "pane: khong Origin, khong token -> 401", status)
         status, _, _ = base.request(core.base + "/v1/runs", "POST", {"prompt": "x", "office": {"port": 1}}, own)
         check(status == 403, "/v1/runs voi Origin cua Core van 403 (guard cu)", status)
+
+        # ---- kenh quan tri cho pane/ribbon (docs/ribbon-ui.md muc 2): cung quy tac xac thuc voi /wps/v1/runs,
+        # nhung mo duoc cac duong /v1/* ma pane khong co token khong goi duoc (Thiet lap, Bo nho AI, Hoi thoai
+        # truoc, Nhat ky hoat dong).
+        status, _, text = base.request(core.base + "/wps/v1/setup", headers=own)
+        check(status == 200 and "visualQaEnabled" in text, "pane: GET /wps/v1/setup (Thiet lap) -> 200", (status, text[:200]))
+        status, _, _ = base.request(core.base + "/wps/v1/setup", headers={"Origin": "http://evil.example"})
+        check(status == 403, "pane: /wps/v1/setup Origin la -> 403", status)
+        status, _, _ = base.request(core.base + "/wps/v1/setup")
+        check(status == 401, "pane: /wps/v1/setup khong Origin, khong token -> 401", status)
+        status, _, text = base.request(core.base + "/wps/v1/conversations", headers=own)
+        check(status == 200, "pane: GET /wps/v1/conversations (Hoi thoai truoc) -> 200", (status, text[:200]))
+        status, _, _ = base.request(core.base + "/v1/conversations", headers=own)
+        check(status in (401, 403), "/v1/conversations voi Origin cua Core van bi chan (guard cu)", status)
+        status, _, _ = base.request(core.base + "/wps/v1/memory", headers=own)
+        check(status not in (401, 403), "pane: /wps/v1/memory di qua kenh WPS (503 khi memory tat)", status)
+
+        # ---- ghi cau hinh tu pane: nut toggle "Nhin tai lieu" (docs/ribbon-ui.md 5.1 - truoc day khong co
+        # duong that dung sau). Ghi vao config.json dung chung voi extension LibreOffice, roi doc lai.
+        status, _, text = base.request(core.base + "/wps/v1/config", "POST", {"Token": "khac"}, own)
+        check(status == 400, "pane: ghi khoa bi cam (Token) -> 400", (status, text[:200]))
+        status, _, text = base.request(core.base + "/wps/v1/config", "POST", {"VisualQaEnabled": True}, own)
+        reply = base.as_json(text).get("result") or {}
+        check(status == 200 and reply.get("saved") == ["VisualQaEnabled"], "pane: POST /wps/v1/config -> saved",
+              (status, text[:300]))
+        check(reply.get("current", {}).get("visualQaEnabled") is True, "pane: config tra gia tri song vua doi", reply)
+        status, _, text = base.request(core.base + "/wps/v1/setup", headers=own)
+        check(base.as_json(text).get("result", {}).get("current", {}).get("visualQaEnabled") is True,
+              "pane: toggle doc lai duoc trang thai THAT (khong suy dien tu viec ghi)", text[:300])
+        check(os.path.exists(config_path) and (os.stat(config_path).st_mode & 0o777) == 0o600,
+              "pane: config.json ghi 0600 (co the chua khoa API)", config_path)
+        with open(config_path, encoding="utf-8") as handle:
+            check(json.load(handle).get("VisualQaEnabled") is True, "pane: config.json giu kieu JSON that", "")
+
+        # ---- lenh truc tiep (nut "Soat bang"/"Hoan tac luot nay"): di thang ra add-in, khong qua agent.
+        status, _, text = base.request(core.base + "/wps/v1/exec", "POST",
+                                       {"action": "writer.getText", "params": {"maxChars": 100}}, own)
+        check(status == 200 and (base.as_json(text).get("result") or {}).get("text") == SELECTION_TEXT,
+              "pane: POST /wps/v1/exec -> ket qua tu add-in", (status, text[:300]))
+        check(("writer.getText", {"maxChars": 100}) in addin.actions, "exec: add-in nhan lenh truc tiep",
+              addin.actions)
+        before = len(addin.actions)
+        status, _, _ = base.request(core.base + "/wps/v1/exec", "POST", {"action": "writer.save"},
+                                    {"Origin": "http://evil.example"})
+        check(status == 403, "exec: Origin la -> 403 (khong chay lenh nao len tai lieu)", status)
+        time.sleep(0.5)
+        check(len(addin.actions) == before, "exec: lenh tu Origin la khong toi add-in", addin.actions)
+        status, _, _ = base.request(core.base + "/wps/v1/exec", "POST", {}, own)
+        check(status == 400, "exec: thieu action -> 400", status)
 
         # ---- luot 1
         status, _, text = base.request(core.base + "/wps/v1/runs", "POST", {"prompt": "Thêm một dòng chào"}, own)
@@ -231,6 +284,10 @@ def main() -> int:
                                        {"prompt": "Làm việc lâu", "conversationId": conversation}, own)
         run2 = (base.as_json(text).get("result") or {}).get("runId")
         time.sleep(1.0)
+        # Lenh truc tiep giua luot chay: add-in chay tuan tu nen du lieu khong hong, nhung agent mat dung
+        # trang thai tai lieu no dang theo doi -> tu choi cho xong luot.
+        status, _, text = base.request(core.base + "/wps/v1/exec", "POST", {"action": "writer.save"}, own)
+        check(status == 409 and "in progress" in text, "exec: dang co luot chay -> 409", (status, text[:200]))
         status, _, text = base.request(core.base + "/wps/v1/runs/%s/cancel" % run2, "POST", {}, own)
         check(status == 200 and (base.as_json(text).get("result") or {}).get("cancelled") is True,
               "pane: POST /wps/v1/runs/{id}/cancel", (status, text))

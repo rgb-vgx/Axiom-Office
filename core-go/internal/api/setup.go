@@ -28,11 +28,11 @@ const (
 )
 
 func mapSetup(mux *http.ServeMux, deps *Deps) {
-	mux.HandleFunc("GET /v1/setup", func(w http.ResponseWriter, r *http.Request) {
+	routeBoth(mux, deps, "GET /v1/setup", func(w http.ResponseWriter, r *http.Request) {
 		OK(w, setupPayload(deps))
 	})
 
-	mux.HandleFunc("POST /v1/llm/test", func(w http.ResponseWriter, r *http.Request) {
+	routeBoth(mux, deps, "POST /v1/llm/test", func(w http.ResponseWriter, r *http.Request) {
 		body, parsed := readJSON(r)
 		if !parsed {
 			Error(w, http.StatusBadRequest, "invalid JSON body")
@@ -81,7 +81,7 @@ func mapSetup(mux *http.ServeMux, deps *Deps) {
 		OK(w, map[string]any{"seconds": rounded, "model": request.model, "provider": request.codec, "reply": reply})
 	})
 
-	mux.HandleFunc("GET /v1/llm/models", func(w http.ResponseWriter, r *http.Request) {
+	routeBoth(mux, deps, "GET /v1/llm/models", func(w http.ResponseWriter, r *http.Request) {
 		query := r.URL.Query()
 		request := adHocFrom(query.Get)
 		if missing := request.missing(); missing != "" {
