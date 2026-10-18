@@ -15,6 +15,7 @@ from __future__ import annotations
 import datetime
 
 import uno
+import unohelper
 
 from . import bridge, checks, config, core, documents, theme
 from .awt import ChildWindow, Dialog, bind_actions
@@ -378,6 +379,85 @@ def skill_status(listing, kind: str | None = None) -> str:
     return " · ".join(parts)
 
 
+def _existing_label(row) -> str:
+    """Nhan nguon cho muc `existing` cua /v1/skills/inspect (khoa la `source`, khac `sources` cua listing)."""
+    source = str((row or {}).get("source") or "")
+    return SKILL_SOURCE_LABELS.get(source, source or "?")
+
+
+def import_lines(preview) -> list:
+    """Cac dong xac nhan truoc khi nhap: mot dong moi ky nang, kem canh bao ghi de / da co o nguon nao."""
+    preview = preview or {}
+    lines = []
+    for row in preview.get("candidates") or []:
+        name = str(row.get("name") or "?")
+        notes = []
+        if row.get("conflict"):
+            notes.append("ghi đè bản trong thư mục cá nhân")
+        existing = row.get("existing") or {}
+        if existing:
+            notes.append("đã có ở nguồn %s" % _existing_label(existing))
+        lines.append("%s — %s" % (name, ", ".join(notes)) if notes else name)
+    for failure in preview.get("errors") or []:
+        lines.append("⚠ %s: %s" % (failure.get("directory") or "?", failure.get("error") or "?"))
+    return lines
+
+
+def _pick_folder(ctx, title: str) -> str:
+    """Chon mot thu muc bang hop thoai chuan cua LibreOffice; tra ve duong dan he thong ('' neu huy).
+
+    FolderPicker tra URL `file:///...` (co ma hoa, vd `%20`), nen doi bang unohelper chu khong cat chuoi.
+    """
+    picker = ctx.ServiceManager.createInstanceWithContext("com.sun.star.ui.dialogs.FolderPicker", ctx)
+    if picker is None:
+        return ""
+    picker.Title = title
+    if picker.execute() != 1:      # 1 = com.sun.star.ui.dialogs.ExecutableDialogResults.OK
+        return ""
+    url = picker.getDirectory()
+    return unohelper.systemPathFromFileURL(url) if url else ""
+
+
+def _confirm_import(ctx, parent, path: str, preview: dict, on_done) -> None:
+    """Cua so xac nhan: liet ke ky nang se copy vao thu muc nguoi dung roi moi ghi len dia.
+
+    Tach khoi dialog "Ky nang" de chi dung cac thao tac da co (add/set/bind_actions/close), khong phai an hien
+    nut trong cung mot cua so. `on_done` nhan ket qua Core de cap nhat lai danh sach ky nang.
+    """
+    dialog = _open(ctx, parent, "Nhập kỹ năng", 620, 380)
+    if dialog is None:
+        return
+    dialog.add("ListBox", "items", PositionX=12, PositionY=46, Width=596, Height=236,
+               StringItemList=uno.Any("[]string", ()))
+    dialog.add("FixedText", "status", PositionX=12, PositionY=290, Width=596, Height=46, MultiLine=True,
+               TextColor=theme.TEXT_MUTED, FontHeight=theme.SIZE_CAPTION,
+               Label="Sẽ copy vào %s. Sửa ở thư mục ngoài thì phải nhập lại."
+               % (preview.get("target") or ""))
+    _button(dialog, "confirm", 12, 342, 120, "Nhập")
+    _button(dialog, "cancel", 518, 342, 90, "Huỷ")
+    _set_list(dialog, "items", import_lines(preview))
+
+    def close() -> None:
+        dialog.close()
+        DIALOGS.pop("Nhập kỹ năng", None)
+
+    def on_action(command: str, event) -> None:
+        if command != "confirm":
+            close()
+            return
+        overwrite = any(row.get("conflict") for row in (preview.get("candidates") or []))
+        try:
+            base, _ = core.ensure()
+            result = core.skill_import(base, path, overwrite)
+        except core.CoreError as exc:
+            dialog.set("status", Label="Không nhập được: %s" % exc)
+            return
+        close()
+        on_done(result)
+
+    bind_actions(dialog, ("confirm", "cancel"), on_action)
+
+
 def open_skills(pane) -> None:
     """Dialog "Ky nang": Core dang thay ky nang nao cho app dang mo, va nap lai thu muc ky nang.
 
@@ -392,7 +472,8 @@ def open_skills(pane) -> None:
                StringItemList=uno.Any("[]string", ()))
     dialog.add("FixedText", "status", PositionX=12, PositionY=364, Width=536, Height=32, MultiLine=True,
                TextColor=theme.TEXT_MUTED, FontHeight=theme.SIZE_CAPTION, Label="Đang đọc…")
-    _button(dialog, "reload", 12, 402, 120, "Nạp lại")
+    _button(dialog, "import", 12, 402, 150, "Nhập kỹ năng…")
+    _button(dialog, "reload", 174, 402, 100, "Nạp lại")
     _button(dialog, "close", 458, 402, 90, "Đóng")
 
     def load(reread: bool = False) -> None:
@@ -409,14 +490,45 @@ def open_skills(pane) -> None:
         _set_list(dialog, "items", skill_lines(listing))
         dialog.set("status", Label=("Đã nạp lại · " if reread else "") + skill_status(listing, kind))
 
+    def do_import() -> None:
+        path = _pick_folder(ctx, "Chọn thư mục chứa kỹ năng")
+        if not path:
+            return
+        try:
+            base, _ = core.ensure()
+            preview = core.skill_inspect(base, path)
+        except core.CoreError as exc:
+            dialog.set("status", Label="Không đọc được thư mục: %s" % exc)
+            return
+        failures = list(preview.get("errors") or [])
+        if failures:
+            rest = "" if len(failures) == 1 else " (và %d chỗ nữa)" % (len(failures) - 1)
+            dialog.set("status", Label="Không nhập: %s: %s%s" % (failures[0].get("directory") or "?",
+                                                                 failures[0].get("error") or "?", rest))
+            return
+        if not (preview.get("candidates") or []):
+            dialog.set("status", Label="Thư mục không có kỹ năng nào.")
+            return
+
+        def after_import(result: dict) -> None:
+            load()
+            names = ", ".join(str(name) for name in (result.get("imported") or []))
+            replaced = ", ".join(str(name) for name in (result.get("replaced") or []))
+            dialog.set("status", Label="Đã nhập: %s%s. AI tự chọn kỹ năng hợp với yêu cầu."
+                       % (names or "?", " (ghi đè: %s)" % replaced if replaced else ""))
+
+        _confirm_import(ctx, pane.frame if hasattr(pane, "frame") else None, path, preview, after_import)
+
     def on_action(command: str, event) -> None:
-        if command == "reload":
+        if command == "import":
+            do_import()
+        elif command == "reload":
             load(reread=True)
         elif command == "close":
             dialog.close()
             DIALOGS.pop("Kỹ năng", None)
 
-    bind_actions(dialog, ("reload", "close"), on_action)
+    bind_actions(dialog, ("import", "reload", "close"), on_action)
     load()
 
 

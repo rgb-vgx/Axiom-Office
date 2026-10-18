@@ -5,6 +5,16 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added - nút "Nhập kỹ năng…" trong add-in (18/10/2026)
+- Windows COM: `SkillsForm` (`Ai/AdminForms.cs`) thêm nút **Nhập kỹ năng…** — chọn thư mục (`FolderBrowserDialog`),
+  `POST /v1/skills/inspect` để soi trước, hộp xác nhận liệt kê kỹ năng sẽ nhập (kèm "đã có ở nguồn …" và cảnh báo
+  ghi đè), rồi `POST /v1/skills/import` và nạp lại danh sách. Client: `CoreClient.InspectSkill`/`ImportSkill`
+  (`Ai/CoreAdmin.cs`).
+- LibreOffice: dialog *Kỹ năng…* (`axiom/dialogs.py`) thêm nút **Nhập kỹ năng…** (`com.sun.star.ui.dialogs.FolderPicker`,
+  đổi URL sang đường dẫn bằng `unohelper`), và dialog xác nhận riêng "Nhập kỹ năng" (cửa sổ con trên Linux không nhận
+  chuột nên phần xác nhận phải là cửa sổ riêng). Client: `core.skill_inspect`/`skill_import` (`axiom/core.py`).
+- Test: `import_lines`/`_pick_folder` trong `tests/lo/test_dialogs.py` (27 ca, chạy không cần UNO thật).
+
 ### Added - nạp skill từ thư mục ngoài (18/10/2026)
 - `internal/skills/import.go`: `Inspect` (soi trước, không ghi đĩa) và `Import` (copy vào thư mục skill của
   người dùng). Nhận thư mục là **một skill** (có `SKILL.md`) hoặc **nhiều skill** (các thư mục con có

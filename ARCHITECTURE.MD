@@ -1344,7 +1344,9 @@ flowchart TD
   trùng, đang ở nguồn nào — rồi `POST /v1/skills/import` (`overwrite`) **copy** vào
   `%LOCALAPPDATA%\AxiomOffice\skills`. Có/không cả lượt (một skill sai frontmatter thì không copy gì);
   bỏ `.git`, từ chối symlink, trần 64 MB; copy vào thư mục tạm `.import` cạnh `skills/` rồi `Rename` để chỉ mục
-  không đọc thấy thư mục đang copy. Thêm nguồn dạng trỏ thẳng (`SkillDirs`) vẫn là việc của add-in.
+  không đọc thấy thư mục đang copy. Chỉ có một đường vào: copy; thêm nguồn dạng trỏ thẳng (`SkillDirs`) là
+  việc của add-in, không nằm trong luồng này. Giao diện: nút **Nhập kỹ năng…** trong `SkillsForm` (Windows COM)
+  và dialog *Kỹ năng…* (LibreOffice) — chọn thư mục → `inspect` → hộp xác nhận → `import`.
 - `loader.go` validate frontmatter theo chuẩn (tên ≤ 64 `a-z0-9-`, không `anthropic`/`claude`; mô tả
   ≤ 1024, không thẻ XML, ngôi thứ ba + từ khoá tiếng Việt; field lạ bỏ qua; `apps` tuỳ chọn).
   Lỗi → bỏ skill đó, hiện ở `/v1/skills`. Chỉ mục tầng 1 cắt ở 300 rune (`skillDescriptionLimit`).

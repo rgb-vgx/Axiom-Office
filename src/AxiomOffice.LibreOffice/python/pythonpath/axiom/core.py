@@ -256,6 +256,24 @@ def reload_skills(base: str) -> dict:
     return call(base, "POST", "/v1/skills/reload", {}) or {}
 
 
+def skill_inspect(base: str, path: str) -> dict:
+    """POST /v1/skills/inspect: soi thu muc ngoai TRUOC khi nhap - Core khong ghi gi len dia.
+
+    `path` la mot thu muc ky nang (co SKILL.md) hoac thu muc chua nhieu thu muc ky nang. Tra ve `candidates`
+    (kem `conflict` va `existing` khi trung ten) va `errors` (thu muc sai dinh dang).
+    """
+    return call(base, "POST", "/v1/skills/inspect", {"path": path}) or {}
+
+
+def skill_import(base: str, path: str, overwrite: bool = False) -> dict:
+    """POST /v1/skills/import: COPY ky nang tu thu muc ngoai vao thu muc ky nang cua nguoi dung.
+
+    Ca luot hoac cung duoc hoac khong: mot ky nang sai frontmatter, hay mot ten da co khi `overwrite=False`,
+    thi Core khong copy gi va tra loi `CoreError`.
+    """
+    return call(base, "POST", "/v1/skills/import", {"path": path, "overwrite": bool(overwrite)}) or {}
+
+
 def audit(base: str, run_id: str = "", limit: int = 100) -> list:
     """GET /v1/audit: cac lenh Core da goi vao tai lieu, moi nhat truoc (khong loc duoc theo tai lieu)."""
     params = {"limit": str(limit)}

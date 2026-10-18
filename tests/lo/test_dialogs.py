@@ -150,6 +150,45 @@ class SkillStatusTest(unittest.TestCase):
         self.assertEqual("0 kỹ năng · 2 thư mục nạp lỗi", dialogs.skill_status({"skills": [], "errors": [{}, {}]}))
 
 
+class ImportLinesTest(unittest.TestCase):
+    """Xac nhan truoc khi nhap: noi ro se ghi de ban nao, va thu muc sai dinh dang khong bi im lang."""
+
+    def test_moi_ky_nang_mot_dong_kem_canh_bao(self):
+        preview = {"candidates": [
+            {"name": "bang-diem", "conflict": True, "existing": {"source": "builtin", "directory": "/x"}},
+            {"name": "cua-toi"},
+        ]}
+        self.assertEqual(["bang-diem — ghi đè bản trong thư mục cá nhân, đã có ở nguồn sẵn có", "cua-toi"],
+                         dialogs.import_lines(preview))
+
+    def test_thu_muc_sai_dinh_dang_van_hien(self):
+        preview = {"candidates": [], "errors": [{"directory": "/tmp/x", "error": "missing name"}]}
+        self.assertEqual(["⚠ /tmp/x: missing name"], dialogs.import_lines(preview))
+
+    def test_khong_co_gi_thi_tra_rong(self):
+        for preview in ({}, None):
+            self.assertEqual([], dialogs.import_lines(preview))
+
+
+class PickFolderTest(unittest.TestCase):
+    """FolderPicker tra URL chu khong phai duong dan he thong - phai doi bang unohelper truoc khi gui Core."""
+
+    def _ctx(self, picker):
+        return types.SimpleNamespace(ServiceManager=types.SimpleNamespace(
+            createInstanceWithContext=lambda name, ctx: picker))
+
+    def test_huy_thi_tra_rong(self):
+        picker = types.SimpleNamespace(execute=lambda: 0)
+        self.assertEqual("", dialogs._pick_folder(self._ctx(picker), "Chọn thư mục"))
+        self.assertEqual("Chọn thư mục", picker.Title)
+
+    def test_chon_duoc_thi_doi_url_sang_duong_dan(self):
+        picker = types.SimpleNamespace(execute=lambda: 1, getDirectory=lambda: "file:///C:/ky-nang")
+        fake = types.SimpleNamespace(systemPathFromFileURL=lambda url: "C:\\ky-nang")
+        with mock.patch.object(dialogs, "unohelper", fake):
+            self.assertEqual("C:\\ky-nang", dialogs._pick_folder(self._ctx(picker), "Chọn thư mục"))
+
+
 class AuditLinesTest(unittest.TestCase):
     """Nhat ky hoat dong: gio · lenh · ok/loi · so ms. Gio doi theo mui gio may nen chi kiem phan duoi."""
 

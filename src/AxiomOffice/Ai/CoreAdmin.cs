@@ -21,6 +21,21 @@ namespace AxiomOffice.Ai
             return MemoryCall("POST", "/v1/skills/reload", new Dictionary<string, object>(), out error) != null;
         }
 
+        // POST /v1/skills/inspect {path}: soi thư mục ngoài trước khi nhập - Core KHÔNG ghi gì lên đĩa, chỉ trả
+        // về kỹ năng nào sẽ nhập, tên nào đã có (kèm nguồn) và thư mục nào sai định dạng.
+        public Dictionary<string, object> InspectSkill(string path, out string error)
+        {
+            return MemoryCall("POST", "/v1/skills/inspect", new Dictionary<string, object> { { "path", path } }, out error);
+        }
+
+        // POST /v1/skills/import {path, overwrite}: COPY kỹ năng trong thư mục ngoài vào thư mục kỹ năng của
+        // người dùng (%LOCALAPPDATA%\AxiomOffice\skills). Một kỹ năng sai frontmatter là cả lượt không nhập gì.
+        public Dictionary<string, object> ImportSkill(string path, bool overwrite, out string error)
+        {
+            return MemoryCall("POST", "/v1/skills/import",
+                new Dictionary<string, object> { { "path", path }, { "overwrite", overwrite } }, out error);
+        }
+
         // GET /v1/mcp: server đã cấu hình (không in env/headers) + tool đang nạp + lỗi khởi động.
         public List<Dictionary<string, object>> McpServers(out string error)
         {

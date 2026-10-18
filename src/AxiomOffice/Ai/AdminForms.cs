@@ -89,6 +89,17 @@ namespace AxiomOffice.Ai
                 default: return "";
             }
         }
+
+        // Các dòng "thư mục: lỗi" từ `errors` của /v1/skills hoặc /v1/skills/inspect.
+        public static string FailureLines(Dictionary<string, object> payload)
+        {
+            var parts = new List<string>();
+            foreach (Dictionary<string, object> failure in List(payload, "errors"))
+            {
+                parts.Add(Field(failure, "directory") + ": " + Field(failure, "error"));
+            }
+            return string.Join("\n", parts.ToArray());
+        }
     }
 
     // Khung chung: danh sách + dòng trạng thái + hàng nút dưới đáy.
@@ -178,6 +189,7 @@ namespace AxiomOffice.Ai
             List.Columns.Add("Dùng cho", 80);
             List.Columns.Add("Nguồn", 70);
             AddButton("Nạp lại", delegate { Reload(true); });
+            AddButton("Nhập kỹ năng…", delegate { Import(); });
             AddCloseButton();
         }
 
@@ -246,6 +258,94 @@ namespace AxiomOffice.Ai
                 parts.Add("nguồn: " + string.Join(", ", sources.ToArray()));
             }
             Status.Text = (reread ? "Đã nạp lại · " : "") + string.Join(" · ", parts.ToArray())
+                + ". AI tự chọn kỹ năng hợp với yêu cầu.";
+        }
+
+        // Nhập kỹ năng từ thư mục ngoài: chọn thư mục -> Core soi trước (không ghi gì) -> xác nhận -> copy vào
+        // thư mục kỹ năng của người dùng. Trùng tên trong thư mục cá nhân thì phải đồng ý ghi đè.
+        private void Import()
+        {
+            string path;
+            using (var picker = new FolderBrowserDialog())
+            {
+                picker.Description = "Chọn thư mục chứa kỹ năng (có SKILL.md, hoặc chứa nhiều thư mục kỹ năng)";
+                picker.ShowNewFolderButton = false;
+                if (picker.ShowDialog(this) != DialogResult.OK)
+                {
+                    return;
+                }
+                path = picker.SelectedPath;
+            }
+
+            string error;
+            Cursor = Cursors.WaitCursor;
+            Dictionary<string, object> preview = CoreClient.Instance.InspectSkill(path, out error);
+            Cursor = Cursors.Default;
+            if (preview == null)
+            {
+                Status.Text = "Không đọc được thư mục: " + error;
+                return;
+            }
+
+            List<Dictionary<string, object>> candidates = AdminText.List(preview, "candidates");
+            List<Dictionary<string, object>> failures = AdminText.List(preview, "errors");
+            if (failures.Count > 0)
+            {
+                Status.Text = "Không nhập: " + failures.Count + " kỹ năng sai định dạng.";
+                MessageBox.Show(this, "Thư mục có kỹ năng sai định dạng nên Core không nhập gì cả:\n\n"
+                    + AdminText.FailureLines(preview), "Nhập kỹ năng", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            if (candidates.Count == 0)
+            {
+                Status.Text = "Thư mục không có kỹ năng nào.";
+                return;
+            }
+
+            var lines = new List<string>();
+            var overwrite = false;
+            foreach (Dictionary<string, object> candidate in candidates)
+            {
+                var note = "";
+                Dictionary<string, object> previous = candidate.ContainsKey("existing")
+                    ? candidate["existing"] as Dictionary<string, object>
+                    : null;
+                if (previous != null)
+                {
+                    note = " (đã có ở nguồn " + AdminText.SourceLabel(AdminText.Field(previous, "source")) + ")";
+                }
+                if (AdminText.Field(candidate, "conflict") == "True")
+                {
+                    overwrite = true;
+                    note = " (đã có trong thư mục cá nhân, sẽ ghi đè)";
+                }
+                lines.Add(AdminText.Field(candidate, "name") + note);
+            }
+
+            string question = candidates.Count + " kỹ năng sẽ được copy vào " + AdminText.Field(preview, "target")
+                + ":\n\n" + string.Join("\n", lines.ToArray());
+            if (overwrite)
+            {
+                question += "\n\nCó kỹ năng trùng tên trong thư mục cá nhân: đồng ý là ghi đè bản cũ.";
+            }
+            if (MessageBox.Show(this, question, "Nhập kỹ năng", MessageBoxButtons.OKCancel, MessageBoxIcon.Question)
+                != DialogResult.OK)
+            {
+                return;
+            }
+
+            Cursor = Cursors.WaitCursor;
+            Dictionary<string, object> result = CoreClient.Instance.ImportSkill(path, overwrite, out error);
+            Cursor = Cursors.Default;
+            if (result == null)
+            {
+                Status.Text = "Không nhập được: " + error;
+                return;
+            }
+            Reload(false);
+            string imported = AdminText.Join(result, "imported");
+            string replaced = AdminText.Join(result, "replaced");
+            Status.Text = "Đã nhập: " + imported + (replaced.Length > 0 ? " (ghi đè: " + replaced + ")" : "")
                 + ". AI tự chọn kỹ năng hợp với yêu cầu.";
         }
 

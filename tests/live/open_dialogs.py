@@ -27,7 +27,8 @@ chinh la toa do man hinh), roi chup them anh "<action>-sau.png".
 `--click-window TIEU-DE:X,Y` (lap lai duoc): bam vao toa do TRONG long dialog cua cua so roi co tieu de do.
 Duong di nay chi chay khi dialog la cua so roi (`awt.Dialog`, xem dialogs._open), vi cua so con khong co cua
 so X rieng. Toa do tinh theo long dialog: nut "Dong" cua "Ky nang" la 503,414 (x 458..548, y 402..426),
-"Nap lai" 72,414. Sau MOI cu bam, script hoi thang X xem cua so con do khong (`xwininfo` Map State) va in ra.
+"Nhap ky nang..." 87,414 (x 12..162), "Nap lai" 224,414 (x 174..274). Sau MOI cu bam, script hoi thang X xem
+cua so con do khong (`xwininfo` Map State) va in ra.
 
 HAI CAI BAY da tra gia khi do bang script nay (13/10/2026), doc truoc khi tin vao anh chup:
 1. Anh chup KHONG phan biet duoc "cua so da dong" voi "cua so da bi an nhung khong ai ve lai vung do": tren

@@ -212,6 +212,9 @@ nguồn tin cậy.
 `"overwrite": true` để thay bản cũ). Cả lượt hoặc cùng được hoặc không: một skill sai frontmatter, hoặc trùng
 tên khi chưa cho phép ghi đè, thì không copy gì. `.git` bị bỏ qua, symlink bị từ chối, tối đa 64 MB.
 
+Trong add-in, hộp thoại **Kỹ năng…** (ribbon Windows, menu LibreOffice) có nút **Nhập kỹ năng…**: chọn thư mục,
+xem danh sách sẽ nhập (kèm cảnh báo trùng tên/ghi đè), rồi xác nhận. Không phải gọi API bằng tay.
+
 ### Ghi nhớ dài hạn (memory)
 
 Agent Core **nhớ qua các phiên** (học từ mem0 2.2.1, tự làm bằng C#, dữ liệu nằm trong
