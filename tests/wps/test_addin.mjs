@@ -263,12 +263,10 @@ const CHUA_CO_HANDLER = {
   "writer.insertHyperlink": "chua co handler trong add-in (agent=true)",
   "writer.checkTables": "chua co handler trong add-in (agent=true)",
   "writer.replaceMany": "chua co handler trong add-in (agent=true: tool nay se loi khi may dang la WPS)",
-  // Ba lenh thiet ke + khoa vung boi den: chi co o add-in Windows (COM); LibreOffice bao not supported.
+  // Hai lenh thiet ke: chi co o add-in Windows (COM); LibreOffice bao not supported.
   // (writer.outline da co handler trong WPS JS tu commit P0-03 nen khong con o day.)
   "writer.restyle": "chi co trong add-in Windows (lenh thiet ke, doc_design); WPS JS chua viet handler",
   "writer.insertBlocks": "chi co trong add-in Windows (lenh thiet ke, doc_design); WPS JS chua viet handler",
-  "writer.lockSelection": "khoa vung boi den moi co o add-in Windows (COM); WPS JS chua viet handler",
-  "writer.unlockSelection": "khoa vung boi den moi co o add-in Windows (COM); WPS JS chua viet handler",
   // Nam lenh lam bai theo mau (docs/template-design.md muc 6.3): moi co tren PowerPoint (COM InsertFromFile,
   // Shape.Export); WPP chua kiem.
   "wpp.newFromTemplate": "chua co handler trong add-in (chi PowerPoint)",

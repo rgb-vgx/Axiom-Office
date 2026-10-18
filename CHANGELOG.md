@@ -5,6 +5,26 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Khóa vùng bôi đen trên WPS: AI chỉ sửa trong đoạn người dùng chọn (18/10/2026)
+- Add-in WPS: hai lệnh `writer.lockSelection` / `writer.unlockSelection` (bản JS của
+  `CommandDispatcher.WriterScope.cs`). Vùng khóa nhớ bằng **phần chữ trước và sau** nó — một lệnh AI viết lại
+  làm sập `Range`, còn "giữa hai chuỗi này" thì không; con trỏ bị kéo về vùng khóa trước mỗi lệnh; sau mỗi
+  lệnh có lưới an toàn: phần ngoài vùng đổi → hoàn tác ngay + báo lỗi, mất một bảng nằm trọn trong vùng →
+  cũng vậy. Lệnh ghi chắc chắn ra ngoài (`appendText`, `insertTable`, …) bị từ chối TRƯỚC khi chạm tài liệu;
+  `replaceAll` chỉ tìm trong vùng khóa; lệnh đọc và `writer.undo` chạy như thường. Bản WPS thiếu API
+  (`Selection.Start/End`, `Content.End`, `Range(a,b).Text`) thì **từ chối khóa** kèm lý do — thiếu chúng là
+  mất lưới an toàn, khóa mà không kiểm được thì tệ hơn không khóa.
+- Core: `Orchestrator.lockSelection` hỏi add-in vùng chọn SỐNG (`writer.selection` + `writer.lockSelection`)
+  trước vòng lặp agent; `finish()` mở khóa — `finish` là mốc duy nhất mọi đường đi (xong, lỗi, hủy) đều qua
+  nên khóa không treo lại. Không tin `document` do pane gửi: `/wps/v1/runs` ghi đè nó bằng bản chụp của add-in,
+  mà bản chụp đó không có `selection`; nhờ đi thẳng xuống add-in nên khóa cũng chạy cho MCP/script, không riêng pane.
+- Test: `tests/wps/test_addin_writer.mjs` (14 phép kiểm trên mock Writer có trạng thái — chỗ quan trọng nhất là
+  lệnh ra ngoài vùng phải bị HOÀN TÁC THẬT, đọc lại tài liệu chứ không tin kết quả trả về); e2e pane kiểm khóa
+  trước / mở khóa sau, kể cả lượt bị hủy giữa chừng; **đo trên WPS thật** (`test_wps_bridge_live.py` bôi đen
+  bằng xdotool/XTEST): cả bốn API đều có, `Ctrl+A` → `{chars: 68, start: 0, end: 68, docEnd: 68, tables: 1}`,
+  con trỏ đặt ở cuối tài liệu vẫn bị kéo về vùng khóa. Chi tiết trong `tests/wps/REFERENCE.md`.
+- LibreOffice: chưa làm — bản WPS trước, như đã thống nhất.
+
 ### Fixed — CI đỏ từ 13/10: ba lỗi độc lập, đã xanh lại (16/10/2026)
 - **Linux/JS**: `tests/wps/test_addin.mjs` còn xếp `writer.outline` vào `CHUA_CO_HANDLER` dù add-in WPS
   đã có handler (P0-03) → gỡ khỏi danh sách, mock `writerApp` đủ `Paragraphs` để handler chạy;

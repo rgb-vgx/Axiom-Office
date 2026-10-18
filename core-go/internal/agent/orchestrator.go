@@ -184,6 +184,11 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 	}
 	documentKey := office.DocumentKey(documentPath)
 
+	// Khoa vung boi den: nguoi dung boi den roi hoi thi AI chi duoc sua trong vung do. Lenh nay doc
+	// vung chon SONG trong add-in chu khong tin pane - POST /wps/v1/runs ghi de `document` bang ban
+	// chup cua add-in, ma ban chup do khong co `selection` - nen no cung dung cho MCP/script.
+	o.lockSelection(ctx, run, request, appKind)
+
 	conversation := o.conversation(request, appKind, session, documentKey)
 	if conversation == nil {
 		o.fail(run, "cannot create the conversation record", "internal")
@@ -497,8 +502,56 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 	o.finish(run)
 }
 
+// lockSelection: hoi add-in WPS khoa vung dang boi den, va ghi vung do vao ngu canh cua luot de prompt
+// noi cho model biet. Khong boi den - hoac ban WPS khong do duoc vung (thieu Selection.Start/End,
+// doc.Range) - thi `chars` = 0 va luot chay chay nhu thuong: day KHONG phai loi cua luot.
+func (o *Orchestrator) lockSelection(ctx context.Context, run *Run, request *Request, appKind string) {
+	if o.Bridge == nil || appKind != "wps" {
+		return
+	}
+	// writer.selection la lenh doc: goi truoc hay sau khi khoa deu ra cung vung (khoa khong doi vung chon).
+	selection := o.Bridge.Command(ctx, request.Port, "writer.selection", nil)
+	locked := o.Bridge.Command(ctx, request.Port, "writer.lockSelection", nil)
+	if !locked.OK {
+		corelog.Info("run %s: selection not locked: %s", run.ID, locked.Error)
+		return
+	}
+	chars := intOf(locked.Result["chars"])
+	if chars <= 0 {
+		return
+	}
+	run.SelectionLock = true
+	if request.Document == nil {
+		request.Document = &DocumentContext{}
+	}
+	request.Document.SelectionLocked = true
+	if selection.OK {
+		if text, ok := selection.Result["text"].(string); ok {
+			request.Document.SelectionText = text
+		}
+	}
+	tables := intOf(locked.Result["tables"])
+	corelog.Info("run %s: selection locked (%d chars, %d whole table(s))", run.ID, chars, tables)
+}
+
+// unlockSelection: mo khoa vung boi den. Chay trong finish() nen phai dung context RIENG: context cua
+// luot da bi huy o moi duong ket thuc (nguoi dung bam Huy, het gio, loi), dung no thi lenh mo khoa
+// khong bao gio toi duoc add-in va khoa cu con treo lai, chan luot sau mot cach vo co.
+func (o *Orchestrator) unlockSelection(run *Run) {
+	if o.Bridge == nil || !run.SelectionLock {
+		return
+	}
+	run.SelectionLock = false
+	unlockCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if result := o.Bridge.Command(unlockCtx, run.Port, "writer.unlockSelection", nil); !result.OK {
+		corelog.Error("run %s: cannot unlock the selection: %s", run.ID, result.Error)
+	}
+}
+
 // finish: moc ket thuc + dong SSE + log (luon chay, ke ca khi loi).
 func (o *Orchestrator) finish(run *Run) {
+	o.unlockSelection(run)
 	now := time.Now().UTC()
 	run.Finished = &now
 	run.Events.Complete()

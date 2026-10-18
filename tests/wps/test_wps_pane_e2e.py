@@ -39,6 +39,8 @@ CATALOG = [
     {"name": "writer.save", "kind": "wps", "agent": True, "summary": "Lưu", "params": []},
 ]
 DOCUMENT = {"name": "bao-cao-tuan.docx", "fullName": "/home/u/bao-cao-tuan.docx"}
+# Nguoi dung boi den "Bao cao tuan" (12 ky tu, ca tai lieu) truoc khi hoi.
+SELECTION_TEXT = "Bao cao tuan"
 
 
 class FakeAddin(threading.Thread):
@@ -61,7 +63,14 @@ class FakeAddin(threading.Thread):
                 self.actions.append((job.get("action"), job.get("params")))
                 if job.get("action") == "writer.getText":
                     answer = {"ok": True, "result": {"name": DOCUMENT["name"], "fullName": DOCUMENT["fullName"],
-                                                     "totalChars": 12, "truncated": False, "text": "Bao cao tuan"}}
+                                                     "totalChars": 12, "truncated": False, "text": SELECTION_TEXT}}
+                elif job.get("action") == "writer.selection":
+                    answer = {"ok": True, "result": {"text": SELECTION_TEXT, "start": 0, "end": 12}}
+                elif job.get("action") == "writer.lockSelection":
+                    answer = {"ok": True, "result": {"chars": 12, "start": 0, "end": 12, "docEnd": 12,
+                                                     "tables": 0, "tablesKnown": True}}
+                elif job.get("action") == "writer.unlockSelection":
+                    answer = {"ok": True, "result": {"locked": False}}
                 else:
                     answer = {"ok": True, "result": {"done": True}}
                 base.request(self.core.base + "/wps/v1/result", "POST", dict(answer, id=job.get("id")),
@@ -188,6 +197,19 @@ def main() -> int:
         check("bao-cao-tuan.docx" in json.dumps(first, ensure_ascii=False),
               "prompt co ten tai lieu tu lan poll cua add-in", "")
 
+        # ---- khoa vung boi den: Core hoi add-in vung chon SONG (khong tin pane) va mo khoa khi luot xong.
+        # SSE dong ngay khi co run.completed, con finish() (cho mo khoa) chay sau do - nen phai CHO.
+        base.wait_for(lambda: "writer.unlockSelection" in [a for a, _ in addin.actions], 10)
+        names = [a for a, _ in addin.actions]
+        check("writer.lockSelection" in names and "writer.unlockSelection" in names,
+              "khoa vung: luot chay khoa roi mo khoa vung boi den", addin.actions)
+        check(names.index("writer.lockSelection") < names.index("writer.appendText"),
+              "khoa vung: khoa TRUOC khi agent chay lenh dau tien", names)
+        check(names.index("writer.unlockSelection") > names.index("writer.appendText"),
+              "khoa vung: mo khoa SAU khi agent chay xong", names)
+        check("ONLY it may change" in json.dumps(first, ensure_ascii=False),
+              "khoa vung: prompt co luat chi sua trong vung boi den", "")
+
         # ---- trinh duyet KHONG gui Origin cho GET cung origin (EventSource cua pane trong WPS, thu 11/10/2026: 401).
         # Pane la trang cua Core nen trinh duyet gui "Sec-Fetch-Site: same-origin" (header trang khac khong gia duoc).
         # Chi GET duoc noi long; POST van can Origin (trinh duyet luon gui Origin cho POST).
@@ -214,6 +236,11 @@ def main() -> int:
               "pane: POST /wps/v1/runs/{id}/cancel", (status, text))
         events = sse(core.base + "/wps/v1/runs/%s/events" % run2, own, timeout=20)
         check(any(e == "run.cancelled" for e, _ in events), "pane SSE: run.cancelled", [e for e, _ in events])
+        # Huy giua chung cung phai mo khoa (finish la moc duy nhat moi duong di deu qua): khoa con treo
+        # lai thi luot sau bi chan oan.
+        base.wait_for(lambda: [a for a, _ in addin.actions].count("writer.unlockSelection") >= 2, 5)
+        check([a for a, _ in addin.actions].count("writer.unlockSelection") >= 2,
+              "khoa vung: huy giua chung van mo khoa", addin.actions)
 
         # ---- luot 3: the xac nhan
         status, _, text = base.request(core.base + "/wps/v1/runs", "POST",

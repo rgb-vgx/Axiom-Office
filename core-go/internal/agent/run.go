@@ -42,7 +42,10 @@ type Run struct {
 	// phai tham so. 0 khi nha cung cap khong cache hoac khong bao.
 	CachedTokens int
 	// Verified: luot nay co sua tai lieu nen da duoc yeu cau doc lai truoc khi tra loi.
-	Verified      bool
+	Verified bool
+	// SelectionLock: luot nay da khoa vung boi den cua tai lieu dang mo (chi WPS). finish() mo khoa -
+	// moc duy nhat moi duong di (thanh cong, loi, huy) deu di qua, nen khoa khong bi treo lai.
+	SelectionLock bool
 	Seconds       float64
 	ToolCalls     int
 	Transcript    []string

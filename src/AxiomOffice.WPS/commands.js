@@ -736,6 +736,21 @@
     return String(v);
   }
 
+  // Doc mot thuoc ti so tu object model WPS. Tra null khi khong doc duoc (khong nem): object model WPS co
+  // the tra ve ham thay vi gia tri, hoac nem loi tren mot so phien ban. Dung cho moi vi tri ky tu
+  // (Selection.Start, Content.End...), la nhung thu KHONG the doan truoc giua cac ban WPS.
+  function numProp(obj, name) {
+    try {
+      var v = obj[name];
+      if (typeof v === "function") { v = v.call(obj); }
+      if (v === undefined || v === null) { return null; }
+      var n = Number(v);
+      return isNaN(n) ? null : n;
+    } catch (e) {
+      return null;
+    }
+  }
+
   function applyFont(font, params) {
     if (hasParam(params, "bold")) { font.Bold = paramBool(params, "bold", false) ? -1 : 0; }
     if (hasParam(params, "italic")) { font.Italic = paramBool(params, "italic", false) ? -1 : 0; }
@@ -1016,6 +1031,18 @@
     if (!find) { return { replaced: false, count: 0 }; }
     var doc = app.ActiveDocument;
     var content = doc.Content;
+    // Dang khoa vung boi den: chi tim trong vung khoa (giong ban Windows), khong quet ca tai lieu. Khong
+    // lay duoc Range thi tu choi han - tim ca tai lieu roi bi luoi an toan hoan tac chi lam loi kho hieu.
+    if (selectionLock !== null) {
+      var lockRange = lockBounds(app, selectionLock);
+      if (lockRange !== null) {
+        try {
+          content = doc.Range(lockRange.start, lockRange.end);
+        } catch (eLockRange) {
+          throw new Error("cannot search inside the selection on this WPS build (Range.Find is unavailable)");
+        }
+      }
+    }
     var findText = toWordFindText(find);
     var replaceText = toWordFindText(replace);
     // Dem truoc khi thay (khong tim lai chuoi vua thay) roi thay mot lan duy nhat.
@@ -1259,6 +1286,245 @@
       return { exported: path };
     }
     return { exported: path };
+  }
+
+  // ---- Khoa vung boi den (port cua CommandDispatcher.WriterScope.cs ben C#) --------------------
+  //
+  // Nguoi dung boi den roi hoi thi chi vung boi den duoc doi. Vung khoa nho bang phan chu TRUOC va SAU
+  // no, khong bang mot Range: AI viet lai ca doan da chon thi Range cu co the ve mot diem, con "giua
+  // phan truoc va phan sau" van dung du chua ben trong dai ra hay ngan di.
+  //
+  // `selectionLock` la trang thai cua CA add-in (mot tien trinh WPS = mot add-in), giong `_selectionLock`
+  // ben C#. Vong doi: Core goi writer.lockSelection truoc luot chay va writer.unlockSelection khi luot
+  // xong - Core giu bridge nen pane khong phai biet gi.
+  var selectionLock = null;
+
+  // Lenh chay nhu thuong khi dang khoa: lenh doc (khong doi tai lieu), writer.undo (hoan tac la viec
+  // nguoi dung goi), va chinh hai lenh khoa - neu khong, lockBegin se keo con tro ve vung khoa CU truoc
+  // khi cmdLockSelection kip doc vung nguoi dung vua boi den.
+  var LOCK_READ_ONLY = {
+    "writer.getText": true,
+    "writer.selection": true,
+    "writer.outline": true,
+    "writer.undo": true,
+    "writer.save": true,
+    "writer.saveAs": true,
+    "writer.exportPdf": true,
+    "writer.lockSelection": true,
+    "writer.unlockSelection": true
+  };
+
+  // Lenh luon cham ra ngoai vung chon: tu choi truoc, noi ro vi sao. Giu du ca cac lenh add-in Windows
+  // co ma WPS chua viet handler (newDocument/open/closeAll/restyle/insertBlocks): khi nao co handler thi
+  // khoa phai tu choi chung, va danh sach nay la cho ghi dieu do.
+  var LOCK_REFUSED = {
+    "writer.appendText": "appends at the end of the document",
+    "writer.restyle": "restyles the whole document",
+    "writer.insertBlocks": "inserts blocks across the document",
+    "writer.newDocument": "creates another document",
+    "writer.open": "opens another document",
+    "writer.closeAll": "closes the documents",
+    // InsertBreak THAY ca vung chon bang dau ngat: khoa vung luon co vung chon nen lenh nay xoa ca doan
+    // da boi den. Muon ngat trang thi bo boi den roi yeu cau.
+    "writer.insertPageBreak": "replaces the whole selected passage with a page break"
+  };
+
+  // Lenh THAY ca vung chon bang chu moi: vo hai voi vung chu, nhung lam MAT bang nam tron trong vung.
+  // Luoi an toan sau khi chay (so bang truoc/sau) bat not cac lenh khong nam trong danh sach nay.
+  var LOCK_TABLE_REFUSED = {
+    "writer.typeText": "it would replace the table with plain text",
+    "writer.insertStyledText": "it would replace the table with plain text",
+    "writer.heading": "it would replace or restyle the table as a heading",
+    "writer.insertHyperlink": "it would replace the table with the link text"
+  };
+
+  function lockMessage(problem) {
+    return "Refused: the user selected part of the document, so only the selected text may change (" + problem +
+      "). Edit inside the selection: writer.replaceAll searches only the selection, writer.typeText replaces it, " +
+      "writer.formatSelection formats it. If the request really needs other parts, stop and tell the user to " +
+      "clear the selection and ask again.";
+  }
+
+  function tableLockMessage(problem) {
+    return "Refused: the selection contains a whole table; " + problem + ". The table is protected: edit text " +
+      "in its cells with writer.replaceAll (it searches only inside the selection) and restyle with " +
+      "writer.formatSelection. If the user really wants the table removed or its rows changed, stop and tell " +
+      "them to clear the selection and ask again.";
+  }
+
+  // Chu cua doan [from, to) trong tai lieu. null = khong doc duoc (khac "" la doan rong).
+  function docRangeText(doc, from, to) {
+    try {
+      var range = doc.Range(from, to);
+      var raw = range.Text;
+      if (typeof raw === "function") { raw = raw.call(range); }
+      if (raw === undefined || raw === null) { return null; }
+      return String(raw);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Cac bang cua tai lieu dang o [start, end) nao. known=false: build WPS nay khong doc duoc Tables.
+  function lockTableRanges(doc) {
+    var out = [];
+    try {
+      var tables = doc.Tables;
+      var count = Number(tables.Count);
+      if (isNaN(count)) { return null; }
+      for (var i = 1; i <= count; i++) {
+        var item = tables.Item(i);
+        var range = item.Range;
+        var s = numProp(range, "Start");
+        var e = numProp(range, "End");
+        if (s === null || e === null) { return null; }
+        out.push([s, e]);
+      }
+      return out;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  // So bang NAM TRON trong [start, end): bang nam tron moi co the bi xoa ca khi thay vung chon; bang nam
+  // mot phan (con tro trong o) van sua chu binh thuong duoc.
+  function countWholeTables(ranges, start, end) {
+    if (ranges === null) { return 0; }
+    var whole = 0;
+    for (var i = 0; i < ranges.length; i++) {
+      if (ranges[i][0] >= start && ranges[i][1] <= end) { whole++; }
+    }
+    return whole;
+  }
+
+  // Vi tri dau/cuoi HIEN TAI cua vung khoa. null = khoa khong ap cho tai lieu nay (khac tai lieu thi
+  // khoa coi nhu khong co, dung nhu C#: doi tai lieu thi khoa cu vo hieu).
+  function lockBounds(app, state) {
+    var doc = null;
+    try { doc = app.ActiveDocument; } catch (eDoc) { return null; }
+    if (doc === undefined || doc === null) { return null; }
+    if (strProp(doc, "FullName") !== state.document) { return null; }
+    var docEnd = numProp(doc.Content, "End");
+    if (docEnd === null) { return null; }
+    var end = docEnd - state.suffixLength;
+    if (end < state.prefixEnd) { end = state.prefixEnd; }
+    return { doc: doc, start: state.prefixEnd, end: end };
+  }
+
+  // Keo con tro/vung chon ve trong vung khoa truoc khi chay lenh theo con tro (typeText, heading...).
+  // Khong keo duoc thi van chay: luoi an toan sau khi chay se hoan tac neu chu roi ra ngoai.
+  function pullCursorInto(app, start, end) {
+    try {
+      var sel = app.Selection;
+      var s = numProp(sel, "Start");
+      var e = numProp(sel, "End");
+      if (s === null || e === null) { return false; }
+      if (s >= start && e <= end) { return true; }
+      try { sel.SetRange(start, end); return true; } catch (eSet) {}
+      try { sel.Start = start; sel.End = end; return true; } catch (eProp) {}
+    } catch (e) {}
+    return false;
+  }
+
+  // Phan NGOAI vung khoa con nguyen khong (so chu truoc + sau voi luc khoa).
+  function lockOutsideUnchanged(bounds, state) {
+    var docEnd = numProp(bounds.doc.Content, "End");
+    if (docEnd === null) { return false; }
+    var suffixStart = docEnd - state.suffixLength;
+    if (suffixStart < state.prefixEnd) { return false; }
+    var pre = docRangeText(bounds.doc, 0, state.prefixEnd);
+    var suf = docRangeText(bounds.doc, suffixStart, docEnd);
+    if (pre === null || suf === null) { return false; }
+    return pre === state.prefix && suf === state.suffix;
+  }
+
+  // Chuan bi chay mot lenh trong vung khoa. Tra null (khong khoa / lenh doc / khac tai lieu) hoac
+  // {app, doc, start, end}. NEM Error khi lenh bi tu choi truoc - execute() doi thanh {ok:false, error}.
+  function lockBegin(app, action) {
+    var state = selectionLock;
+    if (state === null || action.indexOf("writer.") !== 0 || LOCK_READ_ONLY[action]) { return null; }
+    var bounds = lockBounds(app, state);
+    if (bounds === null) { return null; }
+    var reason = LOCK_REFUSED[action];
+    if (reason) { throw new Error(lockMessage(action + " " + reason)); }
+    if (state.tables > 0 && LOCK_TABLE_REFUSED[action]) {
+      throw new Error(tableLockMessage(LOCK_TABLE_REFUSED[action]));
+    }
+    pullCursorInto(app, bounds.start, bounds.end);
+    return { app: app, doc: bounds.doc, start: bounds.start, end: bounds.end };
+  }
+
+  // Sau khi lenh chay xong (va buoc hoan tac da dong): phan ngoai vung doi thi hoan tac ngay va bao loi;
+  // lenh nao lam mat mot bang nam tron trong vung thi cung vay (bat ca lenh khong nam trong danh sach chan).
+  function lockVerify(lock, action) {
+    var state = selectionLock;
+    if (state === null) { return; }
+    if (!lockOutsideUnchanged(lock, state)) {
+      undoOneStep(lock.doc);
+      throw new Error(lockMessage(action + " changed text outside the selection, so it was undone"));
+    }
+    if (state.tables > 0) {
+      var now = lockBounds(lock.app, state);
+      if (now !== null && countWholeTables(lockTableRanges(now.doc), now.start, now.end) < state.tables) {
+        undoOneStep(lock.doc);
+        throw new Error(tableLockMessage(action + " changed the table structure, so it was undone"));
+      }
+    }
+  }
+
+  function undoOneStep(doc) {
+    try { doc.Undo(1); } catch (e) {}
+  }
+
+  function cmdLockSelection(app) {
+    selectionLock = null;
+    var sel = app.Selection;
+    var start = numProp(sel, "Start");
+    var end = numProp(sel, "End");
+    var text = strProp(sel, "Text");
+    // Con tro dung yen (Word/WPS tra 1 ky tu) hoac chi boi khoang trang: khong phai vung chon.
+    if (start === null || end === null) {
+      return { chars: 0, reason: "this WPS build does not report Selection.Start/End" };
+    }
+    if (end - start < 2 || text.trim().length < 2) {
+      return { chars: 0, reason: "nothing selected" };
+    }
+    var doc = null;
+    try { doc = app.ActiveDocument; } catch (eDoc) { doc = null; }
+    if (doc === undefined || doc === null) { return { chars: 0, reason: "no document open" }; }
+    var docEnd = numProp(doc.Content, "End");
+    if (docEnd === null) {
+      return { chars: 0, reason: "this WPS build does not report Content.End" };
+    }
+    var prefix = docRangeText(doc, 0, start);
+    var suffix = docRangeText(doc, end, docEnd);
+    // Khong doc duoc phan truoc/sau thi KHONG khoa: thieu chung thi sau nay khong co cach nao biet
+    // mot lenh co lam doi phan ngoai vung hay khong, tuc luoi an toan khong ton tai.
+    if (prefix === null || suffix === null) {
+      return { chars: 0, reason: "this WPS build cannot read a document range (Range(from, to).Text)" };
+    }
+    var ranges = lockTableRanges(doc);
+    selectionLock = {
+      document: strProp(doc, "FullName"),
+      prefixEnd: start,
+      suffixLength: docEnd - end,
+      prefix: prefix,
+      suffix: suffix,
+      tables: countWholeTables(ranges, start, end)
+    };
+    return {
+      chars: end - start,
+      start: start,
+      end: end,
+      docEnd: docEnd,
+      tables: selectionLock.tables,
+      tablesKnown: ranges !== null
+    };
+  }
+
+  function cmdUnlockSelection() {
+    selectionLock = null;
+    return { locked: false };
   }
 
   // ---- ET (Spreadsheets): undo tu quan ly trong phien add-in (ET khong co UndoRecord).
@@ -2902,6 +3168,8 @@
     "writer.save": cmdSave,
     "writer.saveAs": cmdSaveAs,
     "writer.exportPdf": cmdExportPdf,
+    "writer.lockSelection": cmdLockSelection,
+    "writer.unlockSelection": cmdUnlockSelection,
     "et.newWorkbook": cmdEtNewWorkbook,
     "et.open": cmdEtOpen,
     "et.listSheets": cmdEtListSheets,
@@ -3026,6 +3294,14 @@
       }
       var p = params;
       if (p === undefined || p === null) { p = {}; }
+      // Vung khoa: chuan bi TRUOC khi chay (co the tu choi), kiem SAU khi buoc hoan tac da dong - dung thu
+      // tu cua ban Windows (RunInSelectionLock): handler trong UndoRecordScope, dong scope, roi moi kiem.
+      var lock = null;
+      try {
+        lock = lockBegin(app, action);
+      } catch (lockErr) {
+        return { ok: false, error: errMessage(lockErr) };
+      }
       if (MUTATING[action]) {
         var undo = null;
         try { undo = app.UndoRecord; } catch (e) { undo = null; }
@@ -3036,23 +3312,31 @@
             started = true;
           } catch (e2) { started = false; }
         }
+        var outcome;
         try {
-          var result = handler(app, p);
-          return { ok: true, result: result };
+          outcome = { ok: true, result: handler(app, p) };
         } catch (err) {
-          return { ok: false, error: errMessage(err) };
+          outcome = { ok: false, error: errMessage(err) };
         } finally {
           if (started) {
             try { undo.EndCustomRecord(); } catch (e3) {}
           }
         }
-      } else {
-        try {
-          var res = handler(app, p);
-          return { ok: true, result: res };
-        } catch (err2) {
-          return { ok: false, error: errMessage(err2) };
+        if (outcome.ok && lock !== null) {
+          try {
+            lockVerify(lock, action);
+          } catch (lockErr2) {
+            return { ok: false, error: errMessage(lockErr2) };
+          }
         }
+        return outcome;
+      }
+      try {
+        var res = handler(app, p);
+        if (lock !== null) { lockVerify(lock, action); }
+        return { ok: true, result: res };
+      } catch (err2) {
+        return { ok: false, error: errMessage(err2) };
       }
     } catch (fatal) {
       try {

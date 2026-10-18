@@ -224,6 +224,47 @@ Bài học cho người viết test live: một phép kiểm *mong đợi thất
 nối. Sau mỗi lệnh dài phải có một phép kiểm **khẳng định bridge còn sống**, và phép kiểm lệnh sai phải đòi
 lỗi vì **tên lệnh sai**, không phải vì mất kết nối.
 
+## Khóa vùng bôi đen trên WPS thật (đo 18/10/2026)
+
+Bản WPS của `CommandDispatcher.WriterScope.cs` (add-in Windows). Vùng khóa **không** nhớ bằng một `Range`
+(một lệnh AI viết lại là `Range` sập) mà bằng **phần chữ trước và sau** nó; trạng thái nằm trong biến module
+`selectionLock` của `commands.js` — add-in là tiến trình duy nhất thấy mọi lệnh.
+
+**Bốn API mà thiết kế dựa vào đều có trên WPS 11.1.0.11723** (đo bằng cách bôi đen thật rồi gọi
+`writer.lockSelection`; handler **từ chối khóa** và trả `reason` nếu thiếu bất kỳ API nào, nên `chars > 0`
+là bằng chứng cả bốn đều đọc được):
+
+| Bôi đen | `writer.lockSelection` trả về |
+|---|---|
+| `Ctrl+A` (cả tài liệu, có 1 bảng đã chèn trước đó) | `{chars: 68, start: 0, end: 68, docEnd: 68, tables: 1, tablesKnown: true}` |
+| `Ctrl+Home` rồi `Shift+Right` × 5 | `{chars: 5, start: 0, end: 5, docEnd: 68, tables: 0, tablesKnown: true}` |
+
+- `Selection.Start/End`, `Content.End`, `Range(from, to).Text`, `Tables.Count` + `Tables.Item(i).Range.Start/End`
+  đều đọc được. `tablesKnown: true` quan trọng: `false` nghĩa là `doc.Tables` không đọc được và **lưới an toàn
+  mất phần bảng** trong im lặng.
+- Chọn cả tài liệu thì `Selection.End == Content.End` (68 = 68) — không lệch 1 như Word; đây là số đo, đừng
+  dựa vào nó như một quy luật.
+- **`Selection.SetRange` kéo con trỏ được**: đặt con trỏ ra cuối tài liệu (`Ctrl+End`) rồi `writer.typeText`
+  trong lúc khóa → chữ **rơi vào vùng khóa** (`Selection.SetRange(0,5)`), không phải chỗ con trỏ đang đứng.
+  Nghĩa là trên bản WPS này lưới an toàn (hoàn tác + báo lỗi) là lưới **thứ hai**, không phải đường chính.
+- Từ chối **trước** khi chạm tài liệu đúng như thiết kế: `writer.appendText` (ghi ra ngoài vùng) trả
+  `ok:false` kèm `Refused: the user selected part...`, và tài liệu **không đổi một ký tự**.
+- `writer.unlockSelection` mở khóa xong thì lệnh ghi cả tài liệu chạy lại bình thường.
+
+**Bôi đen thật trong test live**: `xdotool` (XTEST) — `tests/wps/test_wps_bridge_live.py` đọc `DISPLAY`/
+`XAUTHORITY` từ `/proc/<pid>/environ` của tiến trình WPS vì `xvfb-run -a` cấp số hiển thị động. Dưới Xvfb
+**không có window manager**, nên `xdotool windowactivate` báo `_NET_ACTIVE_WINDOW` và hỏng; `windowfocus`
+(XSetInputFocus) là đủ. Đã kiểm chứng đường này trước khi viết vào test: `Ctrl+A` rồi gõ `ZZZ` rồi `Ctrl+S`
+làm `blank.docx` chỉ còn `ZZZ`.
+
+Bẫy nhỏ khi viết test sau: **`xdotool key` thành công mà không in gì ra stdout** — phán "gửi được phím" bằng
+`bool(stdout)` là luôn sai (đã mắc, 3 phép kiểm đỏ oan trong khi vùng chọn đã đổi thật); phải xét mã thoát.
+
+**Một khóa cho mỗi bridge, không phải một khóa cho mỗi lượt chạy**: `selectionLock` là biến module của
+add-in, giống `_selectionLock` bên C#. Hai lượt chạy cùng lúc trên một WPS sẽ giành khóa của nhau — nhưng
+`POST /v1/runs` và `POST /wps/v1/runs` đều đi qua `Manager.TryStart(port)` (`api/runs.go:129`), mà port là
+port của bridge WPS, nên mỗi bridge chỉ có **một** lượt chạy. Không cần khóa theo lượt.
+
 ## Theo công cụ `wpsjs` của WPS (bản online chưa thử)
 
 `publish.xml`:

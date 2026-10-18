@@ -7,8 +7,8 @@ WPS va goi tung lenh cua app do qua POST /cmd, doc lai de kiem.
 Mot Core cho ca ba luot: bridge WPS chi phuc vu app poll gan nhat (docs/wps-bridge.md muc 6), nen giua hai
 app phai doi bridge bao mat ket noi (va file session bi xoa) truoc khi mo app ke tiep.
 
-Can: WPS Office for Linux, xvfb-run, JsApiPlugin=true trong oem.ini (tests/wps/REFERENCE.md), khong co WPS
-dang chay cho nguoi dung nay.
+Can: WPS Office for Linux, xvfb-run, xdotool (boi den that trong bai do khoa vung), JsApiPlugin=true trong
+oem.ini (tests/wps/REFERENCE.md), khong co WPS dang chay cho nguoi dung nay.
 
     python3 tests/wps/test_wps_bridge_live.py [--keep] [--apps wps,et,wpp] [--timeout 120]
 """
@@ -51,6 +51,60 @@ def wps_running() -> list:
     out = subprocess.run(["pgrep", "-u", str(os.getuid()), "-f", "office6/(wps|et|wpp)( |$)"],
                          capture_output=True, text=True).stdout
     return out.split()
+
+
+def wps_display_env() -> dict:
+    """DISPLAY/XAUTHORITY cua WPS dang chay: `xvfb-run -a` cap so hien thi dong nen khong doan duoc -
+    phai doc tu /proc/<pid>/environ cua chinh tien trinh WPS."""
+    out = subprocess.run(["pgrep", "-u", str(os.getuid()), "-f", "office6/wps( |$)"],
+                         capture_output=True, text=True).stdout
+    for pid in out.split():
+        try:
+            with open("/proc/%s/environ" % pid, "rb") as handle:
+                raw = handle.read().decode("utf-8", "replace")
+        except OSError:
+            continue
+        env = dict(item.split("=", 1) for item in raw.split("\0") if "=" in item)
+        if env.get("DISPLAY"):
+            return {"DISPLAY": env["DISPLAY"], "XAUTHORITY": env.get("XAUTHORITY", "")}
+    return {}
+
+
+class WpsKeys:
+    """Ban phim THAT vao cua so WPS (xdotool/XTEST) - cach duy nhat tao vung boi den ma khong phai them
+    mot lenh gia nao vao add-in. Duoi Xvfb khong co window manager nen `windowactivate` bao loi
+    _NET_ACTIVE_WINDOW; `windowfocus` (XSetInputFocus) la du, da do 18/10/2026."""
+
+    def __init__(self, live):
+        self.env = dict(os.environ)
+        self.env.update(wps_display_env())
+        self.window = ""
+        for pattern in ["%s - Writer" % live.document, "Writer"]:
+            found = self._xdotool("search", "--onlyvisible", "--name", pattern)
+            if found:
+                self.window = found.split()[0]
+                break
+
+    def ready(self) -> bool:
+        return bool(self.window) and self.env.get("DISPLAY") is not None
+
+    def _run(self, *args: str) -> tuple:
+        """(chay duoc khong, stdout). Phai tach khoi stdout: `xdotool key` thanh cong ma KHONG in gi."""
+        try:
+            done = subprocess.run(["xdotool", *args], env=self.env, capture_output=True, text=True, timeout=20)
+        except (OSError, subprocess.TimeoutExpired):
+            return False, ""
+        return done.returncode == 0, done.stdout.strip()
+
+    def _xdotool(self, *args: str) -> str:
+        return self._run(*args)[1]
+
+    def send(self, *keys: str) -> bool:
+        """Mot to hop phim (vd "ctrl+a"). Tra True neu xdotool chay duoc - khong bao dam app da nhan."""
+        if not self.window:
+            return False
+        self._xdotool("windowfocus", self.window)
+        return self._run("key", "--clearmodifiers", *keys)[0]
 
 
 def is_pdf(path: str) -> bool:
@@ -206,6 +260,70 @@ def run_writer(live: Session) -> None:
     check(reply.get("ok") is True, "writer.setParagraphAlignment", reply)
     reply = live.cmd("writer.insertPageBreak")
     check(reply.get("ok") is True, "writer.insertPageBreak", reply)
+
+    # ---- Khoa vung boi den (ban WPS cua CommandDispatcher.WriterScope.cs). Nguoi dung boi den bang chuot
+    # roi hoi thi AI chi duoc sua trong vung do; o day boi den bang BAN PHIM THAT qua xdotool/XTEST - dung
+    # duong nguoi dung di, khong phai them mot lenh gia nao vao add-in chi de test duoc.
+    def sel_now() -> dict:
+        return live.cmd("writer.selection").get("result") or {}
+
+    keys = WpsKeys(live)
+    check(keys.ready(), "dieu khien duoc cua so WPS bang xdotool (XTEST)",
+          (keys.env.get("DISPLAY"), keys.window))
+    check(keys.send("ctrl+a"), "gui duoc Ctrl+A vao cua so WPS", keys.window)
+    check(base.wait_for(lambda: (sel_now().get("end") or 0) > (sel_now().get("start") or 0), 15),
+          "Ctrl+A that: writer.selection thay vung chon (Selection.Start/End doc duoc tren WPS that)", sel_now())
+
+    locked = live.cmd("writer.lockSelection")
+    region = locked.get("result") or {}
+    check(locked.get("ok") is True and int(region.get("chars") or 0) > 0,
+          "writer.lockSelection khoa duoc vung boi den THAT, tra so do vung", locked)
+    # tablesKnown=false nghia la doc.Tables.Count khong doc duoc -> luoi an toan mat phan bang. Phai la true.
+    check(region.get("tablesKnown") is True and int(region.get("tables") or 0) >= 1,
+          "khoa: doc.Tables doc duoc va dem dung bang nam tron trong vung (bang da chen o tren)", locked)
+    check(int(region.get("docEnd") or 0) >= int(region.get("end") or 0) > 0,
+          "khoa: Content.End doc duoc (docEnd bao ngoai vung chon)", locked)
+    print("     vung khoa do duoc (Ctrl+A): %s" % region)
+
+    # Lenh ghi ra ngoai vung bi tu choi TRUOC khi cham vao tai lieu (LOCK_REFUSED).
+    before = text_now()
+    refused = live.cmd("writer.appendText", {"text": "KHONG-DUOC-XUAT-HIEN"})
+    check(refused.get("ok") is False and "Refused" in str(refused.get("error") or ""),
+          "dang khoa: writer.appendText (ghi ra ngoai vung) bi tu choi", refused)
+    check("KHONG-DUOC-XUAT-HIEN" not in text_now() and text_now() == before,
+          "dang khoa: lenh bi tu choi khong de lai dau vet trong tai lieu", text_now()[-200:])
+    check(live.cmd("writer.getText", {"maxChars": 1}).get("ok") is True,
+          "dang khoa: lenh doc van chay binh thuong", "")
+
+    # Boi den MOT PHAN (Ctrl+Home roi Shift+Right 5 lan) de do duong quan trong nhat: con tro bi keo ve
+    # vung khoa truoc khi lenh chay, chu khong go ra cho con tro dang dung.
+    check(keys.send("ctrl+Home"), "gui duoc Ctrl+Home (con tro ve dau tai lieu)", keys.window)
+    for _ in range(5):
+        keys.send("shift+Right")
+    partial = live.cmd("writer.lockSelection")
+    part = partial.get("result") or {}
+    check(int(part.get("chars") or 0) > 0 and int(part.get("end") or 0) < int(part.get("docEnd") or 0),
+          "khoa lai vung boi den MOT PHAN: vung khoa moi thay vung cu, khong phai ca tai lieu", partial)
+    start, end = int(part.get("start") or 0), int(part.get("end") or 0)
+    print("     vung khoa do duoc (Ctrl+Home + Shift+Right 5): %s" % part)
+
+    check(keys.send("ctrl+End"), "gui duoc Ctrl+End (con tro ra CUOI tai lieu, ngoai vung khoa)", keys.window)
+    before = text_now()
+    typed = live.cmd("writer.typeText", {"text": "Z"})
+    after = text_now()
+    pulled_back = after == before[:start] + "Z" + before[end:]
+    undone = after == before
+    check(pulled_back or undone,
+          "dang khoa: con tro o ngoai vung -> hoac bi KEO VE vung khoa, hoac lenh bi hoan tac; "
+          "chu ngoai vung khong bao gio doi", (typed, before[-80:], after[-80:]))
+    print("     con tro o cuoi tai lieu: %s" % ("keo ve vung khoa" if pulled_back else "lenh bi hoan tac"))
+
+    unlocked = live.cmd("writer.unlockSelection")
+    check(unlocked.get("ok") is True and (unlocked.get("result") or {}).get("locked") is False,
+          "writer.unlockSelection", unlocked)
+    after_unlock = live.cmd("writer.appendText", {"text": " SAU-KHI-MO-KHOA"})
+    check(after_unlock.get("ok") is True and "SAU-KHI-MO-KHOA" in text_now(),
+          "mo khoa roi thi lenh ghi ca tai lieu chay lai binh thuong", after_unlock)
 
     saved = os.path.join(live.home, "ket-qua.docx")
     reply = live.cmd("writer.saveAs", {"path": saved})
@@ -475,9 +593,9 @@ def main() -> int:
     if "JsApiPlugin=true" not in oem.replace(" ", ""):
         print("FAIL %s chua bat JsApiPlugin=true (can sudo, xem tests/wps/REFERENCE.md)" % OEM_INI)
         return 1
-    missing = [name for name in ("wps", "et", "wpp", "xvfb-run") if not shutil.which(name)]
+    missing = [name for name in ("wps", "et", "wpp", "xvfb-run", "xdotool") if not shutil.which(name)]
     if missing:
-        print("FAIL can wps, et, wpp va xvfb-run (thieu: %s)" % ", ".join(missing))
+        print("FAIL can wps, et, wpp, xvfb-run va xdotool (thieu: %s)" % ", ".join(missing))
         return 1
     if wps_running():
         print("FAIL WPS dang chay cho nguoi dung nay (pid %s) - dong WPS roi chay lai" % " ".join(wps_running()))
