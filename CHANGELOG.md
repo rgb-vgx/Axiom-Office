@@ -5,6 +5,15 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added - nạp skill từ thư mục ngoài (18/10/2026)
+- `internal/skills/import.go`: `Inspect` (soi trước, không ghi đĩa) và `Import` (copy vào thư mục skill của
+  người dùng). Nhận thư mục là **một skill** (có `SKILL.md`) hoặc **nhiều skill** (các thư mục con có
+  `SKILL.md`); bỏ qua `_*` và `.*`, bỏ `.git`, từ chối symlink, trần 64 MB. Cả lượt nhập **hoặc cùng được
+  hoặc không**: một skill sai frontmatter, hoặc trùng tên khi chưa cho phép ghi đè, thì không copy gì.
+- API: `POST /v1/skills/inspect` (soi) và `POST /v1/skills/import` (`overwrite` để ghi đè), trả kèm `existing`
+  khi trùng tên với skill đang có (vd bản dựng sẵn) để giao diện cảnh báo trước khi ghi đè.
+- Test: `internal/skills/import_test.go`, `internal/api/skills_import_test.go`.
+
 ### Changed - giao diện ARCHITECTURE.html theo hướng tài liệu kỹ thuật (17/10/2026)
 - Dựng lại phần trình bày theo design system "Minimalism / Swiss — technical documentation": token màu sáng/tối,
   cặp font **JetBrains Mono + IBM Plex Sans**, nút **chuyển sáng/tối** (nhớ trong `localStorage`, tôn trọng

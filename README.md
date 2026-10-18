@@ -206,6 +206,12 @@ Nguồn skill (trùng tên thì nguồn sau thắng): `skills\` cạnh `AxiomOff
 nạp (skill sai frontmatter bị bỏ qua, không làm hỏng Core). Skill **không chạy script**; chỉ dùng skill từ
 nguồn tin cậy.
 
+**Nạp skill từ ngoài**: `POST /v1/skills/inspect` với `{"path":"D:\\ky-nang\\cua-toi"}` để xem trước — thư mục
+đó là **một skill** nếu nó có `SKILL.md`, hoặc **nhiều skill** nếu các thư mục con có `SKILL.md` — rồi
+`POST /v1/skills/import` với cùng `path` để **copy** vào `%LOCALAPPDATA%\AxiomOffice\skills` (thêm
+`"overwrite": true` để thay bản cũ). Cả lượt hoặc cùng được hoặc không: một skill sai frontmatter, hoặc trùng
+tên khi chưa cho phép ghi đè, thì không copy gì. `.git` bị bỏ qua, symlink bị từ chối, tối đa 64 MB.
+
 ### Ghi nhớ dài hạn (memory)
 
 Agent Core **nhớ qua các phiên** (học từ mem0 2.2.1, tự làm bằng C#, dữ liệu nằm trong
