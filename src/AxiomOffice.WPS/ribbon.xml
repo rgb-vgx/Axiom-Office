@@ -20,6 +20,11 @@
      anh phai co nut dung - them nut ma quen ve anh la spec do ngay.
    - Neu ban WPS nao bo qua getImage, nut tro lai dung nhu ban cu: chi co chu, khong co anh.
 
+  Menu chuot phai (<contextMenus> cuoi tep): "Sua bang AI >" 9 muc + "Hoi AI ve doan nay", tren chu thuong va tren
+  dong danh sach. Ban Windows chi co "Hoi AI ve doan nay" va chi dua contextMenus cho Office (RibbonUi.cs: "WPS
+  khong nhan chac"); libkshell.so cua WPS Linux co du ten the contextMenus/contextMenu/menuSeparator/insertBeforeMso,
+  nhung CHUA nghiem thu tren WPS that - xem docs/ribbon-ui.md muc 5.3.
+
   Vi sao thieu bon control so voi ban Windows (xem docs/ribbon-ui.md muc 5):
    - toggleButton "Nhin tai lieu" (visualQa): lenh app.screenshot ma Core gui qua bridge CHUA co handler
      trong add-in WPS, nen bat toggle len la moi luot chay agent se hong o buoc "nhin tai lieu".
@@ -94,4 +99,42 @@
       </tab>
     </tabs>
   </ribbon>
+  <!-- Menu chuot phai khi boi den (docs/ribbon-ui.md, "Trong khung chat"): cung 9 muc voi menu "Sua bang AI"
+       o chan o soan, cung thu tu va nhan voi bang cua Core (agent/quickactions.go) - spec test_pane.mjs ghim hai
+       ben. Bam mot muc: main.js mo/hien khung chat roi nho Core chuyen muc do vao khung chat (POST
+       /wps/v1/pane/request -> SSE /wps/v1/pane/events), khung chat chay trong CHINH hoi thoai dang mo.
+       ContextMenuText = chuot phai tren chu thuong, ContextMenuList = tren dong danh sach (ten idMso co trong bang
+       lenh cua Writer WPS: res/commands/wps). -->
+  <contextMenus>
+    <contextMenu idMso="ContextMenuText">
+      <menu id="axiomCtxQuick_t" label="Sửa bằng AI" tag="quickMenu" getImage="ribbon.OnGetImage" insertBeforeMso="Cut">
+        <button id="axiomQuick_polish_t" label="Trau chuốt" tag="quick:polish" onAction="ribbon.OnAction"/>
+        <button id="axiomQuick_rewrite_t" label="Viết lại" tag="quick:rewrite" onAction="ribbon.OnAction"/>
+        <button id="axiomQuick_shorten_t" label="Rút gọn" tag="quick:shorten" onAction="ribbon.OnAction"/>
+        <button id="axiomQuick_expand_t" label="Mở rộng" tag="quick:expand" onAction="ribbon.OnAction"/>
+        <button id="axiomQuick_fix_t" label="Sửa lỗi chính tả" tag="quick:fix" onAction="ribbon.OnAction"/>
+        <button id="axiomQuick_formal_t" label="Trang trọng hơn" tag="quick:formal" onAction="ribbon.OnAction"/>
+        <menuSeparator id="axiomCtxQuickSep_t"/>
+        <button id="axiomQuick_summarize_t" label="Tóm tắt" tag="quick:summarize" onAction="ribbon.OnAction"/>
+        <button id="axiomQuick_explain_t" label="Giải thích" tag="quick:explain" onAction="ribbon.OnAction"/>
+        <button id="axiomQuick_translate_t" label="Dịch" tag="quick:translate" onAction="ribbon.OnAction"/>
+      </menu>
+      <button id="axiomCtxAsk_t" label="Hỏi AI về đoạn này" tag="askAi" onAction="ribbon.OnAction" getImage="ribbon.OnGetImage" insertBeforeMso="Cut"/>
+    </contextMenu>
+    <contextMenu idMso="ContextMenuList">
+      <menu id="axiomCtxQuick_l" label="Sửa bằng AI" tag="quickMenu" getImage="ribbon.OnGetImage" insertBeforeMso="Cut">
+        <button id="axiomQuick_polish_l" label="Trau chuốt" tag="quick:polish" onAction="ribbon.OnAction"/>
+        <button id="axiomQuick_rewrite_l" label="Viết lại" tag="quick:rewrite" onAction="ribbon.OnAction"/>
+        <button id="axiomQuick_shorten_l" label="Rút gọn" tag="quick:shorten" onAction="ribbon.OnAction"/>
+        <button id="axiomQuick_expand_l" label="Mở rộng" tag="quick:expand" onAction="ribbon.OnAction"/>
+        <button id="axiomQuick_fix_l" label="Sửa lỗi chính tả" tag="quick:fix" onAction="ribbon.OnAction"/>
+        <button id="axiomQuick_formal_l" label="Trang trọng hơn" tag="quick:formal" onAction="ribbon.OnAction"/>
+        <menuSeparator id="axiomCtxQuickSep_l"/>
+        <button id="axiomQuick_summarize_l" label="Tóm tắt" tag="quick:summarize" onAction="ribbon.OnAction"/>
+        <button id="axiomQuick_explain_l" label="Giải thích" tag="quick:explain" onAction="ribbon.OnAction"/>
+        <button id="axiomQuick_translate_l" label="Dịch" tag="quick:translate" onAction="ribbon.OnAction"/>
+      </menu>
+      <button id="axiomCtxAsk_l" label="Hỏi AI về đoạn này" tag="askAi" onAction="ribbon.OnAction" getImage="ribbon.OnGetImage" insertBeforeMso="Cut"/>
+    </contextMenu>
+  </contextMenus>
 </customUI>

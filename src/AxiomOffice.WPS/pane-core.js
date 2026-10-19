@@ -14,6 +14,10 @@
  * controller.send(prompt)    -> POST base+"runs" {prompt, conversationId?, options?: {mode: "plan"}} roi mo
  *                               EventSource(base+"runs/<id>/events"); dang chay thi bo qua (tra false).
  *                               409 (add-in chua ket noi) -> message "error" tieng Viet.
+ * controller.loadQuickActions() -> GET base+"quick-actions" -> state.quickActions = [{id, label, edits}] - nhan cua
+ *                               cac muc "Sua bang AI" (menu chuot phai); chi Writer, app khac giu []. Loi -> [].
+ * controller.quick(id)       -> POST base+"runs" {quickAction: id, conversationId?} - cau lenh do Core lay theo id;
+ *                               tin nhan nguoi dung hien NHAN cua muc. Bo qua "Lap ke hoach truoc" (viec nho, ro).
  * controller.confirm(ok)     -> POST base+"runs/<id>/confirm" {confirmationId, approved: ok}
  * controller.choose(id, text?) -> POST base+"runs/<id>/confirm" {confirmationId, choice: id, text?} (the nhieu lua
  *                               chon; text = chu nguoi dung go o lua chon input)
@@ -33,6 +37,8 @@
  * confirm.required -> confirmation; confirm.resolved -> confirmation = null;
  * run.completed -> message assistant = reply, running = false, dong EventSource;
  * run.failed|run.cancelled|run.stopped|run.timedout -> message "error", running = false.
+ *   run.failed kind "selection" / "selection-lock" (lenh nhanh khong co doan boi den) -> cau tieng Viet rieng
+ *   (QUICK_ERRORS) thay vi chuoi tieng Anh cua Core.
  *
  * Trang thai dem theo chat.py cua pane LibreOffice (cung he thiet ke): edits = so thao tac SUA tai lieu cua luot
  * (nut "Hoan tac luot nay"), seconds/rounds tu run.completed, summary(state) = dong trang thai o footer.
@@ -47,6 +53,12 @@
 
   var NOT_CONNECTED = "Ch\u01B0a k\u1EBFt n\u1ED1i v\u1EDBi WPS. M\u1EDF m\u1ED9t t\u00E0i li\u1EC7u trong WPS r\u1ED3i th\u1EED l\u1EA1i.";
   var NET_ERROR = "Kh\u00F4ng g\u1ECDi \u0111\u01B0\u1EE3c Agent Core. Ki\u1EC3m tra Core \u0111ang ch\u1EA1y tr\u00EAn m\u00E1y n\u00E0y r\u1ED3i th\u1EED l\u1EA1i.";
+  // Lenh nhanh "Sua bang AI" dung ngay khi khong co doan boi den (agent/orchestrator.go: hasSelection) - ma
+  // kind cua run.failed, dich sang cau noi duoc nguoi dung phai lam gi.
+  var QUICK_ERRORS = {
+    "selection": "H\u00E3y b\u00F4i \u0111en \u0111o\u1EA1n v\u0103n c\u1EA7n l\u00E0m tr\u01B0\u1EDBc, r\u1ED3i ch\u1ECDn l\u1EA1i m\u1EE5c trong menu S\u1EEDa b\u1EB1ng AI.",
+    "selection-lock": "B\u1EA3n WPS n\u00E0y kh\u00F4ng kho\u00E1 \u0111\u01B0\u1EE3c v\u00F9ng b\u00F4i \u0111en, n\u00EAn kh\u00F4ng ch\u1EA1y l\u1EC7nh s\u1EEDa nhanh (AI c\u00F3 th\u1EC3 s\u1EEDa ra ngo\u00E0i \u0111o\u1EA1n \u0111\u00E3 ch\u1ECDn). H\u00E3y g\u00F5 y\u00EAu c\u1EA7u v\u00E0o \u00F4 so\u1EA1n."
+  };
   var SEND_ERROR = "Agent Core tr\u1EA3 l\u1EDDi kh\u00F4ng h\u1EE3p l\u1EC7. Vui l\u00F2ng th\u1EED l\u1EA1i; n\u1EBFu v\u1EABn l\u1ED7i, kh\u1EDFi \u0111\u1ED9ng l\u1EA1i Core.";
 
   // Suy luan ngan hon nguong nay thi hien thang; dai hon thi thu lai thanh mot dong (bam "Hien" de mo) -
@@ -165,7 +177,8 @@
       status: "",
       lastReply: "",
       canUndo: false,
-      canInsert: false
+      canInsert: false,
+      quickActions: []
     };
     var runId = null;
     var source = null;
@@ -391,6 +404,11 @@
             else if (p.text !== undefined && p.text !== null) { msg = safeString(p.text); }
           } catch (e6) {}
           msg = trimText(msg);
+          try {
+            if (type === "run.failed" && Object.prototype.hasOwnProperty.call(QUICK_ERRORS, safeString(p.kind))) {
+              msg = QUICK_ERRORS[safeString(p.kind)];
+            }
+          } catch (eKind) {}
           if (!msg) {
             if (type === "run.cancelled" || type === "run.stopped") {
               msg = "\u0110\u00E3 d\u1EEBng l\u1EA1i.";
@@ -508,10 +526,73 @@
     }
 
     function send(prompt) {
+      var text = trimText(prompt);
+      if (!text) { return false; }
+      var body = { prompt: text };
+      // "Lap ke hoach truoc": Core chi cho doc tai lieu va tra ve ke hoach (CoreClient: mode "plan").
+      try { if (state.plan) { body.options = { mode: "plan" }; } } catch (e) {}
+      return startRun(text, body);
+    }
+
+    // quick: mot muc cua menu "Sua bang AI". Chi gui id - cau lenh nam trong Core (agent/quickactions.go) de ba
+    // ban ra cung mot cau; khung chat hien NHAN cua muc ("Trau chuot") thay vi ca cau lenh dai.
+    function quick(id) {
+      var actionId = trimText(id);
+      if (!actionId) { return false; }
+      var label = actionId;
+      try {
+        for (var i = 0; i < state.quickActions.length; i++) {
+          if (state.quickActions[i].id === actionId) { label = state.quickActions[i].label; }
+        }
+      } catch (e) {}
+      // Muc chon tu menu chuot phai (main.js -> Core -> pane) den bat ky luc nao, ke ca giua mot luot dang chay - noi
+      // ro la bi bo qua, khong im lang nuot mat viec nguoi dung vua chon.
+      if (state.running) {
+        pushInfo("\u0110ang c\u00F3 m\u1ED9t l\u01B0\u1EE3t ch\u1EA1y \u2014 ch\u1EDD xong r\u1ED3i ch\u1ECDn l\u1EA1i \u201C" + label + "\u201D.");
+        emit();
+        return false;
+      }
+      return startRun(label, { quickAction: actionId });
+    }
+
+    // loadQuickActions: danh sach muc lay tu Core, khong chep tay. Chi Writer: lenh nhanh can khoa vung boi den,
+    // ma khoa vung moi co cho van ban (Calc/Impress khong co doan van de boi den).
+    function loadQuickActions() {
+      try {
+        if (kind !== "wps") { return resolved(false); }
+        var req = null;
+        try { req = fetchFn(base + "quick-actions", { method: "GET" }); } catch (e) { req = null; }
+        if (!req || typeof req.then !== "function") { return resolved(false); }
+        return req.then(function (resp) {
+          if (!resp || resp.ok === false) { return null; }
+          return readJson(resp);
+        }).then(function (data) {
+          var list = [];
+          try {
+            var result = (data && data.result !== undefined) ? data.result : data;
+            var raw = (result && result.actions) || [];
+            for (var i = 0; i < raw.length; i++) {
+              var id = trimText(raw[i] && raw[i].id);
+              var label = trimText(raw[i] && raw[i].label);
+              if (id && label) { list.push({ id: id, label: label, edits: !!raw[i].edits }); }
+            }
+          } catch (e2) { list = []; }
+          state.quickActions = list;
+          emit();
+          return list.length > 0;
+        }).then(null, function () {
+          state.quickActions = [];
+          emit();
+          return false;
+        });
+      } catch (e3) {
+        return resolved(false);
+      }
+    }
+
+    function startRun(text, body) {
       try {
         if (state.running) { return false; }
-        var text = trimText(prompt);
-        if (!text) { return false; }
         try {
           state.messages.push({ role: "user", text: text });
           state.steps = [];
@@ -532,11 +613,8 @@
           setRunning(true);
         } catch (e) {}
         emit();
-        var body = { prompt: text };
         try {
           if (state.conversationId) { body.conversationId = state.conversationId; }
-          // "Lap ke hoach truoc": Core chi cho doc tai lieu va tra ve ke hoach (CoreClient: mode "plan").
-          if (state.plan) { body.options = { mode: "plan" }; }
         } catch (e2) {}
         var req = null;
         try {
@@ -871,6 +949,8 @@
 
     return {
       send: send,
+      quick: quick,
+      loadQuickActions: loadQuickActions,
       confirm: confirm,
       choose: choose,
       stop: stop,

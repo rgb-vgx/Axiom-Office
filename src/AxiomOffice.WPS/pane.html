@@ -418,8 +418,14 @@ body {
   align-items: center;
   margin-top: var(--axiom-gap-chip);
 }
+/* Goi y phim tat: KHONG bao gio xuong dong (xuong dong thi day chan o soan cao len va dinh vao nut ben canh).
+   Khong du cho thi updateHint() rut ngan, roi bo han - cau day du van con o tooltip cua nut Gui. */
 #composerHint {
   flex: 1;
+  min-width: 0;
+  margin: 0 var(--axiom-gap-chip) 0 var(--axiom-pad-x);
+  white-space: nowrap;
+  overflow: hidden;
   font-size: var(--axiom-size-caption);
   color: var(--axiom-text-muted);
 }
@@ -784,7 +790,7 @@ button:focus,
       <div class="composerFoot">
         <button id="planToggle" type="button" data-act="plan" aria-pressed="false">○ Lập kế hoạch trước</button>
         <span id="composerHint" class="hint">Enter để gửi · Shift+Enter xuống dòng</span>
-        <button id="sendBtn" class="btnPrimary" type="button" data-act="send">Gửi</button>
+        <button id="sendBtn" class="btnPrimary" type="button" data-act="send" title="Enter để gửi · Shift+Enter xuống dòng">Gửi</button>
       </div>
     </div>
   </div>
@@ -874,21 +880,44 @@ button:focus,
     return KIND;
   }
 
+  // updateHint: chon cau goi y VUA cho trong chan o soan (theme.py PROMPT_HINT / PROMPT_HINT_SHORT). Do cho TRONG
+  // THAT chu khong dung nguong co dinh: nguong 340px cu tung lam cau day du xuong hai dong va dinh vao nut ben canh
+  // (anh chup 20/10/2026) - chan o soan them hay bot mot nut la nguong co dinh sai ngay.
+  function setHint(hint, text) {
+    while (hint.firstChild) { hint.removeChild(hint.firstChild); }
+    hint.appendChild(document.createTextNode(text));
+  }
+
+  // fits: chu co nam tron trong o khong. null = khong do duoc (pane chua ve, hoac khong co layout).
+  function fits(el) {
+    try {
+      if (!el.clientWidth && !el.scrollWidth) { return null; }
+      return el.scrollWidth <= el.clientWidth + 1;
+    } catch (e) { return null; }
+  }
+
   function updateHint() {
     try {
       var hint = $("composerHint");
       if (!hint) { return; }
       var full = "Enter để gửi · Shift+Enter xuống dòng";
       var short = "Enter để gửi";
-      var w = 0;
-      try {
-        var box = $("composerBox");
-        if (box && box.offsetWidth) { w = box.offsetWidth; }
-        else if (window.innerWidth) { w = window.innerWidth; }
-      } catch (e) { w = 0; }
-      var text = (w >= 340 || w <= 0) ? full : short;
-      while (hint.firstChild) { hint.removeChild(hint.firstChild); }
-      hint.appendChild(document.createTextNode(text));
+      setHint(hint, full);
+      var ok = fits(hint);
+      if (ok === null) {
+        // Chua do duoc: doan theo be rong o soan.
+        var w = 0;
+        try {
+          var box = $("composerBox");
+          if (box && box.offsetWidth) { w = box.offsetWidth; }
+          else if (window.innerWidth) { w = window.innerWidth; }
+        } catch (e) { w = 0; }
+        if (w > 0 && w < 340) { setHint(hint, short); }
+        return;
+      }
+      if (ok) { return; }
+      setHint(hint, short);
+      if (fits(hint) === false) { setHint(hint, ""); }
     } catch (e2) {}
   }
 
@@ -1275,6 +1304,35 @@ button:focus,
     if (btn) {
       try { btn.setAttribute("aria-expanded", open ? "true" : "false"); } catch (e2) {}
     }
+  }
+
+  // ---- Menu chuot phai -> khung chat nay (api/wpspane.go) ----
+  // Nguoi dung boi den, bam chuot phai, chon "Trau chuot": main.js hien khung chat roi nho Core chuyen muc do toi day
+  // (ribbon khong noi thang duoc vao trang nay - docs/ribbon-ui.md muc 7). Khung chat nghe SSE pane/events va chay
+  // muc do trong CHINH hoi thoai dang mo. Day la loi vao DUY NHAT cua "Sua bang AI" - khung chat khong ve menu rieng
+  // (20/10/2026, theo yeu cau nguoi dung). Chi khung chat cua Writer nghe: man hinh phu (?view=) va Calc/Impress
+  // khong co menu nay. EventSource tu noi lai khi Core khoi dong lai.
+  var quickReady = null;
+
+  function listenPane() {
+    try {
+      if (VIEW || KIND !== "wps" || !ctl || typeof window.EventSource !== "function") { return; }
+      var source = new window.EventSource(baseUrl() + "pane/events");
+      source.addEventListener("pane.quick", function (evt) {
+        var id = "";
+        try {
+          var data = JSON.parse(evt.data);
+          id = trimText((data && data.data && data.data.quickAction) || (data && data.quickAction));
+        } catch (e) { id = ""; }
+        if (!id) { return; }
+        // Khung chat vua tao: doi danh sach muc ve truoc de bong bong hien NHAN ("Trau chuot") chu khong phai id.
+        var go = function () { try { ctl.quick(id); } catch (e2) {} };
+        try {
+          if (quickReady && typeof quickReady.then === "function") { quickReady.then(go, go); return; }
+        } catch (e3) {}
+        go();
+      });
+    } catch (e4) {}
   }
 
   function openView(name, check, action) {
@@ -2716,6 +2774,10 @@ button:focus,
       }
     } catch (e13) {}
     render({ messages: [], running: false, steps: [], confirmation: null, conversationId: null });
+    // Danh sach muc "Sua bang AI" (chi Writer). Khung chat KHONG ve menu nay - loi vao duy nhat la menu chuot phai
+    // (20/10/2026, theo yeu cau) - nhung can nhan cua muc de bong bong hien "Trau chuot" chu khong phai "polish".
+    try { if (ctl && !VIEW) { quickReady = ctl.loadQuickActions(); } } catch (eQuickLoad) {}
+    listenPane();
     // Ribbon mo pane kem ?view=/?check=/?do= (main.js: paneUrl) - man hinh phai tu mo va tu lam viec
     // duoc yeu cau, khong doi nguoi dung bam lai nut.
     if (VIEW) { openView(VIEW, VIEW_CHECK, VIEW_DO); }

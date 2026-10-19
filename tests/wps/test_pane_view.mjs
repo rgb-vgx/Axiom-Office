@@ -72,7 +72,7 @@ test("cong tac 'Lap ke hoach truoc': doi chu, doi goi y o soan, gui kem options.
   assert.match(pane.byId("input").getAttribute("placeholder"), /AI lập kế hoạch trước, chưa sửa gì/,
     "bat ke hoach thi o soan noi ro chua sua gi");
   await startRun(pane, "Dọn lại bố cục giáo án");
-  assert.deepEqual(calls[0].body.options, { mode: "plan" });
+  assert.deepEqual(calls.find((c) => c.method === "POST").body.options, { mode: "plan" });
 });
 
 test("dang chay: model o phu de, dong tien do, the suy luan co nut Hien/An", async () => {
@@ -720,4 +720,101 @@ test("Hoi thoai truoc: tu choi xac nhan thi khong xoa gi", async () => {
   await tick();
   assert.equal(calls.filter((c) => c.method === "DELETE").length, 0, "tu choi thi khong goi DELETE");
   assert.match(pane.text("view"), /Dọn lại bố cục/, "van o nguyen hoi thoai dang mo");
+});
+
+// ---- "Sua bang AI": danh sach muc lay tu Core. Loi vao duy nhat la menu chuot phai (khung chat khong ve menu rieng).
+const QUICK_LIST = { ok: true, result: { actions: [
+  { id: "polish", label: "Trau chuốt", edits: true },
+  { id: "fix", label: "Sửa lỗi chính tả", edits: true },
+  { id: "summarize", label: "Tóm tắt", edits: false },
+] } };
+test("Sua bang AI KHONG nam trong khung chat (20/10/2026: loi vao duy nhat la menu chuot phai)", async () => {
+  const { pane } = paneWith({ "GET /quick-actions": [200, QUICK_LIST] });
+  await tick();
+  assert.equal(pane.byId("quickBtn"), null, "khong co nut Sua bang AI o chan o soan");
+  assert.equal(pane.byId("quickMenu"), null);
+  assert.equal(pane.find((el) => el.getAttribute && el.getAttribute("data-act") === "quick"), null);
+  assert.equal(pane.text("chat").includes("Sửa bằng AI"), false);
+});
+
+// ---- Menu chuot phai -> khung chat nay: Core chuyen muc qua SSE pane/events (api/wpspane.go).
+const paneSource = (pane) => pane.sources.find((s) => s.url.endsWith("/wps/v1/pane/events"));
+
+test("chuot phai: khung chat Writer nghe pane/events; nhan pane.quick -> chay muc do TRONG hoi thoai dang mo", async () => {
+  const { pane, calls } = paneWith({ "GET /quick-actions": [200, QUICK_LIST],
+    "POST /runs": () => [200, { ok: true, result: { runId: "r" + calls.length, conversationId: "c1" } }] });
+  await tick();
+  const source = paneSource(pane);
+  assert.ok(source, "khung chat Writer phai mo EventSource toi /wps/v1/pane/events");
+  await startRun(pane, "Chào");
+  pane.emit("run.completed", { reply: "Chào bạn" });
+  await tick();
+  source.emit("pane.quick", { quickAction: "fix" });
+  await tick();
+  const posts = calls.filter((c) => c.method === "POST" && c.url.endsWith("/runs"));
+  assert.deepEqual(posts[1].body, { quickAction: "fix", conversationId: "c1" }, "giu hoi thoai dang mo");
+  assert.match(pane.text("chat"), /Sửa lỗi chính tả/, "bong bong hien NHAN cua muc");
+});
+
+test("chuot phai: dang co luot chay -> bao ro bi bo qua, khong chay chen", async () => {
+  const { pane, calls } = paneWith({ "GET /quick-actions": [200, QUICK_LIST],
+    "POST /runs": [200, { ok: true, result: { runId: "r1" } }] });
+  await tick();
+  await startRun(pane, "Việc dài");
+  paneSource(pane).emit("pane.quick", { quickAction: "polish" });
+  await tick();
+  assert.equal(calls.filter((c) => c.method === "POST" && c.url.endsWith("/runs")).length, 1, "khong gui luot thu hai");
+  assert.match(pane.text("chat"), /Đang có một lượt chạy — chờ xong rồi chọn lại “Trau chuốt”/);
+});
+
+test("chuot phai: chua boi den -> the loi tieng Viet bao phai boi den truoc", async () => {
+  const { pane } = paneWith({ "GET /quick-actions": [200, QUICK_LIST],
+    "POST /runs": [200, { ok: true, result: { runId: "q2" } }] });
+  await tick();
+  paneSource(pane).emit("pane.quick", { quickAction: "summarize" });
+  await tick();
+  pane.emit("run.failed", { error: "quick action \"summarize\" works on the selected text: select it first", kind: "selection" });
+  await tick();
+  assert.match(pane.text("chat"), /Hãy bôi đen đoạn văn cần làm trước/);
+  assert.equal(pane.text("chat").includes("select it first"), false);
+});
+
+test("chuot phai: man hinh phu (?view=) va Calc khong nghe pane/events", async () => {
+  const view = paneWith({}, { search: "?app=wps&view=memory" });
+  const calc = paneWith({}, { search: "?app=et" });
+  await tick();
+  assert.equal(paneSource(view.pane), undefined, "man hinh phu khong chay luot");
+  assert.equal(paneSource(calc.pane), undefined, "Calc khong co menu nay");
+});
+
+// ---- Chan o soan: goi y phim tat KHONG xuong dong (anh chup 20/10/2026: cau day du gay hai dong, dinh vao
+// chu "Sua bang AI"). Do cho trong that: day du -> ngan -> bo han; cau day du van o tooltip nut Gui.
+function measureHint(pane, room) {
+  const hint = pane.byId("composerHint");
+  // Layout gia: moi ky tu ~6px, o rong `room` px.
+  Object.defineProperty(hint, "clientWidth", { configurable: true, get: () => room });
+  Object.defineProperty(hint, "scrollWidth", { configurable: true, get: () => hint.text.length * 6 });
+  return hint;
+}
+
+test("chan o soan: goi y vua cho trong THAT; khong du cho thi rut ngan roi bo, tooltip nut Gui van con", async () => {
+  for (const [room, want] of [[300, "Enter để gửi · Shift+Enter xuống dòng"], [100, "Enter để gửi"], [40, ""]]) {
+    const { pane } = paneWith({ "GET /quick-actions": [200, QUICK_LIST] });
+    measureHint(pane, room);
+    await tick(); // nap xong danh sach muc -> render -> updateHint do lai voi layout gia
+    assert.equal(pane.text("composerHint"), want, "o rong " + room + "px");
+  }
+  const { pane } = paneWith({});
+  assert.equal(pane.byId("sendBtn").getAttribute("title"), "Enter để gửi · Shift+Enter xuống dòng",
+    "bo goi y o chan thi phim tat van doc duoc o tooltip nut Gui");
+});
+
+test("chan o soan: chua do duoc layout -> doan theo be rong o soan", () => {
+  // DOM gia khong co clientWidth/offsetWidth: pane rong 420px (pane_dom) - du cho cau day du.
+  const { pane } = paneWith({});
+  assert.equal(pane.text("composerHint"), "Enter để gửi · Shift+Enter xuống dòng");
+  const narrow = paneWith({});
+  narrow.pane.context.innerWidth = 300;
+  narrow.pane.click("planToggle"); // bat ky thao tac nao cung ve lai
+  assert.equal(narrow.pane.text("composerHint"), "Enter để gửi");
 });

@@ -5,6 +5,31 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Chuột phải ra thẳng "Sửa bằng AI" trên WPS (20/10/2026)
+- Bôi đen trong Writer, chuột phải: **Sửa bằng AI ▸** (cùng 9 mục với menu ở ô soạn) và **Hỏi AI về đoạn này**.
+  Chọn một mục thì khung chat hiện ra (dùng lại khung đang mở, giữ hội thoại) và chạy mục đó ngay.
+- Ribbon WPS không nói thẳng được vào khung chat đang mở, nên **Core làm trạm trung chuyển**:
+  `POST /wps/v1/pane/request` → SSE `GET /wps/v1/pane/events` (`api/wpspane.go`). Khung chat vừa tạo thì Core giữ
+  yêu cầu 20 giây cho nó kịp nối vào; đang có lượt chạy thì khung chat nói rõ đã bỏ qua mục vừa chọn.
+- Danh sách mục trong `ribbon.xml` khớp `agent/quickactions.go`, có spec ghim hai bên.
+- Menu *Sửa bằng AI* ở chân ô soạn (thêm hôm 19/10) **đã bỏ** theo yêu cầu: lối vào duy nhất là menu chuột phải.
+- **Chưa nghiệm thu trong WPS thật** — bản Windows từng ghi WPS "không nhận chắc" `contextMenus`.
+
+### Added — Menu "Sửa bằng AI" cho đoạn bôi đen trên WPS (19/10/2026)
+Phần dùng nhiều nhất của WPS AI cài sẵn là sửa vùng chọn; Axiom làm lại theo cách của mình (không lấy mã hay câu
+lệnh của Kingsoft), trên nền khoá vùng bôi đen đã có.
+- **Pane WPS (Writer)**: nút **✦ Sửa bằng AI** ở chân ô soạn, mở menu *Trau chuốt · Viết lại · Rút gọn · Mở rộng ·
+  Sửa lỗi chính tả · Trang trọng hơn* │ *Tóm tắt · Giải thích · Dịch*. Chọn một mục là chạy ngay **trong đoạn hội
+  thoại đang mở**, khung chat hiện nhãn của mục. Đặt ở ô soạn chứ không ở ribbon vì ribbon WPS không nói được vào
+  pane đang mở (`docs/ribbon-ui.md` §7) — đặt trên ribbon thì mỗi lần bấm mất đoạn chat đang dở.
+- **Core**: câu lệnh của 9 mục nằm ở `agent/quickactions.go`; `POST /v1/runs {quickAction}` lấy câu lệnh theo id
+  (ba bản ra cùng một câu), `GET /v1/quick-actions` cho pane vẽ menu. Ba mục sau vạch ngăn **chỉ trả lời**: lượt đó
+  chỉ có tool đọc, nên "không sửa tài liệu" là Core chặn thật. Chưa bôi đen gì thì lượt dừng **trước khi gọi
+  model**, pane nói "Hãy bôi đen đoạn văn cần làm trước…".
+- **Chưa có** ở Windows và LibreOffice (bản LibreOffice cần khoá vùng bôi đen trước); **chưa thử với model thật**
+  trong WPS thật.
+- Spec: e2e 84 (+16), `make test-wps` 168 (+8), Go +2 ca.
+
 ### Changed — Pane và ribbon trông giống MS Word (19/10/2026)
 Yêu cầu: "thiết kế lại phần UI trên ribbon và pane Chat cho giống MS Word". Ba phần, làm cùng lúc vì bảng màu
 dùng chung cả ba nền tảng.

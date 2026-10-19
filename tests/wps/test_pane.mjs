@@ -433,15 +433,19 @@ test("SSE dut giua luot -> khong im lang", async () => {
 // Hai ben phai di cung nhau: them mot nut ma quen ve anh, hoac de lai mot tep anh khong nut nao dung,
 // deu la spec do ngay.
 
-function ribbonControls() {
-  const xml = fs.readFileSync(path.join(ADDIN, "ribbon.xml"), "utf8");
+// ribbon.xml gom hai phan: <ribbon> (tab Axiom Office) va <contextMenus> (menu chuot phai). part = "ribbon" | "context".
+function ribbonControls(part = "ribbon") {
+  const all = fs.readFileSync(path.join(ADDIN, "ribbon.xml"), "utf8").split("-->").slice(1).join("-->");
+  const cut = all.indexOf("<contextMenus>");
+  const xml = part === "ribbon" ? (cut >= 0 ? all.slice(0, cut) : all) : (cut >= 0 ? all.slice(cut) : "");
   const out = [];
-  for (const found of xml.matchAll(/<(button|menu|toggleButton|dropDown|dynamicMenu)\s([^>]*)>/g)) {
+  for (const found of xml.matchAll(/<(button|menu|toggleButton|dropDown|dynamicMenu|menuSeparator|contextMenu)\s([^>]*)>/g)) {
     const attrs = found[2];
-    const one = (name) => { const m = new RegExp(name + '="([^"]*)"').exec(attrs); return m ? m[1] : ""; };
-    out.push({ kind: found[1], id: one("id"), tag: one("tag"), getImage: one("getImage") });
+    const one = (name) => { const m = new RegExp("\\b" + name + '="([^"]*)"').exec(attrs); return m ? m[1] : ""; };
+    out.push({ kind: found[1], id: one("id"), tag: one("tag"), getImage: one("getImage"), label: one("label"),
+      onAction: one("onAction"), idMso: one("idMso") });
   }
-  return out;
+  return part === "ribbon" ? out.filter((c) => c.kind !== "menuSeparator") : out;
 }
 
 function iconFiles() {
@@ -461,8 +465,8 @@ test("ribbon.xml: moi control co getImage, va moi tag co tep anh images/<tag>.sv
     assert.ok(files.indexOf(control.tag) >= 0,
       "images/: thieu tep cho tag '" + control.tag + "' (#" + control.id + ")");
   }
-  // Chieu nguoc lai: tep anh chet (khong nut nao dung) cung la loi.
-  const tags = controls.map((c) => c.tag);
+  // Chieu nguoc lai: tep anh chet (khong nut nao dung - ca ribbon lan menu chuot phai) cung la loi.
+  const tags = controls.concat(ribbonControls("context").filter((c) => c.getImage)).map((c) => c.tag);
   for (const name of files) {
     assert.ok(tags.indexOf(name) >= 0, "images/: co '" + name + ".svg' nhung ribbon.xml khong co nut nao dung");
   }
@@ -483,7 +487,7 @@ test("OnGetImage: tra duong dan tuong doi images/<tag>.svg; khong biet tag thi t
   assert.equal(ctx.ribbon.OnGetImage(null), "");
   // Moi tep anh phai la MOT the <svg> khap kin, chi viewBox (de WPS tu co gian theo co nut: nut lon
   // 32px, nut nho 16px - y nhu tep mau cua SDK @wps-jsapi/wps/images/1.svg), va dung mau accent.
-  for (const control of ribbonControls()) {
+  for (const control of ribbonControls().concat(ribbonControls("context").filter((c) => c.getImage))) {
     assert.equal(ctx.ribbon.OnGetImage({ Tag: control.tag }), "images/" + control.tag + ".svg");
     const text = fs.readFileSync(path.join(ADDIN, "images", control.tag + ".svg"), "utf8");
     assert.match(text, /<svg[^>]*viewBox="0 0 20 20"[^>]*>[\s\S]*<\/svg>\s*$/,
@@ -497,5 +501,131 @@ test("OnGetImage: tra duong dan tuong doi images/<tag>.svg; khong biet tag thi t
     assert.equal((text.match(/</g) || []).length, (text.match(/>/g) || []).length,
       "anh '" + control.tag + "' lech the mo/dong");
   }
+  if (ctx.AxiomBridge) { ctx.AxiomBridge.stop(); }
+});
+
+// ---- Menu "Sua bang AI" (lenh nhanh): danh sach lay tu Core, chi gui id - cau lenh nam trong Core.
+const QUICK = { ok: true, result: { actions: [
+  { id: "polish", label: "Trau chuốt", edits: true },
+  { id: "summarize", label: "Tóm tắt", edits: false },
+] } };
+
+test("loadQuickActions: GET quick-actions -> state.quickActions; app khac Writer khong hoi", async () => {
+  const h = harness({ "/quick-actions": [200, QUICK] });
+  assert.equal(await h.pane.loadQuickActions(), true);
+  assert.deepEqual(h.calls[0], { url: BASE + "quick-actions", method: "GET", body: null });
+  assert.deepEqual(h.state.quickActions.map((a) => a.id), ["polish", "summarize"]);
+  assert.equal(h.state.quickActions[1].edits, false);
+
+  const calc = harness({ "/quick-actions": [200, QUICK] }, null, "et");
+  assert.equal(await calc.pane.loadQuickActions(), false);
+  assert.equal(calc.calls.length, 0, "Calc/Impress khong co doan van de boi den: khong hoi Core");
+
+  // Core cu chua co route (404) / loi mang: danh sach rong, KHONG day the loi vao khung chat.
+  const old = harness({ "/quick-actions": [404, { ok: false, error: "not found" }] });
+  assert.equal(await old.pane.loadQuickActions(), false);
+  assert.deepEqual(old.state.quickActions, []);
+  assert.equal(old.state.messages.length, 0, "menu an di la du, khong bao loi");
+});
+
+test("quick(id): POST runs {quickAction} khong kem prompt, tin nhan hien NHAN cua muc, bo qua ke hoach", async () => {
+  const h = harness({ "/quick-actions": [200, QUICK],
+    "/runs": [200, { ok: true, result: { runId: "q1", conversationId: "c9" } }] });
+  await h.pane.loadQuickActions();
+  h.pane.setPlan(true);
+  await h.pane.quick("polish");
+  await tick();
+  const post = h.calls.find((c) => c.method === "POST");
+  assert.deepEqual(post.body, { quickAction: "polish" },
+    "chi gui id: cau lenh do Core lay, va lenh nhanh khong di cung lap ke hoach");
+  assert.deepEqual(h.state.messages[0], { role: "user", text: "Trau chuốt" });
+  assert.equal(h.state.running, true);
+  assert.equal(await h.pane.quick("summarize"), false, "dang chay thi bo qua, giong send");
+  FakeSource.last.emit("run.completed", { data: { reply: "Đã trau chuốt" } });
+  await tick();
+  await h.pane.quick("summarize");
+  await tick();
+  assert.deepEqual(h.calls.filter((c) => c.method === "POST").pop().body,
+    { quickAction: "summarize", conversationId: "c9" }, "luot sau giu hoi thoai");
+});
+
+test("run.failed kind 'selection'/'selection-lock' -> cau tieng Viet rieng, khong phai chuoi cua Core", async () => {
+  for (const [kind, want] of [["selection", /Hãy bôi đen đoạn văn cần làm trước/],
+    ["selection-lock", /không khoá được vùng bôi đen/]]) {
+    const h = harness({ "/runs": [200, { ok: true, result: { runId: "q2" } }] });
+    await h.pane.quick("polish");
+    await tick();
+    FakeSource.last.emit("run.failed", { data: { error: "quick action \"polish\" works on the selected text", kind } });
+    await tick();
+    const last = h.state.messages[h.state.messages.length - 1];
+    assert.equal(last.role, "error");
+    assert.match(last.text, want);
+    assert.equal(last.text.includes("quick action"), false, "khong lo chuoi tieng Anh cua Core");
+    assert.equal(h.state.running, false);
+  }
+  // kind khac: giu nguyen chuoi loi nhu truoc.
+  const h = harness({ "/runs": [200, { ok: true, result: { runId: "q3" } }] });
+  await h.pane.send("x");
+  await tick();
+  FakeSource.last.emit("run.failed", { data: { error: "the bridge is not answering", kind: "office" } });
+  await tick();
+  assert.equal(h.state.messages[h.state.messages.length - 1].text, "the bridge is not answering");
+});
+
+// ---- Menu chuot phai (contextMenus): cung 9 muc, cung thu tu va nhan voi bang cua Core.
+function coreQuickActions() {
+  const go = fs.readFileSync(path.join(ROOT, "core-go", "internal", "agent", "quickactions.go"), "utf8");
+  return [...go.matchAll(/\{ID: "([a-z]+)", Label: "([^"]+)"(, Edits: true)?/g)]
+    .map((m) => ({ id: m[1], label: m[2], edits: !!m[3] }));
+}
+
+test("ribbon.xml contextMenus: chu thuong + dong danh sach, 'Sua bang AI' khop DUNG bang cua Core", () => {
+  const core = coreQuickActions();
+  assert.equal(core.length, 9, "doc duoc bang QuickActions cua Core");
+  const context = ribbonControls("context");
+  const menus = context.filter((c) => c.kind === "contextMenu").map((c) => c.idMso);
+  assert.deepEqual(menus, ["ContextMenuText", "ContextMenuList"]);
+  for (const suffix of ["t", "l"]) {
+    const items = context.filter((c) => c.kind === "button" && c.id.startsWith("axiomQuick_") && c.id.endsWith("_" + suffix));
+    assert.deepEqual(items.map((c) => [c.tag, c.label]), core.map((a) => ["quick:" + a.id, a.label]),
+      "menu chuot phai (_" + suffix + ") phai cung muc, cung thu tu, cung nhan voi agent/quickactions.go");
+    for (const item of items) {
+      assert.equal(item.id, "axiomQuick_" + item.tag.slice(6) + "_" + suffix, "id theo mau axiomQuick_<muc>_<t|l>");
+      assert.equal(item.onAction, "ribbon.OnAction");
+      assert.equal(item.getImage, "", "muc con khong co tep anh rieng - getImage se ra dau '?'");
+    }
+    // Vach ngan nam dung truoc muc chi-tra-loi dau tien (giong menu trong pane).
+    const block = context.slice(context.findIndex((c) => c.id === "axiomCtxQuick_" + suffix));
+    const sep = block.findIndex((c) => c.kind === "menuSeparator");
+    const firstAnswer = core.find((a) => !a.edits).id;
+    assert.equal(block[sep + 1].tag, "quick:" + firstAnswer);
+    const ask = context.find((c) => c.id === "axiomCtxAsk_" + suffix);
+    assert.ok(ask && ask.tag === "askAi" && ask.label === "Hỏi AI về đoạn này", "con co muc 'Hoi AI ve doan nay'");
+  }
+});
+
+test("menu chuot phai: muc quick:<id> -> hien khung chat (dung lai cai dang mo) + POST pane/request; khong ve anh '?'", async () => {
+  const created = [];
+  const posts = [];
+  const ctx = load(["probe.js", "commands.js", "main.js"], {
+    Application: { CreateTaskPane(url) { const pane = { url, Visible: false }; created.push(pane); return pane; } },
+    location: { href: "http://127.0.0.1:47840/wps/addin/index.html" },
+    fetch: (url, options = {}) => {
+      if (String(url).endsWith("/pane/request")) { posts.push({ url: String(url), body: JSON.parse(options.body) }); }
+      return new Promise(() => {});
+    },
+  });
+  ctx.ribbon.OnAction({ Id: "axiomAskAI" });
+  assert.equal(created.length, 1);
+  created[0].Visible = false;
+  // WPS co ban chi dien Id: tag suy ra tu id axiomQuick_<muc>_<t|l>.
+  ctx.ribbon.OnAction({ Id: "axiomQuick_polish_t" });
+  assert.equal(created.length, 1, "dung lai khung chat dang mo - giu nguyen hoi thoai");
+  assert.equal(created[0].Visible, true, "khung chat phai hien ra");
+  assert.deepEqual(posts, [{ url: "http://127.0.0.1:47840/wps/v1/pane/request", body: { quickAction: "polish" } }]);
+  ctx.ribbon.OnAction({ Tag: "quick:summarize" });
+  assert.deepEqual(posts[1].body, { quickAction: "summarize" });
+  assert.equal(ctx.ribbon.OnGetImage({ Id: "axiomQuick_polish_t" }), "", "muc con: chuoi rong, khong phai duong dan 404");
+  assert.equal(ctx.ribbon.OnGetImage({ Id: "axiomCtxQuick_t" }), "images/quickMenu.svg");
   if (ctx.AxiomBridge) { ctx.AxiomBridge.stop(); }
 });

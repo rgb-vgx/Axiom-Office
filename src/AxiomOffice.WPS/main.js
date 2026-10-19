@@ -409,8 +409,18 @@
     axiomLog: "openLog",
     axiomTestModel: "testModel",
     axiomCopyUrl: "copyUrl",
-    axiomMoreMenu: "more"
+    axiomMoreMenu: "more",
+    // Menu chuot phai (contextMenus trong ribbon.xml; hau to _t = tren chu, _l = tren dong danh sach).
+    axiomCtxAsk_t: "askAi",
+    axiomCtxAsk_l: "askAi",
+    axiomCtxQuick_t: "quickMenu",
+    axiomCtxQuick_l: "quickMenu"
   };
+
+  // Muc "Sua bang AI" trong menu chuot phai: id = axiomQuick_<muc>_<t|l>, tag = "quick:<muc>". Khong liet ke tung
+  // muc vao TAGS_BY_ID - danh sach muc la cua Core (agent/quickactions.go), them muc thi chi phai sua ribbon.xml.
+  var QUICK_ID = /^axiomQuick_([a-z]+)_[tl]$/;
+  var QUICK_TAG = "quick:";
 
   // Nut "Soat ..." nao ung voi lenh nao: pane nhan ten tag qua ?check= roi tra cuu o day, de mot nut
   // bam sai app van chay DUNG lenh cua no (add-in tra loi ro "lenh nay can ung dung kia").
@@ -451,7 +461,20 @@
     try { id = (control && control.Id) || ""; } catch (e2) { id = ""; }
     id = String(id);
     if (Object.prototype.hasOwnProperty.call(TAGS_BY_ID, id)) { return TAGS_BY_ID[id]; }
+    var quick = QUICK_ID.exec(id);
+    if (quick) { return QUICK_TAG + quick[1]; }
     return "";
+  }
+
+  // runQuick: muc "Sua bang AI" chon tu menu chuot phai. Ribbon KHONG dua duoc gi vao khung chat dang mo (muc 7 cua
+  // docs/ribbon-ui.md), nen: hien khung chat (dung lai cai dang mo - giu nguyen hoi thoai), roi nho Core chuyen muc
+  // nay toi no (api/wpspane.go). Khung chat nghe SSE /wps/v1/pane/events va tu chay trong hoi thoai cua no; khung
+  // chat vua tao thi Core giu yeu cau vai giay cho trang nap xong.
+  function runQuick(quickAction) {
+    openPane("", "", "");
+    try {
+      postJson(endpoint("pane/request"), { quickAction: quickAction }).then(null, function () { return null; });
+    } catch (e) {}
   }
 
   function checkCommandOf(tag) {
@@ -484,7 +507,8 @@
   function OnGetImage(control) {
     try {
       var tag = tagOf(control);
-      if (tag !== "") { return ICON_DIR + tag + ".svg"; }
+      // Muc "quick:<muc>" khong co tep anh rieng (cung mot icon voi menu cha) - tra duong dan thi ra dau "?".
+      if (tag !== "" && tag.indexOf(QUICK_TAG) !== 0) { return ICON_DIR + tag + ".svg"; }
     } catch (e) {}
     return "";
   }
@@ -492,6 +516,12 @@
   function OnAction(control) {
     try {
       var tag = tagOf(control);
+      if (tag.indexOf(QUICK_TAG) === 0) {
+        runQuick(tag.substring(QUICK_TAG.length));
+        // Khung chat goi Core chay luot - Core can add-in dang poll de khoa vung boi den va sua tai lieu.
+        try { start(); } catch (eQ) {}
+        return;
+      }
       // Bam vao mot id la: coi nhu mo khung chat, dung hanh vi cu.
       if (!Object.prototype.hasOwnProperty.call(VIEWS, tag)) {
         openPane("", "", "");

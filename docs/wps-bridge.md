@@ -177,13 +177,15 @@ Pane là một trang khác của add-in (`/wps/addin/pane.html`), mở bằng n�
 
 | Endpoint | Tương đương | Ghi chú |
 |---|---|---|
-| `POST /wps/v1/runs {prompt, conversationId?, options?}` | `POST /v1/runs` | Core tự gắn `office` = bridge WPS, `document` = lần poll gần nhất; add-in chưa kết nối → **409** |
+| `POST /wps/v1/runs {prompt, conversationId?, options?}` | `POST /v1/runs` | Core tự gắn `office` = bridge WPS, `document` = lần poll gần nhất; add-in chưa kết nối → **409**. Gửi `{quickAction: "<id>"}` thay cho `prompt` = một mục của menu *Sửa bằng AI* (câu lệnh do Core lấy theo id; id lạ → 400) |
 | `GET /wps/v1/runs/{id}` | `GET /v1/runs/{id}` | |
 | `GET /wps/v1/runs/{id}/events` | SSE `/v1/runs/{id}/events` | `EventSource` cùng origin |
 | `POST /wps/v1/runs/{id}/cancel` · `/confirm` | như `/v1/runs/...` | nút Dừng, thẻ xác nhận |
 | `GET /wps/v1/memory` · `POST /wps/v1/memory` · `PATCH`/`DELETE /wps/v1/memory/{id}` · `POST /wps/v1/memory/{id}/restore` · `GET /wps/v1/memory/{id}/history` · `DELETE /wps/v1/memory` | `routeBoth` → y hệt `/v1/memory...` | màn hình *Bộ nhớ AI* |
 | `GET /wps/v1/audit` | `GET /v1/audit` | màn hình *Nhật ký hoạt động* |
-| `GET /wps/v1/conversations` · `GET`/`DELETE /wps/v1/conversations/{id}` | `routeBoth` | **route có, UI chưa** (mục 7.2) |
+| `GET /wps/v1/conversations` · `GET`/`DELETE /wps/v1/conversations/{id}` | `routeBoth` | màn hình *Hội thoại trước…* (mục 7.2) |
+| `POST /wps/v1/pane/request {quickAction}` · `GET /wps/v1/pane/events` (SSE) | **chỉ có ở kênh WPS** | trạm trung chuyển menu chuột phải → khung chat đang mở (`api/wpspane.go`): `main.js` gửi, khung chat Writer nghe sự kiện `pane.quick` rồi chạy mục đó **trong hội thoại của nó**. Mỗi yêu cầu giao cho **một** khung chat, giữ 20 giây cho khung chat vừa tạo kịp nối vào; bấm liền hai mục thì mục sau thắng |
+| `GET /wps/v1/quick-actions` | `routeBoth` | menu *Sửa bằng AI* ở chân ô soạn: `{actions: [{id, label, edits}]}` — câu lệnh **không** trả ra, nằm trong `agent/quickactions.go` |
 | `GET /wps/v1/setup` · `POST /wps/v1/llm/test` · `GET /wps/v1/llm/models` | `routeBoth` | màn hình *Thiết lập*, nút *Kiểm tra mô hình* |
 | `GET /wps/v1/skills` · `POST /wps/v1/skills/reload` | `routeBoth` | màn hình *Kỹ năng* |
 | `GET /wps/v1/log` | `routeBoth` | màn hình *Mở nhật ký* (log Core, mục 5.2 của `docs/ribbon-ui.md`) |
