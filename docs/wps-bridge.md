@@ -2,7 +2,8 @@
 
 Trạng thái: **đã chạy trên WPS thật** (11/10/2026): Core (T1), trình cài `--core-url` (T2a), add-in 16 lệnh đợt 1
 (T2b, T2c). Đóng gói + `install.sh` (T3) xong, đăng ký cả ba app (T5) xong, nhận biết app + đủ 38 lệnh
-`et.*`/`wpp.*` (T6–T8) xong, pane Ask AI trong WPS (T4) xong. Còn lại: 7 lệnh `writer.*` còn thiếu. Cơ sở thực nghiệm:
+`et.*`/`wpp.*` (T6–T8) xong, pane Ask AI trong WPS (T4) xong, ribbon đầy đủ (đợt C — `docs/ribbon-ui.md`).
+Còn lại: **22/80 lệnh registry chưa có handler ở add-in WPS** (danh sách + lý do ở mục 6). Cơ sở thực nghiệm:
 [wps-spike.md](wps-spike.md) (hướng B) và [tests/wps/REFERENCE.md](../tests/wps/REFERENCE.md).
 
 ## 1. Bài toán
@@ -79,11 +80,12 @@ Cùng giao thức và cùng guard với bridge LibreOffice (`Origin` → 403, to
   (giống VBA/COM — viết theo handler C# trong `src/AxiomOffice/Bridge/CommandDispatcher.Writer.cs`).
   Lệnh sửa tài liệu chạy trong `Application.UndoRecord.StartCustomRecord("AI: <lệnh>")`/`EndCustomRecord()`
   ⇒ mỗi lệnh AI = một bước Undo. Lỗi handler → `{ok:false, error}`, không bao giờ làm treo vòng lặp.
-- **54 lệnh** trong `commands.js`: `app.info` + 15 `writer.*` + 23 `et.*` + 15 `wpp.*` (metadata của cả 54 lấy từ
-  registry LibreOffice). Chỉ 15 lệnh `writer.*` mở `UndoRecord` — ET/WPP không có nó (mục 6). Lệnh chưa có
-  handler trả `unknown action: <lệnh>`; `tests/wps/test_addin.mjs` ghim danh sách 11 lệnh registry chưa có
-  handler (mục 6) và **bắt bỏ tên khỏi danh sách ngay khi viết handler**, để lệnh registry không âm thầm rơi
-  vào `unknown action` khi máy đang chạy WPS.
+- **80 lệnh** trong `commands.js` (đo 19/10/2026): 2 `app.*` + 1 `ai.*` + 2 `ui.*` + 28 `writer.*` + 23 `et.*` +
+  24 `wpp.*` (metadata lấy từ registry LibreOffice). 58 lệnh đã có handler; chỉ **9 lệnh `writer.*`** mở
+  `UndoRecord` (danh sách `MUTATING`) — ET/WPP không có nó (mục 6). Lệnh chưa có handler trả
+  `unknown action: <lệnh>`; `tests/wps/test_addin.mjs` ghim danh sách lệnh registry chưa có handler (mục 6) và
+  **bắt bỏ tên khỏi danh sách ngay khi viết handler**, để lệnh registry không âm thầm rơi vào `unknown action`
+  khi máy đang chạy WPS.
 
 ## 4. Cài đặt
 - Bước admin một lần mỗi máy: `JsApiPlugin=true` trong `/opt/kingsoft/wps-office/office6/cfgs/oem.ini`.
@@ -138,13 +140,24 @@ Cùng giao thức và cùng guard với bridge LibreOffice (`Origin` → 403, to
   `may have been applied`); hết giờ này thì job được bỏ nên vòng session mới xoá file session.
 - Object model ET/WPP khác Writer ở vài chỗ (`Cells.Item(r,c)`, `UsedRange.Address()` là hàm, màu BGR, chỉ số
   1-based, `Application.Documents` không có) — bảng đầy đủ ở `tests/wps/REFERENCE.md`.
-- **11 lệnh trong registry chưa có handler ở add-in WPS** (11/10/2026): bốn lệnh `kind` rỗng — `ai.ask`,
-  `ui.askpane`, `ui.setup`, `app.screenshot` — **không phải** lệnh của app văn phòng (Core/pane/MCP xử lý), add-in
-  không bao giờ nhận. Bảy lệnh `writer.*` còn lại (`newDocument`, `open`, `closeAll`, `formatTable`,
-  `insertImage`, `insertHyperlink`, `checkTables`) là khoảng trống thật: máy đang chạy WPS mà agent gọi chúng thì
-  add-in trả `unknown action: writer.<lệnh>`. Bốn trong bảy lệnh đó (`formatTable`, `insertImage`,
-  `insertHyperlink`, `checkTables`) có `agent=true`, tức Core vẫn đưa chúng cho agent như tool —
-  `tests/wps/test_addin.mjs` ghim đúng danh sách này và bắt bỏ tên ra ngay khi viết handler.
+- **22 lệnh trong registry (80 lệnh) chưa có handler ở add-in WPS** (19/10/2026). Nguồn duy nhất của danh sách
+  là `CHUA_CO_HANDLER` trong `tests/wps/test_addin.mjs` — **đừng chép số vào đây**, spec sẽ đỏ khi một lệnh được
+  viết handler mà còn nằm trong danh sách, và khi add-in khai với Core một lệnh chưa có handler. Chia làm ba nhóm:
+  - **Bốn lệnh `kind` rỗng** — `ai.ask`, `ui.askpane`, `ui.setup`, `app.screenshot`. **Sửa lại một câu cũ ở đây
+    (19/10/2026):** trước kia tài liệu này viết chúng "không phải lệnh của app văn phòng, add-in không bao giờ
+    nhận" — **sai**. Ba trong bốn (`ai.ask`, `ui.askpane`, `app.screenshot`) **là** lệnh của add-in ở bản Windows
+    (`CommandDispatcher.cs`: `AiAsk`, `UiAskPane`, `AppScreenshot`); chỉ `ui.setup` là đường riêng của
+    LibreOffice. Ở add-in WPS, `app.info` có handler còn ba lệnh kia thì không — nên Core gọi chúng qua bridge sẽ
+    nhận `unknown action`. Hệ quả đang thấy được: thiếu `app.screenshot` là **đúng lý do** toggle *Nhìn tài liệu*
+    chưa lên được ribbon WPS (`docs/ribbon-ui.md` §5.1).
+  - **Chín lệnh `writer.*`**: `newDocument`, `open`, `closeAll`, `formatTable`, `insertImage`, `insertHyperlink`,
+    `replaceMany`, cộng hai lệnh thiết kế chỉ có ở add-in Windows (`restyle`, `insertBlocks`). `writer.checkTables`
+    **đã ra khỏi danh sách** — handler viết xong (`commands.js:873`), nên nút *Soát bảng* trên ribbon chạy được.
+  - **Chín lệnh `wpp.*`**: chỉ PowerPoint/đường compose có (`newFromTemplate`, `addSlideFromTemplate`,
+    `sourceManifest`, `setShapeText`, `deleteShapes`, `copyPicture`, `addParagraphs`, `addGrid`, `deleteTagged`).
+  - **Mười trong 22 lệnh có `agent=true`** (`writer.formatTable`, `writer.insertImage`, `writer.insertHyperlink`,
+    `writer.replaceMany`, và sáu lệnh `wpp.*`) — nghĩa là Core **vẫn đưa chúng cho agent như tool**, và trên máy
+    đang chạy WPS agent sẽ nhận `unknown action`. Đây là khoảng trống thật, không phải lỗi hiển thị.
 - **`FileSystem.readFileString`/`writeFileString` bị sandbox** (đo 11/10/2026): mọi đường dẫn có `/` hoặc `\` đều
   ném `path cannot contains "/" or "\"`, tên file trần trả `null`, và chúng không đọc/ghi được file nào — dù tài
   liệu WPS mô tả chúng như API đọc file. Đọc file thật phải bằng **`FileSystem.ReadFile`** (UTF-8, ném
@@ -168,6 +181,20 @@ Pane là một trang khác của add-in (`/wps/addin/pane.html`), mở bằng n�
 | `GET /wps/v1/runs/{id}` | `GET /v1/runs/{id}` | |
 | `GET /wps/v1/runs/{id}/events` | SSE `/v1/runs/{id}/events` | `EventSource` cùng origin |
 | `POST /wps/v1/runs/{id}/cancel` · `/confirm` | như `/v1/runs/...` | nút Dừng, thẻ xác nhận |
+| `GET /wps/v1/memory` · `POST /wps/v1/memory` · `PATCH`/`DELETE /wps/v1/memory/{id}` · `POST /wps/v1/memory/{id}/restore` · `GET /wps/v1/memory/{id}/history` · `DELETE /wps/v1/memory` | `routeBoth` → y hệt `/v1/memory...` | màn hình *Bộ nhớ AI* |
+| `GET /wps/v1/audit` | `GET /v1/audit` | màn hình *Nhật ký hoạt động* |
+| `GET /wps/v1/conversations` · `GET`/`DELETE /wps/v1/conversations/{id}` | `routeBoth` | **route có, UI chưa** (mục 7.2) |
+| `GET /wps/v1/setup` · `POST /wps/v1/llm/test` · `GET /wps/v1/llm/models` | `routeBoth` | màn hình *Thiết lập*, nút *Kiểm tra mô hình* |
+| `GET /wps/v1/skills` · `POST /wps/v1/skills/reload` | `routeBoth` | màn hình *Kỹ năng* |
+| `GET /wps/v1/log` | `routeBoth` | màn hình *Mở nhật ký* (log Core, mục 5.2 của `docs/ribbon-ui.md`) |
+| `GET /wps/v1/status` | **chỉ có ở kênh WPS** | gộp hai tầng: `{addin: <Bridge.Status()>, core: <coreStatus()>}` — pane không phải đoán `Origin` cho `/health` của bridge |
+| `POST /wps/v1/exec {action, params}` | **chỉ có ở kênh WPS** | chạy thẳng một lệnh bridge, **không qua agent**: ba nút *Soát* trên ribbon và *Hoàn tác lượt này* / *Chèn trả lời* trong pane. 409 kèm `code`: `run-in-progress` (đang có lượt chạy) hoặc `addin-disconnected`; khi chạy được thì trả **nguyên phong bì** của add-in, HTTP 200 **kể cả khi add-in trả `ok:false`** — đọc `ok`, đừng đọc mã HTTP |
+| `POST /wps/v1/config {TênKhoá: giá trị}` | **chỉ có ở kênh WPS** | ghi cấu hình nền tảng (Linux `config.json`, Windows HKCU) — đường thật đứng sau nút *Thiết lập*; khoá ngoài danh sách cho phép → 400 |
+
+Phần lớn bảng trên đi qua **`routeBoth`** (`core-go/internal/api/wpsadmin.go`): cùng một handler đăng ký dưới
+**cả hai** tiền tố — `/v1/*` cho script/MCP (guard cũ: token) và `/wps/v1/*` cho pane (guard kênh add-in). Nhờ vậy
+pane không cần token mà vẫn đọc/ghi được đúng những gì bản Windows gọi. Cả `/wps/v1/*` chỉ tồn tại khi bridge WPS
+bật (`mapWPS` thoát sớm khi `deps.WPS == nil`) — không có bridge thì mọi đường dưới đây là 404.
 
 `/v1/runs` giữ guard cũ (mọi `Origin` → 403). Spec: `tests/wps/test_wps_pane_e2e.py` (T4a, phía Core).
 
@@ -191,17 +218,44 @@ dùng màu Google Material: `#e8f0fe`, `#f1f3f4`, `#f9ab00`…).
 - `tests/wps/test_pane_theme.mjs` (9 test) đối chiếu **trực tiếp** với `theme.py` qua `tests/wps/theme_dump.py`
   (không chép tay giá trị nào vào test), nên spec không lệch khỏi nguồn được.
 
+**Bảng màu (19/10/2026):** `theme.py` đổi sang **xanh Fluent `#0F6CBD`** — màu của Copilot trong MS Word — và
+`PaneControls.cs` (Windows) cùng `pane.html` (`:root`) đổi theo, ba bản vẫn khớp từng token. `theme_dump.py`
+gom **mọi hằng int > 0xFFFF** ở cấp module trong `theme.py` thành một màu, nên thêm một hằng màu là **bắt
+buộc** thêm một token `--axiom-*` có dùng thật, nếu không `test_pane_theme.mjs` đỏ. Đổi màu thì phải sửa **cả
+ba** tệp — và cả **12 tệp `src/AxiomOffice.WPS/images/*.svg`** nếu muốn icon ribbon cùng màu, vì ảnh ribbon do
+WPS vẽ bằng bộ nạp ảnh của nó (nó không biết `var()`); màu nằm ở thuộc tính `stroke` của từng tệp, `main.js`
+không còn hằng màu nào, và `test_pane.mjs` kiểm màu **từng tệp** nên quên một tệp là đỏ. Xem
+`docs/ribbon-ui.md` §5.3.
+
 Pane biết mình đang ở app nào qua query string: `main.js:paneUrl()` thêm `?app=<wps|et|wpp>`
 (`currentAppKind()`), pane đọc lại và mặc định `"wps"` nếu thiếu — nhờ đó tiêu đề và gợi ý đúng loại tài liệu
 (Writer/Calc/Impress). `CleanAddinRel` đã cắt `?query`/`#fragment` trước khi resolve nên Core không phải đổi gì.
 
-**Khác bản LibreOffice có chủ ý** — pane WPS chưa có route cho mấy việc này, nên không bày ra nút chết:
+### 7.2 Pane WPS so với hai bản kia (đo 19/10/2026)
 
-| Bản LibreOffice | Pane WPS | Vì sao |
+Pane WPS nay có **đủ bảy màn hình** (chat, *Bộ nhớ AI*, *Nhật ký hoạt động*, *Thiết lập*, *Kỹ năng*, *Trạng thái*,
+*Mở nhật ký*) cộng màn hình *Soát tài liệu* gọi từ ba nút Soát trên ribbon và màn hình ***Hội thoại trước…***
+(danh sách → chi tiết → xoá có xác nhận), và các lối vào trong pane khớp bản LibreOffice: header nay là **tiêu
+đề cộng nút ⋯** (giống Copilot trong Word) chứa *Trò chuyện mới* / *Hội thoại trước…* / *Ghi nhớ* / *Nhật ký* /
+*Thiết lập*, footer `Hoàn tác lượt này` / `Chèn trả lời` / `Dừng`, phụ đề `App · model`. Bốn dòng cũ của bảng
+này ("chưa có route memory/setup", "chưa có route hoàn tác lượt", "pane không được cấp thông tin model", "không
+có menu ⋯") **đã hết đúng** — route có từ `routeBoth` và `POST /wps/v1/exec`, menu ⋯ có từ đợt E.
+
+Cách trình bày cũng đổi cho giống Word: **trả lời của AI không còn bong bóng** — chữ nằm thẳng trên nền pane như
+Copilot, chỉ tin nhắn của người dùng mới có nền; nền và viền của thẻ chỉ còn dùng cho `.card` (tiến trình / kết
+quả).
+
+Còn thiếu thật (chưa vẽ nút vì chưa có đường, hoặc đường có mà UI chưa):
+
+| Việc | Bản có nó | Tình trạng ở WPS |
 |---|---|---|
-| Header có thêm liên kết `Ghi nhớ`, `Thiết lập` | chỉ `Trò chuyện mới` | `/wps/v1/*` chưa có route memory/setup |
-| Footer có `Hoàn tác lượt này` | chỉ `Dừng` | chưa có route hoàn tác lượt |
-| Phụ đề hiện tên model (hoặc `Agent Core`) | phụ đề `Axiom Office` | pane không được cấp thông tin model |
+| **Sửa / ghim / đặt hạn** ghi nhớ | chỉ Windows (`MemoryForm.cs`) — dialog *Ghi nhớ* của LibreOffice **cũng thiếu** ba việc này | màn hình *Bộ nhớ AI* của WPS mới **4/6** nghiệm thu đợt 2: có đọc, lọc phạm vi, xoá tạm, khôi phục, xoá vĩnh viễn, tải lại (LibreOffice còn thiếu cả khôi phục và xoá vĩnh viễn); `PATCH /wps/v1/memory/{id}` đã sẵn nhưng chưa có form |
+| *Cài đặt nâng cao…*, *Tắt Agent Core…*, *Công cụ ngoài…*/MCP, **Tìm web**, menu ngôn ngữ | ribbon Windows | **cố ý không vẽ** trên WPS — xem `docs/ribbon-ui.md` §2 |
+| **Icon ribbon** | Windows: `imageMso` (bộ ảnh của Office) | WPS: `getImage` trả **đường dẫn tệp tương đối** `images/<tag>.svg`, 12 tệp trong `src/AxiomOffice.WPS/images/`. **Đã đo trên WPS thật (19/10/2026):** data URI thì WPS vẽ ra dấu `?` — nó phân giải chuỗi trả về như một đường dẫn; đổi sang đường dẫn tệp theo đúng SDK chính thức của WPS (`@wps-jsapi/wps/js/ribbon.js`: `return "images/1.svg"`). Xem `docs/ribbon-ui.md` §5.3 |
+
+Hai thứ pane WPS **có thêm** so với bản LibreOffice: lối vào *Nhật ký* (nay trong menu ⋯) và nút *Chèn trả lời*
+ở footer. Khác biệt nhỏ còn lại: khi chưa biết model, phụ đề WPS rơi về `Axiom Office` còn bản LibreOffice rơi về
+tên app.
 
 Màu, cỡ chữ, khoảng cách thì khớp từng token; phần **nhìn thấy thật** (font hệ thống, scrollbar của CEF, độ nét
 của chữ) chỉ kiểm chứng được khi mở pane trong WPS — spec chốt token, không chốt pixel.

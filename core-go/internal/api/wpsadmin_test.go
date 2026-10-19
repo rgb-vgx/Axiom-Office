@@ -143,10 +143,20 @@ func TestWPSConfigReportsEnvOverride(t *testing.T) {
 
 func TestWPSExecNeedsConnectedAddin(t *testing.T) {
 	handler := newWPSHandler(t)
-	// Chua co add-in poll -> 409, khong xep hang lenh nao.
+	// Chua co add-in poll -> 409, khong xep hang lenh nao. Kem ma may doc duoc: pane dich hai ca 409
+	// sang hai cau tieng Viet khac nhau (pane.html: execError) chu khong hien chuoi tieng Anh cua Core.
 	reply := call(handler, "POST", "/wps/v1/exec", `{"action":"writer.checkTables"}`, wpsOrigin)
 	if reply.Code != 409 || !strings.Contains(reply.Body.String(), "not connected") {
 		t.Fatalf("exec khi chua ket noi -> %d %s", reply.Code, reply.Body.String())
+	}
+	var conflict struct {
+		Code string `json:"code"`
+	}
+	if err := json.Unmarshal(reply.Body.Bytes(), &conflict); err != nil {
+		t.Fatal(err)
+	}
+	if conflict.Code != "addin-disconnected" {
+		t.Fatalf("409 phai mang ma addin-disconnected: %s", reply.Body.String())
 	}
 	// Thieu action -> 400.
 	if got := call(handler, "POST", "/wps/v1/exec", `{}`, wpsOrigin).Code; got != 400 {

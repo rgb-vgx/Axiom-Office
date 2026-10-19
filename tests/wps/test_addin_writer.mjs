@@ -218,3 +218,135 @@ test("moi lenh writer.* deu chay duoc khi KHONG khoa (khoa khong lam hong duong 
   const text = writerStateOf(app).text;
   assert.ok(text.indexOf("YYY") >= 0, "replaceAll phai quet ca tai lieu khi khong khoa: " + text);
 });
+
+// ---- writer.checkTables: ban WPS cua checks.writer_check_tables (LibreOffice) ----
+//
+// Cung mot lenh trong cung mot hop dong, nen hai ban phai ra CUNG ket qua tren cung mot tai lieu:
+// cung nguong, cung cach tinh trung vi, cung cau `detail`, cung thu tu truong. Cac phep kiem duoi
+// day ghim tung quy tac cua src/AxiomOffice.LibreOffice/python/pythonpath/axiom/checks.py.
+//
+// `tables[].cells` cua fake la luoi o theo hang roi cot; fake tu tra kem "\r\x07" o cuoi moi o y nhu
+// WPS that, nen day cung la phep do cho tableCellText() (boc ky tu ket o truoc khi do dai).
+
+const CHECK = "writer.checkTables";
+
+function checked(ctx, app) {
+  return run(ctx, app, CHECK, {});
+}
+
+test("checkTables: doc dung luoi (hang/cot/o trong/tieu de theo HANG), va la lenh CHI DOC", () => {
+  const ctx = loadAddin();
+  const app = makeWriterApp({
+    text: "AAA BBB CCC",
+    selection: { start: 0, end: 3 },
+    tables: [{ start: 4, end: 10, cells: [["Ho ten", "Tuoi"], ["An", "30"]] }],
+  });
+  const reply = checked(ctx, app);
+  assert.deepEqual(reply, {
+    tableCount: 1,
+    tables: [{ index: 1, rows: 2, cols: 2, emptyCells: 0, header: ["Ho ten", "Tuoi"], layout: false }],
+    issueCount: 0,
+    issues: [],
+  });
+  // Chi doc: khong mo UndoRecord, khong doi tai lieu.
+  assert.ok(!callsOf(app).some((entry) => entry.indexOf("UndoRecord") >= 0), "checkTables khong duoc mo UndoRecord");
+  assert.deepEqual(writerStateOf(app), {
+    text: "AAA BBB CCC",
+    tables: [{ start: 4, end: 10 }],
+    selection: { start: 0, end: 3 },
+    style: "",
+  });
+});
+
+test("checkTables: o chi co ky tu ket o cua Word van tinh la o TRONG", () => {
+  const ctx = loadAddin();
+  // O trong that tra ve "\r\x07" (ky tu ket o), khong phai chuoi rong - do dai phai do SAU khi boc.
+  const app = makeWriterApp({ tables: [{ start: 0, end: 0, cells: [["A", ""], ["", "  "]] }] });
+  const reply = checked(ctx, app);
+  assert.equal(reply.tables[0].emptyCells, 3, "ba o trong (mot o chi co khoang trang)");
+  assert.equal(reply.issueCount, 1);
+  assert.equal(reply.issues[0].type, "empty-cells");
+  assert.equal(reply.issues[0].table, 1);
+  assert.equal(reply.issues[0].detail, "table 1 has 3 empty cell(s)", "cau detail phai GIONG ban LibreOffice");
+});
+
+test("checkTables: o tieu de dai bat thuong -> long-header-cell, nguong y nhu LibreOffice", () => {
+  const ctx = loadAddin();
+  const cases = [
+    // [tieu de, co bao khong, vi sao]
+    [["Muc", "x".repeat(41)], true, "41 ky tu, cac o khac ngan -> bat thuong"],
+    [["Muc", "x".repeat(40)], false, "dung bang nguong LONG_HEADER_CHARS=40 thi khong bao (> chu khong phai >=)"],
+    [["x".repeat(50), "y".repeat(50)], false, "dai nhung CA HAI deu dai -> khong phai chu lot vao o"],
+    [["x".repeat(41), "y".repeat(20)], false, "3 x 20 = 60 > 41 -> ti le binh thuong"],
+  ];
+  for (const [header, expected, why] of cases) {
+    const app = makeWriterApp({ tables: [{ start: 0, end: 0, cells: [header.slice(), ["a", "b"]] }] });
+    const reply = checked(ctx, app);
+    const hits = reply.issues.filter((i) => i.type === "long-header-cell");
+    assert.equal(hits.length > 0, expected, why + ": " + JSON.stringify(reply.issues));
+    if (expected) {
+      assert.equal(hits[0].table, 1);
+      assert.ok(hits[0].detail.indexOf("with 41 characters") >= 0, "detail phai noi ro so ky tu: " + hits[0].detail);
+      assert.ok(hits[0].detail.indexOf("'" + "x".repeat(40) + "'") >= 0, "detail phai cat o 40 ky tu: " + hits[0].detail);
+    }
+  }
+});
+
+test("checkTables: bang MOT cot khong bao long-header-cell (khong co nhom nao de so)", () => {
+  const ctx = loadAddin();
+  const app = makeWriterApp({ tables: [{ start: 0, end: 0, cells: [["x".repeat(80)], ["a"]] }] });
+  const reply = checked(ctx, app);
+  assert.equal(reply.tables[0].cols, 1);
+  assert.equal(reply.issueCount, 0, "mot cot thi khong co ti le nao de noi o do dai BAT THUONG");
+});
+
+test("checkTables: bang dan trang duoc mien 'empty-cells' nhung VAN bao 'long-header-cell'", () => {
+  const ctx = loadAddin();
+  const app = makeWriterApp({
+    tables: [{
+      start: 0, end: 0, title: "AxiomLayout",
+      cells: [["Muc", "x".repeat(45)], ["", ""]],
+    }],
+  });
+  const reply = checked(ctx, app);
+  assert.equal(reply.tables[0].layout, true, "ten bang bat dau bang AxiomLayout -> bang dan trang");
+  assert.equal(reply.tables[0].emptyCells, 2, "so o trong VAN de trong bao cao de agent thay");
+  assert.deepEqual(reply.issues.map((i) => i.type), ["long-header-cell"],
+    "o trong la CO Y voi bang dan trang, con chu lot vao o tieu de thi van la loi that");
+});
+
+test("checkTables: bang khong khai luoi -> coi la MOT o, doc chu trong Range, khong nem", () => {
+  const ctx = loadAddin();
+  const app = makeWriterApp({ text: "AAA [BANG] CCC", tables: [{ start: 4, end: 10 }] });
+  const reply = checked(ctx, app);
+  assert.equal(reply.tables[0].rows, 1);
+  assert.equal(reply.tables[0].cols, 1);
+  assert.deepEqual(reply.tables[0].header, ["[BANG]"]);
+  assert.equal(reply.issueCount, 0);
+});
+
+test("checkTables: o bi gop (hang thieu cot) bi bo qua, khong lam hong ca bao cao", () => {
+  const ctx = loadAddin();
+  const app = makeWriterApp({ tables: [{ start: 0, end: 0, cells: [["A", "B"], ["C"]] }] });
+  const reply = checked(ctx, app);
+  assert.equal(reply.tables[0].rows, 2);
+  assert.equal(reply.tables[0].cols, 2);
+  assert.deepEqual(reply.tables[0].header, ["A", "B"], "tieu de van la hang dau, theo (hang, cot)");
+  assert.equal(reply.tables[0].emptyCells, 0, "o khong ton tai bi bo qua, khong tinh la o trong");
+});
+
+test("checkTables: nhieu bang -> bao cao theo tung bang, chi so 1-based", () => {
+  const ctx = loadAddin();
+  const app = makeWriterApp({
+    text: "x".repeat(30),
+    tables: [
+      { start: 0, end: 4, cells: [["A", "B"]] },
+      { start: 6, end: 10, cells: [["C", ""]] },
+    ],
+  });
+  const reply = checked(ctx, app);
+  assert.equal(reply.tableCount, 2);
+  assert.deepEqual(reply.tables.map((t) => t.index), [1, 2]);
+  assert.deepEqual(reply.issues.map((i) => i.table), [2], "chi bang 2 co o trong");
+});
+

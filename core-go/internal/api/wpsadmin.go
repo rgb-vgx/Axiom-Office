@@ -1,9 +1,11 @@
 package api
 
 import (
+	"math"
 	"net/http"
 	"sort"
 	"strings"
+	"time"
 
 	"axiomoffice/core/internal/config"
 )
@@ -29,8 +31,22 @@ func routeBoth(mux *http.ServeMux, deps *Deps, pattern string, handler http.Hand
 	})
 }
 
-// mapWPSAdmin: hai duong chi pane/ribbon WPS can ma /v1/* khong co (hoac khong dung duoc vi thieu token).
+// mapWPSAdmin: cac duong chi pane/ribbon WPS can ma /v1/* khong co (hoac khong dung duoc vi thieu token).
 func mapWPSAdmin(mux *http.ServeMux, deps *Deps) {
+	// GET /wps/v1/status: nut "Trang thai" tren ribbon (ban Windows: RibbonUi.StatusReport).
+	//
+	// Pane khong tu hoi duoc: bridge WPS nam o CONG RIENG, va /health cua Core khong biet gi ve add-in.
+	// Mot loi goi nay tra ca hai tang, nen pane chi can mot request va khong phai doan Origin cho
+	// /health (guard chung chan /health khi request co Origin - xem guard.go).
+	//
+	// Day la duong CHI DOC: khong xep hang lenh nao, khong doi trang thai nao.
+	mux.HandleFunc("GET /wps/v1/status", func(w http.ResponseWriter, r *http.Request) {
+		if !checkWPSAuth(w, r, deps) {
+			return
+		}
+		OK(w, map[string]any{"addin": deps.WPS.Status(), "core": coreStatus(deps)})
+	})
+
 	// POST /wps/v1/exec {action, params}: goi thang mot lenh bridge, khong qua agent, khong ton token.
 	// Dung cho nut "Soat bang"/"Soat bo cuc" tren ribbon va "Hoan tac luot nay"/"Chen tra loi" trong
 	// pane - Windows lam viec nay bang CommandDispatcher.Execute ngay trong tien trinh add-in.
@@ -54,17 +70,20 @@ func mapWPSAdmin(mux *http.ServeMux, deps *Deps) {
 		}
 		// Luot chay dang chay: lenh ngoai se chen vao giua cac buoc cua agent (add-in chay tuan tu nen
 		// khong hong du lieu, nhung agent mat dung trang thai tai lieu no dang theo doi).
+		//
+		// Hai ca 409 duoi day mang ma may doc duoc: pane hien cau tieng Viet rieng cho tung ca
+		// (pane.html: execError) thay vi do chuoi tieng Anh cua Core.
 		if deps.Manager != nil && deps.Manager.Running() > 0 {
-			Error(w, http.StatusConflict, "a run is in progress: wait for it to finish")
+			ErrorCode(w, http.StatusConflict, "run-in-progress", "a run is in progress: wait for it to finish")
 			return
 		}
 		if !deps.WPS.Connected() {
-			Error(w, http.StatusConflict, "WPS add-in is not connected: open a document in WPS to connect the add-in")
+			ErrorCode(w, http.StatusConflict, "addin-disconnected", "WPS add-in is not connected: open a document in WPS to connect the add-in")
 			return
 		}
 		reply, ok := deps.WPS.Enqueue(action, params)
 		if !ok {
-			Error(w, http.StatusConflict, "WPS add-in is not connected: open a document in WPS to connect the add-in")
+			ErrorCode(w, http.StatusConflict, "addin-disconnected", "WPS add-in is not connected: open a document in WPS to connect the add-in")
 			return
 		}
 		// reply da la phong bi cua bridge ({"ok":true,"result":...} / {"ok":false,"error":...}) - tra nguyen.
@@ -123,6 +142,42 @@ func mapWPSAdmin(mux *http.ServeMux, deps *Deps) {
 			"current": currentJSON(cfg),
 		})
 	})
+}
+
+// coreStatus: tang Core cua bao cao "Trang thai" (ban Windows doc tu /health cua Core + /health cua
+// bridge trong add-in). Cung truong voi /health, cong them logFile va so ky nang - hai thu nut "Mo nhat
+// ky" va man hinh "Ky nang" can, de pane khoi phai goi ba noi.
+//
+// endpoint + configured: nut "Kiem tra mo hinh" trong pane phai biet da chon AI chua (ban Windows:
+// RibbonUi.TestModel doc Config.LlmEndpoint/LlmModel). Thieu chung thi pane phai doan, ma doan sai thi
+// nut bao "chua cau hinh" ngay ca khi da cau hinh.
+func coreStatus(deps *Deps) map[string]any {
+	var memoryError any
+	if deps.Stores.Error != "" {
+		memoryError = deps.Stores.Error
+	}
+	cfg := deps.Live()
+	skillCount, skillErrors := 0, 0
+	if deps.Skills != nil {
+		skillCount, skillErrors = len(deps.Skills.All()), len(deps.Skills.Errors())
+	}
+	return map[string]any{
+		"version":       deps.Runtime.Version,
+		"pid":           pid(),
+		"port":          deps.Runtime.Port,
+		"started":       deps.Runtime.StartedText(),
+		"uptimeSeconds": math.Round(time.Since(deps.Runtime.Started).Seconds()*10) / 10,
+		"dataDir":       deps.Paths.Root,
+		"logFile":       deps.Paths.LogFile,
+		"provider":      cfg.LlmProvider,
+		"endpoint":      cfg.LlmEndpoint,
+		"model":         cfg.LlmModel,
+		"configured":    cfg.LlmEndpoint != "" && cfg.LlmModel != "",
+		"memory":        deps.Stores.Status(cfg.MemoryEnabled),
+		"memoryError":   memoryError,
+		"skills":        skillCount,
+		"skillErrors":   skillErrors,
+	}
 }
 
 // settableSettings: khoa cau hinh pane/ribbon duoc phep doi. Co y KHONG cho ghi Token va CorePort:

@@ -252,7 +252,19 @@ def run_writer(live: Session) -> None:
           "writer.replaceAll khi chuoi thay chua chuoi tim: thay dung 1 lan, khong lap", (reply, now[-200:]))
     reply = live.cmd("writer.insertTable", {"values": [["A1", "B1"], ["A2", "B2"]]})
     check(reply.get("ok") is True and "B2" in text_now(), "writer.insertTable (values 2x2)", reply)
+    # writer.checkTables (ban WPS cua checks.writer_check_tables): bang 2x2 vua chen co du bon o nen
+    # khong co o trong va khong co van de nao. Day cung la phep DO cho ba API ma handler dua vao -
+    # table.Rows.Count, table.Columns.Count va table.Cell(r, c).Range.Text - va cho ca o tieu de:
+    # `header` phai dung bang hang dau, nghia la doc o theo (r, c) chu khong theo (c, r).
+    reply = live.cmd("writer.checkTables")
+    found = (reply.get("result") or {}).get("tables") or []
+    check(reply.get("ok") is True and (reply.get("result") or {}).get("tableCount") == 1 and len(found) == 1
+          and found[0].get("rows") == 2 and found[0].get("cols") == 2 and found[0].get("emptyCells") == 0
+          and found[0].get("header") == ["A1", "B1"] and found[0].get("layout") is False
+          and (reply.get("result") or {}).get("issueCount") == 0,
+          "writer.checkTables: doc duoc luoi bang that (2x2, 0 o trong, tieu de dung thu tu)", reply)
     reply = live.cmd("writer.selection")
+    check(reply.get("ok") is True and "text" in (reply.get("result") or {}), "writer.selection", reply)
     check(reply.get("ok") is True and "text" in (reply.get("result") or {}), "writer.selection", reply)
     reply = live.cmd("writer.formatSelection", {"bold": True, "size": 13})
     check(reply.get("ok") is True, "writer.formatSelection", reply)

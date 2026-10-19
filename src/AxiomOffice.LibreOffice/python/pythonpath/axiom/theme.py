@@ -17,6 +17,19 @@ import zlib
 IS_WINDOWS = sys.platform.startswith("win")
 
 # ---------------------------------------------------------------- mau (giong PaneTheme)
+#
+# 19/10/2026 - doi tu tim indigo sang XANH WORD. Nguon: thang mau Fluent 2 cua Microsoft
+# (BrandBackground #0F6CBD, BrandBackgroundHover #115EA3, BrandBackgroundPressed #0C3B5E,
+# BrandStroke2 #B4D6FA, BrandBackground2 #EFF6FC). Ly do: pane phai trong giong pane Copilot cua
+# MS Word, va ba ban (Windows/WPS/LibreOffice) dung CHUNG mot he thiet ke - doi mau o day la doi ca ba,
+# do la chu y, khong phai tac dung phu.
+#
+# Tuong phan da do lai toan bo (WCAG 2.1, nguong AA 4.5:1 cho chu thuong):
+#   TEXT_PRIMARY/PANE_BG 17.74 · TEXT_SECONDARY/PANE_BG 7.56 · TEXT_MUTED/PANE_BG 4.83
+#   ACCENT_FG/PANE_BG 5.38 · ACCENT_FG/CHIP_HOVER 4.94 · CHIP_FG/PANE_BG 6.66
+#   ON_ACTION/ACTION_BG 5.38 · USER_FG/USER_BG 9.29 · DANGER_FG/DANGER_BG 5.91 · SUCCESS/PANE_BG 5.48
+# Cap duy nhat duoi nguong la DISABLED_FG/DISABLED_BG (2.31:1) - CO SAN TU TRUOC, khong doi o day, va
+# WCAG mien tru chinh phan tu disabled (1.4.3).
 PANE_BG = 0xFFFFFF
 DIVIDER = 0xE5E7EB
 TEXT_PRIMARY = 0x111827
@@ -24,20 +37,20 @@ TEXT_SECONDARY = 0x4B5563
 TEXT_MUTED = 0x6B7280
 AI_BG = 0xF9FAFB
 AI_BORDER = 0xE5E7EB
-USER_BG = 0xE0E7FF
-USER_FG = 0x1E1B4B
-ACCENT = 0x6366F1          # chi de trang tri (trang tren nen nay chi dat 4.47:1)
-ACCENT_FG = 0x4F46E5
-ACTION_BG = 0x4F46E5
-ACTION_HOVER = 0x4338CA
+USER_BG = 0xD6E8F7
+USER_FG = 0x0C3B5E
+ACCENT = 0x0F6CBD          # chi de trang tri (trang tren nen nay dat 5.38:1)
+ACCENT_FG = 0x0F6CBD
+ACTION_BG = 0x0F6CBD
+ACTION_HOVER = 0x115EA3
 ON_ACTION = 0xFFFFFF
 DISABLED_BG = 0xF3F4F6
 DISABLED_FG = 0x9CA3AF
 INPUT_BORDER = 0x8C93A0
-FOCUS = 0x4F46E5
-CHIP_BORDER = 0xC7D2FE
-CHIP_HOVER = 0xEEF2FF
-CHIP_FG = 0x4338CA
+FOCUS = 0x0F6CBD
+CHIP_BORDER = 0xB4D6FA
+CHIP_HOVER = 0xEFF6FC
+CHIP_FG = 0x115EA3
 DANGER = 0xDC2626
 DANGER_FG = 0xB91C1C
 DANGER_BG = 0xFEF2F2

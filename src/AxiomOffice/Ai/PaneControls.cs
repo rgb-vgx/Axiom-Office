@@ -21,25 +21,25 @@ namespace AxiomOffice.Ai
         // Bubbles
         public static readonly Color AiBg = Hex(0xF9FAFB);
         public static readonly Color AiBorder = Hex(0xE5E7EB);
-        public static readonly Color UserBg = Hex(0xE0E7FF);
-        public static readonly Color UserFg = Hex(0x1E1B4B);
+        public static readonly Color UserBg = Hex(0xD6E8F7);
+        public static readonly Color UserFg = Hex(0x0C3B5E);
         // Accent / action. Accent (#6366F1) chỉ để trang trí: trắng trên nó chỉ đạt 4.47:1.
-        public static readonly Color Accent = Hex(0x6366F1);
-        public static readonly Color AccentFg = Hex(0x4F46E5);
-        public static readonly Color ActionBg = Hex(0x4F46E5);
-        public static readonly Color ActionHover = Hex(0x4338CA);
-        public static readonly Color ActionPressed = Hex(0x3730A3);
+        public static readonly Color Accent = Hex(0x0F6CBD);
+        public static readonly Color AccentFg = Hex(0x0F6CBD);
+        public static readonly Color ActionBg = Hex(0x0F6CBD);
+        public static readonly Color ActionHover = Hex(0x115EA3);
+        public static readonly Color ActionPressed = Hex(0x0C3B5E);
         public static readonly Color OnAction = Hex(0xFFFFFF);
         public static readonly Color DisabledBg = Hex(0xF3F4F6);
         public static readonly Color DisabledFg = Hex(0x9CA3AF);
         public static readonly Color InputBorder = Hex(0x8C93A0);
         public static readonly Color InputDisabled = Hex(0xF9FAFB);
-        public static readonly Color Focus = Hex(0x4F46E5);
+        public static readonly Color Focus = Hex(0x0F6CBD);
         // Chip
-        public static readonly Color ChipBorder = Hex(0xC7D2FE);
-        public static readonly Color ChipHover = Hex(0xEEF2FF);
-        public static readonly Color ChipPressed = Hex(0xE0E7FF);
-        public static readonly Color ChipFg = Hex(0x4338CA);
+        public static readonly Color ChipBorder = Hex(0xB4D6FA);
+        public static readonly Color ChipHover = Hex(0xEFF6FC);
+        public static readonly Color ChipPressed = Hex(0xD6E8F7);
+        public static readonly Color ChipFg = Hex(0x115EA3);
         // Status
         public static readonly Color Danger = Hex(0xDC2626);
         public static readonly Color DangerFg = Hex(0xB91C1C);

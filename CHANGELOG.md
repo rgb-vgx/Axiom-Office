@@ -5,6 +5,85 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed — Pane và ribbon trông giống MS Word (19/10/2026)
+Yêu cầu: "thiết kế lại phần UI trên ribbon và pane Chat cho giống MS Word". Ba phần, làm cùng lúc vì bảng màu
+dùng chung cả ba nền tảng.
+- **Bảng màu Fluent.** `theme.py` (nguồn duy nhất của hệ thiết kế pane) đổi từ indigo sang **xanh `#0F6CBD`** —
+  màu Copilot/Word; `Ai/PaneControls.cs` (Windows) và `pane.html` (`:root`) đổi theo, ba bản vẫn khớp từng token.
+  `tests/wps/test_pane_theme.mjs` (9 phép kiểm) là thứ ràng buộc: mọi màu trong `theme.py` phải có token
+  `--axiom-*` **dùng thật**, không được có mã `#RRGGBB` nào ngoài khối `:root`, mọi `transition` phải 150–300ms.
+  (`DISABLED_FG`/`DISABLED_BG` = 2.31:1 vẫn dưới 4.5:1 — **giữ nguyên** như trước, WCAG 1.4.3 miễn trừ cho control
+  bị vô hiệu hoá; đã ghi lý do trong `theme.py`.)
+- **Pane giống Copilot.** Trả lời của AI **bỏ bong bóng** — chữ nằm thẳng trên nền pane, chỉ tin nhắn của người
+  dùng mới có nền; nền/viền `--axiom-ai-*` chỉ còn dùng cho `.card` (tiến trình / kết quả). Header từ dải liên
+  kết chữ thành **tiêu đề + nút ⋯** chứa *Trò chuyện mới / Hội thoại trước… / Ghi nhớ / Nhật ký / Thiết lập* —
+  đóng bằng cách bấm ra ngoài hoặc `Esc` (nghe ở `document.body`). Cố ý **không** khai `role="menu"`, vì chưa làm
+  điều hướng bằng phím mũi tên thì đừng khai ARIA của một menu thật.
+- **Màn hình *Hội thoại trước…*** (WPS, trước đây chỉ có ở Windows): danh sách `GET /wps/v1/conversations` →
+  chi tiết `GET /wps/v1/conversations/{id}` (kèm `messages[]`) → xoá có xác nhận. Đi đúng route `conversations*`
+  đã mở ở đợt A, **không** thêm đường Core nào. Xoá dùng `window.confirm` có kiểm `typeof === "function"`, nên
+  trong bộ test (confirm mặc định là **từ chối**) không có đường bấm nào xoá được dữ liệu.
+- **Icon ribbon WPS** (trước đây ribbon **chỉ có chữ**): mọi control mang `getImage="ribbon.OnGetImage"`, và
+  `main.js` trả **đường dẫn tệp tương đối** `images/<tag>.svg` — 12 tệp trong `src/AxiomOffice.WPS/images/`,
+  `viewBox 0 0 20 20`, nét 1.5, màu `#0F6CBD`. Tên tệp **chính là** `tag` trong `ribbon.xml`, nên không còn
+  bảng tra nào phải giữ cho khớp. `test_pane.mjs` ghim **hai chiều** `ribbon.xml` ↔ **tệp** `images/`: thêm nút
+  mà quên tệp ảnh, hoặc để tệp ảnh mồ côi, đều đỏ ngay; spec còn kiểm **từng tệp** (một thẻ `<svg>` khớp kín,
+  không `width`/`height` ở thẻ mở, đúng màu accent). Icon đã soi bằng mắt ở 32px và 16px (bốn icon hiển thị ở
+  16px — *Trạng thái*, *Mở nhật ký*, *Kiểm tra mô hình*, *Sao chép API URL* — đều đọc được).
+- **Sửa icon: data URI → đường dẫn tệp.** Bản đầu của mục trên trả **data URI SVG vẽ tại chỗ**; mở WPS lên thì
+  chỗ icon **toàn dấu `?`**. Điều đó trả lời luôn câu hỏi còn treo: WPS **có** gọi `getImage`, nhưng đem chuỗi
+  trả về **phân giải như một đường dẫn** — data URI không phải đường dẫn nên trượt, và nó vẽ `?`. Cách đúng có
+  sẵn trong **SDK chính thức của WPS** đã cài trên máy (`@wps-jsapi/wps/js/ribbon.js`: `return "images/1.svg"`),
+  kèm đúng những tệp đó — `<svg>` **chỉ có `viewBox`**, không `width`/`height`, để WPS tự co giãn theo cỡ nút.
+  Xoá hẳn `ICON_BODY` / `svgIcon` / `ICON_COLOR` khỏi `main.js`. **Không phải sửa Core**: `ServeAddin` vốn phục
+  vụ mọi tệp dưới gốc add-in và `ContentTypeFor` **đã có sẵn** nhánh `.svg` → `image/svg+xml` (đo: `curl` qua
+  Core đều `200  image/svg+xml`). Màu icon nay nằm ở thuộc tính `stroke` của **từng tệp**, không phải hằng số
+  trong JS — đổi bảng màu phải sửa **cả 12 tệp** (ảnh ribbon do WPS vẽ, nó không biết `var()`), và spec kiểm
+  màu từng tệp nên quên một tệp là đỏ. **Đã nghiệm thu trong WPS thật**: khởi động lại WPS, icon hiện đủ,
+  hết dấu `?` (`docs/ribbon-ui.md` §5.3).
+- **Spec**: `tests/wps/test_pane_view.mjs` 35 ca (+7 cho menu ⋯ và màn hình hội thoại), `test_pane.mjs` 23 ca
+  (+2 ghim icon), `make test-wps` **160 pass**, eslint sạch.
+
+### Added — Ribbon và khung chat WPS đủ chức năng như bản Windows (19/10/2026)
+Bốn đợt cho yêu cầu "ô thanh ribbon và khung chat WPS thiếu chức năng so với MS Word". Nguyên tắc giữ suốt:
+**không vẽ control giả** — nút chỉ lên ribbon khi có đường thật đứng sau (`docs/ribbon-ui.md`).
+- **Đợt A — Core mở đường** (`8bb558a`). `routeBoth` đăng ký **cả hai** tiền tố cho `setup`, `llm/test`,
+  `llm/models`, `skills`, `memory*`, `audit`, `conversations*`: `/v1/*` cho script/MCP (guard token cũ) và
+  `/wps/v1/*` cho pane (guard kênh add-in) — pane là trang của Core nhưng **không có token**, trước đây mọi
+  đường `/v1/*` đều 401. Thêm `config.SetValue` + `JSONSource.Set` (Linux `~/.config/axiom-office/config.json`,
+  ghi 0600, giữ nguyên khoá khác vì file dùng chung với extension LibreOffice) và `RegistrySource.Set` (Windows,
+  REG_SZ). Hai đường mới chỉ có ở kênh WPS: `POST /wps/v1/config` (danh sách trắng khoá, trả `saved` +
+  `ignored` khi bị `AXIOM_*` đè) và `POST /wps/v1/exec` (chạy thẳng một lệnh bridge, không qua agent).
+- **Đợt B — khung chat 7 màn hình.** Pane WPS từ 1 màn hình (chat) thành **7**: chat, *Bộ nhớ AI*, *Nhật ký hoạt
+  động*, *Thiết lập*, *Kỹ năng*, *Trạng thái*, *Mở nhật ký*, cộng màn hình *Soát tài liệu* gọi từ ba nút Soát.
+  Báo cáo soát do **pane tự render** bằng tiếng Việt (Core/Go không chạy được `checks.py`), giữ bảng nhãn
+  `ISSUE_LABELS` + luật dựng dòng y hệt `checks.py`, và có **spec chặn lệch**: `test_pane_view.mjs` đọc
+  `ISSUE_LABELS` từ **cả hai** tệp rồi so từng dòng hai chiều. Sửa một lỗi thật: `POST /v1/llm/test` đọc khoá
+  **chữ thường** (`providerId`/`endpoint`/`model`/`apiKey`) còn pane gửi chữ hoa — nút *Kiểm tra mô hình* chưa
+  bao giờ chạy đúng.
+- **Đợt C — ribbon đủ bộ nút.** `ribbon.xml`: nhóm *Trợ lý / Kiểm tra / Quản lý / Hệ thống* + **Khác ▸**, cùng
+  nhãn và cùng nhóm với bản Windows. Ba nút Soát mang `?check=<lệnh>`, *Trạng thái* / *Mở nhật ký* mang `?view=`,
+  *Kiểm tra mô hình* / *Sao chép API URL* mang `?do=`. **Bốn control của bản Windows không vẽ** vì không có
+  đường thật đứng sau — *Nhìn tài liệu* (thiếu handler `app.screenshot`), *Cài đặt nâng cao…*, *Tắt Agent
+  Core…*, menu ngôn ngữ — và menu *Tìm web*. Ô *Nhìn tài liệu* trong màn hình *Thiết lập* **vẫn hiện** nhưng
+  kèm câu nói thẳng rằng bật ở đây chưa có tác dụng, thay vì hứa suông.
+- **Đợt D — đo sống trên Core thật** (`make test-wps-e2e`, không cần WPS): **18 phép kiểm** mới trong
+  `tests/wps/test_wps_pane_e2e.py` cho đúng ba đường mà nút gọi — `GET /wps/v1/status` (cả hai tầng,
+  `configured`, `logFile`, `Origin` lạ → 403), `GET /wps/v1/log` (đúng tệp Core đang ghi; `?lines=2` → hai dòng
+  cuối + `truncated`; tệp chưa có → 200 `exists:false`; `/v1/log` vẫn đòi token) và `POST /wps/v1/exec` (báo
+  cáo soát đi qua nguyên vẹn; lệnh add-in không có handler → HTTP 200 + `ok:false`; hai mã 409
+  `addin-disconnected` / `run-in-progress`). Phép đo còn **kiểm chứng địa chỉ mà nút *Sao chép API URL* sao
+  chép**: dán `http://127.0.0.1:<bridgePort>/health` vào trình duyệt (không Origin, không token) → 200
+  `connected:true`. Kết quả: pane e2e **68 pass**, bridge e2e 36 pass. Số đo và một cái bẫy hình dạng JSON
+  (`/health` của bridge trả **phong bì**, phải bóc `result`) ghi ở `tests/wps/REFERENCE.md`.
+- **Tài liệu**: `docs/ribbon-ui.md` thêm §5.1–§5.4 (hai chỗ chặn còn lại, bốn đường mới của Core, phần chưa đo)
+  và cập nhật §2/§4/§7/§8; `docs/wps-bridge.md` §7 viết lại bảng đường `/wps/v1/*` cho khớp mã (bảng cũ còn
+  thiếu 12 đường) và sửa ba khẳng định đã hết đúng về pane, cùng con số registry (80 lệnh, 22 chưa có handler,
+  `CHUA_CO_HANDLER` là nguồn duy nhất).
+- **Chưa làm** (đã ghi rõ trong tài liệu, không vẽ nút): sửa/ghim/đặt hạn trong màn hình *Bộ nhớ AI*, handler
+  `app.screenshot` cho WPS, và **bấm thử nút trong WPS thật**. (*Hội thoại trước…* nằm trong danh sách này lúc
+  viết, nay đã làm — xem mục **Changed — Pane và ribbon trông giống MS Word** ở trên.)
+
 ### Added — Khóa vùng bôi đen trên WPS: AI chỉ sửa trong đoạn người dùng chọn (18/10/2026)
 - Add-in WPS: hai lệnh `writer.lockSelection` / `writer.unlockSelection` (bản JS của
   `CommandDispatcher.WriterScope.cs`). Vùng khóa nhớ bằng **phần chữ trước và sau** nó — một lệnh AI viết lại

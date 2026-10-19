@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"net/url"
@@ -334,6 +335,47 @@ func (b *Bridge) Snapshot() (map[string]any, []any, string, bool) {
 	}
 	cmds := append([]any{}, b.commands...)
 	return doc, cmds, b.addinVersion, connected
+}
+
+// Status: anh chup suc khoe kenh add-in, cho nut "Trang thai" tren ribbon WPS (docs/ribbon-ui.md muc 2).
+//
+// Snapshot() khong du: no tra tai lieu + catalog, nhung khong noi duoc add-in da poll BAO GIO CHUA va
+// lan cuoi la khi nao - ma do chinh la ba cau nguoi dung hoi khi bam "Trang thai" ("add-in co tra loi
+// khong", "dang mo tai lieu nao", "co phai dang chay lenh khong"). Bridge co cong RIENG nen pane khong
+// tu hoi duoc, phai qua Core.
+func (b *Bridge) Status() map[string]any {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	now := time.Now()
+	running := b.busyLocked(now)
+	connected := running || (b.everPoll && now.Sub(b.lastPoll) <= time.Duration(b.opts.DisconnectSeconds)*time.Second)
+
+	doc := map[string]any{}
+	for key, value := range b.document {
+		doc[key] = value
+	}
+	status := map[string]any{
+		"connected":    connected,
+		"everPoll":     b.everPoll,
+		"app":          b.app,
+		"document":     doc,
+		"addinVersion": b.addinVersion,
+		"running":      running,
+		"queued":       len(b.queue),
+		"waiting":      len(b.waiting),
+		"bridgePort":   b.bridgePort,
+		"sessionPath":  b.sessionPath,
+		// Nguong dang ap dung: de nguoi dung tu doc ra "45 giay khong poll thi coi nhu mat ket noi"
+		// thay vi doan tu mot con so "lastPollSeconds" tran.
+		"pollSeconds":       b.opts.PollSeconds,
+		"disconnectSeconds": b.opts.DisconnectSeconds,
+	}
+	if b.everPoll {
+		status["lastPollSeconds"] = math.Round(now.Sub(b.lastPoll).Seconds()*10) / 10
+	}
+	// Uptime cua PHIEN add-in (tu luc bridge duoc tao), khong phai uptime cua Core.
+	status["uptimeSeconds"] = math.Round(now.Sub(b.started).Seconds()*10) / 10
+	return status
 }
 
 // newJobID sinh id duy nhat cho job.

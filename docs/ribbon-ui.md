@@ -1,6 +1,7 @@
 # Giao diện Axiom Office trên ribbon / menu — plan
 
-Cập nhật: 13/10/2026 · trạng thái: **plan đã chốt, đang triển khai**
+Cập nhật: 19/10/2026 · trạng thái: **plan đã chốt; Windows/Windows-LibreOffice xong các đợt 1–3, WPS Linux
+đã dựng đủ bộ nút nhưng chưa bấm trong WPS thật (§5.3)**
 
 Nguồn: một lượt tư vấn qua ChatGPT (bộ nút đầy đủ, phân tầng ưu tiên) rồi **đối chiếu lại với mã trong
 repo**. Mọi dòng dưới đây đã được kiểm là *có thật trong mã*; chỗ nào chưa có API thì ghi rõ là **hoãn**,
@@ -39,20 +40,25 @@ hoạt động* **không lên ribbon** — chúng nằm trong menu **⋯** ở h
 
 | Nhãn | Nhóm | Control | Nền tảng | Đứng sau bằng gì | P |
 |---|---|---|---|---|---|
-| **Ask AI** | Trợ lý | button | W L O | pane Ask AI (đã có) | P0 |
+| **Ask AI** | Trợ lý | button | W · **L ✅** · O | pane Ask AI (đã có) | P0 |
 | **Nhìn tài liệu** | Kiểm tra | **toggle** | W ✅ · O ✅ · ~~L~~ | W: ghi HKCU `VisualQaEnabled`; **O: đã có** (checkbox trong "Cài đặt nâng cao", `dialogs.py:81`); **L: chặn** — xem §5.1. Core đọc lại **mỗi lượt** | P0 |
-| **Soát bố cục** | Kiểm tra | button | **W ✅** · **O ✅** · L | `wpp.checkLayout` — chỉ đọc, tất định, **0 token** | P0 |
-| **Soát bảng** | Kiểm tra | button | W (chưa bấm) · **O ✅** · L | `writer.checkTables` | P1 |
-| **Soát vùng dữ liệu** | Kiểm tra | button | W (chưa bấm) · **O ✅** · L | `et.checkRange` | P1 |
-| **Bộ nhớ AI…** | Quản lý | button | W L O | `GET/POST/PATCH/DELETE /v1/memory`, `/{id}/history`, `/{id}/restore` | P0 |
-| **Kỹ năng…** | Quản lý | button | W L O | `GET /v1/skills?app=` + `POST /v1/skills/reload` | P1 |
-| **Thiết lập…** | Hệ thống | button | W L O | wizard 5 bước (đã có) | P0 |
-| **Trạng thái** | Hệ thống | button | W L O | `/health` của bridge **qua HTTP** + `/health` của Core đang chạy (không khởi động Core) + `sessions/{pid}.json` | P0 |
-| **Mở nhật ký** | Hệ thống | button | W L | `%LOCALAPPDATA%\AxiomOffice\{bridge,core}.log` | P1 |
-| Khác ▸ **Cài đặt nâng cao…** | Hệ thống | menu | W O | `SettingsForm` (đã có) | P0 |
-| Khác ▸ **Kiểm tra mô hình** | Hệ thống | menu | W O | `POST /v1/llm/test` với cấu hình **đã lưu** (apiKey rỗng = khoá đã lưu) | P1 |
-| Khác ▸ **Sao chép API URL** | Hệ thống | menu | W | công cụ gỡ rối | P1 |
-| Khác ▸ **Tắt Agent Core…** | Hệ thống | menu | W | `POST /v1/admin/shutdown` — **bắt buộc xác nhận** | P2 |
+| **Soát bố cục** | Kiểm tra | button | **W ✅** · **L ✅** · **O ✅** | `wpp.checkLayout` — chỉ đọc, tất định, **0 token** | P0 |
+| **Soát bảng** | Kiểm tra | button | W (chưa bấm) · **L ✅** · **O ✅** | `writer.checkTables` | P1 |
+| **Soát vùng dữ liệu** | Kiểm tra | button | W (chưa bấm) · **L ✅** · **O ✅** | `et.checkRange` | P1 |
+| **Bộ nhớ AI…** | Quản lý | button | W · **L ✅** · O | `GET/POST/PATCH/DELETE /v1/memory`, `/{id}/history`, `/{id}/restore` | P0 |
+| **Kỹ năng…** | Quản lý | button | W · **L ✅** · O | `GET /v1/skills?app=` + `POST /v1/skills/reload` | P1 |
+| **Thiết lập…** | Hệ thống | button | W · **L ✅** · O | wizard 5 bước (đã có) | P0 |
+| **Trạng thái** | Hệ thống | button | W · **L ✅** · O | `GET /wps/v1/status` (một lời gọi, **cả hai tầng**: bridge + Core — §5.2) | P0 |
+| **Mở nhật ký** | Hệ thống | button | W · **L ✅** | `GET /v1/log` + `/wps/v1/log` — trong CEF không mở được trình soạn thảo ngoài nên pane **đọc** phần cuối tệp (§5.2) | P1 |
+| Khác ▸ **Cài đặt nâng cao…** | Hệ thống | menu | W · O · ~~L~~ | `SettingsForm` (đã có). Trên WPS **không vẽ**: màn hình *Thiết lập* của pane đã có đủ trường cấu hình, thêm nút mở lại đúng màn hình đó là nút giả | P0 |
+| Khác ▸ **Kiểm tra mô hình** | Hệ thống | menu | W · **L ✅** · O | `POST /v1/llm/test` với cấu hình **đã lưu** (apiKey rỗng = khoá đã lưu) | P1 |
+| Khác ▸ **Sao chép API URL** | Hệ thống | menu | W · **L ✅** | công cụ gỡ rối. Trên WPS sao chép `http://127.0.0.1:<bridgePort>/health` (cổng bridge lấy từ `/wps/v1/status`) — dán vào trình duyệt là chạy, vì chỉ `GET /health` của bridge được miễn token; API của Core thì **không** dán thẳng được (đòi token) | P1 |
+| Khác ▸ **Tắt Agent Core…** | Hệ thống | menu | W · ~~L~~ | `POST /v1/admin/shutdown` — **bắt buộc xác nhận**. Trên WPS **không vẽ**: Core chính là thứ đang phục vụ pane, tắt nó là làm pane chết ngay trước mặt người dùng, mà đường `/v1/admin/shutdown` cũng không có trên kênh `/wps/v1/*` | P2 |
+
+**"L ✅" = đã chạy thật trên Core thật, không cần WPS** (19/10/2026): `make test-wps-e2e` —
+`tests/wps/test_wps_pane_e2e.py` gọi đúng những đường mà nút gọi, với add-in giả poll qua HTTP (68 phép kiểm).
+Phép đo ghi ở `tests/wps/REFERENCE.md`. Việc **còn thiếu để "L ✅" thành nghiệm thu đầy đủ**: bấm nút trong
+WPS thật (xem §5.3).
 
 Vì sao gom vào menu chứ không thêm tab: cùng một tab thì người dùng không phải học "việc này ở tab nào"; đổi
 lại hàng nút phải ngắn, nên thứ ít dùng rút vào **Khác ▸**. Ribbon tự thu nhóm khi cửa sổ hẹp, không cần cắt
@@ -60,16 +66,40 @@ bớt nút thật.
 
 ### Trong khung chat (không phải ribbon)
 
+Từ 19/10/2026 header pane là **tiêu đề + nút ⋯** (giống Copilot trong Word), không còn dải liên kết chữ.
+Menu ⋯ **giống nhau trên cả ba nền tảng** và là chỗ duy nhất chứa các mục dưới đây:
+
 | Nhãn | Chỗ | Nền tảng | Đứng sau bằng gì |
 |---|---|---|---|
-| **Hội thoại trước…** | menu **⋯** ở header pane | W O | `GET/DELETE /v1/conversations`, `GET /v1/conversations/{id}`; mặc định lọc theo tài liệu đang mở |
-| **Nhật ký hoạt động…** | menu **⋯** ở header pane | W O | `GET /v1/audit` (100 dòng mới nhất, giờ máy) |
+| **Trò chuyện mới** | menu **⋯** ở header pane | W O **L ✅** | xoá khung chat đang hiện (không gọi Core; đoạn hội thoại cũ vẫn còn trong *Hội thoại trước…*) |
+| **Hội thoại trước…** | menu **⋯** ở header pane | W O **L ✅** | `GET /v1/conversations` (danh sách) → `GET /v1/conversations/{id}` (kèm `messages[]`); `DELETE` để xoá. Mặc định lọc theo tài liệu đang mở |
+| **Ghi nhớ** | menu **⋯** ở header pane | W O **L ✅** | `GET/POST/PATCH/DELETE /v1/memory` (màn hình *Bộ nhớ AI* của pane) |
+| **Nhật ký** | menu **⋯** ở header pane | W O **L ✅** | `GET /v1/audit` (100 dòng mới nhất, giờ máy) |
+| **Thiết lập** | menu **⋯** ở header pane | W O **L ✅** | `GET/POST /wps/v1/setup` + `POST /wps/v1/config` |
+
+Trên WPS, **⋯ là một khối `hidden`** chứ không phải menu của hệ điều hành: bấm nút thì bật/tắt, bấm ra
+ngoài hoặc `Esc` thì đóng (nghe ở `document.body` — pane không bao giờ tràn ra ngoài khung). Cố ý **không**
+đặt `role="menu"`/`menuitem`: đã không làm được điều hướng bằng phím mũi tên thì đừng khai báo ARIA của
+một menu thật. Cùng lý do, *Hội thoại trước…* là **một màn hình của pane** (danh sách → chi tiết → xoá có
+xác nhận) chứ không phải hộp thoại riêng: `main.js` mở pane bằng `Application.CreateTaskPane(url)` nên
+không có cửa sổ thứ hai nào để mở (§7).
 
 ### Rút gọn theo nền tảng
 
 - **WPS Linux**: đúng **một** tab `axiomTab` trong `ribbon.xml`; các nhóm trên là nhóm của tab đó và
-  **Khác ▸** là `<menu>` trong cùng tab. Nhìn tài liệu chưa lên được (§5.1). Hiện `ribbon.xml` mới có hai nút
-  chỗ trống (*Axiom*, *Ask AI*) — bảng trên còn phải dựng.
+  **Khác ▸** là `<menu>` trong cùng tab. `ribbon.xml` **đã dựng đủ** bộ nút ở bảng trên (19/10/2026): nhóm
+  *Trợ lý* (Ask AI), *Kiểm tra* (ba nút Soát, `getVisible` theo app), *Quản lý* (Bộ nhớ AI, Kỹ năng),
+  *Hệ thống* (Thiết lập, Trạng thái, Mở nhật ký, Khác ▸ Kiểm tra mô hình + Sao chép API URL). **Bốn control
+  của bản Windows cố ý KHÔNG vẽ** — *Nhìn tài liệu* (§5.1: add-in thiếu handler `app.screenshot`),
+  *Cài đặt nâng cao…*, *Tắt Agent Core…*, và menu ngôn ngữ (WPS không có tệp `lang/*.json`) — lý do ghi
+  ngay trong chú thích đầu `ribbon.xml`. Menu *Tìm web* cũng không vẽ: chọn nguồn tìm kiếm ghi vào
+  `mcp.json`, mà kênh `/wps/v1/*` không có route ghi tệp đó.
+  Mọi control mang `getImage="ribbon.OnGetImage"`; `main.js` trả **đường dẫn tệp tương đối**
+  `"images/<tag>.svg"` theo `tag` của control, và 12 tệp SVG (20×20, nét 1.5, màu `#0F6CBD`) nằm ở
+  `src/AxiomOffice.WPS/images/`. Hai bên khớp nhau bằng **spec hai chiều** (`test_pane.mjs`): thêm nút mà
+  quên vẽ ảnh, hoặc để tệp ảnh mồ côi, đều đỏ ngay. Vì sao là đường dẫn chứ không phải data URI — §5.3.
+  Header pane cũng đã có menu **⋯** như bản Windows (bảng *Trong khung chat* ở trên), nên bốn lối vào
+  *Trò chuyện mới / Hội thoại trước… / Ghi nhớ / Nhật ký / Thiết lập* giống nhau trên cả ba nền tảng.
 - **LibreOffice**: **một** mục menu *Axiom Office* (`Addons.xcu`, `OfficeMenuBar`) + một deck sidebar. Menu
   đang phẳng 6 mục (askai / check / skills / audit / setup / settings); theo bảng trên thì chúng thành các dải
   phân cách và **Khác ▸** là menu con cùng cấp. Không dựng cửa sổ tiến trình riêng — dùng chung lối hiển thị
@@ -110,9 +140,9 @@ bớt nút thật.
 
 | Đợt | Nội dung | Nghiệm thu |
 |---|---|---|
-| **1** | Toggle **Nhìn tài liệu** + ba nút **Soát** (bố cục/bảng/vùng) | Bấm ra kết quả ngay; toggle đổi được và lượt sau Core hành xử khác; ba nút Soát không tốn token · **LibreOffice ✅ 13/10** (mục menu *Soát tài liệu…*, §8) · **Windows ✅ PowerPoint 13/10** (Word/Excel/WPS Windows chưa bấm, §8) |
-| **2** | **Bộ nhớ AI…** — form 3 vùng (danh sách / chi tiết / lịch sử); phân biệt rõ **xoá mềm ≠ khôi phục ≠ xoá cứng** | Sửa, ghim, đặt hạn, xoá mềm, khôi phục, xoá cứng đều chạy; lọc được theo phạm vi user/document · **LibreOffice: mới 1/3** — dialog *Ghi nhớ* có **đọc / lọc / xoá mềm / tải lại**; thiếu sửa, ghim, hạn, khôi phục, xoá cứng (§3) · **Windows: viết xong 13/10** (lọc phạm vi + *Xoá tạm* / *Xoá vĩnh viễn…* theo phạm vi; chưa bấm thử) |
-| **3** | **Kỹ năng…** (ribbon), **Nhật ký hoạt động…** + **Hội thoại…** (menu ⋯ của pane) — **không** mở tab thứ hai (§2) | Thấy đúng skill của app đang mở; nạp lại được; audit đọc được · **LibreOffice ✅ 13/10** cho *Kỹ năng…* + *Nhật ký hoạt động…* (§8) · **Hội thoại…**: chưa (route `GET /v1/conversations` có sẵn) · **Windows: viết xong 13/10**, gọi thử API thật OK, chưa bấm trong Office |
+| **1** | Toggle **Nhìn tài liệu** + ba nút **Soát** (bố cục/bảng/vùng) | Bấm ra kết quả ngay; toggle đổi được và lượt sau Core hành xử khác; ba nút Soát không tốn token · **LibreOffice ✅ 13/10** (mục menu *Soát tài liệu…*, §8) · **Windows ✅ PowerPoint 13/10** (Word/Excel/WPS Windows chưa bấm, §8) · **WPS Linux 19/10**: ba nút Soát đã dựng và **đo trên Core thật** (§5.2), nhưng **chưa bấm trong WPS**; toggle *Nhìn tài liệu* **chưa** — add-in thiếu handler `app.screenshot` (§5.1) |
+| **2** | **Bộ nhớ AI…** — form 3 vùng (danh sách / chi tiết / lịch sử); phân biệt rõ **xoá mềm ≠ khôi phục ≠ xoá cứng** | Sửa, ghim, đặt hạn, xoá mềm, khôi phục, xoá cứng đều chạy; lọc được theo phạm vi user/document · **LibreOffice: mới 1/3** — dialog *Ghi nhớ* có **đọc / lọc / xoá mềm / tải lại**; thiếu sửa, ghim, hạn, khôi phục, xoá cứng (§3) · **Windows: viết xong 13/10** (lọc phạm vi + *Xoá tạm* / *Xoá vĩnh viễn…* theo phạm vi; chưa bấm thử) · **WPS Linux 19/10: 4/6** — màn hình *Bộ nhớ AI* có đọc, lọc phạm vi, xoá tạm, khôi phục, xoá vĩnh viễn theo phạm vi, tải lại; **thiếu sửa, ghim, đặt hạn** (không vẽ nút khi chưa có đường) |
+| **3** | **Kỹ năng…** (ribbon), **Nhật ký hoạt động…** + **Hội thoại…** (menu ⋯ của pane) — **không** mở tab thứ hai (§2) | Thấy đúng skill của app đang mở; nạp lại được; audit đọc được · **LibreOffice ✅ 13/10** cho *Kỹ năng…* + *Nhật ký hoạt động…* (§8) · **Hội thoại…**: chưa (route `GET /v1/conversations` có sẵn) · **Windows: viết xong 13/10**, gọi thử API thật OK, chưa bấm trong Office · **WPS Linux 19/10**: *Kỹ năng…* ✅ (lọc theo app, nguồn, lỗi nạp, *Nạp lại*) và *Nhật ký hoạt động…* ✅ (100 dòng mới nhất, giờ máy); *Hội thoại trước…* **chưa** — pane WPS không có menu ⋯ |
 | **4** | ~~Nút theo từng app, xuất PDF, lối tắt soạn thảo~~ — **bỏ** 13/10: soát theo app đã làm ở đợt 1 (`getVisible`); xuất PDF người dùng không muốn trên ribbon; "lối tắt soạn thảo" chưa ai định nghĩa là nút nào (nguyên tắc 3) | — |
 
 **Windows — đợt 2:** dùng lại `src/AxiomOffice/Ai/MemoryForm.cs` (đã có sửa, ghim, hạn dùng, khôi phục, lịch sử),
@@ -142,6 +172,84 @@ Còn một đường chưa khảo sát: add-in WPS *chính là* bên thi hành l
 handler trong tiến trình (như `CommandDispatcher.Execute` ở Windows) — nhưng vòng poll của add-in là
 **đơn luồng**, lệnh chậm sẽ chặn nó (đã gặp lỗi này ở live gate). Chưa kết luận được, cần khảo sát `main.js`.
 
+**Chặn thứ hai, tìm ra 19/10/2026 — và lần này không nằm ở Core:** ghi được cấu hình vẫn **chưa đủ** để bật
+toggle, vì bật lên thì mỗi lượt chạy sẽ hỏng ở chính bước "nhìn tài liệu". Core gửi lệnh `app.screenshot`
+qua bridge, mà add-in WPS **không có handler cho lệnh đó**: `app.screenshot` có trong `CATALOG`
+(`commands.js:45`) nhưng **không** có trong `HANDLERS` (`commands.js:3235` trở đi) — `execute()` sẽ trả
+`{ok:false, error:"unknown action: app.screenshot"}`. Đối chiếu: bản Windows có
+`CommandDispatcher.AppScreenshot`, bản LibreOffice có `general.py:app_screenshot`. Vậy muốn có toggle này
+trên ribbon WPS thì phải **viết handler `app.screenshot` cho add-in WPS trước** (việc của add-in, không phải
+của UI). Trong lúc đó, màn hình *Thiết lập* của pane **vẫn hiện** ô "Nhìn tài liệu" (vì cấu hình ghi được
+thật, và Core đọc lại thật) nhưng kèm một dòng nói thẳng rằng bật ở đây chưa có tác dụng — thà nói ra còn
+hơn để người dùng bật rồi mọi lượt chạy đều lỗi.
+
+### 5.2 Ba đường mới phục vụ pane/ribbon WPS (đo 19/10/2026)
+
+Ba đường này không nằm trong đợt A (đợt A chỉ mở lại các đường `/v1/*` sẵn có dưới tiền tố `/wps/v1/*`):
+
+- **`GET /v1/log` + `/wps/v1/log`** — nút **Mở nhật ký**. Bản Windows mở tệp bằng trình soạn thảo của hệ
+  điều hành (`Process.Start`); trong CEF **không mở được chương trình ngoài**, nên pane phải **đọc** nội
+  dung rồi tự hiển thị. Trả về đúng tệp mà bản Windows mở, **chỉ phần cuối** và có trần
+  (`lines` mặc định 200 / tối đa 2000, tối đa 512 KB từ cuối tệp; dòng dài bị cắt và `truncated` nói rõ) —
+  `corelog` xoay tệp ở 10 MB nên đọc cả tệp vừa phí vừa có thể treo pane. Tệp **chưa có** trả
+  `exists:false` (không phải lỗi): Core mới cài chưa ghi dòng nào là chuyện bình thường. Đây là đường
+  `routeBoth` — `/v1/log` giữ guard token cho script/MCP.
+- **`GET /wps/v1/status`** — nút **Trạng thái**. Pane **không tự hỏi được**: bridge nằm ở cổng riêng, mà
+  `/health` của Core thì bị guard chung chặn khi request có `Origin`. Một lời gọi trả **cả hai tầng**
+  (`{addin: Bridge.Status(), core: coreStatus}`), nên pane không phải đoán. Thêm `endpoint`/`model`/
+  `configured` vào tầng Core để nút *Kiểm tra mô hình* biết đã chọn AI chưa (bản Windows đọc thẳng
+  `Config.LlmEndpoint/LlmModel`; thiếu thì pane phải đoán, mà đoán sai thì nút báo "chưa cấu hình" ngay cả
+  khi đã cấu hình).
+- **`POST /wps/v1/exec`** — ba nút **Soát** và *Hoàn tác lượt này*: chạy thẳng một lệnh bridge, không qua
+  agent, không tốn token. Hai ca từ chối trả **409 kèm mã máy đọc được** (`ErrorCode`):
+  `addin-disconnected` (chưa mở tài liệu) và `run-in-progress` (đang có lượt AI chạy — chạy chen vào thì
+  agent mất dấu trạng thái tài liệu nó đang theo dõi). Pane dịch **mã** sang câu tiếng Việt riêng
+  (`pane.html: execError`), không hiện chuỗi tiếng Anh của Core và cũng không dò chuỗi (dò chuỗi là mong
+  manh). Lệnh add-in **không có** trả HTTP 200 kèm `{ok:false, error:"unknown action: …"}` như
+  `commands.js execute()` — nên pane **phải đọc `ok`**, đọc mã HTTP là hiện báo cáo rỗng như thể đã soát xong.
+
+Số đo đầy đủ (hình dạng JSON, ngữ nghĩa `lines`/`truncated`, cái bẫy phong bì của bridge `/health`):
+`tests/wps/REFERENCE.md`. Spec: `tests/wps/test_wps_pane_e2e.py` (18 phép kiểm mới) +
+`internal/api/wpsadmin_test.go`, `internal/api/log_test.go`.
+
+### 5.3 Còn lại của WPS (chưa nghiệm thu được trên máy này)
+
+- **`getImage` của WPS: trả data URI thì WPS vẽ ra dấu `?` — đã đo, và đã sửa.** Ribbon WPS gắn
+  `getImage="ribbon.OnGetImage"` cho **mọi** control. Bản đầu trả **data URI SVG**; mở WPS lên thì chỗ
+  icon toàn **dấu `?`** (đo trong WPS thật, 19/10/2026). Điều đó trả lời luôn câu hỏi cũ: WPS **có** gọi
+  `getImage` — nó nhận chuỗi trả về, nhưng đem **phân giải như một đường dẫn**, trượt thì vẽ `?`; data URI
+  không phải đường dẫn nên trượt.
+  Cách đúng nằm ngay trong **SDK chính thức của WPS** đã cài trên máy này —
+  `~/.local/lib/node_modules/wpsjs/packages/@wps-jsapi/wps/js/ribbon.js`:
+  `function GetImage(control) { … return "images/1.svg" }`, tức **đường dẫn tệp tương đối so với gốc
+  add-in**, và bộ SDK ship kèm đúng những tệp đó (`images/1.svg` — một thẻ `<svg>` **chỉ có `viewBox`**,
+  không `width`/`height`, để WPS tự co giãn theo cỡ nút). Nay `main.js` trả `"images/<tag>.svg"` và 12 tệp
+  nằm ở `src/AxiomOffice.WPS/images/`. Gốc add-in ở đây là `<core>/wps/addin/`
+  (`publish.xml`: `jspluginonline url="http://127.0.0.1:47840/wps/addin/"`), nên đường dẫn đó thành URL
+  thật, và `ServeAddin` phục vụ bằng `image/svg+xml` — `ContentTypeFor` **đã có sẵn** nhánh `.svg`.
+  Đo trên máy: `curl` ba tệp bất kỳ qua Core đều `HTTP 200  image/svg+xml`. **Đã nghiệm thu trong WPS
+  thật (19/10/2026)**: khởi động lại WPS, tab *Axiom Office* hiện đủ icon, không còn dấu `?`.
+- **Màu icon**: màu **hằng số** `#0F6CBD` nằm trong **từng tệp** `images/<tag>.svg` (trước đây là
+  `ICON_COLOR` trong `main.js`; nay không còn hằng số nào trong JS), **không** đọc từ `theme.py`. Cố ý:
+  `theme.py` là nguồn duy nhất cho **pane**, còn ảnh ribbon do WPS vẽ bằng bộ nạp ảnh của nó — nó không
+  biết `var(--axiom-*)`. Hai chỗ này có thể lệch màu, nên khi đổi bảng màu phải sửa **cả 12 tệp** trong
+  `images/`. Bù lại, `test_pane.mjs` nay **kiểm màu từng tệp** (`stroke="#0F6CBD"`), thứ mà bản dùng
+  `ICON_COLOR` trong JS không kiểm được. (`test_pane_theme.mjs` vẫn chỉ ràng buộc màu *bên trong*
+  `pane.html`.)
+- **Bấm nút trong WPS thật**: mọi phép đo ở trên chạy trên Core thật + add-in giả qua HTTP. Chưa lần nào
+  bấm nút trên ribbon của WPS thật rồi xem kết quả trong tài liệu — cần một lượt chạy tay trong WPS.
+- **`app.screenshot` cho add-in WPS** — điều kiện để toggle *Nhìn tài liệu* lên ribbon (§5.1).
+- **Ràng buộc của khung chat**: `main.js` mở pane bằng `Application.CreateTaskPane(url)`. Cửa sổ task pane
+  **không có kênh nào từ ribbon xuống trang** — bấm *Trạng thái* / *Mở nhật ký* trên ribbon mà pane đang mở
+  thì pane **không tự biết** để chuyển màn hình (xem §7). Vì vậy việc chuyển màn hình đi bằng **query của
+  URL** (`?view=status`, `?view=log`, `?do=testModel`, `?check=writer.checkTables`): ribbon mở **một pane
+  cho mỗi màn hình** (khoá = tên màn hình, khung chat dùng lại pane cũ để không mất đoạn hội thoại đang dở;
+  nút có `?do=` thì **không** dùng lại — bấm *Kiểm tra mô hình* lần hai phải chạy lại thật). Giá phải trả:
+  dữ liệu của một màn hình đã mở có thể **cũ**, và cách duy nhất để làm mới là nút *Tải lại* trong chính màn
+  hình đó — không có cách nào từ ribbon đẩy lệnh vào trang đang mở.
+
+### 5.4 Hoãn khác (có lý do)
+
 
 - **Chọn model bằng dropDown**: làm được (HKCU + cấu hình sống) nhưng đổi model giữa lượt dễ gây
   "lúc chạy lúc không"; để trong **Cấu hình nâng cao**.
@@ -169,6 +277,14 @@ handler trong tiến trình (như `CommandDispatcher.Execute` ở Windows) — n
 - **Máy Linux không biên dịch được C#** (`csc`/`mono`/`dotnet` đều không có) → mọi thay đổi `src/AxiomOffice/**`
   chỉ được kiểm bằng CI job `windows` (push) và bằng bấm tay trên máy Windows.
 - **WPS Linux**: `tests/wps/test_pane.mjs:151` ghim nội dung `ribbon.xml` — thêm nút thì phải mở rộng spec.
+- **WPS Linux — ribbon KHÔNG nói được vào trang pane đang mở.** `Application.CreateTaskPane(url)` chỉ *mở*
+  một cửa sổ CEF mới; giữa add-in và trang đó **không có kênh nào** (không `postMessage`, không API của
+  task pane để đẩy dữ liệu vào — `Application.GetTaskPane` chỉ trả object pane, không phải `window` của
+  trang). Hệ quả: mọi việc "mở màn hình X" phải đi qua **query của URL lúc nạp trang**, và dữ liệu của một
+  màn hình đã mở chỉ làm mới được bằng nút *Tải lại* trong chính màn hình đó. Đừng vẽ nút nào cần "pane
+  đang mở tự đổi theo" — không có đường thật đứng sau. (`main.js` ghi cùng ràng buộc này.)
+- **WPS Linux — add-in không ghi được tệp ra ngoài thư mục add-in**: `fs.readFileString` từ chối mọi đường
+  dẫn có dấu phân cách. Nên mọi thứ cần ghi (cấu hình, phiên) phải đi qua Core; add-in chỉ *chạy lệnh*.
 - **LibreOffice**: `ACTIONS` trong `axiom/dispatch.py` là **danh sách trắng** — thêm mục menu vào
   `Addons.xcu` mà quên thêm tên vào đó thì bấm menu **không làm gì cả, im lặng**. Đã có spec chặn:
   `tests/lo/test_dispatch.py` đối chiếu hai bên.
@@ -189,3 +305,8 @@ handler trong tiến trình (như `CommandDispatcher.Execute` ở Windows) — n
 | 13/10/2026 | Windows COM + Core | Bấm thật *Nhìn tài liệu* trên PowerPoint thì thấy ảnh model nhận là **cả cửa sổ** (slide ~30% ảnh) — lệch hợp đồng `app.screenshot` ("trang/slide hiện tại"). Sửa: trình chiếu xuất thẳng slide đang mở (`Slide.Export`, kèm `slide`/`slideCount`), `look_at_document` nói với model đó là slide số mấy. Kèm sửa pane ẩn các bước ngoài `office_action` (trông như đơ) và vẽ tích xanh cho bước lỗi. Chi tiết: CHANGELOG. |
 | 13/10/2026 | Core + Windows | **Plan mode** (`options.mode="plan"`: chỉ đọc, trả kế hoạch; pane có công tắc + thẻ *Thực hiện kế hoạch*), **đính kèm tệp** .docx/.xlsx/.pptx (pane gửi đường dẫn đầy đủ; Core đọc bằng tool MCP đọc tệp) và **tìm kiếm web Tavily** (tool `tavily_search` của Core, khoá trong wizard bước 4). **Việc của phiên Linux**: pane LibreOffice/WPS thêm công tắc lập kế hoạch (gửi `options.mode`), nút đính kèm, và ô khoá Tavily ghi `TavilyApiKey` vào `~/.config/axiom-office/config.json` — Core đã sẵn sàng. Sub-agent: tạm hoãn theo yêu cầu người dùng. |
 | 19/10/2026 | Core | **Đợt A — mở đường cho pane/ribbon WPS** (gỡ §5.1 và mọi nút "đọc/ghi qua Core" của pane). (1) **Ghi cấu hình**: `config.SetValue` + `WritableSource`, `JSONSource.Set` (Linux, `~/.config/axiom-office/config.json`, ghi 0600, **giữ nguyên khoá khác** vì file dùng chung với extension LibreOffice, ghi kiểu JSON thật như `config.py:set_value`) và `RegistrySource.Set` (Windows, REG_SZ như add-in .NET). (2) **Kênh `/wps/v1/*`**: `routeBoth` đăng ký thêm bản `/wps/v1/*` (xác thực kênh add-in) cho `setup`, `llm/test`, `llm/models`, `skills`, `memory*`, `audit`, `conversations*` — pane là trang của Core nhưng **không có token** nên trước đây mọi đường `/v1/*` đều 401. `/v1/*` giữ nguyên guard cũ (mọi `Origin` → 403). (3) Hai đường mới: `POST /wps/v1/config {Khoá: giá trị}` (danh sách trắng, từ chối `Token`/`CorePort`, trả `saved` + `ignored` khi bị `AXIOM_*` đè + `current`) và `POST /wps/v1/exec {action, params}` (chạy thẳng một lệnh bridge, không qua agent, không tốn token — cho nút **Soát** và *Hoàn tác lượt này*; **409 khi đang có lượt chạy** để agent không mất dấu tài liệu). Spec: `internal/api/wpsadmin_test.go` (4 ca) + `tests/wps/test_wps_pane_e2e.py` (+11 ca, tổng 44). |
+| 19/10/2026 | WPS Linux | **Đợt B — khung chat WPS đủ màn hình.** Pane từ 1 màn hình (chat) thành **7**: chat, *Bộ nhớ AI*, *Nhật ký hoạt động*, *Thiết lập*, *Kỹ năng*, *Trạng thái*, *Mở nhật ký* — cộng màn hình *Soát tài liệu* (gọi từ ba nút Soát). Ba màn hình quản trị hay dùng có lối vào **ngay trong pane** (`Ghi nhớ` / `Nhật ký` / `Thiết lập` ở header, đã có từ trước); bốn màn hình còn lại mở từ ribbon qua `?view=` (§5.3). Báo cáo soát **pane tự render** bằng tiếng Việt: Core/Go không chạy được `checks.py`, nên pane giữ bảng nhãn `ISSUE_LABELS` + luật dựng dòng y hệt `checks.py` của LibreOffice, và có **spec chặn lệch**: `test_pane_view.mjs` đọc `ISSUE_LABELS` từ **cả hai** tệp rồi so từng dòng hai chiều. Sửa một lỗi thật: `POST /v1/llm/test` đọc khoá **chữ thường** (`providerId`/`endpoint`/`model`/`apiKey`) còn pane gửi chữ hoa — nút *Kiểm tra mô hình* chưa bao giờ chạy đúng. **Chưa làm**: *Hội thoại trước…* (§2 xếp nó vào menu **⋯** của pane; pane WPS **không có** menu ⋯ và không có màn hình này — route `GET /wps/v1/conversations` đã sẵn, chỉ thiếu UI). Spec: `tests/wps/test_pane_view.mjs` (28 ca), `pane_dom.mjs` (DOM giả, không cần trình duyệt). |
+| 19/10/2026 | WPS Linux | **Đợt C — ribbon WPS đủ bộ nút** (§2). `ribbon.xml`: nhóm *Trợ lý / Kiểm tra / Quản lý / Hệ thống* + **Khác ▸**, cùng nhãn và cùng nhóm với bản Windows. Ba nút Soát mang `?check=<lệnh>` (mỗi nút một lệnh, mỗi lệnh một app); *Trạng thái* / *Mở nhật ký* mang `?view=`; *Kiểm tra mô hình* / *Sao chép API URL* mang `?do=`. **Bốn control của bản Windows không vẽ** vì không có đường thật đứng sau — *Nhìn tài liệu* (thiếu handler `app.screenshot`, §5.1), *Cài đặt nâng cao…*, *Tắt Agent Core…*, menu ngôn ngữ — và menu *Tìm web* (không có route ghi `mcp.json`). Ô "Nhìn tài liệu" trong màn hình *Thiết lập* của pane **vẫn hiện** nhưng kèm câu nói thẳng rằng bật ở đây chưa có tác dụng, thay vì hứa suông. Supertip *Sao chép API URL* nói đúng thứ nó sao chép (`/health` của bridge, không phải API của Core). |
+| 19/10/2026 | WPS Linux + Core | **Đợt D — đo sống trên Core thật** (`make test-wps-e2e`, không cần WPS). Thêm **18 phép kiểm** vào `tests/wps/test_wps_pane_e2e.py` cho đúng ba đường mà nút gọi: `GET /wps/v1/status` (cả hai tầng, `configured`, `logFile`, `Origin` lạ → 403), `GET /wps/v1/log` (đúng tệp Core đang ghi; `?lines=2` → hai dòng cuối + `truncated`; tệp chưa có → 200 `exists:false`; `/v1/log` vẫn đòi token) và `POST /wps/v1/exec` (báo cáo soát đi qua nguyên vẹn; lệnh add-in không có → 200 + `ok:false`; hai mã 409 `addin-disconnected` / `run-in-progress`). Phép đo còn **kiểm chứng địa chỉ mà nút *Sao chép API URL* sao chép**: dán `http://127.0.0.1:<bridgePort>/health` vào trình duyệt (không Origin, không token) → 200 `connected:true`. Kết quả: pane e2e **68 pass**, bridge e2e 36 pass. Số đo + một cái bẫy hình dạng JSON ghi ở `tests/wps/REFERENCE.md`. **Chưa** bấm nút trong WPS thật (§5.3). |
+| 19/10/2026 | Cả ba nền tảng | **Đợt E — làm pane và ribbon giống MS Word.** (1) **Bảng màu**: `theme.py` đổi từ indigo sang **xanh Fluent `#0F6CBD`** (màu Copilot/Word), kéo theo `PaneControls.cs` và `pane.html` — ba bản phải khớp nhau và `test_pane_theme.mjs` (9 phép kiểm) là thứ ràng buộc điều đó: mọi màu trong `theme.py` phải có token `--axiom-*` dùng thật, và **không** được có mã `#RRGGBB` nào ngoài khối `:root`. (2) **Pane**: trả lời của AI **bỏ bong bóng** — chữ nằm thẳng trên nền pane như Copilot, chỉ tin nhắn người dùng mới có nền; header thành **tiêu đề + nút ⋯** với menu *Trò chuyện mới / Hội thoại trước… / Ghi nhớ / Nhật ký / Thiết lập*; thêm màn hình **Hội thoại trước…** (danh sách → chi tiết có `messages[]` → xoá có xác nhận), mở đúng route `conversations*` đã có sẵn trên kênh `/wps/v1/*` từ đợt A. (3) **Ribbon WPS**: mọi control có **icon** qua `getImage` (trước đó ribbon chỉ có chữ) — 12 icon, `viewBox 0 0 20 20`, nét 1.5. Spec mới: `test_pane.mjs` +2 ca ghim **hai chiều** `ribbon.xml` ↔ icon (thêm nút quên icon, hoặc icon mồ côi, đều đỏ), `test_pane_view.mjs` +7 ca cho menu ⋯ và màn hình hội thoại. Tổng: **160 pass** ở `make test-wps`, eslint sạch. Cách trả ảnh của đợt này (data URI SVG) **sai** — xem đợt F. |
+| 19/10/2026 | WPS Linux | **Đợt F — sửa icon ribbon: data URI → đường dẫn tệp.** Mở WPS thật sau đợt E thì chỗ icon **toàn dấu `?`**. Điều đó trả lời luôn câu hỏi còn treo ở đợt E: WPS **có** gọi `getImage`, nhưng đem chuỗi trả về **phân giải như một đường dẫn** — data URI không phải đường dẫn nên trượt, và nó vẽ `?` thay vì bỏ trống. Cách đúng nằm sẵn trong **SDK chính thức của WPS** đã cài trên máy (`@wps-jsapi/wps/js/ribbon.js`: `return "images/1.svg"`), và bộ SDK ship kèm đúng những tệp đó — `<svg>` **chỉ có `viewBox`**, không `width`/`height`, để WPS tự co giãn theo cỡ nút. Nay: 12 tệp `src/AxiomOffice.WPS/images/<tag>.svg` (tên tệp **chính là** `tag`, nên không còn bảng tra nào phải giữ cho khớp), `main.js` trả `"images/<tag>.svg"`, xoá hẳn `ICON_BODY` / `svgIcon` / `ICON_COLOR` khỏi JS. **Không phải sửa Core**: `ServeAddin` vốn phục vụ mọi tệp dưới gốc add-in và `ContentTypeFor` **đã có sẵn** nhánh `.svg` → `image/svg+xml` (đo: `curl` ba tệp bất kỳ qua Core đều `200  image/svg+xml`). Spec `test_pane.mjs` đổi sang ghim `ribbon.xml` ↔ **tệp** trong `images/`, và kiểm **từng tệp**: một thẻ `<svg>` khớp kín, `viewBox 0 0 20 20`, **không** `width`/`height` ở thẻ mở, đúng màu accent `#0F6CBD`. **Đã nghiệm thu trong WPS thật**: khởi động lại WPS, icon hiện đủ, hết dấu `?` (§5.3). |

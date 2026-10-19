@@ -248,12 +248,15 @@ test("catalogFor(kind): chi tra lenh dung app do; catalog() van la registry day 
 //
 // Danh sach nay chi duoc PHEP ngan di: moi lenh o day ma sau nay co handler thi test ben duoi bat phai bo ra.
 const CHUA_CO_HANDLER = {
-  // Bon lenh kind rong (agent=false): khong phai lenh cua app van phong - Core/pane/MCP xu ly, add-in
-  // khong bao gio nhan. Chung nam trong registry vi registry dung chung cho moi nen tang.
-  "ai.ask": "Core xu ly (khong phai lenh cua app van phong)",
-  "ui.askpane": "Core/pane xu ly",
-  "ui.setup": "Core/pane xu ly",
-  "app.screenshot": "Core chup cua so (phan visual), add-in khong nhan lenh nay",
+  // Bon lenh kind rong (agent=false) nam trong registry vi registry dung chung cho moi nen tang.
+  // Ca bon DEU la lenh cua add-in o ban Windows (CommandDispatcher.cs: app.info, ai.ask, ui.askpane,
+  // app.screenshot) - khong phai "Core tu lam roi add-in khong bao gio nhan". O add-in WPS chi
+  // `app.info` co handler; ba lenh kia khong co, nen Core goi chung qua bridge se nhan
+  // `unknown action`. (ui.setup la duong rieng cua LibreOffice, khong co o CommandDispatcher.)
+  "ai.ask": "chua co handler trong add-in WPS (ban Windows: AiAsk trong CommandDispatcher.cs)",
+  "ui.askpane": "chua co handler trong add-in WPS (ban Windows: UiAskPane)",
+  "ui.setup": "duong cua LibreOffice (setupwizard.py); ban Windows/WPS khong co lenh nay",
+  "app.screenshot": "chua co handler trong add-in WPS (ban Windows: AppScreenshot) - day la ly do nut 'Nhin tai lieu' chua len duoc ribbon WPS, xem docs/ribbon-ui.md muc 5.1",
   // Bay lenh writer.* (docs/wps-bridge.md muc 3): backlog - chua viet handler cho WPS.
   "writer.newDocument": "chua co handler trong add-in",
   "writer.open": "chua co handler trong add-in",
@@ -261,7 +264,6 @@ const CHUA_CO_HANDLER = {
   "writer.formatTable": "chua co handler trong add-in (agent=true: tool nay se loi khi may dang la WPS)",
   "writer.insertImage": "chua co handler trong add-in (agent=true)",
   "writer.insertHyperlink": "chua co handler trong add-in (agent=true)",
-  "writer.checkTables": "chua co handler trong add-in (agent=true)",
   "writer.replaceMany": "chua co handler trong add-in (agent=true: tool nay se loi khi may dang la WPS)",
   // Hai lenh thiet ke: chi co o add-in Windows (COM); LibreOffice bao not supported.
   // (writer.outline da co handler trong WPS JS tu commit P0-03 nen khong con o day.)

@@ -9,6 +9,13 @@ voi cung xac thuc kenh add-in (Origin = origin cua Core, hoac token khi khong co
 bridge WPS (office = bridge WPS, tai lieu = lan poll gan nhat cua add-in). Add-in chua ket noi -> HTTP 409.
 /v1/runs giu nguyen guard cu (moi Origin -> 403).
 
+Cung file nay do luon ba duong ma nut tren ribbon/pane dung (docs/ribbon-ui.md muc 2) tren Core THAT:
+    GET  /wps/v1/status      -> {addin: bridge, core: Core}  (nut "Trang thai")
+    GET  /wps/v1/log?lines=  -> phan cuoi nhat ky Core        (nut "Mo nhat ky")
+    POST /wps/v1/exec        -> chay lenh bridge truc tiep    (nut "Soat bang", "Hoan tac luot nay")
+va hai ma 409 cua /wps/v1/exec (run-in-progress / addin-disconnected) - pane dich chung sang cau tieng Viet
+rieng, nen phep do phai bam vao `code` chu khong vao chuoi tieng Anh cua Core.
+
 Build Core that, LLM gia (tests/core/fake_llm.py), add-in gia poll + tra ket qua lenh. Khong can WPS.
 
     python3 tests/wps/test_wps_pane_e2e.py
@@ -37,6 +44,10 @@ CATALOG = [
     {"name": "writer.appendText", "kind": "wps", "agent": True, "summary": "Nối vào cuối tài liệu",
      "params": [{"name": "text", "required": True, "hint": None}]},
     {"name": "writer.save", "kind": "wps", "agent": True, "summary": "Lưu", "params": []},
+    # Lenh cua nut "Soat bang" tren ribbon: pane goi /wps/v1/exec roi TU RENDER bao cao (Core/Go khong
+    # chay duoc checks.py). Catalog phai co that, vi add-in that chi nhan lenh no da khai.
+    {"name": "writer.checkTables", "kind": "wps", "agent": True, "summary": "Soát bảng (chỉ đọc)",
+     "params": []},
 ]
 DOCUMENT = {"name": "bao-cao-tuan.docx", "fullName": "/home/u/bao-cao-tuan.docx"}
 # Nguoi dung boi den "Bao cao tuan" (12 ky tu, ca tai lieu) truoc khi hoi.
@@ -71,8 +82,21 @@ class FakeAddin(threading.Thread):
                                                      "tables": 0, "tablesKnown": True}}
                 elif job.get("action") == "writer.unlockSelection":
                     answer = {"ok": True, "result": {"locked": False}}
+                elif job.get("action") == "writer.checkTables":
+                    # Dung hinh dang cmdWriterCheckTables tra ve (commands.js): pane doc `issues[].type`
+                    # de dich sang nhan tieng Viet (pane.html: ISSUE_LABELS, khop checks.py).
+                    answer = {"ok": True, "result": {
+                        "tableCount": 1,
+                        "tables": [{"index": 1, "rows": 3, "cols": 2, "emptyCells": 1,
+                                    "header": ["Mục", "Số tiền"], "layout": False}],
+                        "issueCount": 2,
+                        "issues": [{"type": "empty-cells", "detail": "table 1 has 1 empty cell(s)", "table": 1},
+                                   {"type": "long-header-cell",
+                                    "detail": "table 1 has a header cell with 42 characters", "table": 1}]}}
                 else:
-                    answer = {"ok": True, "result": {"done": True}}
+                    # Giong commands.js execute(): lenh khong co handler -> phong bi loi, KHONG phai
+                    # ok:true rong. Pane phai doc `ok` chu khong phai ma HTTP.
+                    answer = {"ok": False, "error": "unknown action: " + str(job.get("action"))}
                 base.request(self.core.base + "/wps/v1/result", "POST", dict(answer, id=job.get("id")),
                              {"Origin": self.core.origin})
 
@@ -167,6 +191,11 @@ def main() -> int:
         # ---- chua co add-in
         status, _, text = base.request(core.base + "/wps/v1/runs", "POST", {"prompt": "chao"}, own)
         check(status == 409 and "not connected" in text, "pane: add-in chua ket noi -> 409 'not connected'", (status, text))
+        # Nut "Soat bang" khi chua mo tai lieu: 409 kem ma may doc duoc - pane dich thanh cau tieng Viet
+        # rieng (pane.html: execError) chu khong hien chuoi tieng Anh cua Core.
+        status, _, text = base.request(core.base + "/wps/v1/exec", "POST", {"action": "writer.checkTables"}, own)
+        check(status == 409 and base.as_json(text).get("code") == "addin-disconnected",
+              "exec: chua co add-in -> 409 ma 'addin-disconnected'", (status, text[:200]))
 
         addin = FakeAddin(core)
         addin.start()
@@ -230,6 +259,101 @@ def main() -> int:
         status, _, _ = base.request(core.base + "/wps/v1/exec", "POST", {}, own)
         check(status == 400, "exec: thieu action -> 400", status)
 
+        # ---- nut "Soat bang" tren ribbon: bao cao cua add-in phai di qua bridge NGUYEN VEN, ke ca
+        # truong `type` - pane dich chinh khoa do sang nhan tieng Viet (pane.html: ISSUE_LABELS, khop
+        # checks.py cua ban LibreOffice). Cat bot hay doi ten truong la pane hien nhan sai hoac rong.
+        status, _, text = base.request(core.base + "/wps/v1/exec", "POST",
+                                       {"action": "writer.checkTables", "params": {}}, own)
+        report = base.as_json(text).get("result") or {}
+        check(status == 200 and report.get("tableCount") == 1 and report.get("issueCount") == 2,
+              "exec: bao cao soat bang di qua nguyen ven", (status, text[:300]))
+        check([i.get("type") for i in report.get("issues") or []] == ["empty-cells", "long-header-cell"],
+              "exec: giu nguyen truong 'type' - khoa de pane dich sang nhan tieng Viet", report.get("issues"))
+        check((report.get("tables") or [{}])[0].get("header") == ["Mục", "Số tiền"],
+              "exec: giu nguyen tieng Viet co dau trong bao cao (khong ep ASCII)", report.get("tables"))
+        # Lenh add-in KHONG co: phong bi loi tra nguyen (HTTP 200, ok=false). Pane phai doc `ok` -
+        # neu chi nhin ma HTTP thi nut "Soat bang" se hien mot bao cao rong nhu the da soat xong.
+        status, _, text = base.request(core.base + "/wps/v1/exec", "POST",
+                                       {"action": "writer.khongCoLenhNay", "params": {}}, own)
+        envelope = base.as_json(text)
+        check(status == 200 and envelope.get("ok") is False and "unknown action" in str(envelope.get("error")),
+              "exec: add-in tu choi lenh -> 200 kem ok=false (pane doc ok, khong doc ma HTTP)", (status, text[:300]))
+
+        # ---- nut "Trang thai" (ban Windows: RibbonUi.StatusReport). Mot loi goi tra CA HAI tang: tang
+        # add-in ma chi bridge biet, va tang Core. Pane khong tu hoi duoc: bridge nam o cong rieng, con
+        # /health cua Core bi guard chan khi request co Origin.
+        status, _, text = base.request(core.base + "/wps/v1/status", headers=own)
+        status_payload = base.as_json(text).get("result") or {}
+        addin_info, core_info = status_payload.get("addin") or {}, status_payload.get("core") or {}
+        check(status == 200 and addin_info.get("connected") is True and addin_info.get("app") == "wps",
+              "status: tang add-in bao dang ket noi + app wps", (status, text[:300]))
+        check((addin_info.get("document") or {}).get("name") == DOCUMENT["name"],
+              "status: ten tai lieu lay tu lan poll gan nhat cua add-in", addin_info.get("document"))
+        check(addin_info.get("addinVersion") == "0.1.0" and addin_info.get("everPoll") is True,
+              "status: phien ban add-in that + da tung poll", addin_info)
+        check(addin_info.get("queued") == 0 and addin_info.get("waiting") == 0,
+              "status: hang doi trong (khong co lenh treo)", addin_info)
+        # Dia chi nut "Sao chep API URL" sao chep: /health cua BRIDGE (khong phai API cua Core - API doi
+        # token). Trinh duyet dan vao khong gui Origin, khong token, nen phai tra loi that.
+        status, _, text = base.request("http://127.0.0.1:%s/health" % addin_info.get("bridgePort"))
+        health = base.as_json(text).get("result") or {}
+        check(status == 200 and health.get("connected") is True and health.get("port") == addin_info.get("bridgePort"),
+              "status: dia chi pane sao chep (bridge /health) tra loi THAT khi khong token", (status, text[:200]))
+        check(core_info.get("port") == core.port and core_info.get("pid") and core_info.get("uptimeSeconds") >= 0,
+              "status: tang Core tra cong/pid/uptime THAT cua tien trinh dang chay", core_info)
+        check(core_info.get("version") != "" and core_info.get("dataDir") == core.data_dir,
+              "status: co phien ban Core (pane canh bao khi thieu) + thu muc du lieu", core_info)
+        check(core_info.get("logFile") == os.path.join(core.data_dir, "core.log"),
+              "status: logFile dung la tep nhat ky Core dang ghi", core_info.get("logFile"))
+        check(core_info.get("model") == "fake-model" and core_info.get("configured") is True,
+              "status: pane biet da cau hinh AI (nut 'Kiem tra mo hinh' khoi doan)", core_info)
+        status, _, _ = base.request(core.base + "/wps/v1/status", headers={"Origin": "http://evil.example"})
+        check(status == 403, "status: Origin la -> 403 (khong lo thong tin may)", status)
+
+        # ---- nut "Mo nhat ky": ban Windows mo bang trinh soan thao cua he dieu hanh, trong CEF khong mo
+        # duoc chuong trinh ngoai nen pane DOC noi dung. Phai la DUNG tep Core dang ghi.
+        log_path = os.path.join(core.data_dir, "core.log")
+        status, _, text = base.request(core.base + "/wps/v1/log", headers=own)
+        log = base.as_json(text).get("result") or {}
+        check(status == 200 and log.get("path") == log_path and log.get("exists") is True,
+              "log: doc dung tep nhat ky Core dang ghi", (status, text[:200]))
+        lines = log.get("lines") or []
+        check(log.get("count") == len(lines) and 0 < len(lines) <= 200,
+              "log: mac dinh tra 200 dong cuoi, count khop so dong", (log.get("count"), len(lines)))
+        check(any("Agent Core starting" in line for line in lines),
+              "log: co dong khoi dong THAT cua Core (khong phai tep khac)", lines[:3])
+        check(log.get("truncated") == (log.get("count") == 200),
+              "log: truncated noi dung su that (chi bat khi that su bi cat)", log.get("truncated"))
+        # Ghi hai dong moc vao chinh tep do de phep do tat dinh (luc nay chua co luot chay nao, Core
+        # khong ghi gi xen vao). Day la phep do `lines` + phan cuoi, khong phai phep do noi dung.
+        with open(log_path, "a", encoding="utf-8") as handle:
+            handle.write("moc-mot\nmoc-hai\n")
+        status, _, text = base.request(core.base + "/wps/v1/log?lines=2", headers=own)
+        two = base.as_json(text).get("result") or {}
+        check(two.get("lines") == ["moc-mot", "moc-hai"] and two.get("truncated") is True,
+              "log: ?lines=2 tra dung hai dong CUOI, truncated=true (con dong phia tren)", (two.get("lines"), two.get("truncated")))
+        status, _, text = base.request(core.base + "/wps/v1/log?lines=1", headers=own)
+        one = base.as_json(text).get("result") or {}
+        check(one.get("lines") == ["moc-hai"] and one.get("count") == 1,
+              "log: ?lines=1 tra dung dong CUOI (nut 'Xem them' noi tiep tu day)", one.get("lines"))
+        # Tep chua co khong phai loi: Core moi cai chua ghi dong nao - tra exists:false de pane noi
+        # "chua co nhat ky" thay vi hien mot cau loi do. Doi ten tam (corelog giu file mo, Linux ghi
+        # tiep theo inode) roi tra lai ngay.
+        os.rename(log_path, log_path + ".bak")
+        try:
+            status, _, text = base.request(core.base + "/wps/v1/log", headers=own)
+            gone = base.as_json(text).get("result") or {}
+            check(status == 200 and gone.get("exists") is False and gone.get("lines") == [],
+                  "log: chua co tep -> 200 exists=false (pane noi 'chua co nhat ky')", (status, text[:200]))
+        finally:
+            os.rename(log_path + ".bak", log_path)
+        # routeBoth: /v1/log giu guard cu cho script/MCP, /wps/v1/log cho pane.
+        status, _, _ = base.request(core.base + "/v1/log")
+        check(status in (401, 403), "log: /v1/log khong token -> bi chan (guard cu)", status)
+        status, _, text = base.request(core.base + "/v1/log", headers={"X-Auth-Token": base.TOKEN})
+        check(status == 200 and (base.as_json(text).get("result") or {}).get("path") == log_path,
+              "log: /v1/log voi token -> cung tep (script/MCP)", (status, text[:200]))
+
         # ---- luot 1
         status, _, text = base.request(core.base + "/wps/v1/runs", "POST", {"prompt": "Thêm một dòng chào"}, own)
         reply = base.as_json(text).get("result") or {}
@@ -287,7 +411,8 @@ def main() -> int:
         # Lenh truc tiep giua luot chay: add-in chay tuan tu nen du lieu khong hong, nhung agent mat dung
         # trang thai tai lieu no dang theo doi -> tu choi cho xong luot.
         status, _, text = base.request(core.base + "/wps/v1/exec", "POST", {"action": "writer.save"}, own)
-        check(status == 409 and "in progress" in text, "exec: dang co luot chay -> 409", (status, text[:200]))
+        check(status == 409 and base.as_json(text).get("code") == "run-in-progress",
+              "exec: dang co luot chay -> 409 ma 'run-in-progress'", (status, text[:200]))
         status, _, text = base.request(core.base + "/wps/v1/runs/%s/cancel" % run2, "POST", {}, own)
         check(status == 200 and (base.as_json(text).get("result") or {}).get("cancelled") is True,
               "pane: POST /wps/v1/runs/{id}/cancel", (status, text))

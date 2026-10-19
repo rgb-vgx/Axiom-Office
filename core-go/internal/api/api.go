@@ -79,6 +79,7 @@ func Handler(deps *Deps, mux *http.ServeMux) http.Handler {
 	mapCore(mux, deps)
 	mapWPS(mux, deps)
 	mapSetup(mux, deps)
+	mapLog(mux, deps)
 	mapRuns(mux, deps)
 	if deps.Skills != nil {
 		mapSkills(mux, deps)
@@ -117,6 +118,13 @@ func OK(w http.ResponseWriter, result any) {
 // Error: loi nghiep vu tra HTTP 200 kem ok:false (giong bridge); status khac cho loi giao thuc.
 func Error(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, map[string]any{"ok": false, "error": message})
+}
+
+// ErrorCode: nhu Error nhung kem ma may doc duoc, de ben goi dich duoc sang tieng cua no ma khong phai
+// do chuoi tieng Anh cua Core. Dung cho cac ca pane WPS phai noi mot cau khac han nhau (xem
+// wpsadmin.go: /wps/v1/exec).
+func ErrorCode(w http.ResponseWriter, status int, code, message string) {
+	writeJSON(w, status, map[string]any{"ok": false, "error": message, "code": code})
 }
 
 // readJSON doc body; body rong -> (nil, true); JSON hong -> (nil, false).

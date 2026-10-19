@@ -1848,12 +1848,28 @@ export function makeWppApp(options = {}) {
 // xoa bang khi vung chon bi de bang chu thuong) - do la truong hop ma luoi an toan cua khoa vung
 // phai bat. Bang nam MOT PHAN trong vung (con tro trong o) thi song, chi dich vi tri theo.
 //
+// Hai truong TUY CHON nua cua mot bang, chi can khi lenh DOC noi dung bang (writer.checkTables):
+//   cells: [[...], ...]  luoi o theo hang roi cot, moi o la CHUOI da sach (khong co ky tu ket o).
+//                        WPS that tra ve `Cell(r, c).Range.Text` KEM "\r\x07" o cuoi; fake tra dung
+//                        nhu vay (`rawCell` ben duoi) de handler phai tu boc - do la phep do cho
+//                        tableCellText() cua commands.js.
+//   title: ten bang. LibreOffice danh dau bang dan trang bang ten "AxiomLayout" (writer.formatTable
+//          {borders:false}); WPS chua co lenh do nen hom nay khong bang nao bi danh dau, nhung fake
+//          phai dung duoc ten that de phep mien tru `layout` kiem duoc.
+// Bang khong khai `cells` duoc coi la bang MOT O: o (1,1) chinh la chu nam trong Range cua bang.
+// Do la dang ma cac phep kiem khoa vung dang dung (chung chi quan tam { start, end }).
+//
+// KHONG mo phong `doc.Tables.Add` va `app.Selection.Range`: `writer.insertTable` vi vay KHONG chay
+// duoc tren fake (no goi tableAnchor -> app.Selection.Range). Duong chen bang da co phep do THAT
+// tren WPS (tests/wps/test_wps_bridge_live.py, writer.insertTable roi writer.checkTables doc lai
+// dung luoi) - o day khong dung lai bang API doan.
+//
 // Hoan tac: WPS Writer CO UndoRecord (khac ET/WPP - xem REFERENCE.md). `StartCustomRecord` mo mot
 // nhom; ca nhom thanh MOT buoc; `doc.Undo(1)` tra ve nguyen trang thai truoc nhom. Nho vay luoi an
 // toan cua khoa vung (goi doc.Undo(1) sau khi lenh chay) kiem duoc that, khong chi "khong nem loi".
 //
 // options:
-//   text, documentName, path, tables: trang thai dau
+//   text, documentName, path, tables: trang thai dau (xem `tables` o khoi tren)
 //   selection: { start, end }        vi tri con tro/vung chon cua nguoi dung
 //   selectionLockable: false         mo phong ban WPS khong keo duoc con tro: Selection khong co
 //                                    SetRange va Start/End chi doc. Dung de kiem LUOI AN TOAN (con
@@ -1861,6 +1877,24 @@ export function makeWppApp(options = {}) {
 //   selectionPositions: false        ban WPS khong tra Selection.Start/End (khong co vung de khoa)
 //   range: false                     ban WPS khong co doc.Range (khong doc duoc phan truoc/sau ->
 //                                    khong the khoa: thieu luoi an toan thi khong khoa)
+// `tables` cua makeWriterApp: giu nguyen { start, end }, va giu them `cells`/`title` neu co.
+function normalizeTable(t) {
+  const out = { start: t.start, end: t.end, cells: null, title: t.title === undefined ? "" : String(t.title) };
+  if (t.cells) {
+    out.cells = t.cells.map((row) => row.map((cell) => String(cell === undefined || cell === null ? "" : cell)));
+  }
+  return out;
+}
+
+function cloneTables(list) {
+  return list.map((t) => ({
+    start: t.start,
+    end: t.end,
+    title: t.title,
+    cells: t.cells ? t.cells.map((row) => row.slice()) : null,
+  }));
+}
+
 export function makeWriterApp(options = {}) {
   const documentName = options.documentName || "blank.docx";
   const fullPath = options.path || ("/tmp/" + documentName);
@@ -1872,7 +1906,7 @@ export function makeWriterApp(options = {}) {
     app: "wps",
     calls: [],
     text: options.text !== undefined ? String(options.text) : "",
-    tables: (options.tables || []).map((t) => ({ start: t.start, end: t.end })),
+    tables: (options.tables || []).map(normalizeTable),
     selection: {
       start: options.selection ? options.selection.start : 0,
       end: options.selection ? options.selection.end : 0,
@@ -1882,7 +1916,7 @@ export function makeWriterApp(options = {}) {
     group: null,
   };
 
-  const snapshot = () => ({ text: state.text, tables: state.tables.map((t) => ({ start: t.start, end: t.end })) });
+  const snapshot = () => ({ text: state.text, tables: cloneTables(state.tables) });
   const same = (a, b) => a.text === b.text && JSON.stringify(a.tables) === JSON.stringify(b.tables);
 
   // Thay doi ngoai mot nhom UndoRecord thi tu no la mot buoc hoan tac; trong nhom thi de nhom lo.
@@ -1900,6 +1934,8 @@ export function makeWriterApp(options = {}) {
       next.push({
         start: t.start >= to ? t.start + delta : t.start,
         end: t.end >= to ? t.end + delta : t.end,
+        cells: t.cells,
+        title: t.title,
       });
     }
     state.tables = next;
@@ -1969,6 +2005,86 @@ export function makeWriterApp(options = {}) {
     });
   }
 
+  // Luoi o cua mot bang: `cells` neu bang co khai, khong thi bang MOT O - o (1,1) chinh la chu nam
+  // trong Range cua bang. WPS that tra `Cell(r, c).Range.Text` KEM "\r\x07" o cuoi moi o (ky tu ket
+  // o cua Word), nen fake tra dung nhu vay; handler phai tu boc lay.
+  function tableGrid(t) {
+    if (t.cells) { return t.cells; }
+    return [[state.text.slice(t.start, t.end)]];
+  }
+
+  function rawCell(t, r, c) {
+    const grid = tableGrid(t);
+    const row = grid[r - 1];
+    if (!row || c < 1 || c > row.length) { throw new Error("Cell(" + r + "," + c + ") ngoai luoi bang"); }
+    return row[c - 1] + "\r\x07";
+  }
+
+  function makeCell(t, path, r, c) {
+    return strict(path, {
+      state,
+      props: {
+        // WPS that dat chu vao o qua Range.Text; chuoi ghi vao khong kem ky tu ket o (xem
+        // cmdInsertTable) - nen fake cung nhan chu thuong va tu them lai.
+        Range: { get: () => makeCellRange(t, path + ".Range", r, c) },
+      },
+      methods: {},
+    });
+  }
+
+  // Chi mo phong `Text` cua Range trong o: do la thu duy nhat cac handler dang dung
+  // (writer.insertTable ghi, writer.checkTables doc). Start/End cua mot o la vi tri that trong tai
+  // lieu, ma fake khong mo phong bang trong `text` - khong bia ra so do.
+  function makeCellRange(t, path, r, c) {
+    return strict(path, {
+      state,
+      props: {
+        Text: {
+          get: () => rawCell(t, r, c),
+          set: (v) => {
+            const grid = tableGrid(t);
+            if (!t.cells) { t.cells = grid; }
+            grid[r - 1][c - 1] = String(v === undefined || v === null ? "" : v);
+          },
+        },
+      },
+      methods: {},
+    });
+  }
+
+  function makeTable(idx) {
+    const t = state.tables[idx - 1];
+    const path = "doc.Tables.Item(" + idx + ")";
+    return strict(path, {
+      state,
+      props: {
+        Range: { get: () => makeRange(t.start, t.end, path + ".Range") },
+        Rows: { get: () => strict(path + ".Rows", { state, props: { Count: { get: () => tableGrid(t).length } }, methods: {} }) },
+        Columns: {
+          get: () => strict(path + ".Columns", {
+            state,
+            props: { Count: { get: () => tableGrid(t)[0].length } },
+            methods: {},
+          }),
+        },
+        // WPS: bang dan trang cua LibreOffice duoc danh dau bang ten "AxiomLayout". WPS chua co lenh
+        // dan trang nen hom nay luon rong - fake van tra ten that de phep mien tru kiem duoc.
+        Title: { get: () => t.title },
+        Name: { get: () => t.title },
+      },
+      methods: {
+        Cell: (r, c) => {
+          const row = Number(r), col = Number(c);
+          if (!Number.isInteger(row) || !Number.isInteger(col) || row < 1 || col < 1) {
+            throw new Error("Cell: chi so phai la so nguyen >= 1");
+          }
+          rawCell(t, row, col);   // nem ngay neu ngoai luoi, giong WPS that
+          return makeCell(t, path + ".Cell(" + row + "," + col + ")", row, col);
+        },
+      },
+    });
+  }
+
   function makeTables() {
     return strict("doc.Tables", {
       state,
@@ -1977,13 +2093,7 @@ export function makeWriterApp(options = {}) {
         Item: (i) => {
           const idx = Number(i);
           if (!Number.isInteger(idx) || idx < 1 || idx > state.tables.length) { throw new Error("index out of range"); }
-          const t = state.tables[idx - 1];
-          const path = "doc.Tables.Item(" + idx + ")";
-          return strict(path, {
-            state,
-            props: { Range: { get: () => makeRange(t.start, t.end, path + ".Range") } },
-            methods: {},
-          });
+          return makeTable(idx);
         },
       },
     });
@@ -2064,7 +2174,7 @@ export function makeWriterApp(options = {}) {
           const prev = state.undoStack.pop();
           if (!prev) { break; }
           state.text = prev.text;
-          state.tables = prev.tables.map((t) => ({ start: t.start, end: t.end }));
+          state.tables = cloneTables(prev.tables);
           done++;
         }
         return done;

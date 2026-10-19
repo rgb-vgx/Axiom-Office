@@ -847,6 +847,78 @@
     return { paragraphs: index, items: items };
   }
 
+  // Soat bang (chi doc) - cung quy tac voi checks.writer_check_tables cua LibreOffice
+  // (src/AxiomOffice.LibreOffice/python/pythonpath/axiom/checks.py): o trong, va o tieu de lan doan van.
+  // Nguong va cach tinh trung vi phai giu GIONG ban LibreOffice, neu khong cung mot tai lieu lai ra hai
+  // ket qua khac nhau tuy ung dung - day la cung mot lenh trong cung mot hop dong.
+  var LONG_HEADER_CHARS = 40;
+  var LAYOUT_TABLE_NAME = "AxiomLayout";
+
+  function tableCellText(raw) {
+    // \r va \x07 la ky tu ket o cua Word/WPS: bo truoc khi do do dai, khong thi o trong bi tinh la co chu.
+    // eslint-disable-next-line no-control-regex -- \x07 la ky tu nghiep vu cua Word, khong phai loi
+    return String(raw === undefined || raw === null ? "" : raw).replace(/\r/g, "").replace(/\x07/g, "").trim();
+  }
+
+  // Bang dan trang: LibreOffice danh dau bang ten "AxiomLayout" (writer.formatTable {borders:false}).
+  // WPS chua co writer.formatTable nen hom nay khong bang nao duoc danh dau - van doc ten de khi lenh do
+  // duoc viet thi mien tru chay dung, va de truong `layout` trong bao cao noi that chu khong doan.
+  function isLayoutTable(table) {
+    var name = "";
+    try { name = strProp(table, "Title"); } catch (e) { name = ""; }
+    if (name === "") { try { name = strProp(table, "Name"); } catch (e2) { name = ""; } }
+    return name.indexOf(LAYOUT_TABLE_NAME) === 0;
+  }
+
+  function cmdWriterCheckTables(app) {
+    var doc = app.ActiveDocument;
+    var tables = doc.Tables;
+    var count = Number(tables.Count);
+    if (isNaN(count)) { count = 0; }
+    var issues = [], report = [], index, r, c, at, k;
+    for (index = 1; index <= count; index++) {
+      var table = tables.Item(index);
+      var rows = Number(table.Rows.Count);
+      var cols = Number(table.Columns.Count);
+      var empty = 0, header = [];
+      for (r = 1; r <= rows; r++) {
+        for (c = 1; c <= cols; c++) {
+          var text;
+          // O bi gop: WPS nem loi khi hoi mot o khong ton tai - bo qua, giong ban LibreOffice.
+          try { text = tableCellText(table.Cell(r, c).Range.Text); } catch (eCell) { continue; }
+          if (text === "") { empty++; }
+          if (r === 1) { header.push(text); }
+        }
+      }
+      var layout = isLayoutTable(table);
+      // O trong o bang dan trang la CO Y (khoang trong ky, o cho dien) nen khong bao; so lieu van de trong
+      // report de agent thay. "long-header-cell" thi bao cho moi bang: voi bang dan trang do cung la loi that.
+      if (empty > 0 && !layout) {
+        issues.push({ type: "empty-cells", detail: "table " + index + " has " + empty + " empty cell(s)",
+          table: index });
+      }
+      // Moi o tieu de so voi trung vi cac o tieu de CON LAI (leave-one-out), khong so voi trung vi ca nhom:
+      // voi bang 2 cot, trung vi ca nhom chinh la o dai hon nen nguong "3 x trung vi" khong bao gio voi toi.
+      // Bang 1 cot khong co nhom de so nen khong bao (xem docs/skills-review.md muc 4.7).
+      for (at = 0; at < header.length; at++) {
+        var others = [];
+        for (k = 0; k < header.length; k++) { if (k !== at) { others.push(header[k].length); } }
+        if (others.length === 0) { continue; }
+        others.sort(function (a, b) { return a - b; });
+        var typical = others[Math.floor(others.length / 2)];
+        if (header[at].length > LONG_HEADER_CHARS && header[at].length > 3 * Math.max(1, typical)) {
+          issues.push({ type: "long-header-cell",
+            detail: "table " + index + " has a header cell with " + header[at].length + " characters ('" +
+              header[at].substring(0, LONG_HEADER_CHARS) +
+              "'): text that should be outside the table may have been typed into it",
+            table: index });
+        }
+      }
+      report.push({ index: index, rows: rows, cols: cols, emptyCells: empty, header: header, layout: layout });
+    }
+    return { tableCount: count, tables: report, issueCount: issues.length, issues: issues };
+  }
+
   function cmdSelection(app) {
     var sel = app.Selection;
     var text = "";
@@ -3163,6 +3235,7 @@
     "writer.setParagraphAlignment": cmdSetParagraphAlignment,
     "writer.insertTable": cmdInsertTable,
     "writer.insertPageBreak": cmdInsertPageBreak,
+    "writer.checkTables": cmdWriterCheckTables,
     "writer.replaceAll": cmdReplaceAll,
     "writer.undo": cmdUndo,
     "writer.save": cmdSave,

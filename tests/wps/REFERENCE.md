@@ -265,6 +265,60 @@ add-in, giống `_selectionLock` bên C#. Hai lượt chạy cùng lúc trên m�
 `POST /v1/runs` và `POST /wps/v1/runs` đều đi qua `Manager.TryStart(port)` (`api/runs.go:129`), mà port là
 port của bridge WPS, nên mỗi bridge chỉ có **một** lượt chạy. Không cần khóa theo lượt.
 
+## Ba đường mới của pane/ribbon trên Core thật (đo 19/10/2026, KHÔNG cần WPS)
+
+`tests/wps/test_wps_pane_e2e.py` (chạy bằng `make test-wps-e2e`: Core thật + add-in giả poll qua HTTP) nay đo
+luôn ba đường mà nút trên ribbon/pane gọi — trước đây chúng chỉ có unit test Go và test DOM giả, chưa lần nào
+chạy trên Core thật. Kết quả lượt đo: **68 phép kiểm pass** (thêm 18 so với trước), bridge e2e 36 pass.
+
+### `GET /wps/v1/status` — một lời gọi, hai tầng
+
+- Trả `{addin: <Bridge.Status()>, core: <coreStatus>}`. Tầng add-in đo được: `connected:true`, `app:"wps"`,
+  `document.name` = tên tài liệu của **lần poll gần nhất** (add-in giả khai `bao-cao-tuan.docx`),
+  `addinVersion:"0.1.0"` (bản add-in khai trong poll, không phải bản Core), `everPoll:true`, `queued:0`,
+  `waiting:0`. Tầng Core: `port` khớp cổng thật của tiến trình, `pid` thật, `uptimeSeconds ≥ 0`,
+  `dataDir` = `AXIOM_CORE_DATA_DIR`, `logFile` = `<dataDir>/core.log`, `model:"fake-model"` và
+  `configured:true` (env có endpoint + model) — pane dựa vào `configured` để nút "Kiểm tra mô hình" biết đã
+  chọn AI chưa, thay vì đoán.
+- `Origin` lạ → 403 (đo được, không chỉ suy từ `checkWPSAuth`).
+
+### Địa chỉ nút "Sao chép API URL" — và cái bẫy hình dạng JSON
+
+Pane sao chép `http://127.0.0.1:<bridgePort>/health` (lấy `bridgePort` từ chính `/wps/v1/status`). Đo trên
+Core thật: dán địa chỉ đó vào trình duyệt (không Origin, không token) → **200**, `connected:true`,
+`port` khớp. Đúng như `DecideBridgeAuth` hứa: chỉ `GET /health` của bridge được miễn token.
+
+**Bẫy đã mắc khi viết phép đo**: `/health` của bridge trả **phong bì** `{"ok":true,"result":{...}}`, không
+phải object trần — phép kiểm đầu tiên đọc thẳng `.connected` nên đỏ oan trong khi đường vẫn chạy đúng. Ai
+viết tiếp cái gì đọc `/health` của bridge thì nhớ bóc `result`.
+
+### `GET /wps/v1/log` — phần cuối nhật ký
+
+- Đọc đúng tệp Core đang ghi (`<dataDir>/core.log`), `exists:true`, `count == len(lines) ≤ 200`, có dòng
+  `Agent Core starting` thật của lượt khởi động.
+- Ngữ nghĩa `lines` đo được: `?lines=2` trả **đúng hai dòng cuối** và `truncated:true` (còn dòng phía trên);
+  `?lines=1` trả dòng cuối cùng. `truncated` = "có dòng bị bỏ", không phải "tệp hỏng" — pane dựa vào đó để
+  hiện nút "Xem thêm".
+- **Tệp chưa có → 200 `exists:false`, `lines:[]`**, không phải lỗi (đo bằng cách đổi tên tệp log sang
+  `.bak` rồi trả lại ngay; `corelog` giữ tệp mở nên Linux ghi tiếp theo inode, không hỏng gì).
+- `/v1/log` giữ guard cũ: không token → 401/403; có token → cùng tệp.
+- Ghi chú về phép đo: để khẳng định "hai dòng cuối" một cách tất định, test **tự ghi thêm hai dòng mốc** vào
+  chính tệp log đó rồi đọc lại (lúc ấy chưa có lượt chạy nào nên Core không ghi xen vào). Đó là phép đo
+  `lines`/phần-cuối, không phải phép đo nội dung log.
+
+### `POST /wps/v1/exec` — lệnh trực tiếp, và hai mã 409
+
+- Kết quả add-in trả về đi qua **nguyên vẹn**: báo cáo `writer.checkTables` giữ đúng
+  `tableCount/issueCount/issues[].type` (`empty-cells`, `long-header-cell`) và tiếng Việt có dấu trong
+  `header` (không bị ép ASCII). Pane dịch `issues[].type` sang nhãn tiếng Việt bằng chính khoá đó
+  (`ISSUE_LABELS`, khớp `checks.py`) — đổi tên khoá là pane hiện nhãn rỗng/sai.
+- Lệnh add-in **không có** → HTTP **200** kèm `{ok:false, error:"unknown action: ..."}`, đúng như
+  `commands.js execute()`. Pane phải đọc `ok` chứ không đọc mã HTTP, nếu không nút "Soát bảng" sẽ hiện một
+  báo cáo rỗng như thể đã soát xong.
+- Hai ca 409 mang **mã máy đọc được**, đo trên HTTP thật: `addin-disconnected` (chưa mở tài liệu) và
+  `run-in-progress` (đang có lượt AI chạy — bắn trong lúc lượt 2 đang chạy). Pane dịch mã sang câu tiếng
+  Việt riêng, nên phép đo phải bám `code`; bám chuỗi tiếng Anh của Core là mong manh.
+
 ## Theo công cụ `wpsjs` của WPS (bản online chưa thử)
 
 `publish.xml`:
