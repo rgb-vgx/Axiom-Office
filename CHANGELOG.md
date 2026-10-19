@@ -5,6 +5,18 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Khung chat mini cạnh đoạn bôi đen trên WPS (20/10/2026)
+- Bôi đen → chuột phải → *Sửa bằng AI ▸ <mục>* hoặc *Hỏi AI về đoạn này* mở một **khung chat mini** nổi
+  (`mini.html`, `Application.ShowDialog`, không modal). Mục *Sửa bằng AI* chạy ngay; khung có chip các mục, ô gõ
+  thêm yêu cầu cho đúng đoạn đó, và *Hoàn tác* / *Dừng* / *Đóng*.
+- Core: `options.requireSelection` — mọi lượt từ khung mini **bắt buộc** có đoạn bôi đen, nên một câu gõ tay như
+  "ngắn hơn nữa" không bao giờ sửa cả tài liệu.
+- System prompt thêm luật cho lệnh nhanh (`QuickEditRule` / `QuickAnswerRule`): lượt thật trên WPS cho thấy model tìm
+  ra lỗi rồi **hỏi** "có áp dụng không?" thay vì sửa; nay bấm lệnh là sửa ngay, hoàn tác một cú bấm.
+- WPS không có `ShowDialog` thì mục chuột phải quay về khung chat lớn (đường qua Core bên dưới).
+- **Thử trên WPS thật (20/10/2026)**: người dùng đánh giá "khá ổn". Chưa có số đo riêng về vị trí cửa sổ
+  (`ShowDialog` không nhận toạ độ) hay trường hợp gõ thêm sau khi model thay cả đoạn.
+
 ### Added — Chuột phải ra thẳng "Sửa bằng AI" trên WPS (20/10/2026)
 - Bôi đen trong Writer, chuột phải: **Sửa bằng AI ▸** (cùng 9 mục với menu ở ô soạn) và **Hỏi AI về đoạn này**.
   Chọn một mục thì khung chat hiện ra (dùng lại khung đang mở, giữ hội thoại) và chạy mục đó ngay.

@@ -466,7 +466,41 @@
     return "";
   }
 
-  // runQuick: muc "Sua bang AI" chon tu menu chuot phai. Ribbon KHONG dua duoc gi vao khung chat dang mo (muc 7 cua
+  // "Hoi AI ve doan nay" trong menu chuot phai: cung tag "askAi" voi nut Ask AI tren ribbon (de dung chung icon), nen
+  // phan biet bang id. WPS khong dien Id thi coi nhu nut Ask AI - mo khung chat lon, van dung viec.
+  function isContextAsk(control) {
+    var id = "";
+    try { id = String((control && control.Id) || ""); } catch (e) { id = ""; }
+    return id.indexOf("axiomCtxAsk_") === 0;
+  }
+
+  // ---- Khung chat mini canh doan boi den (mini.html) ----
+  // Menu chuot phai mo khung nay bang Application.ShowDialog (SDK chinh thuc cua WPS: @wps-jsapi/*/js/ribbon.js goi
+  // ShowDialog(url, tieu de, rong * devicePixelRatio, cao * devicePixelRatio, modal)). KHONG modal: nguoi dung van
+  // nhin va cuon tai lieu trong luc AI sua. ShowDialog khong nhan toa do, nen WPS tu dat cua so.
+  var MINI_W = 440;
+  var MINI_H = 380;
+
+  function miniUrl(quick) {
+    var page = paneUrl("", "", "").replace("pane.html", "mini.html");
+    return quick ? page + "&quick=" + quick : page;
+  }
+
+  // openMini: true khi da mo duoc. Ban WPS khong co ShowDialog (hoac goi loi) -> false, ben goi quay ve khung chat lon.
+  function openMini(quick) {
+    try {
+      var app = getApp();
+      if (!app || typeof app.ShowDialog !== "function") { return false; }
+      var ratio = 1;
+      try { ratio = Number(window.devicePixelRatio) || 1; } catch (e) { ratio = 1; }
+      app.ShowDialog(miniUrl(quick), "Sửa bằng AI", Math.round(MINI_W * ratio), Math.round(MINI_H * ratio), false);
+      return true;
+    } catch (e2) {
+      return false;
+    }
+  }
+
+  // runQuick: duong DU PHONG khi khong mo duoc khung chat mini - muc "Sua bang AI" chay trong khung chat lon. Ribbon KHONG dua duoc gi vao khung chat dang mo (muc 7 cua
   // docs/ribbon-ui.md), nen: hien khung chat (dung lai cai dang mo - giu nguyen hoi thoai), roi nho Core chuyen muc
   // nay toi no (api/wpspane.go). Khung chat nghe SSE /wps/v1/pane/events va tu chay trong hoi thoai cua no; khung
   // chat vua tao thi Core giu yeu cau vai giay cho trang nap xong.
@@ -516,10 +550,17 @@
   function OnAction(control) {
     try {
       var tag = tagOf(control);
+      // Menu chuot phai: mo khung chat mini canh doan boi den. Khong mo duoc thi quay ve khung chat lon.
       if (tag.indexOf(QUICK_TAG) === 0) {
-        runQuick(tag.substring(QUICK_TAG.length));
-        // Khung chat goi Core chay luot - Core can add-in dang poll de khoa vung boi den va sua tai lieu.
+        var quick = tag.substring(QUICK_TAG.length);
+        if (!openMini(quick)) { runQuick(quick); }
+        // Khung chat (mini hay lon) goi Core chay luot - Core can add-in dang poll de khoa vung boi den va sua.
         try { start(); } catch (eQ) {}
+        return;
+      }
+      if (isContextAsk(control)) {
+        if (!openMini("")) { openPane("", "", ""); }
+        try { start(); } catch (eA) {}
         return;
       }
       // Bam vao mot id la: coi nhu mo khung chat, dung hanh vi cu.

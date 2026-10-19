@@ -629,3 +629,56 @@ test("menu chuot phai: muc quick:<id> -> hien khung chat (dung lai cai dang mo) 
   assert.equal(ctx.ribbon.OnGetImage({ Id: "axiomCtxQuick_t" }), "images/quickMenu.svg");
   if (ctx.AxiomBridge) { ctx.AxiomBridge.stop(); }
 });
+
+// ---- Menu chuot phai -> khung chat mini (mini.html) bang Application.ShowDialog; khong co ShowDialog thi khung lon.
+function mainWith(app, ratio = 1) {
+  const posts = [];
+  const ctx = load(["probe.js", "commands.js", "main.js"], {
+    Application: app,
+    location: { href: "http://127.0.0.1:47840/wps/addin/index.html" },
+    devicePixelRatio: ratio,
+    fetch: (url, options = {}) => {
+      if (String(url).endsWith("/pane/request")) { posts.push(JSON.parse(options.body)); }
+      return new Promise(() => {});
+    },
+  });
+  return { ctx, posts };
+}
+
+test("chuot phai: co ShowDialog -> mo khung chat mini canh doan boi den (khong modal), KHONG mo khung lon", () => {
+  const dialogs = [];
+  const panes = [];
+  const app = {
+    ShowDialog(url, title, w, h, modal) { dialogs.push({ url, title, w, h, modal }); },
+    CreateTaskPane(url) { const pane = { url, Visible: false }; panes.push(pane); return pane; },
+  };
+  const { ctx, posts } = mainWith(app, 2);
+  ctx.ribbon.OnAction({ Id: "axiomQuick_polish_t", Tag: "quick:polish" });
+  assert.deepEqual(dialogs[0], { url: "http://127.0.0.1:47840/wps/addin/mini.html?app=wps&quick=polish",
+    title: "Sửa bằng AI", w: 880, h: 760, modal: false }, "kich thuoc nhan devicePixelRatio nhu SDK");
+  assert.equal(panes.length, 0, "khung mini thay cho khung lon");
+  assert.equal(posts.length, 0, "khong di vong qua Core khi da mo duoc khung mini");
+  // "Hoi AI ve doan nay": khung mini trong, cho chon/go.
+  ctx.ribbon.OnAction({ Id: "axiomCtxAsk_l", Tag: "askAi" });
+  assert.equal(dialogs[1].url, "http://127.0.0.1:47840/wps/addin/mini.html?app=wps");
+  // Nut Ask AI tren ribbon (cung tag askAi) van mo khung chat LON.
+  ctx.ribbon.OnAction({ Id: "axiomAskAI", Tag: "askAi" });
+  assert.equal(panes.length, 1);
+  assert.equal(dialogs.length, 2);
+  if (ctx.AxiomBridge) { ctx.AxiomBridge.stop(); }
+});
+
+test("chuot phai: ShowDialog loi -> quay ve khung chat lon + Core chuyen muc (khong mat viec nguoi dung chon)", () => {
+  const panes = [];
+  const app = {
+    ShowDialog() { throw new Error("not supported"); },
+    CreateTaskPane(url) { const pane = { url, Visible: false }; panes.push(pane); return pane; },
+  };
+  const { ctx, posts } = mainWith(app);
+  ctx.ribbon.OnAction({ Id: "axiomQuick_fix_t", Tag: "quick:fix" });
+  assert.equal(panes.length, 1);
+  assert.deepEqual(posts, [{ quickAction: "fix" }]);
+  ctx.ribbon.OnAction({ Id: "axiomCtxAsk_t", Tag: "askAi" });
+  assert.equal(panes[0].Visible, true, "Hoi AI ve doan nay: khung lon hien ra");
+  if (ctx.AxiomBridge) { ctx.AxiomBridge.stop(); }
+});

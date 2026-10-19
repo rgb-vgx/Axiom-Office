@@ -177,7 +177,7 @@ Pane là một trang khác của add-in (`/wps/addin/pane.html`), mở bằng n�
 
 | Endpoint | Tương đương | Ghi chú |
 |---|---|---|
-| `POST /wps/v1/runs {prompt, conversationId?, options?}` | `POST /v1/runs` | Core tự gắn `office` = bridge WPS, `document` = lần poll gần nhất; add-in chưa kết nối → **409**. Gửi `{quickAction: "<id>"}` thay cho `prompt` = một mục của menu *Sửa bằng AI* (câu lệnh do Core lấy theo id; id lạ → 400) |
+| `POST /wps/v1/runs {prompt, conversationId?, options?}` | `POST /v1/runs` | Core tự gắn `office` = bridge WPS, `document` = lần poll gần nhất; add-in chưa kết nối → **409**. Gửi `{quickAction: "<id>"}` thay cho `prompt` = một mục của menu *Sửa bằng AI* (câu lệnh do Core lấy theo id; id lạ → 400). `options.requireSelection: true` (khung chat mini gửi kèm mọi lượt): không có đoạn bôi đen thì dừng ngay, `run.failed` kind `selection` |
 | `GET /wps/v1/runs/{id}` | `GET /v1/runs/{id}` | |
 | `GET /wps/v1/runs/{id}/events` | SSE `/v1/runs/{id}/events` | `EventSource` cùng origin |
 | `POST /wps/v1/runs/{id}/cancel` · `/confirm` | như `/v1/runs/...` | nút Dừng, thẻ xác nhận |

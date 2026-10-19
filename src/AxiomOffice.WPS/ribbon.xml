@@ -21,7 +21,8 @@
    - Neu ban WPS nao bo qua getImage, nut tro lai dung nhu ban cu: chi co chu, khong co anh.
 
   Menu chuot phai (<contextMenus> cuoi tep): "Sua bang AI >" 9 muc + "Hoi AI ve doan nay", tren chu thuong va tren
-  dong danh sach. Ban Windows chi co "Hoi AI ve doan nay" va chi dua contextMenus cho Office (RibbonUi.cs: "WPS
+  dong danh sach. Bam mot muc thi mo KHUNG CHAT MINI canh doan boi den (mini.html, Application.ShowDialog); ban WPS
+  khong co ShowDialog thi quay ve khung chat lon (main.js: openMini / runQuick). Menu da hien tren WPS that 20/10/2026. Ban Windows chi co "Hoi AI ve doan nay" va chi dua contextMenus cho Office (RibbonUi.cs: "WPS
   khong nhan chac"); libkshell.so cua WPS Linux co du ten the contextMenus/contextMenu/menuSeparator/insertBeforeMso,
   nhung CHUA nghiem thu tren WPS that - xem docs/ribbon-ui.md muc 5.3.
 

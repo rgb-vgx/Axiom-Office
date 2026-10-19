@@ -2,7 +2,9 @@
  * Axiom Office - WPS Ask AI task pane logic (khong DOM).
  *
  * Dinh nghia global AxiomPaneCore.create(options):
- *   options = { fetch, EventSource, base: "<...>/wps/v1/", kind: "wps"|"et"|"wpp", onChange(state) }
+ *   options = { fetch, EventSource, base: "<...>/wps/v1/", kind: "wps"|"et"|"wpp", onChange(state),
+ *               requireSelection? }  - requireSelection: moi luot gui kem options.requireSelection (khung chat mini canh
+ *               doan boi den - mini.html): Core dung ngay neu khong co doan boi den, khong sua ca tai lieu.
  *   state   = { messages: [{role: "user"|"assistant"|"error"|"info", text}],
  *               running, steps: [{action, ok, error?}],
  *               confirmation: null | {id, action, reason, choices?: [{id, label, detail, input?}]}, conversationId,
@@ -56,7 +58,7 @@
   // Lenh nhanh "Sua bang AI" dung ngay khi khong co doan boi den (agent/orchestrator.go: hasSelection) - ma
   // kind cua run.failed, dich sang cau noi duoc nguoi dung phai lam gi.
   var QUICK_ERRORS = {
-    "selection": "H\u00E3y b\u00F4i \u0111en \u0111o\u1EA1n v\u0103n c\u1EA7n l\u00E0m tr\u01B0\u1EDBc, r\u1ED3i ch\u1ECDn l\u1EA1i m\u1EE5c trong menu S\u1EEDa b\u1EB1ng AI.",
+    "selection": "H\u00E3y b\u00F4i \u0111en \u0111o\u1EA1n v\u0103n c\u1EA7n l\u00E0m tr\u01B0\u1EDBc, r\u1ED3i th\u1EED l\u1EA1i.",
     "selection-lock": "B\u1EA3n WPS n\u00E0y kh\u00F4ng kho\u00E1 \u0111\u01B0\u1EE3c v\u00F9ng b\u00F4i \u0111en, n\u00EAn kh\u00F4ng ch\u1EA1y l\u1EC7nh s\u1EEDa nhanh (AI c\u00F3 th\u1EC3 s\u1EEDa ra ngo\u00E0i \u0111o\u1EA1n \u0111\u00E3 ch\u1ECDn). H\u00E3y g\u00F5 y\u00EAu c\u1EA7u v\u00E0o \u00F4 so\u1EA1n."
   };
   var SEND_ERROR = "Agent Core tr\u1EA3 l\u1EDDi kh\u00F4ng h\u1EE3p l\u1EC7. Vui l\u00F2ng th\u1EED l\u1EA1i; n\u1EBFu v\u1EABn l\u1ED7i, kh\u1EDFi \u0111\u1ED9ng l\u1EA1i Core.";
@@ -151,6 +153,7 @@
     var Source = options.EventSource;
     var base = safeString(options.base);
     var kind = trimText(options.kind) || "wps";
+    var requireSelection = options.requireSelection === true;
     var onChange = options.onChange;
     if (typeof onChange !== "function") {
       onChange = function () {};
@@ -615,6 +618,10 @@
         emit();
         try {
           if (state.conversationId) { body.conversationId = state.conversationId; }
+          if (requireSelection) {
+            body.options = body.options || {};
+            body.options.requireSelection = true;
+          }
         } catch (e2) {}
         var req = null;
         try {
