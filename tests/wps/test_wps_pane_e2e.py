@@ -60,6 +60,8 @@ class FakeAddin(threading.Thread):
     def __init__(self, core):
         super().__init__(daemon=True)
         self.core, self.actions, self.stop_flag = core, [], threading.Event()
+        # So ky tu dang boi den: 0 = nguoi dung chua boi den gi (lenh nhanh "Sua bang AI" phai dung ngay).
+        self.selected = len(SELECTION_TEXT)
 
     def run(self):
         while not self.stop_flag.is_set():
@@ -76,10 +78,11 @@ class FakeAddin(threading.Thread):
                     answer = {"ok": True, "result": {"name": DOCUMENT["name"], "fullName": DOCUMENT["fullName"],
                                                      "totalChars": 12, "truncated": False, "text": SELECTION_TEXT}}
                 elif job.get("action") == "writer.selection":
-                    answer = {"ok": True, "result": {"text": SELECTION_TEXT, "start": 0, "end": 12}}
+                    answer = {"ok": True, "result": {"text": SELECTION_TEXT[:self.selected], "start": 0,
+                                                     "end": self.selected}}
                 elif job.get("action") == "writer.lockSelection":
-                    answer = {"ok": True, "result": {"chars": 12, "start": 0, "end": 12, "docEnd": 12,
-                                                     "tables": 0, "tablesKnown": True}}
+                    answer = {"ok": True, "result": {"chars": self.selected, "start": 0, "end": self.selected,
+                                                     "docEnd": 12, "tables": 0, "tablesKnown": True}}
                 elif job.get("action") == "writer.unlockSelection":
                     answer = {"ok": True, "result": {"locked": False}}
                 elif job.get("action") == "writer.checkTables":
@@ -175,6 +178,12 @@ def main() -> int:
         {"text": "Không lưu theo ý bạn"},
         # Luot 4: hoi thoai tiep.
         {"text": "Tiếp tục cuộc trò chuyện"},
+        # Luot 5: lenh nhanh "Trau chuot" (muc SUA) - duoc goi lenh sua.
+        {"tool": "office_action", "arguments": {"action": "writer.appendText", "params": {"text": "Bản trau chuốt"}}},
+        {"text": "Đã trau chuốt đoạn văn"},
+        # Luot 6: lenh nhanh "Tom tat" (CHI DOC) - model co tinh goi lenh sua, Core phai chan.
+        {"tool": "office_action", "arguments": {"action": "writer.appendText", "params": {"text": "KHÔNG ĐƯỢC GHI"}}},
+        {"text": "Tóm tắt: báo cáo tuần"},
     ])
     core = base.Core(base.core_exe(work), work, base.TOKEN, base.free_port(), addin_dir, session_dir, {
         "AXIOM_LLM_PROVIDER": "openai", "AXIOM_LLM_ENDPOINT": "http://127.0.0.1:%d/v1" % llm.port,
@@ -449,6 +458,103 @@ def main() -> int:
         reply = base.as_json(text).get("result") or {}
         check(status == 200 and reply.get("conversationId") == conversation, "pane: conversationId giu nguyen", reply)
         sse(core.base + "/wps/v1/runs/%s/events" % reply.get("runId"), own)
+
+        # ---- lenh nhanh "Sua bang AI": danh sach lay tu Core (pane khong chep tay id/nhan).
+        status, _, text = base.request(core.base + "/wps/v1/quick-actions", headers=own)
+        actions = (base.as_json(text).get("result") or {}).get("actions") or []
+        ids = [a.get("id") for a in actions]
+        check(status == 200 and ids[:2] == ["polish", "rewrite"] and "summarize" in ids,
+              "quick-actions: /wps/v1/quick-actions tra danh sach muc, Trau chuot dung dau", (status, ids))
+        check(all(set(a) == {"id", "label", "edits"} for a in actions),
+              "quick-actions: chi tra id/nhan/edits - cau lenh o lai trong Core", actions[:1])
+        check(not [a for a in actions if a.get("id") == "summarize"][0].get("edits"),
+              "quick-actions: Tom tat la muc chi doc (edits=false)", actions)
+        status, _, _ = base.request(core.base + "/v1/quick-actions")
+        check(status in (401, 403), "quick-actions: /v1/quick-actions khong token -> guard cu", status)
+        status, _, text = base.request(core.base + "/wps/v1/runs", "POST", {"quickAction": "no-such"}, own)
+        check(status == 400 and "no-such" in text, "quick-actions: id la -> 400 kem ten id", (status, text[:200]))
+
+        # ---- luot 5: Trau chuot (muc sua). Core tu lay cau lenh, khoa vung boi den nhu luot thuong.
+        before = len(llm.requests())
+        unlocks = [a for a, _ in addin.actions].count("writer.unlockSelection")
+        status, _, text = base.request(core.base + "/wps/v1/runs", "POST",
+                                       {"quickAction": "polish", "conversationId": conversation}, own)
+        run5 = (base.as_json(text).get("result") or {}).get("runId")
+        check(status == 200 and run5, "lenh nhanh: POST /wps/v1/runs {quickAction} -> runId (khong can prompt)",
+              (status, text[:200]))
+        events = sse(core.base + "/wps/v1/runs/%s/events" % run5, own)
+        check(any(e == "run.completed" for e, _ in events), "lenh nhanh Trau chuot: chay xong", [e for e, _ in events])
+        asked = json.dumps(llm.requests()[before:before + 1], ensure_ascii=False)
+        check("Trau chuốt đoạn văn đang bôi đen" in asked and "ONLY it may change" in asked,
+              "lenh nhanh Trau chuot: model nhan cau lenh cua Core + luat khoa vung", asked[:300])
+        check(("writer.appendText", {"text": "Bản trau chuốt"}) in addin.actions,
+              "lenh nhanh Trau chuot: muc SUA duoc goi lenh sua", addin.actions[-4:])
+        base.wait_for(lambda: [a for a, _ in addin.actions].count("writer.unlockSelection") > unlocks, 5)
+        check([a for a, _ in addin.actions].count("writer.unlockSelection") > unlocks,
+              "lenh nhanh Trau chuot: mo khoa vung khi xong", addin.actions[-3:])
+
+        # ---- luot 6: Tom tat (chi doc). Model co tinh ghi vao tai lieu -> Core khong cho lenh sua.
+        status, _, text = base.request(core.base + "/wps/v1/runs", "POST",
+                                       {"quickAction": "summarize", "conversationId": conversation}, own)
+        run6 = (base.as_json(text).get("result") or {}).get("runId")
+        events = sse(core.base + "/wps/v1/runs/%s/events" % run6, own)
+        done = [payload(d) for e, d in events if e == "run.completed"]
+        check(done and done[0].get("reply") == "Tóm tắt: báo cáo tuần", "lenh nhanh Tom tat: tra loi trong khung chat",
+              [e for e, _ in events])
+        check(not any(p == {"text": "KHÔNG ĐƯỢC GHI"} for _, p in addin.actions),
+              "lenh nhanh Tom tat: lenh sua bi chan, add-in KHONG nhan writer.appendText", addin.actions[-4:])
+        started = [payload(d) for e, d in events if e == "run.started"]
+        check(started and started[0].get("mode") == "act",
+              "lenh nhanh Tom tat: chi doc nhung KHONG phai che do lap ke hoach (mode=act)", started)
+
+        # ---- luot 7: chua boi den gi -> dung ngay, ma loi 'selection' (pane dich ra tieng Viet), khong goi model.
+        def message_count():
+            _, _, body = base.request(core.base + "/wps/v1/conversations/%s" % conversation, headers=own)
+            return len((base.as_json(body).get("result") or {}).get("messages") or [])
+
+        addin.selected = 0
+        before = len(llm.requests())
+        messages_before = message_count()
+        status, _, text = base.request(core.base + "/wps/v1/runs", "POST",
+                                       {"quickAction": "polish", "conversationId": conversation}, own)
+        run7 = (base.as_json(text).get("result") or {}).get("runId")
+        events = sse(core.base + "/wps/v1/runs/%s/events" % run7, own)
+        failed = [payload(d) for e, d in events if e == "run.failed"]
+        check(failed and failed[0].get("kind") == "selection",
+              "lenh nhanh khong boi den: run.failed kind='selection'", events[-2:])
+        check(len(llm.requests()) == before, "lenh nhanh khong boi den: KHONG goi model", len(llm.requests()) - before)
+        check(messages_before > 0 and message_count() == messages_before,
+              "lenh nhanh khong boi den: khong ghi tin nhan nao vao hoi thoai", (messages_before, message_count()))
+        addin.selected = len(SELECTION_TEXT)
+
+        # ---- menu chuot phai -> khung chat dang mo: Core lam tram trung chuyen (api/wpspane.go). main.js POST
+        # pane/request, khung chat nghe SSE pane/events roi tu chay muc do trong hoi thoai cua no.
+        got = {}
+
+        def listen(key):
+            got[key] = sse(core.base + "/wps/v1/pane/events", own, timeout=10, until=("pane.quick",))
+
+        listener = threading.Thread(target=listen, args=("live",), daemon=True)
+        listener.start()
+        time.sleep(0.8)
+        status, _, text = base.request(core.base + "/wps/v1/pane/request", "POST", {"quickAction": "shorten"}, own)
+        check(status == 200 and (base.as_json(text).get("result") or {}).get("queued") is True,
+              "chuot phai: POST /wps/v1/pane/request -> queued", (status, text[:200]))
+        listener.join(12)
+        check(got.get("live") and got["live"][-1] == ("pane.quick", {"quickAction": "shorten"}),
+              "chuot phai: khung chat DANG MO nhan su kien pane.quick dung muc", got.get("live"))
+        # Khung chat vua tao (trang con dang nap): yeu cau den truoc khi no nghe van duoc giu cho no lay.
+        status, _, text = base.request(core.base + "/wps/v1/pane/request", "POST", {"quickAction": "fix"}, own)
+        check(status == 200 and (base.as_json(text).get("result") or {}).get("listening") == 0,
+              "chuot phai: chua khung chat nao nghe -> listening=0, yeu cau van duoc giu", text[:200])
+        listen("late")
+        check(got.get("late") and got["late"][-1] == ("pane.quick", {"quickAction": "fix"}),
+              "chuot phai: khung chat noi vao SAU van lay duoc yeu cau dang cho", got.get("late"))
+        status, _, text = base.request(core.base + "/wps/v1/pane/request", "POST", {"quickAction": "no-such"}, own)
+        check(status == 400 and "no-such" in text, "chuot phai: muc la -> 400", (status, text[:200]))
+        status, _, _ = base.request(core.base + "/wps/v1/pane/request", "POST", {"quickAction": "fix"},
+                                    {"Origin": "http://evil.example"})
+        check(status in (401, 403), "chuot phai: Origin la -> bi chan (trang khac khong dieu khien duoc pane)", status)
     finally:
         if addin is not None:
             addin.stop_flag.set()

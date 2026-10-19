@@ -34,6 +34,12 @@ type Request struct {
 	// Plan: che do lap ke hoach (options.mode = "plan") - chi doc tai lieu, tra ve ke hoach, khong sua gi.
 	// Buoc thuc hien la mot luot thuong tiep theo trong CUNG hoi thoai (model thay lai ke hoach trong lich su).
 	Plan bool
+	// QuickAction: id cua muc "Sua bang AI" (quickactions.go) khi luot chay den tu menu do; "" = nguoi dung tu go.
+	// Muc nao cung lam viec tren doan boi den, nen khong boi den gi thi luot chay dung ngay (xem Execute).
+	QuickAction string
+	// ReadOnly: luot chi duoc DOC tai lieu - cung bo tool cua che do lap ke hoach, nhung tra loi nhu mot luot
+	// thuong (khong co the ke hoach, khong PlanModeRule). Dung cho cac muc nhanh chi tra loi (Tom tat, Dich...).
+	ReadOnly bool
 }
 
 const (
@@ -62,6 +68,16 @@ func ParseRequest(body map[string]any) (*Request, string) {
 		return nil, "invalid JSON body"
 	}
 	prompt, _ := body["prompt"].(string)
+	// Lenh nhanh: cau lenh lay tu bang cua Core, khong tin chu pane gui kem - ba ban cung mot cau.
+	quickID := strings.TrimSpace(textOf(body["quickAction"]))
+	quick := QuickAction{}
+	if quickID != "" {
+		found, ok := FindQuickAction(quickID)
+		if !ok {
+			return nil, "unknown 'quickAction' \"" + quickID + "\" (see GET /v1/quick-actions)"
+		}
+		quick, prompt = found, found.Prompt
+	}
 	if strings.TrimSpace(prompt) == "" {
 		return nil, "'prompt' is required"
 	}
@@ -119,7 +135,10 @@ func ParseRequest(body map[string]any) (*Request, string) {
 		Document:       document,
 		Options:        requestOptions(maxRounds, maxTokens, maxSeconds),
 		Interactive:    interactive,
-		Plan:           mode == "plan",
+		// Lenh nhanh khong ket hop voi lap ke hoach: muc nao cung la mot viec nho, ro rang tren doan boi den.
+		Plan:        mode == "plan" && quick.ID == "",
+		QuickAction: quick.ID,
+		ReadOnly:    quick.ID != "" && !quick.Edits,
 	}, ""
 }
 
@@ -187,7 +206,22 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 	// Khoa vung boi den: nguoi dung boi den roi hoi thi AI chi duoc sua trong vung do. Lenh nay doc
 	// vung chon SONG trong add-in chu khong tin pane - POST /wps/v1/runs ghi de `document` bang ban
 	// chup cua add-in, ma ban chup do khong co `selection` - nen no cung dung cho MCP/script.
-	o.lockSelection(ctx, run, request, appKind)
+	lockError := o.lockSelection(ctx, run, request, appKind)
+
+	// Lenh nhanh lam viec tren doan boi den: khong co doan nao thi dung NGAY, truoc khi tao hoi thoai - de
+	// model tu doan "doan nao" thi no se sua ca tai lieu. Hai ma loi rieng de pane noi dung ly do bang tieng
+	// Viet: "selection" = nguoi dung chua boi den; "selection-lock" = co boi den nhung add-in khong khoa duoc
+	// (ban WPS thieu API do vung) - chay ma khong khoa thi khong con gi giu AI trong doan do.
+	if request.QuickAction != "" && !hasSelection(run, request) {
+		if lockError != "" {
+			o.fail(run, "quick action \""+request.QuickAction+"\" needs a locked selection, but the add-in "+
+				"cannot lock it: "+lockError, "selection-lock")
+		} else {
+			o.fail(run, "quick action \""+request.QuickAction+"\" works on the selected text: select it first", "selection")
+		}
+		o.finish(run)
+		return
+	}
 
 	conversation := o.conversation(request, appKind, session, documentKey)
 	if conversation == nil {
@@ -229,24 +263,26 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 	if o.Skills != nil {
 		appSkills = o.Skills.ForApp(appKind)
 	}
+	// readOnly: lap ke hoach, hoac lenh nhanh chi tra loi (Tom tat, Dich...) - ca hai chi duoc goi lenh doc.
+	readOnly := request.Plan || request.ReadOnly
 	officeTool := tools.NewOfficeActionTool(catalog, appKind)
-	if request.Plan {
+	if readOnly {
 		officeTool = tools.NewReadOnlyOfficeActionTool(catalog, appKind)
 	}
 	list := []tools.Tool{officeTool}
 	// Dung lai ca bai theo mau tung lo (docs/template-design.md muc 6.6): chi trinh chieu, chi khi sua duoc, va
 	// chi khi bridge co lenh doc bai nguon (PowerPoint; LibreOffice/WPS chua co).
-	if appKind == "wpp" && !request.Plan && catalog.Has("wpp.sourceManifest") {
+	if appKind == "wpp" && !readOnly && catalog.Has("wpp.sourceManifest") {
 		list = append(list, tools.NewSlidesFromTemplateTool())
 	}
 	// Trinh bay lai tai lieu Word theo mau (khoi bo tron nen nhat): chi khi sua duoc va bridge co lenh dung khoi.
 	// Dang khoa vung boi den thi khong mo (doc_design trinh bay lai ca tai lieu, bridge se tu choi).
 	locked := request.Document != nil && request.Document.SelectionLocked
-	if appKind == "wps" && !request.Plan && !locked && catalog.Has("writer.insertBlocks") {
+	if appKind == "wps" && !readOnly && !locked && catalog.Has("writer.insertBlocks") {
 		list = append(list, tools.NewDocDesignTool())
 	}
 	// Danh sach viec (write_todos): chi khi lam that - lap ke hoach da tra ve ke hoach bang chu.
-	if !request.Plan {
+	if !readOnly {
 		list = append(list, tools.NewTodoTool())
 	}
 	if len(appSkills) > 0 && o.Skills != nil {
@@ -286,7 +322,7 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 	// MCP (muc 8.7): lan file office + server nguoi dung cau hinh; loi server khong hong run.
 	if o.MCP != nil {
 		bound := o.MCP.Tools(ctx)
-		if request.Plan {
+		if readOnly {
 			bound = tools.ReadOnlyMCP(bound)
 		}
 		if len(bound) > 0 {
@@ -418,7 +454,7 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 
 	// Tu kiem chung doc lai tu cau hinh moi luot (nhu VisualQaEnabled): doi trong Cai dat co hieu luc ngay.
 	options := request.Options
-	options.Verify = o.Config().VerifyWorkEnabled && !request.Plan
+	options.Verify = o.Config().VerifyWorkEnabled && !readOnly
 	// Model du phong + cua so ngu canh (GET /models doc mot lan cho moi cau hinh LLM).
 	options.FallbackModels = o.Config().LlmFallbackModels
 	options.ContextWindow = client.ModelInfo(ctx, client.Model).ContextWindow
@@ -505,20 +541,23 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 // lockSelection: hoi add-in WPS khoa vung dang boi den, va ghi vung do vao ngu canh cua luot de prompt
 // noi cho model biet. Khong boi den - hoac ban WPS khong do duoc vung (thieu Selection.Start/End,
 // doc.Range) - thi `chars` = 0 va luot chay chay nhu thuong: day KHONG phai loi cua luot.
-func (o *Orchestrator) lockSelection(ctx context.Context, run *Run, request *Request, appKind string) {
+//
+// Tra ve loi cua add-in khi no TU CHOI khoa (vd ban WPS thieu API); "" khi khoa duoc, khi khong boi den gi,
+// hoac khi app nay khong co khoa vung.
+func (o *Orchestrator) lockSelection(ctx context.Context, run *Run, request *Request, appKind string) string {
 	if o.Bridge == nil || appKind != "wps" {
-		return
+		return ""
 	}
 	// writer.selection la lenh doc: goi truoc hay sau khi khoa deu ra cung vung (khoa khong doi vung chon).
 	selection := o.Bridge.Command(ctx, request.Port, "writer.selection", nil)
 	locked := o.Bridge.Command(ctx, request.Port, "writer.lockSelection", nil)
 	if !locked.OK {
 		corelog.Info("run %s: selection not locked: %s", run.ID, locked.Error)
-		return
+		return locked.Error
 	}
 	chars := intOf(locked.Result["chars"])
 	if chars <= 0 {
-		return
+		return ""
 	}
 	run.SelectionLock = true
 	if request.Document == nil {
@@ -532,6 +571,16 @@ func (o *Orchestrator) lockSelection(ctx context.Context, run *Run, request *Req
 	}
 	tables := intOf(locked.Result["tables"])
 	corelog.Info("run %s: selection locked (%d chars, %d whole table(s))", run.ID, chars, tables)
+	return ""
+}
+
+// hasSelection: luot nay co doan boi den de lam viec khong. WPS: add-in da khoa duoc mot vung (doc SONG,
+// khong tin pane). Ban khong co khoa vung (Windows, LibreOffice): doan chu ben goi gui kem trong document.
+func hasSelection(run *Run, request *Request) bool {
+	if run.SelectionLock {
+		return true
+	}
+	return request.Document != nil && strings.TrimSpace(request.Document.SelectionText) != ""
 }
 
 // unlockSelection: mo khoa vung boi den. Chay trong finish() nen phai dung context RIENG: context cua

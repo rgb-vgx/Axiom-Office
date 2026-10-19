@@ -33,6 +33,7 @@ func mapWPS(mux *http.ServeMux, deps *Deps) {
 	})
 	mapWPSRuns(mux, deps)
 	mapWPSAdmin(mux, deps)
+	mapWPSPane(mux, deps)
 	// Duong dan la duoi /wps/* (vd ".." da duoc server chuan hoa): tra 404 truc tiep, khong lo
 	// vo guard 401. /wps/v1/* la van ap dung xac thuc kenh (Origin la -> 403).
 	mux.HandleFunc("/wps/v1/", func(w http.ResponseWriter, r *http.Request) {
