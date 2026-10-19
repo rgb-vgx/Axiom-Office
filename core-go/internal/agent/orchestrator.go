@@ -40,6 +40,10 @@ type Request struct {
 	// ReadOnly: luot chi duoc DOC tai lieu - cung bo tool cua che do lap ke hoach, nhung tra loi nhu mot luot
 	// thuong (khong co the ke hoach, khong PlanModeRule). Dung cho cac muc nhanh chi tra loi (Tom tat, Dich...).
 	ReadOnly bool
+	// RequireSelection (options.requireSelection): luot nay CHI lam viec tren doan boi den - khung chat mini canh doan
+	// boi den gui kem. Khong co doan nao thi dung nhu lenh nhanh, de mot cau "ngan hon nua" khong bi hieu thanh sua ca
+	// tai lieu.
+	RequireSelection bool
 }
 
 const (
@@ -118,6 +122,7 @@ func ParseRequest(body map[string]any) (*Request, string) {
 	if value, ok := tryMap(body["options"])["interactive"].(bool); ok {
 		interactive = value
 	}
+	requireSelection, _ := tryMap(body["options"])["requireSelection"].(bool)
 	mode := strings.TrimSpace(textOf(tryMap(body["options"])["mode"]))
 	if mode != "" && mode != "plan" && mode != "act" {
 		return nil, "'options.mode' must be \"plan\" or \"act\""
@@ -139,6 +144,8 @@ func ParseRequest(body map[string]any) (*Request, string) {
 		Plan:        mode == "plan" && quick.ID == "",
 		QuickAction: quick.ID,
 		ReadOnly:    quick.ID != "" && !quick.Edits,
+		// Lenh nhanh nao cung lam tren doan boi den, nen luon can doan boi den.
+		RequireSelection: quick.ID != "" || requireSelection,
 	}, ""
 }
 
@@ -208,16 +215,19 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 	// chup cua add-in, ma ban chup do khong co `selection` - nen no cung dung cho MCP/script.
 	lockError := o.lockSelection(ctx, run, request, appKind)
 
-	// Lenh nhanh lam viec tren doan boi den: khong co doan nao thi dung NGAY, truoc khi tao hoi thoai - de
+	// Lenh nhanh (va khung chat mini) lam viec tren doan boi den: khong co doan nao thi dung NGAY, truoc khi tao hoi thoai - de
 	// model tu doan "doan nao" thi no se sua ca tai lieu. Hai ma loi rieng de pane noi dung ly do bang tieng
 	// Viet: "selection" = nguoi dung chua boi den; "selection-lock" = co boi den nhung add-in khong khoa duoc
 	// (ban WPS thieu API do vung) - chay ma khong khoa thi khong con gi giu AI trong doan do.
-	if request.QuickAction != "" && !hasSelection(run, request) {
+	if request.RequireSelection && !hasSelection(run, request) {
+		what := "this request"
+		if request.QuickAction != "" {
+			what = "quick action \"" + request.QuickAction + "\""
+		}
 		if lockError != "" {
-			o.fail(run, "quick action \""+request.QuickAction+"\" needs a locked selection, but the add-in "+
-				"cannot lock it: "+lockError, "selection-lock")
+			o.fail(run, what+" needs a locked selection, but the add-in cannot lock it: "+lockError, "selection-lock")
 		} else {
-			o.fail(run, "quick action \""+request.QuickAction+"\" works on the selected text: select it first", "selection")
+			o.fail(run, what+" works on the selected text: select it first", "selection")
 		}
 		o.finish(run)
 		return
@@ -370,6 +380,14 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 		assembled.RecentActionLines)
 	if request.Plan {
 		systemPrompt += "\n\n" + PlanModeRule
+	}
+	// Lenh nhanh "Sua bang AI": nguoi dung bam lenh la da quyet - sua ngay, khong hoi lai (quickactions.go).
+	if request.QuickAction != "" {
+		if request.ReadOnly {
+			systemPrompt += "\n\n" + QuickAnswerRule
+		} else {
+			systemPrompt += "\n\n" + QuickEditRule
+		}
 	}
 
 	liveReasoning, liveStatus := "", ""

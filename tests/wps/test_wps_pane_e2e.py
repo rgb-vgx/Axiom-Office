@@ -487,6 +487,10 @@ def main() -> int:
         asked = json.dumps(llm.requests()[before:before + 1], ensure_ascii=False)
         check("Trau chuốt đoạn văn đang bôi đen" in asked and "ONLY it may change" in asked,
               "lenh nhanh Trau chuot: model nhan cau lenh cua Core + luat khoa vung", asked[:300])
+        # Luot that 20/10/2026: "Sua loi chinh ta" tim ra loi roi HOI lai thay vi sua -> system prompt phai noi ro
+        # bam lenh la da quyet.
+        check("ONE-CLICK EDIT" in asked and "ONE-CLICK ANSWER" not in asked,
+              "lenh nhanh Trau chuot: system prompt co luat SUA NGAY, khong hoi lai", "")
         check(("writer.appendText", {"text": "Bản trau chuốt"}) in addin.actions,
               "lenh nhanh Trau chuot: muc SUA duoc goi lenh sua", addin.actions[-4:])
         base.wait_for(lambda: [a for a, _ in addin.actions].count("writer.unlockSelection") > unlocks, 5)
@@ -494,6 +498,7 @@ def main() -> int:
               "lenh nhanh Trau chuot: mo khoa vung khi xong", addin.actions[-3:])
 
         # ---- luot 6: Tom tat (chi doc). Model co tinh ghi vao tai lieu -> Core khong cho lenh sua.
+        before = len(llm.requests())
         status, _, text = base.request(core.base + "/wps/v1/runs", "POST",
                                        {"quickAction": "summarize", "conversationId": conversation}, own)
         run6 = (base.as_json(text).get("result") or {}).get("runId")
@@ -503,6 +508,11 @@ def main() -> int:
               [e for e, _ in events])
         check(not any(p == {"text": "KHÔNG ĐƯỢC GHI"} for _, p in addin.actions),
               "lenh nhanh Tom tat: lenh sua bi chan, add-in KHONG nhan writer.appendText", addin.actions[-4:])
+        asked = json.dumps(llm.requests()[before:before + 1], ensure_ascii=False)
+        check("ONE-CLICK ANSWER" in asked and "ONE-CLICK EDIT" not in asked,
+              "lenh nhanh Tom tat: system prompt co luat TRA LOI THANG (khong luat sua ngay)", "")
+        check("ONE-CLICK" not in json.dumps(first, ensure_ascii=False),
+              "luot go tay binh thuong: khong co luat lenh nhanh nao", "")
         started = [payload(d) for e, d in events if e == "run.started"]
         check(started and started[0].get("mode") == "act",
               "lenh nhanh Tom tat: chi doc nhung KHONG phai che do lap ke hoach (mode=act)", started)
@@ -525,6 +535,14 @@ def main() -> int:
         check(len(llm.requests()) == before, "lenh nhanh khong boi den: KHONG goi model", len(llm.requests()) - before)
         check(messages_before > 0 and message_count() == messages_before,
               "lenh nhanh khong boi den: khong ghi tin nhan nao vao hoi thoai", (messages_before, message_count()))
+        # Khung chat mini: yeu cau go tay kem options.requireSelection - cung dung ngay, khong goi model.
+        status, _, text = base.request(core.base + "/wps/v1/runs", "POST",
+                                       {"prompt": "Ngắn hơn nữa", "options": {"requireSelection": True}}, own)
+        events = sse(core.base + "/wps/v1/runs/%s/events" % (base.as_json(text).get("result") or {}).get("runId"), own)
+        failed = [payload(d) for e, d in events if e == "run.failed"]
+        check(failed and failed[0].get("kind") == "selection" and len(llm.requests()) == before,
+              "khung chat mini: go tay + requireSelection, chua boi den -> dung, kind 'selection', khong goi model",
+              events[-2:])
         addin.selected = len(SELECTION_TEXT)
 
         # ---- menu chuot phai -> khung chat dang mo: Core lam tram trung chuyen (api/wpspane.go). main.js POST

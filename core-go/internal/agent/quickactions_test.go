@@ -84,3 +84,21 @@ func TestQuickActionsTable(t *testing.T) {
 		t.Fatal("phai co ca muc sua lan muc chi doc")
 	}
 }
+
+// Khung chat mini: yeu cau go tay gui options.requireSelection -> can doan boi den nhu lenh nhanh.
+func TestParseRequestRequireSelection(t *testing.T) {
+	office := map[string]any{"port": float64(1)}
+	request, _ := ParseRequest(map[string]any{"prompt": "ngắn hơn nữa", "office": office,
+		"options": map[string]any{"requireSelection": true}})
+	if !request.RequireSelection || request.QuickAction != "" || request.ReadOnly {
+		t.Fatalf("requireSelection phai doc duoc, va KHONG bien thanh lenh nhanh: %+v", request)
+	}
+	request, _ = ParseRequest(map[string]any{"quickAction": "polish", "office": office})
+	if !request.RequireSelection {
+		t.Fatal("lenh nhanh luon can doan boi den")
+	}
+	request, _ = ParseRequest(map[string]any{"prompt": "x", "office": office})
+	if request.RequireSelection {
+		t.Fatal("luot go tay thuong: khong bat buoc boi den")
+	}
+}

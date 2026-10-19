@@ -52,6 +52,21 @@ var QuickActions = []QuickAction{
 		"Việt thì dịch sang tiếng Anh. Chỉ đưa bản dịch." + quickAnswerTail},
 }
 
+// QuickEditRule / QuickAnswerRule: noi them vao system prompt khi luot chay den tu menu "Sua bang AI" (nhu PlanModeRule
+// cua che do lap ke hoach). Can vi cau lenh trong tin nhan KHONG du: luot that 20/10/2026 - "Sua loi chinh ta" tim
+// ra hai loi roi HOI "ban muon toi ap dung khong?" thay vi sua, nguoi dung bam menu ma khong thay gi doi. Nguoi dung
+// bam mot lenh sua la da quyet; hoi lai bien mot cu bam thanh hai luot.
+const QuickEditRule = "ONE-CLICK EDIT for this turn: the user selected text and picked the menu command quoted in " +
+	"their message. That IS the instruction to change the document, not a question - apply it to the selected text " +
+	"now with office_action. Do not ask for confirmation, do not offer options or wait for approval: the user undoes " +
+	"the whole turn with one click if they dislike the result. For small fixes (spelling, punctuation, a few words) " +
+	"use writer.replaceAll/replaceMany inside the selection so formatting is kept; use writer.typeText only to replace " +
+	"the whole selection (rewrite, shorten, expand, change tone). If nothing needs to change, change nothing and say " +
+	"so in one sentence. Finish with one or two short lines on what changed."
+
+const QuickAnswerRule = "ONE-CLICK ANSWER for this turn: the user selected text and picked the menu command quoted " +
+	"in their message. Answer it directly about the selected text; do not ask follow-up questions."
+
 // FindQuickAction: tra muc theo id (phan biet hoa thuong - id do Core cap, pane gui lai nguyen van).
 func FindQuickAction(id string) (QuickAction, bool) {
 	for _, action := range QuickActions {
