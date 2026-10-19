@@ -12,6 +12,9 @@ Hanh vi mong doi:
 - Khong co WPS, hoac --no-wps: khong dong gi toi Kingsoft.
 - Core cai kem add-in: <data>/axiom-office/core/wps-addin/index.html.
 - --uninstall: go dang ky add-in khoi publish.xml (giu add-in khac).
+- DU LIEU cua nguoi dung: Core luu core.db (+ -wal, -shm) ngay trong <data>/axiom-office/core/ - chinh thu muc
+  install.sh thay khi cai. Cai lai / nang cap va --uninstall KHONG --purge phai giu nguyen ba tep do; chi --purge
+  moi xoa (loi that 20/10/2026: ca ba duong deu rm -rf thu muc core/, mat het hoi thoai va Bo nho AI).
 
     python3 tests/linux/test_install_sh.py
 """
@@ -78,6 +81,24 @@ class InstallShTests(unittest.TestCase):
                                 capture_output=True, text=True, timeout=120, cwd=self.stage)
         return result.returncode, result.stdout + result.stderr
 
+    def core_dir(self):
+        return os.path.join(self.env["XDG_DATA_HOME"], "axiom-office", "core")
+
+    def seed_data(self):
+        # Gia lap Core da chay: co hoi thoai + Bo nho AI trong core.db, WAL chua checkpoint.
+        data = {"core.db": "hoi thoai + bo nho", "core.db-wal": "wal", "core.db-shm": "shm"}
+        for name, text in data.items():
+            with open(os.path.join(self.core_dir(), name), "w") as handle:
+                handle.write(text)
+        return data
+
+    def assert_data_kept(self, data, out):
+        for name, text in data.items():
+            path = os.path.join(self.core_dir(), name)
+            self.assertTrue(os.path.exists(path), name + " bi xoa - mat du lieu nguoi dung\n" + out)
+            with open(path) as handle:
+                self.assertEqual(handle.read(), text, name + " bi doi noi dung")
+
     def read_publish(self):
         try:
             with open(self.publish, encoding="utf-8") as handle:
@@ -128,6 +149,36 @@ class InstallShTests(unittest.TestCase):
         text = self.read_publish()
         self.assertNotIn('name="axiomoffice"', text, out)
         self.assertIn(OTHER, text, "giu add-in khac")
+
+    def test_reinstall_keeps_user_data(self):
+        self.assertEqual(self.run_install()[0], 0)
+        data = self.seed_data()
+        # Goi moi co tep moi; tep cu khong con trong goi phai bien mat (khong giu ca thu muc cu).
+        stale = os.path.join(self.core_dir(), "tep-cua-ban-cu.txt")
+        open(stale, "w").close()
+        with open(os.path.join(self.stage, "core", "wps-addin", "mini.html"), "w") as handle:
+            handle.write("<!-- moi -->\n")
+        code, out = self.run_install()
+        self.assertEqual(code, 0, out)
+        self.assert_data_kept(data, out)
+        self.assertTrue(os.path.exists(os.path.join(self.core_dir(), "wps-addin", "mini.html")), "phai cai ban moi")
+        self.assertFalse(os.path.exists(stale), "tep cua ban cu khong co trong goi moi thi bo")
+
+    def test_uninstall_keeps_data_unless_purge(self):
+        self.assertEqual(self.run_install()[0], 0)
+        data = self.seed_data()
+        code, out = self.run_install("--uninstall")
+        self.assertEqual(code, 0, out)
+        self.assert_data_kept(data, out)
+        self.assertFalse(os.path.exists(os.path.join(self.core_dir(), "AxiomOffice.Core")), "go phai xoa Core")
+        self.assertFalse(os.path.exists(os.path.join(self.core_dir(), "wps-addin")), "go phai xoa add-in")
+        # Cai lai sau khi go: du lieu van con, dung nhu loi hua "Giu ... du lieu".
+        self.assertEqual(self.run_install()[0], 0)
+        self.assert_data_kept(data, out)
+        code, out = self.run_install("--uninstall", "--purge")
+        self.assertEqual(code, 0, out)
+        self.assertFalse(os.path.exists(os.path.join(self.env["XDG_DATA_HOME"], "axiom-office")),
+                         "--purge xoa ca du lieu\n" + out)
 
 
 if __name__ == "__main__":

@@ -49,6 +49,35 @@ if [ "$API_KEY" = "-" ]; then IFS= read -r API_KEY || true; fi
 
 die() { echo "Loi: $*" >&2; exit 1; }
 
+# Du lieu cua nguoi dung ma Core ghi ngay trong $CORE_DIR (core-go/internal/config/paths.go: <data>/core/core.db):
+# hoi thoai, Bo nho AI, nhat ky thao tac, nguon web. Thu muc nay CUNG la noi cai binary Core, nen moi lan cai lai /
+# go phai giu rieng ba tep nay - truoc 20/10/2026 ca hai duong deu rm -rf ca thu muc va lam mat het du lieu.
+# Them tep du lieu moi vao $CORE_DIR thi phai them ten vao day (tests/linux/test_install_sh.py giu hop dong nay).
+CORE_DATA="core.db core.db-wal core.db-shm"
+
+# keep_core_data <tu> <toi>: chuyen tep du lieu cua Core sang thu muc moi (cung o dia nen mv khong chep lai).
+keep_core_data() {
+    local name
+    for name in $CORE_DATA; do
+        if [ -e "$1/$name" ]; then mv -f "$1/$name" "$2/$name"; fi
+    done
+}
+
+# remove_core_keep_data: xoa Core da cai nhung giu tep du lieu (go khong --purge).
+remove_core_keep_data() {
+    [ -d "$CORE_DIR" ] || return 0
+    local entry name keep
+    for entry in "$CORE_DIR"/* "$CORE_DIR"/.[!.]*; do
+        [ -e "$entry" ] || continue
+        keep=0
+        for name in $CORE_DATA; do
+            if [ "$(basename "$entry")" = "$name" ]; then keep=1; fi
+        done
+        if [ "$keep" = 0 ]; then rm -rf "$entry"; fi
+    done
+    rmdir "$CORE_DIR" 2>/dev/null || true
+}
+
 assert_libreoffice_closed() {
     # Test bo qua kiem tra nay bang AXIOM_INSTALL_SKIP_LO_CHECK=1.
     [ "${AXIOM_INSTALL_SKIP_LO_CHECK:-0}" = "1" ] && return 0
@@ -173,6 +202,8 @@ install() {
     mkdir -p "$DATA_DIR"
     rm -rf "$CORE_DIR.new"
     cp -a "$HERE/core" "$CORE_DIR.new"
+    # Core da dung (stop_core o tren) nen core.db va WAL dang nhat quan: chuyen ca ba sang ban moi roi moi xoa ban cu.
+    if [ -d "$CORE_DIR" ]; then keep_core_data "$CORE_DIR" "$CORE_DIR.new"; fi
     rm -rf "$CORE_DIR"
     mv "$CORE_DIR.new" "$CORE_DIR"
 
@@ -218,8 +249,9 @@ uninstall() {
     stop_core
     unregister_wps_addin
     "$UNOPKG" remove "$EXTENSION_ID" 2>/dev/null && echo "Da go extension $EXTENSION_ID" || echo "(extension chua cai)"
-    rm -rf "$CORE_DIR" "$MCP_DIR"
-    echo "Da xoa $CORE_DIR va $MCP_DIR"
+    remove_core_keep_data
+    rm -rf "$MCP_DIR"
+    echo "Da go Agent Core khoi $CORE_DIR (giu du lieu: $CORE_DATA)"
     if [ "$PURGE" = 1 ]; then
         rm -rf "$DATA_DIR" "$CONFIG_DIR" "${XDG_RUNTIME_DIR:-$HOME/.cache}/axiom-office"
         echo "Da xoa cau hinh va du lieu (hoi thoai, memory, log)."
