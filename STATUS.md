@@ -1,20 +1,22 @@
 # Tình trạng dự án Axiom Office
 
-Cập nhật: **03/10/2026** · nhánh `main` · cây làm việc sạch · **7 commit chưa push remote**
-(chỉ commit, không push — theo yêu cầu của bạn)
+Cập nhật: **20/10/2026** · nhánh `main` · **7 commit chưa push remote** (18–20/10: khoá vùng bôi đen trên WPS →
+khung chat mini; remote dừng ở 16/10) — chỉ commit, không push, theo yêu cầu của bạn. Số liệu kiểm chứng ở §2.4 là
+lượt đo **01/10/2026**; số mới của đợt WPS ở §2.6.
 
 Tài liệu này là ảnh chụp nhanh "đã làm được gì / chưa làm được gì". Chi tiết thiết kế nằm ở
 [New_arch.md](New_arch.md) (Core + add-in) và [LibreOffice_arch.md](LibreOffice_arch.md) (LibreOffice);
 hướng dẫn dùng ở [README.md](README.md); lịch sử thay đổi ở [CHANGELOG.md](CHANGELOG.md).
 
-## 1. Bốn thành phần và trạng thái
+## 1. Năm thành phần và trạng thái
 
 | Thành phần | Nền tảng | Trạng thái |
 |---|---|---|
 | **Add-in COM** (`src/AxiomOffice`, net48) | Word/Excel/PowerPoint + WPS, Windows | Chạy được; đã kiểm chứng trên Office/WPS thật ở các đợt trước. Đợt này **chưa** chạy lại làn `--office` |
 | **Agent Core** (`core-go/`, Go) | Windows + Linux | **Đã thay bản .NET làm bản phát hành** (G1–G10), qua toàn bộ e2e của bản .NET |
 | **MCP server** (`core-go/internal/mcpserver`, Go) | Windows + Linux | **Một bản duy nhất**, chạy bằng `AxiomOffice.Core.exe mcp`; 61/61 trên cả hai nền tảng (và 103/103 ở bộ parity sâu). Bản C# đã xoá; `AxiomOffice.Host.exe mcp` còn 232 dòng **chuyển tiếp byte** sang Core nên cấu hình cũ không phải đổi |
-| **Extension LibreOffice** (Python UNO) | Linux (LibreOffice) | Chạy được; 281/281 trên LibreOffice thật + wizard 20/20 với Core Go |
+| **Extension LibreOffice** (Python UNO) | Windows + Linux (LibreOffice) | Chạy được; 281/281 trên LibreOffice thật + wizard 20/20 với Core Go (01/10) |
+| **Add-in WPS Linux** (`src/AxiomOffice.WPS`, JS ES5; Core phục vụ + bridge cổng 47861) | Linux (WPS 12) | Chạy trên WPS thật: 58/80 lệnh có handler (22 chưa — `docs/wps-bridge.md` §6); ribbon 4 nhóm có icon; khung chat với menu ⋯ và 8 màn hình phụ; menu chuột phải *Sửa bằng AI* + khung chat mini (§2.6) |
 | **Wizard thiết lập** | Windows (WinForms) + Linux (awt) | Bản Linux đã chạy thật (20/20); **bản Windows mới chỉ biên dịch sạch, chưa bấm tay trong Office** |
 
 ## 2. Đã làm được
@@ -72,7 +74,7 @@ Cả hai đều nằm trong hợp đồng mà bộ parity kiểm tra, nên sửa
 - Câu chữ + preset nằm ở một nguồn `catalog/setup.json` → sinh ra `SetupCatalog.cs` (C#, dùng chung add-in và
   Core), `axiom/setup_catalog.py` (Python) và `core-go/internal/setup/catalog_gen.go` (Go); CI kiểm tra không lệch.
 
-### 2.4 Kiểm chứng (số liệu mới nhất, 01/10/2026)
+### 2.4 Kiểm chứng (số liệu 01/10/2026 — chưa đo lại; đợt WPS ở §2.6)
 
 | Bộ kiểm thử | Kết quả |
 |---|---|
@@ -93,13 +95,28 @@ Cả hai đều nằm trong hợp đồng mà bộ parity kiểm tra, nên sửa
 | `systemd --user` (Linux) | `enabled` + `active`, `/health` OK, đúng port 47840 |
 | Đóng gói | Windows: `bin\Release` có Core Go 1.0.0 + DLL + Host + skills; Linux: tar.gz 39 MB với `core/AxiomOffice.Core` là ELF chạy độc lập |
 
-### 2.5 CI
+### 2.5 CI (cập nhật 20/10/2026)
 
 `.github/workflows/ci.yml`: job **linux** không còn cài .NET — chạy unit test extension, kiểm ba file sinh
-không lệch nguồn, `go vet`/`go test`, e2e **14 phần** (đã gồm `mcp`, vì Core tự làm MCP server), bộ MCP
-portable nhắm vào binary Go, rồi cài LibreOffice chạy bộ live + wizard và đóng gói tarball. Job **windows**
+không lệch nguồn, `go vet`/`go test`, e2e **15 phần** (đã gồm `mcp`, vì Core tự làm MCP server, và `verify`), unit
+test add-in WPS (Node), e2e kênh WPS + pane (`make test-wps-e2e`), bộ MCP portable nhắm vào binary Go, trình cài
+`install.sh`, rồi cài LibreOffice chạy bộ live + wizard và đóng gói tarball. Job **windows**
 chạy unit test, `go test`, build net48, **toàn bộ e2e của bản Go** (kèm `AxiomOffice.Host.exe` như gói phát
 hành) và bộ MCP portable nhắm vào `AxiomOffice.Host.exe mcp`.
+
+### 2.6 Đợt 18–20/10/2026: WPS Office for Linux
+
+- **Khoá vùng bôi đen** (`writer.lockSelection`/`unlockSelection`): bôi đen rồi hỏi thì AI chỉ sửa trong đoạn đó;
+  Core khoá trước mỗi lượt, mở khoá ở `finish()`.
+- **Ribbon và khung chat đủ chức năng như bản Windows**: kênh `/wps/v1/*` (`routeBoth` cho setup, llm, skills,
+  memory, audit, conversations; riêng WPS: status, exec, config, log), các màn hình phụ của pane, ba nút *Soát*.
+- **Trông giống MS Word**: bảng màu Fluent `#0F6CBD` cho cả ba nền tảng; trả lời AI không bong bóng; menu ⋯; màn
+  hình *Hội thoại trước…*; icon ribbon là tệp SVG (data URI làm WPS vẽ dấu `?`).
+- **Sửa bằng AI**: 9 mục câu lệnh nằm trong Core (`agent/quickactions.go`, `GET /v1/quick-actions`,
+  `POST /v1/runs {quickAction}`); menu chuột phải trên WPS mở **khung chat mini** (`mini.html`,
+  `Application.ShowDialog`); `options.requireSelection`; `QuickEditRule` (sửa ngay, không hỏi lại).
+- **Đã thử trên WPS thật**: icon ribbon, menu chuột phải (chạy trọn tới Core), khung chat mini (người dùng: "khá ổn").
+- **Số liệu 20/10/2026**: `make test-wps` 181 · `make test-wps-e2e` 94 · bridge e2e 36 · Core e2e 169 · `go test` xanh.
 
 ## 3. Chưa làm / chưa kiểm chứng
 
@@ -113,6 +130,12 @@ hành) và bộ MCP portable nhắm vào `AxiomOffice.Host.exe mcp`.
 | Merge `feat/setup-wizard` + `feat/core-go` vào `main` | **Đã xong** | Fast-forward, lịch sử thẳng |
 | Nền tảng khác | Chưa | Chỉ build được Windows (amd64) và Linux (amd64/arm64); chưa có macOS hay Windows ARM |
 | Embedding với máy chủ thật | Chưa | Chỉ kiểm bằng máy chủ giả trả vector điều khiển được |
+| Lỗi `install.sh` xoá `core.db` | **Đã sửa 20/10/2026** | Cài lại / nâng cấp chuyển `core.db*` sang bản mới; `--uninstall` không `--purge` giữ lại; `tests/linux/test_install_sh.py` +2 ca (đỏ trước khi sửa). Gói phát hành trước ngày này vẫn mang `install.sh` cũ |
+| *Sửa bằng AI* / khung chat mini trên Windows và LibreOffice | Chưa | Mới có trên WPS Linux; Core đã sẵn. LibreOffice cần **khoá vùng bôi đen** trước (chưa có) |
+| Add-in WPS: 22 lệnh chưa có handler | Chưa | `docs/wps-bridge.md` §6; thiếu `app.screenshot` nên chưa có QA thị giác trên WPS |
+| Bộ nhớ AI trên WPS: sửa / ghim / đặt hạn | Chưa | Màn hình WPS có xoá tạm, khôi phục, xoá vĩnh viễn, lọc phạm vi |
+| Bấm từng nút ribbon WPS trên WPS thật | Chưa | Mới đo qua Core thật + add-in giả; menu chuột phải và khung mini đã thử thật |
+| *Sửa bằng AI* với model thật trên nhiều trường hợp | Một phần | Một lượt thật (model hỏi lại thay vì sửa → đã thêm `QuickEditRule`); chưa đo lại sau khi sửa. Vị trí cửa sổ `ShowDialog` không chỉnh được |
 
 ## 4. Ghi chú hành vi (khác bản .NET đã bỏ ngày 01/10/2026)
 
@@ -146,7 +169,7 @@ python tests/mcp-host/oracle_diff.py    # đối chiếu Go ↔ C# trên cùng k
 ```
 
 Các phần e2e chạy riêng được: `fake_bridge`, `guards`, `skills`, `memory`, `confirm`, `mcp`, `visual`,
-`setup`, `shutdown`, `anthropic`, `embeddings`, `summarize`, `cancel`, `mcp_http`.
+`setup`, `shutdown`, `anthropic`, `embeddings`, `summarize`, `cancel`, `mcp_http`, `verify`.
 
 ## 6. Việc nên làm tiếp (đề xuất)
 
@@ -155,8 +178,11 @@ Các phần e2e chạy riêng được: `fake_bridge`, `guards`, `skills`, `memo
 3. Chạy `test_mcp_host.py` (parity sâu) **trên Linux** — đợt này mới chạy được trên Windows; máy Linux
    không kết nối được lúc kiểm. Trên Linux cần venv có `mcp`/`python-docx`/`openpyxl`/`python-pptx`
    (xem ghi chú máy kiểm chứng) và đặt `AXIOM_MCP_NO_CATALOG=1`.
-4. Nhánh C# đã đóng băng (không sửa `src/AxiomOffice/**` và `src/AxiomOffice.Host/**`);
-   `Host.exe mcp` chỉ là shim chuyển tiếp byte sang Core Go (`src/AxiomOffice.Host/Mcp/McpHost.cs`).
+4. Nhánh C# **không còn đóng băng**: từ 04/10 add-in Windows có thêm ribbon đủ nhóm (Trợ lý / Tìm web / Kiểm tra /
+   Quản lý / Hệ thống), chọn ngôn ngữ hiển thị, khoá vùng chọn trong Word, dialog *Công cụ ngoài…*, màu Fluent. `Host.exe mcp` vẫn chỉ là
+   shim chuyển tiếp byte sang Core Go (`src/AxiomOffice.Host/Mcp/McpHost.cs`).
+5. Phát hành gói Linux mới để người dùng có `install.sh` đã sửa (§3).
+6. Push các commit đang chờ.
 
 ## 7. Đối chiếu benchmark & lộ trình hiệu năng (02–03/10/2026)
 

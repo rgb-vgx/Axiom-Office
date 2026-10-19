@@ -292,7 +292,8 @@ sequenceDiagram
 ### 7.2 Bảo mật Core API
 
 Giống bridge: chỉ `127.0.0.1`; mọi endpoint trừ `/health` cần `X-Auth-Token` = `HKCU\Software\AxiomOffice\Token`;
-từ chối request có header `Origin` (403); body `POST` bắt buộc `application/json` (415). Không log
+từ chối request có header `Origin` (403) — **trừ** `/wps/*`, kênh của add-in WPS Linux, xác thực riêng theo
+`Origin` của chính Core (`docs/wps-bridge.md` §2.2, `checkWPSAuth`); body `POST` bắt buộc `application/json` (415). Không log
 header, token, API key, nội dung prompt đầy đủ ở mức mặc định (chỉ độ dài + 200 ký tự đầu, giống
 `bridge.log` hiện nay ghi prompt; giữ hành vi hiện tại nhưng không bao giờ log secret).
 
@@ -315,9 +316,22 @@ Mọi response JSON dạng `{"ok": true, "result": ...}` hoặc `{"ok": false, "
 | `POST` | `/v1/skills/reload` | Quét lại thư mục skill |
 | `GET` | `/v1/memory?scope=user|document&documentKey=&q=` | Liệt kê/tìm memory |
 | `POST` | `/v1/memory` | Người dùng tự thêm memory `{"scope","documentKey?","text"}` |
+| `PATCH` | `/v1/memory/{id}` | Sửa / ghim / đặt hạn (§8.5.11) |
+| `POST` | `/v1/memory/{id}/restore` | Khôi phục memory đã xoá tạm |
+| `GET` | `/v1/memory/{id}/history` | Lịch sử thay đổi của một memory |
 | `DELETE` | `/v1/memory/{id}` | Xoá một memory; `DELETE /v1/memory?scope=all` xoá hết (UI phải hỏi lại) |
 | `GET` | `/v1/audit?runId=&limit=` | Nhật ký thao tác |
 | `POST` | `/v1/admin/shutdown` | Thoát êm (dùng bởi build/uninstall) |
+| `GET` | `/v1/setup` | Trạng thái thiết lập cho wizard (cấu hình đang dùng, không lộ khoá) |
+| `POST` | `/v1/llm/test` | Thử kết nối model (khoá rỗng = dùng khoá đã lưu) |
+| `GET` | `/v1/llm/models` | Danh sách model của máy chủ AI |
+| `GET` | `/v1/mcp` | Các MCP server đang cấu hình |
+| `GET` | `/v1/log?lines=` | Phần cuối `core.log` |
+| `GET` | `/v1/quick-actions` | Mục của menu *Sửa bằng AI*: `{actions: [{id, label, edits}]}` (câu lệnh ở lại trong Core) |
+
+Kênh pane WPS Linux (`/wps/v1/*`, không token, xác thực theo `Origin` của Core) — phần lớn là bản sao của các
+đường trên qua `routeBoth`, cộng vài đường riêng (`status`, `exec`, `config`, `pane/request`, `pane/events`): xem
+`docs/wps-bridge.md` §7.
 
 Body `POST /v1/runs`:
 
@@ -328,9 +342,16 @@ Body `POST /v1/runs`:
   "office": {"port": 47831, "pid": 5128, "app": "wps", "family": "office"},
   "document": {"name": "bao-cao.docx", "fullName": "C:\\...\\bao-cao.docx"},
   "selection": {"text": "...", "start": 10, "end": 42},   // tuỳ chọn, pane gửi nếu có
-  "options": {"maxSeconds": 300, "maxTokens": 200000}
+  "options": {"maxSeconds": 300, "maxTokens": 200000,
+              "mode": "plan",                  // tuỳ chọn: "plan" = chỉ đọc + trả kế hoạch; "act" = mặc định
+              "requireSelection": true},       // tuỳ chọn: không có đoạn bôi đen thì dừng ngay (kind "selection")
+  "quickAction": "polish"                       // tuỳ chọn, thay cho prompt: một mục Sửa bằng AI (GET /v1/quick-actions)
 }
 ```
+
+- `quickAction`: Core lấy câu lệnh theo id (bỏ qua `prompt` gửi kèm), luôn bắt buộc đoạn bôi đen, không đi cùng
+  `mode: "plan"`; ba mục chỉ trả lời chạy với bộ tool chỉ-đọc. System prompt thêm `QuickEditRule` (sửa ngay, không
+  hỏi lại) hoặc `QuickAnswerRule`.
 
 - Core kiểm tra `office.port` tồn tại trong thư mục `sessions` và `/health` của bridge trả đúng
   `pid`; sai thì lỗi `office session not found`.
@@ -343,16 +364,19 @@ Mỗi event có `seq` tăng dần, `runId`, `time`. Tên event và dữ liệu:
 
 | Event | Dữ liệu | Pane hiển thị |
 |---|---|---|
-| `run.started` | `conversationId`, `model` | Typing bubble |
+| `run.started` | `conversationId`, `model`, `mode` (`act`/`plan`) | Typing bubble |
+| `run.progress` | `round`, `text` | Dòng tiến trình ngắn ("Đang thiết kế phần 1–15…") |
 | `skill.loaded` | `name` | Dòng "Dùng kỹ năng: …" |
 | `tool.started` | `callId`, `tool`, `action?`, `paramsPreview` | ToolLine đang chạy |
 | `tool.finished` | `callId`, `ok`, `error?`, `ms` | Tick xanh / x đỏ |
 | `confirm.required` | `confirmationId`, `action`, `reason`, `paramsPreview` | Thẻ xác nhận Đồng ý / Từ chối |
+| `confirm.resolved` | `confirmationId`, `approved`, `by`, `choice?`, `text?` | Gỡ thẻ xác nhận |
 | `memory.written` | `id`, `scope`, `text` | Dòng nhỏ "Đã ghi nhớ: …" (bấm để xoá) |
 | `run.reasoning` | `round`, `text`, `model` | Khối "Suy luận · vòng N" (mờ, bấm Hiện/Ẩn). Chỉ phát khi bật `LlmShowReasoning` |
+| `run.reasoning.live` | `round`, `text`, `model` | Suy luận đang đến dần (cùng điều kiện) |
 | `message.delta` | `text` | (tuỳ chọn, nếu provider stream) |
 | `run.completed` | `reply`, `rounds`, `seconds`, `inputTokens`, `outputTokens`, `cachedTokens` | Bubble trả lời |
-| `run.failed` | `error`, `kind` (`provider`, `config`, `office`, `internal`) | ErrorCard |
+| `run.failed` | `error`, `kind` (`provider`, `config`, `office`, `internal`, `selection`, `selection-lock`) | ErrorCard; `selection*` = lượt bắt buộc đoạn bôi đen mà không có — pane dịch ra câu tiếng Việt |
 | `run.cancelled` | `seconds` | Trạng thái đã dừng |
 | `run.timedout` | `seconds` | ErrorCard + Thử lại |
 | `run.stopped` | `error`, `rounds`, `inputTokens`, `outputTokens` | ErrorCard "hết ngân sách token" + Thử lại (tăng ngân sách) |

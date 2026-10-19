@@ -13,7 +13,7 @@
 
   Icon (giong ban Windows: moi nut deu co icon):
    - Moi control o day co getImage="ribbon.OnGetImage"; main.js tra ve DUONG DAN TUONG DOI
-     "images/<tag>.svg", va 12 tep do nam o src/AxiomOffice.WPS/images/ (Core phuc vu qua ServeAddin).
+     "images/<tag>.svg", va cac tep do nam o src/AxiomOffice.WPS/images/ (Core phuc vu qua ServeAddin).
    - WPS KHONG nhan data URI: no dem chuoi tra ve di phan giai nhu mot duong dan, truot thi ve dau "?".
      Cach lam dung la theo SDK chinh thuc cua WPS (@wps-jsapi/wps/js/ribbon.js: `return "images/1.svg"`).
    - Spec tests/wps/test_pane.mjs doi chieu hai ben: moi tag trong tep nay phai co tep anh, va moi tep
@@ -22,9 +22,9 @@
 
   Menu chuot phai (<contextMenus> cuoi tep): "Sua bang AI >" 9 muc + "Hoi AI ve doan nay", tren chu thuong va tren
   dong danh sach. Bam mot muc thi mo KHUNG CHAT MINI canh doan boi den (mini.html, Application.ShowDialog); ban WPS
-  khong co ShowDialog thi quay ve khung chat lon (main.js: openMini / runQuick). Menu da hien tren WPS that 20/10/2026. Ban Windows chi co "Hoi AI ve doan nay" va chi dua contextMenus cho Office (RibbonUi.cs: "WPS
-  khong nhan chac"); libkshell.so cua WPS Linux co du ten the contextMenus/contextMenu/menuSeparator/insertBeforeMso,
-  nhung CHUA nghiem thu tren WPS that - xem docs/ribbon-ui.md muc 5.3.
+  khong co ShowDialog thi quay ve khung chat lon (main.js: openMini / runQuick).
+  Ban Windows chi co "Hoi AI ve doan nay" va chi dua contextMenus cho Office (RibbonUi.cs: "WPS khong nhan chac").
+  WPS Linux THI NHAN: menu da hien va chay tren WPS that 20/10/2026 (docs/ribbon-ui.md muc 5.3).
 
   Vi sao thieu bon control so voi ban Windows (xem docs/ribbon-ui.md muc 5):
    - toggleButton "Nhin tai lieu" (visualQa): lenh app.screenshot ma Core gui qua bridge CHUA co handler
@@ -71,7 +71,7 @@
         <group id="axiomManageGroup" label="Quản lý">
           <button id="axiomMemory" label="Bộ nhớ AI…" size="large" tag="memory" onAction="ribbon.OnAction" getImage="ribbon.OnGetImage"
                   screentip="Bộ nhớ AI"
-                  supertip="Xem, sửa, ghim, đặt hạn dùng, xoá những điều AI đã ghi nhớ về bạn và tài liệu."/>
+                  supertip="Xem, lọc theo phạm vi, xoá tạm, khôi phục, xoá vĩnh viễn những điều AI đã ghi nhớ về bạn và tài liệu."/>
           <button id="axiomSkills" label="Kỹ năng…" size="large" tag="skills" onAction="ribbon.OnAction" getImage="ribbon.OnGetImage"
                   screentip="Kỹ năng"
                   supertip="Các kỹ năng AI đang có cho ứng dụng này; nạp lại sau khi thêm hoặc sửa kỹ năng."/>
@@ -100,10 +100,11 @@
       </tab>
     </tabs>
   </ribbon>
-  <!-- Menu chuot phai khi boi den (docs/ribbon-ui.md, "Trong khung chat"): cung 9 muc voi menu "Sua bang AI"
-       o chan o soan, cung thu tu va nhan voi bang cua Core (agent/quickactions.go) - spec test_pane.mjs ghim hai
-       ben. Bam mot muc: main.js mo/hien khung chat roi nho Core chuyen muc do vao khung chat (POST
-       /wps/v1/pane/request -> SSE /wps/v1/pane/events), khung chat chay trong CHINH hoi thoai dang mo.
+  <!-- Menu chuot phai khi boi den (docs/ribbon-ui.md, "Trong khung chat"): 9 muc "Sua bang AI", cung thu tu va
+       nhan voi bang cua Core (agent/quickactions.go) - spec test_pane.mjs ghim hai ben. Bam mot muc: main.js mo
+       KHUNG CHAT MINI (mini.html, Application.ShowDialog) va muc do chay ngay trong khung ay. Du phong khi WPS
+       khong co ShowDialog: hien khung chat lon roi nho Core chuyen muc (POST /wps/v1/pane/request -> SSE
+       /wps/v1/pane/events), muc chay trong hoi thoai cua khung chat lon.
        ContextMenuText = chuot phai tren chu thuong, ContextMenuList = tren dong danh sach (ten idMso co trong bang
        lenh cua Writer WPS: res/commands/wps). -->
   <contextMenus>

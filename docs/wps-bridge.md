@@ -2,7 +2,8 @@
 
 Trạng thái: **đã chạy trên WPS thật** (11/10/2026): Core (T1), trình cài `--core-url` (T2a), add-in 16 lệnh đợt 1
 (T2b, T2c). Đóng gói + `install.sh` (T3) xong, đăng ký cả ba app (T5) xong, nhận biết app + đủ 38 lệnh
-`et.*`/`wpp.*` (T6–T8) xong, pane Ask AI trong WPS (T4) xong, ribbon đầy đủ (đợt C — `docs/ribbon-ui.md`).
+`et.*`/`wpp.*` (T6–T8) xong, pane Ask AI trong WPS (T4) xong, ribbon đầy đủ (đợt C — `docs/ribbon-ui.md`), menu
+chuột phải *Sửa bằng AI* + khung chat mini (20/10/2026, đã thử trên WPS thật — mục 7.3).
 Còn lại: **22/80 lệnh registry chưa có handler ở add-in WPS** (danh sách + lý do ở mục 6). Cơ sở thực nghiệm:
 [wps-spike.md](wps-spike.md) (hướng B) và [tests/wps/REFERENCE.md](../tests/wps/REFERENCE.md).
 
@@ -172,31 +173,34 @@ Cùng giao thức và cùng guard với bridge LibreOffice (`Origin` → 403, to
 
 ## 7. Pane Ask AI trong WPS
 Pane là một trang khác của add-in (`/wps/addin/pane.html`), mở bằng nút trên ribbon qua
-`Application.CreateTaskPane(url)`. Cùng origin với Core nên **không có token**: dùng kênh add-in với cùng xác thực
+`Application.CreateTaskPane(url)`. Trang thứ hai là `/wps/addin/mini.html` — **khung chat mini**, mở từ menu chuột
+phải bằng `Application.ShowDialog(url, "Sửa bằng AI", 440 × devicePixelRatio, 380 × devicePixelRatio, false)`
+(không modal; `main.js: openMini`) — mục 7.3. Cùng origin với Core nên **không có token**: dùng kênh add-in với cùng xác thực
 (`Origin` = origin của Core, hoặc token khi không có `Origin`):
 
 | Endpoint | Tương đương | Ghi chú |
 |---|---|---|
-| `POST /wps/v1/runs {prompt, conversationId?, options?}` | `POST /v1/runs` | Core tự gắn `office` = bridge WPS, `document` = lần poll gần nhất; add-in chưa kết nối → **409**. Gửi `{quickAction: "<id>"}` thay cho `prompt` = một mục của menu *Sửa bằng AI* (câu lệnh do Core lấy theo id; id lạ → 400). `options.requireSelection: true` (khung chat mini gửi kèm mọi lượt): không có đoạn bôi đen thì dừng ngay, `run.failed` kind `selection` |
+| `POST /wps/v1/runs {prompt, conversationId?, options?}` | `POST /v1/runs` | Core tự gắn `office` = bridge WPS, `document` = lần poll gần nhất; add-in chưa kết nối → **409**. Gửi `{quickAction: "<id>"}` thay cho `prompt` = một mục của menu *Sửa bằng AI* (câu lệnh do Core lấy theo id; id lạ → 400). `options.requireSelection: true` (khung chat mini gửi kèm mọi lượt): không có đoạn bôi đen thì dừng ngay, `run.failed` kind `selection` (chưa bôi đen) hoặc `selection-lock` (có bôi đen nhưng add-in không khoá được) |
 | `GET /wps/v1/runs/{id}` | `GET /v1/runs/{id}` | |
 | `GET /wps/v1/runs/{id}/events` | SSE `/v1/runs/{id}/events` | `EventSource` cùng origin |
 | `POST /wps/v1/runs/{id}/cancel` · `/confirm` | như `/v1/runs/...` | nút Dừng, thẻ xác nhận |
 | `GET /wps/v1/memory` · `POST /wps/v1/memory` · `PATCH`/`DELETE /wps/v1/memory/{id}` · `POST /wps/v1/memory/{id}/restore` · `GET /wps/v1/memory/{id}/history` · `DELETE /wps/v1/memory` | `routeBoth` → y hệt `/v1/memory...` | màn hình *Bộ nhớ AI* |
 | `GET /wps/v1/audit` | `GET /v1/audit` | màn hình *Nhật ký hoạt động* |
 | `GET /wps/v1/conversations` · `GET`/`DELETE /wps/v1/conversations/{id}` | `routeBoth` | màn hình *Hội thoại trước…* (mục 7.2) |
-| `POST /wps/v1/pane/request {quickAction}` · `GET /wps/v1/pane/events` (SSE) | **chỉ có ở kênh WPS** | trạm trung chuyển menu chuột phải → khung chat đang mở (`api/wpspane.go`): `main.js` gửi, khung chat Writer nghe sự kiện `pane.quick` rồi chạy mục đó **trong hội thoại của nó**. Mỗi yêu cầu giao cho **một** khung chat, giữ 20 giây cho khung chat vừa tạo kịp nối vào; bấm liền hai mục thì mục sau thắng |
-| `GET /wps/v1/quick-actions` | `routeBoth` | menu *Sửa bằng AI* ở chân ô soạn: `{actions: [{id, label, edits}]}` — câu lệnh **không** trả ra, nằm trong `agent/quickactions.go` |
+| `POST /wps/v1/pane/request {quickAction}` · `GET /wps/v1/pane/events` (SSE) | **chỉ có ở kênh WPS** | trạm trung chuyển menu chuột phải → khung chat lớn đang mở (`api/wpspane.go`) — **đường dự phòng** khi WPS không có `ShowDialog`: `main.js` (`runQuick`) hiện khung chat lớn rồi gửi, khung chat Writer nghe sự kiện `pane.quick` rồi chạy mục đó **trong hội thoại của nó**. Mỗi yêu cầu giao cho **một** khung chat, giữ 20 giây cho khung chat vừa tạo kịp nối vào; bấm liền hai mục thì mục sau thắng |
+| `GET /wps/v1/quick-actions` | `routeBoth` | `{actions: [{id, label, edits}]}`: khung chat mini dựng chip từ đây, cả hai khung dùng để bong bóng hiện nhãn ("Trau chuốt") thay vì id. Câu lệnh **không** trả ra — nằm trong `agent/quickactions.go` |
 | `GET /wps/v1/setup` · `POST /wps/v1/llm/test` · `GET /wps/v1/llm/models` | `routeBoth` | màn hình *Thiết lập*, nút *Kiểm tra mô hình* |
 | `GET /wps/v1/skills` · `POST /wps/v1/skills/reload` | `routeBoth` | màn hình *Kỹ năng* |
-| `GET /wps/v1/log` | `routeBoth` | màn hình *Mở nhật ký* (log Core, mục 5.2 của `docs/ribbon-ui.md`) |
+| `GET /wps/v1/log` | `GET /v1/log` (đăng ký riêng, chỉ khi bridge WPS bật) | màn hình *Mở nhật ký* (log Core, mục 5.2 của `docs/ribbon-ui.md`) |
 | `GET /wps/v1/status` | **chỉ có ở kênh WPS** | gộp hai tầng: `{addin: <Bridge.Status()>, core: <coreStatus()>}` — pane không phải đoán `Origin` cho `/health` của bridge |
 | `POST /wps/v1/exec {action, params}` | **chỉ có ở kênh WPS** | chạy thẳng một lệnh bridge, **không qua agent**: ba nút *Soát* trên ribbon và *Hoàn tác lượt này* / *Chèn trả lời* trong pane. 409 kèm `code`: `run-in-progress` (đang có lượt chạy) hoặc `addin-disconnected`; khi chạy được thì trả **nguyên phong bì** của add-in, HTTP 200 **kể cả khi add-in trả `ok:false`** — đọc `ok`, đừng đọc mã HTTP |
 | `POST /wps/v1/config {TênKhoá: giá trị}` | **chỉ có ở kênh WPS** | ghi cấu hình nền tảng (Linux `config.json`, Windows HKCU) — đường thật đứng sau nút *Thiết lập*; khoá ngoài danh sách cho phép → 400 |
 
 Phần lớn bảng trên đi qua **`routeBoth`** (`core-go/internal/api/wpsadmin.go`): cùng một handler đăng ký dưới
 **cả hai** tiền tố — `/v1/*` cho script/MCP (guard cũ: token) và `/wps/v1/*` cho pane (guard kênh add-in). Nhờ vậy
-pane không cần token mà vẫn đọc/ghi được đúng những gì bản Windows gọi. Cả `/wps/v1/*` chỉ tồn tại khi bridge WPS
-bật (`mapWPS` thoát sớm khi `deps.WPS == nil`) — không có bridge thì mọi đường dưới đây là 404.
+pane không cần token mà vẫn đọc/ghi được đúng những gì bản Windows gọi. Các đường `routeBoth` luôn có cả hai tiền
+tố; các đường **riêng** của kênh WPS (`runs*`, `status`, `exec`, `config`, `pane/*`, `log`) chỉ có khi bridge WPS
+bật (`mapWPS` thoát sớm khi `deps.WPS == nil`). Bản chạy thật luôn bật bridge; khác biệt này chỉ lộ ra trong test.
 
 `/v1/runs` giữ guard cũ (mọi `Origin` → 403). Spec: `tests/wps/test_wps_pane_e2e.py` (T4a, phía Core).
 
@@ -224,7 +228,8 @@ dùng màu Google Material: `#e8f0fe`, `#f1f3f4`, `#f9ab00`…).
 `PaneControls.cs` (Windows) cùng `pane.html` (`:root`) đổi theo, ba bản vẫn khớp từng token. `theme_dump.py`
 gom **mọi hằng int > 0xFFFF** ở cấp module trong `theme.py` thành một màu, nên thêm một hằng màu là **bắt
 buộc** thêm một token `--axiom-*` có dùng thật, nếu không `test_pane_theme.mjs` đỏ. Đổi màu thì phải sửa **cả
-ba** tệp — và cả **12 tệp `src/AxiomOffice.WPS/images/*.svg`** nếu muốn icon ribbon cùng màu, vì ảnh ribbon do
+ba** tệp (cộng `mini.html` — `:root` của nó chép nguyên từ `pane.html`, `test_mini_view.mjs` bắt hai bản giống
+hệt) — và cả **13 tệp `src/AxiomOffice.WPS/images/*.svg`** nếu muốn icon ribbon cùng màu, vì ảnh ribbon do
 WPS vẽ bằng bộ nạp ảnh của nó (nó không biết `var()`); màu nằm ở thuộc tính `stroke` của từng tệp, `main.js`
 không còn hằng màu nào, và `test_pane.mjs` kiểm màu **từng tệp** nên quên một tệp là đỏ. Xem
 `docs/ribbon-ui.md` §5.3.
@@ -237,9 +242,9 @@ Pane biết mình đang ở app nào qua query string: `main.js:paneUrl()` thêm
 
 Pane WPS nay có **đủ bảy màn hình** (chat, *Bộ nhớ AI*, *Nhật ký hoạt động*, *Thiết lập*, *Kỹ năng*, *Trạng thái*,
 *Mở nhật ký*) cộng màn hình *Soát tài liệu* gọi từ ba nút Soát trên ribbon và màn hình ***Hội thoại trước…***
-(danh sách → chi tiết → xoá có xác nhận), và các lối vào trong pane khớp bản LibreOffice: header nay là **tiêu
-đề cộng nút ⋯** (giống Copilot trong Word) chứa *Trò chuyện mới* / *Hội thoại trước…* / *Ghi nhớ* / *Nhật ký* /
-*Thiết lập*, footer `Hoàn tác lượt này` / `Chèn trả lời` / `Dừng`, phụ đề `App · model`. Bốn dòng cũ của bảng
+(danh sách → chi tiết → xoá có xác nhận). Header WPS là **tiêu đề cộng nút ⋯** (giống Copilot trong Word) chứa
+*Trò chuyện mới* / *Hội thoại trước…* / *Ghi nhớ* / *Nhật ký* / *Thiết lập* — bản LibreOffice vẫn là ba liên kết
+chữ *Trò chuyện mới* / *Ghi nhớ* / *Thiết lập*; footer `Hoàn tác lượt này` / `Chèn trả lời` / `Dừng`, phụ đề `App · model`. Bốn dòng cũ của bảng
 này ("chưa có route memory/setup", "chưa có route hoàn tác lượt", "pane không được cấp thông tin model", "không
 có menu ⋯") **đã hết đúng** — route có từ `routeBoth` và `POST /wps/v1/exec`, menu ⋯ có từ đợt E.
 
@@ -251,13 +256,35 @@ Còn thiếu thật (chưa vẽ nút vì chưa có đường, hoặc đường c
 
 | Việc | Bản có nó | Tình trạng ở WPS |
 |---|---|---|
-| **Sửa / ghim / đặt hạn** ghi nhớ | chỉ Windows (`MemoryForm.cs`) — dialog *Ghi nhớ* của LibreOffice **cũng thiếu** ba việc này | màn hình *Bộ nhớ AI* của WPS mới **4/6** nghiệm thu đợt 2: có đọc, lọc phạm vi, xoá tạm, khôi phục, xoá vĩnh viễn, tải lại (LibreOffice còn thiếu cả khôi phục và xoá vĩnh viễn); `PATCH /wps/v1/memory/{id}` đã sẵn nhưng chưa có form |
+| **Sửa / ghim / đặt hạn** ghi nhớ | chỉ Windows (`MemoryForm.cs`) — dialog *Ghi nhớ* của LibreOffice **cũng thiếu** ba việc này | màn hình *Bộ nhớ AI* của WPS mới **3/6** việc của nghiệm thu đợt 2 (xoá tạm, khôi phục, xoá vĩnh viễn) cộng đọc, lọc phạm vi, tải lại (LibreOffice còn thiếu cả khôi phục và xoá vĩnh viễn); `PATCH /wps/v1/memory/{id}` đã sẵn nhưng chưa có form |
 | *Cài đặt nâng cao…*, *Tắt Agent Core…*, *Công cụ ngoài…*/MCP, **Tìm web**, menu ngôn ngữ | ribbon Windows | **cố ý không vẽ** trên WPS — xem `docs/ribbon-ui.md` §2 |
-| **Icon ribbon** | Windows: `imageMso` (bộ ảnh của Office) | WPS: `getImage` trả **đường dẫn tệp tương đối** `images/<tag>.svg`, 12 tệp trong `src/AxiomOffice.WPS/images/`. **Đã đo trên WPS thật (19/10/2026):** data URI thì WPS vẽ ra dấu `?` — nó phân giải chuỗi trả về như một đường dẫn; đổi sang đường dẫn tệp theo đúng SDK chính thức của WPS (`@wps-jsapi/wps/js/ribbon.js`: `return "images/1.svg"`). Xem `docs/ribbon-ui.md` §5.3 |
 
-Hai thứ pane WPS **có thêm** so với bản LibreOffice: lối vào *Nhật ký* (nay trong menu ⋯) và nút *Chèn trả lời*
-ở footer. Khác biệt nhỏ còn lại: khi chưa biết model, phụ đề WPS rơi về `Axiom Office` còn bản LibreOffice rơi về
+Những thứ WPS **có thêm** so với bản LibreOffice: *Nhật ký* và *Hội thoại trước…* trong menu ⋯, nút *Chèn trả lời*
+ở footer, menu chuột phải *Sửa bằng AI* và khung chat mini (mục 7.3).
+
+**Đã xong (không còn thiếu)** — *Icon ribbon*: Windows dùng `imageMso` (bộ ảnh của Office); WPS dùng `getImage` trả
+**đường dẫn tệp tương đối** `images/<tag>.svg` (13 tệp). Đo trên WPS thật 19/10/2026: data URI thì WPS vẽ ra dấu
+`?` — nó phân giải chuỗi trả về như một đường dẫn; đường dẫn tệp theo đúng SDK chính thức của WPS
+(`@wps-jsapi/wps/js/ribbon.js`: `return "images/1.svg"`) thì hiện đủ icon. Xem `docs/ribbon-ui.md` §5.3. Khác biệt nhỏ còn lại: khi chưa biết model, phụ đề WPS rơi về `Axiom Office` còn bản LibreOffice rơi về
 tên app.
 
 Màu, cỡ chữ, khoảng cách thì khớp từng token; phần **nhìn thấy thật** (font hệ thống, scrollbar của CEF, độ nét
 của chữ) chỉ kiểm chứng được khi mở pane trong WPS — spec chốt token, không chốt pixel.
+
+### 7.3 Menu chuột phải *Sửa bằng AI* và khung chat mini (20/10/2026)
+
+- `ribbon.xml` có `<contextMenus>` trên `ContextMenuText` và `ContextMenuList`: **Sửa bằng AI ▸** (9 mục, sinh từ
+  `core-go/internal/agent/quickactions.go`, spec ghim hai bên) và **Hỏi AI về đoạn này**. **Đã thử trên WPS thật**:
+  menu hiện và chạy trọn tới Core.
+- Bấm một mục: `main.js: openMini` mở `mini.html` bằng `Application.ShowDialog` (không modal). Mục *Sửa bằng AI*
+  chạy ngay (`?quick=<id>`); *Hỏi AI về đoạn này* mở ra chip + ô nhập. Khung mini dùng lại `pane-core.js` với
+  `create({requireSelection: true})`: **mọi lượt** gửi `options.requireSelection`, không có đoạn bôi đen thì Core
+  dừng trước khi gọi model. Có *Hoàn tác* (`writer.undo {count}`), *Dừng*, *Đóng* (đang chạy thì huỷ lượt trước).
+  Người dùng thử trên WPS thật: "khá ổn"; chưa đo vị trí cửa sổ (`ShowDialog` không nhận toạ độ).
+- Lượt từ lệnh nhanh có thêm luật trong system prompt: `QuickEditRule` (sửa ngay, không hỏi lại — lượt thật đầu
+  tiên model tìm ra lỗi rồi *hỏi* "có áp dụng không?") hoặc `QuickAnswerRule` (ba mục chỉ trả lời; Core cho lượt
+  đó bộ tool chỉ-đọc).
+- WPS không có `ShowDialog` (hoặc gọi lỗi) thì quay về khung chat lớn qua `POST /wps/v1/pane/request` → SSE
+  `GET /wps/v1/pane/events` (bảng ở đầu mục 7).
+- Spec: `tests/wps/test_mini_view.mjs`, các ca menu chuột phải trong `test_pane.mjs`, e2e
+  `test_wps_pane_e2e.py` (lệnh nhanh, `requireSelection`, trạm trung chuyển).

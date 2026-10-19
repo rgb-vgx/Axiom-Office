@@ -53,7 +53,7 @@ Ba biến thể đã thử, **chỉ biến thể A nạp được add-in trong c
 | C | ba entry, cùng `name`, ba `type` | chỉ entry đầu có hiệu lực |
 
 Vậy `type` nhận **danh sách ngăn bằng dấu phẩy** và một add-in phục vụ cả ba app. Hệ quả: add-in phải tự biết
-app nào đang chạy (`Application.Name`) và chỉ khai báo lệnh của app đó — xem `docs/wps-bridge.md` mục 5.
+app nào đang chạy (`Application.Name`) và chỉ khai báo lệnh của app đó — xem `docs/wps-bridge.md` mục 3.
 
 - `GET` mà WPS gọi khi nạp add-in: `ribbon.xml`, `index.html`, rồi script trong `index.html` — y hệt bản một app.
 - Tên app đo được (`Application.Name`): `WPS Writer`, `WPS Spreadsheets` (ET), `WPS Presentation` (WPP).
@@ -67,8 +67,9 @@ app nào đang chạy (`Application.Name`) và chỉ khai báo lệnh của app 
   `An signal occurred during the jsapi EXECUTE call.`; đặt `Visible` bằng **chuỗi** ném `参数类型错误(第0个).`
   ⇒ lỗi `Error: arguments error` khi bấm nút Ask AI **không** đến từ lời gọi này.
 - Pane do `CreateTaskPane` tạo **có** nạp trang (CEF GET trang pane, 200) nhưng script trong trang pane **không báo
-  về** server probe — chưa rõ nguyên nhân, cần đo tiếp (nghi: script trong pane không chạy, hoặc pane không được
-  render dưới Xvfb).
+  về** server probe — **dưới Xvfb**. Trên màn hình thật script của pane chạy được: ngày 11/10/2026 chính script đó gọi
+  `EventSource` và lộ ra lỗi 401 (`docs/wps-bridge.md` mục 7). Vậy đây là chuyện của lượt đo dưới Xvfb, chưa đo
+  riêng nguyên nhân.
 - Danh sách key liên quan task pane trên `Application`: `CreateTaskPane`, `GetTaskPane`,
   `DisplayDocumentActionTaskPane`, `DisplayXMLSourcePane`, `DisplayDocumentInformationPanel`. `window.wps` **chính là**
   `window.Application` (`wpsIsApplication` = true), `IsSandboxed` = `false`.
@@ -195,11 +196,11 @@ Gán chuỗi trông-như-số (`"42"`) hoặc trông-như-ngày (`"01/01"`) vào
 ## Bridge: vòng poll, và vì sao một lệnh dài làm bridge báo "mất kết nối" oan (đo 12/10/2026)
 
 Add-in **không listen được** (CEF Chrome 87), nên Core giữ bridge còn add-in **poll**: mỗi lời gọi
-`/wps/poll` là một request dài mà Core giữ tới **20 giây** nếu chưa có lệnh (`DefaultPollSeconds`,
+`/wps/v1/poll` là một request dài mà Core giữ tới **20 giây** nếu chưa có lệnh (`DefaultPollSeconds`,
 `wpsbridge.go:30`). "Còn sống" vì thế là một phép đo **thời gian**, không phải một kết nối:
 
 ```
-Connected() = busyLocked() || (everPoll && now - lastPoll <= DisconnectSeconds)   // wpsbridge.go:312-322
+Connected() = busyLocked() || (everPoll && now - lastPoll <= DisconnectSeconds)   // wpsbridge.go: Connected()
 ```
 
 - `DisconnectSeconds` mặc định của sản phẩm là **45** (`wpsbridge.go:32`); tầng e2e dùng 4 giây
@@ -210,15 +211,16 @@ Connected() = busyLocked() || (everPoll && now - lastPoll <= DisconnectSeconds) 
 **Hệ quả đo được**: add-in **đơn luồng** — trong lúc nó đang chạy một lệnh thì nó **không poll được**. Với
 `et.exportPdf` đo được **11 giây** (16:40:11 → 16:40:22), `lastPoll` đã cũ hơn ngưỡng 4 giây ngay khi lệnh
 xong, nên lệnh kế bị từ chối **trước khi gửi**:
-`WPS add-in is not connected: open a document in WPS to connect the add-in` (`wpsbridge.go:859-861`).
+`WPS add-in is not connected: open a document in WPS to connect the add-in` (`wpsbridge.go`, `writeErr` khi `!Connected()`).
 Lượt đo có probe theo dõi tiến trình cho thấy ET **ALIVE liên tục** trong suốt thời gian đó — app không hề chết.
 
 Đây là **cấu hình quá chặt của tầng test**, không phải lỗi app: tầng live nay truyền ngưỡng mặc định của sản
 phẩm (45 giây) qua `extra_env`. Nhưng phép đo **cũng phơi ra một lỗi thật**: với ngưỡng 45 giây, một lệnh chạy
 quá 45 giây vẫn làm mọi người gọi khác thấy bridge mất kết nối, và vì `StartSessionLoop` **xoá file session**
-khi `!Connected()` (`wpsbridge.go:984`), pane giữa chừng báo "chưa mở tài liệu" rồi lại thấy lại. Hướng sửa:
-coi "add-in vừa trả kết quả" là bằng chứng còn sống (làm mới mốc hoạt động khi giao kết quả) — đã ghi thành
-việc riêng (T8b trong hàng đợi tái cấu trúc).
+khi `!Connected()` (`removeSession`), pane giữa chừng báo "chưa mở tài liệu" rồi lại thấy lại. **Đã sửa (T8b)**
+đúng theo hướng này: `Bridge.Complete` coi "add-in vừa trả kết quả" là bằng chứng còn sống và làm mới `lastPoll`
+ngay khi bỏ job khỏi `waiting`; cùng với `busyLocked` (job đã giao còn trong `AXIOM_WPS_CMD_WAIT_SECONDS` được tính
+là còn kết nối) — xem `docs/wps-bridge.md` mục 6.
 
 Bài học cho người viết test live: một phép kiểm *mong đợi thất bại* sẽ xanh **kể cả khi** bridge đã mất kết
 nối. Sau mỗi lệnh dài phải có một phép kiểm **khẳng định bridge còn sống**, và phép kiểm lệnh sai phải đòi
@@ -270,6 +272,7 @@ port của bridge WPS, nên mỗi bridge chỉ có **một** lượt chạy. Kh�
 `tests/wps/test_wps_pane_e2e.py` (chạy bằng `make test-wps-e2e`: Core thật + add-in giả poll qua HTTP) nay đo
 luôn ba đường mà nút trên ribbon/pane gọi — trước đây chúng chỉ có unit test Go và test DOM giả, chưa lần nào
 chạy trên Core thật. Kết quả lượt đo: **68 phép kiểm pass** (thêm 18 so với trước), bridge e2e 36 pass.
+(20/10/2026, sau lệnh nhanh và khung chat mini: **94** phép kiểm.)
 
 ### `GET /wps/v1/status` — một lời gọi, hai tầng
 
@@ -318,6 +321,20 @@ viết tiếp cái gì đọc `/health` của bridge thì nhớ bóc `result`.
 - Hai ca 409 mang **mã máy đọc được**, đo trên HTTP thật: `addin-disconnected` (chưa mở tài liệu) và
   `run-in-progress` (đang có lượt AI chạy — bắn trong lúc lượt 2 đang chạy). Pane dịch mã sang câu tiếng
   Việt riêng, nên phép đo phải bám `code`; bám chuỗi tiếng Anh của Core là mong manh.
+
+## Ribbon, menu chuột phải, hộp thoại — đo trên WPS thật (19–20/10/2026, WPS 12.1.2.29182)
+
+- **`getImage` nhận ĐƯỜNG DẪN, không nhận data URI.** Trả `data:image/svg+xml,…` thì WPS vẽ dấu `?` ở chỗ icon:
+  nó **có** gọi callback, nhưng đem chuỗi trả về phân giải như một đường dẫn tương đối so với gốc add-in. Trả
+  `"images/<tag>.svg"` (cách của SDK chính thức `@wps-jsapi/wps/js/ribbon.js`) thì hiện đủ icon. Tệp SVG chỉ có
+  `viewBox`, không `width`/`height`.
+- **`<contextMenus>` được nhận.** `<contextMenu idMso="ContextMenuText">` / `"ContextMenuList"` với `<menu>`, `<button>`,
+  `<menuSeparator>`, `insertBeforeMso="Cut"` — menu hiện khi chuột phải trên đoạn bôi đen, `onAction` gọi được
+  `ribbon.OnAction`. (Ghi chú trong `RibbonUi.cs` của bản Windows rằng WPS "không nhận chắc" không đúng với WPS
+  Linux.) Tên `idMso` của menu ngữ cảnh có trong bảng lệnh của Writer: `/opt/kingsoft/wps-office/office6/res/commands/wps`.
+- **`Application.ShowDialog(url, title, width, height, modal)`** mở được trang add-in (`mini.html`) thành một cửa sổ
+  riêng, không modal. Gọi y như SDK (kích thước × `devicePixelRatio`). Hàm **không nhận toạ độ** — chưa đo vị trí
+  cửa sổ so với đoạn bôi đen.
 
 ## Theo công cụ `wpsjs` của WPS (bản online chưa thử)
 

@@ -5,6 +5,30 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — `install.sh` (Linux) làm mất hội thoại và Bộ nhớ AI (20/10/2026)
+- Core lưu `core.db` (+ `-wal`, `-shm`) ngay trong `~/.local/share/axiom-office/core/` — chính thư mục `install.sh`
+  thay khi cài. Trước bản sửa, **cài lại / nâng cấp** và cả **`--uninstall` không `--purge`** đều `rm -rf` cả thư
+  mục: mất hội thoại, Bộ nhớ AI, nhật ký, nguồn web; khi gỡ script còn in "Giữ … dữ liệu".
+- Nay cài lại chuyển ba tệp đó sang bản Core mới rồi mới xoá bản cũ (tệp cũ không còn trong gói vẫn được dọn);
+  gỡ không `--purge` xoá Core nhưng giữ ba tệp; `--purge` vẫn xoá sạch. Danh sách tệp ở `CORE_DATA` đầu script.
+- Spec `tests/linux/test_install_sh.py` +2 ca (cài lại giữ dữ liệu; gỡ giữ dữ liệu, cài lại vẫn còn, `--purge`
+  xoá) — cả hai **đỏ trên script cũ** (`core.db bi xoa`), xanh sau khi sửa.
+
+### Docs — Hướng dẫn sử dụng + rà tài liệu theo mã (20/10/2026)
+- **Mới: [docs/user-manual.md](docs/user-manual.md)** — hướng dẫn cho người dùng cuối: cài, thiết lập, khung chat,
+  sửa nhanh bằng chuột phải, từng nút ribbon/menu, Soát tài liệu, Bộ nhớ AI, dữ liệu, xử lý sự cố, bảng tính năng
+  theo nền tảng, gỡ cài đặt. README trỏ tới nó.
+- **Rà từng câu với mã** (README, STATUS, `docs/ribbon-ui.md`, `docs/wps-bridge.md`, `tests/wps/REFERENCE.md`,
+  `core-go/README.md`, `New_arch.md` §7): README thêm mục **WPS Office for Linux** (trước đó không nhắc gì tới add-in
+  WPS), sửa "gói cài ~250 KB", trần "5 phút" (chỉ còn ở chế độ cơ bản), memory "làm bằng C#", màu indigo, server
+  MCP `office`; `New_arch.md` §7.3 thêm 10 route và trường `quickAction` / `options.requireSelection`, §7.4 thêm
+  `run.progress`, `run.reasoning.live`, `confirm.resolved`, kind `selection*`; `ribbon-ui.md` sửa bảng *Trong khung
+  chat* (menu ⋯ **không** giống nhau trên ba nền tảng; LibreOffice chưa có *Hội thoại trước…*), ghi nghiệm thu
+  trên WPS thật; `REFERENCE.md` ghi ba phép đo mới trên WPS 12.1.2.29182 (`getImage` cần đường dẫn,
+  `<contextMenus>` được nhận, `ShowDialog`) và đánh dấu T8b đã sửa.
+- README, STATUS và hướng dẫn ghi đúng hành vi giữ dữ liệu của `install.sh` sau bản sửa bên dưới.
+- `ribbon.xml`: tooltip *Bộ nhớ AI…* hứa "sửa, ghim, đặt hạn" mà màn hình WPS không có — sửa thành đúng việc nút làm.
+
 ### Added — Khung chat mini cạnh đoạn bôi đen trên WPS (20/10/2026)
 - Bôi đen → chuột phải → *Sửa bằng AI ▸ <mục>* hoặc *Hỏi AI về đoạn này* mở một **khung chat mini** nổi
   (`mini.html`, `Application.ShowDialog`, không modal). Mục *Sửa bằng AI* chạy ngay; khung có chip các mục, ô gõ
