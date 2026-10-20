@@ -69,16 +69,49 @@
   // Dong xem truoc khi thu lai (theme.reasoning_preview cua pane LibreOffice).
   var REASONING_PREVIEW_LIMIT = 200;
 
-  // Lenh chi doc/luu: KHONG tinh la thao tac sua tai lieu (chat.py:READ_ONLY_ACTIONS, giong
-  // AskAiPane.IsWordEdit cua ban Windows).
-  var READ_ONLY_ACTIONS = {
-    "writer.getText": true, "writer.selection": true, "writer.checkTables": true, "writer.save": true,
-    "writer.saveAs": true, "writer.exportPdf": true, "writer.undo": true,
-    "et.readRange": true, "et.listSheets": true, "et.checkRange": true, "et.save": true, "et.saveAs": true,
-    "et.exportPdf": true, "et.undo": true,
-    "wps.listSlides": true, "wpp.listSlides": true, "wpp.checkLayout": true, "wpp.save": true, "wpp.saveAs": true,
-    "wpp.exportPdf": true
+  // --- BEGIN SINH TU DONG (scripts/generate_mcp_commands.py) - KHONG SUA TAY ---
+  // Lenh SUA tai lieu: co `undo` trong registry = dung mot buoc Undo; pane dem de "Hoan tac luot nay".
+  var EDIT_ACTIONS = {
+    "et.addChart": true,
+    "et.addSheet": true,
+    "et.fillRange": true,
+    "et.formatRange": true,
+    "et.importCsv": true,
+    "et.renameSheet": true,
+    "et.setConditionalFormat": true,
+    "et.writeRange": true,
+    "et.writeRanges": true,
+    "wpp.addGrid": true,
+    "wpp.addImage": true,
+    "wpp.addParagraphs": true,
+    "wpp.addSlide": true,
+    "wpp.addSlideFromTemplate": true,
+    "wpp.addTable": true,
+    "wpp.addText": true,
+    "wpp.addTextBox": true,
+    "wpp.copyPicture": true,
+    "wpp.deleteShapes": true,
+    "wpp.deleteSlide": true,
+    "wpp.deleteTagged": true,
+    "wpp.setNotes": true,
+    "wpp.setShapeText": true,
+    "writer.appendText": true,
+    "writer.formatSelection": true,
+    "writer.formatTable": true,
+    "writer.heading": true,
+    "writer.insertBlocks": true,
+    "writer.insertHyperlink": true,
+    "writer.insertImage": true,
+    "writer.insertPageBreak": true,
+    "writer.insertStyledText": true,
+    "writer.insertTable": true,
+    "writer.replaceAll": true,
+    "writer.replaceMany": true,
+    "writer.restyle": true,
+    "writer.setParagraphAlignment": true,
+    "writer.typeText": true
   };
+  // --- END SINH TU DONG ---
   // "Hoan tac luot nay" / "Chen tra loi": ban Windows chi co o Word (Excel/PowerPoint khong hoan tac duoc qua COM).
   // WPS co writer.undo va et.undo nhung KHONG co wpp.undo -> PowerPoint khong hien nut hoan tac.
   var UNDO_ACTIONS = { "wps": "writer.undo", "et": "et.undo" };
@@ -858,7 +891,11 @@
               var undone = Number(result.undone);
               if (isNaN(undone)) { undone = count; }
               state.edits = 0;
-              pushInfo("Đã hoàn tác " + undone + " thao tác của lượt vừa rồi.");
+              // et.undo: dinh dang, bieu do... WPS Spreadsheets chua hoan tac duoc - noi ro, khong im lang.
+              var skipped = (result.skipped && result.skipped.length) || 0;
+              pushInfo("Đã hoàn tác " + undone + " thao tác của lượt vừa rồi." + (skipped > 0
+                ? " " + skipped + " thao tác chưa hoàn tác được trên bảng tính WPS (định dạng, biểu đồ…), hãy sửa tay nếu cần."
+                : ""));
             } else {
               pushInfo("Không hoàn tác được: " + trimText(outcome && outcome.error));
             }
@@ -1083,13 +1120,11 @@
 
   // ---- Trang thai luot chay (chat.py: ChatSession) ----
 
-  // Lenh sua tai lieu: moi lenh nhu vay = mot buoc Undo cua bridge (chat.py:is_edit).
+  // Lenh sua tai lieu = lenh co `undo` trong registry (EDIT_ACTIONS sinh tu dong o tren, cung nguon voi
+  // chat.py:is_edit va AskAiPane.IsWordEdit): moi lenh = dung mot buoc Undo cua bridge.
   function isEdit(action) {
     try {
-      var key = trimText(action);
-      if (!key || READ_ONLY_ACTIONS[key]) { return false; }
-      var head = key.split(".")[0];
-      return head === "writer" || head === "et" || head === "wpp";
+      return Object.prototype.hasOwnProperty.call(EDIT_ACTIONS, trimText(action));
     } catch (e) { return false; }
   }
 
@@ -1126,7 +1161,7 @@
     } catch (e) { return "lỗi"; }
   }
 
-  var api = { create: create, ACTION_LABELS: ACTION_LABELS, SUFFIX_LABELS: SUFFIX_LABELS, TOOL_LABELS: TOOL_LABELS, NOUNS: NOUNS, APP_NAMES: APP_NAMES, SUGGESTIONS: SUGGESTIONS, labelFor: labelFor, emptyState: emptyState, plainReply: plainReply, isEdit: isEdit, summary: summary, reasoningPreview: reasoningPreview, errorSummary: errorSummary, READ_ONLY_ACTIONS: READ_ONLY_ACTIONS, UNDO_ACTIONS: UNDO_ACTIONS, INSERT_ACTIONS: INSERT_ACTIONS, PLAN_EXECUTE_PROMPT: PLAN_EXECUTE_PROMPT, REASONING_INLINE_LIMIT: REASONING_INLINE_LIMIT };
+  var api = { create: create, ACTION_LABELS: ACTION_LABELS, SUFFIX_LABELS: SUFFIX_LABELS, TOOL_LABELS: TOOL_LABELS, NOUNS: NOUNS, APP_NAMES: APP_NAMES, SUGGESTIONS: SUGGESTIONS, labelFor: labelFor, emptyState: emptyState, plainReply: plainReply, isEdit: isEdit, summary: summary, reasoningPreview: reasoningPreview, errorSummary: errorSummary, EDIT_ACTIONS: EDIT_ACTIONS, UNDO_ACTIONS: UNDO_ACTIONS, INSERT_ACTIONS: INSERT_ACTIONS, PLAN_EXECUTE_PROMPT: PLAN_EXECUTE_PROMPT, REASONING_INLINE_LIMIT: REASONING_INLINE_LIMIT };
   try {
     if (root) { root.AxiomPaneCore = api; }
   } catch (e) {}

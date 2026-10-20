@@ -5,6 +5,18 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — "Hoàn tác lượt này" gỡ quá tay (20/10/2026)
+- Ba pane (LibreOffice, WPS, Windows) đếm "thao tác sửa" bằng danh sách lệnh **chỉ đọc chép tay** — lệnh nào
+  không có trong danh sách thì bị tính là sửa. 18 lệnh không tạo bước Undo (vd `writer.outline` mà prompt bảo
+  model đọc trước, `et.sheetInfo`, `et.listCharts`, `*.open`, `*.closeAll`, `writer.lockSelection`) bị đếm, nên
+  nút hoàn tác gửi `count` lớn hơn thật và gỡ cả bước của lượt **trước**.
+- Nay **một nguồn**: cờ `undo` của registry Python (lệnh có cờ = đúng một bước Undo). `catalog()` xuất cờ này;
+  `scripts/generate_mcp_commands.py` sinh `EDIT_ACTIONS` vào `pane-core.js`, `axiom/chat.py` và `WordEditActions`
+  vào `AskAiPane.cs`; `check-gen` canh. `MUTATING` của `commands.js` (lệnh Writer mở `UndoRecord`) suy ra từ cờ.
+- WPS bảng tính tự giữ ngăn Undo: nay **mỗi lệnh có cờ = đúng một mục** — `et.writeRanges` (nhiều vùng) gộp
+  thành một, lệnh WPS chưa hoàn tác được (`formatRange`, `setConditionalFormat`, `addChart`, `renameSheet`) giữ
+  chỗ bằng mục rỗng và `et.undo` trả `skipped`; pane nói rõ "N thao tác chưa hoàn tác được" thay vì im lặng.
+
 ### Docs — Sắp xếp lại thư mục `docs/` (20/10/2026)
 - Mục lục mới **[docs/README.md](docs/README.md)**, chia theo người đọc. Gốc repo chỉ còn `README.md`, `CHANGELOG.md`,
   `STATUS.md`.

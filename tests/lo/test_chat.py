@@ -12,6 +12,7 @@ import os
 import shutil
 import sys
 import tempfile
+import subprocess
 import threading
 import time
 import types
@@ -220,8 +221,21 @@ class EditCountTests(unittest.TestCase):
 
     def test_mutating_actions_are_edits(self):
         for action in ("writer.appendText", "writer.insertTable", "writer.formatTable", "et.writeRange",
-                       "et.formatSelection", "wpp.addSlide", "wpp.deleteSlide", "wpp.setNotes"):
+                       "et.formatRange", "wpp.addSlide", "wpp.deleteSlide", "wpp.setNotes"):
             self.assertTrue(chat.is_edit(action), action)
+
+    def test_commands_without_undo_step_are_not_edits(self):
+        # Doc / mo / dong / khoa: khong tao buoc Undo nao. Dem nham -> "Hoan tac luot nay" go them buoc cua luot truoc.
+        for action in ("writer.outline", "writer.open", "writer.lockSelection", "et.sheetInfo", "et.listCharts",
+                       "et.listConditionalFormats", "et.closeAll", "wpp.sourceManifest", "wpp.open"):
+            self.assertFalse(chat.is_edit(action), action)
+
+    def test_edit_is_exactly_registry_undo_flag(self):
+        # Mot nguon: lenh co co undo trong registry = dung mot buoc Undo (documents.undo_step).
+        out = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "wps", "lo_catalog.py")],
+                             capture_output=True, text=True, check=True).stdout
+        for item in json.loads(out):
+            self.assertEqual(chat.is_edit(item["name"]), bool(item.get("undo")), item["name"])
 
     def test_unknown_tools_are_not_edits(self):
         for action in (None, "", "load_skill", "memory.list", "app.screenshot", "ui.askpane"):

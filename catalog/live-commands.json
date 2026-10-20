@@ -3,6 +3,7 @@
     "name": "app.info",
     "kind": null,
     "agent": false,
+    "undo": false,
     "summary": "Tên/version app, tài liệu đang mở, `state` (tài liệu, cửa sổ, visible)",
     "params": []
   },
@@ -10,6 +11,7 @@
     "name": "ai.ask",
     "kind": null,
     "agent": false,
+    "undo": false,
     "summary": "Chạy AI agent trên tài liệu đang mở; trả `reply`, `transcript`, `seconds`, `rounds`",
     "params": [
       {
@@ -23,6 +25,7 @@
     "name": "ui.askpane",
     "kind": null,
     "agent": false,
+    "undo": false,
     "summary": "Mở panel Ask AI trong sidebar",
     "params": []
   },
@@ -30,6 +33,7 @@
     "name": "ui.setup",
     "kind": null,
     "agent": false,
+    "undo": false,
     "summary": "Mở wizard thiết lập (nhập máy chủ AI, model, kiểm tra kết nối)",
     "params": []
   },
@@ -37,6 +41,7 @@
     "name": "app.screenshot",
     "kind": null,
     "agent": false,
+    "undo": false,
     "summary": "Ảnh chụp trang/slide hiện tại (PNG base64, thu nhỏ theo `maxWidth`, mặc định 1280)",
     "params": [
       {
@@ -50,6 +55,7 @@
     "name": "writer.newDocument",
     "kind": "wps",
     "agent": false,
+    "undo": false,
     "summary": "Tạo tài liệu mới",
     "params": []
   },
@@ -57,6 +63,7 @@
     "name": "writer.open",
     "kind": "wps",
     "agent": false,
+    "undo": false,
     "summary": "Mở .docx/.doc/.odt",
     "params": [
       {
@@ -70,6 +77,7 @@
     "name": "writer.getText",
     "kind": "wps",
     "agent": true,
+    "undo": false,
     "summary": "Đọc toàn bộ text",
     "params": [
       {
@@ -83,6 +91,7 @@
     "name": "writer.selection",
     "kind": "wps",
     "agent": true,
+    "undo": false,
     "summary": "Text + vị trí đang chọn",
     "params": []
   },
@@ -90,6 +99,7 @@
     "name": "writer.typeText",
     "kind": "wps",
     "agent": true,
+    "undo": true,
     "summary": "Gõ tại con trỏ",
     "params": [
       {
@@ -103,6 +113,7 @@
     "name": "writer.appendText",
     "kind": "wps",
     "agent": true,
+    "undo": true,
     "summary": "Nối vào cuối tài liệu",
     "params": [
       {
@@ -116,6 +127,7 @@
     "name": "writer.insertStyledText",
     "kind": "wps",
     "agent": true,
+    "undo": true,
     "summary": "Chèn text có định dạng tại con trỏ (`color` dạng `#RRGGBB`)",
     "params": [
       {
@@ -159,6 +171,7 @@
     "name": "writer.heading",
     "kind": "wps",
     "agent": true,
+    "undo": true,
     "summary": "Heading 1-9 (`level`, mặc định 1) + tự xuống dòng (`break`, mặc định true)",
     "params": [
       {
@@ -182,6 +195,7 @@
     "name": "writer.formatSelection",
     "kind": "wps",
     "agent": true,
+    "undo": true,
     "summary": "Định dạng vùng chọn",
     "params": [
       {
@@ -225,6 +239,7 @@
     "name": "writer.setParagraphAlignment",
     "kind": "wps",
     "agent": true,
+    "undo": true,
     "summary": "Căn đoạn: left/center/right/justify",
     "params": [
       {
@@ -238,6 +253,7 @@
     "name": "writer.insertTable",
     "kind": "wps",
     "agent": true,
+    "undo": true,
     "summary": "Chèn bảng; `rows`/`cols` tự suy ra/nới theo `values`",
     "params": [
       {
@@ -266,6 +282,7 @@
     "name": "writer.formatTable",
     "kind": "wps",
     "agent": true,
+    "undo": true,
     "summary": "Định dạng bảng CÓ SẴN (không tạo lại): kiểu, font, màu hàng tiêu đề, màu sọc, viền, căn lề, co giãn",
     "params": [
       {
@@ -339,6 +356,7 @@
     "name": "writer.insertPageBreak",
     "kind": "wps",
     "agent": true,
+    "undo": true,
     "summary": "Ngắt trang",
     "params": []
   },
@@ -346,6 +364,7 @@
     "name": "writer.insertImage",
     "kind": "wps",
     "agent": true,
+    "undo": true,
     "summary": "Chèn ảnh tại con trỏ (kích thước theo point)",
     "params": [
       {
@@ -369,6 +388,7 @@
     "name": "writer.insertHyperlink",
     "kind": "wps",
     "agent": true,
+    "undo": true,
     "summary": "Chèn liên kết",
     "params": [
       {
@@ -387,6 +407,7 @@
     "name": "writer.replaceAll",
     "kind": "wps",
     "agent": true,
+    "undo": true,
     "summary": "Tìm và thay toàn bộ",
     "params": [
       {
@@ -405,6 +426,7 @@
     "name": "writer.replaceMany",
     "kind": "wps",
     "agent": true,
+    "undo": true,
     "summary": "Thay NHIỀU chỗ trong một lần: `edits` = [{find, replace}] theo thứ tự (mỗi cặp thay mọi chỗ khớp) - dùng thay cho nhiều lần writer.replaceAll; trả số chỗ đã thay của từng cặp",
     "params": [
       {
@@ -418,6 +440,7 @@
     "name": "writer.lockSelection",
     "kind": "wps",
     "agent": false,
+    "undo": false,
     "summary": "Khoá vùng đang bôi đen: tới khi mở khoá, lệnh writer.* chỉ được đổi chữ trong vùng đó (chars = 0: không bôi đen, không khoá)",
     "params": []
   },
@@ -425,6 +448,7 @@
     "name": "writer.unlockSelection",
     "kind": "wps",
     "agent": false,
+    "undo": false,
     "summary": "Mở khoá vùng bôi đen",
     "params": []
   },
@@ -432,6 +456,7 @@
     "name": "writer.outline",
     "kind": "wps",
     "agent": true,
+    "undo": false,
     "summary": "Dàn bài tài liệu: các đoạn (số thứ tự toàn tài liệu, chữ rút gọn, số tự động) và bảng (số hàng, cột, hàng tiêu đề)",
     "params": [
       {
@@ -445,6 +470,7 @@
     "name": "writer.restyle",
     "kind": "wps",
     "agent": false,
+    "undo": true,
     "summary": "Trình bày lại nền chung KHÔNG đổi chữ: tiêu đề mục (I., A., *), tiêu đề con (1.), nhãn (a. ...:), gạch đầu dòng hai cấp, bỏ dòng trống thừa, bảng (viền mảnh, hàng tiêu đề nhạt lặp lại), lề trang, số trang",
     "params": [
       {
@@ -468,6 +494,7 @@
     "name": "writer.insertBlocks",
     "kind": "wps",
     "agent": false,
+    "undo": true,
     "summary": "Chèn khối bo tròn nền nhạt (ô ghi chú, cảnh báo, thẻ cạnh nhau) - thay các đoạn [replaceFrom, replaceTo] hoặc chèn trước đoạn `before`",
     "params": [
       {
@@ -491,6 +518,7 @@
     "name": "writer.undo",
     "kind": "wps",
     "agent": true,
+    "undo": false,
     "summary": "Hoàn tác (mỗi thao tác AI = 1 bước)",
     "params": [
       {
@@ -504,6 +532,7 @@
     "name": "writer.exportPdf",
     "kind": "wps",
     "agent": true,
+    "undo": false,
     "summary": "Xuất PDF",
     "params": [
       {
@@ -517,6 +546,7 @@
     "name": "writer.save",
     "kind": "wps",
     "agent": true,
+    "undo": false,
     "summary": "Lưu",
     "params": []
   },
@@ -524,6 +554,7 @@
     "name": "writer.saveAs",
     "kind": "wps",
     "agent": true,
+    "undo": false,
     "summary": "Lưu thành file mới",
     "params": [
       {
@@ -537,6 +568,7 @@
     "name": "writer.closeAll",
     "kind": "wps",
     "agent": false,
+    "undo": false,
     "summary": "**Đóng mọi tài liệu, không lưu**",
     "params": []
   },
@@ -544,6 +576,7 @@
     "name": "et.newWorkbook",
     "kind": "et",
     "agent": false,
+    "undo": false,
     "summary": "Tạo sổ tính mới",
     "params": []
   },
@@ -551,6 +584,7 @@
     "name": "et.open",
     "kind": "et",
     "agent": false,
+    "undo": false,
     "summary": "Mở .xlsx/.xls/.ods/.csv",
     "params": [
       {
@@ -564,6 +598,7 @@
     "name": "et.listSheets",
     "kind": "et",
     "agent": true,
+    "undo": false,
     "summary": "Danh sách sheet + sheet đang active",
     "params": []
   },
@@ -571,6 +606,7 @@
     "name": "et.sheetInfo",
     "kind": "et",
     "agent": true,
+    "undo": false,
     "summary": "Kích thước dùng thật của TỪNG sheet trong một lời gọi (`usedRange`/`rows`/`cols`/`empty`) — dùng để soát sheet nào thực sự có nội dung, không chỉ có tên",
     "params": []
   },
@@ -578,6 +614,7 @@
     "name": "et.addSheet",
     "kind": "et",
     "agent": true,
+    "undo": true,
     "summary": "Thêm sheet mới (bỏ trống `name` thì đặt tên Sheet1, Sheet2...)",
     "params": [
       {
@@ -596,6 +633,7 @@
     "name": "et.renameSheet",
     "kind": "et",
     "agent": true,
+    "undo": true,
     "summary": "Đổi tên sheet",
     "params": [
       {
@@ -614,6 +652,7 @@
     "name": "et.activateSheet",
     "kind": "et",
     "agent": true,
+    "undo": false,
     "summary": "Chuyển sheet",
     "params": [
       {
@@ -627,6 +666,7 @@
     "name": "et.readRange",
     "kind": "et",
     "agent": true,
+    "undo": false,
     "summary": "Đọc vùng, ví dụ `A1:C10`; `formulas=true` trả về công thức (ô không có công thức = null)",
     "params": [
       {
@@ -650,6 +690,7 @@
     "name": "et.writeRange",
     "kind": "et",
     "agent": true,
+    "undo": true,
     "summary": "Ghi vùng từ ô góc trên-trái; `values` là mảng 2 chiều. Công thức viết theo cú pháp en-US (dấu phẩy); nếu máy dùng dấu chấm phẩy thì tự đổi. Công thức còn lỗi trả về ở `formulaErrors`",
     "params": [
       {
@@ -673,6 +714,7 @@
     "name": "et.importCsv",
     "kind": "et",
     "agent": true,
+    "undo": true,
     "summary": "Nạp một file CSV vào sổ: không có `range` thì tạo sheet mới đặt tên theo tên file, có `range` thì ghi vào ô góc đó. Ô trông như số thì thành số, còn lại là chuỗi; ngày để nguyên chuỗi",
     "params": [
       {
@@ -706,6 +748,7 @@
     "name": "et.writeRanges",
     "kind": "et",
     "agent": true,
+    "undo": true,
     "summary": "Ghi NHIỀU vùng trong MỘT lời gọi: `writes` là mảng {range, values, sheet?}. Dùng khi cần viết nhiều khối trong cùng một phản hồi (bớt vòng qua bridge); công thức vẫn theo cú pháp en-US và lỗi công thức gom ở `formulaErrors`. Kiểm hết tham số trước khi ghi: một vùng sai thì không vùng nào được ghi",
     "params": [
       {
@@ -724,6 +767,7 @@
     "name": "et.fillRange",
     "kind": "et",
     "agent": true,
+    "undo": true,
     "summary": "Viết MỘT công thức vào ô góc trên-trái của `range` rồi điền ra cả vùng, tham chiếu tương đối tự dịch (dùng cho bảng nghìn dòng: đừng gửi từng ô)",
     "params": [
       {
@@ -747,6 +791,7 @@
     "name": "et.formatRange",
     "kind": "et",
     "agent": true,
+    "undo": true,
     "summary": "Định dạng vùng",
     "params": [
       {
@@ -805,6 +850,7 @@
     "name": "et.setConditionalFormat",
     "kind": "et",
     "agent": true,
+    "undo": true,
     "summary": "Đặt định dạng điều kiện cho vùng: `rules` là mảng rule, mỗi rule có operator (less/lessEqual/greater/greaterEqual/equal/notEqual/between/notBetween/formula), formula1, formula2 (chỉ between), và styleName có sẵn (Good/Bad/Neutral/Warning/Error/...) hoặc bold/italic/fontColor/fillColor/numFmt. Gọi lại trên cùng vùng thì THAY rule cũ của vùng đó, nên nhiều rule trên một vùng phải để trong MỘT lần gọi",
     "params": [
       {
@@ -828,6 +874,7 @@
     "name": "et.listConditionalFormats",
     "kind": "et",
     "agent": true,
+    "undo": false,
     "summary": "Liệt kê định dạng điều kiện đang có (đọc lại để tự kiểm); bỏ trống `range` thì cả sheet",
     "params": [
       {
@@ -846,6 +893,7 @@
     "name": "et.addChart",
     "kind": "et",
     "agent": true,
+    "undo": true,
     "summary": "Chèn biểu đồ từ vùng dữ liệu; `type` column/bar/line/pie/area/scatter, `width`/`height` tính bằng cm",
     "params": [
       {
@@ -894,6 +942,7 @@
     "name": "et.listCharts",
     "kind": "et",
     "agent": true,
+    "undo": false,
     "summary": "Danh sách biểu đồ trên sheet",
     "params": [
       {
@@ -907,6 +956,7 @@
     "name": "et.undo",
     "kind": "et",
     "agent": true,
+    "undo": false,
     "summary": "Hoàn tác",
     "params": [
       {
@@ -920,6 +970,7 @@
     "name": "et.exportPdf",
     "kind": "et",
     "agent": true,
+    "undo": false,
     "summary": "Xuất PDF",
     "params": [
       {
@@ -933,6 +984,7 @@
     "name": "et.save",
     "kind": "et",
     "agent": true,
+    "undo": false,
     "summary": "Lưu",
     "params": []
   },
@@ -940,6 +992,7 @@
     "name": "et.saveAs",
     "kind": "et",
     "agent": true,
+    "undo": false,
     "summary": "Lưu thành file mới",
     "params": [
       {
@@ -953,6 +1006,7 @@
     "name": "et.closeAll",
     "kind": "et",
     "agent": false,
+    "undo": false,
     "summary": "**Đóng mọi sổ, không lưu**",
     "params": []
   },
@@ -960,6 +1014,7 @@
     "name": "wpp.newPresentation",
     "kind": "wpp",
     "agent": false,
+    "undo": false,
     "summary": "Tạo bài trình bày mới",
     "params": []
   },
@@ -967,6 +1022,7 @@
     "name": "wpp.open",
     "kind": "wpp",
     "agent": false,
+    "undo": false,
     "summary": "Mở .pptx/.ppt/.odp",
     "params": [
       {
@@ -980,6 +1036,7 @@
     "name": "wpp.listSlides",
     "kind": "wpp",
     "agent": true,
+    "undo": false,
     "summary": "Số slide + text từng slide",
     "params": [
       {
@@ -998,6 +1055,7 @@
     "name": "wpp.addSlide",
     "kind": "wpp",
     "agent": true,
+    "undo": true,
     "summary": "Thêm slide cuối; `layout` mặc định 12 = trống (1 = tiêu đề, 2 = tiêu đề + nội dung, 11 = chỉ tiêu đề)",
     "params": [
       {
@@ -1011,6 +1069,7 @@
     "name": "wpp.addText",
     "kind": "wpp",
     "agent": true,
+    "undo": true,
     "summary": "Textbox có định dạng (`color` dạng `#RRGGBB`, `align` left/center/right)",
     "params": [
       {
@@ -1074,6 +1133,7 @@
     "name": "wpp.addTextBox",
     "kind": "wpp",
     "agent": false,
+    "undo": true,
     "summary": "Textbox",
     "params": [
       {
@@ -1112,6 +1172,7 @@
     "name": "wpp.addImage",
     "kind": "wpp",
     "agent": true,
+    "undo": true,
     "summary": "Chèn ảnh (kích thước gốc nếu bỏ trống `width`/`height`)",
     "params": [
       {
@@ -1150,6 +1211,7 @@
     "name": "wpp.addTable",
     "kind": "wpp",
     "agent": true,
+    "undo": true,
     "summary": "Bảng; `rows`/`cols` tự suy ra/nới theo `values`",
     "params": [
       {
@@ -1198,6 +1260,7 @@
     "name": "wpp.setNotes",
     "kind": "wpp",
     "agent": true,
+    "undo": true,
     "summary": "Ghi chú thuyết trình",
     "params": [
       {
@@ -1221,6 +1284,7 @@
     "name": "wpp.deleteSlide",
     "kind": "wpp",
     "agent": true,
+    "undo": true,
     "summary": "Xoá slide (mặc định slide cuối)",
     "params": [
       {
@@ -1234,6 +1298,7 @@
     "name": "wpp.exportPdf",
     "kind": "wpp",
     "agent": true,
+    "undo": false,
     "summary": "Xuất PDF",
     "params": [
       {
@@ -1247,6 +1312,7 @@
     "name": "wpp.save",
     "kind": "wpp",
     "agent": true,
+    "undo": false,
     "summary": "Lưu",
     "params": [
       {
@@ -1260,6 +1326,7 @@
     "name": "wpp.saveAs",
     "kind": "wpp",
     "agent": true,
+    "undo": false,
     "summary": "Lưu thành file mới",
     "params": [
       {
@@ -1273,6 +1340,7 @@
     "name": "wpp.newFromTemplate",
     "kind": "wpp",
     "agent": true,
+    "undo": false,
     "summary": "Tạo bài MỚI từ tệp mẫu (.pptx/.potx): giữ khổ + master, bỏ hết slide mẫu, lưu ở `path` và mở ra",
     "params": [
       {
@@ -1291,6 +1359,7 @@
     "name": "wpp.addSlideFromTemplate",
     "kind": "wpp",
     "agent": true,
+    "undo": true,
     "summary": "Chèn bản sao slide số `kind` của tệp mẫu (giữ ảnh nền, khung chữ, định dạng); trả tên các khung chữ",
     "params": [
       {
@@ -1329,6 +1398,7 @@
     "name": "wpp.sourceManifest",
     "kind": "wpp",
     "agent": true,
+    "undo": false,
     "summary": "Đọc bài nguồn (vd bài cũ .ppt) theo slide: tiêu đề, chữ, danh sách ảnh - để dựng lại theo mẫu",
     "params": [
       {
@@ -1352,6 +1422,7 @@
     "name": "wpp.setShapeText",
     "kind": "wpp",
     "agent": true,
+    "undo": true,
     "summary": "Thay chữ của một khung theo TÊN shape, giữ định dạng của khung (font, cỡ, màu)",
     "params": [
       {
@@ -1380,6 +1451,7 @@
     "name": "wpp.deleteShapes",
     "kind": "wpp",
     "agent": true,
+    "undo": true,
     "summary": "Xoá các shape theo tên (mục lặp thừa của slide mẫu); không xoá ảnh nền",
     "params": [
       {
@@ -1408,6 +1480,7 @@
     "name": "wpp.copyPicture",
     "kind": "wpp",
     "agent": true,
+    "undo": true,
     "summary": "Chép ảnh từ slide của bài khác (vd bài cũ) vào slide của bài đang làm, co vừa khung, giữ tỉ lệ",
     "params": [
       {
@@ -1476,6 +1549,7 @@
     "name": "wpp.addParagraphs",
     "kind": "wpp",
     "agent": false,
+    "undo": true,
     "summary": "Khung chữ nhiều đoạn giữ phân cấp (cấp thụt lề, đậm, nghiêng, số thứ tự, gạch đầu dòng); tự chọn cỡ chữ lớn nhất vừa khung",
     "params": [
       {
@@ -1569,6 +1643,7 @@
     "name": "wpp.addGrid",
     "kind": "wpp",
     "agent": false,
+    "undo": true,
     "summary": "Bảng có định dạng: dòng đầu là tiêu đề (nền màu, chữ trắng đậm), dòng xen kẽ nền nhạt, cột rộng theo nội dung, tự chọn cỡ chữ vừa khung",
     "params": [
       {
@@ -1642,6 +1717,7 @@
     "name": "wpp.deleteTagged",
     "kind": "wpp",
     "agent": false,
+    "undo": true,
     "summary": "Xoá các slide do công cụ dựng (có tag nguồn) mà tag bắt đầu trong [first, last] - dựng lại một lô theo bố cục mới",
     "params": [
       {
@@ -1665,6 +1741,7 @@
     "name": "wpp.closeAll",
     "kind": "wpp",
     "agent": false,
+    "undo": false,
     "summary": "**Đóng mọi bài trình bày, không lưu**",
     "params": []
   },
@@ -1672,6 +1749,7 @@
     "name": "writer.checkTables",
     "kind": "wps",
     "agent": true,
+    "undo": false,
     "summary": "Soát các bảng (chỉ đọc): số dòng/cột, ô trống, ô tiêu đề lẫn đoạn văn. Bảng dàn trang — bảng đã gọi writer.formatTable với borders:false — được đánh dấu layout và KHÔNG báo empty-cells (ô trống ở đó là cố ý: khoảng trống ký, ô chờ điền)",
     "params": []
   },
@@ -1679,6 +1757,7 @@
     "name": "et.checkRange",
     "kind": "et",
     "agent": true,
+    "undo": false,
     "summary": "Soát bảng dữ liệu (chỉ đọc): tiêu đề trống, kiểu lẫn lộn, số dạng chữ, number format, dữ liệu lạc ngoài bảng (chỉ khi không truyền range)",
     "params": [
       {
@@ -1697,6 +1776,7 @@
     "name": "wpp.checkLayout",
     "kind": "wpp",
     "agent": true,
+    "undo": false,
     "summary": "Soát bố cục slide (chỉ đọc): chữ tràn khung, shape ra ngoài slide, shape chồng nhau, chữ quá nhỏ",
     "params": [
       {

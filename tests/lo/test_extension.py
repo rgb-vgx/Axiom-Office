@@ -122,7 +122,7 @@ class CatalogTests(unittest.TestCase):
         catalog = commands.catalog()
         self.assertEqual(len(catalog), len(commands.REGISTRY))
         for item in catalog:
-            self.assertEqual(set(item), {"name", "kind", "agent", "summary", "params"})
+            self.assertEqual(set(item), {"name", "kind", "agent", "undo", "summary", "params"})
             self.assertTrue(item["summary"])
             self.assertIn(item["kind"], (None, "wps", "et", "wpp"))
             for param in item["params"]:

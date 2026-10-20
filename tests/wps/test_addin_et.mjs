@@ -559,3 +559,22 @@ test("moi lenh et.* deu tra {ok:false, error} khi thieu tham so bat buoc, khong 
     assert.ok(String(reply.error).length > 0, command + ": phai co thong diep loi");
   }
 });
+
+test("et.undo: moi lenh co co undo = dung mot buoc, ke ca lenh WPS chua hoan tac duoc", () => {
+  // Pane dem so lenh co co undo cua luot roi gui et.undo {count}. Lenh khong day buoc nao (dinh dang...) ma
+  // khong giu cho thi count lech: hoan tac luot nay go mat buoc cua luot TRUOC.
+  const ctx = loadAddin();
+  const app = makeEtApp({ sheets: [{ name: "S", cells: { A1: "a0", B1: "b0", C1: "c0" } }] });
+  run(ctx, app, "et.writeRange", { range: "A1", values: [["x"]] });           // luot truoc
+  run(ctx, app, "et.formatRange", { range: "A1", bold: true });               // luot nay: 1 lenh
+  const one = run(ctx, app, "et.undo", { count: 1 });
+  assert.equal(one.undone, 0, "formatRange khong hoan tac duoc tren WPS");
+  assert.deepEqual(one.skipped, ["et.formatRange"]);
+  assert.equal(run(ctx, app, "et.readRange", { range: "A1" }).values[0][0], "x", "khong duoc go buoc cua luot truoc");
+
+  // writeRanges ghi hai vung = MOT buoc (mot lenh), go mot lan la ve het.
+  run(ctx, app, "et.writeRanges", { writes: [{ range: "B1", values: [["y"]] }, { range: "C1", values: [["z"]] }] });
+  const two = run(ctx, app, "et.undo", { count: 1 });
+  assert.equal(two.undone, 1);
+  assert.deepEqual(run(ctx, app, "et.readRange", { range: "A1:C1" }).values, [["x", "b0", "c0"]]);
+});

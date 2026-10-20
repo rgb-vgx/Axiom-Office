@@ -52,6 +52,7 @@ def catalog() -> list:
         "name": c.name,
         "kind": c.kind,
         "agent": c.agent,
+        "undo": c.undo,
         "summary": c.summary,
         "params": [{"name": p.name, "required": p.required, "hint": p.hint} for p in c.params],
     } for c in REGISTRY.values()]

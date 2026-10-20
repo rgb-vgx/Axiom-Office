@@ -1097,26 +1097,34 @@ namespace AxiomOffice.Ai
             }
         }
 
-        // Lệnh writer.* có sửa tài liệu (mỗi lệnh = 1 bước Undo nhờ UndoRecordScope); lệnh đọc/soát/lưu không tính.
+        // --- BEGIN SINH TU DONG (scripts/generate_mcp_commands.py) - KHONG SUA TAY ---
+        // Lenh writer.* co `undo` trong registry = dung mot buoc Undo (UndoRecordScope).
+        private static readonly HashSet<string> WordEditActions = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "writer.appendText",
+            "writer.formatSelection",
+            "writer.formatTable",
+            "writer.heading",
+            "writer.insertBlocks",
+            "writer.insertHyperlink",
+            "writer.insertImage",
+            "writer.insertPageBreak",
+            "writer.insertStyledText",
+            "writer.insertTable",
+            "writer.replaceAll",
+            "writer.replaceMany",
+            "writer.restyle",
+            "writer.setParagraphAlignment",
+            "writer.typeText",
+        };
+        // --- END SINH TU DONG ---
+
+        // Lệnh writer.* có sửa tài liệu = lệnh có `undo` trong registry (WordEditActions sinh tự động ở trên):
+        // mỗi lệnh = 1 bước Undo nhờ UndoRecordScope; lệnh đọc/mở/soát/lưu không tính.
         internal static bool IsWordEdit(string action)
         {
-            if (string.IsNullOrEmpty(action) || !action.StartsWith("writer.", StringComparison.Ordinal))
-            {
-                return false;
-            }
-            switch (action)
-            {
-                case "writer.getText":
-                case "writer.selection":
-                case "writer.checkTables":
-                case "writer.save":
-                case "writer.saveAs":
-                case "writer.exportPdf":
-                case "writer.undo":
-                    return false;
-                default:
-                    return true;
-            }
+            return !string.IsNullOrEmpty(action) && WordEditActions.Contains(action);
+        }
         }
 
         // "Hoàn tác lượt này" (docs/architecture/core.md mục 9.2, chỉ Word): writer.undo {count: số thao tác sửa của lượt}.

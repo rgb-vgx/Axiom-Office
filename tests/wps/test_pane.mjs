@@ -27,6 +27,7 @@ import fs from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
+import { loCatalog } from "./addin_harness.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const ADDIN = path.join(ROOT, "src", "AxiomOffice.WPS");
@@ -329,6 +330,22 @@ test("Hoan tac luot nay: exec <kind>.undo {count}, xong thi thoi dem", async () 
   assert.match(last.text, /Đã hoàn tác 2 thao tác/);
 });
 
+test("Hoan tac (bang tinh): noi ro thao tac WPS chua hoan tac duoc thay vi im lang", async () => {
+  const h = harness({ "/runs": [200, { ok: true, result: { runId: "r25b" } }],
+    "/exec": [200, { ok: true, result: { undone: 1, restored: [{}], skipped: ["et.formatRange"] } }] }, null, "et");
+  await h.pane.send("Tô đậm tiêu đề");
+  await tick();
+  FakeSource.last.emit("tool.finished", { data: { callId: "k1", action: "et.writeRange", ok: true } });
+  FakeSource.last.emit("tool.finished", { data: { callId: "k2", action: "et.formatRange", ok: true } });
+  FakeSource.last.emit("run.completed", { data: { reply: "Xong", seconds: 2 } });
+  await tick();
+  await h.pane.undoLastTurn();
+  assert.deepEqual(h.calls.find((c) => c.url === BASE + "exec").body, { action: "et.undo", params: { count: 2 } });
+  const last = h.state.messages[h.state.messages.length - 1];
+  assert.match(last.text, /Đã hoàn tác 1 thao tác/);
+  assert.match(last.text, /1 thao tác chưa hoàn tác được/);
+});
+
 test("Hoan tac: PowerPoint khong co wpp.undo nen khong hien nut", async () => {
   const h = harness({ "/runs": [200, { ok: true, result: { runId: "r26" } }] }, null, "wpp");
   await h.pane.send("Thêm slide");
@@ -405,6 +422,15 @@ test("pane-core: isEdit/reasoningPreview/errorSummary giong chat.py + theme.py",
   for (const action of ["writer.appendText", "writer.replaceAll", "writer.insertTable", "writer.restyle",
     "et.writeRange", "et.formatRange", "wpp.addSlide", "wpp.addText"]) {
     assert.equal(core.isEdit(action), true, "la thao tac sua: " + action);
+  }
+  // Lenh khong tao buoc Undo (doc/mo/dong/khoa) khong duoc tinh: dem nham -> "Hoan tac luot nay" go qua tay.
+  for (const action of ["writer.outline", "writer.open", "writer.lockSelection", "et.sheetInfo", "et.listCharts",
+    "et.listConditionalFormats", "et.closeAll", "wpp.sourceManifest"]) {
+    assert.equal(core.isEdit(action), false, "khong tao buoc Undo: " + action);
+  }
+  // Mot nguon: isEdit == co undo cua registry LibreOffice (sinh vao pane-core.js boi generate_mcp_commands.py).
+  for (const item of loCatalog()) {
+    assert.equal(core.isEdit(item.name), !!item.undo, "isEdit khop co undo: " + item.name);
   }
   assert.equal(core.reasoningPreview("  một   hai ba  "), "một hai ba");
   assert.equal(core.reasoningPreview("x".repeat(250), 200), "x".repeat(199) + "…");

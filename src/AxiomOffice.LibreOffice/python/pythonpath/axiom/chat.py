@@ -10,22 +10,57 @@ dong tool, the xac nhan... Moi muc la dict co `kind` va `rev`; muc bi sua (vd th
 """
 from __future__ import annotations
 
-# Lenh chi doc/luu: khong tinh la thao tac sua tai lieu (giong AskAiPane.IsWordEdit cua ban Windows).
-READ_ONLY_ACTIONS = {
-    "writer.getText", "writer.selection", "writer.checkTables", "writer.save", "writer.saveAs", "writer.exportPdf",
-    "writer.undo", "et.readRange", "et.listSheets", "et.checkRange", "et.save", "et.saveAs", "et.exportPdf",
-    "et.undo", "wps.listSlides", "wpp.listSlides", "wpp.checkLayout", "wpp.save", "wpp.saveAs", "wpp.exportPdf",
-}
+# --- BEGIN SINH TU DONG (scripts/generate_mcp_commands.py) - KHONG SUA TAY ---
+# Lenh SUA tai lieu: co `undo` trong registry = dung mot buoc Undo (documents.undo_step).
+EDIT_ACTIONS = frozenset({
+    "et.addChart",
+    "et.addSheet",
+    "et.fillRange",
+    "et.formatRange",
+    "et.importCsv",
+    "et.renameSheet",
+    "et.setConditionalFormat",
+    "et.writeRange",
+    "et.writeRanges",
+    "wpp.addGrid",
+    "wpp.addImage",
+    "wpp.addParagraphs",
+    "wpp.addSlide",
+    "wpp.addSlideFromTemplate",
+    "wpp.addTable",
+    "wpp.addText",
+    "wpp.addTextBox",
+    "wpp.copyPicture",
+    "wpp.deleteShapes",
+    "wpp.deleteSlide",
+    "wpp.deleteTagged",
+    "wpp.setNotes",
+    "wpp.setShapeText",
+    "writer.appendText",
+    "writer.formatSelection",
+    "writer.formatTable",
+    "writer.heading",
+    "writer.insertBlocks",
+    "writer.insertHyperlink",
+    "writer.insertImage",
+    "writer.insertPageBreak",
+    "writer.insertStyledText",
+    "writer.insertTable",
+    "writer.replaceAll",
+    "writer.replaceMany",
+    "writer.restyle",
+    "writer.setParagraphAlignment",
+    "writer.typeText",
+})
+# --- END SINH TU DONG ---
 TERMINAL_STATUS = ("completed", "cancelled", "timedout", "stopped", "failed")
 # Suy luan ngan hon nguong nay thi hien thang; dai hon thi thu lai thanh mot dong (bam de mo).
 REASONING_INLINE_LIMIT = 320
 
 
 def is_edit(action: str | None) -> bool:
-    """Lenh sua tai lieu (moi lenh nhu vay = mot buoc Undo trong undo context cua bridge)."""
-    if not action or action in READ_ONLY_ACTIONS:
-        return False
-    return action.split(".", 1)[0] in ("writer", "et", "wpp")
+    """Lenh sua tai lieu = lenh co `undo` trong registry: moi lenh = dung mot buoc Undo (documents.undo_step)."""
+    return bool(action) and action in EDIT_ACTIONS
 
 
 class ChatSession:
