@@ -5,6 +5,67 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — CI Windows: tên lệnh tiếng Việt làm vỡ console cp1252 (20/10/2026)
+- `tests/wps/lo_catalog.py` in catalog bằng `json.dump(ensure_ascii=False)`; trên Windows stdout của tiến trình con là
+  cp1252 nên gặp tên lệnh tiếng Việt là `UnicodeEncodeError`, job đỏ trước khi vào test. Nay script tự
+  `reconfigure(encoding="utf-8")` khi stdout hỗ trợ.
+- `tests/lo/test_chat.py` nay bắt `stderr` của tiến trình con (trước đây `check=True` nuốt mất, chỉ thấy "exit 1"),
+  và thêm ca hồi quy chạy với `PYTHONIOENCODING=cp1252` — đỏ trên script cũ, xanh sau khi sửa.
+
+### Fixed — CI Linux: job oracle thiếu phụ thuộc Python (20/10/2026)
+- `make test-oracle` chạy ba bộ `tests/oracle/*-mcp` nhưng CI chưa cài `requirements.txt` của chúng, nên job đỏ vì
+  thiếu gói. Thêm bước `pip install` cả ba trước `make test-oracle`; chạy lại tại máy với venv riêng: 34 test xanh.
+
+### Fixed — WPS: hoàn tác bảng tính và định dạng điều kiện theo nhầm workbook (20/10/2026)
+- Ngăn undo của ET và kho định dạng điều kiện trước đây khoá theo **tên sheet trần**, mà `Sheet1` lặp lại ở mọi
+  workbook: hoàn tác một sổ có thể gỡ bước của sổ khác, hoặc rơi vào `ActiveSheet` khi sheet đích đã đóng. Nay khoá
+  theo định danh workbook (`FullName`, chưa lưu thì `Name`) **cộng** tên sheet; không còn đường dự phòng về sheet đang mở.
+- `et.renameSheet` chuyển cả bước undo lẫn định dạng điều kiện sang tên mới; workbook/sheet không còn mở thì bỏ qua thay
+  vì ghi nhầm. Test mới: hai workbook cùng tên sheet, đổi tên sheet, và migration kho định dạng điều kiện.
+
+### Fixed — WPS: `closeAll` và `exportPdf` báo sai khi thiếu thư mục/FileSystem (20/10/2026)
+- `closeAll` (ET/WPP) cứu bản chưa lưu vào `<tmpdir>/rescued` nhưng chưa tạo thư mục, và lấy tên tài liệu có thể rỗng.
+  Nay tạo thư mục bằng `FileSystem.Mkdir`, dùng chung `rescueDir`/`rescueName`, tên rỗng có tên dự phòng; lỗi tạo thư
+  mục không chặn việc đóng tài liệu.
+- `writer.exportPdf` trước đây trả "đã xuất" dù `app.FileSystem` không có (không có tệp nào được ghi). Nay ném lỗi rõ
+  ràng; fake add-in được mở rộng `Save`/`SaveAs`/`SaveAs2`/`ExportAsFixedFormat`/`FileSystem` để test cả đường thành công.
+
+### Fixed — LibreOffice: bỏ qua `presentation`, lỗi Core khó đọc và lượt chạy bị bỏ mặc (20/10/2026)
+- Nhiều lệnh `wpp.*` khai báo `presentation` nhưng `bridge.Env` luôn lấy tài liệu đang active. Nay `Env` nhận `params`
+  và chọn đúng tài liệu qua `documents.find_open_path`; test mới `tests/lo/test_bridge_env.py`.
+- Client Core của extension gom về `core.call`: body lỗi không phải JSON (proxy trả HTML) và `URLError` đều thành
+  `CoreError` có nội dung đọc được. `core.wait_for_run` thêm `timeout` và **huỷ lượt** khi hết giờ; `ai.ask` dùng
+  `start_run`/`wait_for_run` thay vì tự gọi HTTP, nên không còn bỏ mặc lượt chạy trên Core.
+
+### Fixed — Core: ghi memory theo lô để lại bản ghi dở; API đọc JSON không giới hạn, làm tròn số âm sai (20/10/2026)
+- `AddBatch` ghi từng mục trong một transaction chung: mục thứ N lỗi thì các mục trước đã vào DB dù lượt gọi trả lỗi.
+  Nay mỗi mục có `SAVEPOINT memory_item` riêng qua helper `insertMemory`; lỗi ở đâu rollback/release đúng đó.
+- `readJSON` của API không giới hạn kích thước body; nay chặn 8 MB. `round1` dùng `int(x*10+0.5)` nên làm tròn sai số
+  âm (`-1.24` thành `-1.1`); nay dùng `math.Round`.
+
+### Changed — Pane/mini WPS tách tệp, dùng chung helper DOM (20/10/2026)
+- CSS/JS của pane và khung chat mini tách khỏi HTML thành `pane.css`/`pane.js` và `mini.css`/`mini.js`; helper DOM dùng
+  chung nằm ở `pane-dom.js` (`$`, `textOf`, `trimText`, `clearNode`, `addText`, `make`, `baseUrl`, `actOf`).
+- `onAction` của pane thay chuỗi `if` bằng bảng tra `ACTIONS` cộng `withCtl`/`reloadList`; test đọc tệp ngoài theo đúng
+  thứ tự script trong HTML.
+
+### Changed — `commands.js`: gom xuất PDF/đóng tất cả, đọc thuộc tính có kiểu (20/10/2026)
+- Ba nhánh xuất PDF dùng chung `pdfBinaryString`/`writePdf`; ba nhánh đóng tất cả dùng chung `closeAllDocuments`.
+- Các chỗ đọc thuộc tính thô chuyển sang `strProp`/`numProp` khi ngữ nghĩa tương đương; sửa escape thừa trong regex.
+
+### Changed — Core Go: tách luồng `Execute` và bridge, gom helper số/chuỗi (20/10/2026)
+- `Execute` tách thành `prepareExecution`, `buildCallbacks`, `applyResult` (tệp mới `orchestrator_execution.go`);
+  `wpsbridge.go` tách phần xác thực/HTTP/session sang `auth.go`, `http.go`, `session.go`.
+- Thêm `sheet.Int` (làm tròn .5 ra xa 0) thay hai bản `asInt` trùng ở `xlsx`/`pptx`; hai helper `containsString` thay
+  bằng `slices.Contains`. Các `asInt`/`textOf`/`stringList` khác nghĩa ở package khác được giữ nguyên.
+
+### Changed — LibreOffice: một đường chạy lệnh, dùng chung client Core, bỏ mã chết (20/10/2026)
+- `bridge.execute` và `bridge.run_on_main` gom về một `_invoke` (tham số `on_main` quyết định có qua gate); lỗi của
+  pane nay cũng có traceback và kiểm đúng `kind` như đường HTTP.
+- `general.py` dùng `core.call`/`core.start_run`/`core.wait_for_run` thay client HTTP riêng; xoá `calc.check_range`,
+  `impress.check_layout` (đã có `checks.range_report`/`layout_report` đăng ký) và `bridge.uptime_started` (không dùng).
+- Stub UNO trong `test_bridge_env.py` trả mọi tên nên không còn rò sang `test_dialogs.py` khi chạy cả bộ `make test-lo`.
+
 ### Fixed — Data race trên trạng thái lượt chạy của Core (20/10/2026)
 - `Execute` ghi `Status`, `Error`, `Finished`, `Transcript`… của `agent.Run` trên goroutine riêng, không khoá, trong
   khi `GET /v1/runs/{id}`, vòng chờ `conversationId` của `POST /v1/runs`, nút Huỷ và `Manager` (`Running`,
