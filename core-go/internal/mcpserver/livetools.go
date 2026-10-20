@@ -3,6 +3,7 @@ package mcpserver
 import (
 	"context"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -174,7 +175,7 @@ func commandSignature(command liveCommand) string {
 func commandList(kinds ...string) string {
 	signatures := []string{}
 	for _, command := range liveCommands {
-		if command.Kind == "" || containsString(kinds, command.Kind) {
+		if command.Kind == "" || slices.Contains(kinds, command.Kind) {
 			signatures = append(signatures, commandSignature(command))
 		}
 	}

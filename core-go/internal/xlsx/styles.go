@@ -3,7 +3,6 @@ package xlsx
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"strconv"
 	"strings"
 
@@ -172,7 +171,7 @@ func (s *Styles) Derive(baseXf int, spec map[string]any) (int, error) {
 			}
 		}
 		if value, exists := alignment["rotation"]; exists && value != nil {
-			align.SetAttr("", "", "textRotation", strconv.Itoa(asInt(value)))
+			align.SetAttr("", "", "textRotation", strconv.Itoa(sheet.Int(value)))
 		}
 		xf.SetAttr("", "", "applyAlignment", "1")
 	}
@@ -183,7 +182,7 @@ func (s *Styles) Derive(baseXf int, spec map[string]any) (int, error) {
 	}
 	if numFmt == "" {
 		if value, exists := spec["decimalPlaces"]; exists && value != nil {
-			places := max(0, min(30, asInt(value)))
+			places := max(0, min(30, sheet.Int(value)))
 			if places == 0 {
 				numFmt = "0"
 			} else {
@@ -448,14 +447,6 @@ func setOrRemove(element *ooxml.Element, name, value string) {
 		return
 	}
 	element.SetAttr("", "", name, value)
-}
-
-func asInt(value any) int {
-	number, ok := sheet.AsFloat(value)
-	if !ok {
-		return 0
-	}
-	return int(math.Round(number))
 }
 
 // styleKey dung khoa cache giong ban C# (baseXf + "|" + JSON cua spec).

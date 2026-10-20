@@ -3,7 +3,6 @@ package pptx
 
 import (
 	"fmt"
-	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -332,7 +331,7 @@ func Create(path string, slides []any, overwrite bool) (map[string]any, error) {
 			}
 			layout := 1
 			if value, ok := spec["layout"]; ok && value != nil {
-				layout = asInt(value)
+				layout = sheet.Int(value)
 			}
 			title := ""
 			if value, ok := spec["title"]; ok && value != nil {
@@ -651,14 +650,6 @@ func ResetCore(pkg *ooxml.Package) error {
 	docx.SetCore(doc, "http://purl.org/dc/terms/", "modified", now)
 	pkg.Put(core.TargetPart, doc)
 	return nil
-}
-
-func asInt(value any) int {
-	number, ok := sheet.AsFloat(value)
-	if !ok {
-		return 0
-	}
-	return int(math.Round(number))
 }
 
 // timeNow dung cung dinh dang voi DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ") cua ban C#.

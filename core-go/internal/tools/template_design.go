@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -563,7 +564,7 @@ func checkUpdate(row designRow, kind *pptx.Kind, slot int, webSource func(string
 			continue
 		}
 		domain := strings.SplitN(normalizeURL(url), "/", 2)[0]
-		if !containsString(domains, domain) {
+		if !slices.Contains(domains, domain) {
 			domains = append(domains, domain)
 		}
 	}
@@ -586,15 +587,6 @@ func checkUpdate(row designRow, kind *pptx.Kind, slot int, webSource func(string
 }
 
 const maxUpdatePoints = 6
-
-func containsString(list []string, value string) bool {
-	for _, item := range list {
-		if item == value {
-			return true
-		}
-	}
-	return false
-}
 
 // compareTextShare: cot co ca chu va anh - chu o phan tren, toi da 40% chieu cao cot.
 const compareTextShare = 0.4

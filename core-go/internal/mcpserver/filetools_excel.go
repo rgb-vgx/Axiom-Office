@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -98,7 +99,7 @@ func excelExt(path string) string {
 
 func excelCheckFormat(path string) error {
 	ext := excelExt(path)
-	if !containsString(workbookExtensions, ext) && ext != ".xls" && !sheet.IsCsvExtension(ext) {
+	if !slices.Contains(workbookExtensions, ext) && ext != ".xls" && !sheet.IsCsvExtension(ext) {
 		return fmt.Errorf("unsupported format '%s': supported are xlsx, xlsm, xls, csv, tsv", ext)
 	}
 	return nil
@@ -120,7 +121,7 @@ func excelKind(path string) string {
 		}
 	}
 	ext := excelExt(path)
-	if containsString(workbookExtensions, ext) {
+	if slices.Contains(workbookExtensions, ext) {
 		return "xlsx"
 	}
 	if ext == ".xls" {
@@ -142,15 +143,6 @@ func findSheetRef(book *xlsx.Book, name string) *xlsx.SheetRef {
 		}
 	}
 	return nil
-}
-
-func containsString(values []string, wanted string) bool {
-	for _, value := range values {
-		if value == wanted {
-			return true
-		}
-	}
-	return false
 }
 
 // ---- doc ----
