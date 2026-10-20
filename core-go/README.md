@@ -10,7 +10,7 @@ add-in, extension LibreOffice và MCP không phải đổi gì.
 
 Từ đó API v1 chỉ **thêm**, không đổi cái cũ: `GET /v1/log`, `GET /v1/quick-actions`, trường `quickAction` và
 `options.requireSelection` của `POST /v1/runs` (kèm `QuickEditRule` / `QuickAnswerRule` trong system prompt), và
-kênh `/wps/*` cho add-in WPS Linux — xem `docs/wps-bridge.md` mục 2 và 7, `New_arch.md` §7.3.
+kênh `/wps/*` cho add-in WPS Linux — xem `docs/architecture/wps-bridge.md` mục 2 và 7, `docs/architecture/core.md` §7.3.
 
 **Cách làm: song song dần.** Bản Go đã qua **toàn bộ** `tests/core/test_core_e2e.py` (155 kiểm tra lúc bỏ bản
 .NET; 169 vào 20/10/2026) và được
@@ -88,7 +88,7 @@ AXIOM_E2E_CORE_EXE=/duong/dan/axiom-core python tests/core/test_core_e2e.py --on
 | `internal/tools` | `Tools/ITool.cs`, `OfficeActionTool.cs`, `SkillTools.cs` |
 | `internal/agent` | `Agent/Orchestrator.cs`, `RunManager.cs`, `RunEventStream.cs`, `PolicyEngine.cs` (phần xác nhận), `PromptBuilder.cs`, `ContextAssembler.cs` |
 | `internal/api` | `Api/CoreApi.cs`, `CoreApiGuard.cs`, `ApiJson.cs`, `SetupEndpoints.cs`, `RunEndpoints.cs`, `SkillEndpoints.cs`. Thêm sau khi bỏ .NET: `log.go` (`GET /v1/log`), `quickactions.go` (`GET /v1/quick-actions`), và kênh `/wps/*` cho add-in WPS Linux — `wps.go` (file add-in, poll/result, runs), `wpsadmin.go` (`routeBoth`, status, exec, config), `wpspane.go` (menu chuột phải → khung chat) |
-| `internal/wpsbridge` | **mới, không có bản .NET**: bridge WPS Linux (cổng riêng 47861) — add-in JS poll Core, Core giao lệnh (`docs/wps-bridge.md`) |
+| `internal/wpsbridge` | **mới, không có bản .NET**: bridge WPS Linux (cổng riêng 47861) — add-in JS poll Core, Core giao lệnh (`docs/architecture/wps-bridge.md`) |
 | `internal/doctor` | **mới**: subcommand `doctor` — chẩn đoán một lượt chạy, in báo cáo chữ thường để dán vào chat/email |
 | `internal/cfb` | **mới**: đọc thùng Compound File Binary (OLE2) của `.xls`/`.doc`/`.ppt` đời cũ, không cần LibreOffice |
 | `internal/store` | `Memory/CoreDb.cs`, `ConversationStore.cs`, `RunStore.cs`, `Api/CoreStores.cs` |

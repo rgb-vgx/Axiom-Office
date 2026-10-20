@@ -9,7 +9,7 @@ using AxiomOffice.Setup;
 
 namespace AxiomOffice.Ai
 {
-    // Wizard thiet lap cho nguoi dung khong chuyen (New_arch.md muc 9; cung noi dung voi
+    // Wizard thiet lap cho nguoi dung khong chuyen (docs/architecture/core.md muc 9; cung noi dung voi
     // setupwizard.py cua ban Linux - catalog/setup.json sinh ra SetupCatalog.cs).
     // 5 buoc: chao mung -> kiem tra may -> noi may chu AI -> tinh nang -> hoan tat.
     // Khong co Tab control: cac buoc la cac panel an/hien.

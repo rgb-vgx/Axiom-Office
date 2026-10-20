@@ -1,6 +1,6 @@
 package agent
 
-// Lenh nhanh "Sua bang AI" (docs/ribbon-ui.md muc 2, "Trong khung chat"): nguoi dung boi den mot doan roi
+// Lenh nhanh "Sua bang AI" (docs/architecture/ribbon-ui.md muc 2, "Trong khung chat"): nguoi dung boi den mot doan roi
 // chon mot muc trong menu - Trau chuot, Viet lai, Rut gon, ... - thay vi tu go cau lenh.
 //
 // Cau lenh cua moi muc nam O DAY, trong Core, chu khong nam trong pane: ba ban (Windows, WPS, LibreOffice)

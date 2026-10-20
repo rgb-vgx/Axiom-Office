@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// Tool ma model duoc thay trong mot luot chay (New_arch.md muc 8.3).
+// Tool ma model duoc thay trong mot luot chay (docs/architecture/core.md muc 8.3).
 type Tool struct {
 	Name        string
 	Description string

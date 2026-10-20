@@ -24,7 +24,7 @@ const (
 // RetentionMinutes: giu ket qua 30 phut sau khi xong de client doc ket qua va SSE ket noi lai.
 const RetentionMinutes = 30
 
-// Run: trang thai mot luot chay (New_arch.md muc 7.3, 8.1).
+// Run: trang thai mot luot chay (docs/architecture/core.md muc 7.3, 8.1).
 type Run struct {
 	ID             string
 	Port           int

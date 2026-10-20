@@ -4,10 +4,10 @@ Trạng thái: **P0 (§3) xong 11/10/2026, P1 (§4.1–§4.9) xong 12/10/2026** 
 hiện P1 (§4.7, §4.8), và P1 sửa §4.3 sinh thêm **§4.9** (`description` dài quá 300 ký tự bị cắt đuôi),
 đã sửa trong cùng ngày sau khi chốt hướng. P2–P4 còn nguyên (xem §8). Cách làm: 4 lượt review độc lập qua
 ChatGPT, rồi **đối chiếu máy móc lại với mã** — registry lệnh trong
-[livecommands_gen.go](../core-go/internal/mcpserver/livecommands_gen.go) (65 mục: 60 lệnh tài liệu — `writer`
+[livecommands_gen.go](../../core-go/internal/mcpserver/livecommands_gen.go) (65 mục: 60 lệnh tài liệu — `writer`
 22, `et` 23, `wpp` 15 — cộng 5 lệnh app/UI), mã bridge LibreOffice
-trong [src/AxiomOffice.LibreOffice/python/pythonpath/axiom/](../src/AxiomOffice.LibreOffice/python/pythonpath/axiom/),
-và tầng skill trong [core-go/internal/skills/](../core-go/internal/skills/).
+trong [src/AxiomOffice.LibreOffice/python/pythonpath/axiom/](../../src/AxiomOffice.LibreOffice/python/pythonpath/axiom),
+và tầng skill trong [core-go/internal/skills/](../../core-go/internal/skills).
 
 Mọi phát hiện dưới đây đã kiểm lại trên mã. Chỗ nào chưa xác minh được thì ghi rõ **(chưa xác minh)** —
 đừng đọc thành đã kiểm.
@@ -22,8 +22,8 @@ Mọi phát hiện dưới đây đã kiểm lại trên mã. Chỗ nào chưa x
 - Thứ tự đúng: sửa P0 → bù lệnh bridge → viết eval → **rồi mới** viết skill mới.
 
 Bối cảnh cần nhớ: bộ skill hiện tại là **skill mẫu**, không phải danh mục sản phẩm.
-[New_arch.md:71](../New_arch.md#L71) ghi rõ giai đoạn này gói NĐ30 "chỉ làm skill mẫu", và
-[New_arch.md:566-579](../New_arch.md#L566-L579) §8.4.6 thiết kế đúng 4 skill tầng thiết kế — tức 4/8 skill
+[docs/architecture/core.md:71](../architecture/core.md#L71) ghi rõ giai đoạn này gói NĐ30 "chỉ làm skill mẫu", và
+[docs/architecture/core.md:566-579](../architecture/core.md#L566-L579) §8.4.6 thiết kế đúng 4 skill tầng thiết kế — tức 4/8 skill
 hiện có là **đúng thiết kế**, không phải nghiệp vụ. Vì vậy đừng đọc bảng kiểm kê ở §2 như một danh mục
 sản phẩm bị thiếu.
 
@@ -42,10 +42,10 @@ sản phẩm bị thiếu.
 
 Hai ghi chú kiểm chứng được:
 
-- `thiet-ke-van-phong` **không có `apps:`**, và [index.go:38-48](../core-go/internal/skills/index.go#L38-L48)
+- `thiet-ke-van-phong` **không có `apps:`**, và [index.go:38-48](../../core-go/internal/skills/index.go#L38-L48)
   cho `AppliesTo` trả `true` khi `Apps` rỗng → skill này có mặt trong cả ba app. **Đây là hành vi đúng**,
   không phải lỗi. Chỉ nên nói rõ trong `description` rằng nó dùng chung cho cả Word/Excel/PowerPoint.
-- `mo-hinh-nhieu-sheet` là skill duy nhất viết từ **số đo thật** ([mo-hinh-nhieu-sheet/SKILL.md:16-17](../skills/mo-hinh-nhieu-sheet/SKILL.md#L16-L17)
+- `mo-hinh-nhieu-sheet` là skill duy nhất viết từ **số đo thật** ([mo-hinh-nhieu-sheet/SKILL.md:16-17](../../skills/mo-hinh-nhieu-sheet/SKILL.md#L16-L17)
   trích `tests/bench/results/`). Đây là mẫu đúng cho mọi skill nghiệp vụ sau này.
 
 Soát tự động: **23/23 lệnh được nhắc trong skill đều tồn tại trong registry** — không có tên lệnh bịa.
@@ -55,11 +55,11 @@ Vấn đề nằm ở **ngữ nghĩa**, không ở tên lệnh.
 
 ### 3.1 `the-thuc-van-ban` bảo sửa một ô bằng `writer.replaceAll` — lệnh không làm được việc đó
 
-[the-thuc-van-ban/SKILL.md:33-34](../skills/the-thuc-van-ban/SKILL.md#L33-L34):
+[the-thuc-van-ban/SKILL.md:33-34](../../skills/the-thuc-van-ban/SKILL.md#L33-L34):
 
 > `long-header-cell` (đoạn văn bị lọt vào ô tiêu đề: **sửa lại ô đó bằng `writer.replaceAll`**)
 
-Nhưng [writer.py:541-567](../src/AxiomOffice.LibreOffice/python/pythonpath/axiom/writer.py#L541-L567):
+Nhưng [writer.py:541-567](../../src/AxiomOffice.LibreOffice/python/pythonpath/axiom/writer.py#L541-L567):
 `replace_all` tạo `document.createReplaceDescriptor()` rồi gọi `document.replaceAll(descriptor)` —
 **toàn tài liệu**, không nhắm được bảng/ô, và còn đặt `SearchCaseSensitive = False`.
 
@@ -67,46 +67,46 @@ Hệ quả: model làm đúng theo skill sẽ thay **mọi** lần xuất hiện
 hoa/thường. Với văn bản hành chính — nơi tên cơ quan, "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM", chức vụ lặp lại
 nhiều nơi — đây là lệnh phá tài liệu.
 
-**Đã sửa:** bỏ hẳn `writer.replaceAll` khỏi skill ([the-thuc-van-ban/SKILL.md](../skills/the-thuc-van-ban/SKILL.md)).
+**Đã sửa:** bỏ hẳn `writer.replaceAll` khỏi skill ([the-thuc-van-ban/SKILL.md](../../skills/the-thuc-van-ban/SKILL.md)).
 Thay bằng hai đường **làm được thật**: bảng do **chính lượt này** chèn và sau đó chưa làm gì khác thì
 `writer.undo` lùi về trước `writer.insertTable` rồi chèn lại bằng `values` đúng; bảng có sẵn trong tài liệu,
 hoặc đã làm việc khác sau đó, thì **báo người dùng**, đừng tự vá. Kèm theo, `UndoRule`
-([office_action.go:23-32](../core-go/internal/tools/office_action.go#L23-L32)) được nới đúng một ngoại lệ —
+([office_action.go:23-32](../../core-go/internal/tools/office_action.go#L23-L32)) được nới đúng một ngoại lệ —
 được `undo` thứ **chính lượt này** vừa làm khi không có cách sửa tại chỗ — nếu không thì prompt cấm đúng cái
 đường duy nhất còn lại và dồn agent về `writer.replaceAll`. Lệnh `writer.setCell` vẫn nằm ở §5 (P2).
 
 ### 3.2 `bao-cao-du-lieu` bảo xoá `outside-table` bằng cách ghi `""` vào ô
 
-[bao-cao-du-lieu/SKILL.md:39-41](../skills/bao-cao-du-lieu/SKILL.md#L39-L41):
+[bao-cao-du-lieu/SKILL.md:39-41](../../skills/bao-cao-du-lieu/SKILL.md#L39-L41):
 
 > `outside-table` (dữ liệu ghi lạc ô — **xoá bằng cách ghi `""` vào đúng các ô đó**)
 
 Câu này mâu thuẫn trực tiếp với chính system prompt:
-[prompt.go:48-57](../core-go/internal/agent/prompt.go#L48-L57) — `CheckRule` nói *"Never change a cell
+[prompt.go:48-57](../../core-go/internal/agent/prompt.go#L48-L57) — `CheckRule` nói *"Never change a cell
 holding data the user already had, not even temporarily"*.
 
 Vấn đề thật: `outside-table` là ô có dữ liệu **nằm ngoài vùng bảng** — mà ô đó rất thường là **dữ liệu
 người dùng đã có sẵn** cạnh bảng. Skill đang dạy model xoá dữ liệu người dùng để làm `issueCount` về 0, tức
 là **tối ưu chỉ số thay vì làm đúng việc**.
 
-**Đã sửa:** [bao-cao-du-lieu/SKILL.md](../skills/bao-cao-du-lieu/SKILL.md) nay tách `outside-table` ra khỏi
+**Đã sửa:** [bao-cao-du-lieu/SKILL.md](../../skills/bao-cao-du-lieu/SKILL.md) nay tách `outside-table` ra khỏi
 danh sách "sửa mọi `issues`": chỉ xoá ô mà **chính lượt này** đã ghi nhầm, không chắc thì báo người dùng, và
 muốn soát đúng bảng vừa dựng thì truyền `range` (đã kiểm trong
-[checks.py](../src/AxiomOffice.LibreOffice/python/pythonpath/axiom/checks.py): `outside-table` chỉ bắn khi
+[checks.py](../../src/AxiomOffice.LibreOffice/python/pythonpath/axiom/checks.py): `outside-table` chỉ bắn khi
 **không** truyền `range`). Yêu cầu tuyệt đối *"lặp đến khi `issueCount` = 0"* cũng bỏ — nó chính là chỗ biến
 việc soát thành tối ưu chỉ số. Mô tả lệnh `et.checkRange` cũng nói rõ `outside-table` có thể là dữ liệu người
 dùng đã có và **không** được xoá ô có sẵn từ trước.
 
 ### 3.3 Hai skill thiết kế để dùng cùng nhau lại mâu thuẫn về `empty-cells`
 
-- [van-ban-hanh-chinh/SKILL.md:25-26](../skills/van-ban-hanh-chinh/SKILL.md#L25-L26) dựng bảng dàn trang
+- [van-ban-hanh-chinh/SKILL.md:25-26](../../skills/van-ban-hanh-chinh/SKILL.md#L25-L26) dựng bảng dàn trang
   2 cột **có ô trống cố ý** (khoảng trống ký, ô chờ điền).
-- [the-thuc-van-ban/SKILL.md:33](../skills/the-thuc-van-ban/SKILL.md#L33) lại bảo:
+- [the-thuc-van-ban/SKILL.md:33](../../skills/the-thuc-van-ban/SKILL.md#L33) lại bảo:
   *"sửa `empty-cells` (điền hoặc ghi `—`)"*.
-- [checks.py:66-67](../src/AxiomOffice.LibreOffice/python/pythonpath/axiom/checks.py#L66-L67) đếm ô trống
+- [checks.py:66-67](../../src/AxiomOffice.LibreOffice/python/pythonpath/axiom/checks.py#L66-L67) đếm ô trống
   cho **mọi** bảng, không có ngoại lệ cho bảng dàn trang.
 
-Mà [van-ban-hanh-chinh/SKILL.md:15](../skills/van-ban-hanh-chinh/SKILL.md#L15) nói rõ *"Dùng cùng skill
+Mà [van-ban-hanh-chinh/SKILL.md:15](../../skills/van-ban-hanh-chinh/SKILL.md#L15) nói rõ *"Dùng cùng skill
 `the-thuc-van-ban`"*. Nên model làm xong văn bản NĐ30 sẽ tự nhét `—` vào ô ký. Hai skill đang chống nhau.
 
 **Đã sửa — nhưng không theo cách đề xuất ở trên.** Cách "bỏ qua bảng không viền" **sai**, và kiểm trên
@@ -122,8 +122,8 @@ nhất — khoảng trống ký của NĐ30 nằm trong dòng **có** chữ (`"-
 
 Nên dấu hiệu được chọn là **tem tường minh**: `formatTable {borders:false}` đặt tên bảng thành
 `writer.LAYOUT_TABLE_NAME`, `checkTables` đọc tem đó và trả cờ `layout` cho từng bảng
-([writer.py](../src/AxiomOffice.LibreOffice/python/pythonpath/axiom/writer.py),
-[checks.py](../src/AxiomOffice.LibreOffice/python/pythonpath/axiom/checks.py)). Số ô trống **vẫn hiện** trong
+([writer.py](../../src/AxiomOffice.LibreOffice/python/pythonpath/axiom/writer.py),
+[checks.py](../../src/AxiomOffice.LibreOffice/python/pythonpath/axiom/checks.py)). Số ô trống **vẫn hiện** trong
 report để agent thấy, chỉ không thành `issue`. Ba chi tiết đo được khi làm:
 
 - tên bảng Writer **không được chứa dấu cách hay dấu chấm** (`unotbl.cxx:2958`) và **không được trùng**
@@ -144,11 +144,11 @@ viết lại); phần còn lại của §4 sửa theo. Ghi chú từng mục ở
 > nên bám token thôi chưa đủ. Các liên kết tới `bo-cuc.md` dưới đây nay là liên kết chết, giữ lại để đọc
 > lịch sử; bố cục giờ ở `trinh-bay-chuyen-nghiep/references/bo-cuc-slide.md`.
 
-[bao-cao-thang/references/bo-cuc.md:7](../skills/bao-cao-thang/references/bo-cuc.md#L7) dùng
-`fontSize: 40` cho slide tiêu đề, [dòng 12](../skills/bao-cao-thang/references/bo-cuc.md#L12) dùng `32` cho
+[bao-cao-thang/references/bo-cuc.md:7](../../skills/bao-cao-thang/references/bo-cuc.md#L7) dùng
+`fontSize: 40` cho slide tiêu đề, [dòng 12](../../skills/bao-cao-thang/references/bo-cuc.md#L12) dùng `32` cho
 tiêu đề slide nội dung — nhưng
-[skills/_design/tokens.json](../skills/_design/tokens.json) đặt `slide.type.title = 36`, và
-[trinh-bay-chuyen-nghiep/SKILL.md:33](../skills/trinh-bay-chuyen-nghiep/SKILL.md#L33) bảo dùng đúng
+[skills/_design/tokens.json](../../skills/_design/tokens.json) đặt `slide.type.title = 36`, và
+[trinh-bay-chuyen-nghiep/SKILL.md:33](../../skills/trinh-bay-chuyen-nghiep/SKILL.md#L33) bảo dùng đúng
 `type.title`. File này cũng chép cứng `#1F4E79`, `#2E75B6`, `#595959`, `#262626` thay vì đọc token.
 
 Hệ quả: hai skill dùng cùng nhau cho ra hai cỡ tiêu đề khác nhau, và **sửa `tokens.json` sẽ không lan tới
@@ -167,7 +167,7 @@ Hệ quả: hai skill dùng cùng nhau cho ra hai cỡ tiêu đề khác nhau, v
   **không** thêm token mà gán về token có sẵn, vì đó mới đúng là chỗ hai skill lệch nhau:
   tiêu đề slide 32 → `slide.type.title` (36, khớp `trinh-bay-chuyen-nghiep`), nhãn dưới số 18 →
   `slide.type.body` (20). Đây là **thay đổi nhìn thấy được** của slide (tiêu đề 32→36, nhãn 18→20).
-- Test mới [repo_skills_tokens_test.go](../core-go/internal/tools/repo_skills_tokens_test.go) (chạy trong
+- Test mới [repo_skills_tokens_test.go](../../core-go/internal/tools/repo_skills_tokens_test.go) (chạy trong
   `go test ./...`): `references/*.md` không được có `#RRGGBB` hay `fontSize: <số>`, và mọi tên token được
   nhắc trong đó phải **có thật** trong `tokens.json`. Đã kiểm ngược: với `bo-cuc.md` cũ test **đỏ** đúng
   ba lý do (màu chép cứng, cỡ chữ chép cứng, không có tên token nào).
@@ -177,12 +177,12 @@ Hệ quả: hai skill dùng cùng nhau cho ra hai cỡ tiêu đề khác nhau, v
 
 ### 4.2 Hai skill lệch nhau về số lần gọi `wpp.checkLayout`
 
-[bao-cao-thang/SKILL.md:32](../skills/bao-cao-thang/SKILL.md#L32): *"`wpp.checkLayout` cho **từng** slide mới"*.
-[trinh-bay-chuyen-nghiep/SKILL.md:16](../skills/trinh-bay-chuyen-nghiep/SKILL.md#L16): *"Gọi `wpp.checkLayout`
+[bao-cao-thang/SKILL.md:32](../../skills/bao-cao-thang/SKILL.md#L32): *"`wpp.checkLayout` cho **từng** slide mới"*.
+[trinh-bay-chuyen-nghiep/SKILL.md:16](../../skills/trinh-bay-chuyen-nghiep/SKILL.md#L16): *"Gọi `wpp.checkLayout`
 **một lần**"*.
 
 `checkLayout` mặc định kiểm **mọi** slide, nên cách của `bao-cao-thang` là thừa lượt gọi — mà chính
-`CheckRule`/`PlanRule` trong [prompt.go](../core-go/internal/agent/prompt.go) đang cấm đọc thừa. Chốt một
+`CheckRule`/`PlanRule` trong [prompt.go](../../core-go/internal/agent/prompt.go) đang cấm đọc thừa. Chốt một
 cách: gọi một lần, không truyền `slide`.
 
 **Chốt 12/10/2026 — gọi một lần, không truyền `slide`.** Đã sửa `bao-cao-thang/SKILL.md` theo
@@ -190,7 +190,7 @@ cách: gọi một lần, không truyền `slide`.
 
 ### 4.3 `description` của `bao-cao-du-lieu` hứa "độ rộng bảng" — không lệnh nào làm được
 
-[bao-cao-du-lieu/SKILL.md:4-5](../skills/bao-cao-du-lieu/SKILL.md#L4-L5) hứa *"mật độ và **độ rộng bảng**"*.
+[bao-cao-du-lieu/SKILL.md:4-5](../../skills/bao-cao-du-lieu/SKILL.md#L4-L5) hứa *"mật độ và **độ rộng bảng**"*.
 `et.formatRange` chỉ nhận `range, bold, italic, fontSize, fontColor, fillColor, numFmt, horizontal, wrap,
 sheet` — **không có width/height**, và quét cả registry không có lệnh nào đặt độ rộng cột.
 
@@ -204,9 +204,9 @@ lệnh nào đặt độ rộng cột, nên lời hứa đó chưa được phé
 
 ### 4.4 Cho hai lựa chọn thay vì một mặc định
 
-[van-ban-hanh-chinh/references/the-thuc.md:18](../skills/van-ban-hanh-chinh/references/the-thuc.md#L18) ghi
-cỡ nội dung `13–14`, [SKILL.md:32](../skills/van-ban-hanh-chinh/SKILL.md#L32) dùng `size: 14`, còn
-`tokens.json` đặt `document.type.body = 13`. [New_arch.md:563-564](../New_arch.md#L563-L564) §8.4.5 đã đặt
+[van-ban-hanh-chinh/references/the-thuc.md:18](../../skills/van-ban-hanh-chinh/references/the-thuc.md#L18) ghi
+cỡ nội dung `13–14`, [SKILL.md:32](../../skills/van-ban-hanh-chinh/SKILL.md#L32) dùng `size: 14`, còn
+`tokens.json` đặt `document.type.body = 13`. [docs/architecture/core.md:563-564](../architecture/core.md#L563-L564) §8.4.5 đã đặt
 luật: *"nêu một cách mặc định thay vì liệt kê nhiều lựa chọn"*. Chốt một số.
 
 **Chốt 12/10/2026 — 13, theo token.** `document.type.body` giữ nguyên 13 (không đổi token, vì
@@ -217,7 +217,7 @@ NĐ30, không phải token, và chốt chúng sẽ là bịa số.
 
 ### 4.5 `thiet-ke-van-phong` dạy "viết spec ngắn **trong đầu**"
 
-[thiet-ke-van-phong/SKILL.md:34](../skills/thiet-ke-van-phong/SKILL.md#L34). Chỉ dẫn này không kiểm chứng
+[thiet-ke-van-phong/SKILL.md:34](../../skills/thiet-ke-van-phong/SKILL.md#L34). Chỉ dẫn này không kiểm chứng
 được và không ràng buộc hành vi. Cách `mo-hinh-nhieu-sheet` làm mới đúng: bắt **viết plan ra** rồi bám theo
 (quy tắc 9 của skill đó, và `PlanRule` trong `prompt.go`).
 
@@ -226,18 +226,18 @@ không có gì ràng buộc các lệnh sau").
 
 ### 4.6 NĐ30: một quy tắc chưa đối chiếu được bản gốc **(chưa xác minh)**
 
-[the-thuc.md:26](../skills/van-ban-hanh-chinh/references/the-thuc.md#L26): *"Ngày dưới 10 và tháng 1, 2 thêm
+[the-thuc.md:26](../../skills/van-ban-hanh-chinh/references/the-thuc.md#L26): *"Ngày dưới 10 và tháng 1, 2 thêm
 số 0"*. Lượt review qua ChatGPT cho rằng quy tắc này **không có** trong Phụ lục I NĐ 30/2020. Tôi **không
 xác minh được**: WebSearch trả kết quả rỗng và thuvienphapluat.vn chặn `403 Forbidden`.
 
 Đây có thể là **thông lệ** soạn thảo chứ không phải quy định của nghị định. **Cần đối chiếu bản gốc Phụ lục I
 trước khi giữ câu này.** Ngược lại, mục *"Nơi nhận:"* cỡ 12 nghiêng đậm và danh sách nơi nhận cỡ 11
-([the-thuc.md:21-22](../skills/van-ban-hanh-chinh/references/the-thuc.md#L21-L22)) thì tôi cho là **đúng** —
+([the-thuc.md:21-22](../../skills/van-ban-hanh-chinh/references/the-thuc.md#L21-L22)) thì tôi cho là **đúng** —
 ChatGPT phân vân chỗ này nhưng không đưa được căn cứ.
 
 ### 4.7 `long-header-cell` **không thể** bắn với bảng 2 cột — mà `van-ban-hanh-chinh` chỉ dựng bảng 2 cột
 
-Phát hiện khi sửa §3.3. [checks.py:74-81](../src/AxiomOffice.LibreOffice/python/pythonpath/axiom/checks.py#L74-L81):
+Phát hiện khi sửa §3.3. [checks.py:74-81](../../src/AxiomOffice.LibreOffice/python/pythonpath/axiom/checks.py#L74-L81):
 `typical = lengths[len(lengths) // 2]` lấy **trung vị của chính các ô tiêu đề**, rồi đòi
 `len(text) > 40` **và** `len(text) > 3 * typical`.
 
@@ -246,9 +246,9 @@ Với bảng **đúng 2 cột**, `sorted([a, b])[1]` chính là giá trị **l�
 bảng 2 cột với một đoạn văn 57 ký tự gõ lọt vào ô tiêu đề → `long-header-cell` **không bắn**. Đây là
 **bất khả thi về số học**, không phải ngưỡng đặt cao.
 
-Hệ quả trực tiếp: [van-ban-hanh-chinh/SKILL.md:44-45](../skills/van-ban-hanh-chinh/SKILL.md#L44-L45) đòi
+Hệ quả trực tiếp: [van-ban-hanh-chinh/SKILL.md:44-45](../../skills/van-ban-hanh-chinh/SKILL.md#L44-L45) đòi
 *"không được có `long-header-cell` do gõ lọt chữ"*, nhưng cả hai bảng của skill này đều **2 cột**
-([SKILL.md:19-20, 25-26](../skills/van-ban-hanh-chinh/SKILL.md#L19-L26)). Một điều kiện **không bao giờ sai**
+([SKILL.md:19-20, 25-26](../../skills/van-ban-hanh-chinh/SKILL.md#L19-L26)). Một điều kiện **không bao giờ sai**
 thì không phải là kiểm tra — nó chỉ làm checklist trông chặt hơn thực tế, và đúng cái lỗi nó sinh ra để bắt
 (chữ lọt vào ô tiêu đề) thì nó không bắt được.
 
@@ -263,7 +263,7 @@ nào (`LONG_HEADER_CHARS` vẫn 40, tỉ lệ vẫn 3×):
 | 3 cột, mọi tiêu đề đều dài | ~50 | 55 > 150 sai → không báo oan |
 
 Bảng **1 cột** vẫn không bao giờ báo (không có nhóm để so — ghi rõ trong mã, không phải im lặng).
-Đã sửa [checks.py](../src/AxiomOffice.LibreOffice/python/pythonpath/axiom/checks.py) và thêm 4 test vào
+Đã sửa [checks.py](../../src/AxiomOffice.LibreOffice/python/pythonpath/axiom/checks.py) và thêm 4 test vào
 `tests/lo/test_checks.py`; đã **kiểm ngược**: test "bảng 2 cột có đoạn văn lọt vào ô tiêu đề" **đỏ** với
 luật cũ (`'long-header-cell' not found`), xanh với luật mới — tức lời hứa "không được có
 `long-header-cell`" của `van-ban-hanh-chinh` (SKILL.md:44-45) nay mới thật sự kiểm được với hai bảng 2 cột
@@ -281,12 +281,12 @@ của chính nó.
 
 ### 4.8 `tokens.json` có một token không ai đọc: `plainTableStyle`
 
-[skills/_design/tokens.json:32](../skills/_design/tokens.json#L32) đặt `document.plainTableStyle = "Table Grid"`.
+[skills/_design/tokens.json:32](../../skills/_design/tokens.json#L32) đặt `document.plainTableStyle = "Table Grid"`.
 Quét cả kho: **không file `.md`, `.go`, `.py` nào nhắc tới `plainTableStyle`**. Token chết.
 
 Khác `document.tableStyle` (dòng 31, được
-[the-thuc-van-ban/SKILL.md:24](../skills/the-thuc-van-ban/SKILL.md#L24) dùng thật, và
-[writer.py:28-31](../src/AxiomOffice.LibreOffice/python/pythonpath/axiom/writer.py#L28-L31) dịch tên style Word
+[the-thuc-van-ban/SKILL.md:24](../../skills/the-thuc-van-ban/SKILL.md#L24) dùng thật, và
+[writer.py:28-31](../../src/AxiomOffice.LibreOffice/python/pythonpath/axiom/writer.py#L28-L31) dịch tên style Word
 sang autoformat LibreOffice), `plainTableStyle` không có đường nào tới tài liệu.
 
 Đây là cùng một loại lỗi với §4.1 — **token là dữ liệu, nhưng skill không đọc hết dữ liệu** — chỉ khác là
@@ -301,7 +301,7 @@ giữ nguyên (có người dùng thật). Khi nào có lệnh đặt style cho 
 ### 4.9 **MỚI 12/10/2026** — 5/8 `description` dài hơn 300 ký tự nên phần đuôi **không tới model** — **đã sửa 12/10/2026**
 
 Phát hiện khi sửa §4.3. Tầng 1 chỉ đưa `name` + `description` vào system prompt, và
-[prompt.go:107](../core-go/internal/agent/prompt.go#L107) cắt ở **300 rune**:
+[prompt.go:107](../../core-go/internal/agent/prompt.go#L107) cắt ở **300 rune**:
 
 ```go
 lines = append(lines, "- "+skill.Name+": "+flatten(skill.Description, skillDescriptionLimit))
@@ -322,7 +322,7 @@ Chỗ đo là **chuỗi một dòng mà router thật sự thấy** — `flatten
 Đây **cùng loại lỗi với §4.3** nhưng nặng hơn: `mo-hinh-nhieu-sheet` mất **cả** danh sách từ khoá dùng để
 được nạp — nó gần như không thể định tuyến tới, trừ khi câu người dùng chứa đúng "mô hình tài" ở ngay mốc
 300. Hai skill bị cắt phần **"Không dùng khi…"** thì rủi ro ngược lại: model nạp skill thiết kế cho một yêu
-cầu sửa nhỏ, đúng ca mà [test_core_e2e.py:1241](../tests/core/test_core_e2e.py#L1241) đang canh (`forbidden`).
+cầu sửa nhỏ, đúng ca mà [test_core_e2e.py:1241](../../tests/core/test_core_e2e.py#L1241) đang canh (`forbidden`).
 
 **Đã sửa 12/10/2026 — từ khoá lên trước.** Mỗi description viết lại theo thứ tự: một câu định vị ngắn → danh
 sách "Dùng khi …" **nằm gọn trong 300** → "Không dùng khi …" ngắn. Phần mô tả năng lực bị bỏ khỏi
@@ -340,8 +340,8 @@ trang".
 | `bang-diem` / `bao-cao-du-lieu` / `bao-cao-thang` | 265 / 282 / 253 | không đổi | |
 
 **Test chặn** (giờ mới thêm được): trần 300 có tên — `skillDescriptionLimit`
-([prompt.go:98](../core-go/internal/agent/prompt.go#L98)) — và
-[TestRepoSkillDescriptionsFitRouterLimit](../core-go/internal/agent/skills_router_test.go) đọc **skill thật
+([prompt.go:98](../../core-go/internal/agent/prompt.go#L98)) — và
+[TestRepoSkillDescriptionsFitRouterLimit](../../core-go/internal/agent/skills_router_test.go) đọc **skill thật
 trong repo**, đo bằng **chính `flatten` của router** (không đo lại bằng tay), in bảng `dài/300` khi chạy
 `-v`. Test nằm ở package `agent` chứ không phải `tools` vì phải gọi `flatten` + hằng số của chính router. Đã
 chạy khi **chưa** sửa: đỏ đúng 5 skill (665/348/339/338/305) — test bắt đúng lỗi, rồi xanh sau khi sửa.
@@ -499,17 +499,17 @@ lệnh bridge là việc có đòn bẩy lớn hơn viết thêm skill.
 
 ## 7. Định nghĩa "đủ" và eval
 
-[New_arch.md:557-558](../New_arch.md#L557-L558) §8.4.5 đã tự đặt luật: *"Viết eval trước, viết hướng dẫn
+[docs/architecture/core.md:557-558](../architecture/core.md#L557-L558) §8.4.5 đã tự đặt luật: *"Viết eval trước, viết hướng dẫn
 sau: mỗi skill có ≥ 3 kịch bản test dựng từ chỗ model làm sai khi **chưa** có skill."*
 
 Hiện trạng: ba test chạm tới skill, **cả ba đều là test cấu trúc, không phải eval**:
 
-- [TestRepoSkillsLoadAndReferencesResolve](../core-go/internal/tools/repo_skills_test.go) — skill **nạp
+- [TestRepoSkillsLoadAndReferencesResolve](../../core-go/internal/tools/repo_skills_test.go) — skill **nạp
   được** và mọi `read_skill_file` trỏ tới file **có thật**;
-- [TestSkillReferencesDoNotHardcodeDesignValues](../core-go/internal/tools/repo_skills_tokens_test.go)
+- [TestSkillReferencesDoNotHardcodeDesignValues](../../core-go/internal/tools/repo_skills_tokens_test.go)
   (thêm 12/10/2026, §4.1) — `references/*.md` không chép cứng màu/cỡ chữ, và mọi tên token nhắc tới đều
   **có thật** trong `tokens.json`;
-- [TestRepoSkillDescriptionsFitRouterLimit](../core-go/internal/agent/skills_router_test.go) (thêm
+- [TestRepoSkillDescriptionsFitRouterLimit](../../core-go/internal/agent/skills_router_test.go) (thêm
   12/10/2026, §4.9) — `description` không vượt trần 300 ký tự của router, nên không skill nào bị cắt mất
   phần từ khoá.
 
@@ -524,7 +524,7 @@ Vì vậy **"đủ" phải định nghĩa bằng tiêu chí phủ, không bằng
 4. Đo thêm **tỉ lệ chọn đúng skill** (Recall@1): model có nạp đúng skill cho tình huống đó không. Tầng 1
    chỉ có `name` + `description`, nên đây là chỉ số đo chất lượng `description`.
 
-Hạ tầng đã có: harness `POST /v1/runs` + SSE trong [tests/bench/](../tests/bench/) tái dùng được; số đo
+Hạ tầng đã có: harness `POST /v1/runs` + SSE trong [tests/bench/](../../tests/bench) tái dùng được; số đo
 `by_tool`, `dup_ratio`, `failures` đã đủ để chấm cả chất lượng lẫn chi phí.
 
 ## 8. Roadmap
@@ -545,13 +545,13 @@ Hạ tầng đã có: harness `POST /v1/runs` + SSE trong [tests/bench/](../test
 - **Viết skill cho header/footer, số trang, mục lục, lề, sort, filter, pivot.** Chưa có lệnh nào làm được
   (§5). Skill sẽ dạy model gọi lệnh không tồn tại — đúng loại lỗi tệ nhất, vì `office_action` chỉ trả về
   danh sách lệnh hợp lệ sau khi model đã gọi sai.
-- **Cho skill chạy script.** [New_arch.md:543-546](../New_arch.md#L543-L546) §8.4.4 ghi rõ đây là **lệch
+- **Cho skill chạy script.** [docs/architecture/core.md:543-546](../architecture/core.md#L543-L546) §8.4.4 ghi rõ đây là **lệch
   chuẩn có chủ đích**; giữ nguyên.
 - **Thêm field frontmatter mới** (`keywords`, `requires`, `when_not_to_use`…). Loader
-  ([loader.go:32-79](../core-go/internal/skills/loader.go#L32-L79)) chỉ đọc `name`, `description`, `apps` —
+  ([loader.go:32-79](../../core-go/internal/skills/loader.go#L32-L79)) chỉ đọc `name`, `description`, `apps` —
   field mới sẽ **bị bỏ qua im lặng**, không có tác dụng gì cho tới khi sửa loader và `SkillsSection`.
 - **Nhồi thêm chỉ dẫn vào `description`.** Nó bị cắt ở 300 ký tự khi vào system prompt
-  ([prompt.go:107](../core-go/internal/agent/prompt.go#L107)) — phần vượt sẽ **không tới model**. Cả 8 skill
+  ([prompt.go:107](../../core-go/internal/agent/prompt.go#L107)) — phần vượt sẽ **không tới model**. Cả 8 skill
   nay đã trong trần (§4.9), và `description` chỉ nên chứa thứ để **định tuyến**: một câu định vị + danh sách
   "Dùng khi …" + "Không dùng khi …". Chỉ dẫn thao tác thuộc về thân SKILL.md (tầng 2) — thêm vào
   description thì vừa bị cắt, vừa đẩy từ khoá ra ngoài trần.

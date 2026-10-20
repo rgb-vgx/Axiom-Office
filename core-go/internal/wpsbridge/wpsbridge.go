@@ -1,4 +1,4 @@
-// Package wpsbridge: Core lam bridge cho JS add-in WPS (docs/wps-bridge.md muc 2) - phuc vu file
+// Package wpsbridge: Core lam bridge cho JS add-in WPS (docs/architecture/wps-bridge.md muc 2) - phuc vu file
 // add-in, kenh /wps/v1/poll + /wps/v1/result tren Core API va bridge WPS tren cong rieng.
 package wpsbridge
 
@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	// DefaultBridgePort: cong bridge WPS mac dinh (docs/wps-bridge.md 2.3).
+	// DefaultBridgePort: cong bridge WPS mac dinh (docs/architecture/wps-bridge.md 2.3).
 	DefaultBridgePort = 47861
 	// DefaultPollSeconds: poll giu request bao lau khi chua co lenh.
 	DefaultPollSeconds = 20
@@ -337,7 +337,7 @@ func (b *Bridge) Snapshot() (map[string]any, []any, string, bool) {
 	return doc, cmds, b.addinVersion, connected
 }
 
-// Status: anh chup suc khoe kenh add-in, cho nut "Trang thai" tren ribbon WPS (docs/ribbon-ui.md muc 2).
+// Status: anh chup suc khoe kenh add-in, cho nut "Trang thai" tren ribbon WPS (docs/architecture/ribbon-ui.md muc 2).
 //
 // Snapshot() khong du: no tra tai lieu + catalog, nhung khong noi duoc add-in da poll BAO GIO CHUA va
 // lan cuoi la khi nao - ma do chinh la ba cau nguoi dung hoi khi bam "Trang thai" ("add-in co tra loi

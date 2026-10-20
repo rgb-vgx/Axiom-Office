@@ -1,4 +1,4 @@
-"""Tim tai lieu dich theo loai app va gom moi lenh thanh mot buoc Undo (LibreOffice_arch.md muc 5.2, LD-5)."""
+"""Tim tai lieu dich theo loai app va gom moi lenh thanh mot buoc Undo (docs/architecture/libreoffice.md muc 5.2, LD-5)."""
 from __future__ import annotations
 
 import contextlib

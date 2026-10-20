@@ -62,7 +62,7 @@ namespace AxiomOffice.Ai
         }
     }
 
-    // Phan Core API danh cho wizard thiet lap (New_arch.md 7.3; Core: Api/SetupEndpoints.cs).
+    // Phan Core API danh cho wizard thiet lap (docs/architecture/core.md 7.3; Core: Api/SetupEndpoints.cs).
     // Tach khoi CoreClient.cs cho de doc; cung mot lop nho partial.
     internal sealed partial class CoreClient
     {

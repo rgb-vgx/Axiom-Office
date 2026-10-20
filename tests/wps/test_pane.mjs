@@ -1,4 +1,4 @@
-// Spec T4b (docs/wps-bridge.md muc 7): pane Ask AI trong WPS - logic khong DOM + nut ribbon. Khong can WPS.
+// Spec T4b (docs/architecture/wps-bridge.md muc 7): pane Ask AI trong WPS - logic khong DOM + nut ribbon. Khong can WPS.
 //
 //   node --test tests/wps/test_pane.mjs
 //
@@ -457,7 +457,7 @@ function iconFiles() {
 // Icon nut ribbon = imageMso, bo icon co san cua WPS (do tren WPS 12.1.2 that 20/10/2026: hien dung icon). WPS tra
 // ten kieu Office qua bang lenh cua no (/opt/kingsoft/wps-office/office6/res/commands/<wps|et|wpp>/ongmani/*.kuip:
 // idMso="..." icon="..._kd"); ten khong co trong bang thi khong co icon. Bang duoi la DUNG bo ten da do - doi ten
-// nao thi phai tra lai bang lenh cua WPS (docs/ribbon-ui.md muc 5.3) va thu lai tren WPS that.
+// nao thi phai tra lai bang lenh cua WPS (docs/architecture/ribbon-ui.md muc 5.3) va thu lai tren WPS that.
 const RIBBON_IMAGE_MSO = {
   axiomAskAI: "Help", // ca ba app (question_kd)
   axiomCheckLayout: "SlideShowFromCurrent", // chi trinh chieu - dung nut Soat bo cuc cua trinh chieu

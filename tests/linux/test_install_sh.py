@@ -1,4 +1,4 @@
-"""Spec T3 (docs/wps-bridge.md muc 4): scripts/linux/install.sh cai them add-in WPS - khong can WPS/LibreOffice that.
+"""Spec T3 (docs/architecture/wps-bridge.md muc 4): scripts/linux/install.sh cai them add-in WPS - khong can WPS/LibreOffice that.
 
 Chay install.sh tu mot "goi" gia (core/ gia, .oxt gia, unopkg gia) voi HOME/XDG_* tam - khong bao gio dung toi
 Core, LibreOffice hay WPS that cua nguoi dung. Bien moi truong cho test:

@@ -1,4 +1,4 @@
-// Spec add-in WPS cho 15 lenh wpp.* (Presentation) — T8 trong docs/wps-bridge.md muc 5.
+// Spec add-in WPS cho 15 lenh wpp.* (Presentation) — T8 trong docs/architecture/wps-bridge.md muc 5.
 // Chay offline: nap add-in trong vm voi object model WPS gia (addin_fake.mjs), doi chieu metadata
 // voi registry LibreOffice (lo_catalog.py qua addin_harness.mjs).
 //
@@ -28,7 +28,7 @@
 // "presentation has no slides; call wpp.addSlide first" (giong `_page` cua ban LibreOffice).
 // `align` nhan left/center/right -> WPS ParagraphFormat.Alignment 1/2/3.
 //
-// Khac ban LibreOffice (do tren WPS that 11/10/2026, xem docs/wps-bridge.md muc 6 va REFERENCE.md):
+// Khac ban LibreOffice (do tren WPS that 11/10/2026, xem docs/architecture/wps-bridge.md muc 6 va REFERENCE.md):
 // - `addSlide`: layout la so kieu PowerPoint va WPS dung dung cac hang so nay
 //   (ppLayoutTitle=1, ppLayoutText=2, ppLayoutTitleOnly=11, ppLayoutBlank=12). Layout sai bi tu choi
 //   TRUOC khi chen, nen bai khong bi de lai slide rac.

@@ -1,4 +1,4 @@
-"""Lenh Impress (kind "wpp") - cung ten/ket qua voi CommandDispatcher.Presentation.cs (LibreOffice_arch.md
+"""Lenh Impress (kind "wpp") - cung ten/ket qua voi CommandDispatcher.Presentation.cs (docs/architecture/libreoffice.md
 muc 7.3). Kich thuoc trong UNO la 1/100 mm; tham so cua lenh tinh bang point (giong ban Windows)."""
 from __future__ import annotations
 
@@ -319,7 +319,7 @@ command("wpp.saveAs", "wpp", lambda env, p: documents.save(env.document, "wpp", 
         "Lưu thành file mới", req("path"), agent=True)
 
 def _template_unsupported(env, params):
-    # Lam bai theo mau (docs/template-design.md muc 6) moi co tren PowerPoint (CommandDispatcher.Template.cs):
+    # Lam bai theo mau (docs/architecture/template-design.md muc 6) moi co tren PowerPoint (CommandDispatcher.Template.cs):
     # can InsertFromFile + Shape.Export cua COM. Ban LibreOffice lam o phien Linux.
     raise values.ParamError("not available on LibreOffice yet: build the slides with wpp.addSlide/wpp.addText "
                             "and wpp.addImage, using the template's colors from ppt_profile")

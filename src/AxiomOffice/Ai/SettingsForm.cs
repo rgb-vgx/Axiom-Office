@@ -80,7 +80,7 @@ namespace AxiomOffice.Ai
                 ForeColor = SystemColors.GrayText
             };
 
-            // Agent Core + ghi nhớ dài hạn (New_arch.md mục 9.4, 8.5.10).
+            // Agent Core + ghi nhớ dài hạn (docs/architecture/core.md mục 9.4, 8.5.10).
             var lblAgent = new Label { Text = "Agent:", Left = 14, Top = 262, Width = 90 };
             _core = new CheckBox { Text = "Dùng Agent Core (hội thoại liên tục, kỹ năng, ghi nhớ)", Left = 110, Top = 258, Width = 370 };
             _memory = new CheckBox { Text = "Ghi nhớ dài hạn", Left = 110, Top = 282, Width = 150 };
@@ -90,7 +90,7 @@ namespace AxiomOffice.Ai
             _verify = new CheckBox { Text = "Tự kiểm chứng: đọc lại tài liệu sau khi sửa trước khi trả lời", Left = 110, Top = 328, Width = 370 };
             // Suy luận (tắt mặc định): hiện phần model nghĩ, đổi lại tốn token và chậm hơn.
             _reasoning = new CheckBox { Text = "Hiện suy luận của model trong khung chat (tốn token)", Left = 110, Top = 348, Width = 370 };
-            // QA thị giác (New_arch.md 8.4.6): tắt mặc định vì mỗi ảnh tốn nhiều token; cần model đọc được ảnh.
+            // QA thị giác (docs/architecture/core.md 8.4.6): tắt mặc định vì mỗi ảnh tốn nhiều token; cần model đọc được ảnh.
             // Riêng một dòng: để cạnh nút "Quản lý ghi nhớ" thì nhãn bị cắt cụt.
             _visual = new CheckBox { Text = "Cho AI xem ảnh chụp cửa sổ (tốn token)", Left = 110, Top = 368, Width = 370 };
             // Lưu nguồn web tải về vào kho Core: lượt sau trích dẫn lại / khỏi tải lại trang (bật mặc định).

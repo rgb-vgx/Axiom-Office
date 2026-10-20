@@ -10,7 +10,7 @@ using AxiomOffice.Bridge;
 
 namespace AxiomOffice.Ai
 {
-    // Mot su kien tien trinh tu Agent Core (SSE, New_arch.md muc 7.4).
+    // Mot su kien tien trinh tu Agent Core (SSE, docs/architecture/core.md muc 7.4).
     internal sealed class CoreEvent
     {
         public string Type;
@@ -862,7 +862,7 @@ namespace AxiomOffice.Ai
             return document;
         }
 
-        // Trả lời thẻ xác nhận của policy (New_arch.md 8.6): POST /v1/runs/{id}/confirm.
+        // Trả lời thẻ xác nhận của policy (docs/architecture/core.md 8.6): POST /v1/runs/{id}/confirm.
         public bool ConfirmRun(string runId, string confirmationId, bool approved, out string error)
         {
             var body = new Dictionary<string, object> { { "confirmationId", confirmationId }, { "approved", approved } };
@@ -880,7 +880,7 @@ namespace AxiomOffice.Ai
             return MemoryCall("POST", "/v1/runs/" + Uri.EscapeDataString(runId) + "/confirm", body, out error) != null;
         }
 
-        // ---- Memory dài hạn (New_arch.md mục 8.5.11): form "Quản lý ghi nhớ" và dòng "Đã ghi nhớ" trong pane ----
+        // ---- Memory dài hạn (docs/architecture/core.md mục 8.5.11): form "Quản lý ghi nhớ" và dòng "Đã ghi nhớ" trong pane ----
 
         // GET /v1/memory (query/runId/includeDeleted tuỳ chọn). Lỗi -> null + error.
         public List<Dictionary<string, object>> ListMemories(string query, string runId, bool includeDeleted, out string error)

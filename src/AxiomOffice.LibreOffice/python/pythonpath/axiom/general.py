@@ -1,4 +1,4 @@
-"""Lenh chung moi app (LibreOffice_arch.md muc 7.4): app.info, ai.ask (qua Agent Core), ui.askpane, app.screenshot."""
+"""Lenh chung moi app (docs/architecture/libreoffice.md muc 7.4): app.info, ai.ask (qua Agent Core), ui.askpane, app.screenshot."""
 from __future__ import annotations
 
 import base64
@@ -121,7 +121,7 @@ def ai_ask(env, params):
 
 
 def ui_askpane(env, params):
-    """Mo deck Axiom Office trong sidebar (LibreOffice_arch.md muc 10). Gated: dispatcher UI phai o main thread."""
+    """Mo deck Axiom Office trong sidebar (docs/architecture/libreoffice.md muc 10). Gated: dispatcher UI phai o main thread."""
     from . import panel
 
     frame = documents.desktop(env.ctx).getCurrentFrame()

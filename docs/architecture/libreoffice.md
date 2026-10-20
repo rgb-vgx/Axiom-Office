@@ -1,9 +1,11 @@
-# LibreOffice_arch.md: Thiết kế tích hợp LibreOffice trên Linux
+# Thiết kế tích hợp LibreOffice trên Linux
+
+> Trước 20/10/2026 tài liệu này là `LibreOffice_arch.md` ở gốc repo.
 
 Tài liệu thiết kế để đưa Axiom Office sang **LibreOffice trên Linux** (Writer, Calc, Impress), dùng lại
-Agent Core, skill và memory đã có. Viết theo khuôn [New_arch.md](New_arch.md): bối cảnh → mục tiêu →
+Agent Core, skill và memory đã có. Viết theo khuôn [docs/architecture/core.md](core.md): bối cảnh → mục tiêu →
 kiến trúc đích → thiết kế từng module → giai đoạn triển khai có tiêu chí "xong khi". Kiến trúc hiện
-tại (Windows) xem [ARCHITECTURE.MD](ARCHITECTURE.MD).
+tại (Windows) xem [docs/architecture/README.md](README.md).
 
 ## Mục lục
 
@@ -38,7 +40,7 @@ Hiện tại Axiom Office gồm ba phần, gắn với Windows ở mức khác n
 
 Điểm then chốt làm việc chuyển sang LibreOffice khả thi: **Core chỉ nói chuyện với ứng dụng văn phòng
 qua bridge HTTP** (`/health`, `GET /commands`, `POST /cmd`, session file), không gọi COM
-([ARCHITECTURE.MD](ARCHITECTURE.MD) AD-12). Vậy chỉ cần viết **một bridge mới cho LibreOffice** nói đúng
+([docs/architecture/README.md](README.md) AD-12). Vậy chỉ cần viết **một bridge mới cho LibreOffice** nói đúng
 giao thức đó; Core, skill, memory, policy, MCP client dùng lại gần như nguyên.
 
 LibreOffice cung cấp **UNO API** (Python qua `pyuno`, Java, C++, Basic). Extension `.oxt` viết bằng
@@ -344,7 +346,7 @@ Sidebar deck **"Axiom Office"** (hiện với Writer, Calc, Impress), panel dự
 > `mcp` của chính Agent Core Go, dùng engine OOXML viết lại bằng Go (`core-go/internal/{ooxml,xlsx,docx,pptx,
 > sheet}`); dự án `src/AxiomOffice.Mcp` và các nhánh `#if PORTABLE` đã bị xoá. Hợp đồng tool (50 tool, tên,
 > tham số, cách trả lỗi) và mọi khác biệt so với bản Windows ở bảng dưới vẫn giữ nguyên giá trị. Xem
-> [core-go/README.md](core-go/README.md) và [STATUS.md](STATUS.md) mục 2.2.
+> [core-go/README.md](../../core-go/README.md) và [STATUS.md](../../STATUS.md) mục 2.2.
 >
 > **Đã làm (30/09/2026)** — làm khác kế hoạch ban đầu ở chỗ *không* tách thư viện `AxiomOffice.Files`:
 > `src/AxiomOffice.Mcp` (`net10.0`, `axiom-office-mcp`) **compile lại chính** `src/AxiomOffice.Host/Mcp/*.cs`

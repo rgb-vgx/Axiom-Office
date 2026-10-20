@@ -23,7 +23,7 @@
   // Duong vao mot man hinh phu: ?view=<ten> (pane.html doc tham so nay luc nap - xem pane.html: VIEW).
   // Du lieu cua man hinh phu co the cu sau mot thoi gian: moi man hinh deu co nut "Tai lai" rieng, va
   // do la cach duy nhat - tu ribbon khong co kenh nao noi vao trang dang mo trong CEF (xem
-  // docs/ribbon-ui.md muc 7).
+  // docs/architecture/ribbon-ui.md muc 7).
   var panes = {};
 
   function paneUrl(view, check, action) {
@@ -500,7 +500,7 @@
   }
 
   // runQuick: duong DU PHONG khi khong mo duoc khung chat mini - muc "Sua bang AI" chay trong khung chat lon. Ribbon KHONG dua duoc gi vao khung chat dang mo (muc 7 cua
-  // docs/ribbon-ui.md), nen: hien khung chat (dung lai cai dang mo - giu nguyen hoi thoai), roi nho Core chuyen muc
+  // docs/architecture/ribbon-ui.md), nen: hien khung chat (dung lai cai dang mo - giu nguyen hoi thoai), roi nho Core chuyen muc
   // nay toi no (api/wpspane.go). Khung chat nghe SSE /wps/v1/pane/events va tu chay trong hoi thoai cua no; khung
   // chat vua tao thi Core giu yeu cau vai giay cho trang nap xong.
   function runQuick(quickAction) {

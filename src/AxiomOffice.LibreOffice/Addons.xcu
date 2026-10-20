@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Menu "Axiom Office" trong menubar cua Writer/Calc/Impress (LibreOffice_arch.md muc 10): Hoi AI (pane),
+<!-- Menu "Axiom Office" trong menubar cua Writer/Calc/Impress (docs/architecture/libreoffice.md muc 10): Hoi AI (pane),
      Soat tai lieu, Ky nang, Nhat ky hoat dong, Thiet lap, Cai dat nang cao. URL org.axiomoffice.bridge:*
      duoc xu ly boi ProtocolHandler.xcu -> axiom/dispatch.py, va MOI URL o day phai co ten tuong ung trong
      ACTIONS cua dispatch.py (khong thi bam vao khong lam gi) - tests/lo/test_dispatch.py giu hai ben khop. -->

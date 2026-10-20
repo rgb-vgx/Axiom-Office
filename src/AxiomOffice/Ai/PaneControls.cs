@@ -1256,7 +1256,7 @@ namespace AxiomOffice.Ai
         }
     }
 
-    // Thẻ xác nhận của policy (New_arch.md mục 7.4 confirm.required, 8.6): Đồng ý / Từ chối; hết giờ = từ chối.
+    // Thẻ xác nhận của policy (docs/architecture/core.md mục 7.4 confirm.required, 8.6): Đồng ý / Từ chối; hết giờ = từ chối.
     internal sealed class ConfirmCard : Panel
     {
         private readonly Label _title;
@@ -1560,7 +1560,7 @@ namespace AxiomOffice.Ai
         }
     }
 
-    // Dòng "Đã ghi nhớ: …" + link Xoá (New_arch.md mục 7.4 memory.written, 8.5.10: người dùng thấy và xoá được ngay).
+    // Dòng "Đã ghi nhớ: …" + link Xoá (docs/architecture/core.md mục 7.4 memory.written, 8.5.10: người dùng thấy và xoá được ngay).
     internal sealed class MemoryNote : Panel
     {
         private readonly Label _text;

@@ -1,8 +1,8 @@
 # Kiến trúc Axiom Office
 
-Tài liệu thiết kế của Axiom Office (sau đợt **Agent Core** giai đoạn 0–4 theo [New_arch.md](New_arch.md),
+Tài liệu thiết kế của Axiom Office (sau đợt **Agent Core** giai đoạn 0–4 theo [docs/architecture/core.md](core.md),
 đợt viết lại Core bằng Go G1–G12 và đợt tích hợp LibreOffice/WPS Linux theo
-[LibreOffice_arch.md](LibreOffice_arch.md) và [docs/wps-bridge.md](docs/wps-bridge.md), tháng 10/2026), chia hai phần:
+[docs/architecture/libreoffice.md](libreoffice.md) và [docs/architecture/wps-bridge.md](wps-bridge.md), tháng 10/2026), chia hai phần:
 
 - **Phần I: High Level Design (HLD)**: hệ thống nhìn từ ngoài vào: mục tiêu, bối cảnh, các khối
   lớn và cách chúng nói chuyện, kịch bản chính, triển khai, yêu cầu phi chức năng, quyết định kiến
@@ -10,7 +10,7 @@ Tài liệu thiết kế của Axiom Office (sau đợt **Agent Core** giai đo�
 - **Phần II: Low Level Design (LLD)**: từng module bên trong: class, luồng gọi, thread, schema dữ
   liệu, quy tắc xử lý, build và kiểm thử.
 
-Cách cài và dùng xem [README.md](README.md); lịch sử thay đổi xem [CHANGELOG.md](CHANGELOG.md).
+Cách cài và dùng xem [README.md](../../README.md); lịch sử thay đổi xem [CHANGELOG.md](../../CHANGELOG.md).
 
 ## Mục lục
 
@@ -349,9 +349,9 @@ flowchart LR
   (Linux: SIGTERM cũng dừng êm).
 - **LibreOffice** (Linux/Windows): extension Python UNO mở ba bridge `:47851` (Writer) /
   `:47852` (Calc) / `:47853` (Impress), cùng giao thức và tên lệnh; session file
-  `{pid}-{kind}.json`. Chi tiết: [LibreOffice_arch.md](LibreOffice_arch.md).
+  `{pid}-{kind}.json`. Chi tiết: [docs/architecture/libreoffice.md](libreoffice.md).
 - **WPS Linux**: JS add-in (`src/AxiomOffice.WPS`) nối long-poll về Core; Core mở bridge `:47861`
-  nói đúng giao thức bridge. Chi tiết: [docs/wps-bridge.md](docs/wps-bridge.md).
+  nói đúng giao thức bridge. Chi tiết: [docs/architecture/wps-bridge.md](wps-bridge.md).
 
 ## 7. Yêu cầu phi chức năng
 
@@ -387,7 +387,7 @@ flowchart LR
 | AD-12 | Core chỉ thao tác tài liệu qua bridge (`/cmd`), không gọi COM | Một đường thực thi lệnh duy nhất (allowlist, ComGate, Undo); Core không phụ thuộc Office | Mỗi lệnh thêm một vòng HTTP loopback |
 | AD-13 | Pane thử Core trước, dự phòng agent in-process; đã có runId thì không chạy lại | Pane không bao giờ bị khoá vì Core; không sửa tài liệu hai lần | Hai bản agent (C# 7.3 và .NET 10) phải giữ hành vi gần nhau |
 | AD-14 | Skill theo chuẩn Agent Skills (thư mục + `SKILL.md`), nạp 3 tầng | Hệ sinh thái sẵn có; prompt gọn (chỉ mục ~100 token/skill) | Không chạy script trong skill |
-| AD-15 | Memory tự làm bằng C# theo ý tưởng mem0 2.2.1 (chỉ-ADD) | Dữ liệu ở lại máy, không Python/Docker, model không tự sửa/xoá memory | Tự bảo trì thuật toán chấm điểm; embedding tuỳ chọn |
+| AD-15 | Memory tự làm (ban đầu bằng C#, nay bằng Go — `core-go/internal/memory`) theo ý tưởng mem0 2.2.1 (chỉ-ADD) | Dữ liệu ở lại máy, không Python/Docker, model không tự sửa/xoá memory | Tự bảo trì thuật toán chấm điểm; embedding tuỳ chọn |
 | AD-16 | Policy xác nhận trong Core, trả lời qua pane | Người dùng quyết định thao tác rủi ro; audit đầy đủ | Lượt chạy có thể dừng chờ tới 120s |
 | AD-17 | QA hai mức: cấu trúc bằng số (mặc định) + thị giác (tuỳ chọn) | Agent "mù" vẫn soát được tràn chữ/chồng shape/dữ liệu lạc ô với chi phí thấp | QA thị giác tốn token, cần model đọc ảnh |
 | AD-18 | Vòng agent chạy qua chuỗi guard (`model/guards.go`, học LangChain `AgentMiddleware`): `RunAgent` chỉ gọi model + chạy tool, mỗi cơ chế chống lỗi là một guard | Thêm cơ chế mới không sửa vòng lặp; hành vi đã kiểm chứng giữ nguyên | Thứ tự guard có nghĩa, phải giữ khi thêm guard mới |
@@ -473,12 +473,12 @@ core-go/                                 → AxiomOffice.Core.exe (Go, không cg
   internal/store                         SQLite core.db (schema 2): hội thoại, lượt chạy, audit
   internal/setup                         /v1/setup, /v1/llm/*, catalog sinh từ catalog/setup.json
 
-src/AxiomOffice.LibreOffice/             → axiom-office.oxt (Python UNO; thiết kế LibreOffice_arch.md)
+src/AxiomOffice.LibreOffice/             → axiom-office.oxt (Python UNO; thiết kế docs/architecture/libreoffice.md)
   python/pythonpath/axiom/               bridge.py, commands.py (cùng tên lệnh), writer.py, calc.py,
                                          impress.py, checks.py, gate.py (UnoGate), sessions.py, pane.py,
                                          chat.py, awt.py, setup*.py, theme.py...
 
-src/AxiomOffice.WPS/                     → add-in JS cho WPS Linux (thiết kế docs/wps-bridge.md)
+src/AxiomOffice.WPS/                     → add-in JS cho WPS Linux (thiết kế docs/architecture/wps-bridge.md)
   commands.js, main.js, probe.js         appKind/catalogFor theo app, 16 lệnh writer.* + 23 et.* + 15 wpp.*
 
 skills/                                  Skill dựng sẵn + _design/tokens.json (chép cạnh exe khi build)
@@ -1233,10 +1233,10 @@ flowchart TD
 
 ## 22. Agent Core (bản Go: `core-go/`)
 
-Đặc tả đầy đủ và lý do từng lựa chọn: [New_arch.md](New_arch.md) (thiết kế ban đầu cho bản .NET);
+Đặc tả đầy đủ và lý do từng lựa chọn: [docs/architecture/core.md](core.md) (thiết kế ban đầu cho bản .NET);
 bản Go giữ nguyên hợp đồng ngoài (Core API v1, `core.json`, `core.db` schema 2, nguồn cấu hình,
 tên mutex) nên add-in/extension/MCP không phải đổi gì. Chi tiết cài đặt Go:
-[core-go/README.md](core-go/README.md). Mục này mô tả bản Go đang chạy.
+[core-go/README.md](../../core-go/README.md). Mục này mô tả bản Go đang chạy.
 
 ### 22.1 Process, tìm Core, bảo mật
 

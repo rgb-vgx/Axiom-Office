@@ -2,16 +2,16 @@
 
 Trạng thái: **đã chạy trên WPS thật** (11/10/2026): Core (T1), trình cài `--core-url` (T2a), add-in 16 lệnh đợt 1
 (T2b, T2c). Đóng gói + `install.sh` (T3) xong, đăng ký cả ba app (T5) xong, nhận biết app + đủ 38 lệnh
-`et.*`/`wpp.*` (T6–T8) xong, pane Ask AI trong WPS (T4) xong, ribbon đầy đủ (đợt C — `docs/ribbon-ui.md`), menu
+`et.*`/`wpp.*` (T6–T8) xong, pane Ask AI trong WPS (T4) xong, ribbon đầy đủ (đợt C — `docs/architecture/ribbon-ui.md`), menu
 chuột phải *Sửa bằng AI* + khung chat mini (20/10/2026, đã thử trên WPS thật — mục 7.3).
 Còn lại: **22/80 lệnh registry chưa có handler ở add-in WPS** (danh sách + lý do ở mục 6). Cơ sở thực nghiệm:
-[wps-spike.md](wps-spike.md) (hướng B) và [tests/wps/REFERENCE.md](../tests/wps/REFERENCE.md).
+[docs/research/wps-spike.md](../research/wps-spike.md) (hướng B) và [tests/wps/REFERENCE.md](../../tests/wps/REFERENCE.md).
 
 ## 1. Bài toán
 
 Mọi thứ trong Axiom Office (agent của Core, MCP làn live, script) nói với app văn phòng qua **giao thức
 bridge**: file session + `GET /health`, `GET /commands`, `GET /session`, `POST /cmd` trên một cổng loopback
-(LibreOffice_arch.md LD-2). Add-in COM (Windows) và extension LibreOffice tự mở HTTP server trong process app.
+(docs/architecture/libreoffice.md LD-2). Add-in COM (Windows) và extension LibreOffice tự mở HTTP server trong process app.
 
 JS add-in của WPS Linux **không mở được cổng nghe** — nó chỉ là trang web trong CEF. Nên đảo chiều: add-in
 kết nối *tới* Core, còn Core đứng ra làm bridge thay cho WPS.
@@ -150,7 +150,7 @@ Cùng giao thức và cùng guard với bridge LibreOffice (`Origin` → 403, to
     (`CommandDispatcher.cs`: `AiAsk`, `UiAskPane`, `AppScreenshot`); chỉ `ui.setup` là đường riêng của
     LibreOffice. Ở add-in WPS, `app.info` có handler còn ba lệnh kia thì không — nên Core gọi chúng qua bridge sẽ
     nhận `unknown action`. Hệ quả đang thấy được: thiếu `app.screenshot` là **đúng lý do** toggle *Nhìn tài liệu*
-    chưa lên được ribbon WPS (`docs/ribbon-ui.md` §5.1).
+    chưa lên được ribbon WPS (`docs/architecture/ribbon-ui.md` §5.1).
   - **Chín lệnh `writer.*`**: `newDocument`, `open`, `closeAll`, `formatTable`, `insertImage`, `insertHyperlink`,
     `replaceMany`, cộng hai lệnh thiết kế chỉ có ở add-in Windows (`restyle`, `insertBlocks`). `writer.checkTables`
     **đã ra khỏi danh sách** — handler viết xong (`commands.js:873`), nên nút *Soát bảng* trên ribbon chạy được.
@@ -191,7 +191,7 @@ phải bằng `Application.ShowDialog(url, "Sửa bằng AI", 440 × devicePixel
 | `GET /wps/v1/quick-actions` | `routeBoth` | `{actions: [{id, label, edits}]}`: khung chat mini dựng chip từ đây, cả hai khung dùng để bong bóng hiện nhãn ("Trau chuốt") thay vì id. Câu lệnh **không** trả ra — nằm trong `agent/quickactions.go` |
 | `GET /wps/v1/setup` · `POST /wps/v1/llm/test` · `GET /wps/v1/llm/models` | `routeBoth` | màn hình *Thiết lập*, nút *Kiểm tra mô hình* |
 | `GET /wps/v1/skills` · `POST /wps/v1/skills/reload` | `routeBoth` | màn hình *Kỹ năng* |
-| `GET /wps/v1/log` | `GET /v1/log` (đăng ký riêng, chỉ khi bridge WPS bật) | màn hình *Mở nhật ký* (log Core, mục 5.2 của `docs/ribbon-ui.md`) |
+| `GET /wps/v1/log` | `GET /v1/log` (đăng ký riêng, chỉ khi bridge WPS bật) | màn hình *Mở nhật ký* (log Core, mục 5.2 của `docs/architecture/ribbon-ui.md`) |
 | `GET /wps/v1/status` | **chỉ có ở kênh WPS** | gộp hai tầng: `{addin: <Bridge.Status()>, core: <coreStatus()>}` — pane không phải đoán `Origin` cho `/health` của bridge |
 | `POST /wps/v1/exec {action, params}` | **chỉ có ở kênh WPS** | chạy thẳng một lệnh bridge, **không qua agent**: ba nút *Soát* trên ribbon và *Hoàn tác lượt này* / *Chèn trả lời* trong pane. 409 kèm `code`: `run-in-progress` (đang có lượt chạy) hoặc `addin-disconnected`; khi chạy được thì trả **nguyên phong bì** của add-in, HTTP 200 **kể cả khi add-in trả `ok:false`** — đọc `ok`, đừng đọc mã HTTP |
 | `POST /wps/v1/config {TênKhoá: giá trị}` | **chỉ có ở kênh WPS** | ghi cấu hình nền tảng (Linux `config.json`, Windows HKCU) — đường thật đứng sau nút *Thiết lập*; khoá ngoài danh sách cho phép → 400 |
@@ -229,10 +229,9 @@ dùng màu Google Material: `#e8f0fe`, `#f1f3f4`, `#f9ab00`…).
 gom **mọi hằng int > 0xFFFF** ở cấp module trong `theme.py` thành một màu, nên thêm một hằng màu là **bắt
 buộc** thêm một token `--axiom-*` có dùng thật, nếu không `test_pane_theme.mjs` đỏ. Đổi màu thì phải sửa **cả
 ba** tệp (cộng `mini.html` — `:root` của nó chép nguyên từ `pane.html`, `test_mini_view.mjs` bắt hai bản giống
-hệt) — và cả **13 tệp `src/AxiomOffice.WPS/images/*.svg`** nếu muốn icon ribbon cùng màu, vì ảnh ribbon do
-WPS vẽ bằng bộ nạp ảnh của nó (nó không biết `var()`); màu nằm ở thuộc tính `stroke` của từng tệp, `main.js`
-không còn hằng màu nào, và `test_pane.mjs` kiểm màu **từng tệp** nên quên một tệp là đỏ. Xem
-`docs/ribbon-ui.md` §5.3.
+hệt) — và cả **hai tệp `src/AxiomOffice.WPS/images/*.svg`** (icon menu chuột phải) nếu muốn cùng màu, vì ảnh do
+WPS vẽ bằng bộ nạp ảnh của nó (nó không biết `var()`); `test_pane.mjs` kiểm màu từng tệp. Icon trên ribbon là
+`imageMso` (bộ icon của WPS) nên không theo bảng màu này. Xem `docs/architecture/ribbon-ui.md` §5.3.
 
 Pane biết mình đang ở app nào qua query string: `main.js:paneUrl()` thêm `?app=<wps|et|wpp>`
 (`currentAppKind()`), pane đọc lại và mặc định `"wps"` nếu thiếu — nhờ đó tiêu đề và gợi ý đúng loại tài liệu
@@ -257,15 +256,17 @@ Còn thiếu thật (chưa vẽ nút vì chưa có đường, hoặc đường c
 | Việc | Bản có nó | Tình trạng ở WPS |
 |---|---|---|
 | **Sửa / ghim / đặt hạn** ghi nhớ | chỉ Windows (`MemoryForm.cs`) — dialog *Ghi nhớ* của LibreOffice **cũng thiếu** ba việc này | màn hình *Bộ nhớ AI* của WPS mới **3/6** việc của nghiệm thu đợt 2 (xoá tạm, khôi phục, xoá vĩnh viễn) cộng đọc, lọc phạm vi, tải lại (LibreOffice còn thiếu cả khôi phục và xoá vĩnh viễn); `PATCH /wps/v1/memory/{id}` đã sẵn nhưng chưa có form |
-| *Cài đặt nâng cao…*, *Tắt Agent Core…*, *Công cụ ngoài…*/MCP, **Tìm web**, menu ngôn ngữ | ribbon Windows | **cố ý không vẽ** trên WPS — xem `docs/ribbon-ui.md` §2 |
+| *Cài đặt nâng cao…*, *Tắt Agent Core…*, *Công cụ ngoài…*/MCP, **Tìm web**, menu ngôn ngữ | ribbon Windows | **cố ý không vẽ** trên WPS — xem `docs/architecture/ribbon-ui.md` §2 |
 
 Những thứ WPS **có thêm** so với bản LibreOffice: *Nhật ký* và *Hội thoại trước…* trong menu ⋯, nút *Chèn trả lời*
 ở footer, menu chuột phải *Sửa bằng AI* và khung chat mini (mục 7.3).
 
-**Đã xong (không còn thiếu)** — *Icon ribbon*: Windows dùng `imageMso` (bộ ảnh của Office); WPS dùng `getImage` trả
-**đường dẫn tệp tương đối** `images/<tag>.svg` (13 tệp). Đo trên WPS thật 19/10/2026: data URI thì WPS vẽ ra dấu
-`?` — nó phân giải chuỗi trả về như một đường dẫn; đường dẫn tệp theo đúng SDK chính thức của WPS
-(`@wps-jsapi/wps/js/ribbon.js`: `return "images/1.svg"`) thì hiện đủ icon. Xem `docs/ribbon-ui.md` §5.3. Khác biệt nhỏ còn lại: khi chưa biết model, phụ đề WPS rơi về `Axiom Office` còn bản LibreOffice rơi về
+**Đã xong (không còn thiếu)** — *Icon ribbon*: như Windows, ribbon WPS dùng **`imageMso`** — bộ icon có sẵn của
+WPS (đã thử trên WPS thật 20/10/2026; năm tên Windows dùng không có trong WPS nên được thay — bảng ở
+`docs/architecture/ribbon-ui.md` §5.3). Menu chuột phải dùng `getImage` trả **đường dẫn tệp tương đối** `images/<tag>.svg`
+(data URI thì WPS vẽ dấu `?` — đo 19/10/2026).
+
+Khác biệt nhỏ còn lại: khi chưa biết model, phụ đề WPS rơi về `Axiom Office` còn bản LibreOffice rơi về
 tên app.
 
 Màu, cỡ chữ, khoảng cách thì khớp từng token; phần **nhìn thấy thật** (font hệ thống, scrollbar của CEF, độ nét

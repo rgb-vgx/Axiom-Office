@@ -1,0 +1,1088 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Thiết kế tổng thể Axiom Office</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,500;6..72,600;6..72,700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* ---------------------------------------------------------------------
+   Axiom Office — High Level Design
+   Bố cục: một cột nội dung, thanh mục lục dính bên trái từ 1060px.
+   Màu nhấn lấy từ token giao diện của chính sản phẩm (axiom/theme.py,
+   ACCENT = 0x0F6CBD — xanh Fluent, từ 19/10/2026) để tài liệu và pane trong ứng dụng cùng một hệ.
+   --------------------------------------------------------------------- */
+:root{
+  --bg:#FAFAFE;
+  --surface:#FFFFFF;
+  --surface-2:#F2F2FA;
+  --fg:#191927;
+  --fg-muted:#5C5C78;
+  --line:#E3E2F0;
+  --line-strong:#CFCEDF;
+  --accent:#0F6CBD;
+  --accent-ink:#0C3B5E;
+  --accent-soft:#EFF6FC;
+  --ok:#0F766E;
+  --ok-soft:#E6F5F2;
+  --warn:#9A5B06;
+  --warn-soft:#FDF3E3;
+  --danger:#B42318;
+  --danger-soft:#FDEFEE;
+  --code-bg:#F4F4FB;
+  --code-fg:#26264A;
+  --shadow:0 1px 2px rgba(25,25,39,.05), 0 10px 30px -22px rgba(25,25,39,.35);
+
+  --font-display:"Newsreader",Georgia,"Times New Roman",serif;
+  --font-body:"Be Vietnam Pro",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+
+  --fs-xs:.75rem;
+  --fs-sm:.84rem;
+  --fs-base:1rem;
+  --fs-lg:1.08rem;
+  --fs-h3:1.16rem;
+  --fs-h2:1.6rem;
+  --fs-h1:clamp(2rem,1.4rem + 2.4vw,2.9rem);
+  --radius:10px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#101018;
+    --surface:#17171F;
+    --surface-2:#1E1E29;
+    --fg:#E9E9F3;
+    --fg-muted:#A2A2BC;
+    --line:#2B2B3A;
+    --line-strong:#41415A;
+    --accent:#479EF5;
+    --accent-ink:#B4D6FA;
+    --accent-soft:#082338;
+    --ok:#5EEAD4;
+    --ok-soft:#12302C;
+    --warn:#F0C685;
+    --warn-soft:#33260F;
+    --danger:#FDA4A0;
+    --danger-soft:#3A1A18;
+    --code-bg:#1B1B26;
+    --code-fg:#DEDEF2;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 12px 34px -24px rgba(0,0,0,.9);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#101018;
+  --surface:#17171F;
+  --surface-2:#1E1E29;
+  --fg:#E9E9F3;
+  --fg-muted:#A2A2BC;
+  --line:#2B2B3A;
+  --line-strong:#41415A;
+  --accent:#479EF5;
+  --accent-ink:#B4D6FA;
+  --accent-soft:#082338;
+  --ok:#5EEAD4;
+  --ok-soft:#12302C;
+  --warn:#F0C685;
+  --warn-soft:#33260F;
+  --danger:#FDA4A0;
+  --danger-soft:#3A1A18;
+  --code-bg:#1B1B26;
+  --code-fg:#DEDEF2;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 12px 34px -24px rgba(0,0,0,.9);
+  color-scheme:dark;
+}
+
+body{
+  background:var(--bg);
+  color:var(--fg);
+  font-family:var(--font-body);
+  font-size:var(--fs-base);
+  line-height:1.68;
+  margin:0;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{
+  max-width:1180px;
+  margin-inline:auto;
+  padding-inline:clamp(16px,4vw,40px);
+  padding-block:clamp(28px,5vw,56px) clamp(48px,7vw,96px);
+}
+.shell{display:grid;gap:clamp(26px,4vw,52px);grid-template-columns:1fr;align-items:start}
+@media (min-width:1060px){
+  .shell{grid-template-columns:238px minmax(0,1fr)}
+}
+
+/* --- đầu trang --- */
+.masthead{display:grid;gap:14px;padding-bottom:clamp(20px,3vw,30px);border-bottom:1px solid var(--line)}
+.eyebrow{
+  font-family:var(--font-mono);
+  font-size:var(--fs-xs);
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  color:var(--accent);
+}
+h1{
+  font-family:var(--font-display);
+  font-weight:600;
+  font-size:var(--fs-h1);
+  line-height:1.1;
+  letter-spacing:-.015em;
+  text-wrap:balance;
+  margin:0;
+}
+.lede{font-size:var(--fs-lg);max-width:62ch;margin:0}
+.meta{font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--fg-muted);letter-spacing:.02em}
+
+/* --- dải số liệu --- */
+.figures{
+  display:grid;
+  gap:1px;
+  grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+  background:var(--line);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  overflow:hidden;
+  margin-top:clamp(20px,3vw,28px);
+}
+.fig{background:var(--surface);padding:14px 16px;display:grid;gap:2px}
+.fig b{
+  font-family:var(--font-display);
+  font-weight:600;
+  font-size:1.5rem;
+  font-variant-numeric:tabular-nums;
+  line-height:1.1;
+}
+.fig span{font-size:var(--fs-sm);color:var(--fg-muted)}
+
+/* --- mục lục --- */
+.toc{font-size:var(--fs-sm)}
+@media (min-width:1060px){
+  .toc{position:sticky;top:22px;max-height:calc(100vh - 48px);max-height:calc(100dvh - 48px);overflow-y:auto}
+}
+.toc-box{border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);padding:12px 14px}
+.toc-box>summary{
+  cursor:pointer;
+  font-family:var(--font-mono);
+  font-size:var(--fs-xs);
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  color:var(--fg-muted);
+}
+@media (min-width:1060px){
+  .toc-box{border:0;background:transparent;padding:0}
+  .toc-box>summary{display:none}
+}
+.toc ul{list-style:none;margin:0;padding:0;display:grid;gap:1px}
+.toc .toc-group{
+  font-family:var(--font-mono);
+  font-size:var(--fs-xs);
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  color:var(--fg-muted);
+  margin:14px 0 5px;
+}
+.toc .toc-group:first-child{margin-top:0}
+.toc a{
+  display:block;
+  padding:3px 8px 3px 9px;
+  color:var(--fg-muted);
+  text-decoration:none;
+  border-left:2px solid transparent;
+  border-radius:0 6px 6px 0;
+}
+.toc a:hover{color:var(--fg);background:var(--surface-2)}
+.toc a.on{color:var(--accent-ink);border-left-color:var(--accent);background:var(--accent-soft)}
+
+/* --- nội dung --- */
+main{display:grid;gap:clamp(34px,4.5vw,54px);min-width:0}
+section{display:grid;gap:14px;min-width:0;scroll-margin-top:18px}
+h2{
+  font-family:var(--font-display);
+  font-weight:600;
+  font-size:var(--fs-h2);
+  line-height:1.22;
+  letter-spacing:-.01em;
+  text-wrap:balance;
+  margin:0;
+}
+h2 .mark{color:var(--line-strong);font-family:var(--font-mono);font-size:.62em;font-weight:400;margin-right:.5em;letter-spacing:0}
+h3{font-size:var(--fs-h3);font-weight:600;margin:6px 0 0;line-height:1.35}
+p{margin:0;max-width:68ch}
+ul,ol{margin:0;padding-left:1.15em;display:grid;gap:7px;max-width:68ch}
+li>ul,li>ol{margin-top:7px}
+a{color:var(--accent-ink);text-underline-offset:3px}
+a:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+strong{font-weight:600}
+code{
+  font-family:var(--font-mono);
+  font-size:.86em;
+  background:var(--code-bg);
+  color:var(--code-fg);
+  padding:.08em .3em;
+  border-radius:4px;
+  overflow-wrap:anywhere;
+}
+h2 code,h3 code{background:transparent;padding:0;color:var(--accent-ink);font-size:.8em;font-weight:500}
+
+/* --- bảng --- */
+.table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:var(--fs-sm);min-width:520px}
+caption{caption-side:bottom;text-align:left;padding:9px 14px;font-size:var(--fs-xs);color:var(--fg-muted);border-top:1px solid var(--line)}
+th,td{text-align:left;vertical-align:top;padding:9px 14px;border-bottom:1px solid var(--line)}
+thead th{
+  font-family:var(--font-mono);
+  font-size:var(--fs-xs);
+  letter-spacing:.07em;
+  text-transform:uppercase;
+  color:var(--fg-muted);
+  font-weight:500;
+  background:var(--surface-2);
+  white-space:nowrap;
+}
+tbody tr:last-child td{border-bottom:0}
+td code{background:transparent;padding:0;font-size:.86em}
+.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* --- callout --- */
+.callout{
+  border-left:3px solid var(--accent);
+  background:var(--accent-soft);
+  border-radius:0 var(--radius) var(--radius) 0;
+  padding:13px 16px;
+  display:grid;gap:6px;
+  max-width:70ch;
+}
+.callout .tag{
+  font-family:var(--font-mono);
+  font-size:var(--fs-xs);
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  color:var(--accent-ink);
+}
+.callout p{font-size:var(--fs-sm)}
+.callout.warn{border-left-color:var(--warn);background:var(--warn-soft)}
+.callout.warn .tag{color:var(--warn)}
+.callout.danger{border-left-color:var(--danger);background:var(--danger-soft)}
+.callout.danger .tag{color:var(--danger)}
+.callout.ok{border-left-color:var(--ok);background:var(--ok-soft)}
+.callout.ok .tag{color:var(--ok)}
+
+/* --- sơ đồ --- */
+.diagram{
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  background:var(--surface);
+  padding:clamp(14px,2.4vw,22px);
+  display:grid;gap:10px;
+  box-shadow:var(--shadow);
+}
+.d-label{
+  font-family:var(--font-mono);
+  font-size:var(--fs-xs);
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  color:var(--fg-muted);
+}
+.d-row{display:grid;gap:8px;min-width:0}
+.d-cards{display:flex;flex-wrap:wrap;gap:8px}
+.node{
+  border:1px solid var(--line-strong);
+  border-radius:8px;
+  background:var(--surface-2);
+  padding:8px 11px;
+  font-size:var(--fs-sm);
+  line-height:1.4;
+  display:grid;gap:2px;
+  min-width:0;
+}
+.node b{font-weight:600;font-size:var(--fs-sm)}
+.node span{color:var(--fg-muted);font-size:var(--fs-xs);font-family:var(--font-mono)}
+.node.hi{background:var(--accent-soft);border-color:var(--accent)}
+.node.hi b{color:var(--accent-ink)}
+.node.out{border-style:dashed}
+.d-arrow{
+  text-align:center;
+  color:var(--line-strong);
+  font-family:var(--font-mono);
+  font-size:var(--fs-sm);
+  line-height:1;
+  padding:2px 0;
+}
+
+/* --- hai cột: trong / ngoài phạm vi --- */
+.split{display:grid;gap:12px;grid-template-columns:1fr}
+@media (min-width:760px){.split{grid-template-columns:1fr 1fr}}
+.col{border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:grid;gap:9px;min-width:0;align-content:start}
+.col h4{
+  margin:0;
+  font-family:var(--font-mono);
+  font-size:var(--fs-xs);
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--accent-ink);
+}
+.col ul{font-size:var(--fs-sm);gap:6px}
+
+/* --- quyết định kiến trúc --- */
+.decision{
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  background:var(--surface);
+  padding:14px 16px;
+  display:grid;
+  gap:10px;
+  min-width:0;
+}
+.decision h3{margin:0;font-size:1.02rem;font-weight:600}
+.decision .why{font-size:var(--fs-sm);display:grid;gap:9px;grid-template-columns:1fr}
+@media (min-width:720px){
+  .decision .why{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+.decision .why div{display:grid;gap:3px;align-content:start;min-width:0}
+.decision .why dt,.decision .why .k{
+  font-family:var(--font-mono);
+  font-size:var(--fs-xs);
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--fg-muted);
+}
+.decision .why p{font-size:var(--fs-sm);max-width:none}
+.decisions{display:grid;gap:12px}
+
+/* --- luồng: bước có nhãn actor --- */
+.seq{display:grid;gap:0;max-width:70ch}
+.seq-step{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr);
+  gap:12px;
+  padding:11px 0;
+  border-bottom:1px dashed var(--line);
+  align-items:start;
+}
+.seq-step:last-child{border-bottom:0}
+.who{
+  font-family:var(--font-mono);
+  font-size:var(--fs-xs);
+  letter-spacing:.04em;
+  color:var(--accent-ink);
+  background:var(--accent-soft);
+  border:1px solid var(--accent);
+  border-radius:999px;
+  padding:2px 9px;
+  white-space:nowrap;
+  line-height:1.6;
+}
+.seq-step .body{display:grid;gap:3px;min-width:0}
+.seq-step p,.seq-step ul{font-size:var(--fs-sm);max-width:60ch}
+
+footer{
+  margin-top:clamp(40px,6vw,72px);
+  padding-top:20px;
+  border-top:1px solid var(--line);
+  font-size:var(--fs-sm);
+  color:var(--fg-muted);
+  display:grid;gap:6px;
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="masthead">
+    <div class="eyebrow">High Level Design · tài liệu 01/02</div>
+    <h1>Thiết kế tổng thể Axiom Office</h1>
+    <p class="lede">Axiom Office là trợ lý AI chạy bên trong LibreOffice và WPS. Tài liệu này trả lời câu hỏi vì sao hệ thống được chia như hiện tại: ai nói với ai, dữ liệu đi qua đâu, quyết định nào đã chốt và đánh đổi của từng quyết định là gì. Chi tiết cài đặt nằm ở tài liệu Low Level Design đi kèm.</p>
+    <div class="meta">Cập nhật 12/10/2026 · nhánh main · phạm vi Linux: LibreOffice và WPS</div>
+
+    <div class="figures">
+      <div class="fig"><b>2</b><span>nửa: bộ não và cánh tay</span></div>
+      <div class="fig"><b>9</b><span>quyết định kiến trúc</span></div>
+      <div class="fig"><b>6</b><span>lớp an toàn</span></div>
+      <div class="fig"><b>4</b><span>tầng kiểm thử</span></div>
+    </div>
+  </header>
+
+  <div class="shell">
+    <nav class="toc" aria-label="Mục lục">
+      <details class="toc-box" open>
+        <summary>Mục lục</summary>
+        <ul>
+          <li class="toc-group">Bối cảnh</li>
+          <li><a href="#muc-tieu">1. Mục tiêu và phạm vi</a></li>
+          <li><a href="#nfr">2. Yêu cầu phi chức năng</a></li>
+          <li><a href="#ngu-canh">3. Sơ đồ ngữ cảnh</a></li>
+          <li class="toc-group">Kiến trúc</li>
+          <li><a href="#thanh-phan">4. Thành phần và trách nhiệm</a></li>
+          <li><a href="#trien-khai">5. Sơ đồ triển khai</a></li>
+          <li><a href="#khai-niem">6. Mô hình khái niệm</a></li>
+          <li><a href="#luong">7. Các luồng chính</a></li>
+          <li class="toc-group">Quyết định</li>
+          <li><a href="#quyet-dinh">8. Chín quyết định kiến trúc</a></li>
+          <li class="toc-group">Xuyên suốt</li>
+          <li><a href="#an-ninh">9. An ninh và riêng tư</a></li>
+          <li><a href="#xac-nhan">10. Xác nhận và hoàn tác</a></li>
+          <li><a href="#loi">11. Lỗi, trần và hiệu năng</a></li>
+          <li><a href="#kiem-thu">12. Chiến lược kiểm thử</a></li>
+          <li class="toc-group">Bàn giao</li>
+          <li><a href="#rui-ro">13. Rủi ro và giới hạn</a></li>
+          <li><a href="#mo-rong">14. Điểm mở rộng</a></li>
+          <li><a href="#tu-dien">15. Từ điển</a></li>
+        </ul>
+      </details>
+    </nav>
+
+    <main>
+      <!-- 1 -->
+      <section id="muc-tieu">
+        <h2><span class="mark">01</span>Mục tiêu và phạm vi</h2>
+        <p>Người dùng là nhân viên văn phòng Việt Nam đang soạn văn bản, bảng tính và slide. Họ đã quen LibreOffice hoặc WPS, không muốn đổi phần mềm, nhưng muốn nhờ AI làm những việc cụ thể trong tài liệu đang mở: lập bảng điểm, dựng báo cáo tháng, trình bày theo thể thức, soát lỗi bảng dữ liệu.</p>
+        <p>Axiom Office là một thanh trò chuyện nằm trong chính ứng dụng đó. Người dùng gõ yêu cầu bằng tiếng Việt, AI làm việc trực tiếp trên tài liệu đang mở, và mọi thay đổi đều nhìn thấy được ngay trong ứng dụng.</p>
+        <div class="split">
+          <div class="col">
+            <h4>Trong phạm vi</h4>
+            <ul>
+              <li>LibreOffice Writer, Calc, Impress trên Linux, và WPS Writer, ET, WPP trên Linux</li>
+              <li>Đọc, sửa, định dạng và kiểm tra tài liệu đang mở</li>
+              <li>Bộ skill dựng sẵn cho văn bản hành chính, báo cáo, bảng điểm, mô hình nhiều sheet, trình bày</li>
+              <li>Máy chủ MCP để công cụ AI bên ngoài dùng lại chính hệ lệnh này</li>
+            </ul>
+          </div>
+          <div class="col">
+            <h4>Ngoài phạm vi</h4>
+            <ul>
+              <li>Không có web UI: giao diện luôn nằm trong ứng dụng văn phòng</li>
+              <li>Không có máy chủ trung tâm: không tài khoản, không đồng bộ, không thu thập số liệu</li>
+              <li>Không tự động hoá hàng loạt theo lô; mỗi lượt là một yêu cầu của người dùng đang ngồi trước máy</li>
+              <li>Không soạn nội dung thay con người: AI làm việc trên tài liệu người dùng đã có</li>
+            </ul>
+          </div>
+        </div>
+        <div class="callout">
+          <div class="tag">Ba bản bridge</div>
+          <p>Có ba bản bridge: LibreOffice (Python), WPS Linux (JS) và Windows (C#, cho Word/Excel/PowerPoint và WPS trên Windows). Cả ba dùng chung một Core bản Go — cái đã dừng từ 01/10/2026 là Core <b>.NET</b>, không phải add-in Windows. Danh mục lệnh dùng chung, nhưng mỗi bản làm được một tập con khác nhau; độ lệch được ghi trong test (<code>CHUA_CO_HANDLER</code> của WPS) thay vì che đi. Tài liệu này tập trung vào phía Linux.</p>
+        </div>
+      </section>
+
+      <!-- 2 -->
+      <section id="nfr">
+        <h2><span class="mark">02</span>Yêu cầu phi chức năng</h2>
+        <p>Những yêu cầu này quyết định phần lớn kiến trúc, nên đọc trước khi đọc phần thành phần.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Yêu cầu</th><th>Vì sao</th><th>Hệ thống đáp ứng bằng</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><b>Tài liệu không rời khỏi máy</b></td>
+                <td>Tài liệu nội bộ, có khi là dữ liệu cá nhân. Người dùng không ký hợp đồng xử lý dữ liệu với ai.</td>
+                <td>Không có máy chủ trung tâm. File chỉ được mở bởi chính ứng dụng văn phòng trên máy. Ra ngoài chỉ có phần nội dung mà model cần đọc để trả lời.</td>
+              </tr>
+              <tr>
+                <td><b>Không mở thêm bề mặt tấn công</b></td>
+                <td>Máy trạm nằm trong mạng nội bộ, thường cùng dải với máy khác.</td>
+                <td>Chỉ nghe trên loopback, có token, chặn request từ trình duyệt, mỗi người dùng một tiến trình Core.</td>
+              </tr>
+              <tr>
+                <td><b>Cài bằng một lệnh</b></td>
+                <td>Người dùng cuối không phải kỹ thuật viên.</td>
+                <td>Một script cài đặt lo cả extension LibreOffice, add-in WPS và file cấu hình; riêng WPS cần thêm một lệnh <code>sudo</code> một lần (trình cài in sẵn lệnh).</td>
+              </tr>
+              <tr>
+                <td><b>Không được làm hỏng tài liệu</b></td>
+                <td>Một tài liệu bị phá có thể mất nhiều giờ làm lại, và niềm tin mất thì không lấy lại được.</td>
+                <td>Sáu lớp an toàn ở mục 9, trong đó lớp quan trọng nhất là xác nhận trước khi ghi đè dữ liệu có thật.</td>
+              </tr>
+              <tr>
+                <td><b>Phản hồi theo dòng chảy</b></td>
+                <td>Một lượt dựng báo cáo có thể chạy vài phút. Màn hình im lặng vài phút thì người dùng tưởng treo.</td>
+                <td>Mọi sự kiện đẩy về pane ngay khi xảy ra: đang gọi lệnh gì, kết quả ra sao, đang chờ trả lời gì.</td>
+              </tr>
+              <tr>
+                <td><b>Thêm được ứng dụng mới</b></td>
+                <td>Các bộ văn phòng khác. (Microsoft Office trên Windows đã dùng cùng Core.)</td>
+                <td>Phần thực thi lệnh giữa Core và ứng dụng chỉ gồm bốn endpoint HTTP cộng một bảng đăng ký lệnh. Riêng phần giao diện của WPS dùng thêm kênh <code>/wps/v1/*</code> do Core cung cấp.</td>
+              </tr>
+              <tr>
+                <td><b>Đúng tiếng Việt và đúng thói quen soạn thảo Việt Nam</b></td>
+                <td>Thể thức văn bản hành chính, quốc hiệu, số và ngày tháng theo kiểu Việt Nam đều có quy tắc riêng.</td>
+                <td>Skill dựng sẵn cho từng loại văn bản, và các quy tắc định dạng được nhắc trong prompt thay vì để model tự đoán.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Một chi tiết dễ bỏ qua nhưng ảnh hưởng tới trải nghiệm: công thức trong bảng tính được ghi theo cú pháp en-US (dấu phẩy ngăn tham số) rồi tự đổi sang dấu chấm phẩy nếu máy người dùng cấu hình như vậy. Nếu không có bước đổi này, mọi công thức do AI viết đều lỗi trên máy dùng định dạng Việt Nam.</p>
+      </section>
+
+      <!-- 3 -->
+      <section id="ngu-canh">
+        <h2><span class="mark">03</span>Sơ đồ ngữ cảnh</h2>
+        <p>Hệ thống nằm giữa người dùng và các ứng dụng văn phòng. Ra ngoài: gọi mô hình ngôn ngữ do người dùng cấu hình, và — chỉ khi người dùng bật — dịch vụ tìm web (Tavily hoặc MCP server ngoài).</p>
+        <div class="diagram">
+          <div class="d-row">
+            <div class="d-label">Ngoài hệ thống</div>
+            <div class="d-cards">
+              <div class="node out"><b>Người dùng</b><span>gõ yêu cầu trong pane</span></div>
+              <div class="node out"><b>Công cụ AI bên ngoài</b><span>Claude Code, Cursor, script</span></div>
+              <div class="node out"><b>Mô hình ngôn ngữ</b><span>API do người dùng cấu hình</span></div>
+              <div class="node out"><b>Khoá hệ điều hành</b><span>nơi giữ API key</span></div>
+            </div>
+          </div>
+          <div class="d-arrow">↓ yêu cầu &nbsp;·&nbsp; ↑ sự kiện và câu hỏi xác nhận ↓</div>
+          <div class="d-row">
+            <div class="d-label">Axiom Office</div>
+            <div class="d-cards">
+              <div class="node hi"><b>Core</b><span>quyết định, gọi model, giữ chính sách</span></div>
+              <div class="node"><b>Bridge LibreOffice</b><span>thực thi trong Writer/Calc/Impress</span></div>
+              <div class="node"><b>Add-in WPS</b><span>thực thi trong WPS Writer/ET/WPP</span></div>
+              <div class="node"><b>Dữ liệu skill</b><span>hướng dẫn soạn thảo theo loại văn bản</span></div>
+            </div>
+          </div>
+          <div class="d-arrow">↓ thao tác trên tài liệu đang mở ↓</div>
+          <div class="d-row">
+            <div class="d-label">Tài sản cần bảo vệ</div>
+            <div class="d-cards">
+              <div class="node"><b>Tài liệu của người dùng</b><span>chỉ ở lại trên máy</span></div>
+            </div>
+          </div>
+        </div>
+        <p>Điều đáng chú ý ở sơ đồ này là Core giữ mọi thứ cần suy nghĩ, còn bridge chỉ biết làm theo. Nhờ vậy khi thêm một ứng dụng văn phòng mới, phần viết thêm không chứa logic AI nào.</p>
+      </section>
+
+      <!-- 4 -->
+      <section id="thanh-phan">
+        <h2><span class="mark">04</span>Thành phần và trách nhiệm</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Thành phần</th><th>Chịu trách nhiệm</th><th>Không làm gì</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><b>Core</b><br><span class="meta">Go, chạy nền</span></td>
+                <td>Dựng prompt, gọi mô hình, chạy vòng lặp agent, quyết định khi nào hỏi người dùng, giữ hội thoại, Bộ nhớ AI, nhật ký và nguồn web (<code>core.db</code>), giữ câu lệnh của menu <i>Sửa bằng AI</i>, phục vụ MCP, và phục vụ file add-in WPS cùng kênh <code>/wps/v1/*</code> của nó</td>
+                <td>Không tự mở hay sửa file tài liệu. Không biết cấu trúc bên trong của Writer hay ET.</td>
+              </tr>
+              <tr>
+                <td><b>Bridge LibreOffice</b><br><span class="meta">Python + UNO</span></td>
+                <td>Báo cho Core biết tài liệu đang mở trông thế nào, thực thi lệnh trên Writer, Calc, Impress, và dựng pane trong ứng dụng</td>
+                <td>Không gọi mô hình, không giữ API key, không quyết định thay người dùng</td>
+              </tr>
+              <tr>
+                <td><b>Add-in WPS</b><br><span class="meta">JavaScript trong CEF</span></td>
+                <td>Cùng trách nhiệm với bridge LibreOffice, nhưng cho WPS Writer, ET, WPP, và dựng pane bằng HTML</td>
+                <td>Không mở cổng lắng nghe, không giữ khoá API</td>
+              </tr>
+              <tr>
+                <td><b>Dữ liệu skill</b><br><span class="meta">thư mục trong gói cài</span></td>
+                <td>Hướng dẫn cách dựng từng loại văn bản, bảng, slide: bố cục, cỡ chữ, màu, thứ tự các bước</td>
+                <td>Không phải mã; sửa skill không cần biên dịch lại gì</td>
+              </tr>
+              <tr>
+                <td><b>Máy chủ MCP</b><br><span class="meta">cùng binary với Core</span></td>
+                <td>Mở chính hệ lệnh này cho công cụ AI bên ngoài dùng, gồm cả nhóm công cụ đọc tài liệu đang mở</td>
+                <td>Không mở cổng mạng; chỉ nói qua stdio</td>
+              </tr>
+            </tbody>
+            <caption>Cách nhớ: Core là nơi duy nhất biết về mô hình ngôn ngữ, bridge là nơi duy nhất chạm vào tài liệu.</caption>
+          </table>
+        </div>
+      </section>
+
+      <!-- 5 -->
+      <section id="trien-khai">
+        <h2><span class="mark">05</span>Sơ đồ triển khai</h2>
+        <p>Tất cả chạy trên máy người dùng, không có thành phần nào ở xa. Bốn nhóm tiến trình, mỗi nhóm một dải cổng riêng để không đụng nhau.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Tiến trình</th><th>Cổng</th><th>Do ai khởi động</th><th>Vòng đời</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><b>Core</b></td>
+                <td class="num">47840<br>dải 47840–47849</td>
+                <td>Extension LibreOffice tự khởi động khi cần; với WPS, Core phải chạy <b>trước</b> khi mở WPS (khuyến nghị <code>install.sh --systemd</code>)</td>
+                <td>Sống lâu; chỉ một bản cho mỗi người dùng nhờ khoá tiến trình</td>
+              </tr>
+              <tr>
+                <td><b>Bridge LibreOffice</b></td>
+                <td class="num">47851–47853</td>
+                <td>LibreOffice, khi extension được nạp</td>
+                <td>Theo ứng dụng; tắt ứng dụng là bridge chết theo</td>
+              </tr>
+              <tr>
+                <td><b>Add-in WPS</b></td>
+                <td class="num">không tự mở cổng</td>
+                <td>WPS, khi add-in được nạp</td>
+                <td>Theo ứng dụng. Không mở cổng được nên đi nhờ Core ở cổng 47861</td>
+              </tr>
+              <tr>
+                <td><b>Bridge Windows (C#)</b></td>
+                <td class="num">47821–47823<br>47831–47833</td>
+                <td>Word, Excel, PowerPoint, WPS trên Windows</td>
+                <td>Theo ứng dụng. Bản cũ, không phải sản phẩm chính</td>
+              </tr>
+            </tbody>
+            <caption>Dải cổng được dành sẵn để một máy có thể chạy nhiều bộ văn phòng cùng lúc mà không tranh cổng.</caption>
+          </table>
+        </div>
+        <div class="split">
+          <div class="col">
+            <h4>Trên đĩa</h4>
+            <ul>
+              <li>Cấu hình người dùng: <code>~/.config/axiom-office/config.json</code>, quyền 0600</li>
+              <li>Thư mục phiên: mỗi ứng dụng đang mở ghi một file mô tả chính nó</li>
+              <li>Khoá API: extension LibreOffice cất vào keyring của hệ điều hành; <code>install.sh --api-key</code> và pane WPS ghi vào <code>config.json</code> với quyền 0600</li>
+              <li>Dữ liệu: <code>~/.local/share/axiom-office/core/core.db</code> (hội thoại, Bộ nhớ AI, nhật ký, nguồn web); cài lại và gỡ không <code>--purge</code> giữ nguyên tệp này</li>
+              <li>Gói cài: binary Core, thư mục skill, extension LibreOffice, add-in WPS, script cài</li>
+            </ul>
+          </div>
+          <div class="col">
+            <h4>Quy tắc vòng đời</h4>
+            <ul>
+              <li>Một người dùng chỉ có một Core: đã có Core chạy thì lần khởi động sau thoát ngay</li>
+              <li>Core chết thì không kéo theo ứng dụng văn phòng; tài liệu vẫn nguyên</li>
+              <li>Ứng dụng chết đột ngột để lại file phiên cũ; Core bỏ qua file quá hạn và kiểm tra tiến trình còn sống hay không</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 6 -->
+      <section id="khai-niem">
+        <h2><span class="mark">06</span>Mô hình khái niệm</h2>
+        <p>Năm khái niệm dưới đây xuất hiện khắp mã nguồn. Hiểu chúng trước thì đọc phần còn lại dễ hơn nhiều.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Khái niệm</th><th>Nghĩa</th><th>Vì sao cần</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><b>Phiên</b></td>
+                <td>Một ứng dụng văn phòng đang mở, cùng cổng, tiến trình và tài liệu hiện tại của nó</td>
+                <td>Core không tự dò ứng dụng; ứng dụng tự công bố mình đang sống. Cách này chịu được việc Core khởi động lại bất cứ lúc nào.</td>
+              </tr>
+              <tr>
+                <td><b>Lệnh</b></td>
+                <td>Một hành động cụ thể trên tài liệu, có tên, có tham số, có mô tả</td>
+                <td>Là đơn vị nhỏ nhất mà AI được phép yêu cầu. Không có đường nào sửa tài liệu ngoài một lệnh có tên.</td>
+              </tr>
+              <tr>
+                <td><b>Lượt chạy</b></td>
+                <td>Một lần AI làm việc từ lúc nhận yêu cầu đến lúc trả lời xong</td>
+                <td>Đơn vị để giới hạn và để huỷ. Mỗi cổng có tối đa một lượt, nên hai người không sửa cùng một tài liệu và ghi đè lên nhau.</td>
+              </tr>
+              <tr>
+                <td><b>Hội thoại</b></td>
+                <td>Chuỗi yêu cầu và câu trả lời được giữ lại giữa các lượt</td>
+                <td>Người dùng nói "làm tiếp ý vừa rồi" mà không phải nhắc lại ngữ cảnh.</td>
+              </tr>
+              <tr>
+                <td><b>Skill</b></td>
+                <td>Gói hướng dẫn cho một loại công việc, nạp theo ba tầng từ mục lục tới nội dung chi tiết</td>
+                <td>Giữ prompt nền ngắn mà vẫn dạy được nhiều quy tắc soạn thảo. Chi tiết cách nạp nằm ở tài liệu Low Level Design.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout warn">
+          <div class="tag">Một chữ, hai nghĩa</div>
+          <p>Từ <em>token</em> trong dự án chỉ hai thứ khác nhau: bộ cỡ chữ và màu dùng để dựng tài liệu, và bộ màu dùng cho giao diện pane. Sửa cái này không ảnh hưởng cái kia. Chi tiết ở tài liệu Low Level Design.</p>
+        </div>
+      </section>
+
+      <!-- 7 -->
+      <section id="luong">
+        <h2><span class="mark">07</span>Các luồng chính</h2>
+        <p>Ba luồng dưới đây phủ gần hết những gì hệ thống làm. Cách đọc: nhãn bên trái là bên đang hành động.</p>
+
+        <h3>Luồng 1 · Hỏi và trả lời, không sửa gì</h3>
+        <div class="seq">
+          <div class="seq-step"><span class="who">Người dùng</span><div class="body"><p>Gõ câu hỏi trong pane, ví dụ "bảng này có lỗi gì không".</p></div></div>
+          <div class="seq-step"><span class="who">Core</span><div class="body"><p>Dựng prompt từ câu hỏi cộng bối cảnh tài liệu đang mở, gọi mô hình.</p></div></div>
+          <div class="seq-step"><span class="who">Core → Bridge</span><div class="body"><p>Mô hình yêu cầu đọc tài liệu. Core gọi lệnh đọc tương ứng, bridge trả về nội dung.</p></div></div>
+          <div class="seq-step"><span class="who">Core → Pane</span><div class="body"><p>Câu trả lời hiện dần trong pane. Tài liệu không đổi một ký tự nào.</p></div></div>
+        </div>
+
+        <h3>Luồng 2 · Sửa tài liệu, có chỗ phải hỏi lại</h3>
+        <div class="seq">
+          <div class="seq-step"><span class="who">Người dùng</span><div class="body"><p>"Lập bảng điểm cho lớp 10A theo mẫu này."</p></div></div>
+          <div class="seq-step"><span class="who">Core</span><div class="body"><p>Mô hình xem tài liệu trước, chọn skill phù hợp, rồi mới bắt đầu ghi.</p></div></div>
+          <div class="seq-step"><span class="who">Core → Bridge</span><div class="body"><p>Từng lệnh ghi được gửi xuống và thực thi ngay trong tài liệu đang mở. Người dùng thấy bảng mọc lên trước mắt.</p></div></div>
+          <div class="seq-step"><span class="who">Core → Pane</span><div class="body"><p>Nếu một lệnh rơi vào trường hợp phải hỏi, câu hỏi hiện ra kèm bản xem trước tham số. Lượt chạy dừng chờ trả lời.</p></div></div>
+          <div class="seq-step"><span class="who">Người dùng</span><div class="body"><p>Đồng ý hoặc từ chối. Từ chối thì lệnh đó không chạy, phần còn lại của kế hoạch vẫn tiếp tục.</p></div></div>
+          <div class="seq-step"><span class="who">Core</span><div class="body"><p>Ghi xong thì đọc lại kết quả, tự sửa chỗ sai, rồi mới kết thúc lượt.</p></div></div>
+        </div>
+
+        <h3>Luồng 3 · Công cụ AI bên ngoài dùng cùng hệ lệnh</h3>
+        <div class="seq">
+          <div class="seq-step"><span class="who">Client ngoài</span><div class="body"><p>Khởi động máy chủ MCP của Core và hỏi danh sách công cụ.</p></div></div>
+          <div class="seq-step"><span class="who">Core</span><div class="body"><p>Trả về danh mục lệnh cộng nhóm công cụ đọc tài liệu đang mở.</p></div></div>
+          <div class="seq-step"><span class="who">Client ngoài → Core</span><div class="body"><p>Gọi công cụ, theo một trong hai cách. <b>Tool live</b> (vd <code>word_command</code>, <code>wps_live_command</code>): lệnh đi thẳng tới bridge — không qua allowlist, không hỏi xác nhận. <b><code>ai.ask</code></b>: chạy agent của Core, khi đó mới đi qua đủ bảy bước, gồm cả bước hỏi người dùng.</p></div></div>
+        </div>
+        <p>Chính sách xác nhận đặt ở Core để mọi pane dùng chung một cửa. Client MCP gọi tool live thì nằm <b>ngoài</b> cửa đó: tin cậy dựa vào việc chính người dùng cấu hình client ấy.</p>
+
+        <h3>Luồng 4 · Sửa nhanh bằng chuột phải (WPS Linux)</h3>
+        <div class="seq">
+          <div class="seq-step"><span class="who">Người dùng</span><div class="body"><p>Bôi đen một đoạn, chuột phải, chọn <i>Sửa bằng AI ▸ Trau chuốt</i>.</p></div></div>
+          <div class="seq-step"><span class="who">Add-in</span><div class="body"><p>Mở khung chat mini (<code>Application.ShowDialog</code>); khung gửi <code>POST /wps/v1/runs {quickAction: "polish"}</code>.</p></div></div>
+          <div class="seq-step"><span class="who">Core</span><div class="body"><p>Lấy câu lệnh theo id, khoá vùng bôi đen (không có thì dừng trước khi gọi mô hình), chạy lượt; ba mục chỉ trả lời chỉ được cấp tool đọc.</p></div></div>
+          <div class="seq-step"><span class="who">Người dùng</span><div class="body"><p>Xem kết quả trong tài liệu; không ưng thì <i>Hoàn tác</i> cả lượt.</p></div></div>
+        </div>
+      </section>
+
+      <!-- 8 -->
+      <section id="quyet-dinh">
+        <h2><span class="mark">08</span>Chín quyết định kiến trúc</h2>
+        <p>Mỗi quyết định dưới đây đều có đánh đổi. Ghi lại cả phần đánh đổi để lần sau không ai phải đoán lại từ đầu.</p>
+        <div class="decisions">
+
+          <div class="decision">
+            <h3>1. Tách bộ não khỏi cánh tay</h3>
+            <div class="why">
+              <div><span class="k">Chọn</span><p>Một tiến trình Core giữ toàn bộ phần AI; mỗi ứng dụng văn phòng có một bridge mỏng chỉ để thực thi lệnh.</p></div>
+              <div><span class="k">Vì sao</span><p>Prompt, skill và chính sách chỉ tồn tại một bản. Thêm ứng dụng mới không phải viết lại phần AI.</p></div>
+              <div><span class="k">Đánh đổi</span><p>Thêm một chặng mạng nội bộ cho mỗi lệnh, và phải định nghĩa một hợp đồng ổn định giữa hai bên.</p></div>
+              <div><span class="k">Nếu đổi ý</span><p>Nhúng phần AI vào từng extension sẽ khiến mỗi ứng dụng có một hành vi khác nhau, không kiểm soát được.</p></div>
+            </div>
+          </div>
+
+          <div class="decision">
+            <h3>2. Nói chuyện bằng HTTP trên loopback, và công bố sự tồn tại bằng file phiên</h3>
+            <div class="why">
+              <div><span class="k">Chọn</span><p>Bridge mở một cổng nhỏ trên 127.0.0.1; Core dò thư mục phiên để biết ai đang chạy.</p></div>
+              <div><span class="k">Vì sao</span><p>Không phụ thuộc cơ chế riêng của từng bộ văn phòng, và Core khởi động lại vẫn tìm thấy các ứng dụng đang mở. Cổng cộng token cũng là ranh giới tin cậy rõ ràng.</p></div>
+              <div><span class="k">Đánh đổi</span><p>Phải tự lo dọn file phiên cũ và phân biệt phiên chết với phiên đang bận.</p></div>
+              <div><span class="k">Nếu đổi ý</span><p>Cơ chế IPC riêng cho từng bộ văn phòng sẽ buộc Core phải biết về từng ứng dụng, đúng thứ kiến trúc này muốn tránh.</p></div>
+            </div>
+          </div>
+
+          <div class="decision">
+            <h3>3. Mỗi cổng chỉ chạy một lượt tại một thời điểm</h3>
+            <div class="why">
+              <div><span class="k">Chọn</span><p>Yêu cầu thứ hai cho cùng một ứng dụng bị từ chối cho tới khi lượt đang chạy kết thúc.</p></div>
+              <div><span class="k">Vì sao</span><p>Hai lượt cùng sửa một tài liệu sẽ ghi đè lên nhau, và người dùng không có cách nào biết bản nào đúng.</p></div>
+              <div><span class="k">Đánh đổi</span><p>Người dùng phải đợi. Chấp nhận được vì mỗi lượt là một việc họ vừa yêu cầu và đang theo dõi.</p></div>
+              <div><span class="k">Nếu đổi ý</span><p>Cho chạy song song cần một cơ chế khoá theo vùng tài liệu, phức tạp hơn nhiều so với lợi ích mang lại.</p></div>
+            </div>
+          </div>
+
+          <div class="decision">
+            <h3>4. Add-in WPS không mở cổng, Core phục vụ nó</h3>
+            <div class="why">
+              <div><span class="k">Chọn</span><p>Core phục vụ chính file giao diện của add-in, và add-in liên tục hỏi Core xem có việc gì không.</p></div>
+              <div><span class="k">Vì sao</span><p>Add-in chạy trong môi trường nhúng của WPS, không mở được cổng lắng nghe. Đảo chiều thì vẫn giữ nguyên hợp đồng bốn endpoint.</p></div>
+              <div><span class="k">Đánh đổi</span><p>Việc đến tay add-in chậm hơn một nhịp hỏi, và Core phải giữ trạng thái kết nối của add-in.</p></div>
+              <div><span class="k">Nếu đổi ý</span><p>Không có phương án thay thế trong môi trường nhúng hiện tại của WPS.</p></div>
+            </div>
+          </div>
+
+          <div class="decision">
+            <h3>5. Danh mục lệnh là hợp đồng duy nhất giữa các bản bridge</h3>
+            <div class="why">
+              <div><span class="k">Chọn</span><p>Cùng tên lệnh, cùng tên tham số, cùng dạng kết quả ở mọi bản bridge; các bản sinh ra cho MCP lấy từ nguồn này.</p></div>
+              <div><span class="k">Vì sao</span><p>Skill và prompt viết một lần là chạy được trên mọi ứng dụng. Soát lỗi cũng đơn giản vì chỉ có một từ vựng.</p></div>
+              <div><span class="k">Đánh đổi</span><p>Thêm một lệnh phải sửa nhiều nơi và chạy script sinh lại. Đây là loại việc dễ quên nhất trong dự án, nên CI kiểm tra thay con người.</p></div>
+              <div><span class="k">Nếu đổi ý</span><p>Để mỗi bản tự đặt tên riêng thì mọi skill phải viết theo từng ứng dụng.</p></div>
+            </div>
+          </div>
+
+          <div class="decision">
+            <h3>6. Skill là dữ liệu của Core, không thuộc ứng dụng nào</h3>
+            <div class="why">
+              <div><span class="k">Chọn</span><p>Skill nằm trong gói cài của Core và được nạp theo ba tầng tuỳ mức cần thiết.</p></div>
+              <div><span class="k">Vì sao</span><p>Kiến thức soạn thảo không phụ thuộc ứng dụng. Nạp theo tầng giữ prompt nền ngắn nên chi phí và độ trễ thấp.</p></div>
+              <div><span class="k">Đánh đổi</span><p>Chất lượng nội dung skill chỉ được đọc tay (CI chỉ bắt lỗi cấu trúc: frontmatter, token thiết kế, định tuyến), nên phụ thuộc người viết.</p></div>
+              <div><span class="k">Nếu đổi ý</span><p>Nhồi hết vào prompt nền sẽ tốn token mỗi lượt và làm mô hình lẫn giữa các loại văn bản.</p></div>
+            </div>
+          </div>
+
+          <div class="decision">
+            <h3>7. Xác nhận là cơ chế ở Core, không phải lời dặn trong prompt</h3>
+            <div class="why">
+              <div><span class="k">Chọn</span><p>Core tự quyết định khi nào hỏi người dùng, dựa trên luật viết bằng mã, không dựa vào việc mô hình có nhớ lời dặn hay không.</p></div>
+              <div><span class="k">Vì sao</span><p>Một lời dặn trong prompt có thể bị bỏ qua, nhất là khi tài liệu chứa nội dung đánh lừa. Luật bằng mã thì luôn chạy.</p></div>
+              <div><span class="k">Đánh đổi</span><p>Danh sách trường hợp phải hỏi là do người viết mã liệt kê, nên cần cập nhật khi phát hiện tình huống mới.</p></div>
+              <div><span class="k">Nếu đổi ý</span><p>Tin vào prompt sẽ đặt an toàn tài liệu vào tay mô hình, thứ không kiểm chứng được.</p></div>
+            </div>
+          </div>
+
+          <div class="decision">
+            <h3>8. Chỉ cho phép những lệnh có trong danh mục</h3>
+            <div class="why">
+              <div><span class="k">Chọn</span><p>Mô hình chỉ gọi được lệnh nằm trong danh sách dựng từ registry của bridge đang kết nối; tên lệch nhẹ được sửa về tên đúng, tên lạ bị từ chối kèm danh sách lệnh hiện có.</p></div>
+              <div><span class="k">Vì sao</span><p>Giới hạn thiệt hại khi mô hình đoán bừa, và cho nó biết ngay mình sai ở đâu thay vì để nó thử năm lần liền.</p></div>
+              <div><span class="k">Đánh đổi</span><p>Viết một khả năng mới phải đăng ký lệnh trước, không thể "chạy tạm" một đoạn mã tuỳ ý.</p></div>
+              <div><span class="k">Nếu đổi ý</span><p>Cho chạy mã tuỳ ý trong tài liệu người dùng là điều không thể chấp nhận với dữ liệu nội bộ.</p></div>
+            </div>
+          </div>
+
+          <div class="decision">
+            <h3>9. MCP chỉ nói qua stdio</h3>
+            <div class="why">
+              <div><span class="k">Chọn</span><p>Máy chủ MCP là cùng binary Core, chạy theo yêu cầu của client và nói qua luồng vào ra chuẩn.</p></div>
+              <div><span class="k">Vì sao</span><p>Không thêm cổng nào phải bảo vệ, không thêm cấu hình mạng, client tự quản vòng đời tiến trình.</p></div>
+              <div><span class="k">Đánh đổi</span><p>Client từ xa không dùng được, và mỗi client mở một tiến trình riêng.</p></div>
+              <div><span class="k">Nếu đổi ý</span><p>Thêm HTTP hoặc SSE là việc mở rộng độc lập, không phải viết lại kiến trúc.</p></div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- 9 -->
+      <section id="an-ninh">
+        <h2><span class="mark">09</span>An ninh và riêng tư</h2>
+        <p>Mô hình tin cậy có hai câu: chỉ máy này gọi được vào hệ thống, và tài liệu chỉ được rời máy dưới dạng nội dung mà mô hình thật sự cần đọc.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Lớp</th><th>Chặn cái gì</th></tr></thead>
+            <tbody>
+              <tr><td><b>Chỉ loopback</b></td><td>Máy khác trong mạng nội bộ không gọi được vào Core hay bridge; trang web lạ cũng không.</td></tr>
+              <tr><td><b>Token và kiểm tra request</b></td><td>API <code>/v1/*</code> và bridge đòi token; request không đúng dạng bị loại từ đầu. Ngoại lệ: kênh pane WPS <code>/wps/v1/*</code> nhận request mang <code>Origin</code> của chính Core mà không cần token (pane không giữ token) — tiến trình cục bộ giả được <code>Origin</code>, nên ở kênh này mức tin cậy là "mọi tiến trình của cùng người dùng".</td></tr>
+              <tr><td><b>Một Core cho mỗi người dùng</b></td><td>Hai Core chạy song song giành cùng phiên và cùng cổng.</td></tr>
+              <tr><td><b>Danh mục lệnh đóng</b></td><td>Mô hình không gọi được lệnh nằm ngoài danh mục, kể cả lệnh đóng tài liệu hay gọi lồng nhau.</td></tr>
+              <tr><td><b>Luật chống đánh lừa</b></td><td>Nội dung đọc từ tài liệu được coi là dữ liệu, không phải mệnh lệnh. Tài liệu nhận từ người khác có thể chứa câu lừa mô hình.</td></tr>
+              <tr><td><b>Hỏi trước khi ghi</b></td><td>Ghi đè dữ liệu có thật, lưu file ngoài ý muốn, xoá slide, thay thế hàng loạt trong tài liệu dài. Chỉ áp cho agent của Core — tool live của MCP không qua lớp này.</td></tr>
+              <tr><td><b>Khoá vùng bôi đen</b></td><td>Người dùng bôi đen rồi hỏi thì AI chỉ sửa trong đoạn đó; bridge hoàn tác ngay lệnh sửa ra ngoài vùng. Lệnh nhanh <i>Sửa bằng AI</i> và khung chat mini bắt buộc có đoạn bôi đen. Có trên Word và WPS Linux, chưa có trên LibreOffice.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>Riêng tư: cái gì thật sự ra khỏi máy</h3>
+        <p>File tài liệu không bao giờ được gửi đi nguyên khối. Thứ rời máy là phần nội dung mà mô hình cần để trả lời câu hỏi hiện tại, cộng chỉ dẫn và skill, gửi tới API mà chính người dùng cấu hình. Máy chủ của nhà cung cấp mô hình là bên thứ ba chính, và đó là lựa chọn của người dùng chứ không phải mặc định của sản phẩm. Nếu người dùng bật tìm web, câu truy vấn web cũng rời khỏi máy tới dịch vụ đó.</p>
+        <div class="callout ok">
+          <div class="tag">Hệ quả thiết kế</div>
+          <p>Vì ranh giới tin cậy là cổng loopback cộng token, mọi tính năng mới đều phải trả lời được câu hỏi: nó nói qua kênh nào. Không có đường tắt nào khác đi vào hệ thống.</p>
+        </div>
+      </section>
+
+      <!-- 10 -->
+      <section id="xac-nhan">
+        <h2><span class="mark">10</span>Xác nhận và hoàn tác</h2>
+        <p>Đây là phần người dùng cảm nhận rõ nhất, và cũng là phần quyết định sản phẩm có đáng tin hay không.</p>
+        <h3>Nguyên tắc</h3>
+        <ul>
+          <li><strong>Mặc định là chạy.</strong> Chỉ những trường hợp có khả năng mất dữ liệu thật mới bị hỏi. Hỏi quá nhiều thì người dùng bấm đồng ý theo phản xạ, và việc hỏi mất hết ý nghĩa.</li>
+          <li><strong>Câu hỏi phải nói rõ sẽ làm gì.</strong> Kèm bản xem trước tham số, để người dùng quyết định dựa trên việc sắp xảy ra chứ không phải niềm tin.</li>
+          <li><strong>Từ chối là quyết định của người dùng, không phải lỗi.</strong> Lệnh đó không chạy; AI biết mình bị từ chối và có thể đề nghị cách khác.</li>
+        </ul>
+        <h3>Những trường hợp phải hỏi</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Trường hợp</th><th>Rủi ro nếu không hỏi</th></tr></thead>
+            <tbody>
+              <tr><td>Lệnh lưu hoặc xuất file trong khi yêu cầu không nhắc tới việc lưu</td><td>Ghi đè file người dùng đang cố ý giữ nguyên</td></tr>
+              <tr><td>Xuất hoặc lưu vào đường dẫn đã tồn tại</td><td>Mất file cũ</td></tr>
+              <tr><td>Xoá slide khỏi bài thuyết trình</td><td>Mất nội dung không có bản sao</td></tr>
+              <tr><td>Thay thế toàn bộ trong tài liệu dài</td><td>Một lệnh sai làm hỏng cả tài liệu</td></tr>
+              <tr><td>Ghi vào ô đã có dữ liệu, với giá trị khác giá trị cũ</td><td>Mất số liệu đã nhập, thường là số liệu thật của người dùng</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>Hoàn tác</h3>
+        <p>Các lệnh có sửa tài liệu được gom thành nhóm để một lần hoàn tác trả về trạng thái trước đó, chứ không bắt người dùng bấm hoàn tác mười lần. Một quy tắc liên quan: AI không được dùng hoàn tác để làm lại từ đầu, vì như vậy sẽ xoá luôn công việc trước đó của chính người dùng. Ngoại lệ duy nhất là khi nó vừa gây ra một thay đổi không thể sửa tại chỗ trong cùng lượt.</p>
+        <div class="callout warn">
+          <div class="tag">Giới hạn hiện tại</div>
+          <p>Nhóm ET và WPP của WPS chưa gom được thao tác vào một bước hoàn tác như bên LibreOffice. Đây là khoảng trống đã biết, không phải hành vi mong muốn.</p>
+        </div>
+      </section>
+
+      <!-- 11 -->
+      <section id="loi">
+        <h2><span class="mark">11</span>Lỗi, trần và hiệu năng</h2>
+        <h3>Đối xử với lỗi</h3>
+        <p>Lỗi được viết cho mô hình đọc, không phải cho người lập trình đọc log. Hai lần trong lịch sử dự án, một thông báo lỗi mơ hồ khiến mô hình gửi lại y hệt tham số sai năm lần liền. Từ đó có hai quy tắc:</p>
+        <ul>
+          <li>Lỗi sai tham số phải nói đúng chỗ sai, không được bỏ qua rồi để tầng dưới báo lỗi chung chung.</li>
+          <li>Lỗi sai tên lệnh phải liệt kê ngay những lệnh đang có, để mô hình thôi đoán.</li>
+        </ul>
+        <h3>Trần của một lượt chạy</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Trần</th><th>Giá trị</th><th>Lý do</th></tr></thead>
+            <tbody>
+              <tr><td>Số vòng</td><td class="num">100</td><td>Đủ rộng cho một việc lớn, vẫn chặn được vòng lặp vô tận</td></tr>
+              <tr><td>Token</td><td class="num">không đặt trần mặc định</td><td>Chi phí chặn bằng guard lặp (lệnh y hệt, lệnh cùng việc, lỗi lặp), câu hỏi chạy tiếp ở vòng 30 / 500.000 token, và nút Dừng; bên gọi vẫn đặt được <code>options.maxTokens</code></td></tr>
+              <tr><td>Lỗi giống nhau liên tiếp</td><td class="num">3</td><td>Mô hình đang bí; dừng để báo người dùng thay vì đốt token</td></tr>
+              <tr><td>Thời gian</td><td>không giới hạn</td><td>Việc dựng báo cáo lớn có thể chạy lâu; cắt theo thời gian sẽ hỏng việc đang làm dở</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>Hiệu năng</h3>
+        <ul>
+          <li><strong>Tận dụng bộ nhớ đệm của nhà cung cấp mô hình.</strong> Prompt được ghép theo thứ tự cố định, phần đầu giống nhau giữa các lượt nên được dùng lại, giảm cả chi phí lẫn độ trễ.</li>
+          <li><strong>Cắt bớt kết quả đọc lớn.</strong> Đọc một bảng vài nghìn dòng mà nhét hết vào hội thoại sẽ đẩy chi phí lên mỗi vòng sau. Kết quả bị cắt có tín hiệu rõ để mô hình biết mà đọc tiếp phần còn lại.</li>
+          <li><strong>Ghi theo đợt.</strong> Bảng lớn được ghi thành nhiều lần gọi, vì một lần gọi quá lớn không nằm gọn trong một phản hồi của mô hình.</li>
+          <li><strong>Trả lời theo dòng chảy.</strong> Người dùng thấy tiến độ nên thời gian chờ cảm nhận ngắn hơn nhiều so với con số thật.</li>
+        </ul>
+      </section>
+
+      <!-- 12 -->
+      <section id="kiem-thu">
+        <h2><span class="mark">12</span>Chiến lược kiểm thử</h2>
+        <p>Bốn tầng, xếp theo mức phụ thuộc vào môi trường thật. Tầng càng thấp càng chạy nhanh và càng ít lý do để đỏ oan.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Tầng</th><th>Cần gì</th><th>Trả lời câu hỏi gì</th></tr></thead>
+            <tbody>
+              <tr><td><b>1. Logic extension</b></td><td>Chỉ Python, ứng dụng văn phòng được giả lập</td><td>Handler và các hàm kiểm tra tài liệu có đúng không</td></tr>
+              <tr><td><b>2. Add-in WPS</b></td><td>Node và Python, add-in được giả lập</td><td>Danh mục lệnh, vòng hỏi việc, giao diện pane có đúng không</td></tr>
+              <tr><td><b>3. Core đầu-cuối</b></td><td>Mô hình và bridge đều được giả lập</td><td>Cả vòng lặp agent, chính sách xác nhận, cách cắt kết quả có đúng không</td></tr>
+              <tr><td><b>4. Chạy thật</b></td><td>LibreOffice hoặc WPS thật, trên màn hình ảo</td><td>Những thứ chỉ API thật mới lộ ra</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Ba tầng đầu chạy trên mọi lần đẩy mã, cùng cổng lint (Go, Python, JS ES5) và e2e kênh WPS với Core thật. Tầng bốn chạy trên máy dev; trong CI chỉ là bước được phép đỏ (LibreOffice thật hiện chưa cài được trên runner, WPS thật không có trong CI) — coi nó là tín hiệu cần xem, không phải cổng chặn.</p>
+        <div class="callout">
+          <div class="tag">Thứ CI không kiểm tra được</div>
+          <p>Không có bộ đánh giá cho skill: chất lượng nội dung hướng dẫn vẫn phải đọc bằng mắt. CI chỉ bắt được lỗi cấu trúc, ví dụ tài liệu hướng dẫn trỏ vào một token không tồn tại, hay mô tả skill bị cắt ở tầng nạp đầu tiên.</p>
+        </div>
+      </section>
+
+      <!-- 13 -->
+      <section id="rui-ro">
+        <h2><span class="mark">13</span>Rủi ro và giới hạn</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Điểm</th><th>Ảnh hưởng</th><th>Hướng xử lý</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><b>Ba bản bridge lệch nhau</b></td>
+                <td>Mỗi bản làm được một tập con khác nhau của danh mục chung: WPS Linux còn 22/80 lệnh chưa có handler; lệnh thiết kế và slide theo mẫu chỉ có trên Windows; LibreOffice chưa có khoá vùng bôi đen và lệnh nhanh. Cùng một yêu cầu có thể cho kết quả khác nhau theo nền tảng</td>
+                <td>Ghi độ lệch thành test (<code>CHUA_CO_HANDLER</code>, spec đối chiếu registry) và tài liệu, thay vì đồng bộ chữ nghĩa để rồi tạo ra lời hứa sai</td>
+              </tr>
+              <tr>
+                <td><b>Chất lượng skill không đo được</b></td>
+                <td>Sửa skill có thể làm giảm chất lượng mà không ai biết</td>
+                <td>Cần một bộ đánh giá chạy trên vài tình huống mẫu; hiện chưa có</td>
+              </tr>
+              <tr>
+                <td><b>Phụ thuộc API mô hình bên ngoài</b></td>
+                <td>Mất mạng hoặc hết hạn mức thì tính năng AI ngừng, dù ứng dụng văn phòng vẫn chạy bình thường</td>
+                <td>Lỗi phải hiện rõ cho người dùng; phần soạn thảo không phụ thuộc AI</td>
+              </tr>
+              <tr>
+                <td><b>Môi trường nhúng của WPS khá cũ</b></td>
+                <td>Mã add-in phải viết theo chuẩn JavaScript cũ, không dùng được cú pháp hiện đại</td>
+                <td>Ràng buộc đã biết, ghi trong tài liệu Low Level Design để người viết mã không mắc</td>
+              </tr>
+              <tr>
+                <td><b>Khác biệt giữa các phiên bản bộ văn phòng</b></td>
+                <td>Cùng một lệnh có thể hành xử khác nhau giữa các bản LibreOffice và WPS</td>
+                <td>Tầng kiểm thử chạy thật trong CI là lưới bắt chính</td>
+              </tr>
+              <tr>
+                <td><b>MCP mới chỉ có stdio</b></td>
+                <td>Không dùng được từ xa, mỗi client một tiến trình</td>
+                <td>Chấp nhận trong giai đoạn này; mở rộng sau nếu có nhu cầu</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 14 -->
+      <section id="mo-rong">
+        <h2><span class="mark">14</span>Điểm mở rộng</h2>
+        <p>Kiến trúc này được thiết kế để ba loại việc dưới đây không phải sửa lại cấu trúc.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Muốn thêm</th><th>Phải làm gì</th><th>Không phải làm gì</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><b>Một ứng dụng văn phòng mới</b></td>
+                <td>Viết một bridge biết bốn endpoint và đăng ký danh mục lệnh theo đúng từ vựng hiện có; thêm bản bridge vào các nơi kiểm tra tính tương đương. Một lệnh mới thì thêm vào registry Python (catalog của WPS sinh tự động), rồi viết handler WPS hoặc ghi tên vào <code>CHUA_CO_HANDLER</code> kèm lý do</td>
+                <td>Không đụng tới prompt, skill, chính sách xác nhận hay vòng lặp agent</td>
+              </tr>
+              <tr>
+                <td><b>Một loại văn bản mới</b></td>
+                <td>Viết một skill: mục lục tầng một ngắn, nội dung chi tiết trong file riêng, dùng token thiết kế có sẵn</td>
+                <td>Không sửa mã Core, không biên dịch lại gì</td>
+              </tr>
+              <tr>
+                <td><b>Một nhóm lệnh mới cho tài liệu</b></td>
+                <td>Đăng ký lệnh ở bản Python trước, chạy script sinh lại danh mục, rồi thêm vào các bản bridge còn lại</td>
+                <td>Không phải định nghĩa lại cách kiểm tra an toàn; mọi lệnh đi qua cùng một cửa</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Điểm chung của cả ba: phần mở rộng luôn nằm ở rìa hệ thống. Nếu một tính năng mới buộc phải sửa vòng lặp agent hoặc chính sách xác nhận, đó là dấu hiệu cần xem lại thiết kế của tính năng đó trước.</p>
+      </section>
+
+      <!-- 15 -->
+      <section id="tu-dien">
+        <h2><span class="mark">15</span>Từ điển</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Từ</th><th>Nghĩa trong dự án này</th></tr></thead>
+            <tbody>
+              <tr><td><b>Core</b></td><td>Tiến trình nền giữ toàn bộ phần AI: prompt, mô hình, chính sách, lịch sử hội thoại, máy chủ MCP.</td></tr>
+              <tr><td><b>Bridge</b></td><td>Mã nằm trong ứng dụng văn phòng, nhận lệnh từ Core và thực thi trên tài liệu đang mở.</td></tr>
+              <tr><td><b>Pane</b></td><td>Thanh trò chuyện trong ứng dụng, nơi người dùng gõ yêu cầu.</td></tr>
+              <tr><td><b>Phiên</b></td><td>Một ứng dụng văn phòng đang mở, được công bố cho Core qua file trong thư mục phiên.</td></tr>
+              <tr><td><b>Lượt chạy</b></td><td>Một lần AI làm việc từ lúc nhận yêu cầu đến lúc trả lời xong. Mỗi cổng có tối đa một lượt.</td></tr>
+              <tr><td><b>Lệnh</b></td><td>Một hành động cụ thể trên tài liệu, có tên và tham số. Là đơn vị nhỏ nhất AI được phép yêu cầu.</td></tr>
+              <tr><td><b>Tool</b></td><td>Việc mô hình được phép gọi ở phía Core. Lệnh là việc bridge làm; tool là cửa để mô hình yêu cầu lệnh.</td></tr>
+              <tr><td><b>Skill</b></td><td>Gói hướng dẫn soạn thảo cho một loại công việc, nạp theo ba tầng.</td></tr>
+              <tr><td><b>MCP</b></td><td>Chuẩn để công cụ AI bên ngoài dùng được hệ lệnh này. Core vừa làm máy chủ vừa làm client.</td></tr>
+              <tr><td><b>Extension</b></td><td>Gói cài vào LibreOffice, định dạng <code>.oxt</code>.</td></tr>
+              <tr><td><b>Add-in</b></td><td>Gói cài vào WPS, viết bằng JavaScript và chạy trong môi trường nhúng của WPS.</td></tr>
+              <tr><td><b>Xvfb</b></td><td>Màn hình ảo, dùng để chạy ứng dụng văn phòng thật trong CI không có màn hình.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout">
+          <div class="tag">Đọc tiếp</div>
+          <p>Tài liệu Low Level Design mô tả phần cài đặt: hợp đồng giữa Core và bridge theo từng endpoint, các bước trong mã khi một lệnh được gọi, cách nạp skill, các nơi phải sửa khi thêm lệnh, cách chạy từng tầng kiểm thử và cách tái hiện lỗi trên máy. Nếu bạn chuẩn bị sửa mã, đọc tài liệu đó trước.</p>
+        </div>
+      </section>
+
+      <footer>
+        <p>Tài liệu này viết cho thiết kế trên nhánh <code>main</code> tại commit <code>8422c34</code> (12/10/2026) và được rà lại với mã ngày 20/10/2026.</p>
+        <p>Khi mã đổi, sửa tài liệu cùng lúc với <code>CHANGELOG.md</code>. Một tài liệu thiết kế lệch khỏi mã còn tệ hơn không có tài liệu.</p>
+      </footer>
+    </main>
+  </div>
+</div>
+
+<script>
+(function () {
+  // Ở khổ rộng, mục lục luôn mở; người dùng có thể đã thu nó lại lúc xem trên điện thoại.
+  var box = document.querySelector('.toc-box');
+  if (box && window.matchMedia) {
+    var wide = window.matchMedia('(min-width: 1060px)');
+    var sync = function () { if (wide.matches) box.open = true; };
+    sync();
+    if (wide.addEventListener) wide.addEventListener('change', sync);
+  }
+
+  var links = Array.prototype.slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  if (!links.length || !('IntersectionObserver' in window)) return;
+  var byId = {};
+  var targets = [];
+  links.forEach(function (link) {
+    var id = link.getAttribute('href').slice(1);
+    var el = document.getElementById(id);
+    if (!el) return;
+    byId[id] = link;
+    targets.push(el);
+  });
+  function setActive(id) {
+    links.forEach(function (l) { l.classList.remove('on'); });
+    if (byId[id]) byId[id].classList.add('on');
+  }
+  var visible = {};
+  var observer = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      visible[entry.target.id] = entry.isIntersecting ? entry.boundingClientRect.top : null;
+    });
+    var current = null;
+    for (var i = 0; i < targets.length; i++) {
+      var id = targets[i].id;
+      if (visible[id] !== null && visible[id] !== undefined) { current = id; break; }
+    }
+    if (current) setActive(current);
+  }, { rootMargin: '-10% 0px -70% 0px', threshold: 0 });
+  targets.forEach(function (t) { observer.observe(t); });
+})();
+</script>
+</body>
+</html>

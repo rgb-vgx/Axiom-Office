@@ -168,7 +168,7 @@ func ViewSection(document *DocumentContext) string {
 
 // skillDescriptionLimit: so ky tu cua description lot vao chi muc tang 1 (SkillsSection). Dai hon thi
 // bi cat duoi, va vi day la thu DUY NHAT model thay khi chon skill, tu khoa dinh tuyen phai nam trong
-// han muc nay (docs/skills-review.md muc 4.9).
+// han muc nay (docs/research/skills-review.md muc 4.9).
 const skillDescriptionLimit = 300
 
 // SkillsSection: tang 1 cua chuan Agent Skills - chi muc ten + mo ta.

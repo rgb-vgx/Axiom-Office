@@ -81,7 +81,7 @@ func run() int {
 	}
 	corelog.Init(paths.LogFile)
 
-	// Mot Core cho moi nguoi dung: instance thu hai thoat ngay (New_arch.md muc 4.3).
+	// Mot Core cho moi nguoi dung: instance thu hai thoat ngay (docs/architecture/core.md muc 4.3).
 	if cfg.SingleInstance {
 		lock, acquired, err := instance.Acquire(cfg.MutexName)
 		if err != nil {
@@ -164,7 +164,7 @@ func run() int {
 
 	server := &http.Server{ReadHeaderTimeout: 10 * time.Second}
 	var stopOnce sync.Once
-	// Bridge WPS (docs/wps-bridge.md muc 2): kenh add-in tren Core API + listener rieng + file session.
+	// Bridge WPS (docs/architecture/wps-bridge.md muc 2): kenh add-in tren Core API + listener rieng + file session.
 	exeDir := filepath.Dir(exe)
 	wps := wpsbridge.New(wpsbridge.ResolveOptions(os.Getenv, exeDir, sessionDir(cfg), cfg.Token, version, port))
 	stop := func() {

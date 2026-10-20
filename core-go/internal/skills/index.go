@@ -1,4 +1,4 @@
-// Package skills: chi muc skill theo chuan Agent Skills (New_arch.md muc 8.4.4) - ban Go cua
+// Package skills: chi muc skill theo chuan Agent Skills (docs/architecture/core.md muc 8.4.4) - ban Go cua
 // Skills/SkillIndex.cs, SkillLoader.cs, Tools/SkillTools.cs (phan file).
 package skills
 

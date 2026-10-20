@@ -71,7 +71,7 @@ Cai dat:
   add-in khac, cai lai khong trung).
 - Ghi 3 khoa `Office.conf` tren vao muc `[6.0]` (giu cac dong khac).
 
-Kiem tra (ban spike, da thay boi bridge that - xem `docs/wps-bridge.md`): `tests/wps/spike_check.py`
+Kiem tra (ban spike, da thay boi bridge that - xem `docs/architecture/wps-bridge.md`): `tests/wps/spike_check.py`
 (da bo) mo `blank.docx` trong WPS duoi Xvfb va doi bao cao probe.
 
 ## He qua cho kien truc Axiom Office

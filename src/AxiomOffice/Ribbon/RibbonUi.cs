@@ -9,7 +9,7 @@ using AxiomOffice.Bridge;
 
 namespace AxiomOffice.Ribbon
 {
-    // docs/ribbon-ui.md: ribbon khởi động việc, pane điều phối. Chỉ đặt nút có đường thật đứng sau.
+    // docs/architecture/ribbon-ui.md: ribbon khởi động việc, pane điều phối. Chỉ đặt nút có đường thật đứng sau.
     internal static class RibbonUi
     {
         private const string VisualQaId = "tglVisualQa";
@@ -538,7 +538,7 @@ namespace AxiomOffice.Ribbon
                     connect.ShowAskAiPane();
                     break;
                 case "setup":
-                    // Wizard thiet lap cho nguoi dung khong chuyen (New_arch.md muc 9) - cung noi dung voi
+                    // Wizard thiet lap cho nguoi dung khong chuyen (docs/architecture/core.md muc 9) - cung noi dung voi
                     // ban Linux (menu "Thiet lap..." + "Cai dat nang cao..."). Cau hinh nang cao cung nam
                     // trong buoc 4 cua wizard.
                     using (var form = new Ai.SetupWizardForm(connect))
@@ -600,7 +600,7 @@ namespace AxiomOffice.Ribbon
             thread.Start();
         }
 
-        // Nút Trạng thái: kiểm THẬT từng tầng (docs/ribbon-ui.md §6) - gọi /health của bridge trong add-in qua HTTP,
+        // Nút Trạng thái: kiểm THẬT từng tầng (docs/architecture/ribbon-ui.md §6) - gọi /health của bridge trong add-in qua HTTP,
         // hỏi /health của Core đang chạy (không khởi động Core chỉ để xem), đếm các phiên Office đã đăng ký.
         // Chạy ở luồng nền: mỗi lần hỏi có hạn chờ, luồng UI không được đứng.
         private static void ShowStatus(Connect connect)

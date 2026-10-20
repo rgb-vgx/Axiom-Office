@@ -2,7 +2,7 @@ package store
 
 import "database/sql"
 
-// RunRow: mot luot chay da luu (New_arch.md muc 8.5.2).
+// RunRow: mot luot chay da luu (docs/architecture/core.md muc 8.5.2).
 type RunRow struct {
 	ID             string
 	ConversationID *string

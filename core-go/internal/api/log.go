@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// GET /v1/log: phan cuoi nhat ky Core, cho nut "Mo nhat ky" tren ribbon WPS (docs/ribbon-ui.md muc 2).
+// GET /v1/log: phan cuoi nhat ky Core, cho nut "Mo nhat ky" tren ribbon WPS (docs/architecture/ribbon-ui.md muc 2).
 //
 // Ban Windows lam viec nay bang Process.Start(Logger.LogFilePath) - giao cho trinh soan thao cua he
 // dieu hanh. Trong CEF khong mo duoc chuong trinh ngoai, nen pane phai DOC noi dung roi tu hien thi.
@@ -16,7 +16,7 @@ import (
 // Duong nay la routeBoth: /v1/log (co token, cho script/MCP) va /wps/v1/log (kenh pane, xac thuc kenh
 // add-in). No tra ve dung tep ma ban Windows mo - khong loc, khong che - nen no khong mo them gi moi:
 // tep nam trong thu muc du lieu cua chinh nguoi dung, va nguoi nguoi dung da doc duoc no bang trinh
-// soan thao. Xem docs/ribbon-ui.md muc 5.2.
+// soan thao. Xem docs/architecture/ribbon-ui.md muc 5.2.
 //
 // CHI DOC PHAN CUOI, co tran: corelog xoay file o 10MB, doc ca file vao mot response vua lang phi vua
 // co the treo pane (CEF phai render tung dong).

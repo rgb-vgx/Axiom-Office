@@ -1,4 +1,4 @@
-"""Client Agent Core (LibreOffice_arch.md muc 9, 10): ban Python cua CoreClient.cs.
+"""Client Agent Core (docs/architecture/libreoffice.md muc 9, 10): ban Python cua CoreClient.cs.
 
 Pane trong LibreOffice noi chuyen voi Agent Core qua HTTP/SSE: POST /v1/runs, GET /v1/runs/{id}/events,
 POST /v1/runs/{id}/cancel|confirm, GET /v1/memory|/v1/skills|/v1/audit. Core doc session registry cua bridge

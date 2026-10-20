@@ -1,0 +1,1118 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kiến trúc Axiom Office</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,500;6..72,600;6..72,700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* ---------------------------------------------------------------
+   Axiom Office — tài liệu kiến trúc
+   Bố cục: một cột nội dung, thanh mục lục dính bên trái từ 1060px.
+   Màu nhấn lấy từ chính token giao diện của sản phẩm
+   (axiom/theme.py, ACCENT = 0x0F6CBD — xanh Fluent, từ 19/10/2026) để trang tài liệu và pane
+   trong ứng dụng nhìn cùng một hệ.
+   --------------------------------------------------------------- */
+:root{
+  --bg:#FAFAFE;
+  --surface:#FFFFFF;
+  --surface-2:#F2F2FA;
+  --fg:#191927;
+  --fg-muted:#5C5C78;
+  --line:#E3E2F0;
+  --line-strong:#CFCEDF;
+  --accent:#0F6CBD;
+  --accent-ink:#0C3B5E;
+  --accent-soft:#EFF6FC;
+  --ok:#0F766E;
+  --ok-soft:#E6F5F2;
+  --warn:#9A5B06;
+  --warn-soft:#FDF3E3;
+  --danger:#B42318;
+  --danger-soft:#FDEFEE;
+  --code-bg:#F4F4FB;
+  --code-fg:#26264A;
+  --shadow:0 1px 2px rgba(25,25,39,.05), 0 10px 30px -22px rgba(25,25,39,.35);
+
+  --font-display:"Newsreader",Georgia,"Times New Roman",serif;
+  --font-body:"Be Vietnam Pro",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+
+  --fs-xs:.75rem;
+  --fs-sm:.84rem;
+  --fs-base:1rem;
+  --fs-lg:1.08rem;
+  --fs-h3:1.16rem;
+  --fs-h2:1.6rem;
+  --fs-h1:clamp(2rem,1.4rem + 2.4vw,2.9rem);
+  --radius:10px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#101018;
+    --surface:#17171F;
+    --surface-2:#1E1E29;
+    --fg:#E9E9F3;
+    --fg-muted:#A2A2BC;
+    --line:#2B2B3A;
+    --line-strong:#41415A;
+    --accent:#479EF5;
+    --accent-ink:#B4D6FA;
+    --accent-soft:#082338;
+    --ok:#5EEAD4;
+    --ok-soft:#12302C;
+    --warn:#F0C685;
+    --warn-soft:#33260F;
+    --danger:#FDA4A0;
+    --danger-soft:#3A1A18;
+    --code-bg:#1B1B26;
+    --code-fg:#DEDEF2;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 12px 34px -24px rgba(0,0,0,.9);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#101018;
+  --surface:#17171F;
+  --surface-2:#1E1E29;
+  --fg:#E9E9F3;
+  --fg-muted:#A2A2BC;
+  --line:#2B2B3A;
+  --line-strong:#41415A;
+  --accent:#479EF5;
+  --accent-ink:#B4D6FA;
+  --accent-soft:#082338;
+  --ok:#5EEAD4;
+  --ok-soft:#12302C;
+  --warn:#F0C685;
+  --warn-soft:#33260F;
+  --danger:#FDA4A0;
+  --danger-soft:#3A1A18;
+  --code-bg:#1B1B26;
+  --code-fg:#DEDEF2;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 12px 34px -24px rgba(0,0,0,.9);
+  color-scheme:dark;
+}
+
+body{
+  background:var(--bg);
+  color:var(--fg);
+  font-family:var(--font-body);
+  font-size:var(--fs-base);
+  line-height:1.68;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{
+  max-width:1180px;
+  margin-inline:auto;
+  padding-inline:clamp(16px,4vw,40px);
+  padding-block:clamp(28px,5vw,56px) clamp(48px,7vw,96px);
+}
+.shell{display:grid;gap:clamp(26px,4vw,52px);grid-template-columns:1fr;align-items:start}
+@media (min-width:1060px){
+  .shell{grid-template-columns:238px minmax(0,1fr)}
+}
+
+/* --- đầu trang --- */
+.masthead{display:grid;gap:14px;padding-bottom:clamp(20px,3vw,30px);border-bottom:1px solid var(--line)}
+.eyebrow{
+  font-family:var(--font-mono);
+  font-size:var(--fs-xs);
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  color:var(--accent);
+}
+h1{
+  font-family:var(--font-display);
+  font-weight:600;
+  font-size:var(--fs-h1);
+  line-height:1.1;
+  letter-spacing:-.015em;
+  text-wrap:balance;
+  margin:0;
+}
+.lede{font-size:var(--fs-lg);color:var(--fg);max-width:62ch;margin:0}
+.meta{font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--fg-muted);letter-spacing:.02em}
+
+/* --- dải số liệu --- */
+.figures{
+  display:grid;
+  gap:1px;
+  grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+  background:var(--line);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  overflow:hidden;
+  margin-top:clamp(20px,3vw,28px);
+}
+.fig{background:var(--surface);padding:14px 16px;display:grid;gap:2px}
+.fig b{
+  font-family:var(--font-display);
+  font-weight:600;
+  font-size:1.5rem;
+  font-variant-numeric:tabular-nums;
+  line-height:1.1;
+}
+.fig span{font-size:var(--fs-sm);color:var(--fg-muted)}
+
+/* --- mục lục --- */
+.toc{font-size:var(--fs-sm)}
+@media (min-width:1060px){
+  .toc{position:sticky;top:calc(env(safe-area-inset-top,0px) + 22px);max-height:calc(100vh - 48px);max-height:calc(100dvh - 48px);overflow-y:auto}
+}
+.toc-box{border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);padding:12px 14px}
+.toc-box>summary{
+  cursor:pointer;
+  font-family:var(--font-mono);
+  font-size:var(--fs-xs);
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  color:var(--fg-muted);
+}
+@media (min-width:1060px){
+  .toc-box{border:0;background:transparent;padding:0}
+  .toc-box>summary{display:none}
+}
+.toc ul{list-style:none;margin:0;padding:0;display:grid;gap:1px}
+.toc .toc-group{
+  font-family:var(--font-mono);
+  font-size:var(--fs-xs);
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  color:var(--fg-muted);
+  margin:14px 0 5px;
+}
+.toc .toc-group:first-child{margin-top:0}
+.toc a{
+  display:block;
+  padding:3px 8px 3px 9px;
+  color:var(--fg-muted);
+  text-decoration:none;
+  border-left:2px solid transparent;
+  border-radius:0 6px 6px 0;
+}
+.toc a:hover{color:var(--fg);background:var(--surface-2)}
+.toc a.on{color:var(--accent-ink);border-left-color:var(--accent);background:var(--accent-soft)}
+
+/* --- nội dung --- */
+main{display:grid;gap:clamp(34px,4.5vw,54px);min-width:0}
+section{display:grid;gap:14px;min-width:0;scroll-margin-top:calc(env(safe-area-inset-top,0px) + 18px)}
+h2{
+  font-family:var(--font-display);
+  font-weight:600;
+  font-size:var(--fs-h2);
+  line-height:1.22;
+  letter-spacing:-.01em;
+  text-wrap:balance;
+  margin:0;
+}
+h2 .mark{color:var(--line-strong);font-family:var(--font-mono);font-size:.62em;font-weight:400;margin-right:.5em;letter-spacing:0}
+h3{font-size:var(--fs-h3);font-weight:600;margin:6px 0 0;line-height:1.35}
+p{margin:0;max-width:68ch}
+ul,ol{margin:0;padding-left:1.15em;display:grid;gap:7px;max-width:68ch}
+li>ul,li>ol{margin-top:7px}
+a{color:var(--accent-ink);text-underline-offset:3px}
+a:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+strong{font-weight:600}
+code{
+  font-family:var(--font-mono);
+  font-size:.86em;
+  background:var(--code-bg);
+  color:var(--code-fg);
+  padding:.08em .3em;
+  border-radius:4px;
+  overflow-wrap:anywhere;
+}
+h2 code,h3 code{background:transparent;padding:0;color:var(--accent-ink);font-size:.8em;font-weight:500}
+.path{font-size:.82em;color:var(--fg-muted);background:transparent;padding:0;border-bottom:1px dotted var(--line-strong);border-radius:0}
+
+/* --- bảng --- */
+.table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:var(--fs-sm);min-width:520px}
+caption{caption-side:bottom;text-align:left;padding:9px 14px;font-size:var(--fs-xs);color:var(--fg-muted);border-top:1px solid var(--line)}
+th,td{text-align:left;vertical-align:top;padding:9px 14px;border-bottom:1px solid var(--line)}
+thead th{
+  font-family:var(--font-mono);
+  font-size:var(--fs-xs);
+  letter-spacing:.07em;
+  text-transform:uppercase;
+  color:var(--fg-muted);
+  font-weight:500;
+  background:var(--surface-2);
+  white-space:nowrap;
+}
+tbody tr:last-child td{border-bottom:0}
+td code{background:transparent;padding:0;font-size:.86em}
+.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* --- callout --- */
+.callout{
+  border-left:3px solid var(--accent);
+  background:var(--accent-soft);
+  border-radius:0 var(--radius) var(--radius) 0;
+  padding:13px 16px;
+  display:grid;gap:6px;
+  max-width:70ch;
+}
+.callout .tag{
+  font-family:var(--font-mono);
+  font-size:var(--fs-xs);
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  color:var(--accent-ink);
+}
+.callout p{font-size:var(--fs-sm)}
+.callout.warn{border-left-color:var(--warn);background:var(--warn-soft)}
+.callout.warn .tag{color:var(--warn)}
+.callout.danger{border-left-color:var(--danger);background:var(--danger-soft)}
+.callout.danger .tag{color:var(--danger)}
+.callout.ok{border-left-color:var(--ok);background:var(--ok-soft)}
+.callout.ok .tag{color:var(--ok)}
+
+/* --- sơ đồ --- */
+.diagram{
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  background:var(--surface);
+  padding:clamp(14px,2.4vw,22px);
+  display:grid;gap:10px;
+  box-shadow:var(--shadow);
+}
+.scroll-x{overflow-x:auto}
+.d-label{
+  font-family:var(--font-mono);
+  font-size:var(--fs-xs);
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  color:var(--fg-muted);
+}
+.d-row{display:grid;gap:8px;min-width:0}
+.d-cards{display:flex;flex-wrap:wrap;gap:8px}
+.node{
+  border:1px solid var(--line-strong);
+  border-radius:8px;
+  background:var(--surface-2);
+  padding:8px 11px;
+  font-size:var(--fs-sm);
+  line-height:1.4;
+  display:grid;gap:2px;
+  min-width:0;
+}
+.node b{font-weight:600;font-size:var(--fs-sm)}
+.node span{color:var(--fg-muted);font-size:var(--fs-xs);font-family:var(--font-mono)}
+.node.hi{background:var(--accent-soft);border-color:var(--accent)}
+.node.hi b{color:var(--accent-ink)}
+.d-arrow{
+  text-align:center;
+  color:var(--line-strong);
+  font-family:var(--font-mono);
+  font-size:var(--fs-sm);
+  line-height:1;
+  padding:2px 0;
+}
+.pipe{display:flex;flex-wrap:wrap;align-items:stretch;gap:6px}
+.chip{
+  border:1px solid var(--line-strong);
+  border-radius:999px;
+  background:var(--surface-2);
+  padding:5px 12px;
+  font-size:var(--fs-sm);
+  display:flex;align-items:center;gap:7px;
+}
+.chip i{
+  font-style:normal;
+  font-family:var(--font-mono);
+  font-size:var(--fs-xs);
+  color:var(--accent);
+}
+.split{display:grid;gap:12px;grid-template-columns:1fr}
+@media (min-width:760px){.split{grid-template-columns:1fr 1fr}}
+.col{border:1px solid var(--line);border-radius:8px;padding:11px 13px;display:grid;gap:8px;min-width:0}
+.col h4{
+  margin:0;
+  font-family:var(--font-mono);
+  font-size:var(--fs-xs);
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--accent-ink);
+}
+.col ol{font-size:var(--fs-sm);gap:6px;padding-left:1.2em}
+
+/* --- quy trình --- */
+.steps{counter-reset:step;list-style:none;padding:0;display:grid;gap:12px;max-width:70ch}
+.steps>li{counter-increment:step;display:grid;grid-template-columns:26px minmax(0,1fr);gap:12px;align-items:start}
+.steps>li::before{
+  content:counter(step);
+  font-family:var(--font-mono);
+  font-size:var(--fs-xs);
+  color:var(--accent-ink);
+  background:var(--accent-soft);
+  border:1px solid var(--accent);
+  border-radius:999px;
+  width:26px;height:26px;
+  display:grid;place-items:center;
+}
+.steps>li>div{display:grid;gap:4px;min-width:0}
+.steps b{font-weight:600}
+
+footer{
+  margin-top:clamp(40px,6vw,72px);
+  padding-top:20px;
+  border-top:1px solid var(--line);
+  font-size:var(--fs-sm);
+  color:var(--fg-muted);
+  display:grid;gap:6px;
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <div class="eyebrow">Tài liệu kiến trúc · đọc từ đầu</div>
+    <h1>Kiến trúc Axiom Office</h1>
+    <p class="lede">Axiom Office là trợ lý AI chạy ngay bên trong LibreOffice và WPS. Trang này mô tả hệ thống đang chạy thật hôm nay: có những tiến trình nào, chúng nói chuyện với nhau bằng gì, dữ liệu nằm ở đâu, và vì sao từng mảnh được tách ra như vậy. Đọc hết trang là đủ để mở mã nguồn và sửa.</p>
+    <div class="meta">Cập nhật 12/10/2026 · nhánh main · phạm vi Linux: LibreOffice và WPS</div>
+
+    <div class="figures">
+      <div class="fig"><b>4</b><span>tiến trình, 4 nhóm cổng</span></div>
+      <div class="fig"><b>80</b><span>lệnh bridge (nguồn Python)</span></div>
+      <div class="fig"><b>8</b><span>skill dựng sẵn</span></div>
+      <div class="fig"><b>4</b><span>tầng kiểm thử</span></div>
+    </div>
+  </header>
+
+  <div class="shell">
+    <nav class="toc" aria-label="Mục lục">
+      <details class="toc-box" open>
+        <summary>Mục lục</summary>
+        <ul>
+          <li class="toc-group">Bối cảnh</li>
+          <li><a href="#la-gi">1. Axiom Office là gì</a></li>
+          <li><a href="#rang-buoc">2. Ba ràng buộc</a></li>
+          <li><a href="#so-do">3. Sơ đồ tổng</a></li>
+          <li class="toc-group">Thành phần</li>
+          <li><a href="#tien-trinh">4. Tiến trình và cổng</a></li>
+          <li><a href="#du-lieu">5. Dữ liệu nằm ở đâu</a></li>
+          <li><a href="#giao-thuc">6. Giao thức Core ↔ bridge</a></li>
+          <li class="toc-group">Luồng chạy</li>
+          <li><a href="#mot-luot">7. Một lượt chạy end-to-end</a></li>
+          <li><a href="#prompt">8. Vòng lặp agent và prompt</a></li>
+          <li><a href="#office-action">9. Bảy bước của mọi lệnh</a></li>
+          <li class="toc-group">Hợp đồng</li>
+          <li><a href="#he-lenh">10. Hệ lệnh: một nguồn, ba bản sao</a></li>
+          <li><a href="#skill">11. Skill ba tầng</a></li>
+          <li><a href="#hai-token">12. Hai hệ token khác nhau</a></li>
+          <li class="toc-group">An toàn</li>
+          <li><a href="#an-toan">13. Bảy lớp an toàn</a></li>
+          <li><a href="#pane">14. Pane, ribbon, menu chuột phải</a></li>
+          <li class="toc-group">Mở rộng và vận hành</li>
+          <li><a href="#mcp">15. MCP hai chiều</a></li>
+          <li><a href="#test">16. Bốn tầng test và CI</a></li>
+          <li><a href="#dong-goi">17. Cài đặt và đóng gói</a></li>
+          <li class="toc-group">Bàn giao</li>
+          <li><a href="#no">18. Nợ đã biết</a></li>
+          <li><a href="#doc-ma">19. Đọc mã theo thứ tự</a></li>
+          <li><a href="#tu-dien">20. Từ điển</a></li>
+        </ul>
+      </details>
+    </nav>
+
+    <main>
+      <!-- 1 -->
+      <section id="la-gi">
+        <h2><span class="mark">01</span>Axiom Office là gì</h2>
+        <p>Cách nhớ gọn nhất: <strong>một bộ não chạy nền, nhiều cánh tay cắm vào từng ứng dụng.</strong></p>
+        <div class="split">
+          <div class="col">
+            <h4>Bộ não</h4>
+            <p><code>axiom-core</code>, viết bằng Go, nằm trong <code class="path">core-go/</code>. Đây là nơi duy nhất biết về LLM, prompt, skill, lịch sử hội thoại, chính sách xác nhận và cả máy chủ MCP. Não không tự sửa tài liệu.</p>
+          </div>
+          <div class="col">
+            <h4>Cánh tay</h4>
+            <p>Bridge, mã nhỏ nằm trong từng ứng dụng. Bridge chỉ biết hai việc: cho biết tài liệu đang mở trông thế nào, và thực thi một lệnh có tên. Bridge không gọi LLM, không giữ khoá API.</p>
+          </div>
+        </div>
+        <p>Hai bên gặp nhau qua một hợp đồng rất hẹp: HTTP trên loopback, JSON, một token. Chọn cách tách này vì hai lý do.</p>
+        <ul>
+          <li><strong>Một chỗ để sửa.</strong> Prompt, skill và danh mục lệnh chỉ tồn tại một bản trong Core. Thêm một skill mới thì cả LibreOffice lẫn WPS dùng được ngay, không phải chép sang hai nơi.</li>
+          <li><strong>Mỗi ứng dụng một kiểu automation.</strong> LibreOffice nói UNO, WPS nói JS API trong CEF, Microsoft Office nói COM. Phần riêng cho từng ứng dụng vì thế phải mỏng, và mỏng nhất có thể là một bảng đăng ký lệnh cộng vài handler.</li>
+        </ul>
+      </section>
+
+      <!-- 2 -->
+      <section id="rang-buoc">
+        <h2><span class="mark">02</span>Ba ràng buộc định hình mọi quyết định</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Ràng buộc</th><th>Nghĩa là</th><th>Dấu vết trong mã</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Chạy trên máy người dùng, không có server ở giữa</td>
+                <td>Core chỉ nghe trên loopback. Kết nối ra ngoài là gọi LLM do người dùng cấu hình, và — chỉ khi người dùng bật — tìm web (Tavily hoặc MCP server ngoài).</td>
+                <td><code>DefaultPort = 47840</code>, <code class="path">core-go/internal/config/config.go</code></td>
+              </tr>
+              <tr>
+                <td>Chỉ một kênh nói chuyện</td>
+                <td>HTTP loopback cộng file trong thư mục cấu hình. Không IPC riêng, không COM trên Linux.</td>
+                <td><code class="path">core-go/internal/api/</code>, <code class="path">core-go/internal/office/session.go</code></td>
+              </tr>
+              <tr>
+                <td>Tài liệu người dùng là bất khả xâm phạm</td>
+                <td>Không có đường nào sửa file mà không đi qua một lệnh có tên, đã qua kiểm tra, và có thể hỏi lại người dùng.</td>
+                <td><code class="path">core-go/internal/policy/policy.go</code>, <code class="path">core-go/internal/tools/office_action.go</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout warn">
+          <div class="tag">Đừng nhầm với quá khứ</div>
+          <p>Bản .NET <b>Core</b> đã bỏ ngày 01/10/2026; Core hiện là bản Go. Tài liệu kiến trúc chi tiết (<code>docs/architecture/README.md</code>, <code>docs/architecture/core.md</code>) đã cập nhật theo Core Go, LibreOffice và WPS Linux; <code>STATUS.md</code> là ảnh chụp tình trạng mới nhất. Add-in Windows (C#) <b>vẫn được phát triển</b> và chạy với cùng Core Go — xem mục 10 và 18.</p>
+        </div>
+      </section>
+
+      <!-- 3 -->
+      <section id="so-do">
+        <h2><span class="mark">03</span>Sơ đồ tổng</h2>
+        <div class="diagram">
+          <div class="d-row">
+            <div class="d-label">Người dùng và client ngoài</div>
+            <div class="d-cards">
+              <div class="node"><b>Pane Ask AI</b><span>trong LibreOffice hoặc WPS</span></div>
+              <div class="node"><b>MCP client</b><span>Claude Code, Cursor, script</span></div>
+            </div>
+          </div>
+          <div class="d-arrow">↓ HTTP loopback / stdio ↓</div>
+          <div class="d-row">
+            <div class="d-label">Core — tiến trình duy nhất giữ LLM và chính sách</div>
+            <div class="d-cards">
+              <div class="node hi"><b>axiom-core</b><span>127.0.0.1:47840</span></div>
+              <div class="node"><b>HTTP API + SSE</b><span>/v1/*, /wps/*</span></div>
+              <div class="node"><b>Vòng lặp agent</b><span>core-go/internal/agent</span></div>
+              <div class="node"><b>Tool office_action</b><span>core-go/internal/tools</span></div>
+              <div class="node"><b>Skill + memory</b><span>internal/skills · internal/memory + store (core.db)</span></div>
+              <div class="node"><b>MCP server</b><span>axiom-core mcp, stdio</span></div>
+            </div>
+          </div>
+          <div class="d-arrow">↓ POST /cmd &nbsp;·&nbsp; long-poll /wps/v1/poll ↓</div>
+          <div class="d-row">
+            <div class="d-label">Bridge — cánh tay trong từng ứng dụng</div>
+            <div class="d-cards">
+              <div class="node"><b>LibreOffice</b><span>Python + UNO · 47851–47853</span></div>
+              <div class="node"><b>Add-in WPS</b><span>JS/CEF · Core host ở 47861</span></div>
+              <div class="node"><b>Windows (C#)</b><span>47821–47823 · 47831–47833</span></div>
+            </div>
+          </div>
+          <div class="d-arrow">↓ ↓</div>
+          <div class="d-row">
+            <div class="d-label">Tài liệu người dùng — không bao giờ rời khỏi ứng dụng</div>
+            <div class="d-cards">
+              <div class="node"><b>Writer / Calc / Impress</b></div>
+              <div class="node"><b>WPS Writer / ET / WPP</b></div>
+            </div>
+          </div>
+        </div>
+        <p>Chú ý chiều mũi tên: Core gọi bridge, bridge không bao giờ gọi ngược lại Core để xin việc. Riêng WPS thì add-in phải tự quay sang Core lấy việc, vì lý do ở mục 6.</p>
+      </section>
+
+      <!-- 4 -->
+      <section id="tien-trinh">
+        <h2><span class="mark">04</span>Bốn tiến trình, bốn nhóm cổng</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Tiến trình</th><th>Viết bằng</th><th>Cổng</th><th>Việc nó làm</th><th>Mã nguồn</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><b>Core</b></td>
+                <td>Go</td>
+                <td class="num">47840<br>(dải 47840–47849)</td>
+                <td>Vòng lặp agent, tool, skill, lịch sử hội thoại, MCP server, và host file add-in WPS</td>
+                <td><code class="path">core-go/</code></td>
+              </tr>
+              <tr>
+                <td><b>Bridge LibreOffice</b></td>
+                <td>Python + UNO</td>
+                <td class="num">47851<br>(47851–47853)</td>
+                <td>Thực thi lệnh trong Writer, Calc, Impress</td>
+                <td><code class="path">src/AxiomOffice.LibreOffice/python/pythonpath/axiom/</code></td>
+              </tr>
+              <tr>
+                <td><b>Add-in WPS</b></td>
+                <td>JavaScript ES5 (CEF Chrome 87)</td>
+                <td class="num">47861<br>do Core host</td>
+                <td>Thực thi lệnh trong WPS Writer, ET, WPP</td>
+                <td><code class="path">src/AxiomOffice.WPS/</code></td>
+              </tr>
+              <tr>
+                <td><b>Bridge Windows</b></td>
+                <td>C# / .NET</td>
+                <td class="num">47821–47823<br>47831–47833</td>
+                <td>Nhóm WPS và nhóm Microsoft Office trên Windows. Vẫn được phát triển, chạy với cùng Core Go.</td>
+                <td><code class="path">src/AxiomOffice/Bridge/CommandDispatcher*.cs</code></td>
+              </tr>
+            </tbody>
+            <caption>Cổng mặc định: <code class="path">core-go/internal/config/bridge.go</code> và <code class="path">core-go/internal/wpsbridge/wpsbridge.go</code>.</caption>
+          </table>
+        </div>
+        <div class="callout">
+          <div class="tag">Không phải tiến trình thứ năm</div>
+          <p>MCP server là cùng một binary, gọi bằng <code>axiom-core mcp</code>, và nói qua stdio. Nó không mở cổng nào, nên không có dòng riêng trong bảng trên.</p>
+        </div>
+      </section>
+
+      <!-- 5 -->
+      <section id="du-lieu">
+        <h2><span class="mark">05</span>Dữ liệu nằm ở đâu trên Linux</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Thứ gì</th><th>Ở đâu</th><th>Ghi chú</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Cấu hình</td>
+                <td><code>~/.config/axiom-office/config.json</code></td>
+                <td>Trình cài và nút Thiết lập của pane WPS (<code>POST /wps/v1/config</code>) ghi file này, luôn với quyền 0600</td>
+              </tr>
+              <tr>
+                <td>Khoá API của LLM</td>
+                <td>Extension LibreOffice cất vào keyring (libsecret, service <code>axiom-office</code>) và chỉ ghi <code>libsecret:&lt;tên&gt;</code> vào <code>config.json</code>; <code>install.sh --api-key</code> và pane WPS ghi thẳng khoá vào <code>config.json</code> (0600)</td>
+                <td>Không nằm trong file cấu hình; <code class="path">core-go/internal/config/secrets.go</code></td>
+              </tr>
+              <tr>
+                <td>Phiên của ứng dụng đang mở</td>
+                <td><code>~/.config/axiom-office/sessions/*.json</code></td>
+                <td>Mỗi ứng dụng ghi một file: tên app, cổng, pid, tài liệu đang mở, token; <code class="path">core-go/internal/config/paths.go</code></td>
+              </tr>
+              <tr>
+                <td>Hội thoại, Bộ nhớ AI, nhật ký, nguồn web</td>
+                <td><code>~/.local/share/axiom-office/core/core.db</code> (SQLite, kèm <code>-wal</code>, <code>-shm</code>); <code>install.sh</code> giữ tệp này khi cài lại hoặc gỡ, chỉ <code>--purge</code> mới xoá</td>
+                <td>Đọc qua <code>GET /v1/conversations</code></td>
+              </tr>
+              <tr>
+                <td>Skill</td>
+                <td><code>core/skills/</code> trong gói cài</td>
+                <td>Dữ liệu của Core, không thuộc ứng dụng nào</td>
+              </tr>
+              <tr>
+                <td>Danh mục lệnh đã sinh</td>
+                <td><code class="path">catalog/live-commands.json</code> (80 mục) và <code class="path">core-go/internal/mcpserver/livecommands_gen.go</code></td>
+                <td>Sinh bằng script, CI kiểm tra không được lệch nguồn</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>Cách Core biết ứng dụng nào đang mở</h3>
+        <p>Bridge ghi file phiên vào thư mục <code>sessions</code> khi ứng dụng khởi động và xoá khi thoát. Core đọc cả thư mục, kiểm tra pid trong file còn sống hay không, và coi file cũ hơn 90 giây là phiên chết (<code>StaleSeconds = 90</code>, <code class="path">core-go/internal/office/session.go</code>). Nhờ vậy không cần một tiến trình điều phối riêng, và Core khởi động lại vẫn thấy các ứng dụng đang mở. Riêng WPS, <b>Core</b> ghi file phiên thay cho add-in (<code>&lt;pid&gt;-wps.json</code>) và xoá khi add-in ngừng poll quá 45 giây.</p>
+      </section>
+
+      <!-- 6 -->
+      <section id="giao-thuc">
+        <h2><span class="mark">06</span>Giao thức giữa Core và bridge</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Endpoint</th><th>Trả về</th><th>Dùng khi nào</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>GET /health</code></td><td>Trạng thái sống</td><td>Dò xem cổng có phải bridge của Axiom không. Endpoint duy nhất không cần token.</td></tr>
+              <tr><td><code>GET /commands</code></td><td>Danh mục lệnh của app đó</td><td>Core dựng allowlist và mô tả tool cho model</td></tr>
+              <tr><td><code>GET /session</code></td><td>Tài liệu đang mở, trạng thái app</td><td>Đầu mỗi lượt chạy, để prompt biết đang làm việc với file nào</td></tr>
+              <tr><td><code>POST /cmd</code></td><td>Kết quả JSON của một lệnh</td><td>Mọi lệnh cụ thể, kèm header <code>X-Auth-Token</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>Guard: biên giới tin cậy</h3>
+        <p>Ba luật, nằm ở <code class="path">core-go/internal/api/guard.go</code> và áp dụng giống nhau cho bridge lẫn Core:</p>
+        <ul>
+          <li>Request có header <code>Origin</code> thì bị trả <strong>403</strong>. Trình duyệt luôn gửi header này, nên một trang web lạ không gọi được vào Core.</li>
+          <li>Thiếu hoặc sai token thì <strong>401</strong>, trừ <code>GET /health</code>.</li>
+          <li>Request có body mà không phải <code>application/json</code> thì <strong>415</strong>.</li>
+        </ul>
+        <h3>Biến thể WPS, và vì sao nó khác</h3>
+        <p>Add-in WPS chạy trong CEF nên không mở được cổng lắng nghe. Core đảo vai: Core phục vụ chính file add-in qua <code>GET /wps/addin/&lt;tên file&gt;</code> (có chặn <code>../</code>), rồi đóng vai đầu nhận. Add-in long-poll <code>POST /wps/v1/poll</code>, trả kết quả bằng <code>POST /wps/v1/result</code>, còn lượt chạy đi qua <code>/wps/v1/runs</code> kèm SSE.</p>
+        <ul>
+          <li>Chưa mở tài liệu nào trong WPS thì Core trả <strong>409</strong> với thông báo <code>WPS add-in is not connected</code> (<code class="path">core-go/internal/api/wps.go</code>).</li>
+          <li>Nhóm <code>/wps/*</code> tự xác thực theo origin của Core hoặc token, không đi qua guard chung, vì guard chung chặn mọi request có <code>Origin</code> (<code class="path">core-go/internal/api/wps.go</code>, <code class="path">core-go/internal/api/api.go</code>).</li>
+        </ul>
+      </section>
+
+      <!-- 7 -->
+      <section id="mot-luot">
+        <h2><span class="mark">07</span>Một lượt chạy, từ cú bấm đến câu trả lời</h2>
+        <ol class="steps">
+          <li><div>
+            <b>Người dùng bấm Ask AI trong pane.</b>
+            <p>Pane gửi yêu cầu tới Core. Pane ở LibreOffice và pane ở WPS gửi cùng một dạng request, dù một bên vẽ bằng toolkit của LibreOffice còn một bên là HTML.</p>
+          </div></li>
+          <li><div>
+            <b>Core chọn bridge.</b>
+            <p>Đọc thư mục phiên, chọn phiên của ứng dụng mà pane thuộc về, lấy cổng và token. Từ đây Core biết chắc đang nói với Writer hay ET hay WPP.</p>
+          </div></li>
+          <li><div>
+            <b>Hỏi bridge về tài liệu, rồi bắt đầu lượt chạy.</b>
+            <p>LibreOffice: Core gọi <code>GET /session</code> rồi mở lượt chạy nội bộ. WPS: Core mở lượt chạy qua <code>/wps/v1/runs</code>, add-in nhận việc ở vòng long-poll kế tiếp. Mỗi cổng chỉ có một lượt chạy tại một thời điểm: lượt thứ hai bị trả <strong>409</strong> (<code>Manager.TryStart(port)</code>, <code class="path">core-go/internal/api/runs.go</code>).</p>
+          </div></li>
+          <li><div>
+            <b>Core dựng prompt.</b>
+            <p>Ghép theo thứ tự cố định: chỉ dẫn nền, bối cảnh tài liệu, mục lục skill, memory, rồi hội thoại (<code class="path">core-go/internal/agent/prompt.go</code>).</p>
+          </div></li>
+          <li><div>
+            <b>Vòng lặp agent chạy.</b>
+            <p>Model trả về một tool call, Core gọi <code>office_action</code>, bridge thực thi, kết quả JSON quay lại model. Lặp tối đa 100 vòng; mặc định không có trần token và không giới hạn thời gian. Lượt bị chặn bằng guard: 4 lệnh giống hệt, 3 lỗi giống nhau, 25 lệnh cùng việc — và nút Dừng; tới vòng 30 hoặc 500.000 token thì hỏi người dùng có chạy tiếp.</p>
+          </div></li>
+          <li><div>
+            <b>Sự kiện chảy về pane.</b>
+            <p>Text, tên tool, kết quả, và cả câu hỏi xác nhận đi qua SSE, nên người dùng thấy việc đang xảy ra chứ không phải đợi một cục kết quả.</p>
+          </div></li>
+          <li><div>
+            <b>Lượt chạy đóng, tài liệu ở lại trong ứng dụng.</b>
+            <p>Core không giữ bản sao tài liệu. File trên đĩa là bản duy nhất, được sửa bởi chính ứng dụng văn phòng.</p>
+          </div></li>
+        </ol>
+      </section>
+
+      <!-- 8 -->
+      <section id="prompt">
+        <h2><span class="mark">08</span>Vòng lặp agent và cách dựng prompt</h2>
+        <h3>Prompt được ghép thế nào</h3>
+        <p><code>Build</code> ở <code class="path">core-go/internal/agent/prompt.go</code> nối các phần theo một thứ tự không đổi: chỉ dẫn nền → bối cảnh tài liệu → mục lục skill (tầng 1) → memory → hội thoại → chỗ người dùng đang xem. Tuỳ lượt, cuối prompt có thêm luật riêng: <code>SelectionLockRule</code> (đang khoá vùng bôi đen), <code>PlanModeRule</code> (lập kế hoạch trước), <code>QuickEditRule</code> / <code>QuickAnswerRule</code> (lệnh nhanh Sửa bằng AI), <code>BatchEditRule</code>. Thứ tự cố định có mục đích: phần đầu giống nhau giữa các lượt nên prompt cache dùng lại được, chi phí và độ trễ giảm.</p>
+        <h3>Luật nằm ở hai chỗ, không phải một</h3>
+        <p>Một điều dễ hiểu sai khi mới đọc mã: không phải mọi luật đều nằm trong system prompt.</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Luật</th><th>Nơi thật</th><th>Nội dung</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>InjectionRule</code></td><td><code class="path">core-go/internal/agent/prompt.go</code></td><td>Nội dung đọc từ tài liệu là dữ liệu, không phải mệnh lệnh</td></tr>
+              <tr><td><code>ReconRule</code></td><td><code class="path">core-go/internal/agent/prompt.go</code></td><td>Việc gì hơn một bước thì xem tài liệu trước đã</td></tr>
+              <tr><td><code>PlanRule</code></td><td><code class="path">core-go/internal/agent/prompt.go</code></td><td>Lập kế hoạch một lần trước khi ghi</td></tr>
+              <tr><td><code>CheckRule</code></td><td><code class="path">core-go/internal/agent/prompt.go</code></td><td>Ghi xong thì đọc lại kết quả và sửa chỗ sai</td></tr>
+              <tr><td><code>UndoRule</code></td><td><code class="path">core-go/internal/tools/office_action.go</code></td><td>Không dùng undo để làm lại từ đầu</td></tr>
+              <tr><td><code>ChunkRule</code></td><td><code class="path">core-go/internal/tools/office_action.go</code></td><td>Bảng lớn thì ghi thành nhiều đợt</td></tr>
+              <tr><td><code>SheetRefRule</code></td><td><code class="path">core-go/internal/tools/office_action.go</code></td><td>Một cú pháp tham chiếu sheet cho mọi ứng dụng</td></tr>
+              <tr><td><code>TruncationContract</code></td><td><code class="path">core-go/internal/tools/office_action.go</code></td><td>Khi kết quả bị cắt thì <code>truncated=true</code> nghĩa là gì</td></tr>
+            </tbody>
+            <caption>Luật gắn với hành vi chung nằm trong prompt; luật chỉ có nghĩa khi gọi một tool cụ thể nằm trong mô tả của tool đó, để model đọc đúng lúc nó cần.</caption>
+          </table>
+        </div>
+        <div class="callout warn">
+          <div class="tag">Không tồn tại ConfirmRule</div>
+          <p>Không có hằng số nào tên <code>ConfirmRule</code> trong mã. Việc hỏi lại người dùng không phải một câu dặn trong prompt mà là cơ chế thật: <code>policy.Evaluate</code> quyết định, <code>agent/confirm.go</code> gửi câu hỏi qua SSE và chờ trả lời. Nếu đi tìm nó trong <code>prompt.go</code> thì sẽ mất thời gian vô ích.</p>
+        </div>
+        <h3>Trần của một lượt chạy</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Trần</th><th>Giá trị</th><th>Nơi khai báo</th></tr></thead>
+            <tbody>
+              <tr><td>Số vòng</td><td class="num">100</td><td><code>DefaultMaxRounds</code>, <code class="path">core-go/internal/agent/orchestrator.go</code></td></tr>
+              <tr><td>Token</td><td class="num">không giới hạn</td><td><code>DefaultMaxTokens = 0</code> (bên gọi vẫn đặt được <code>options.maxTokens</code>), <code class="path">core-go/internal/agent/orchestrator.go</code></td></tr>
+              <tr><td>Lỗi giống nhau liên tiếp</td><td class="num">3</td><td><code>DefaultMaxIdenticalFailures</code></td></tr>
+              <tr><td>Thời gian</td><td>không giới hạn</td><td>Trần đếm thay cho trần đồng hồ</td></tr>
+              <tr><td>Mô tả skill ở tầng 1</td><td class="num">300 ký tự</td><td><code>skillDescriptionLimit</code>, <code class="path">core-go/internal/agent/prompt.go</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Dòng cuối là một cái bẫy đã từng xảy ra: mô tả dài hơn 300 ký tự bị cắt âm thầm ở tầng 1, nên điều kiện kích hoạt skill có thể biến mất khỏi mắt model mà không có cảnh báo nào. Nay có test chặn ở <code class="path">core-go/internal/agent/skills_router_test.go</code>.</p>
+      </section>
+
+      <!-- 9 -->
+      <section id="office-action">
+        <h2><span class="mark">09</span><code>office_action</code>: bảy bước của mọi lệnh</h2>
+        <p>Mọi lệnh model gọi đều đi qua một hàm duy nhất, <code>OfficeActionTool.Invoke</code> ở <code class="path">core-go/internal/tools/office_action.go</code>. Thứ tự bảy bước là thứ tự thật trong mã, không phải bản mô tả.</p>
+        <div class="diagram scroll-x">
+          <div class="pipe">
+            <div class="chip"><i>1</i>Đọc tên lệnh</div>
+            <div class="chip"><i>2</i>Chuẩn hoá tên, kiểm allowlist</div>
+            <div class="chip"><i>3</i>Kiểm tham số</div>
+            <div class="chip"><i>4</i>Map tên tham số cũ</div>
+            <div class="chip"><i>5</i>Guard ghi đè ô</div>
+            <div class="chip"><i>6</i>Policy xác nhận</div>
+            <div class="chip"><i>7</i>Gọi bridge, cắt kết quả</div>
+          </div>
+        </div>
+        <ol>
+          <li><strong>Thiếu <code>action</code> thì báo lỗi ngay</strong>, không đoán.</li>
+          <li><strong>Chuẩn hoá tên rồi kiểm allowlist.</strong> Tên viết lệch nhẹ như <code>et_writeRange</code> hay sai hoa thường được quy về tên đúng thay vì từ chối. Nếu vẫn không có trong allowlist thì lỗi liệt kê ngay những lệnh đang có, vì log cho thấy model từng đoán khoảng 30 tên lệnh không tồn tại chỉ vì không tin là chúng không có.</li>
+          <li><strong>Kiểm tham số và nói đúng chỗ sai.</strong> Trước đây tham số hỏng bị bỏ im thành rỗng, bridge báo thiếu <code>range</code> trong khi model đã gửi, và model gửi lại y hệt năm lần liền.</li>
+          <li><strong>Map tên tham số cũ</strong> sang tên hiện hành, để lệnh cũ không chết.</li>
+          <li><strong>Guard ghi đè.</strong> Ghi vào ô đã có dữ liệu, với giá trị khác giá trị cũ, thì hỏi người dùng trước. Đã duyệt cho một sheet trong lượt này thì các lần ghi sau vào sheet đó không hỏi lại.</li>
+          <li><strong>Policy xác nhận.</strong> Xem bảng dưới. Nếu cần hỏi, câu hỏi đi qua SSE và lượt chạy dừng chờ câu trả lời.</li>
+          <li><strong>Gọi bridge rồi cắt kết quả.</strong> Kết quả đọc lớn bị cắt trước khi vào hội thoại, nhưng lỗi thì trả nguyên văn để model đọc đủ thông điệp. Lệnh thất bại được đánh dấu là không sửa tài liệu.</li>
+        </ol>
+        <h3>Sáu trường hợp policy hỏi người dùng</h3>
+        <p>Toàn bộ nằm ở <code>policy.Evaluate</code>, <code class="path">core-go/internal/policy/policy.go</code>:</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Trường hợp</th><th>Câu hỏi</th></tr></thead>
+            <tbody>
+              <tr><td>Lệnh lưu hoặc xuất file, mà yêu cầu của người dùng không nhắc tới việc lưu</td><td>AI muốn lưu/xuất file dù yêu cầu của bạn không nhắc tới việc lưu</td></tr>
+              <tr><td><code>saveAs</code> hoặc <code>exportPdf</code> trỏ vào đường dẫn đã tồn tại</td><td>Ghi đè file đã có: <code>&lt;đường dẫn&gt;</code></td></tr>
+              <tr><td><code>wpp.deleteSlide</code></td><td>Xoá slide khỏi bài thuyết trình</td></tr>
+              <tr><td><code>writer.replaceAll</code> trên tài liệu dài hơn ngưỡng</td><td>Thay thế toàn bộ trong tài liệu dài (<code>n</code> ký tự)</td></tr>
+              <tr><td>Ghi đè ô có dữ liệu (bước 5, không phải policy)</td><td>Tuỳ ngữ cảnh ô và giá trị mới</td></tr>
+              <tr><td>Mọi trường hợp còn lại</td><td>Không hỏi, chạy luôn</td></tr>
+            </tbody>
+            <caption>Hàm nhận diện ý định lưu có xử lý phủ định (<code>negated</code>, <code class="path">core-go/internal/policy/policy.go</code>): câu "đừng lưu file" không bị tính là yêu cầu lưu. Để biết tài liệu dài hay ngắn, Core gọi thật một lệnh bridge nhẹ (<code>writer.getText</code> với <code>maxChars=1</code>, trả <code>totalChars</code>).</caption>
+          </table>
+        </div>
+      </section>
+
+      <!-- 10 -->
+      <section id="he-lenh">
+        <h2><span class="mark">10</span>Hệ lệnh: một nguồn, ba bản sao</h2>
+        <p>Danh mục lệnh là hợp đồng lớn nhất của hệ thống, và nó tồn tại ở bốn dạng. Nguồn chuẩn là bản Python.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Bản</th><th>Số lệnh</th><th>Vai trò</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><b>Python</b> — <code class="path">axiom/commands.py</code> cộng các module <code>writer</code>, <code>calc</code>, <code>impress</code>, <code>general</code>, <code>checks</code></td>
+                <td class="num">80</td>
+                <td>Nguồn chuẩn. Thêm lệnh là thêm một dòng <code>command(...)</code>.</td>
+              </tr>
+              <tr>
+                <td><b>WPS</b> — <code class="path">src/AxiomOffice.WPS/commands.js</code></td>
+                <td class="num">80 (58 chạy được)</td>
+                <td><code>CATALOG</code> <b>sinh tự động</b> từ registry Python (khối BEGIN/END SINH TU DONG); handler và danh sách 9 lệnh gom undo (<code>MUTATING</code>) viết tay. 22 mục chưa có handler, liệt kê kèm lý do ở <code>CHUA_CO_HANDLER</code> (<code class="path">tests/wps/test_addin.mjs</code>).</td>
+              </tr>
+              <tr>
+                <td><b>C#</b> — <code class="path">src/AxiomOffice/Bridge/CommandDispatcher*.cs</code></td>
+                <td class="num">77 tên</td>
+                <td>Bản Windows, cố ý giữ nguyên tên và chữ ký với bản Python; thiếu <code>et.closeAll</code>, <code>wpp.closeAll</code>, <code>ui.setup</code>. Có lệnh trong danh mục chung mới chạy được ở một nền tảng (lệnh thiết kế, slide theo mẫu chỉ có trên Windows) — "có trong danh mục" không có nghĩa là "chạy được ở mọi bản".</td>
+              </tr>
+              <tr>
+                <td><b>Sinh ra</b> — <code class="path">catalog/live-commands.json</code> và <code class="path">core-go/internal/mcpserver/livecommands_gen.go</code></td>
+                <td class="num">80</td>
+                <td>Dùng cho MCP và tool live. Không sửa tay.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>Thứ tự đúng khi thêm một lệnh mới</h3>
+        <ol>
+          <li>Thêm dòng <code>command(...)</code> và handler trong Python.</li>
+          <li>Chạy script sinh lại danh mục (<code class="path">scripts/generate_mcp_commands.py</code>, <code class="path">scripts/generate_setup_catalog.py</code>).</li>
+          <li>Thêm mục tương ứng vào <code>commands.js</code> cho WPS.</li>
+          <li>Thêm vào dispatcher C# nếu lệnh đó áp dụng cho Windows.</li>
+        </ol>
+        <p>CI bắt lệch ở bước 2 bằng chế độ <code>--check</code>, nên quên sinh lại danh mục là đỏ ngay. Ba lệnh chỉ có ở Python là <code>et.closeAll</code>, <code>wpp.closeAll</code> và <code>ui.setup</code>; phần còn lại phải có mặt ở cả ba bản.</p>
+        <div class="callout warn">
+          <div class="tag">Cẩn thận khi đồng bộ chữ nghĩa</div>
+          <p>Sửa <code>summary</code> ở một bản mà bản kia không làm được việc đó sẽ tạo ra một lời hứa sai. Đã có lần phải cố ý để bản C# giữ nguyên câu cũ, vì bản C# chưa xử lý bảng layout nên câu mới sẽ là mô tả sai sự thật.</p>
+        </div>
+      </section>
+
+      <!-- 11 -->
+      <section id="skill">
+        <h2><span class="mark">11</span>Skill ba tầng</h2>
+        <p>Skill là cách dạy model làm văn bản theo chuẩn Việt Nam mà không nhồi tất cả vào prompt. Chúng được nạp theo ba tầng, mỗi tầng tốn thêm token chỉ khi thật cần.</p>
+        <div class="diagram">
+          <div class="d-row">
+            <div class="d-label">Tầng 1 — luôn có mặt</div>
+            <div class="d-cards"><div class="node hi"><b>Mục lục skill trong system prompt</b><span>mỗi skill một dòng "tên: mô tả", cắt ở 300 ký tự</span></div></div>
+          </div>
+          <div class="d-arrow">↓ model thấy skill nào hợp việc</div>
+          <div class="d-row">
+            <div class="d-label">Tầng 2 — nạp khi cần</div>
+            <div class="d-cards"><div class="node"><b>load_skill</b><span>core-go/internal/tools/skill_tools.go</span></div></div>
+          </div>
+          <div class="d-arrow">↓ đọc tới file chi tiết</div>
+          <div class="d-row">
+            <div class="d-label">Tầng 3 — chỉ khi được trỏ tới</div>
+            <div class="d-cards"><div class="node"><b>read_skill_file</b><span>core-go/internal/tools/skill_tools.go</span></div></div>
+          </div>
+        </div>
+        <p>Tám skill dựng sẵn: <code>bang-diem</code>, <code>bao-cao-du-lieu</code>, <code>bao-cao-thang</code>, <code>mo-hinh-nhieu-sheet</code>, <code>the-thuc-van-ban</code>, <code>thiet-ke-van-phong</code>, <code>trinh-bay-chuyen-nghiep</code>, <code>van-ban-hanh-chinh</code>. Thư mục <code class="path">skills/_design/</code> không phải skill mà là gói tài nguyên dùng chung; tiền tố <code>_</code> đánh dấu điều đó.</p>
+        <div class="callout ok">
+          <div class="tag">Điểm quan trọng nhất</div>
+          <p>Skill là <strong>dữ liệu của Core</strong>. LibreOffice và WPS dùng chung, không có bản riêng cho từng ứng dụng. Sửa một skill là cả hai ứng dụng đổi hành vi ở lượt chạy kế tiếp, không cần biên dịch lại gì.</p>
+        </div>
+      </section>
+
+      <!-- 12 -->
+      <section id="hai-token">
+        <h2><span class="mark">12</span>Hai hệ "token" hoàn toàn khác nhau</h2>
+        <p>Chữ "token" xuất hiện ở hai nơi trong dự án và chúng không liên quan gì tới nhau. Đây là chỗ nhầm phổ biến nhất khi mới vào.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th></th><th><code class="path">skills/_design/tokens.json</code></th><th><code class="path">axiom/theme.py</code></th></tr></thead>
+            <tbody>
+              <tr><td><b>Cho ai</b></td><td>Model, khi dựng tài liệu</td><td>Giao diện pane Ask AI</td></tr>
+              <tr><td><b>Chứa gì</b></td><td>Cỡ chữ, màu, kiểu cho văn bản và slide</td><td>Màu chrome của pane</td></tr>
+              <tr><td><b>Ai đọc</b></td><td>Chỉ Core</td><td>Pane ở LibreOffice; bản WPS lấy qua <code class="path">tests/wps/theme_dump.py</code></td></tr>
+              <tr><td><b>Kiểm bằng gì</b></td><td><code class="path">core-go/internal/tools/repo_skills_tokens_test.go</code></td><td><code class="path">tests/wps/test_pane_theme.mjs</code></td></tr>
+              <tr><td><b>Nhầm thì ra gì</b></td><td colspan="2">Sửa token thiết kế mà đi tìm chỗ đổi màu pane, hoặc tìm mã dựng tài liệu trong file theme của pane</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Test ở cột trái chặn hai lỗi cụ thể: không cho mã màu dạng <code>#RRGGBB</code> hay <code>fontSize</code> dạng số nằm thẳng trong <code>references/*.md</code>, và bắt mọi tên token được nhắc trong tài liệu phải tồn tại thật trong <code>tokens.json</code>. Lý do: tài liệu hướng dẫn từng trỏ vào những token đã bị xoá, model đọc xong làm theo và ra kết quả sai.</p>
+      </section>
+
+      <!-- 13 -->
+      <section id="an-toan">
+        <h2><span class="mark">13</span>Bảy lớp an toàn</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Lớp</th><th>Chặn cái gì</th><th>Ở đâu</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><b>1. Chỉ loopback</b></td>
+                <td>Máy khác trong mạng LAN, và trang web lạ gọi vào Core</td>
+                <td>Bind <code>127.0.0.1</code>; guard 403/401/415 ở <code class="path">core-go/internal/api/guard.go</code></td>
+              </tr>
+              <tr>
+                <td><b>2. Một Core cho mỗi người dùng</b></td>
+                <td>Hai Core chạy song song giành cùng phiên và cùng cổng</td>
+                <td>Khoá flock ở <code>$XDG_RUNTIME_DIR/axiom-office/&lt;tên&gt;.lock</code>, tự nhả khi tiến trình chết; Windows dùng named mutex cùng tên với bản .NET (<code class="path">core-go/internal/instance/</code>)</td>
+              </tr>
+              <tr>
+                <td><b>3. Allowlist và mô tả tool</b></td>
+                <td>Model gọi lệnh không tồn tại, hoặc lệnh bị cấm như <code>writer.closeAll</code></td>
+                <td>Bước 2 ở <code class="path">core-go/internal/tools/office_action.go</code></td>
+              </tr>
+              <tr>
+                <td><b>4. Prompt injection</b></td>
+                <td>Văn bản trong tài liệu đọc lên và tự nhận là mệnh lệnh</td>
+                <td><code>InjectionRule</code>, <code class="path">core-go/internal/agent/prompt.go</code></td>
+              </tr>
+              <tr>
+                <td><b>5. Hỏi trước khi ghi</b></td>
+                <td>Ghi đè dữ liệu có thật, lưu file ngoài ý muốn, xoá slide, thay thế hàng loạt trong tài liệu dài</td>
+                <td>Guard ghi đè cộng <code class="path">core-go/internal/policy/policy.go</code>, câu hỏi gửi qua SSE bởi <code class="path">core-go/internal/agent/confirm.go</code></td>
+              </tr>
+              <tr>
+                <td><b>6. Ghi file kiểu atomic</b></td>
+                <td>File hỏng nằm lại giữa chừng nếu tiến trình chết lúc đang ghi</td>
+                <td><code class="path">core-go/internal/filesafe/</code>: ghi ra file tạm cùng thư mục rồi thay thế bằng một lần đổi tên</td>
+              </tr>
+              <tr>
+                <td><b>7. Khoá vùng bôi đen</b></td>
+                <td>AI sửa ra ngoài đoạn người dùng đã chọn; lệnh nhanh không có đoạn bôi đen thì sửa cả tài liệu</td>
+                <td><code>Orchestrator.lockSelection</code> (<code class="path">core-go/internal/agent/orchestrator.go</code>) gọi <code>writer.lockSelection</code>; bridge hoàn tác ngay lệnh sửa ra ngoài vùng. <code>options.requireSelection</code> / lệnh nhanh: không có đoạn bôi đen thì dừng trước khi gọi model. Có trên Word (Windows) và WPS Linux; <b>chưa có trên LibreOffice</b></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p><b>Lớp 3, 5 và 7 chỉ áp cho agent trong Core.</b> Client MCP gọi tool live (<code>word_command</code>, <code>wps_live_command</code>…) thì lệnh đi thẳng tới bridge (<code class="path">core-go/internal/mcpserver/livetools.go</code>, <code>CommandRaw</code>): không allowlist, không hỏi xác nhận. Tin cậy dựa vào việc chính người dùng cấu hình client MCP đó. Kênh pane WPS <code>/wps/v1/*</code> cũng không đòi token: request mang <code>Origin</code> của chính Core là qua, nên mức tin cậy là "mọi tiến trình của cùng người dùng" (<code class="path">core-go/internal/api/wpsadmin.go</code>).</p>
+        <p>Thêm một chi tiết vận hành: mỗi cổng chỉ chạy một lượt tại một thời điểm, và khi Core tắt thì các lượt đang chạy bị huỷ trước. Không có chuyện hai pane cùng sửa một tài liệu và ghi đè lên nhau.</p>
+      </section>
+
+      <!-- 14 -->
+      <section id="pane">
+        <h2><span class="mark">14</span>Ba pane, một hệ thiết kế; ribbon và menu chuột phải của WPS</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th></th><th>Pane LibreOffice</th><th>Pane WPS</th></tr></thead>
+            <tbody>
+              <tr><td><b>Dựng bằng</b></td><td>Toolkit của LibreOffice qua Python/UNO</td><td>HTML, CSS và JavaScript</td></tr>
+              <tr><td><b>Mã</b></td><td><code class="path">src/AxiomOffice.LibreOffice/python/pythonpath/axiom/panel.py</code></td><td><code class="path">src/AxiomOffice.WPS/</code>, Core phục vụ ở <code>/wps/addin/</code></td></tr>
+              <tr><td><b>Màu và cỡ chữ</b></td><td><code class="path">axiom/theme.py</code></td><td>Cùng token đó, chuyển sang CSS</td></tr>
+              <tr><td><b>Nhận kết quả</b></td><td>SSE từ Core</td><td>SSE từ Core</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Hai bên khác nhau ở công nghệ vẽ, giống nhau ở luồng dữ liệu và ở hệ thiết kế, nên sửa một chỗ về mặt hình thức thì phải kiểm cả hai. Pane thứ ba là của add-in Windows (<code class="path">src/AxiomOffice/Ai/PaneControls.cs</code>) — cả ba dùng chung một bộ token màu (xanh Fluent <code>#0F6CBD</code> từ 19/10/2026).</p>
+        <h3>WPS: kênh pane, ribbon, menu chuột phải, khung chat mini</h3>
+        <ul>
+          <li><b>Kênh <code>/wps/v1/*</code></b>: pane là trang của Core nhưng không giữ token, nên mọi việc của pane đi qua kênh này — bản sao <code>routeBoth</code> của setup, llm/test, llm/models, skills, memory, audit, conversations, quick-actions, cộng các đường riêng: <code>status</code>, <code>log</code>, <code>config</code>, <code>exec</code> (chạy thẳng một lệnh, 409 kèm mã <code>run-in-progress</code> / <code>addin-disconnected</code>). Xem <code class="path">docs/architecture/wps-bridge.md</code> §7.</li>
+          <li><b>Ribbon</b> (<code class="path">src/AxiomOffice.WPS/ribbon.xml</code>): nhóm Trợ lý / Kiểm tra / Quản lý / Hệ thống, menu Khác; icon là <code>imageMso</code> — bộ icon có sẵn của WPS.</li>
+          <li><b>Menu chuột phải</b> khi bôi đen: <i>Sửa bằng AI ▸</i> 9 mục và <i>Hỏi AI về đoạn này</i>, mở <b>khung chat mini</b> (<code class="path">src/AxiomOffice.WPS/mini.html</code>, <code>Application.ShowDialog</code>). Câu lệnh của 9 mục nằm trong Core (<code class="path">core-go/internal/agent/quickactions.go</code>, <code>quickAction</code>); ba mục chỉ trả lời thì Core chỉ cấp tool đọc.</li>
+          <li><b>Ribbon không nói thẳng được vào pane đang mở</b>: Core làm trạm trung chuyển (<code>/wps/v1/pane/request</code> → SSE <code>/wps/v1/pane/events</code>, <code class="path">core-go/internal/api/wpspane.go</code>) — dùng khi WPS không có <code>ShowDialog</code>.</li>
+        </ul>
+        <div class="callout warn">
+          <div class="tag">Không có web UI riêng</div>
+          <p>Pane WPS là HTML nhưng sống bên trong WPS và cần API của WPS để làm việc. Đừng mở nó bằng trình duyệt để thử, và đừng dựng một web UI độc lập: nó sẽ không có tài liệu nào để thao tác.</p>
+        </div>
+      </section>
+
+      <!-- 15 -->
+      <section id="mcp">
+        <h2><span class="mark">15</span>MCP: Core vừa là server vừa là client</h2>
+        <div class="split">
+          <div class="col">
+            <h4>Core làm server</h4>
+            <p><code>axiom-core mcp</code> nói qua stdio cho Claude Code, Cursor hay một script bất kỳ. Danh mục tool sinh từ catalog lệnh, nên thêm một lệnh bridge là tool MCP tương ứng xuất hiện sau khi sinh lại. Nhóm tool <em>live</em> đọc thẳng tài liệu đang mở, và có cả tool gửi lệnh bất kỳ tới bridge.</p>
+          </div>
+          <div class="col">
+            <h4>Core làm client</h4>
+            <p>Core cũng nói MCP ra ngoài để dùng tool của server khác, phần này nằm ở <code class="path">core-go/internal/mcp/</code>. Nhờ vậy một skill có thể gọi thêm công cụ ngoài mà không phải viết client riêng.</p>
+          </div>
+        </div>
+        <p>Một hạn chế hiện tại: MCP server chỉ nói stdio, chưa có HTTP hay SSE, nên client phải tự khởi động tiến trình.</p>
+      </section>
+
+      <!-- 16 -->
+      <section id="test">
+        <h2><span class="mark">16</span>Bốn tầng test và CI</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Tầng</th><th>Cần gì để chạy</th><th>Nằm ở</th><th>Bắt được loại lỗi gì</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><b>1. Headless extension</b></td>
+                <td>Chỉ Python, dùng <code>uno</code> giả</td>
+                <td><code class="path">tests/lo/</code></td>
+                <td>Logic của handler, registry lệnh, các hàm kiểm tra tài liệu</td>
+              </tr>
+              <tr>
+                <td><b>2. Add-in WPS</b></td>
+                <td>Node và Python, dùng add-in giả</td>
+                <td><code class="path">tests/wps/</code></td>
+                <td>Registry, vòng long-poll, giao diện pane, màu token</td>
+              </tr>
+              <tr>
+                <td><b>3. Core end-to-end</b></td>
+                <td>Go, LLM giả và bridge giả</td>
+                <td><code class="path">core-go/</code></td>
+                <td>Toàn bộ vòng lặp agent, policy, cắt kết quả, hỏi xác nhận</td>
+              </tr>
+              <tr>
+                <td><b>4. Live</b></td>
+                <td>LibreOffice hoặc WPS thật, dưới Xvfb</td>
+                <td><code class="path">tests/live/</code>, <code class="path">tests/wps/test_wps_bridge_live.py</code>; chạy trên máy dev. Trong CI chỉ là bước được phép đỏ: LibreOffice thật hiện sập ở <code>unopkg</code> trên runner, WPS thật không có trong CI</td>
+                <td>Chỉ những thứ API thật mới lộ ra. Trong CI đặt <code>continue-on-error</code> vì môi trường dựng giao diện hay chập chờn.</td>
+              </tr>
+            </tbody>
+            <caption>Ngoài bốn tầng này còn nhóm test đối chiếu MCP ở <code class="path">tests/mcp-host/</code>, kiểm tra tool MCP và bridge trả cùng kết quả.</caption>
+          </table>
+        </div>
+        <h3>CI chạy những gì</h3>
+        <p>Hai job trong <code class="path">.github/workflows/ci.yml</code>: <code>linux</code> trên Ubuntu 24.04 và <code>windows</code>. Job Linux lần lượt: test extension, test add-in, lint (gofmt, vet, staticcheck, ruff, ESLint ES5), kiểm tra file sinh không lệch nguồn, <code>go test</code> cộng build cộng e2e đầy đủ, e2e kênh WPS với Core thật (<code>make test-wps-e2e</code>), MCP không cần ứng dụng mở, cài LibreOffice và UNO kèm xvfb, chạy trình cài với <code>HOME</code> tạm và <code>unopkg</code> giả, cài extension rồi test mọi lệnh trên LibreOffice thật, chạy wizard dưới Xvfb với LLM giả, test MCP với tool live, và cuối cùng đóng gói tarball.</p>
+        <div class="callout">
+          <div class="tag">Khi test đỏ, hỏi trước một câu</div>
+          <p>Một test đỏ phải đỏ vì đúng lý do mình đang nghĩ. Đã có lần một test đỏ vì thứ tự chạy file trong <code>unittest discover</code>, không phải vì lỗi cần sửa. Đọc thông báo lỗi trước khi sửa mã.</p>
+        </div>
+      </section>
+
+      <!-- 17 -->
+      <section id="dong-goi">
+        <h2><span class="mark">17</span>Cài đặt và đóng gói</h2>
+        <p><code class="path">scripts/linux/package.sh</code> tạo một tarball gồm binary Core, thư mục <code>skills/</code>, thư mục add-in WPS, file <code>.oxt</code> cho LibreOffice, script cài add-in WPS, <code>install.sh</code> và unit systemd.</p>
+        <p><code>install.sh</code>: chép Core vào <code>~/.local/share/axiom-office/core</code> (giữ <code>core.db</code>), cài extension bằng <code>unopkg add --force</code>, ghi <code>~/.config/axiom-office/config.json</code> với quyền 0600, và với WPS thì ghi <code>publish.xml</code> trỏ tới <code>http://127.0.0.1:47840/wps/addin/</code> để WPS biết tải add-in từ đâu (WPS còn cần một lệnh <code>sudo</code> một lần bật <code>JsApiPlugin</code> — trình cài in sẵn). Tuỳ chọn <code>--systemd</code> cho Core chạy thường trực — nên dùng khi có WPS, vì Core phải chạy <b>trước</b> khi mở WPS. Gỡ bằng <code>--uninstall</code>, xoá cả dữ liệu bằng <code>--purge</code>.</p>
+        <div class="callout warn">
+          <div class="tag">Một dòng mà trình cài cố ý không tự sửa</div>
+          <p>WPS cần <code>JsApiPlugin=true</code> trong <code>oem.ini</code>. Trình cài chỉ in ra lệnh <code>sudo</code> cần chạy chứ không tự sửa file hệ thống.</p>
+        </div>
+        <h3>Tái hiện lỗi</h3>
+        <p>Máy phát triển dùng cùng phiên bản với CI, nên tái hiện bằng cách dựng một <code>HOME</code> và profile tạm, không cần container. Cách này cũng đúng với phần cài đặt: chạy <code>install.sh</code> trong <code>HOME</code> tạm là thấy đủ hành vi thật.</p>
+      </section>
+
+      <!-- 18 -->
+      <section id="no">
+        <h2><span class="mark">18</span>Nợ đã biết</h2>
+        <p>Những điểm dưới đây đúng tại thời điểm 12/10/2026. Đọc trước khi tin vào một tài liệu cũ hoặc trước khi so hai bản bridge với nhau.</p>
+        <ul>
+          <li><strong>Bridge C# lệch vài chỗ về hành vi,</strong> không chỉ về chữ nghĩa: thiếu ba lệnh so với bản Python, còn câu mô tả cũ cho <code>et.checkRange</code>, và <code>WriterCheckTables</code> chưa xử lý bảng layout. (Ngược lại, nó đi trước Linux ở lệnh thiết kế và slide theo mẫu.)</li>
+          <li><strong>WPS còn thiếu:</strong> ET và WPP chưa có <code>UndoRecord</code>; 22 mục chưa có handler (danh sách ở <code>CHUA_CO_HANDLER</code>), gồm bảy lệnh <code>writer.*</code>, lệnh thiết kế, lệnh slide theo mẫu và <code>app.screenshot</code>.</li>
+          <li><strong>LibreOffice còn thiếu:</strong> khoá vùng bôi đen và lệnh nhanh <i>Sửa bằng AI</i>.</li>
+          <li><strong>WPS ET chưa kiểm tra dữ liệu lạc ngoài bảng</strong> trong <code>cmdEtCheckRange</code>, trong khi câu mô tả của nó đã hứa điều đó.</li>
+          <li><strong>MCP chỉ có stdio,</strong> chưa có HTTP hay SSE.</li>
+          <li><strong>Chưa có bộ đánh giá cho skill.</strong> Sửa skill hiện dựa vào review đọc tay cộng các test cấu trúc, nên chất lượng nội dung chưa đo được bằng máy.</li>
+          <li><strong>Test đóng gói chưa nối vào CI:</strong> <code class="path">tests/linux/test_package.py</code> có nhưng chưa được gọi trong workflow.</li>
+        </ul>
+        <p class="meta">Phần chưa kiểm chứng ở mức chi tiết: các engine OOXML (<code>core-go/internal/ooxml</code>, <code>docx</code>, <code>xlsx</code>, <code>pptx</code>) và <code>core-go/internal/memory</code> mới chỉ được đọc ở mức chữ ký hàm, chưa đọc thân hàm.</p>
+      </section>
+
+      <!-- 19 -->
+      <section id="doc-ma">
+        <h2><span class="mark">19</span>Đọc mã theo thứ tự này</h2>
+        <p>Đường đi ngắn nhất để hiểu hệ thống, mỗi bước là một câu hỏi cụ thể.</p>
+        <ol>
+          <li><code class="path">core-go/internal/config/bridge.go</code> và <code class="path">config.go</code> — cổng và đường dẫn đến từ đâu.</li>
+          <li><code class="path">core-go/internal/office/session.go</code> — Core biết ứng dụng nào đang mở bằng cách nào.</li>
+          <li><code class="path">core-go/internal/api/guard.go</code> rồi <code class="path">api.go</code> — biên giới tin cậy nằm ở đâu.</li>
+          <li><code class="path">core-go/internal/agent/prompt.go</code> — prompt được ghép ra sao và luật nào nằm ở đây.</li>
+          <li><code class="path">core-go/internal/tools/office_action.go</code> — bảy bước của mọi lệnh, đọc kỹ nhất file này.</li>
+          <li><code class="path">core-go/internal/policy/policy.go</code> cộng <code class="path">core-go/internal/agent/confirm.go</code> — khi nào hệ thống hỏi người dùng.</li>
+          <li><code class="path">src/AxiomOffice.LibreOffice/python/pythonpath/axiom/commands.py</code> rồi <code class="path">writer.py</code> — registry và một handler đầy đủ.</li>
+          <li><code class="path">src/AxiomOffice.WPS/commands.js</code> — cùng hợp đồng đó viết cho WPS, chú ý phần <code>MUTATING</code> ở đầu file.</li>
+          <li><code class="path">core-go/internal/wpsbridge/wpsbridge.go</code> cộng <code class="path">core-go/internal/api/wps.go</code> — kênh long-poll, chỗ dễ lạc nhất.</li>
+          <li><code class="path">core-go/internal/api/wpsadmin.go</code> cộng <code class="path">wpspane.go</code> — kênh pane WPS không token (<code>routeBoth</code>, <code>exec</code>, <code>config</code>) và trạm trung chuyển ribbon → pane.</li>
+          <li><code class="path">core-go/internal/agent/quickactions.go</code> rồi <code class="path">src/AxiomOffice.WPS/mini.html</code> — lệnh nhanh <i>Sửa bằng AI</i> từ câu lệnh trong Core tới khung chat mini.</li>
+          <li><code class="path">skills/</code> — dữ liệu dạy model, không phải mã.</li>
+        </ol>
+      </section>
+
+      <!-- 20 -->
+      <section id="tu-dien">
+        <h2><span class="mark">20</span>Từ điển</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Từ</th><th>Nghĩa trong dự án này</th></tr></thead>
+            <tbody>
+              <tr><td><b>Core</b></td><td>Tiến trình <code>axiom-core</code> viết bằng Go. Nơi duy nhất giữ LLM, prompt, skill và chính sách.</td></tr>
+              <tr><td><b>Bridge</b></td><td>Mã trong ứng dụng văn phòng, nhận lệnh từ Core và thực thi trên tài liệu đang mở.</td></tr>
+              <tr><td><b>Phiên (session)</b></td><td>Một file JSON mô tả một ứng dụng đang mở: cổng, pid, tài liệu, token.</td></tr>
+              <tr><td><b>Pane</b></td><td>Không gian chat bên trong ứng dụng, người dùng gõ yêu cầu ở đây.</td></tr>
+              <tr><td><b>Lượt chạy (run)</b></td><td>Một lần agent làm việc từ lúc nhận yêu cầu đến lúc trả lời xong. Mỗi cổng có tối đa một lượt tại một thời điểm.</td></tr>
+              <tr><td><b>Tool</b></td><td>Việc model được phép gọi, ví dụ <code>office_action</code> hay <code>load_skill</code>. Tool là phía Core; lệnh là phía bridge.</td></tr>
+              <tr><td><b>Lệnh</b></td><td>Một hành động cụ thể trên tài liệu, có tên trong registry, ví dụ <code>writer.heading</code>.</td></tr>
+              <tr><td><b>Allowlist</b></td><td>Danh sách lệnh model được gọi, dựng từ registry của bridge đang kết nối.</td></tr>
+              <tr><td><b>Gated</b></td><td>Cờ trong registry: lệnh có đi qua cổng kiểm soát chung hay tự lo phần của nó (như <code>ui.setup</code>).</td></tr>
+              <tr><td><b>Skill</b></td><td>Gói hướng dẫn cho model, nạp theo ba tầng. Là dữ liệu của Core, dùng chung cho mọi ứng dụng.</td></tr>
+              <tr><td><b>Live tool</b></td><td>Tool MCP đọc hoặc thao tác trực tiếp trên tài liệu đang mở.</td></tr>
+              <tr><td><b>.oxt</b></td><td>Gói extension của LibreOffice, cài bằng <code>unopkg</code>.</td></tr>
+              <tr><td><b>Xvfb</b></td><td>Màn hình ảo, dùng để chạy LibreOffice và WPS trong CI.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <footer>
+        <p>Tài liệu này viết cho mã trên nhánh <code>main</code> tại commit <code>8422c34</code> (12/10/2026) và được rà lại với mã ngày 20/10/2026. Mọi đường dẫn đều tính từ gốc repo; số dòng đã bỏ vì trôi theo mã — tìm theo tên ký hiệu.</p>
+        <p>Khi mã đổi, sửa trang này cùng lúc với <code>CHANGELOG.md</code>. Một tài liệu kiến trúc lệch khỏi mã còn tệ hơn không có tài liệu.</p>
+      </footer>
+    </main>
+  </div>
+</div>
+
+<script>
+(function () {
+  // Ở khổ rộng, mục lục phải luôn mở; người dùng có thể đã thu nó lại lúc xem trên điện thoại.
+  var box = document.querySelector('.toc-box');
+  if (box && window.matchMedia) {
+    var wide = window.matchMedia('(min-width: 1060px)');
+    var sync = function () { if (wide.matches) box.open = true; };
+    sync();
+    if (wide.addEventListener) wide.addEventListener('change', sync);
+  }
+
+  var links = Array.prototype.slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  if (!links.length || !('IntersectionObserver' in window)) return;
+  var byId = {};
+  var targets = [];
+  links.forEach(function (link) {
+    var id = link.getAttribute('href').slice(1);
+    var el = document.getElementById(id);
+    if (!el) return;
+    byId[id] = link;
+    targets.push(el);
+  });
+  function setActive(id) {
+    links.forEach(function (l) { l.classList.remove('on'); });
+    if (byId[id]) byId[id].classList.add('on');
+  }
+  var visible = {};
+  var observer = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      visible[entry.target.id] = entry.isIntersecting ? entry.boundingClientRect.top : null;
+    });
+    var current = null;
+    for (var i = 0; i < targets.length; i++) {
+      var id = targets[i].id;
+      if (visible[id] !== null && visible[id] !== undefined) { current = id; break; }
+    }
+    if (current) setActive(current);
+  }, { rootMargin: '-10% 0px -70% 0px', threshold: 0 });
+  targets.forEach(function (t) { observer.observe(t); });
+})();
+</script>
+</body>
+</html>

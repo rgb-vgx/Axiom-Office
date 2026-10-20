@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  # Linux la nen tang chinh cua lan LibreOffice (LibreOffice_arch.md): chay duoc ca test that voi soffice.
+  # Linux la nen tang chinh cua lan LibreOffice (docs/architecture/libreoffice.md): chay duoc ca test that voi soffice.
   # Khong con .NET o day: MCP server ban Linux la subcommand `mcp` cua chinh Agent Core (Go).
   linux:
     runs-on: ubuntu-24.04

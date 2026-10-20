@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Cai Axiom Office cho LibreOffice tren Linux (LibreOffice_arch.md giai doan L3) - khong can root.
+# Cai Axiom Office cho LibreOffice tren Linux (docs/architecture/libreoffice.md giai doan L3) - khong can root.
 #
 #   ./install.sh [--endpoint URL] [--model NAME] [--api-key KEY|-] [--systemd] [--no-wps]   cai / nang cap
 #                 (--api-key - = doc khoa tu stdin; --systemd = bat Core chay thuong truc bang systemd --user;

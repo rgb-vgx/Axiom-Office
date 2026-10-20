@@ -48,7 +48,7 @@ namespace AxiomOffice.Bridge
             get { return ReadInt("Enabled", 1) != 0; }
         }
 
-        // 0 = pane luon dung agent in-process, khong khoi dong Agent Core (New_arch.md muc 7.6).
+        // 0 = pane luon dung agent in-process, khong khoi dong Agent Core (docs/architecture/core.md muc 7.6).
         public static bool CoreEnabled
         {
             get { return ReadInt("CoreEnabled", 1) != 0; }
@@ -151,7 +151,7 @@ namespace AxiomOffice.Bridge
             return false;
         }
 
-        // Ghi nhớ dài hạn của Agent Core (New_arch.md mục 8.5.10); Core đọc lại mỗi lượt.
+        // Ghi nhớ dài hạn của Agent Core (docs/architecture/core.md mục 8.5.10); Core đọc lại mỗi lượt.
         public static bool MemoryEnabled
         {
             get { return ReadInt("MemoryEnabled", 1) != 0; }

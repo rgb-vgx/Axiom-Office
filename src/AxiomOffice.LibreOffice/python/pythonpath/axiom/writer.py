@@ -1,5 +1,5 @@
 """Lenh Writer (kind "wps") - cung ten, tham so va hinh dang ket qua voi CommandDispatcher.Writer.cs
-(LibreOffice_arch.md muc 7.1). Moi lenh sua tai lieu chay trong mot undo context (undo=True)."""
+(docs/architecture/libreoffice.md muc 7.1). Moi lenh sua tai lieu chay trong mot undo context (undo=True)."""
 from __future__ import annotations
 
 import uno

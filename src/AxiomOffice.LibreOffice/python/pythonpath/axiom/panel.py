@@ -1,4 +1,4 @@
-"""Pane Ask AI cua LibreOffice (LibreOffice_arch.md muc 10, 14.3).
+"""Pane Ask AI cua LibreOffice (docs/architecture/libreoffice.md muc 10, 14.3).
 
 Giao dien giong pane cua MS Office/WPS (AskAiPane.cs + PaneControls.cs): header co cham accent, tieu de,
 phu de va link "Tro chuyen moi / Ghi nho / Cai dat"; vung chat voi bong bong bo goc, dong thao tac co icon,

@@ -15,12 +15,12 @@ Có ba cách dùng, chung một lõi:
 
 Không cần quyền admin, không cần Python. Gói cài Windows kèm Agent Core (một binary Go ~12 MB).
 
-**Hướng dẫn sử dụng cho người dùng cuối** (cài, thiết lập, dùng từng nút, xử lý lỗi): [docs/user-manual.md](docs/user-manual.md).
+**Hướng dẫn sử dụng cho người dùng cuối** (cài, thiết lập, dùng từng nút, xử lý lỗi): [docs/user/user-manual.md](docs/user/user-manual.md).
 
 LibreOffice dùng **extension Python UNO** (`src\AxiomOffice.LibreOffice`) nói đúng giao thức bridge
 trên (cùng tên lệnh `writer.*`/`et.*`/`wpp.*`, cùng session registry) — xem
 [mục LibreOffice](#libreoffice). Chạy được trên cả Windows và Linux (Ubuntu 24.04 + LibreOffice 24.2 đã kiểm
-chứng; CI chạy LibreOffice thật — xem `LibreOffice_arch.md`).
+chứng; CI chạy LibreOffice thật — xem `docs/architecture/libreoffice.md`).
 
 **WPS Office for Linux** dùng một add-in JS riêng (`src/AxiomOffice.WPS`) do Agent Core phục vụ — xem
 [mục WPS Office for Linux](#wps-office-for-linux).
@@ -32,6 +32,7 @@ chứng; CI chạy LibreOffice thật — xem `LibreOffice_arch.md`).
 ## Mục lục
 
 - [Tình trạng dự án](STATUS.md) — đã làm được gì, chưa làm được gì
+- [Mục lục tài liệu](docs/README.md) — hướng dẫn sử dụng, kiến trúc, nghiên cứu, lộ trình
 - [Kiến trúc](#kiến-trúc)
 - [Cài đặt cho người dùng](#cài-đặt-cho-người-dùng)
 - [Ask AI (agent trong app)](#ask-ai-agent-trong-app)
@@ -48,7 +49,7 @@ chứng; CI chạy LibreOffice thật — xem `LibreOffice_arch.md`).
 ## Kiến trúc
 
 > Tài liệu thiết kế đầy đủ, gồm High Level Design và Low Level Design, có sơ đồ mermaid: xem
-> [ARCHITECTURE.MD](ARCHITECTURE.MD).
+> [docs/architecture/README.md](docs/architecture/README.md).
 
 ```
  Người dùng ── Ask AI (task pane) ──┐
@@ -66,7 +67,7 @@ chứng; CI chạy LibreOffice thật — xem `LibreOffice_arch.md`).
 |---|---|
 | `AxiomOffice.dll` | COM add-in (`IDTExtensibility2`) nạp vào Word/Excel/PowerPoint và WPS: mở HTTP bridge trong process của app, thêm tab ribbon **Axiom Office**, task pane Ask AI và AI agent |
 | `AxiomOffice.Host.exe` | `mcp [all\|word\|excel\|ppt]`: chuyển tiếp sang `AxiomOffice.Core.exe mcp` (giữ cho cấu hình MCP client đã có) · `wps\|et\|wpp\|word\|excel\|ppt`: companion tự tạo app qua COM automation và mở bridge (khi add-in không nạp được) · `commands`: danh sách lệnh bridge · `llm-test`: thử cấu hình AI |
-| `AxiomOffice.Core.exe` | **Agent Core** viết bằng Go ([core-go/](core-go/README.md), theo [New_arch.md](New_arch.md)): process riêng chạy agent cho mọi app, một bản cho mỗi người dùng, chỉ nghe `127.0.0.1:47840`; add-in khởi động khi cần và tìm qua `%LOCALAPPDATA%\AxiomOffice\core.json`. Hiện có: vòng lặp agent (OpenAI-compatible + Anthropic), hội thoại liên tục theo tài liệu, audit tool call, SSE `/v1/runs/{id}/events`, hủy, trần token, **skills** (`load_skill`, `read_skill_file`, `/v1/skills`), memory dài hạn, xác nhận thao tác rủi ro, MCP client, lệnh nhanh *Sửa bằng AI* (`quickAction`), và kênh `/wps/*` phục vụ add-in WPS Linux (bridge WPS cổng 47861) |
+| `AxiomOffice.Core.exe` | **Agent Core** viết bằng Go ([core-go/](core-go/README.md), theo [docs/architecture/core.md](docs/architecture/core.md)): process riêng chạy agent cho mọi app, một bản cho mỗi người dùng, chỉ nghe `127.0.0.1:47840`; add-in khởi động khi cần và tìm qua `%LOCALAPPDATA%\AxiomOffice\core.json`. Hiện có: vòng lặp agent (OpenAI-compatible + Anthropic), hội thoại liên tục theo tài liệu, audit tool call, SSE `/v1/runs/{id}/events`, hủy, trần token, **skills** (`load_skill`, `read_skill_file`, `/v1/skills`), memory dài hạn, xác nhận thao tác rủi ro, MCP client, lệnh nhanh *Sửa bằng AI* (`quickAction`), và kênh `/wps/*` phục vụ add-in WPS Linux (bridge WPS cổng 47861) |
 
 Mỗi app có port riêng; WPS và Microsoft Office dùng hai dải khác nhau nên chạy song song
 được (đổi qua registry, xem [Cấu hình](#cấu-hình)):
@@ -82,7 +83,7 @@ session registry — xem [mục LibreOffice](#libreoffice)); ba app chung một 
 process ghi ba file session. **WPS Office for Linux** không tự mở cổng nào: Agent Core đứng ra làm bridge ở
 cổng 47861 (`AXIOM_WPS_BRIDGE_PORT`), add-in JS nối về Core qua `/wps/v1/poll` — xem
 [mục WPS Office for Linux](#wps-office-for-linux). Thiết kế đầy đủ (Linux, sidebar, Core đa nền tảng, giai đoạn L0–L4):
-[LibreOffice_arch.md](LibreOffice_arch.md).
+[docs/architecture/libreoffice.md](docs/architecture/libreoffice.md).
 
 ## Cài đặt cho người dùng
 
@@ -710,7 +711,7 @@ Cùng một DLL, một lần cài phục vụ cả hai bộ app:
 WPS trên Linux không nạp được COM add-in, nên có một **add-in JS riêng** (`src/AxiomOffice.WPS`, ES5 — WPS chạy nó
 trong CEF Chrome 87). **Agent Core phục vụ** các tệp của add-in (`http://127.0.0.1:47840/wps/addin/`) và đứng ra làm
 bridge ở cổng 47861; add-in không mở được cổng nên nó **poll** Core (`/wps/v1/poll`) để nhận lệnh. Thiết kế và các
-phép đo trên WPS thật: [docs/wps-bridge.md](docs/wps-bridge.md), [tests/wps/REFERENCE.md](tests/wps/REFERENCE.md).
+phép đo trên WPS thật: [docs/architecture/wps-bridge.md](docs/architecture/wps-bridge.md), [tests/wps/REFERENCE.md](tests/wps/REFERENCE.md).
 
 - **Cài**: `scripts/linux/install.sh` tự đăng ký add-in khi có `/opt/kingsoft/wps-office` (ghi một dòng
   `jspluginonline` vào `~/.local/share/Kingsoft/wps/jsaddons/publish.xml`, giữ add-in khác; `--no-wps` để bỏ qua).
@@ -718,9 +719,10 @@ phép đo trên WPS thật: [docs/wps-bridge.md](docs/wps-bridge.md), [tests/wps
   khi Core đã chạy, nên dùng `./install.sh --systemd`.
 - **Ribbon** (tab *Axiom Office*, `ribbon.xml`): *Trợ lý* (Ask AI) · *Kiểm tra* (Soát bố cục / Soát bảng / Soát vùng
   dữ liệu) · *Quản lý* (Bộ nhớ AI…, Kỹ năng…) · *Hệ thống* (Thiết lập…, Trạng thái, Mở nhật ký, Khác ▸ Kiểm tra mô
-  hình / Sao chép API URL). Icon là tệp `images/<tag>.svg` (WPS **không** nhận data URI — nó vẽ dấu `?`). Các control
+  hình / Sao chép API URL). Icon ribbon là `imageMso` — bộ icon có sẵn của WPS, như bản Windows dùng icon của Office (tên phải có trong bảng
+  lệnh của WPS — `docs/architecture/ribbon-ui.md` §5.3). Các control
   Windows **cố ý không có** trên WPS (Nhìn tài liệu, Tìm web, Công cụ ngoài, Cài đặt nâng cao, Tắt Agent Core, menu
-  ngôn ngữ) — lý do ghi đầu `ribbon.xml` và `docs/ribbon-ui.md` §2.
+  ngôn ngữ) — lý do ghi đầu `ribbon.xml` và `docs/architecture/ribbon-ui.md` §2.
 - **Khung chat** (`pane.html`): menu **⋯** (Trò chuyện mới / Hội thoại trước… / Ghi nhớ / Nhật ký / Thiết lập), các
   màn hình phụ (Bộ nhớ AI, Nhật ký hoạt động, Thiết lập, Kỹ năng, Trạng thái, Nhật ký Core, Soát tài liệu, Hội
   thoại), công tắc *Lập kế hoạch trước*, footer *Hoàn tác lượt này* / *Chèn trả lời* / *Dừng*.
@@ -738,7 +740,7 @@ phép đo trên WPS thật: [docs/wps-bridge.md](docs/wps-bridge.md), [tests/wps
 
 Cùng giao thức, cùng tên lệnh với add-in — nhưng bridge nằm trong **extension Python UNO**
 (`src\AxiomOffice.LibreOffice`), không phải COM add-in, nên không cần .NET và chạy được cả **Windows** lẫn
-**Linux** (thiết kế: `LibreOffice_arch.md`). Trên Linux, Agent Core đọc cấu hình từ
+**Linux** (thiết kế: `docs/architecture/libreoffice.md`). Trên Linux, Agent Core đọc cấu hình từ
 `~/.config/axiom-office/config.json` thay cho HKCU, và **không cần .NET trên máy đích**: bản phát hành kèm
 Core self-contained.
 
@@ -792,7 +794,7 @@ Pane mở ở một trong hai chỗ (cùng một giao diện):
 
 Hạn chế: con lăn chuột không cuộn được hội thoại (awt không có sự kiện wheel cho khung tự vẽ) — dùng thanh
 cuộn hoặc PageUp/PageDown trong ô soạn; hội thoại tự cuộn xuống cuối khi có dòng mới. Chi tiết kỹ thuật:
-`LibreOffice_arch.md` mục 14.2–14.3.
+`docs/architecture/libreoffice.md` mục 14.2–14.3.
 
 Khác bản Office (do UNO):
 
@@ -908,7 +910,7 @@ src/AxiomOffice/              COM add-in (net48)
   Ribbon/                     Ribbon XML + xử lý nút
 src/AxiomOffice.Host/         AxiomOffice.Host.exe: companion + MCP server
   Mcp/                        giao thức MCP, tool file (OOXML) + live, template docx/pptx nhúng
-core-go/                      Agent Core viết bằng Go (New_arch.md; thiết kế riêng: core-go/README.md)
+core-go/                      Agent Core viết bằng Go (docs/architecture/core.md; thiết kế riêng: core-go/README.md)
   cmd/axiom-core/             main: một Core mỗi người dùng, chọn port, core.json, dừng êm khi nhận SIGTERM
   internal/agent/             Orchestrator, RunManager, luồng sự kiện SSE, prompt, ngữ cảnh, xác nhận
   internal/model/             codec OpenAI/Anthropic + vòng lặp agent; internal/skills, internal/memory, internal/mcp

@@ -1,4 +1,4 @@
-"""QA cau truc (chi doc) - cung quy tac voi CommandDispatcher.Checks.cs (LibreOffice_arch.md muc 7): agent
+"""QA cau truc (chi doc) - cung quy tac voi CommandDispatcher.Checks.cs (docs/architecture/libreoffice.md muc 7): agent
 "mu", chi doc duoc text, nen sau khi sua no doc lai bang so de tu soat (tran chu, shape chong, o trong...)."""
 from __future__ import annotations
 
@@ -71,7 +71,7 @@ def writer_check_tables(env, params):
             issues.append(issue("empty-cells", "table %d has %d empty cell(s)" % (index, empty), table=index))
         # Moi o tieu de so voi trung vi cac o tieu de CON LAI (leave-one-out), khong so voi trung vi ca nhom:
         # voi bang 2 cot, trung vi ca nhom chinh la o dai hon nen nguong "3 x trung vi" khong bao gio voi toi
-        # (docs/skills-review.md muc 4.7) - mot dieu kien khong bao gio sai thi khong phai la kiem tra.
+        # (docs/research/skills-review.md muc 4.7) - mot dieu kien khong bao gio sai thi khong phai la kiem tra.
         # Bang 1 cot khong co nhom de so, nen khong bao (khong co ti le nao de noi o do dai BAT THUONG).
         for position, text in enumerate(header):
             others = sorted(len(other) for at, other in enumerate(header) if at != position)

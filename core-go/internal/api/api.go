@@ -1,4 +1,4 @@
-// Package api: Core API v1 (New_arch.md muc 7.3) - ban Go cua Api/*.cs. Hinh dang response giong bridge:
+// Package api: Core API v1 (docs/architecture/core.md muc 7.3) - ban Go cua Api/*.cs. Hinh dang response giong bridge:
 // {"ok":true,"result":...} hoac {"ok":false,"error":"..."}.
 package api
 
@@ -62,7 +62,7 @@ type Deps struct {
 	// Stop dung Core (POST /v1/admin/shutdown).
 	Stop func()
 
-	// WPS: bridge cho JS add-in WPS (docs/wps-bridge.md muc 2). nil = tat (cho test cu).
+	// WPS: bridge cho JS add-in WPS (docs/architecture/wps-bridge.md muc 2). nil = tat (cho test cu).
 	WPS *wpsbridge.Bridge
 }
 

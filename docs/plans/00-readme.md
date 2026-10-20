@@ -34,6 +34,6 @@ trong code: trạng thái có thể đã đổi.
 
 ## Việc ngoài các phase (chưa có tệp riêng)
 
-- Đóng gói, cập nhật, ký số DLL và exe (ARCHITECTURE.MD ghi DLL chưa ký số).
+- Đóng gói, cập nhật, ký số DLL và exe (docs/architecture/README.md ghi DLL chưa ký số).
 - Chất lượng tính năng trình bày: `doc_design` (Word), `slides_from_template` (PowerPoint) - đo bằng bộ `17`.
 - Dịch giao diện: xong ribbon + khung chat Windows; còn wizard, các form quản lý, khung chat WPS/LibreOffice.

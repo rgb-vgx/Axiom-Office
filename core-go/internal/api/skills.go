@@ -8,7 +8,7 @@ import (
 	"axiomoffice/core/internal/skills"
 )
 
-// GET /v1/skills?app=wps|et|wpp, POST /v1/skills/reload (New_arch.md muc 7.3, 8.4.4).
+// GET /v1/skills?app=wps|et|wpp, POST /v1/skills/reload (docs/architecture/core.md muc 7.3, 8.4.4).
 func mapSkills(mux *http.ServeMux, deps *Deps) {
 	routeBoth(mux, deps, "GET /v1/skills", func(w http.ResponseWriter, r *http.Request) {
 		appKind := strings.TrimSpace(r.URL.Query().Get("app"))

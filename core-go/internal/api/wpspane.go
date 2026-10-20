@@ -10,7 +10,7 @@ import (
 	"axiomoffice/core/internal/agent"
 )
 
-// Kenh ribbon/menu chuot phai -> khung chat dang mo (docs/ribbon-ui.md muc 7).
+// Kenh ribbon/menu chuot phai -> khung chat dang mo (docs/architecture/ribbon-ui.md muc 7).
 //
 // Tren WPS, ribbon (main.js) va khung chat (pane.html) la hai trang CEF rieng va KHONG co kenh nao giua chung:
 // Application.CreateTaskPane chi MO trang, khong dua duoc gi vao trang dang mo. Ca hai deu noi duoc voi Core, nen

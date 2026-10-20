@@ -1,7 +1,9 @@
-# New_arch.md: Yêu cầu triển khai Agent Core cho Axiom Office
+# Agent Core: yêu cầu triển khai (kiến trúc Core + add-in)
+
+> Trước 20/10/2026 tài liệu này là `New_arch.md` ở gốc repo.
 
 > **Dành cho Claude ở phiên làm việc mới.** Đây là bản yêu cầu triển khai, không phải tài liệu
-> giới thiệu. Đọc hết tài liệu này, rồi đọc `ARCHITECTURE.MD`, `README.md`, `CHANGELOG.md` (mục
+> giới thiệu. Đọc hết tài liệu này, rồi đọc `docs/architecture/README.md`, `README.md`, `CHANGELOG.md` (mục
 > `[Unreleased]`) trước khi sửa code. Làm **theo từng giai đoạn** (mục 12); mỗi giai đoạn một
 > branch, chạy đủ test, commit, rồi **dừng lại hỏi người dùng trước khi merge** vào `main`.
 > Gặp điểm chưa rõ thì xem mục 14 (câu hỏi mở); quyết định nào ảnh hưởng người dùng thì hỏi, còn lại
@@ -29,7 +31,7 @@
 ## 1. Bối cảnh: hệ thống hiện tại
 
 Trạng thái xuất phát: branch `main` tại commit `e8f177e` (tháng 9/2026). Chi tiết đầy đủ trong
-`ARCHITECTURE.MD`; tóm tắt những gì cần biết:
+`docs/architecture/README.md`; tóm tắt những gì cần biết:
 
 | Thành phần | Hiện trạng |
 |---|---|
@@ -93,7 +95,7 @@ Các quy tắc này do người dùng đặt ra từ trước, **không được
    `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Không commit khi đang ở `main`: tạo
    branch trước. Không push (repo không có remote). Merge bằng `git merge --ff-only` khi được đồng ý.
 9. Cập nhật `README.md` và `CHANGELOG.md` (`[Unreleased]`) **trong cùng đợt** với thay đổi code;
-   cập nhật `ARCHITECTURE.MD` khi kiến trúc đổi. Bảng lệnh README sinh bằng
+   cập nhật `docs/architecture/README.md` khi kiến trúc đổi. Bảng lệnh README sinh bằng
    `AxiomOffice.Host.exe commands --markdown`.
 10. **Không bao giờ in token hay API key** ra màn hình, log, test output hay commit.
 11. Script `.ps1` giữ ASCII không BOM. Khi sửa file bằng script Python, đọc/ghi giữ nguyên kiểu
@@ -293,7 +295,7 @@ sequenceDiagram
 
 Giống bridge: chỉ `127.0.0.1`; mọi endpoint trừ `/health` cần `X-Auth-Token` = `HKCU\Software\AxiomOffice\Token`;
 từ chối request có header `Origin` (403) — **trừ** `/wps/*`, kênh của add-in WPS Linux, xác thực riêng theo
-`Origin` của chính Core (`docs/wps-bridge.md` §2.2, `checkWPSAuth`); body `POST` bắt buộc `application/json` (415). Không log
+`Origin` của chính Core (`docs/architecture/wps-bridge.md` §2.2, `checkWPSAuth`); body `POST` bắt buộc `application/json` (415). Không log
 header, token, API key, nội dung prompt đầy đủ ở mức mặc định (chỉ độ dài + 200 ký tự đầu, giống
 `bridge.log` hiện nay ghi prompt; giữ hành vi hiện tại nhưng không bao giờ log secret).
 
@@ -331,7 +333,7 @@ Mọi response JSON dạng `{"ok": true, "result": ...}` hoặc `{"ok": false, "
 
 Kênh pane WPS Linux (`/wps/v1/*`, không token, xác thực theo `Origin` của Core) — phần lớn là bản sao của các
 đường trên qua `routeBoth`, cộng vài đường riêng (`status`, `exec`, `config`, `pane/request`, `pane/events`): xem
-`docs/wps-bridge.md` §7.
+`docs/architecture/wps-bridge.md` §7.
 
 Body `POST /v1/runs`:
 
@@ -1012,7 +1014,7 @@ chạy tiếp (gọi shutdown, rồi kill **đúng pid do test tạo** nếu c�
 ## 12. Các giai đoạn triển khai
 
 Mỗi giai đoạn: branch riêng (`feat/core-phase-N-...`), commit nhỏ theo đường dẫn, cập nhật
-README + CHANGELOG + `ARCHITECTURE.MD` khi cần, chạy test, báo cáo kết quả (con số pass/fail thật),
+README + CHANGELOG + `docs/architecture/README.md` khi cần, chạy test, báo cáo kết quả (con số pass/fail thật),
 **hỏi trước khi merge**.
 
 ### Giai đoạn 0: Toolchain và khung
@@ -1081,7 +1083,7 @@ README + CHANGELOG + `ARCHITECTURE.MD` khi cần, chạy test, báo cáo kết q
 - [x] (Hỏi người dùng) `ai.ask` chuyển sang Core khi sẵn sàng (7.7).
 - [x] (Hỏi người dùng) `app.screenshot` + QA thị giác: chụp cửa sổ app, model đọc ảnh soát bố cục
       (8.4.6) — chỉ bật khi người dùng đồng ý vì tốn token hơn QA cấu trúc.
-- [x] Cập nhật `ARCHITECTURE.MD` (HLD + LLD) cho kiến trúc mới.
+- [x] Cập nhật `docs/architecture/README.md` (HLD + LLD) cho kiến trúc mới.
 - **Xong khi**: e2e cho confirm (đồng ý / từ chối / hết giờ), MCP server mẫu (một server Python
   stdlib nhỏ trong `tests/core/`) được gọi qua agent; audit đầy đủ.
 

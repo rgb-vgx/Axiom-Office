@@ -1,6 +1,7 @@
 # WPS Office for Linux — JS add-in: những gì đã biết (tài liệu tham khảo cho spike)
 
-Máy dev: WPS Office for Linux **11.1.0.11723**, cài ở `/opt/kingsoft/wps-office` (launcher `/usr/bin/wps`).
+Máy dev: WPS Office for Linux **11.1.0.11723** lúc đo 08–12/10/2026; từ 19/10/2026 là **12.1.2.29182** (các mục ghi
+ngày 19–20/10 đo trên bản này). Cài ở `/opt/kingsoft/wps-office` (launcher `/usr/bin/wps`).
 Không cần (và agent trong worktree không được phép) đọc `/opt` — mọi thứ cần biết đã chép ở đây.
 
 ## Đã xác minh trên WPS thật (08/10/2026, chạy add-in dưới Xvfb)
@@ -53,7 +54,7 @@ Ba biến thể đã thử, **chỉ biến thể A nạp được add-in trong c
 | C | ba entry, cùng `name`, ba `type` | chỉ entry đầu có hiệu lực |
 
 Vậy `type` nhận **danh sách ngăn bằng dấu phẩy** và một add-in phục vụ cả ba app. Hệ quả: add-in phải tự biết
-app nào đang chạy (`Application.Name`) và chỉ khai báo lệnh của app đó — xem `docs/wps-bridge.md` mục 3.
+app nào đang chạy (`Application.Name`) và chỉ khai báo lệnh của app đó — xem `docs/architecture/wps-bridge.md` mục 3.
 
 - `GET` mà WPS gọi khi nạp add-in: `ribbon.xml`, `index.html`, rồi script trong `index.html` — y hệt bản một app.
 - Tên app đo được (`Application.Name`): `WPS Writer`, `WPS Spreadsheets` (ET), `WPS Presentation` (WPP).
@@ -68,7 +69,7 @@ app nào đang chạy (`Application.Name`) và chỉ khai báo lệnh của app 
   ⇒ lỗi `Error: arguments error` khi bấm nút Ask AI **không** đến từ lời gọi này.
 - Pane do `CreateTaskPane` tạo **có** nạp trang (CEF GET trang pane, 200) nhưng script trong trang pane **không báo
   về** server probe — **dưới Xvfb**. Trên màn hình thật script của pane chạy được: ngày 11/10/2026 chính script đó gọi
-  `EventSource` và lộ ra lỗi 401 (`docs/wps-bridge.md` mục 7). Vậy đây là chuyện của lượt đo dưới Xvfb, chưa đo
+  `EventSource` và lộ ra lỗi 401 (`docs/architecture/wps-bridge.md` mục 7). Vậy đây là chuyện của lượt đo dưới Xvfb, chưa đo
   riêng nguyên nhân.
 - Danh sách key liên quan task pane trên `Application`: `CreateTaskPane`, `GetTaskPane`,
   `DisplayDocumentActionTaskPane`, `DisplayXMLSourcePane`, `DisplayDocumentInformationPanel`. `window.wps` **chính là**
@@ -220,7 +221,7 @@ quá 45 giây vẫn làm mọi người gọi khác thấy bridge mất kết n�
 khi `!Connected()` (`removeSession`), pane giữa chừng báo "chưa mở tài liệu" rồi lại thấy lại. **Đã sửa (T8b)**
 đúng theo hướng này: `Bridge.Complete` coi "add-in vừa trả kết quả" là bằng chứng còn sống và làm mới `lastPoll`
 ngay khi bỏ job khỏi `waiting`; cùng với `busyLocked` (job đã giao còn trong `AXIOM_WPS_CMD_WAIT_SECONDS` được tính
-là còn kết nối) — xem `docs/wps-bridge.md` mục 6.
+là còn kết nối) — xem `docs/architecture/wps-bridge.md` mục 6.
 
 Bài học cho người viết test live: một phép kiểm *mong đợi thất bại* sẽ xanh **kể cả khi** bridge đã mất kết
 nối. Sau mỗi lệnh dài phải có một phép kiểm **khẳng định bridge còn sống**, và phép kiểm lệnh sai phải đòi
@@ -328,6 +329,12 @@ viết tiếp cái gì đọc `/health` của bridge thì nhớ bóc `result`.
   nó **có** gọi callback, nhưng đem chuỗi trả về phân giải như một đường dẫn tương đối so với gốc add-in. Trả
   `"images/<tag>.svg"` (cách của SDK chính thức `@wps-jsapi/wps/js/ribbon.js`) thì hiện đủ icon. Tệp SVG chỉ có
   `viewBox`, không `width`/`height`.
+- **`imageMso` được nhận — icon có sẵn của WPS.** WPS ánh xạ tên kiểu Office sang icon riêng qua bảng lệnh
+  `/opt/kingsoft/wps-office/office6/res/commands/<wps|et|wpp>/ongmani/*.kuip` (`idMso="…"` + `icon="…_kd"`; 965 tên
+  khác nhau, chỉ 82 tên có ở cả ba app). Đặt `imageMso` = một tên có trong bảng thì ribbon hiện đúng icon WPS (người
+  dùng xác nhận 20/10/2026; chưa nhìn riêng từng app). Năm tên bản Windows dùng (`RecordsSaveRecord`, `ControlWizards`, `Info`,
+  `PropertySheet`, `AcceptInvitation`) không có trong bảng; `TableInsert` chỉ có ở trình chiếu. Bảng tên đang dùng:
+  `docs/architecture/ribbon-ui.md` §5.3.
 - **`<contextMenus>` được nhận.** `<contextMenu idMso="ContextMenuText">` / `"ContextMenuList"` với `<menu>`, `<button>`,
   `<menuSeparator>`, `insertBeforeMso="Cut"` — menu hiện khi chuột phải trên đoạn bôi đen, `onAction` gọi được
   `ribbon.OnAction`. (Ghi chú trong `RibbonUi.cs` của bản Windows rằng WPS "không nhận chắc" không đúng với WPS

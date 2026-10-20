@@ -158,7 +158,7 @@ namespace AxiomOffice.Bridge
 
             if (path == "/commands" && context.Request.HttpMethod == "GET")
             {
-                // Bo lenh cua dung DLL dang chay (New_arch.md muc 7.5): Agent Core dung de dung tool
+                // Bo lenh cua dung DLL dang chay (docs/architecture/core.md muc 7.5): Agent Core dung de dung tool
                 // office_action ma khong phai doan phien ban.
                 WriteJson(context, 200, new Dictionary<string, object>
                 {
@@ -234,7 +234,7 @@ namespace AxiomOffice.Bridge
                 if (action == "ai.ask")
                 {
                     // ai.ask chạy qua Agent Core: Core gọi ngược /cmd vào CHÍNH bridge này. Pump xử lý tuần tự nên
-                    // chờ ai.ask ngay trên Pump sẽ kẹt cả hai (New_arch.md mục 13, "bridge pump tuần tự") ->
+                    // chờ ai.ask ngay trên Pump sẽ kẹt cả hai (docs/architecture/core.md mục 13, "bridge pump tuần tự") ->
                     // chạy trên luồng riêng như SSE; lệnh COM vẫn tuần tự qua ComGate.
                     ThreadPool.QueueUserWorkItem(delegate
                     {

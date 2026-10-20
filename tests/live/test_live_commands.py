@@ -259,7 +259,7 @@ def test_writer(b, out, png, run_ai):
     b.cmd("writer.insertPageBreak")
     b.cmd("writer.insertImage", {"path": png, "width": 40, "height": 40})
     b.cmd("writer.insertHyperlink", {"url": "https://example.com", "text": "ví dụ"})
-    # "Hoàn tác lượt này" (New_arch.md 9.2): N thao tác AI = N bước Undo -> writer.undo {count: N} trả lại như cũ.
+    # "Hoàn tác lượt này" (docs/architecture/core.md 9.2): N thao tác AI = N bước Undo -> writer.undo {count: N} trả lại như cũ.
     baseline = (b.cmd("writer.getText", record=False) or {}).get("text")
     b.cmd("writer.appendText", {"text": "\rLượt AI dòng 1"}, record=False)
     b.cmd("writer.appendText", {"text": "\rLượt AI dòng 2"}, record=False)
@@ -353,7 +353,7 @@ def test_spreadsheet(b, out, run_ai):
     b.cmd("et.writeRange", {"range": "M1", "values": [["Mã", "Giá"], ["x", "'12"], ["y", "'15"]]}, key="et.writeRange numbers as text")
     text_qa = b.cmd("et.checkRange", {"range": "M1:N3"}, key="et.checkRange numbers as text") or {}
     check("numbers-as-text" in {i.get("type") for i in text_qa.get("issues", [])}, "Excel checkRange bắt số lưu dạng chữ", text_qa)
-    # QA thị giác (New_arch.md 8.4.6): ảnh chụp cửa sổ app, thu nhỏ theo maxWidth.
+    # QA thị giác (docs/architecture/core.md 8.4.6): ảnh chụp cửa sổ app, thu nhỏ theo maxWidth.
     shot = b.cmd("app.screenshot", {"maxWidth": 640}, key="app.screenshot", record=False) or {}
     png = base64.b64decode(shot.get("base64", "") or "")
     check(png[:8] == b"\x89PNG\r\n\x1a\n" and 0 < shot.get("width", 0) <= 640 and shot.get("height", 0) > 0,
@@ -397,7 +397,7 @@ def test_presentation(b, out, png, run_ai):
     check(listing and listing.get("slideCount") == 2, "PowerPoint listSlides có 2 slide", listing)
     b.cmd("wpp.addSlide", {"layout": 12}, key="wpp.addSlide third")
     b.cmd("wpp.deleteSlide", {})
-    # QA cấu trúc (New_arch.md 8.4.6): ca dựng sẵn - hai hộp chồng nhau + chữ dài tràn quá đáy slide.
+    # QA cấu trúc (docs/architecture/core.md 8.4.6): ca dựng sẵn - hai hộp chồng nhau + chữ dài tràn quá đáy slide.
     clean = b.cmd("wpp.checkLayout", {"slide": 1}, key="wpp.checkLayout clean slide")
     check(clean and clean.get("issueCount") == 0, "PowerPoint checkLayout slide gọn không báo lỗi", clean)
     b.cmd("wpp.addSlide", {"layout": 12}, key="wpp.addSlide qa")

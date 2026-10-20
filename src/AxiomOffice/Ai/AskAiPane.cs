@@ -158,10 +158,10 @@ namespace AxiomOffice.Ai
             _headerSubtitle.AutoEllipsis = true;
             _settingsLink = PaneTheme.MakeLink(Ui.T("Thiết lập"), PaneTheme.Caption);
             _settingsLink.AccessibleName = Ui.T("Mở wizard thiết lập Axiom Office");
-            // New_arch.md mục 9.2: link ở header (trước đây ở footer, người dùng không thấy trong Word).
+            // docs/architecture/core.md mục 9.2: link ở header (trước đây ở footer, người dùng không thấy trong Word).
             _newChatLink = PaneTheme.MakeLink(Ui.T("Trò chuyện mới"), PaneTheme.Caption);
             _newChatLink.AccessibleName = Ui.T("Bắt đầu cuộc trò chuyện mới cho tài liệu này");
-            // Hội thoại trước / nhật ký hoạt động: thuộc về khung chat, không đặt trên ribbon (docs/ribbon-ui.md).
+            // Hội thoại trước / nhật ký hoạt động: thuộc về khung chat, không đặt trên ribbon (docs/architecture/ribbon-ui.md).
             _moreLink = PaneTheme.MakeLink("⋯", PaneTheme.Caption);
             _moreLink.AccessibleName = Ui.T("Hội thoại trước và nhật ký hoạt động");
             header.Controls.Add(dot);
@@ -636,7 +636,7 @@ namespace AxiomOffice.Ai
                 LlmResult result;
                 try
                 {
-                    // Uu tien Agent Core (New_arch.md muc 9); Core khong dung duoc thi chay trong add-in
+                    // Uu tien Agent Core (docs/architecture/core.md muc 9); Core khong dung duoc thi chay trong add-in
                     // nhu cu de pane khong bao gio bi khoa vi Core.
                     result = RunViaCore(host, corePrompt, run, progress, plan);
                     if (result == null && files.Count > 0)
@@ -782,7 +782,7 @@ namespace AxiomOffice.Ai
 
             if (item.Type == "skill.loaded")
             {
-                // Dòng thông tin (không có " -> ") - New_arch.md mục 7.4.
+                // Dòng thông tin (không có " -> ") - docs/architecture/core.md mục 7.4.
                 return Ui.T("(Dùng kỹ năng: ") + (item.Name ?? "?") + ")";
             }
 
@@ -1020,7 +1020,7 @@ namespace AxiomOffice.Ai
             _chat.AddBlock(note);
         }
 
-        // Trích xuất memory chạy nền sau lượt (New_arch.md 8.5.4): hỏi lại sau ít giây để hiện "Đã ghi nhớ".
+        // Trích xuất memory chạy nền sau lượt (docs/architecture/core.md 8.5.4): hỏi lại sau ít giây để hiện "Đã ghi nhớ".
         private void PollExtractedMemories(string runId)
         {
             if (string.IsNullOrEmpty(runId))
@@ -1119,7 +1119,7 @@ namespace AxiomOffice.Ai
             }
         }
 
-        // "Hoàn tác lượt này" (New_arch.md mục 9.2, chỉ Word): writer.undo {count: số thao tác sửa của lượt}.
+        // "Hoàn tác lượt này" (docs/architecture/core.md mục 9.2, chỉ Word): writer.undo {count: số thao tác sửa của lượt}.
         // Excel/PowerPoint không hoàn tác được thay đổi qua COM nên không có nút.
         private void UndoLastRun()
         {

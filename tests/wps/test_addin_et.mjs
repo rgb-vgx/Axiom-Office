@@ -1,4 +1,4 @@
-// Spec T7 (docs/wps-bridge.md muc 5): 23 lenh `et.*` (Spreadsheets) cua JS add-in WPS.
+// Spec T7 (docs/architecture/wps-bridge.md muc 5): 23 lenh `et.*` (Spreadsheets) cua JS add-in WPS.
 //
 //   node --test tests/wps/test_addin_et.mjs
 //
@@ -33,7 +33,7 @@
 //   et.closeAll {}                         -> {closed, rescued}
 //   et.checkRange {range?, sheet?}         -> {sheet, range, usedRange, table, rows, cols, title, columns, issueCount, issues}
 //
-// Khac ban LibreOffice (do WPS that, ghi o docs/wps-bridge.md muc 6 va REFERENCE.md):
+// Khac ban LibreOffice (do WPS that, ghi o docs/architecture/wps-bridge.md muc 6 va REFERENCE.md):
 // - `undo`: ET khong co UndoRecord. Add-in TU CHUP gia tri o truoc khi ghi (va ghi nhan sheet do luot
 //   truoc tao), roi khoi phuc theo thu tu nguoc. Chi hoan tac duoc trong cung phien add-in.
 // - `exportPdf`: API goc (ExportAsFixedFormat/SaveAs .pdf) bao thanh cong ma KHONG ghi file, nen add-in
@@ -47,7 +47,7 @@
 // - `importCsv`: WPS chi doc duoc file qua `FileSystem.ReadFile` (UTF-8; `readFileString`/`writeFileString` bi
 //   sandbox - nem voi moi duong dan co dau phan cach). Nen `encoding` chi nhan cac cach viet UTF-8
 //   (mac dinh "utf-8-sig"; chuan hoa "_" -> "-", khong phan biet hoa/thuong), giao thuc khac bi tu choi ro rang
-//   thay vi am tham tra ve chuoi hong; BOM dau file bi cat. Chi tiet: docs/wps-bridge.md muc 6, REFERENCE.md.
+//   thay vi am tham tra ve chuoi hong; BOM dau file bi cat. Chi tiet: docs/architecture/wps-bridge.md muc 6, REFERENCE.md.
 // - Ghi o: ET EP KIEU chuoi trong nhu so / nhu ngay khi gan vao `Value2` ("42" -> 42, "01/01" -> ngay), khac
 //   LibreOffice (giu nguyen chuoi). Fake CHUA mo phong viec ep kieu nay (xem ghi chu o setCellScalar trong
 //   addin_fake.mjs): spec o day kiem hanh vi cua add-in, khong kiem lai luat ep kieu cua WPS.

@@ -85,7 +85,7 @@ class MenuParityTest(unittest.TestCase):
         self.assertIn("check", menu_actions())
 
     def test_chi_mot_muc_axiom_office_tren_menubar(self):
-        """Chi MOT muc "Axiom Office" (nguoi dung chot 13/10/2026, docs/ribbon-ui.md muc 1.2).
+        """Chi MOT muc "Axiom Office" (nguoi dung chot 13/10/2026, docs/architecture/ribbon-ui.md muc 1.2).
 
         Them muc thu hai vao OfficeMenuBar thi menubar co hai cho cho cung mot tinh nang; chan ngay tu file
         .xcu thay vi doi den luc nhin thay tren man hinh.

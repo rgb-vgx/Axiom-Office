@@ -10,7 +10,7 @@ import (
 
 // Tang 1 cua chuan Agent Skills (SkillsSection) chi gui `skillDescriptionLimit` ky tu dau cua description;
 // phan duoi KHONG toi model. Voi skill ma danh sach "Dung khi ..." nam o cuoi - thu duy nhat giup router
-// khop dung viec - bi cat nghia la skill coi nhu vo hinh (docs/skills-review.md muc 4.9). Test nay giu
+// khop dung viec - bi cat nghia la skill coi nhu vo hinh (docs/research/skills-review.md muc 4.9). Test nay giu
 // moi description trong repo lot qua router.
 func TestRepoSkillDescriptionsFitRouterLimit(t *testing.T) {
 	root, err := filepath.Abs(filepath.Join("..", "..", "..", "skills"))

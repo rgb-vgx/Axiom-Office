@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// Kenh add-in WPS (docs/wps-bridge.md 2.1-2.2, muc 7): phuc vu file tinh, /wps/v1/poll + /wps/v1/result
+// Kenh add-in WPS (docs/architecture/wps-bridge.md 2.1-2.2, muc 7): phuc vu file tinh, /wps/v1/poll + /wps/v1/result
 // va luot chay agent cho pane Ask AI (/wps/v1/runs...).
 // Xac thuc rieng (Origin dung bang origin cua Core hoac token khi khong Origin) nen di thang vao
 // mux, khong qua guard chung (guard chung chan moi Origin).
@@ -44,7 +44,7 @@ func mapWPS(mux *http.ServeMux, deps *Deps) {
 	})
 }
 
-// mapWPSRuns: luot chay agent cho pane Ask AI (docs/wps-bridge.md muc 7) - cung hanh vi va response
+// mapWPSRuns: luot chay agent cho pane Ask AI (docs/architecture/wps-bridge.md muc 7) - cung hanh vi va response
 // nhu /v1/runs, nhung Core tu gan office (bridge WPS) va document (lan poll gan nhat cua add-in).
 // Xac thuc kenh add-in (DecideWPSAuth + doi body JSON); /v1/runs giu guard cu.
 func mapWPSRuns(mux *http.ServeMux, deps *Deps) {

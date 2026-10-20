@@ -85,7 +85,7 @@ if ($config.GetValue("PortOffice") -eq $null) {
 if ($config.GetValue("Enabled") -eq $null) {
     $config.SetValue("Enabled", 1, [Microsoft.Win32.RegistryValueKind]::DWord)
 }
-# Cau hinh cua Agent Core (New_arch.md muc 7.6).
+# Cau hinh cua Agent Core (docs/architecture/core.md muc 7.6).
 if ($config.GetValue("CorePort") -eq $null) {
     $config.SetValue("CorePort", 47840, [Microsoft.Win32.RegistryValueKind]::DWord)
 }

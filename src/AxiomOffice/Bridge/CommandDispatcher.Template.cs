@@ -10,7 +10,7 @@ using System.Web.Script.Serialization;
 
 namespace AxiomOffice.Bridge
 {
-    // Làm bài theo MẪU đính kèm (docs/template-design.md mục 6). Thí nghiệm 13/10/2026 trên PowerPoint 16 với mẫu
+    // Làm bài theo MẪU đính kèm (docs/architecture/template-design.md mục 6). Thí nghiệm 13/10/2026 trên PowerPoint 16 với mẫu
     // của trường: master/layout là Office mặc định, logo + dải màu nằm trong ẢNH NỀN trên từng slide, chữ là
     // textbox tự vẽ. Vì vậy:
     //   - AddSlide theo CustomLayout của slide mẫu ra slide TRẮNG -> nhân bản slide mẫu bằng InsertFromFile

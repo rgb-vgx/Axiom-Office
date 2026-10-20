@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Extension bridge LibreOffice tren Linux (LibreOffice_arch.md muc 12): dong goi .oxt, cai/go bang unopkg
+# Extension bridge LibreOffice tren Linux (docs/architecture/libreoffice.md muc 12): dong goi .oxt, cai/go bang unopkg
 # cua nguoi dung (khong can root), xem trang thai va log. Khong bao gio tat LibreOffice cua nguoi dung.
 #
 #   scripts/libreoffice.sh package | install | uninstall | status | log

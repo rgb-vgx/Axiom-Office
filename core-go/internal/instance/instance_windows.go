@@ -1,6 +1,6 @@
 //go:build windows
 
-// Package instance giu MOT Core cho moi nguoi dung (New_arch.md muc 4.3).
+// Package instance giu MOT Core cho moi nguoi dung (docs/architecture/core.md muc 4.3).
 package instance
 
 import (

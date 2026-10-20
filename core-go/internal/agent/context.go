@@ -6,7 +6,7 @@ import (
 )
 
 // AssembledContext: ngu canh dua vao prompt - tom tat (neu co) + cac luot user/assistant gan nhat trong
-// ngan sach token, va danh sach hanh dong da chay (New_arch.md muc 8.5.9).
+// ngan sach token, va danh sach hanh dong da chay (docs/architecture/core.md muc 8.5.9).
 type AssembledContext struct {
 	Summary           string
 	PriorTurns        []model.ConversationTurn

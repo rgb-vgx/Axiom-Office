@@ -17,10 +17,10 @@ const (
 	ssePingEvery          = 15 * time.Second
 )
 
-// Endpoint cua luot chay va hoi thoai (New_arch.md muc 7.3, 7.4):
+// Endpoint cua luot chay va hoi thoai (docs/architecture/core.md muc 7.3, 7.4):
 // POST /v1/runs, GET /v1/runs/{id}, GET /v1/runs/{id}/events (SSE), POST /v1/runs/{id}/cancel,
 // POST /v1/runs/{id}/confirm, GET /v1/audit, GET/DELETE /v1/conversations...
-// Cac ham serve* dung chung cho /v1/runs va kenh add-in /wps/v1/runs (docs/wps-bridge.md muc 7).
+// Cac ham serve* dung chung cho /v1/runs va kenh add-in /wps/v1/runs (docs/architecture/wps-bridge.md muc 7).
 func mapRuns(mux *http.ServeMux, deps *Deps) {
 	mux.HandleFunc("POST /v1/runs", func(w http.ResponseWriter, r *http.Request) {
 		if !deps.Stores.Available {

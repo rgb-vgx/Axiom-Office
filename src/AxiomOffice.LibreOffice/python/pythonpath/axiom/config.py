@@ -1,4 +1,4 @@
-"""Cau hinh va duong dan (LibreOffice_arch.md muc 4, 9).
+"""Cau hinh va duong dan (docs/architecture/libreoffice.md muc 4, 9).
 
 Windows: dung chung HKCU\\Software\\AxiomOffice va %LOCALAPPDATA%\\AxiomOffice voi add-in (cung token,
 cung thu muc sessions de Agent Core tim thay bridge). Linux: ~/.config/axiom-office/config.json (0600)

@@ -65,7 +65,7 @@ public static class FileLockers {
 }
 "@
 }
-# Agent Core dang chay giu AxiomOffice.Core.exe: tat em truoc khi ghi de (New_arch.md muc 10).
+# Agent Core dang chay giu AxiomOffice.Core.exe: tat em truoc khi ghi de (docs/architecture/core.md muc 10).
 # Core la tien trinh cua chinh du an nen tat bang API shutdown, khong can -Kill (khac Word/Excel cua nguoi dung).
 [void](Stop-AgentCore)
 
@@ -131,7 +131,7 @@ $stagedExe = Join-Path $stage "AxiomOffice.Host.exe"
 & $csc @commonArgs @hostArgs /target:exe "/out:$stagedExe" $hostSources
 if ($LASTEXITCODE -ne 0) { throw "Host build failed with exit code $LASTEXITCODE" }
 
-# Agent Core (Go): version lay tu DLL add-in vua build de /health cua Core khop version bridge (New_arch.md muc 10).
+# Agent Core (Go): version lay tu DLL add-in vua build de /health cua Core khop version bridge (docs/architecture/core.md muc 10).
 # Mot binary, khong can .NET runtime tren may nguoi dung (core-go/README.md).
 $coreVersion = [System.Reflection.AssemblyName]::GetAssemblyName($stagedDll).Version.ToString(3)
 $go = Get-Command go -ErrorAction SilentlyContinue
@@ -156,7 +156,7 @@ foreach ($file in @($stagedDll, $stagedExe)) {
 }
 Remove-Item -LiteralPath $stage -Recurse -Force
 
-# Skill dung san (New_arch.md muc 8.4): chep canh exe de Core doc duoc luc chay.
+# Skill dung san (docs/architecture/core.md muc 8.4): chep canh exe de Core doc duoc luc chay.
 if (Test-Path -LiteralPath $skillsDir) {
     # Xoa ban cu TRUOC khi chep: Copy-Item mot thu muc vao dich DA TON TAI se chep long vao trong
     # (skills\skills) chu khong lam moi - do duoc 04/10/2026: 4/8 skill canh Core release cu hon repo

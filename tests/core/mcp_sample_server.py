@@ -1,4 +1,4 @@
-"""MCP server mau (stdio, chi thu vien chuan) cho test e2e cua Agent Core (New_arch.md muc 8.7, 12).
+"""MCP server mau (stdio, chi thu vien chuan) cho test e2e cua Agent Core (docs/architecture/core.md muc 8.7, 12).
 
     python tests/core/mcp_sample_server.py
 

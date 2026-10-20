@@ -1,5 +1,5 @@
-// Spec T2 (docs/wps-bridge.md muc 3): registry lenh + vong poll cua JS add-in WPS, khong can WPS.
-// Spec T6 (docs/wps-bridge.md muc 5): add-in nhan biet app dang chay (Writer/Spreadsheets/Presentation).
+// Spec T2 (docs/architecture/wps-bridge.md muc 3): registry lenh + vong poll cua JS add-in WPS, khong can WPS.
+// Spec T6 (docs/architecture/wps-bridge.md muc 5): add-in nhan biet app dang chay (Writer/Spreadsheets/Presentation).
 // Spec registry ⊆ handler: moi lenh trong registry LibreOffice (nguon sinh tool cho agent) phai co
 // handler trong add-in, hoac nam trong CHUA_CO_HANDLER kem ly do - de lenh registry khong am tham
 // thanh "unknown action" khi may dang chay WPS.
@@ -165,7 +165,7 @@ test("main.js: ribbon.OnAddinLoad tra true va bat vong poll; job -> result dung 
   assert.ok(polls.length <= after + 1, "stop() phai dung vong poll");
 });
 
-// ---- T6: add-in nhan biet app dang chay (docs/wps-bridge.md muc 5) ----
+// ---- T6: add-in nhan biet app dang chay (docs/architecture/wps-bridge.md muc 5) ----
 //
 // WPS nap cung mot add-in trong ca ba app (publish.xml: type="wps,et,wpp"). Ten app that do duoc:
 // "WPS Writer" (Writer), "WPS Spreadsheets" (ET), "WPS Presentation" (WPP).
@@ -256,8 +256,8 @@ const CHUA_CO_HANDLER = {
   "ai.ask": "chua co handler trong add-in WPS (ban Windows: AiAsk trong CommandDispatcher.cs)",
   "ui.askpane": "chua co handler trong add-in WPS (ban Windows: UiAskPane)",
   "ui.setup": "duong cua LibreOffice (setupwizard.py); ban Windows/WPS khong co lenh nay",
-  "app.screenshot": "chua co handler trong add-in WPS (ban Windows: AppScreenshot) - day la ly do nut 'Nhin tai lieu' chua len duoc ribbon WPS, xem docs/ribbon-ui.md muc 5.1",
-  // Bay lenh writer.* (docs/wps-bridge.md muc 3): backlog - chua viet handler cho WPS.
+  "app.screenshot": "chua co handler trong add-in WPS (ban Windows: AppScreenshot) - day la ly do nut 'Nhin tai lieu' chua len duoc ribbon WPS, xem docs/architecture/ribbon-ui.md muc 5.1",
+  // Bay lenh writer.* (docs/architecture/wps-bridge.md muc 3): backlog - chua viet handler cho WPS.
   "writer.newDocument": "chua co handler trong add-in",
   "writer.open": "chua co handler trong add-in",
   "writer.closeAll": "chua co handler trong add-in",
@@ -269,7 +269,7 @@ const CHUA_CO_HANDLER = {
   // (writer.outline da co handler trong WPS JS tu commit P0-03 nen khong con o day.)
   "writer.restyle": "chi co trong add-in Windows (lenh thiet ke, doc_design); WPS JS chua viet handler",
   "writer.insertBlocks": "chi co trong add-in Windows (lenh thiet ke, doc_design); WPS JS chua viet handler",
-  // Nam lenh lam bai theo mau (docs/template-design.md muc 6.3): moi co tren PowerPoint (COM InsertFromFile,
+  // Nam lenh lam bai theo mau (docs/architecture/template-design.md muc 6.3): moi co tren PowerPoint (COM InsertFromFile,
   // Shape.Export); WPP chua kiem.
   "wpp.newFromTemplate": "chua co handler trong add-in (chi PowerPoint)",
   "wpp.addSlideFromTemplate": "chua co handler trong add-in (chi PowerPoint)",

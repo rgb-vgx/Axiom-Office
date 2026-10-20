@@ -1,5 +1,5 @@
 """Registry lenh cua bridge LibreOffice: cung ten, loai app, tham so, co ForAgent voi CommandDispatcher (C#)
-de Agent Core dung lai allowlist va skill (LibreOffice_arch.md LD-2). Them lenh = them mot dong command(...)."""
+de Agent Core dung lai allowlist va skill (docs/architecture/libreoffice.md LD-2). Them lenh = them mot dong command(...)."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field

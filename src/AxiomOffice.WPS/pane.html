@@ -1250,7 +1250,7 @@ button:focus,
   }
 
   // ---- Man hinh phu cua pane (Windows: MemoryForm / AuditForm / SetupWizardForm; LibreOffice: dialogs.py) ----
-  // Moi duong deu di qua kenh /wps/v1/* (cung goc voi Core, khong token) - xem docs/wps-bridge.md muc 7.
+  // Moi duong deu di qua kenh /wps/v1/* (cung goc voi Core, khong token) - xem docs/architecture/wps-bridge.md muc 7.
 
   var view = { name: "", busy: false, note: "", scope: "all", data: null, fields: null,
     check: "", todo: "", lines: 0, detail: "" };
@@ -1308,7 +1308,7 @@ button:focus,
 
   // ---- Menu chuot phai -> khung chat nay (api/wpspane.go) ----
   // Nguoi dung boi den, bam chuot phai, chon "Trau chuot": main.js hien khung chat roi nho Core chuyen muc do toi day
-  // (ribbon khong noi thang duoc vao trang nay - docs/ribbon-ui.md muc 7). Khung chat nghe SSE pane/events va chay
+  // (ribbon khong noi thang duoc vao trang nay - docs/architecture/ribbon-ui.md muc 7). Khung chat nghe SSE pane/events va chay
   // muc do trong CHINH hoi thoai dang mo. Day la loi vao DUY NHAT cua "Sua bang AI" - khung chat khong ve menu rieng
   // (20/10/2026, theo yeu cau nguoi dung). Chi khung chat cua Writer nghe: man hinh phu (?view=) va Calc/Impress
   // khong co menu nay. EventSource tu noi lai khi Core khoi dong lai.
@@ -1669,7 +1669,7 @@ button:focus,
     box.appendChild(settingField("Nhìn tài liệu", "VisualQaEnabled", view.fields.VisualQaEnabled, "bool"));
     // Cau that, khong phai loi khuyen: add-in WPS thieu lenh app.screenshot (ban Windows:
     // CommandDispatcher.AppScreenshot; LibreOffice: general.py app_screenshot), nen bat o day thi Core se
-    // bat tool look_at_document va tool do se loi. Xem docs/ribbon-ui.md muc 5.1.
+    // bat tool look_at_document va tool do se loi. Xem docs/architecture/ribbon-ui.md muc 5.1.
     viewNote(box, "WPS chưa chụp được trang — add-in thiếu lệnh app.screenshot, nên bật \"Nhìn tài liệu\" ở đây chưa có tác dụng.");
     box.appendChild(settingField("Ghi nhớ", "MemoryEnabled", view.fields.MemoryEnabled, "bool"));
     box.appendChild(settingField("Hiện suy luận", "LlmShowReasoning", view.fields.LlmShowReasoning, "bool"));

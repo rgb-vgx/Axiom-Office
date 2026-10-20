@@ -1,4 +1,4 @@
-// Package mcp: MCP client cua Core (New_arch.md muc 8.7) - ban Go cua Mcp/McpManager.cs, McpTransport.cs.
+// Package mcp: MCP client cua Core (docs/architecture/core.md muc 8.7) - ban Go cua Mcp/McpManager.cs, McpTransport.cs.
 package mcp
 
 import (

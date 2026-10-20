@@ -331,7 +331,7 @@ Chưa đo: ảnh hưởng của dọn ngữ cảnh lên cache của deepseek/mim
 - **Hoàn tác trên PowerPoint** (mục 4 §3).
 - **Phiên Linux**: pane LibreOffice/WPS thêm công tắc lập kế hoạch (`options.mode`), nút đính kèm, ô khoá Tavily
   (`TavilyApiKey` trong `~/.config/axiom-office/config.json`), gửi `document.view`. Core đã sẵn sàng. Ghi ở
-  `docs/ribbon-ui.md` §8.
+  `docs/architecture/ribbon-ui.md` §8.
 - **Sub-agent**: tạm hoãn theo yêu cầu người dùng.
 
 ## 8. Trạng thái mã (cuối phiên 13/10/2026)
@@ -346,7 +346,7 @@ Commit đã có trên `main` (chưa push): `0e219db` (ribbon đợt 1), `76936eb
   `tools/{plan,websearch}_test.go`, `tools/websearch.go`, `tools/truncate_test.go`
 - Add-in: `Ai/AskAiPane.cs`, `Ai/CoreClient.cs`, `Ai/PaneControls.cs`, `Ai/SetupWizardForm.cs`,
   `Bridge/Config.cs`, `Bridge/HostProbe.cs`
-- Tài liệu: `CHANGELOG.md`, `docs/ribbon-ui.md`, tài liệu này
+- Tài liệu: `CHANGELOG.md`, `docs/architecture/ribbon-ui.md`, tài liệu này
 - Làm theo mẫu (§6.3): `core-go/internal/pptx/kinds.go`(+test), `src/AxiomOffice/Bridge/CommandDispatcher.Template.cs`,
   `CommandDispatcher.cs`, `CommandDispatcher.Checks.cs`, `impress.py`, catalog sinh lại (`catalog/live-commands.json`,
   `mcpserver/livecommands_gen.go`, `AxiomOffice.WPS/commands.js`), `tests/lo/test_extension.py`,

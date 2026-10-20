@@ -8,7 +8,7 @@ import (
 // Ghi cau hinh: ban Go cua config.py:set_value cua extension LibreOffice (Windows: HKCU, Linux:
 // ~/.config/axiom-office/config.json - cung file Core doc). Truoc 19/10/2026 Core chi DOC cau hinh,
 // nen moi nut doi cau hinh tren giao dien (toggle "Nhin tai lieu" cua ribbon WPS) khong co duong that
-// dung sau (docs/ribbon-ui.md 5.1).
+// dung sau (docs/architecture/ribbon-ui.md 5.1).
 
 // WritableSource: nguon cau hinh ghi duoc (JSONSource tren Linux, RegistrySource tren Windows).
 // Khai bao rieng thay vi them vao Source de khong phai sua moi ban gia cua Source trong test.

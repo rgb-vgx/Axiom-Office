@@ -8,7 +8,7 @@ import (
 	"axiomoffice/core/internal/memory"
 )
 
-// API memory (New_arch.md muc 8.5.11). Moi thay doi o day la cua NGUOI DUNG (form "Quan ly ghi nho", API).
+// API memory (docs/architecture/core.md muc 8.5.11). Moi thay doi o day la cua NGUOI DUNG (form "Quan ly ghi nho", API).
 func mapMemory(mux *http.ServeMux, deps *Deps) {
 	service := deps.Memory
 

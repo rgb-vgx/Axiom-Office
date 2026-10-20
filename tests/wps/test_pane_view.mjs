@@ -1,4 +1,4 @@
-// Spec T4d (docs/wps-bridge.md muc 7 + docs/ribbon-ui.md §2): PHAN GIAO DIEN cua pane Ask AI trong WPS.
+// Spec T4d (docs/architecture/wps-bridge.md muc 7 + docs/architecture/ribbon-ui.md §2): PHAN GIAO DIEN cua pane Ask AI trong WPS.
 // test_pane.mjs kiem logic khong DOM (pane-core.js); file nay kiem chinh pane.html: cong tac ke hoach, the
 // suy luan / ghi nho / ke hoach, nut Hoan tac + Chen tra loi o footer, the loi, va bay man hinh phu
 // (Ghi nho / Nhat ky / Thiet lap / Ky nang / Trang thai / Soat tai lieu / Nhat ky Core) - doi chieu voi

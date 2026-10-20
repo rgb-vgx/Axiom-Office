@@ -1,4 +1,4 @@
-// Package policy: quy tac xac nhan truoc lenh rui ro (New_arch.md muc 8.6) - ban Go cua
+// Package policy: quy tac xac nhan truoc lenh rui ro (docs/architecture/core.md muc 8.6) - ban Go cua
 // Agent/PolicyEngine.cs. Nam rieng mot goi de tools va agent cung dung ma khong vong import.
 package policy
 

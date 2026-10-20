@@ -1,4 +1,4 @@
-"""Spec trinh cai add-in WPS (docs/wps-bridge.md muc 4) - offline, khong can WPS. Khong sua de qua bai.
+"""Spec trinh cai add-in WPS (docs/architecture/wps-bridge.md muc 4) - offline, khong can WPS. Khong sua de qua bai.
 
     python3 scripts/wps/install_jsaddon.py --home <HOME> --core-url http://127.0.0.1:47840 [--test-profile]
 

@@ -1,4 +1,4 @@
-// Spec T4c (docs/wps-bridge.md muc 7): pane Ask AI trong WPS phai dung CHUNG he thiet ke voi pane
+// Spec T4c (docs/architecture/wps-bridge.md muc 7): pane Ask AI trong WPS phai dung CHUNG he thiet ke voi pane
 // LibreOffice. theme.py la ban LibreOffice cua PaneTheme (src/AxiomOffice/Ai/PaneControls.cs) va tu khai
 // "cung mau, co chu, khoang cach voi pane cua MS Office/WPS de hai ban trong nhu mot san pham" - nen pane
 // WPS khong duoc tu nghi ra bang mau rieng (ban cu dung mau Google Material: #e8f0fe, #f1f3f4, #f9ab00...).

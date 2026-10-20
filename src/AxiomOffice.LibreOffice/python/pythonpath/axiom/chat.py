@@ -1,4 +1,4 @@
-"""Logic hoi thoai cua pane (LibreOffice_arch.md muc 10): thuan Python, khong import uno/awt.
+"""Logic hoi thoai cua pane (docs/architecture/libreoffice.md muc 10): thuan Python, khong import uno/awt.
 
 `ChatSession` giu transcript, trang thai luot chay, the xac nhan dang cho, ghi nho vua ghi va dem so thao
 tac sua tai lieu de "Hoan tac luot nay". `panel.py` chi ve ra awt; `tests/lo/test_chat.py` test truc tiep

@@ -1,4 +1,4 @@
-"""Lenh Calc (kind "et") - cung ten/ket qua voi CommandDispatcher.Spreadsheet.cs (LibreOffice_arch.md muc 7.2).
+"""Lenh Calc (kind "et") - cung ten/ket qua voi CommandDispatcher.Spreadsheet.cs (docs/architecture/libreoffice.md muc 7.2).
 
 Khac Excel mot diem: LibreOffice hoan tac duoc bang undo manager nen et.undo la undo that.
 """

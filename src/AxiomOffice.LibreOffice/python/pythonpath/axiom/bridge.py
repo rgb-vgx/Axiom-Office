@@ -1,4 +1,4 @@
-"""Bridge HTTP cua LibreOffice (LibreOffice_arch.md muc 5, 6): ba listener (Writer/Calc/Impress) tren
+"""Bridge HTTP cua LibreOffice (docs/architecture/libreoffice.md muc 5, 6): ba listener (Writer/Calc/Impress) tren
 127.0.0.1, cung giao thuc voi add-in Office/WPS: /health (khong token), /commands, /cmd, /session.
 Bao ve giong HttpBridge.cs: chan Origin (403), sai token (401), body khong phai JSON (415)."""
 from __future__ import annotations

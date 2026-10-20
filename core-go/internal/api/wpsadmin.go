@@ -10,7 +10,7 @@ import (
 	"axiomoffice/core/internal/config"
 )
 
-// Kenh quan tri cho pane Ask AI trong WPS (docs/wps-bridge.md muc 7, docs/ribbon-ui.md muc 2).
+// Kenh quan tri cho pane Ask AI trong WPS (docs/architecture/wps-bridge.md muc 7, docs/architecture/ribbon-ui.md muc 2).
 //
 // Pane la trang do Core phuc vu: cung origin voi Core nhung KHONG co token, nen guard chung (moi
 // request khong token -> 401) chan het /v1/*. Vi vay moi endpoint pane can duoc dang ky them duoi
@@ -92,7 +92,7 @@ func mapWPSAdmin(mux *http.ServeMux, deps *Deps) {
 
 	// POST /wps/v1/config {TenKhoa: gia tri}: ghi cau hinh nen tang (Linux: config.json, Windows: HKCU).
 	// Truoc 19/10/2026 Core chi doc cau hinh nen moi nut doi cau hinh tren giao dien WPS khong co duong
-	// that dung sau (docs/ribbon-ui.md 5.1: toggle "Nhin tai lieu" bi chan).
+	// that dung sau (docs/architecture/ribbon-ui.md 5.1: toggle "Nhin tai lieu" bi chan).
 	mux.HandleFunc("POST /wps/v1/config", func(w http.ResponseWriter, r *http.Request) {
 		if !checkWPSAuth(w, r, deps) {
 			return

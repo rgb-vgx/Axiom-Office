@@ -19,7 +19,7 @@ import (
 	"axiomoffice/core/internal/tools"
 )
 
-// Request: body cua POST /v1/runs (New_arch.md muc 7.3).
+// Request: body cua POST /v1/runs (docs/architecture/core.md muc 7.3).
 type Request struct {
 	Prompt         string
 	ConversationID string
@@ -159,7 +159,7 @@ func requestOptions(maxRounds, maxTokens, maxSeconds int) model.AgentOptions {
 	return options
 }
 
-// Orchestrator: chay mot luot agent (New_arch.md muc 8.1) - dung prompt, goi model, chay tool qua bridge,
+// Orchestrator: chay mot luot agent (docs/architecture/core.md muc 8.1) - dung prompt, goi model, chay tool qua bridge,
 // phat su kien cho pane, luu hoi thoai + audit. Khong goi COM truc tiep: moi thao tac tai lieu qua /cmd.
 type Orchestrator struct {
 	Bridge        *office.BridgeClient
@@ -280,7 +280,7 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 		officeTool = tools.NewReadOnlyOfficeActionTool(catalog, appKind)
 	}
 	list := []tools.Tool{officeTool}
-	// Dung lai ca bai theo mau tung lo (docs/template-design.md muc 6.6): chi trinh chieu, chi khi sua duoc, va
+	// Dung lai ca bai theo mau tung lo (docs/architecture/template-design.md muc 6.6): chi trinh chieu, chi khi sua duoc, va
 	// chi khi bridge co lenh doc bai nguon (PowerPoint; LibreOffice/WPS chua co).
 	if appKind == "wpp" && !readOnly && catalog.Has("wpp.sourceManifest") {
 		list = append(list, tools.NewSlidesFromTemplateTool())

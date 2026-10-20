@@ -1,4 +1,4 @@
-"""Spec T4a (pane Ask AI trong WPS, docs/wps-bridge.md muc 7): luot chay agent qua kenh add-in /wps/v1/runs.
+"""Spec T4a (pane Ask AI trong WPS, docs/architecture/wps-bridge.md muc 7): luot chay agent qua kenh add-in /wps/v1/runs.
 
 Pane la trang do Core phuc vu (cung origin voi Core) nen khong co token: no goi
     POST /wps/v1/runs {prompt, conversationId?}     -> {runId, conversationId, status}
@@ -9,7 +9,7 @@ voi cung xac thuc kenh add-in (Origin = origin cua Core, hoac token khi khong co
 bridge WPS (office = bridge WPS, tai lieu = lan poll gan nhat cua add-in). Add-in chua ket noi -> HTTP 409.
 /v1/runs giu nguyen guard cu (moi Origin -> 403).
 
-Cung file nay do luon ba duong ma nut tren ribbon/pane dung (docs/ribbon-ui.md muc 2) tren Core THAT:
+Cung file nay do luon ba duong ma nut tren ribbon/pane dung (docs/architecture/ribbon-ui.md muc 2) tren Core THAT:
     GET  /wps/v1/status      -> {addin: bridge, core: Core}  (nut "Trang thai")
     GET  /wps/v1/log?lines=  -> phan cuoi nhat ky Core        (nut "Mo nhat ky")
     POST /wps/v1/exec        -> chay lenh bridge truc tiep    (nut "Soat bang", "Hoan tac luot nay")
@@ -219,7 +219,7 @@ def main() -> int:
         status, _, _ = base.request(core.base + "/v1/runs", "POST", {"prompt": "x", "office": {"port": 1}}, own)
         check(status == 403, "/v1/runs voi Origin cua Core van 403 (guard cu)", status)
 
-        # ---- kenh quan tri cho pane/ribbon (docs/ribbon-ui.md muc 2): cung quy tac xac thuc voi /wps/v1/runs,
+        # ---- kenh quan tri cho pane/ribbon (docs/architecture/ribbon-ui.md muc 2): cung quy tac xac thuc voi /wps/v1/runs,
         # nhung mo duoc cac duong /v1/* ma pane khong co token khong goi duoc (Thiet lap, Bo nho AI, Hoi thoai
         # truoc, Nhat ky hoat dong).
         status, _, text = base.request(core.base + "/wps/v1/setup", headers=own)
@@ -235,7 +235,7 @@ def main() -> int:
         status, _, _ = base.request(core.base + "/wps/v1/memory", headers=own)
         check(status not in (401, 403), "pane: /wps/v1/memory di qua kenh WPS (503 khi memory tat)", status)
 
-        # ---- ghi cau hinh tu pane: nut toggle "Nhin tai lieu" (docs/ribbon-ui.md 5.1 - truoc day khong co
+        # ---- ghi cau hinh tu pane: nut toggle "Nhin tai lieu" (docs/architecture/ribbon-ui.md 5.1 - truoc day khong co
         # duong that dung sau). Ghi vao config.json dung chung voi extension LibreOffice, roi doc lai.
         status, _, text = base.request(core.base + "/wps/v1/config", "POST", {"Token": "khac"}, own)
         check(status == 400, "pane: ghi khoa bi cam (Token) -> 400", (status, text[:200]))

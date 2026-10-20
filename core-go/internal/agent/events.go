@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// Event: mot su kien cua luot chay (SSE - New_arch.md muc 7.4). Seq tang dan de client ket noi lai voi ?after=.
+// Event: mot su kien cua luot chay (SSE - docs/architecture/core.md muc 7.4). Seq tang dan de client ket noi lai voi ?after=.
 type Event struct {
 	Seq  int64
 	Type string

@@ -899,7 +899,7 @@
       }
       // Moi o tieu de so voi trung vi cac o tieu de CON LAI (leave-one-out), khong so voi trung vi ca nhom:
       // voi bang 2 cot, trung vi ca nhom chinh la o dai hon nen nguong "3 x trung vi" khong bao gio voi toi.
-      // Bang 1 cot khong co nhom de so nen khong bao (xem docs/skills-review.md muc 4.7).
+      // Bang 1 cot khong co nhom de so nen khong bao (xem docs/research/skills-review.md muc 4.7).
       for (at = 0; at < header.length; at++) {
         var others = [];
         for (k = 0; k < header.length; k++) { if (k !== at) { others.push(header[k].length); } }

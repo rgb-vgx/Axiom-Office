@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 
 namespace AxiomOffice.Bridge
 {
-    // QA cấu trúc (New_arch.md mục 8.4.6, giai đoạn 2): agent "mù", chỉ đọc được text, nên sau khi tạo
+    // QA cấu trúc (docs/architecture/core.md mục 8.4.6, giai đoạn 2): agent "mù", chỉ đọc được text, nên sau khi tạo
     // slide/bảng nó đọc lại bằng các lệnh này để tự soát lỗi trình bày bằng số - tràn chữ, shape chồng,
     // ra ngoài slide, ô trống, dữ liệu lạc ra ngoài bảng (ca Excel ghi rác sang C7), number format.
     // Chỉ đọc, không sửa tài liệu. Mỗi phần đọc COM bọc try riêng: host thiếu thuộc tính (WPS) thì bỏ qua.

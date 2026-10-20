@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace AxiomOffice.Ai
 {
-    // Phần Core API cho nhóm "Quản lý" trên ribbon (docs/ribbon-ui.md): kỹ năng, hội thoại, nhật ký hoạt động,
+    // Phần Core API cho nhóm "Quản lý" trên ribbon (docs/architecture/ribbon-ui.md): kỹ năng, hội thoại, nhật ký hoạt động,
     // trạng thái, tắt Core. Tách khỏi CoreClient.cs cho dễ đọc; cùng một lớp partial.
     internal sealed partial class CoreClient
     {

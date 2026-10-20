@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Ribbon cua add-in WPS (docs/ribbon-ui.md muc 2): cung mot tab, cung nhom, cung nhan voi ban Windows
+  Ribbon cua add-in WPS (docs/architecture/ribbon-ui.md muc 2): cung mot tab, cung nhom, cung nhan voi ban Windows
   (src/AxiomOffice/Ribbon/RibbonUi.cs, const RibbonXml) - nguoi dung doi may khong phai hoc lai.
 
-  Bon nguyen tac cua docs/ribbon-ui.md muc 1 duoc giu o day:
+  Bon nguyen tac cua docs/architecture/ribbon-ui.md muc 1 duoc giu o day:
    - Mot tab duy nhat "Axiom Office"; khong mo tab thu hai.
    - Khong ve control gia: moi nut deu co duong that dung sau (lenh bridge da co, hoac route /wps/v1/*
      ma pane goi duoc). Bon thu cua ban Windows CO Y KHONG ve o day, xem chu thich ngay duoi.
@@ -17,7 +17,7 @@
      <wps|et|wpp>/ongmani/*.kuip, moi lenh co idMso="..." va icon="..._kd". CHI dung ten co trong bang do: ten
      khong co thi WPS khong ve icon. Ten nao chi co o mot app (SlideShowFromCurrent: trinh chieu,
      TableInsertDialogWord: van ban, DataValidation: bang tinh) thi chi dung cho nut cua dung app do (ba nut
-     Soat); nut dung chung ca ba app phai la ten co o CA BA bang. Bang ten + ly do: docs/ribbon-ui.md muc 5.3;
+     Soat); nut dung chung ca ba app phai la ten co o CA BA bang. Bang ten + ly do: docs/architecture/ribbon-ui.md muc 5.3;
      spec tests/wps/test_pane.mjs ghim.
    - Menu CHUOT PHAI van dung getImage="ribbon.OnGetImage" -> main.js tra DUONG DAN TUONG DOI "images/<tag>.svg"
      (askAi.svg, quickMenu.svg) - imageMso trong menu ngu canh chua thu. WPS KHONG nhan data URI cho getImage: no
@@ -27,9 +27,9 @@
   dong danh sach. Bam mot muc thi mo KHUNG CHAT MINI canh doan boi den (mini.html, Application.ShowDialog); ban WPS
   khong co ShowDialog thi quay ve khung chat lon (main.js: openMini / runQuick).
   Ban Windows chi co "Hoi AI ve doan nay" va chi dua contextMenus cho Office (RibbonUi.cs: "WPS khong nhan chac").
-  WPS Linux THI NHAN: menu da hien va chay tren WPS that 20/10/2026 (docs/ribbon-ui.md muc 5.3).
+  WPS Linux THI NHAN: menu da hien va chay tren WPS that 20/10/2026 (docs/architecture/ribbon-ui.md muc 5.3).
 
-  Vi sao thieu bon control so voi ban Windows (xem docs/ribbon-ui.md muc 5):
+  Vi sao thieu bon control so voi ban Windows (xem docs/architecture/ribbon-ui.md muc 5):
    - toggleButton "Nhin tai lieu" (visualQa): lenh app.screenshot ma Core gui qua bridge CHUA co handler
      trong add-in WPS, nen bat toggle len la moi luot chay agent se hong o buoc "nhin tai lieu".
    - dropDown "Tim web": chon nguon tim kiem ghi ca vao mcp.json (SearchSources.Activate), ma kenh
@@ -103,7 +103,7 @@
       </tab>
     </tabs>
   </ribbon>
-  <!-- Menu chuot phai khi boi den (docs/ribbon-ui.md, "Trong khung chat"): 9 muc "Sua bang AI", cung thu tu va
+  <!-- Menu chuot phai khi boi den (docs/architecture/ribbon-ui.md, "Trong khung chat"): 9 muc "Sua bang AI", cung thu tu va
        nhan voi bang cua Core (agent/quickactions.go) - spec test_pane.mjs ghim hai ben. Bam mot muc: main.js mo
        KHUNG CHAT MINI (mini.html, Application.ShowDialog) va muc do chay ngay trong khung ay. Du phong khi WPS
        khong co ShowDialog: hien khung chat lon roi nho Core chuyen muc (POST /wps/v1/pane/request -> SSE

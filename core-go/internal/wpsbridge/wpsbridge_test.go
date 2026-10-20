@@ -294,7 +294,7 @@ func takeJobsWithin(t *testing.T, b *Bridge, limit time.Duration) []*Job {
 	return nil
 }
 
-// T6 (docs/wps-bridge.md muc 5): WPS nap CUNG mot add-in trong ca ba app (publish.xml type="wps,et,wpp"),
+// T6 (docs/architecture/wps-bridge.md muc 5): WPS nap CUNG mot add-in trong ca ba app (publish.xml type="wps,et,wpp"),
 // nen app cua phien phai theo app ma add-in bao trong poll, khong duoc hard-code "wps".
 // Core loc lenh theo session.App (tools/office_action.go), sai app thi et.*/wpp.* bi bo im lang.
 func TestAppFollowsAddinPoll(t *testing.T) {

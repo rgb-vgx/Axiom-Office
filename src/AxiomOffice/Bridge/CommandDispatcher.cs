@@ -244,7 +244,7 @@ namespace AxiomOffice.Bridge
                     Req("prompt")).Ungated(),
                 // ui.askpane chuyển sang UI thread; giữ cổng ở đây có thể deadlock với UI thread đang chờ cổng.
                 Command("ui.askpane", null, UiAskPane, "Mở task pane Ask AI").Ungated(),
-                // QA thị giác (New_arch.md 8.4.6): Core gửi ảnh cho model qua tool look_at_document; agent không
+                // QA thị giác (docs/architecture/core.md 8.4.6): Core gửi ảnh cho model qua tool look_at_document; agent không
                 // gọi thẳng (base64 lớn sẽ đổ vào ngữ cảnh) nên không ForAgent.
                 Command("app.screenshot", null, AppScreenshot, "Ảnh chụp trang/slide hiện tại (PNG base64, thu nhỏ theo `maxWidth`, mặc định 1280)",
                     Opt("maxWidth"))
@@ -427,7 +427,7 @@ namespace AxiomOffice.Bridge
             {
                 throw new InvalidOperationException("'prompt' is required");
             }
-            // Giai đoạn 4 (New_arch.md 7.7): chạy qua Agent Core khi có (skill, memory, policy, MCP), dịch kết quả về
+            // Giai đoạn 4 (docs/architecture/core.md 7.7): chạy qua Agent Core khi có (skill, memory, policy, MCP), dịch kết quả về
             // đúng hình dạng cũ; Core không dùng được (chưa nhận lượt chạy) thì chạy agent in-process như trước.
             Ai.LlmResult agentResult = null;
             var connect = host as Connect;

@@ -7,7 +7,7 @@ using System.Windows.Forms;
 
 namespace AxiomOffice.Ai
 {
-    // Ba màn hình nhóm "Quản lý" trên ribbon (docs/ribbon-ui.md, đợt 3): Kỹ năng, Nhật ký hoạt động, Hội thoại.
+    // Ba màn hình nhóm "Quản lý" trên ribbon (docs/architecture/ribbon-ui.md, đợt 3): Kỹ năng, Nhật ký hoạt động, Hội thoại.
     // Cùng nội dung với dialog bên LibreOffice (axiom/dialogs.py: skill_lines, audit_lines, _clock).
     internal static class AdminText
     {

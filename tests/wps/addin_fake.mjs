@@ -253,7 +253,7 @@ function translateFormula(formula, dRow, dCol) {
 // LUU Y (lech da do, chua mo phong): WPS ET EP KIEU chuoi trong nhu so / nhu ngay khi gan vao `Value2`
 // ("42" -> 42, "01/01" -> ngay kieu d-mmm; do tren WPS that 11/10/2026). Fake giu nguyen chuoi, nen mot lenh
 // GHI chuoi trong nhu so se ra ket qua khac WPS that. Duong DOC thi dung: mot o da co chu trong file (seed o
-// day, hoac file nguoi dung mo) van la chu that. Xem docs/wps-bridge.md muc 6.
+// day, hoac file nguoi dung mo) van la chu that. Xem docs/architecture/wps-bridge.md muc 6.
 function setCellScalar(sheet, r, c, value) {
   const key = cellKey(r, c);
   if (value === null || value === undefined || value === "") {

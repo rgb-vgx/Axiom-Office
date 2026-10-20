@@ -1,5 +1,5 @@
 # Tien ich cho Agent Core (AxiomOffice.Core.exe) - dot-source tu build.ps1 / uninstall.ps1.
-# Core ghi %LOCALAPPDATA%\AxiomOffice\core.json khi san sang (New_arch.md muc 7.1); tat Core bang
+# Core ghi %LOCALAPPDATA%\AxiomOffice\core.json khi san sang (docs/architecture/core.md muc 7.1); tat Core bang
 # API shutdown truoc khi ghi de/go file. Token doc tu HKCU va chi gui trong header, khong in ra.
 
 function Get-AgentCoreInfo {

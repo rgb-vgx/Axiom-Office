@@ -5,10 +5,32 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Docs — Sắp xếp lại thư mục `docs/` (20/10/2026)
+- Mục lục mới **[docs/README.md](docs/README.md)**, chia theo người đọc. Gốc repo chỉ còn `README.md`, `CHANGELOG.md`,
+  `STATUS.md`.
+- `docs/user/` (hướng dẫn sử dụng) · `docs/architecture/` (thiết kế) · `docs/research/` (spike, review) · `docs/plans/`
+  (giữ nguyên). Đổi chỗ: `ARCHITECTURE.MD` → `docs/architecture/README.md`, `New_arch.md` → `docs/architecture/core.md`,
+  `LibreOffice_arch.md` → `docs/architecture/libreoffice.md`, `docs/{wps-bridge,ribbon-ui,template-design}.md` →
+  `docs/architecture/`, `docs/{wps-spike,skills-review}.md` → `docs/research/`, `docs/user-manual.md` → `docs/user/`,
+  hai trang `docs/architecture-{hld,for-interns}.html` → `docs/architecture/{hld,for-interns}.html`.
+- Mọi chỗ trỏ tới (~300 chỗ trong ~120 tệp, phần lớn là chú thích trong mã) sửa bằng script: liên kết Markdown/HTML
+  tính lại đường dẫn tương đối theo chỗ mới của cả hai đầu, chữ thường đổi sang đường dẫn tính từ gốc repo. Kiểm: không
+  còn tên cũ nào; 91 liên kết tương đối đều tới được tệp (trừ một liên kết chết có chủ đích trong `skills-review.md`);
+  test + lint + `check-gen` xanh. `git mv` nên lịch sử từng tệp được giữ.
+- `tests/wps/REFERENCE.md` để nguyên cạnh test của add-in WPS (số đo gắn với bộ test).
+- Hai trang `architecture/hld.html` và `architecture/for-interns.html` (viết 12/10, trước đây chưa commit) **rà lại với
+  mã** và sửa: **hai câu sai về an ninh** — "client MCP đi qua đủ bảy bước, kể cả hỏi người dùng" (thật ra tool live
+  của MCP gọi thẳng bridge, không allowlist, không xác nhận) và "không có token thì không gửi được lệnh" (kênh
+  `/wps/v1/*` nhận request mang `Origin` của Core mà không cần token); cùng các câu cũ: 65 → 80 lệnh, trần 200.000
+  token (nay không đặt trần), khoá API "chỉ trong keyring", "kết nối ra ngoài duy nhất là LLM", add-in Windows "tụt
+  hậu / bảo trì", màu indigo → `#0F6CBD`. Thêm phần WPS (kênh pane, ribbon `imageMso`, menu chuột phải, khung chat
+  mini, lệnh nhanh), lớp an toàn *khoá vùng bôi đen*, luồng *sửa nhanh bằng chuột phải*. Bỏ số dòng mã (đã trôi).
+- `architecture/README.md` (AD-15): memory nay viết bằng Go, không còn là C#.
+
 ### Changed — Icon ribbon WPS dùng bộ icon có sẵn của WPS (`imageMso`) (20/10/2026)
 - Như bản Windows dùng icon của Office: 12 nút ribbon WPS nay mang `imageMso` thay cho SVG tự vẽ. WPS ánh xạ tên
   kiểu Office sang icon của nó qua bảng lệnh `res/commands/<app>/ongmani/*.kuip`; chỉ dùng tên có trong bảng (nút
-  dùng chung: tên có ở cả ba app). Năm tên Windows không có trong WPS được thay — bảng ở `docs/ribbon-ui.md` §5.3.
+  dùng chung: tên có ở cả ba app). Năm tên Windows không có trong WPS được thay — bảng ở `docs/architecture/ribbon-ui.md` §5.3.
   Đã thử trên WPS thật: hiện đúng icon.
 - Menu chuột phải vẫn dùng `getImage` + `images/askAi.svg`, `images/quickMenu.svg`; xoá 11 tệp SVG không còn dùng.
   `OnGetImage` chỉ trả đường dẫn cho tag có tệp, tag khác trả rỗng (tránh dấu `?`).
@@ -23,14 +45,14 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
   xoá) — cả hai **đỏ trên script cũ** (`core.db bi xoa`), xanh sau khi sửa.
 
 ### Docs — Hướng dẫn sử dụng + rà tài liệu theo mã (20/10/2026)
-- **Mới: [docs/user-manual.md](docs/user-manual.md)** — hướng dẫn cho người dùng cuối: cài, thiết lập, khung chat,
+- **Mới: [docs/user/user-manual.md](docs/user/user-manual.md)** — hướng dẫn cho người dùng cuối: cài, thiết lập, khung chat,
   sửa nhanh bằng chuột phải, từng nút ribbon/menu, Soát tài liệu, Bộ nhớ AI, dữ liệu, xử lý sự cố, bảng tính năng
   theo nền tảng, gỡ cài đặt. README trỏ tới nó.
-- **Rà từng câu với mã** (README, STATUS, `docs/ribbon-ui.md`, `docs/wps-bridge.md`, `tests/wps/REFERENCE.md`,
-  `core-go/README.md`, `New_arch.md` §7): README thêm mục **WPS Office for Linux** (trước đó không nhắc gì tới add-in
+- **Rà từng câu với mã** (README, STATUS, `docs/architecture/ribbon-ui.md`, `docs/architecture/wps-bridge.md`, `tests/wps/REFERENCE.md`,
+  `core-go/README.md`, `docs/architecture/core.md` §7): README thêm mục **WPS Office for Linux** (trước đó không nhắc gì tới add-in
   WPS), sửa "gói cài ~250 KB", trần "5 phút" (chỉ còn ở chế độ cơ bản), memory "làm bằng C#", màu indigo, server
-  MCP `office`; `New_arch.md` §7.3 thêm 10 route và trường `quickAction` / `options.requireSelection`, §7.4 thêm
-  `run.progress`, `run.reasoning.live`, `confirm.resolved`, kind `selection*`; `ribbon-ui.md` sửa bảng *Trong khung
+  MCP `office`; `docs/architecture/core.md` §7.3 thêm 10 route và trường `quickAction` / `options.requireSelection`, §7.4 thêm
+  `run.progress`, `run.reasoning.live`, `confirm.resolved`, kind `selection*`; `docs/architecture/ribbon-ui.md` sửa bảng *Trong khung
   chat* (menu ⋯ **không** giống nhau trên ba nền tảng; LibreOffice chưa có *Hội thoại trước…*), ghi nghiệm thu
   trên WPS thật; `REFERENCE.md` ghi ba phép đo mới trên WPS 12.1.2.29182 (`getImage` cần đường dẫn,
   `<contextMenus>` được nhận, `ShowDialog`) và đánh dấu T8b đã sửa.
@@ -65,7 +87,7 @@ lệnh của Kingsoft), trên nền khoá vùng bôi đen đã có.
 - **Pane WPS (Writer)**: nút **✦ Sửa bằng AI** ở chân ô soạn, mở menu *Trau chuốt · Viết lại · Rút gọn · Mở rộng ·
   Sửa lỗi chính tả · Trang trọng hơn* │ *Tóm tắt · Giải thích · Dịch*. Chọn một mục là chạy ngay **trong đoạn hội
   thoại đang mở**, khung chat hiện nhãn của mục. Đặt ở ô soạn chứ không ở ribbon vì ribbon WPS không nói được vào
-  pane đang mở (`docs/ribbon-ui.md` §7) — đặt trên ribbon thì mỗi lần bấm mất đoạn chat đang dở.
+  pane đang mở (`docs/architecture/ribbon-ui.md` §7) — đặt trên ribbon thì mỗi lần bấm mất đoạn chat đang dở.
 - **Core**: câu lệnh của 9 mục nằm ở `agent/quickactions.go`; `POST /v1/runs {quickAction}` lấy câu lệnh theo id
   (ba bản ra cùng một câu), `GET /v1/quick-actions` cho pane vẽ menu. Ba mục sau vạch ngăn **chỉ trả lời**: lượt đó
   chỉ có tool đọc, nên "không sửa tài liệu" là Core chặn thật. Chưa bôi đen gì thì lượt dừng **trước khi gọi
@@ -109,13 +131,13 @@ dùng chung cả ba nền tảng.
   Core đều `200  image/svg+xml`). Màu icon nay nằm ở thuộc tính `stroke` của **từng tệp**, không phải hằng số
   trong JS — đổi bảng màu phải sửa **cả 12 tệp** (ảnh ribbon do WPS vẽ, nó không biết `var()`), và spec kiểm
   màu từng tệp nên quên một tệp là đỏ. **Đã nghiệm thu trong WPS thật**: khởi động lại WPS, icon hiện đủ,
-  hết dấu `?` (`docs/ribbon-ui.md` §5.3).
+  hết dấu `?` (`docs/architecture/ribbon-ui.md` §5.3).
 - **Spec**: `tests/wps/test_pane_view.mjs` 35 ca (+7 cho menu ⋯ và màn hình hội thoại), `test_pane.mjs` 23 ca
   (+2 ghim icon), `make test-wps` **160 pass**, eslint sạch.
 
 ### Added — Ribbon và khung chat WPS đủ chức năng như bản Windows (19/10/2026)
 Bốn đợt cho yêu cầu "ô thanh ribbon và khung chat WPS thiếu chức năng so với MS Word". Nguyên tắc giữ suốt:
-**không vẽ control giả** — nút chỉ lên ribbon khi có đường thật đứng sau (`docs/ribbon-ui.md`).
+**không vẽ control giả** — nút chỉ lên ribbon khi có đường thật đứng sau (`docs/architecture/ribbon-ui.md`).
 - **Đợt A — Core mở đường** (`8bb558a`). `routeBoth` đăng ký **cả hai** tiền tố cho `setup`, `llm/test`,
   `llm/models`, `skills`, `memory*`, `audit`, `conversations*`: `/v1/*` cho script/MCP (guard token cũ) và
   `/wps/v1/*` cho pane (guard kênh add-in) — pane là trang của Core nhưng **không có token**, trước đây mọi
@@ -145,8 +167,8 @@ Bốn đợt cho yêu cầu "ô thanh ribbon và khung chat WPS thiếu chức n
   chép**: dán `http://127.0.0.1:<bridgePort>/health` vào trình duyệt (không Origin, không token) → 200
   `connected:true`. Kết quả: pane e2e **68 pass**, bridge e2e 36 pass. Số đo và một cái bẫy hình dạng JSON
   (`/health` của bridge trả **phong bì**, phải bóc `result`) ghi ở `tests/wps/REFERENCE.md`.
-- **Tài liệu**: `docs/ribbon-ui.md` thêm §5.1–§5.4 (hai chỗ chặn còn lại, bốn đường mới của Core, phần chưa đo)
-  và cập nhật §2/§4/§7/§8; `docs/wps-bridge.md` §7 viết lại bảng đường `/wps/v1/*` cho khớp mã (bảng cũ còn
+- **Tài liệu**: `docs/architecture/ribbon-ui.md` thêm §5.1–§5.4 (hai chỗ chặn còn lại, bốn đường mới của Core, phần chưa đo)
+  và cập nhật §2/§4/§7/§8; `docs/architecture/wps-bridge.md` §7 viết lại bảng đường `/wps/v1/*` cho khớp mã (bảng cũ còn
   thiếu 12 đường) và sửa ba khẳng định đã hết đúng về pane, cùng con số registry (80 lệnh, 22 chưa có handler,
   `CHUA_CO_HANDLER` là nguồn duy nhất).
 - **Chưa làm** (đã ghi rõ trong tài liệu, không vẽ nút): sửa/ghim/đặt hạn trong màn hình *Bộ nhớ AI*, handler
@@ -338,7 +360,7 @@ Lượt thật Y4.5-ĐM.14 (95 slide) hết trần 200k token dù việc xong �
   giữa lô → các lệnh sau trúng bài cũ (chốt "khác khổ" đã chặn). Câu cuối đếm đúng số slide dựng trong cả lượt
 
 ### Added — Dựng lại cả bài theo mẫu, từng lô: `slides_from_template` (13/10/2026)
-Theo tư vấn ChatGPT (docs/template-design.md §6.5): model chỉ viết những slide máy không tự quyết được.
+Theo tư vấn ChatGPT (docs/architecture/template-design.md §6.5): model chỉ viết những slide máy không tự quyết được.
 - **Tool Core `slides_from_template`** (`tools/template_build.go`, chỉ PowerPoint, không có trong plan mode): tự tạo/mở
   bài đích cạnh bài cũ, đọc bài cũ một lần, dựng theo lô 25 slide bằng chuỗi lệnh bridge cố định. Tự quyết: bìa; tiêu
   đề từ khung cao nhất hoặc **mang sang từ mục đang trình bày**; đoạn mô tả giữ nguyên ở cột trái, ảnh cột phải; ảnh
@@ -358,7 +380,7 @@ Theo tư vấn ChatGPT (docs/template-design.md §6.5): model chỉ viết nhữ
   bảo model trả lời ngay
 
 ### Added — Làm bài theo tệp mẫu đính kèm (PowerPoint, 13/10/2026)
-Thí nghiệm trên PowerPoint 16 với mẫu thật của trường (docs/template-design.md §6.1): master/layout là Office
+Thí nghiệm trên PowerPoint 16 với mẫu thật của trường (docs/architecture/template-design.md §6.1): master/layout là Office
 mặc định, logo + dải màu nằm trong **ảnh nền trên từng slide**, chữ là textbox tự vẽ — nên `AddSlide` theo layout
 ra slide trắng, `ApplyTemplate` giữ khổ 4:3 và mất logo. Cách làm được: nhân bản slide mẫu rồi thay chữ theo tên khung.
 - **Năm lệnh mới** (`CommandDispatcher.Template.cs`, ForAgent): `wpp.newFromTemplate {template, path}` (mở bản sao
@@ -378,7 +400,7 @@ ra slide trắng, `ApplyTemplate` giữ khổ 4:3 và mất logo. Cách làm đ�
   xét mép chữ thật (`BoundLeft`) thay vì mép khung; hai hình trang trí chồng nhau hoặc khung chữ nằm gọn trong ô màu
   là chủ ý. Chữ dài làm khung giãn ra khỏi ô màu → `overflow` ("runs out of 'Rectangle 8'"). Slide mẫu: 20 → 0 lỗi
 - Skill `trinh-bay-chuyen-nghiep`: có tệp mẫu → `references/mau-dinh-kem.md` (quy trình + ví dụ), không tự vẽ mẫu
-- **Sau lượt thật với `ocg/mimo-v2.6-flash`** (docs/template-design.md §6.4): lượt 1 model không biết đường dẫn
+- **Sau lượt thật với `ocg/mimo-v2.6-flash`** (docs/architecture/template-design.md §6.4): lượt 1 model không biết đường dẫn
   bài cũ và chèn slide mẫu 16:9 thẳng vào bài cũ 4:3 → (a) prompt có *"Its full path: …"* của tài liệu đang mở
   (`DocumentSection`); (b) `wpp.addSlideFromTemplate` từ chối khi khổ bài đang mở ≠ khổ mẫu (đọc `p:sldSz` bằng
   `ZipArchive`; add-in thêm tham chiếu `System.IO.Compression`); (c) tool tệp gặp `.ppt/.doc/.xls` nhị phân thì lỗi
@@ -490,7 +512,7 @@ sửa slide đang mở, chọn màu xanh trong khi mẫu tông đỏ đô, và t
   đang mở) và *Nhật ký hoạt động…* (`AuditForm`: 100 lệnh gần nhất, giờ máy, dòng lỗi tô đỏ)
 - Client Core mới gom ở `Ai/CoreAdmin.cs`; bỏ `PurgeMemories()` không tham số (thay bằng bản có phạm vi)
 
-### Added — Ribbon add-in COM (Windows), đợt 1 của `docs/ribbon-ui.md`: "Nhìn tài liệu" + ba nút Soát (13/10/2026)
+### Added — Ribbon add-in COM (Windows), đợt 1 của `docs/architecture/ribbon-ui.md`: "Nhìn tài liệu" + ba nút Soát (13/10/2026)
 - Tab **Axiom Office** sắp lại thành ba nhóm **Trợ lý** / **Kiểm tra** / **Truy cập nhanh**, nhãn tiếng Việt theo
   kết quả người dùng muốn; *Cài đặt nâng cao…* và *Sao chép API URL* hạ xuống nút nhỏ (chuyển sang tab
   "Axiom · Quản lý" ở đợt 3)
@@ -692,14 +714,14 @@ sửa slide đang mở, chọn màu xanh trong khi mẫu tông đỏ đô, và t
   `layout: true`, hết `empty-cells`, `long-header-cell` vẫn còn, và kẻ khung lại thì tem mất). Đo đầu-cuối trên
   LibreOffice thật (profile tạm, chạy thẳng handler): 12/12 điểm xanh, gồm cả vòng lưu/mở lại `.odt`
 
-### Added — `docs/skills-review.md`: review 8 skill dựng sẵn + khoảng trống so với việc văn phòng
+### Added — `docs/research/skills-review.md`: review 8 skill dựng sẵn + khoảng trống so với việc văn phòng
 - Kiểm kê từng skill (app, vai trò, lệnh dùng — 23/23 lệnh nhắc trong skill đều có thật trong registry), 3 lỗi P0
   ở trên, 6 điểm P1 (lệch token ở `bo-cuc.md`, hai skill lệch nhau về số lần gọi `checkLayout`, `description` hứa
   "độ rộng bảng" mà không lệnh nào làm được…), **trần công cụ** theo từng app, 7 loại việc chưa skill nào phủ, và
   roadmap P0–P4. Kết luận: bộ skill **đủ để chứng minh cơ chế nạp 3 tầng**, **chưa đủ** cho nhân viên văn phòng —
   nhưng nút thắt là trần `office_action` và việc thiếu eval, không phải số lượng skill
 
-### Added — WPS Office for Linux: Agent Core làm bridge cho JS add-in (docs/wps-bridge.md)
+### Added — WPS Office for Linux: Agent Core làm bridge cho JS add-in (docs/architecture/wps-bridge.md)
 - **Core** phục vụ add-in ở `/wps/addin/`, kênh long-poll `/wps/v1/poll|result` chỉ nhận `Origin` của chính Core,
   và một **bridge WPS** trên cổng 47861 nói đúng giao thức bridge (`/health`, `/commands`, `/session`, `/cmd`) kèm
   file session `<pid Core>-wps.json` - agent, MCP làn live và script dùng WPS như mọi bridge khác. `/cmd` báo lỗi
@@ -727,7 +749,7 @@ sửa slide đang mở, chọn màu xanh trong khi mẫu tông đỏ đô, và t
   (TASK-000115)
 - **38 lệnh `et.*`/`wpp.*`**: 23 lệnh Spreadsheets (TASK-000118) và 15 lệnh Presentation (TASK-000119) — metadata
   giống hệt registry LibreOffice (nguồn `tests/wps/lo_catalog.py`), tham số/kết quả/thông điệp lỗi theo bản
-  LibreOffice, trừ những chỗ object model WPS khác (mục 6 của docs/wps-bridge.md: `et.undo` tự khôi phục,
+  LibreOffice, trừ những chỗ object model WPS khác (mục 6 của docs/architecture/wps-bridge.md: `et.undo` tự khôi phục,
   `exportPdf` tự dựng PDF, `checkRange` không có `table`, `wpp.checkLayout` không có `overflow`…)
 - **Spec cho T6–T8** (viết trước, nay đã xanh): `tests/wps/test_addin.mjs` (appKind/catalogFor/cổng chặn lệnh),
   `test_addin_et.mjs` (21), `test_addin_wpp.mjs` (15), `core-go/internal/wpsbridge/wpsbridge_test.go`; dùng chung
@@ -745,7 +767,7 @@ sửa slide đang mở, chọn màu xanh trong khi mẫu tông đỏ đô, và t
   `...before the command was sent (WPS closed?) - safe to retry` để agent biết thử lại là an toàn. Lệnh đã giao mà
   không có kết quả hết giờ theo `AXIOM_WPS_CMD_WAIT_SECONDS` (mặc định 300, trước là hằng số) với câu lỗi
   `...did not answer within Ns; the command may have been applied - check the document before retrying`
-- `docs/wps-bridge.md` mục 2.2/2.3/6: định nghĩa "đã kết nối", hai câu lỗi hết giờ, và biến môi trường mới
+- `docs/architecture/wps-bridge.md` mục 2.2/2.3/6: định nghĩa "đã kết nối", hai câu lỗi hết giờ, và biến môi trường mới
 
 ### Fixed — Add-in WPS: đọc file bằng `FileSystem.ReadFile`, không phải `readFileString` (spec viết trước)
 - **`et.importCsv` không bao giờ chạy được trên WPS thật**: nó đọc file bằng `FileSystem.readFileString`, nhưng
@@ -765,7 +787,7 @@ sửa slide đang mở, chọn màu xanh trong khi mẫu tông đỏ đô, và t
   (`utf-8`/`utf8`/`utf-8-sig`/`utf8-sig`, chuẩn hoá `_` -> `-`, không phân biệt hoa/thường); encoding khác bị từ
   chối **trước khi ghi** kèm lý do (`ReadFile` của WPS không có tham số charset); chỉ bản `-sig` mới cắt BOM.
   Test add-in: 76 xanh
-- `docs/wps-bridge.md` mục 6 ghi thêm hai điểm đo được: sandbox của `readFileString`/`writeFileString`, và việc
+- `docs/architecture/wps-bridge.md` mục 6 ghi thêm hai điểm đo được: sandbox của `readFileString`/`writeFileString`, và việc
   ET **ép kiểu khi ghi `Value2`** (chuỗi trông-như-số thành số) nên `numbers-as-text` chỉ còn đúng với ô có sẵn
   text trong file — fake không mô phỏng việc ép kiểu này
 
@@ -802,7 +824,7 @@ Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho th
   `Origin` của request là `file://`
 - Điều kiện nạp: `JsApiPlugin=true` trong `/opt/kingsoft/wps-office/office6/cfgs/oem.ini` (file của root —
   **cần admin một lần mỗi máy**), mở một tài liệu (trang chủ không nạp ribbon), có `index.html`, đăng ký
-  `<jsplugin>` offline trong `publish.xml`. Chi tiết: `docs/wps-spike.md`, `tests/wps/REFERENCE.md`
+  `<jsplugin>` offline trong `publish.xml`. Chi tiết: `docs/research/wps-spike.md`, `tests/wps/REFERENCE.md`
 - Test: `tests/wps/test_install_jsaddon.py` + `tests/wps/test_probe.mjs` (CI Linux);
   `tests/wps/spike_check.py [--stage load|full]` chạy WPS thật dưới Xvfb (chỉ ở máy dev)
 
@@ -1278,7 +1300,7 @@ Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho th
   CI bỏ hai bước `dotnet test tests/core/AxiomOffice.Core.Tests` và bước so sánh `prompts/extract.txt`
   (nay chỉ còn một bản, nhúng bằng `go:embed`); `catalog/setup.json` giờ chỉ sinh catalog cho add-in + extension + Go
 - Tài liệu cập nhật theo: README (cây thư mục, lệnh test, yêu cầu build), `STATUS.md`, `core-go/README.md`
-  và một ghi chú ở `New_arch.md` (phần .NET còn lại là thiết kế ban đầu)
+  và một ghi chú ở `docs/architecture/core.md` (phần .NET còn lại là thiết kế ban đầu)
 
 ### Fixed — Wizard thiết lập (Linux): nút "Quay lại" bấm không được
 - **Gốc bệnh**: ở hàng nút dưới cùng, nhãn trạng thái (`FixedText` nền trắng, rộng `WIDTH - 2*PAD -
@@ -1504,7 +1526,7 @@ Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho th
 ### Added — Nốt phần L3 cho Linux: skill trong gói, libsecret, systemd, CI
 - **Skill dựng sẵn trong gói**: `scripts/linux/package.sh` chép `skills/` (8 skill + `_design/tokens.json`)
   vào `core/skills` — Core nạp sẵn nguồn "builtin" cạnh binary, máy mới cài không cần cấu hình `SkillDirs`
-- **libsecret cho khoá API trên Linux** (`LibreOffice_arch.md` mục 9): pane **Cài đặt** lưu khoá vào keyring
+- **libsecret cho khoá API trên Linux** (`docs/architecture/libreoffice.md` mục 9): pane **Cài đặt** lưu khoá vào keyring
   qua `secret-tool` khi máy có, `config.json` chỉ giữ `libsecret:LlmApiKey`; Core (`Secrets.Unprotect`) đọc
   lại từ keyring. Máy không có `secret-tool`, keyring khoá, hoặc khoá `dpapi:` của máy Windows khác → coi
   như chưa cấu hình (không làm Core dừng), và vẫn giữ đường lưu thường trong file `0600`
@@ -1519,7 +1541,7 @@ Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho th
 - Test: `tests/lo` 56 test (thêm `SecretStoreTests` cho `protect_secret`); `tests/core` 201 test (thêm
   `Api_key_libsecret_doc_tu_keyring` dùng `secret-tool` giả trong PATH, không đụng keyring thật)
 
-### Added — MCP server đa nền tảng `axiom-office-mcp` (LibreOffice_arch.md mục 11)
+### Added — MCP server đa nền tảng `axiom-office-mcp` (docs/architecture/libreoffice.md mục 11)
 - **`src/AxiomOffice.Mcp`** (`net10.0`, `axiom-office-mcp`): MCP stdio 50 tool — 20 tool file (docx/xlsx/
   pptx/csv: đọc, tạo, sửa, format, export) + tool live gọi bridge qua HTTP + `office_sessions`. **Dùng
   chung mã nguồn** với `AxiomOffice.Host` (compile lại `src/AxiomOffice.Host/Mcp/*.cs` với ký hiệu
@@ -1544,7 +1566,7 @@ Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho th
   70/70 (LibreOffice Calc đang mở, có ghi/đọc ô thật qua bridge); bản net48 (`AxiomOffice.Host.exe`) vẫn
   biên dịch và chạy nguyên như trước
 
-### Added — LibreOffice trên Linux (LibreOffice_arch.md giai đoạn L2–L3)
+### Added — LibreOffice trên Linux (docs/architecture/libreoffice.md giai đoạn L2–L3)
 - **Agent Core chạy được trên Linux**: `TargetFramework` `net10.0` (bỏ `-windows`); cấu hình đọc từ
   `~/.config/axiom-office/config.json` (`JsonConfigSource`, cùng tên khoá với HKCU — giá trị bool ghi
   `1/0`, `SkillDirs` là mảng), khoá API để plaintext trong file `0600` (không có DPAPI), dữ liệu theo XDG
@@ -1596,7 +1618,7 @@ Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho th
   live 159/159 (thêm ca heading), cả headless lẫn có cửa sổ; đã chạy thật bằng chuột/bàn phím: chip → Gửi,
   Enter giữa câu, Hoàn tác lượt này, ✕ đóng, mở lại qua menu, phóng to cửa sổ, lượt thật trong sidebar Calc
 
-### Added — pane Ask AI trong LibreOffice (LibreOffice_arch.md mục 10, giai đoạn L2)
+### Added — pane Ask AI trong LibreOffice (docs/architecture/libreoffice.md mục 10, giai đoạn L2)
 - **Pane nói chuyện với Agent Core bằng Python** (`axiom/core.py`, `axiom/chat.py`): POST `/v1/runs` (kèm
   `office.port` của bridge), đọc SSE `/v1/runs/{id}/events`, `cancel`/`confirm`, `GET /v1/memory`; Core
   chưa chạy thì tự khởi động bằng `CoreExe` trong cấu hình. Logic hội thoại (`chat.py`) thuần Python:
@@ -1618,12 +1640,12 @@ Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho th
   SSE bằng server giả); đã chạy thật trên LibreOffice: gửi yêu cầu → Core sửa tài liệu → hiện phản hồi
   (Writer 7–10s), **Hoàn tác lượt này** trả tài liệu về nguyên trạng, **Dừng** hủy giữa lượt, thẻ xác nhận
   `wpp.deleteSlide` trên Impress (đồng ý → xoá slide thật), dialog Cài đặt/Ghi nhớ hiện đúng cấu hình
-- `LibreOffice_arch.md` mục 14.2: các khác biệt API phải xử lý khi làm pane (model điều khiển awt không
+- `docs/architecture/libreoffice.md` mục 14.2: các khác biệt API phải xử lý khi làm pane (model điều khiển awt không
   nhận toạ độ → đặt lên view; dialog rời không hiện được → cửa sổ con; sidebar của LO 26.8 không có phần
   tử layout; `XInitialization` nằm ở `com.sun.star.lang`; tên node ProtocolHandler = implementation name;
   MRO khi vừa `XDispatchProvider` vừa `XDispatchProviderInterceptor`)
 
-### Added — làn LibreOffice: extension Python UNO (LibreOffice_arch.md, giai đoạn L1)
+### Added — làn LibreOffice: extension Python UNO (docs/architecture/libreoffice.md, giai đoạn L1)
 - `src\AxiomOffice.LibreOffice`: extension `.oxt` (`org.axiomoffice.bridge`) chạy trong `soffice` — job
   `OnStartApp` bật bridge HTTP trên 47851/47852/47853 (Writer/Calc/Impress, kind `wps`/`et`/`wpp`),
   **giữ nguyên giao thức và tên lệnh** với add-in nên Agent Core, MCP (`office_sessions` + `*_command`
@@ -1650,7 +1672,7 @@ Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho th
 - Đã kiểm chứng `ai.ask` end-to-end: Core chạy agent đầy đủ (nạp skill, đọc tài liệu, chèn heading +
   bảng, tự soát bằng `writer.checkTables`) trên tài liệu LibreOffice thật
 
-### Docs — `LibreOffice_arch.md`: thiết kế tích hợp LibreOffice trên Linux
+### Docs — `docs/architecture/libreoffice.md`: thiết kế tích hợp LibreOffice trên Linux
 - Bridge là extension Python UNO (`axiom-office.oxt`) chạy trong `soffice`, **giữ nguyên giao thức bridge và tên
   lệnh** (`writer.*`/`et.*`/`wpp.*`) để Agent Core, skill, memory, test dùng lại; ba session/port như WPS
   (47851–47853); `UnoGate` đưa lệnh về main thread qua `AsyncCallback`; mỗi thao tác AI = 1 bước Undo
@@ -1659,7 +1681,7 @@ Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho th
   làn file `axiom-office-mcp`, cài không cần root (`unopkg` + tarball), kiểm thử headless + CI Ubuntu,
   giai đoạn L0–L4, rủi ro và câu hỏi mở
 
-### Added — Agent Core giai đoạn 4: Mở rộng và an toàn (New_arch.md mục 7.7, 8.6, 8.7, 8.4.6)
+### Added — Agent Core giai đoạn 4: Mở rộng và an toàn (docs/architecture/core.md mục 7.7, 8.6, 8.7, 8.4.6)
 - **Policy xác nhận** (`PolicyEngine` + `ConfirmationBroker`): hỏi trước khi model lưu/xuất file mà yêu cầu
   không nhắc tới lưu/xuất, `saveAs`/`exportPdf` ghi đè file đã có, `wpp.deleteSlide`, `writer.replaceAll` trên
   tài liệu > 20.000 ký tự, tool MCP ngoài; SSE `confirm.required` / `confirm.resolved`, `POST
@@ -1673,15 +1695,15 @@ Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho th
   xác nhận ngay); bridge xử lý `ai.ask` trên thread riêng để Core gọi ngược `/cmd` không bị kẹt
 - **QA thị giác tuỳ chọn** (`VisualQaEnabled`, tắt mặc định): lệnh bridge `app.screenshot` (PrintWindow, thu
   nhỏ), tool `look_at_document` gửi ảnh cho model (OpenAI `image_url` / Anthropic khối `image`); Cài đặt có ô bật
-- Pane (New_arch.md mục 9.2): nút **Hoàn tác lượt này** trong Word (đếm thao tác `writer.*` có sửa tài liệu
+- Pane (docs/architecture/core.md mục 9.2): nút **Hoàn tác lượt này** trong Word (đếm thao tác `writer.*` có sửa tài liệu
   của lượt, gọi `writer.undo {count: N}`; hiện cả sau khi bấm Dừng); link **Trò chuyện mới** chuyển lên header
   cạnh Cài đặt và luôn hiện khi dùng Agent Core (trước ở footer, khó thấy trong Word)
-- `ARCHITECTURE.MD`: HLD cập nhật cho Agent Core (container, khối chức năng, kịch bản K1/K6/K7, triển khai,
+- `docs/architecture/README.md`: HLD cập nhật cho Agent Core (container, khối chức năng, kịch bản K1/K6/K7, triển khai,
   NFR, AD-11…AD-17, rủi ro) + LLD mục 22 Agent Core
 - Test: 194 unit test Core; e2e 76 kiểm tra (xác nhận đồng ý/từ chối/hết giờ, MCP server mẫu Python stdlib,
   làn file office, QA thị giác, audit); `ai.ask` qua Core trên Excel thật; `app.screenshot` trên Excel thật
 
-### Added — Agent Core giai đoạn 3: Memory dài hạn (New_arch.md mục 8.5, học từ mem0 2.2.1)
+### Added — Agent Core giai đoạn 3: Memory dài hạn (docs/architecture/core.md mục 8.5, học từ mem0 2.2.1)
 - Schema 2: `memories`, `memories_fts` (FTS5, text chuẩn hoá bỏ dấu kể cả `đ`), `memory_links`,
   `memory_history`, `memory_embeddings`; `runs.memory_status`
 - `SqliteMemoryStore`: ADD theo lô trong một transaction (chống trùng hash SHA-256 trong lô + với memory cũ,
@@ -1705,7 +1727,7 @@ Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho th
 - Chuẩn hoá bỏ dấu tiếng Việt trong Core dùng bảng tường minh: Core chạy `InvariantGlobalization` nên
   `string.Normalize(FormD)` không tách dấu ("in đậm" không thành "in dam"); project test cũng chạy invariant
 
-### Added — Agent Core giai đoạn 2: Skills (New_arch.md mục 8.4)
+### Added — Agent Core giai đoạn 2: Skills (docs/architecture/core.md mục 8.4)
 - **Skill theo chuẩn Agent Skills**: `Skills/SkillLoader` (frontmatter `name`/`description` + `apps` tuỳ
   chọn; validate tên ≤ 64 ký tự `a-z0-9-`, từ cấm `anthropic`/`claude`, mô tả ≤ 1024 không thẻ XML; field
   lạ bỏ qua), `SkillIndex` (3 nguồn: `skills\` cạnh exe → `SkillDirs` → `%LOCALAPPDATA%\AxiomOffice\skills`,
@@ -1809,7 +1831,7 @@ Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho th
   Office + 6 kiểm tra `--office` trên Excel thật): thứ tự sự kiện SSE, hội thoại, audit, allowlist
   (lệnh bị chặn không xuống bridge), hủy, trần token, lỗi office, và tài liệu thật sự đổi
 
-### Docs — `New_arch.md`: tầng thiết kế cho skills (design intelligence)
+### Docs — `docs/architecture/core.md`: tầng thiết kế cho skills (design intelligence)
 - Tách design intelligence khỏi skill triển khai theo app: **token thiết kế là dữ liệu**
   (`skills/_design/tokens.json`), skill thiết kế nạp khi cần (`thiet-ke-van-phong`,
   `trinh-bay-chuyen-nghiep`, `the-thuc-van-ban`, `bao-cao-du-lieu`), skill theo app dùng giá trị cụ
@@ -1819,7 +1841,7 @@ Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho th
   chồng, số dòng/cột, number format — không cần thị giác); giai đoạn 4 mới thêm `app.screenshot` +
   model thị giác, kèm xác nhận của người dùng vì tốn token
 
-### Added — Agent Core (giai đoạn 0 của New_arch.md)
+### Added — Agent Core (giai đoạn 0 của docs/architecture/core.md)
 - `src/AxiomOffice.Core/` (.NET 10, `AxiomOffice.Core.exe`): process riêng của agent, một bản cho
   mỗi người dùng Windows (mutex `Local\AxiomOffice.Core`, instance thứ hai thoát ngay), chỉ nghe
   `127.0.0.1`. Giai đoạn 0 gồm: `GET /health` (không cần token), `POST /v1/admin/shutdown`, quy tắc
@@ -1840,7 +1862,7 @@ Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho th
 - `tests/live/test_live_commands.py`: kiểm tra `/commands` khớp registry và version Core ↔ bridge khi
   Core đang chạy
 
-### Docs — `New_arch.md`: yêu cầu triển khai Agent Core
+### Docs — `docs/architecture/core.md`: yêu cầu triển khai Agent Core
 - Bản yêu cầu cho phiên làm việc mới: tách agent ra process riêng `AxiomOffice.Core.exe` (.NET 10,
   một bản mỗi người dùng) với hội thoại liên tục, skills (`SKILL.md`), memory SQLite, policy/xác
   nhận, MCP client; add-in mỏng lại, giữ agent in-process làm dự phòng
@@ -1866,7 +1888,7 @@ Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho th
   vừa rồi** trong pane (Word: đếm N lệnh đã chạy → `writer.undo {count: N}`); (4) **trần token
   mỗi run** (`maxTokens` mặc định 200k, event `run.stopped` kèm số token đã dùng)
 
-### Docs — `ARCHITECTURE.MD`: tài liệu thiết kế
+### Docs — `docs/architecture/README.md`: tài liệu thiết kế
 - Phần I, High Level Design: mục tiêu và phạm vi, bối cảnh hệ thống, container, khối chức năng,
   kịch bản chính, triển khai, yêu cầu phi chức năng, quyết định kiến trúc (AD-1..AD-10), rủi ro
 - Phần II, Low Level Design: tổ chức mã nguồn, vòng đời add-in, mô hình thread và `ComGate`, HTTP

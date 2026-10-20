@@ -1,4 +1,4 @@
-"""Test e2e cua Agent Core (New_arch.md muc 11): Core that + LLM gia + bridge gia.
+"""Test e2e cua Agent Core (docs/architecture/core.md muc 11): Core that + LLM gia + bridge gia.
 
     python tests/core/test_core_e2e.py            # khong can Office (bridge gia, session gia)
     python tests/core/test_core_e2e.py --office   # bridge that: tu mo Word/Excel/PowerPoint
@@ -427,7 +427,7 @@ def write_skill(root: str, folder: str, frontmatter: str, body: str) -> str:
 
 
 def test_skills(work: str, token: str, bridge: FakeBridge, document_path: str, session_dir: str) -> None:
-    """Giai doan 2 (New_arch.md 8.4, 12): luong load_skill / read_skill_file voi LLM gia, skill loi khong lam hong Core."""
+    """Giai doan 2 (docs/architecture/core.md 8.4, 12): luong load_skill / read_skill_file voi LLM gia, skill loi khong lam hong Core."""
     org = os.path.join(work, "skills-org")
     write_skill(org, "quy-trinh-rieng", "name: quy-trinh-rieng\ndescription: Quy trinh bang tinh rieng cua to chuc. Dung khi lap bao cao.\napps: [et]",
                 "# Buoc\nMa kiem tra: BUOC-BI-MAT-123. Ghi bang roi soat bang et.checkRange.")
@@ -503,7 +503,7 @@ def wait_for(predicate, timeout=30.0, interval=0.3):
 
 
 def test_memory(work: str, token: str, bridge: FakeBridge, document_path: str, session_dir: str) -> None:
-    """Giai doan 3 (New_arch.md 8.5, 12): memory ghi o phien nay duoc dung o phien sau (ke ca sau khi Core khoi dong
+    """Giai doan 3 (docs/architecture/core.md 8.5, 12): memory ghi o phien nay duoc dung o phien sau (ke ca sau khi Core khoi dong
     lai); thong tin moi mau thuan -> memory MOI ghi ro chuyen doi + lien ket ban cu (ban cu khong bi sua); trung hash
     khong tao ban moi; id bia bi bo; lenh thao tac thuan khong ton lenh goi trich xuat; tat MemoryEnabled thi khong
     doc/ghi; xoa la mat khoi ngu canh."""
@@ -851,7 +851,7 @@ def test_embeddings(work: str, token: str, bridge: FakeBridge, document_path: st
 
 def test_summarize(work: str, token: str, bridge: FakeBridge, document_path: str, session_dir: str) -> None:
     """Hoi thoai dai: Core tom tat o hang doi nen, CHI khi vuot moc (khong ton mot lan goi model moi luot),
-    va ban tom tat duoc dua vao ngu canh cua luot sau (New_arch.md muc 8.5.9).
+    va ban tom tat duoc dua vao ngu canh cua luot sau (docs/architecture/core.md muc 8.5.9).
     """
     llm = FakeLlm(work, [{"text": "Da lam xong."}] * 80)
     data_dir = os.path.join(work, "core-summarize")
@@ -1027,7 +1027,7 @@ def test_mcp_http(work: str, token: str, bridge: FakeBridge, document_path: str,
 
 
 def test_confirm(work: str, token: str, bridge: FakeBridge, document_path: str, session_dir: str) -> None:
-    """Giai doan 4 (New_arch.md 8.6, 12): policy xac nhan - dong y / tu choi / het gio; audit day du."""
+    """Giai doan 4 (docs/architecture/core.md 8.6, 12): policy xac nhan - dong y / tu choi / het gio; audit day du."""
     llm = FakeLlm(work, [
         {"tool": "office_action", "arguments": {"action": "et.saveAs", "params": {"path": os.path.join(work, "dong-y.xlsx")}}},
         {"text": "Da luu (dong y)"},
@@ -1115,7 +1115,7 @@ def test_confirm(work: str, token: str, bridge: FakeBridge, document_path: str, 
 
 
 def test_mcp(work: str, token: str, bridge: FakeBridge, document_path: str, session_dir: str) -> None:
-    """Giai doan 4 (New_arch.md 8.7, 12): MCP server mau (Python stdlib) duoc goi qua agent; server ngoai can xac
+    """Giai doan 4 (docs/architecture/core.md 8.7, 12): MCP server mau (Python stdlib) duoc goi qua agent; server ngoai can xac
     nhan, "trusted" thi khong; lan file office (Host.exe) doc/ghi file; ghi de file da co thi hoi; server loi
     khong hong run; audit ghi du tham so."""
     sample = os.path.join(ROOT, "tests", "core", "mcp_sample_server.py")
@@ -1195,7 +1195,7 @@ def test_mcp(work: str, token: str, bridge: FakeBridge, document_path: str, sess
 
 
 def test_visual(work: str, token: str, bridge: FakeBridge, document_path: str, session_dir: str) -> None:
-    """Giai doan 4 (New_arch.md 8.4.6): QA thi giac chi khi bat VisualQaEnabled; anh toi model dang image_url."""
+    """Giai doan 4 (docs/architecture/core.md 8.4.6): QA thi giac chi khi bat VisualQaEnabled; anh toi model dang image_url."""
     office = {"port": bridge.port, "pid": bridge.pid, "app": "et", "family": "office"}
     for enabled in (False, True):
         # Moi Core mot LLM gia rieng: kich ban tuan tu, Core truoc khong duoc tieu buoc cua Core sau.
@@ -1248,7 +1248,7 @@ def real_commands() -> list[dict]:
 
 def test_real_llm(work: str, token: str) -> None:
     """LLM that (cau hinh HKCU, chi doc): model tu chon dung skill cho 3 yeu cau mau va khong nap skill thiet ke cho sua nho.
-    Bridge gia (khong can Office) tra ok cho moi lenh. Bao cao so vong va thoi gian (New_arch.md muc 11, 12)."""
+    Bridge gia (khong can Office) tra ok cho moi lenh. Bao cao so vong va thoi gian (docs/architecture/core.md muc 11, 12)."""
     global COMMANDS
     COMMANDS = real_commands()
     session_dir = os.path.join(work, "sessions-real")
@@ -1413,7 +1413,7 @@ def test_office(core: Core, port: int, pid: int) -> None:
 
 
 def test_verify(work: str, token: str, bridge: FakeBridge, document_path: str, session_dir: str) -> None:
-    """Tu kiem chung sau khi sua tai lieu (mac dinh BAT) - New_arch.md muc 8.1.
+    """Tu kiem chung sau khi sua tai lieu (mac dinh BAT) - docs/architecture/core.md muc 8.1.
 
     Do duoc tu ba bo khung chay cung mot prompt (02/10/2026): bo khung khong tu kiem chung thi phai co
     nguoi nhac moi chay tiep. Bai nay kiem ba mat: co kiem chung, tat duoc, va khi lan doc lai THAT SU

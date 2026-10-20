@@ -1,4 +1,4 @@
-"""UnoGate: chay moi lenh UNO tren main thread cua LibreOffice, tuan tu (LibreOffice_arch.md muc 8).
+"""UnoGate: chay moi lenh UNO tren main thread cua LibreOffice, tuan tu (docs/architecture/libreoffice.md muc 8).
 
 Tuong duong ComGate cua add-in Windows. Thread HTTP dat viec qua com.sun.star.awt.AsyncCallback (hang doi
 message cua VCL) roi cho ket qua; khoa giu tuan tu. Neu AsyncCallback khong chay (vd moi truong khong co

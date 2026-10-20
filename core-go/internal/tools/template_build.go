@@ -14,7 +14,7 @@ import (
 	"axiomoffice/core/internal/pptx"
 )
 
-// SlidesFromTemplateTool: dung lai ca bai trinh chieu theo tep mau, tung lo (docs/template-design.md muc 6.6).
+// SlidesFromTemplateTool: dung lai ca bai trinh chieu theo tep mau, tung lo (docs/architecture/template-design.md muc 6.6).
 //
 // Luot that 13/10/2026 (mimo, 6 slide): ~4 lan goi tool + ~2,5 phut moi slide, tran 200k token cua pane chi du
 // ~15-18 slide. Tu van ChatGPT: model chi KHAI BAO y dinh, may thuc thi; slide may tu quyet duoc (bia, slide anh

@@ -79,7 +79,7 @@ foreach ($entry in $layout.GetEnumerator()) {
     Copy-Item -LiteralPath $entry.Value -Destination $target -Force
 }
 
-# Agent Core + skill dung san (New_arch.md muc 10): them sau khi da co layout co ban.
+# Agent Core + skill dung san (docs/architecture/core.md muc 10): them sau khi da co layout co ban.
 if (Test-Path -LiteralPath $coreExe) {
     $layout["src\AxiomOffice\bin\Release\AxiomOffice.Core.exe"] = $coreExe
     $coreTarget = Join-Path $stage "src\AxiomOffice\bin\Release\AxiomOffice.Core.exe"

@@ -1,10 +1,10 @@
-"""Spec T2/T3 chay that (docs/wps-bridge.md): Agent Core + JS add-in + ca ba app WPS duoi Xvfb.
+"""Spec T2/T3 chay that (docs/architecture/wps-bridge.md): Agent Core + JS add-in + ca ba app WPS duoi Xvfb.
 
 Build Core, cai add-in vao HOME tam (`install_jsaddon.py --core-url ... --test-profile`), roi LAN LUOT mo
 Writer (`wps`), Spreadsheets (`et`) va Presentation (`wpp`) voi mot tai lieu mau, cho add-in ket noi bridge
 WPS va goi tung lenh cua app do qua POST /cmd, doc lai de kiem.
 
-Mot Core cho ca ba luot: bridge WPS chi phuc vu app poll gan nhat (docs/wps-bridge.md muc 6), nen giua hai
+Mot Core cho ca ba luot: bridge WPS chi phuc vu app poll gan nhat (docs/architecture/wps-bridge.md muc 6), nen giua hai
 app phai doi bridge bao mat ket noi (va file session bi xoa) truoc khi mo app ke tiep.
 
 Can: WPS Office for Linux, xvfb-run, xdotool (boi den that trong bai do khoa vung), JsApiPlugin=true trong
