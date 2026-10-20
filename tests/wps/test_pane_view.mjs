@@ -553,7 +553,8 @@ test("man hinh Nhat ky Core: Core chua ghi dong nao thi noi ro, khong hien loi d
 
 test("bang nhan van de cua pane.html khop tung dong voi checks.py", () => {
   const python = fs.readFileSync(CHECKS_PY, "utf8");
-  const html = fs.readFileSync(PANE, "utf8");
+  // Bang nhan va cau bao cao nam trong pane.js (markup da tach khoi pane.html).
+  const html = [fs.readFileSync(PANE, "utf8"), fs.readFileSync(path.join(ADDIN, "pane.js"), "utf8")].join("\n");
   const read = (source, open, close, line) => {
     const block = new RegExp(open + "([\\s\\S]*?)" + close).exec(source);
     assert.ok(block, "khong doc duoc bang nhan trong: " + open);
@@ -578,6 +579,7 @@ test("bang nhan van de cua pane.html khop tung dong voi checks.py", () => {
 
 test("pane.html: id moi co that trong markup va #view la anh em cua #app", () => {
   const html = fs.readFileSync(PANE, "utf8");
+  const js = fs.readFileSync(path.join(ADDIN, "pane.js"), "utf8");
   for (const [id, why] of [["planToggle", "cong tac lap ke hoach"], ["undoBtn", "nut Hoan tac luot nay"],
     ["insertBtn", "nut Chen tra loi"], ["view", "man hinh phu (Ghi nho / Nhat ky / Thiet lap)"],
     ["memoryBtn", "loi vao Ghi nho"], ["auditBtn", "loi vao Nhat ky"], ["setupBtn", "loi vao Thiet lap"]]) {
@@ -585,7 +587,7 @@ test("pane.html: id moi co that trong markup va #view la anh em cua #app", () =>
   }
   // #view phai nam NGOAI #app: no phu ca pane, va listener bam duoc gan rieng (bindClicks).
   assert.match(html, /<\/div>\s*<div id="view"/, "#view phai la anh em dung sau #app");
-  assert.match(html, /bindClicks\(\$\("view"\)\)/, "man hinh phu phai duoc gan listener bam");
+  assert.match(js, /bindClicks\(\$\("view"\)\)/, "man hinh phu phai duoc gan listener bam");
 });
 
 // ---- Menu "..." tren header (Word Copilot: tieu de + mot nut ... o goc phai) ----

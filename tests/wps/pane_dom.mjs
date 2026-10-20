@@ -216,16 +216,17 @@ export function findAll(root, test, out = []) {
   return out;
 }
 
-// Nap pane.html: dung cay DOM that tu chinh file do (khong chep tay markup) roi chay script trong pane.
+// Nap pane.html/mini.html: dung cay DOM that tu chinh file do (khong chep tay markup) roi chay cac
+// script ngoai theo DUNG thu tu trong trang (pane-dom.js -> pane-core.js -> pane.js/mini.js) - giong CEF.
 // navigator: chi can cho nut "Sao chep API URL" (clipboard) - CEF co navigator.clipboard, harness thi
 // khong, nen mac dinh la khong co (pane phai chiu duoc dieu do va roi ve loi nhac chon tay).
-// page: "pane.html" (khung chat lon) hoac "mini.html" (khung chat mini canh doan boi den) - ca hai dung pane-core.js.
+// page: "pane.html" (khung chat lon) hoac "mini.html" (khung chat mini canh doan boi den).
 export function loadPane({ search = "", fetch, confirm, navigator, page = "pane.html" } = {}) {
   const html = fs.readFileSync(path.join(ADDIN, page), "utf8");
   const document = parseHtml(html);
   const body = findTag(document, "body");
-  const inline = /<script>([\s\S]*?)<\/script>/.exec(html);
-  if (!inline) { throw new Error(page + " khong co <script> trong trang"); }
+  const scripts = [...html.matchAll(/<script\s+src="([^"]+)"\s*><\/script>/g)].map((match) => match[1]);
+  if (scripts.length === 0) { throw new Error(page + " khong nap script ngoai nao"); }
   const context = {
     console, setTimeout, clearTimeout, setInterval, clearInterval, Promise, JSON, Date, URL, Math, String,
     Number, Boolean, Array, Object, RegExp, isNaN, encodeURIComponent, decodeURIComponent,
@@ -266,8 +267,9 @@ export function loadPane({ search = "", fetch, confirm, navigator, page = "pane.
     for (const fn of this.handlers[type] || []) { fn({ type, data: JSON.stringify(data) }); }
   };
   vm.createContext(context);
-  vm.runInContext(fs.readFileSync(path.join(ADDIN, "pane-core.js"), "utf8"), context, { filename: "pane-core.js" });
-  vm.runInContext(inline[1], context, { filename: "pane.html:inline" });
+  for (const src of scripts) {
+    vm.runInContext(fs.readFileSync(path.join(ADDIN, src), "utf8"), context, { filename: src });
+  }
   return {
     document,
     context,

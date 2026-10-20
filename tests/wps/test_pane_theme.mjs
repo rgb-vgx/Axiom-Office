@@ -31,6 +31,8 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const ADDIN = path.join(ROOT, "src", "AxiomOffice.WPS");
 const PANE = path.join(ADDIN, "pane.html");
+const PANE_CSS = path.join(ADDIN, "pane.css");
+const PANE_JS = path.join(ADDIN, "pane.js");
 
 // He thiet ke cua pane LibreOffice (nguon doi chieu duy nhat - khong chep tay so nao vao day).
 function theme() {
@@ -40,6 +42,14 @@ function theme() {
 function paneHtml() {
   return fs.readFileSync(PANE, "utf8");
 }
+function paneCss() {
+  return fs.readFileSync(PANE_CSS, "utf8");
+}
+// Giao dien cua pane gom 3 file: markup (pane.html), he thiet ke (pane.css), hanh vi/nhan (pane.js).
+// Cac kiem tra chuoi/doc token phai doc ca ba, khong chi markup.
+function paneSource() {
+  return [paneHtml(), paneCss(), fs.readFileSync(PANE_JS, "utf8")].join("\n");
+}
 // Ten token trong khoi :root (khong tien to - dung de tra trong rootVars) va ten custom property day du.
 function token(name) {
   return name.toLowerCase().replace(/_/g, "-");
@@ -48,13 +58,13 @@ function cssVar(name) {
   return "--axiom-" + token(name);
 }
 // Noi dung khoi :root (bo chu thich) -> { "pane-bg": "#ffffff", ... } theo ten khong co tien to.
-function rootVars(html) {
-  const start = html.indexOf(":root");
-  assert.ok(start >= 0, "pane.html thieu khoi :root (khai bao token cua theme.py)");
-  const open = html.indexOf("{", start);
-  const close = html.indexOf("}", open);
+function rootVars(css) {
+  const start = css.indexOf(":root");
+  assert.ok(start >= 0, "pane.css thieu khoi :root (khai bao token cua theme.py)");
+  const open = css.indexOf("{", start);
+  const close = css.indexOf("}", open);
   assert.ok(open >= 0 && close > open, "khoi :root khong dong (phai la mot khoi phang, khong long nhau)");
-  const body = html.slice(open + 1, close).replace(/\/\*[\s\S]*?\*\//g, "");
+  const body = css.slice(open + 1, close).replace(/\/\*[\s\S]*?\*\//g, "");
   const vars = {};
   for (const match of body.matchAll(/--axiom-([a-z0-9-]+)\s*:\s*([^;]+)/g)) {
     vars[match[1]] = match[2].trim();
@@ -76,7 +86,7 @@ const sorted = (object) => Object.fromEntries(Object.entries(object).sort(([a], 
 
 test("pane.html: MOI mau cua theme.py co mat, dung gia tri", () => {
   const t = theme();
-  const { vars } = rootVars(paneHtml());
+  const { vars } = rootVars(paneCss());
   const missing = [];
   for (const [name, hex] of Object.entries(t.colors)) {
     const key = token(name);
@@ -89,20 +99,20 @@ test("pane.html: MOI mau cua theme.py co mat, dung gia tri", () => {
 });
 
 test("pane.html: khong co mau nao ngoai theme.py, va khong token nao chet", () => {
-  const html = paneHtml();
-  const { vars, span } = rootVars(html);
+  const css = paneCss();
+  const { vars, span } = rootVars(css);
   const allowed = new Set(Object.values(theme().colors).map((hex) => hex.toUpperCase()));
   const strays = [];
-  for (const match of html.matchAll(/#[0-9A-Fa-f]{6}\b/g)) {
+  for (const match of css.matchAll(/#[0-9A-Fa-f]{6}\b/g)) {
     if (match.index >= span[0] && match.index <= span[1]) { continue; }
     if (!allowed.has(match[0].toUpperCase())) { strays.push(match[0]); }
   }
   assert.deepEqual(strays, [],
-    "pane.html con mau ngoai theme.py (moi mau phai qua var(--axiom-...)): " + strays.join(", "));
+    "pane.css con mau ngoai theme.py (moi mau phai qua var(--axiom-...)): " + strays.join(", "));
   // Mau viet ngan (#fff, #abc) cung la mau ngoai bang: chan luon.
-  const shortHex = [...html.matchAll(/:\s*[^;{}]*#[0-9A-Fa-f]{3,4}\b/g)].map((m) => m[0].trim());
-  assert.deepEqual(shortHex, [], "pane.html dung mau viet ngan: " + shortHex.join(", "));
-  const unused = Object.keys(vars).filter((key) => !html.includes("var(--axiom-" + key + ")"));
+  const shortHex = [...css.matchAll(/:\s*[^;{}]*#[0-9A-Fa-f]{3,4}\b/g)].map((m) => m[0].trim());
+  assert.deepEqual(shortHex, [], "pane.css dung mau viet ngan: " + shortHex.join(", "));
+  const unused = Object.keys(vars).filter((key) => !css.includes("var(--axiom-" + key + ")"));
   assert.deepEqual(unused, [], "token khai bao ma khong dung - bo ra hoac dung that: " + unused.join(", "));
   // Ten token khong duoc lap tien to lan hai (--axiom-axiom-...): do la cach lach luat chu khong phai thiet ke.
   const doubled = Object.keys(vars).filter((key) => key.indexOf("axiom-") === 0);
@@ -113,7 +123,7 @@ test("pane.html: khong co mau nao ngoai theme.py, va khong token nao chet", () =
 
 test("pane.html: so do va co chu khop theme.py", () => {
   const t = theme();
-  const { vars } = rootVars(paneHtml());
+  const { vars } = rootVars(paneCss());
   for (const [name, value] of Object.entries(t.metrics)) {
     const key = token(name);
     assert.ok(vars[key], "pane.html thieu " + cssVar(name) + " (theme.py " + name + " = " + value + ")");
@@ -139,6 +149,7 @@ test("pane.html: so do va co chu khop theme.py", () => {
 test("pane.html: dung chuoi tieng Viet cua pane LibreOffice", () => {
   const t = theme();
   const html = paneHtml();
+  const source = paneSource();
   for (const [name, text] of Object.entries({
     "theme.PROMPT_PLACEHOLDER": t.strings.placeholder,
     "theme.PROMPT_HINT": t.strings.hint,
@@ -153,9 +164,9 @@ test("pane.html: dung chuoi tieng Viet cua pane LibreOffice", () => {
     "panel.py:137 'Trò chuyện mới'": "Trò chuyện mới",
     "chatview.py 'Đồng ý'/'Từ chối'": "Đồng ý",
   })) {
-    assert.ok(html.includes(text), "pane.html thieu chuoi cua " + name + ": " + text);
+    assert.ok(source.includes(text), "pane thieu chuoi cua " + name + ": " + text);
   }
-  assert.ok(html.includes("Từ chối"), "pane.html thieu nut 'Từ chối'");
+  assert.ok(source.includes("Từ chối"), "pane thieu nut 'Từ chối'");
   // Tieng Viet phai la UTF-8 that trong file (khong viet &amp;#7897;): pane.html co <meta charset="utf-8">.
   assert.match(html, /charset="?utf-8"?/i, "pane.html phai khai charset utf-8");
   assert.doesNotMatch(html, /&#\d{3,};/, "pane.html viet ky tu tieng Viet bang ma so - dung UTF-8 truc tiep");
@@ -192,15 +203,16 @@ test("pane-core.js: nhan lenh, goi y, empty state BANG theme.py", () => {
 });
 
 test("pane.html dung labelFor/emptyState cua pane-core (khong tu che nhan)", () => {
-  const html = paneHtml();
-  assert.match(html, /labelFor/, "pane.html phai hien nhan lenh bang AxiomPaneCore.labelFor");
-  assert.match(html, /emptyState/, "pane.html phai dung AxiomPaneCore.emptyState cho man hinh trong");
+  const html = paneSource();
+  assert.match(html, /labelFor/, "pane phai hien nhan lenh bang AxiomPaneCore.labelFor");
+  assert.match(html, /emptyState/, "pane phai dung AxiomPaneCore.emptyState cho man hinh trong");
 });
 
 // ---------------------------------------------------------------- cau truc + chat luong tuong tac
 
 test("pane.html: du vung giao dien cua pane LibreOffice", () => {
   const html = paneHtml();
+  const source = paneSource();
   for (const [id, why] of [["paneHeader", "header (cham accent + tieu de + lien ket)"],
     ["paneTitle", "tieu de = ten app"], ["paneSubtitle", "phu de"],
     ["newBtn", "lien ket 'Trò chuyện mới'"], ["chat", "vung hoi thoai cuon duoc"],
@@ -208,18 +220,18 @@ test("pane.html: du vung giao dien cua pane LibreOffice", () => {
     ["stopBtn", "nut 'Dừng' (footer)"], ["statusText", "dong trang thai o footer"],
     ["emptyTitle", "tieu de man hinh trong"], ["confirmTitle", "the xac nhan"]]) {
     // Vung sinh dong (man hinh trong, the xac nhan) gan id bang JS: chap nhan ca id="x" lan .id = "x".
-    assert.match(html, new RegExp("id\\s*=\\s*[\"']" + id + "[\"']"),
-      "pane.html thieu #" + id + " (" + why + ")");
+    assert.match(source, new RegExp("id\\s*=\\s*[\"']" + id + "[\"']"),
+      "pane thieu #" + id + " (" + why + ")");
   }
   assert.match(html, /pane-core\.js/, "pane.html phai nap pane-core.js");
+  assert.match(html, /pane-dom\.js/, "pane.html phai nap pane-dom.js (helper DOM dung chung voi mini)");
   assert.match(html, /<html[^>]*lang="vi"/i, "pane.html phai khai lang=\"vi\"");
   // Trang thai khong chi noi bang mau: co ca dau ✓/✕ cho dong thao tac (chatview.py _line).
-  assert.ok(html.includes("✓") && html.includes("✕"), "dong thao tac phai co dau ✓ va ✕, khong chi doi mau");
+  assert.ok(source.includes("✓") && source.includes("✕"), "dong thao tac phai co dau ✓ va ✕, khong chi doi mau");
 });
 
 test("pane.html: trang thai hover/focus/disabled theo chuan UX", () => {
-  const html = paneHtml();
-  const rules = html.slice(html.indexOf("<style"), html.indexOf("</style>"));
+  const rules = paneCss();
   assert.match(rules, /:focus[^{]*\{[^}]*var\(--axiom-focus\)/, "thieu vien focus nhin thay duoc (mau theme.FOCUS)");
   assert.match(rules, /:disabled[^{]*\{[^}]*var\(--axiom-disabled-bg\)/, "trang thai disabled thieu nen DISABLED_BG");
   assert.match(rules, /:disabled[^{]*\{[^}]*var\(--axiom-disabled-fg\)/, "trang thai disabled thieu chu DISABLED_FG");
@@ -236,7 +248,7 @@ test("pane.html: trang thai hover/focus/disabled theo chuan UX", () => {
 // ---------------------------------------------------------------- pane biet app nao (goi y theo app)
 
 test("main.js: paneUrl() mang ?app=<kind>; pane.html doc lai", () => {
-  const html = paneHtml();
+  const html = paneSource();
   assert.match(html, /location\s*\.\s*search/, "pane.html phai doc app tu query string (?app=)");
   assert.match(html, /"wps"/, "pane.html thieu mac dinh 'wps' khi khong co ?app=");
   const main = fs.readFileSync(path.join(ADDIN, "main.js"), "utf8");

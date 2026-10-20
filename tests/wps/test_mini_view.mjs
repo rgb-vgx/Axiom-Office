@@ -41,13 +41,10 @@ function mini(routes = {}, search = "?app=wps") {
 const RUN = (id) => [200, { ok: true, result: { runId: id, conversationId: "c-mini" } }];
 
 test("mini.html: cung he thiet ke voi pane.html - :root CHEP NGUYEN, khong mau ngoai :root, chuyen dong 150-300ms", () => {
-  const rootOf = (file) => {
-    const html = fs.readFileSync(path.join(ADDIN, file), "utf8");
-    return /:root\{[\s\S]*?\n\}/.exec(html)[0];
-  };
-  assert.equal(rootOf("mini.html"), rootOf("pane.html"), "doi token o pane.html thi phai chep sang mini.html");
-  const html = fs.readFileSync(path.join(ADDIN, "mini.html"), "utf8");
-  const css = /<style>([\s\S]*?)<\/style>/.exec(html)[1].replace(/:root\{[\s\S]*?\n\}/, "");
+  const cssOf = (file) => fs.readFileSync(path.join(ADDIN, file), "utf8");
+  const rootOf = (css) => /:root\{[\s\S]*?\n\}/.exec(css)[0];
+  assert.equal(rootOf(cssOf("mini.css")), rootOf(cssOf("pane.css")), "doi token o pane.css thi phai chep sang mini.css");
+  const css = cssOf("mini.css").replace(/:root\{[\s\S]*?\n\}/, "");
   assert.deepEqual(css.match(/#[0-9a-fA-F]{3,8}\b/g) || [], [], "mau phai di qua token --axiom-*");
   for (const ms of css.match(/\b(\d+)ms\b/g) || []) {
     const n = Number.parseInt(ms, 10);

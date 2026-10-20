@@ -1,0 +1,280 @@
+:root{
+  --axiom-pane-bg:#ffffff;
+  --axiom-divider:#e5e7eb;
+  --axiom-text-primary:#111827;
+  --axiom-text-secondary:#4b5563;
+  --axiom-text-muted:#6b7280;
+  --axiom-ai-bg:#f9fafb;
+  --axiom-ai-border:#e5e7eb;
+  --axiom-user-bg:#d6e8f7;
+  --axiom-user-fg:#0c3b5e;
+  --axiom-accent:#0f6cbd;
+  --axiom-accent-fg:#0f6cbd;
+  --axiom-action-bg:#0f6cbd;
+  --axiom-action-hover:#115ea3;
+  --axiom-on-action:#ffffff;
+  --axiom-disabled-bg:#f3f4f6;
+  --axiom-disabled-fg:#9ca3af;
+  --axiom-input-border:#8c93a0;
+  --axiom-focus:#0f6cbd;
+  --axiom-chip-border:#b4d6fa;
+  --axiom-chip-hover:#eff6fc;
+  --axiom-chip-fg:#115ea3;
+  --axiom-danger:#dc2626;
+  --axiom-danger-fg:#b91c1c;
+  --axiom-danger-bg:#fef2f2;
+  --axiom-danger-border:#fecaca;
+  --axiom-success:#047857;
+  --axiom-pad-x:12px;
+  --axiom-gap-message:12px;
+  --axiom-gap-before-tools:8px;
+  --axiom-gap-tool-line:2px;
+  --axiom-gap-chip:6px;
+  --axiom-radius-bubble:10px;
+  --axiom-radius-control:8px;
+  --axiom-radius-composer:10px;
+  --axiom-bubble-pad-x:12px;
+  --axiom-bubble-pad-y:8px;
+  --axiom-bubble-max-user:80%;
+  --axiom-bubble-max-ai:92%;
+  --axiom-header-h:48px;
+  --axiom-footer-h:28px;
+  --axiom-composer-h:98px;
+  --axiom-send-w:64px;
+  --axiom-send-h:30px;
+  --axiom-chip-h:32px;
+  --axiom-tool-row-h:20px;
+  --axiom-icon:12px;
+  --axiom-scroll-w:12px;
+  --axiom-size-title:10pt;
+  --axiom-size-empty-title:11pt;
+  --axiom-size-body:9.5pt;
+  --axiom-size-small:9pt;
+  --axiom-size-tool:8.5pt;
+  --axiom-size-tool-id:8pt;
+  --axiom-size-caption:8.25pt;
+}
+html,
+body {
+  height: 100%;
+}
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--axiom-pane-bg);
+  color: var(--axiom-text-primary);
+  font-family: system-ui,"Segoe UI","Noto Sans",sans-serif;
+  font-size: var(--axiom-size-body);
+}
+#mini {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+#miniHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--axiom-gap-chip);
+  padding: 10px var(--axiom-pad-x) 6px var(--axiom-pad-x);
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  min-width: 8px;
+  border-radius: 50%;
+  background: var(--axiom-accent);
+}
+#miniTitle {
+  font-size: var(--axiom-size-title);
+  font-weight: 600;
+}
+#miniModel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: right;
+  font-size: var(--axiom-size-caption);
+  color: var(--axiom-text-muted);
+}
+#miniBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px var(--axiom-pad-x) 8px var(--axiom-pad-x);
+}
+.miniHint {
+  margin: 4px 0 10px 0;
+  font-size: var(--axiom-size-small);
+  color: var(--axiom-text-secondary);
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--axiom-gap-chip);
+}
+.chip {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--axiom-chip-border);
+  border-radius: 14px;
+  background: var(--axiom-pane-bg);
+  color: var(--axiom-chip-fg);
+  font-family: system-ui,"Segoe UI","Noto Sans",sans-serif;
+  font-size: var(--axiom-size-small);
+  cursor: pointer;
+  transition: background-color 200ms ease, border-color 200ms ease;
+}
+.chip:hover {
+  background: var(--axiom-chip-hover);
+}
+.chip:focus-visible {
+  outline: 2px solid var(--axiom-focus);
+  outline-offset: 1px;
+}
+.you {
+  align-self: flex-end;
+  margin: 6px 0 6px auto;
+  max-width: var(--axiom-bubble-max-user);
+  width: fit-content;
+  padding: 4px 10px;
+  border-radius: var(--axiom-radius-bubble);
+  background: var(--axiom-user-bg);
+  color: var(--axiom-user-fg);
+  font-size: var(--axiom-size-small);
+  white-space: pre-wrap;
+}
+.step {
+  min-height: var(--axiom-tool-row-h);
+  font-size: var(--axiom-size-tool);
+  color: var(--axiom-text-secondary);
+}
+.stepOk {
+  color: var(--axiom-success);
+}
+.stepFail {
+  color: var(--axiom-danger-fg);
+}
+.progress {
+  font-size: var(--axiom-size-tool);
+  color: var(--axiom-text-muted);
+}
+.reply {
+  margin: 6px 0;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+.info {
+  margin: 6px 0;
+  font-size: var(--axiom-size-small);
+  color: var(--axiom-text-secondary);
+}
+.error {
+  margin: 6px 0;
+  padding: 6px 10px;
+  border: 1px solid var(--axiom-danger-border);
+  border-radius: var(--axiom-radius-control);
+  background: var(--axiom-danger-bg);
+  color: var(--axiom-danger-fg);
+  font-size: var(--axiom-size-small);
+}
+.confirm {
+  margin: 6px 0;
+  padding: 8px 10px;
+  border: 1px solid var(--axiom-divider);
+  border-radius: var(--axiom-radius-control);
+  font-size: var(--axiom-size-small);
+}
+.confirm .row {
+  display: flex;
+  gap: var(--axiom-gap-chip);
+  margin-top: 6px;
+}
+#miniComposer {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--axiom-gap-chip);
+  margin: 0 var(--axiom-pad-x);
+  padding: 6px 6px 6px 10px;
+  border: 1px solid var(--axiom-input-border);
+  border-radius: var(--axiom-radius-composer);
+  transition: border-color 200ms ease;
+}
+#miniComposer:focus-within {
+  border-color: var(--axiom-focus);
+}
+#miniInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: var(--axiom-text-primary);
+  font-family: system-ui,"Segoe UI","Noto Sans",sans-serif;
+  font-size: var(--axiom-size-body);
+}
+.btnPrimary {
+  min-width: var(--axiom-send-w);
+  height: var(--axiom-send-h);
+  border: none;
+  border-radius: var(--axiom-radius-control);
+  background: var(--axiom-action-bg);
+  color: var(--axiom-on-action);
+  font-family: system-ui,"Segoe UI","Noto Sans",sans-serif;
+  font-size: var(--axiom-size-small);
+  cursor: pointer;
+  transition: background-color 200ms ease;
+}
+.btnPrimary:hover {
+  background: var(--axiom-action-hover);
+}
+.btnPrimary:disabled {
+  background: var(--axiom-disabled-bg);
+  color: var(--axiom-disabled-fg);
+  cursor: default;
+}
+.btnPrimary:focus-visible,
+.link:focus-visible {
+  outline: 2px solid var(--axiom-focus);
+  outline-offset: 1px;
+}
+#miniFooter {
+  display: flex;
+  align-items: center;
+  gap: var(--axiom-gap-chip);
+  height: var(--axiom-footer-h);
+  padding: 2px var(--axiom-pad-x) 4px var(--axiom-pad-x);
+}
+#miniStatus {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--axiom-size-caption);
+  color: var(--axiom-text-muted);
+}
+.link {
+  background: transparent;
+  border: none;
+  padding: 0 4px;
+  color: var(--axiom-accent-fg);
+  font-family: system-ui,"Segoe UI","Noto Sans",sans-serif;
+  font-size: var(--axiom-size-caption);
+  cursor: pointer;
+  transition: color 200ms ease;
+}
+.link:hover {
+  color: var(--axiom-action-hover);
+  text-decoration: underline;
+}
+.link[hidden],
+.chips[hidden] {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chip, .btnPrimary, .link, #miniComposer {
+    transition: none;
+  }
+}

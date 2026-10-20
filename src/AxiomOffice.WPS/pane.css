@@ -1,0 +1,757 @@
+:root{
+  --axiom-pane-bg:#ffffff;
+  --axiom-divider:#e5e7eb;
+  --axiom-text-primary:#111827;
+  --axiom-text-secondary:#4b5563;
+  --axiom-text-muted:#6b7280;
+  --axiom-ai-bg:#f9fafb;
+  --axiom-ai-border:#e5e7eb;
+  --axiom-user-bg:#d6e8f7;
+  --axiom-user-fg:#0c3b5e;
+  --axiom-accent:#0f6cbd;
+  --axiom-accent-fg:#0f6cbd;
+  --axiom-action-bg:#0f6cbd;
+  --axiom-action-hover:#115ea3;
+  --axiom-on-action:#ffffff;
+  --axiom-disabled-bg:#f3f4f6;
+  --axiom-disabled-fg:#9ca3af;
+  --axiom-input-border:#8c93a0;
+  --axiom-focus:#0f6cbd;
+  --axiom-chip-border:#b4d6fa;
+  --axiom-chip-hover:#eff6fc;
+  --axiom-chip-fg:#115ea3;
+  --axiom-danger:#dc2626;
+  --axiom-danger-fg:#b91c1c;
+  --axiom-danger-bg:#fef2f2;
+  --axiom-danger-border:#fecaca;
+  --axiom-success:#047857;
+  --axiom-pad-x:12px;
+  --axiom-gap-message:12px;
+  --axiom-gap-before-tools:8px;
+  --axiom-gap-tool-line:2px;
+  --axiom-gap-chip:6px;
+  --axiom-radius-bubble:10px;
+  --axiom-radius-control:8px;
+  --axiom-radius-composer:10px;
+  --axiom-bubble-pad-x:12px;
+  --axiom-bubble-pad-y:8px;
+  --axiom-bubble-max-user:80%;
+  --axiom-bubble-max-ai:92%;
+  --axiom-header-h:48px;
+  --axiom-footer-h:28px;
+  --axiom-composer-h:98px;
+  --axiom-send-w:64px;
+  --axiom-send-h:30px;
+  --axiom-chip-h:32px;
+  --axiom-tool-row-h:20px;
+  --axiom-icon:12px;
+  --axiom-scroll-w:12px;
+  --axiom-size-title:10pt;
+  --axiom-size-empty-title:11pt;
+  --axiom-size-body:9.5pt;
+  --axiom-size-small:9pt;
+  --axiom-size-tool:8.5pt;
+  --axiom-size-tool-id:8pt;
+  --axiom-size-caption:8.25pt;
+}
+html,
+body {
+  height: 100%;
+}
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--axiom-pane-bg);
+  color: var(--axiom-text-primary);
+  font-family: system-ui,"Segoe UI","Noto Sans",sans-serif;
+  font-size: var(--axiom-size-body);
+}
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--axiom-pane-bg);
+}
+#paneHeader {
+  position: relative;   /* moc cho menu "..." (Word: tieu de + nut ... o goc phai) */
+  height: var(--axiom-header-h);
+  min-height: var(--axiom-header-h);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--axiom-pad-x);
+  background: var(--axiom-pane-bg);
+  border-bottom: 1px solid var(--axiom-divider);
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  min-width: 8px;
+  border-radius: 50%;
+  background: var(--axiom-accent);
+}
+.dotSmall {
+  width: 6px;
+  height: 6px;
+  min-width: 6px;
+}
+.headText {
+  display: flex;
+  flex-direction: column;
+  margin-left: var(--axiom-gap-chip);
+  flex: 1;
+  min-width: 0;
+}
+#paneTitle {
+  font-size: var(--axiom-size-title);
+  font-weight: 600;
+  color: var(--axiom-text-primary);
+}
+#paneSubtitle {
+  font-size: var(--axiom-size-caption);
+  color: var(--axiom-text-muted);
+}
+.link {
+  background: transparent;
+  border: none;
+  padding: 2px 4px;
+  color: var(--axiom-accent-fg);
+  font-family: system-ui,"Segoe UI","Noto Sans",sans-serif;
+  font-size: var(--axiom-size-caption);
+  cursor: pointer;
+  transition: color 200ms ease, background-color 200ms ease;
+}
+.link:hover {
+  color: var(--axiom-action-hover);
+  text-decoration: underline;
+}
+.link:active {
+  opacity: 0.75;
+}
+#chat {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--axiom-gap-message) var(--axiom-pad-x);
+  background: var(--axiom-pane-bg);
+}
+#chat::-webkit-scrollbar {
+  width: var(--axiom-scroll-w);
+}
+.bubble {
+  padding: var(--axiom-bubble-pad-y) var(--axiom-bubble-pad-x);
+  border-radius: var(--axiom-radius-bubble);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  margin-bottom: var(--axiom-gap-message);
+  transition: background-color 200ms ease, border-color 200ms ease;
+}
+.bubbleUser {
+  margin-left: auto;
+  max-width: var(--axiom-bubble-max-user);
+  background: var(--axiom-user-bg);
+  color: var(--axiom-user-fg);
+}
+/* Tra loi cua AI: giong Copilot trong Word - KHONG ve bong bong, chu nam thang tren nen pane.
+   Chi tin nhan cua NGUOI DUNG moi co nen (bubbleUser). Nen/vien --axiom-ai-bg + --axiom-ai-border
+   gio chi con dung o .card (the tien trinh / ket qua). */
+.bubbleAi {
+  margin-right: auto;
+  max-width: var(--axiom-bubble-max-ai);
+  padding-left: 0;
+  background: transparent;
+  border: none;
+  color: var(--axiom-text-primary);
+}
+.toolWrap {
+  margin-top: var(--axiom-gap-before-tools);
+}
+.toolRow {
+  display: flex;
+  align-items: center;
+  min-height: var(--axiom-tool-row-h);
+  margin-bottom: var(--axiom-gap-tool-line);
+}
+.toolIcon {
+  width: var(--axiom-icon);
+  height: var(--axiom-icon);
+  min-width: var(--axiom-icon);
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--axiom-size-tool-id);
+  margin-right: var(--axiom-gap-chip);
+}
+.iconOk {
+  background: var(--axiom-success);
+  color: var(--axiom-on-action);
+}
+.iconErr {
+  background: var(--axiom-danger);
+  color: var(--axiom-on-action);
+}
+.iconRun {
+  background: transparent;
+  border: 2px solid var(--axiom-text-muted);
+  color: transparent;
+}
+.toolLabel {
+  font-size: var(--axiom-size-tool);
+  color: var(--axiom-text-secondary);
+}
+.toolLabelErr {
+  color: var(--axiom-danger-fg);
+}
+.toolCode {
+  font-family: "Consolas","DejaVu Sans Mono",monospace;
+  font-size: var(--axiom-size-tool-id);
+  color: var(--axiom-text-muted);
+  margin-left: var(--axiom-gap-chip);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.typingDots {
+  display: inline-flex;
+  gap: var(--axiom-gap-chip);
+}
+.tdot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--axiom-accent);
+  animation: axiomBlink 1s ease-in-out infinite;
+}
+.tdot2 {
+  animation-delay: 200ms;
+}
+.tdot3 {
+  animation-delay: 400ms;
+}
+@keyframes axiomBlink {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tdot {
+    animation: none;
+  }
+}
+.emptyTitle {
+  font-size: var(--axiom-size-empty-title);
+  font-weight: 600;
+  color: var(--axiom-text-primary);
+  margin: 4px 0;
+}
+.emptyDesc {
+  font-size: var(--axiom-size-body);
+  color: var(--axiom-text-secondary);
+  margin: 0 0 var(--axiom-gap-message) 0;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+.suggestLabel {
+  font-size: var(--axiom-size-caption);
+  font-weight: 600;
+  color: var(--axiom-text-muted);
+  margin: 0 0 var(--axiom-gap-chip) 0;
+}
+.chip {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: var(--axiom-chip-h);
+  margin-bottom: var(--axiom-gap-chip);
+  padding: 4px var(--axiom-pad-x);
+  text-align: left;
+  background: var(--axiom-pane-bg);
+  border: 1px solid var(--axiom-chip-border);
+  border-radius: var(--axiom-radius-control);
+  color: var(--axiom-chip-fg);
+  font-family: system-ui,"Segoe UI","Noto Sans",sans-serif;
+  font-size: var(--axiom-size-body);
+  cursor: pointer;
+  transition: background-color 200ms ease, border-color 200ms ease;
+}
+.chip:hover {
+  background: var(--axiom-chip-hover);
+}
+.chip:active {
+  opacity: 0.8;
+}
+.errCard {
+  background: var(--axiom-danger-bg);
+  border: 1px solid var(--axiom-danger-border);
+  border-left: 3px solid var(--axiom-danger);
+  border-radius: var(--axiom-radius-control);
+  padding: var(--axiom-bubble-pad-y) var(--axiom-bubble-pad-x);
+  margin-bottom: var(--axiom-gap-message);
+}
+.errTitle {
+  color: var(--axiom-danger-fg);
+  font-weight: 600;
+  font-size: var(--axiom-size-small);
+  margin-bottom: var(--axiom-gap-tool-line);
+}
+.errBody {
+  color: var(--axiom-text-primary);
+  font-size: var(--axiom-size-small);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+.confirmCard {
+  background: var(--axiom-chip-hover);
+  border: 1px solid var(--axiom-chip-border);
+  border-left: 3px solid var(--axiom-accent);
+  border-radius: var(--axiom-radius-control);
+  padding: var(--axiom-bubble-pad-y) var(--axiom-bubble-pad-x);
+  margin-bottom: var(--axiom-gap-message);
+}
+.confirmReason {
+  color: var(--axiom-text-primary);
+  font-size: var(--axiom-size-small);
+  margin: 0 0 var(--axiom-gap-chip) 0;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+#confirmTitle {
+  color: var(--axiom-accent-fg);
+  font-weight: 600;
+  font-size: var(--axiom-size-small);
+  margin-bottom: var(--axiom-gap-chip);
+}
+.btnRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--axiom-gap-chip);
+}
+.btnPrimary {
+  background: var(--axiom-action-bg);
+  color: var(--axiom-on-action);
+  border: none;
+  border-radius: var(--axiom-radius-control);
+  font-family: system-ui,"Segoe UI","Noto Sans",sans-serif;
+  font-size: var(--axiom-size-small);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 200ms ease, color 200ms ease;
+}
+.btnPrimary:hover {
+  background: var(--axiom-action-hover);
+}
+.btnPrimary:active {
+  opacity: 0.85;
+}
+.btnSecondary {
+  background: var(--axiom-pane-bg);
+  color: var(--axiom-chip-fg);
+  border: 1px solid var(--axiom-chip-border);
+  border-radius: var(--axiom-radius-control);
+  font-family: system-ui,"Segoe UI","Noto Sans",sans-serif;
+  font-size: var(--axiom-size-small);
+  font-weight: 600;
+  padding: 4px var(--axiom-pad-x);
+  cursor: pointer;
+  transition: background-color 200ms ease, border-color 200ms ease;
+}
+.btnSecondary:hover {
+  background: var(--axiom-chip-hover);
+}
+.btnSecondary:active {
+  opacity: 0.85;
+}
+/* Viec khong khoi phuc duoc (xoa hoi thoai): chu do, tach khoi nut thuong - khong dung mau chinh. */
+.btnDanger {
+  background: var(--axiom-pane-bg);
+  color: var(--axiom-danger-fg);
+  border: 1px solid var(--axiom-danger-border);
+  border-radius: var(--axiom-radius-control);
+  font-family: system-ui,"Segoe UI","Noto Sans",sans-serif;
+  font-size: var(--axiom-size-small);
+  font-weight: 600;
+  padding: 4px var(--axiom-pad-x);
+  cursor: pointer;
+  transition: background-color 200ms ease, border-color 200ms ease;
+}
+.btnDanger:hover {
+  background: var(--axiom-danger-bg);
+  border-color: var(--axiom-danger);
+}
+.btnDanger:active {
+  opacity: 0.85;
+}
+#composer {
+  padding: 0 var(--axiom-pad-x) var(--axiom-gap-chip) var(--axiom-pad-x);
+  background: var(--axiom-pane-bg);
+}
+#composerBox {
+  border: 1px solid var(--axiom-input-border);
+  border-radius: var(--axiom-radius-composer);
+  background: var(--axiom-pane-bg);
+  min-height: var(--axiom-composer-h);
+  padding: 8px var(--axiom-pad-x);
+  box-sizing: border-box;
+  transition: border-color 200ms ease;
+}
+#composerBox:focus-within {
+  border-color: var(--axiom-focus);
+}
+#input {
+  width: 100%;
+  box-sizing: border-box;
+  border: none;
+  outline: none;
+  background: transparent;
+  resize: none;
+  font-family: system-ui,"Segoe UI","Noto Sans",sans-serif;
+  font-size: var(--axiom-size-body);
+  color: var(--axiom-text-primary);
+}
+.composerFoot {
+  display: flex;
+  align-items: center;
+  margin-top: var(--axiom-gap-chip);
+}
+/* Goi y phim tat: KHONG bao gio xuong dong (xuong dong thi day chan o soan cao len va dinh vao nut ben canh).
+   Khong du cho thi updateHint() rut ngan, roi bo han - cau day du van con o tooltip cua nut Gui. */
+#composerHint {
+  flex: 1;
+  min-width: 0;
+  margin: 0 var(--axiom-gap-chip) 0 var(--axiom-pad-x);
+  white-space: nowrap;
+  overflow: hidden;
+  font-size: var(--axiom-size-caption);
+  color: var(--axiom-text-muted);
+}
+#sendBtn {
+  width: var(--axiom-send-w);
+  height: var(--axiom-send-h);
+}
+#paneFooter {
+  height: var(--axiom-footer-h);
+  min-height: var(--axiom-footer-h);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--axiom-pad-x);
+  background: var(--axiom-pane-bg);
+  border-top: 1px solid var(--axiom-divider);
+}
+#statusText {
+  font-size: var(--axiom-size-caption);
+  color: var(--axiom-text-muted);
+  flex: 1;
+  margin-left: var(--axiom-gap-chip);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#stopBtn {
+  margin-left: auto;
+}
+/* Nut "..." tren header (Word Copilot: tieu de + mot nut ...). Mo ra menu #moreMenu. */
+#moreBtn {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--axiom-radius-control);
+  color: var(--axiom-text-secondary);
+  font-family: system-ui,"Segoe UI","Noto Sans",sans-serif;
+  font-size: var(--axiom-size-title);
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 200ms ease, color 200ms ease;
+}
+#moreBtn:hover {
+  background: var(--axiom-chip-hover);
+  color: var(--axiom-text-primary);
+}
+#moreBtn:active {
+  background: var(--axiom-chip-border);
+}
+#moreBtn[aria-expanded="true"] {
+  background: var(--axiom-chip-hover);
+  color: var(--axiom-accent-fg);
+}
+/* Menu do xuong: mot cot, nen trang, vien + bong nhe de tach khoi khung chat. */
+.headerLinks {
+  position: absolute;
+  top: calc(var(--axiom-header-h) - 4px);
+  right: var(--axiom-pad-x);
+  z-index: 40;
+  min-width: 184px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  padding: var(--axiom-gap-chip) 0;
+  background: var(--axiom-pane-bg);
+  border: 1px solid var(--axiom-divider);
+  border-radius: var(--axiom-radius-control);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.14);
+}
+.headerLinks[hidden] {
+  display: none;
+}
+.menuItem {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px var(--axiom-pad-x);
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--axiom-text-primary);
+  font-family: system-ui,"Segoe UI","Noto Sans",sans-serif;
+  font-size: var(--axiom-size-small);
+  cursor: pointer;
+  transition: background-color 200ms ease;
+}
+.menuItem:hover {
+  background: var(--axiom-chip-hover);
+}
+.menuItem:active {
+  background: var(--axiom-chip-border);
+}
+/* Vach ngan giua nhom "lam viec" va nhom "xem" trong menu. */
+.menuSep {
+  height: 1px;
+  margin: var(--axiom-gap-chip) 0;
+  background: var(--axiom-divider);
+}
+.infoLine {
+  font-size: var(--axiom-size-caption);
+  color: var(--axiom-text-muted);
+  margin: 0 0 var(--axiom-gap-message) 0;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+.card {
+  border: 1px solid var(--axiom-ai-border);
+  border-left: 3px solid var(--axiom-accent);
+  border-radius: var(--axiom-radius-control);
+  background: var(--axiom-ai-bg);
+  padding: var(--axiom-bubble-pad-y) var(--axiom-bubble-pad-x);
+  margin-bottom: var(--axiom-gap-message);
+}
+.cardTitle {
+  display: flex;
+  align-items: center;
+  font-size: var(--axiom-size-small);
+  font-weight: 600;
+  color: var(--axiom-accent-fg);
+}
+.cardBody {
+  margin-top: var(--axiom-gap-tool-line);
+  font-size: var(--axiom-size-small);
+  color: var(--axiom-text-secondary);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+.cardLink {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  padding: 0 0 0 var(--axiom-gap-chip);
+  color: var(--axiom-accent-fg);
+  font-family: system-ui,"Segoe UI","Noto Sans",sans-serif;
+  font-size: var(--axiom-size-caption);
+  cursor: pointer;
+  transition: color 200ms ease;
+}
+.cardLink:hover {
+  color: var(--axiom-action-hover);
+  text-decoration: underline;
+}
+.cardLink:active {
+  opacity: 0.75;
+}
+.cardLink:disabled {
+  background: transparent;
+}
+.planCard {
+  border-left-color: var(--axiom-success);
+}
+.planTitle {
+  color: var(--axiom-success);
+}
+.progressLine {
+  font-size: var(--axiom-size-caption);
+  color: var(--axiom-text-muted);
+  margin: 0 0 var(--axiom-gap-tool-line) 0;
+  overflow-wrap: break-word;
+}
+.memRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--axiom-gap-chip);
+  margin-top: var(--axiom-gap-tool-line);
+  font-size: var(--axiom-size-small);
+  color: var(--axiom-text-secondary);
+}
+.memText {
+  flex: 1;
+  overflow-wrap: break-word;
+}
+.memGone {
+  color: var(--axiom-text-muted);
+  text-decoration: line-through;
+}
+#planToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--axiom-gap-chip);
+  background: transparent;
+  border: none;
+  padding: 2px 0;
+  color: var(--axiom-text-secondary);
+  font-family: system-ui,"Segoe UI","Noto Sans",sans-serif;
+  font-size: var(--axiom-size-caption);
+  cursor: pointer;
+  transition: color 200ms ease;
+}
+#planToggle:hover {
+  color: var(--axiom-accent-fg);
+}
+#planToggle:active {
+  opacity: 0.75;
+}
+#planToggle[aria-pressed="true"] {
+  color: var(--axiom-accent-fg);
+  font-weight: 600;
+}
+.footLink {
+  background: transparent;
+  border: none;
+  padding: 0 var(--axiom-gap-chip);
+  color: var(--axiom-accent-fg);
+  font-family: system-ui,"Segoe UI","Noto Sans",sans-serif;
+  font-size: var(--axiom-size-caption);
+  cursor: pointer;
+  transition: color 200ms ease;
+}
+.footLink:hover {
+  color: var(--axiom-action-hover);
+  text-decoration: underline;
+}
+.footLink:active {
+  opacity: 0.75;
+}
+.footLink:disabled {
+  background: transparent;
+}
+#view {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  padding: var(--axiom-gap-message) var(--axiom-pad-x);
+  background: var(--axiom-pane-bg);
+  overflow-y: auto;
+}
+#view[hidden] {
+  display: none;
+}
+.viewTitle {
+  font-size: var(--axiom-size-title);
+  font-weight: 600;
+  color: var(--axiom-text-primary);
+  margin-bottom: var(--axiom-gap-chip);
+}
+.viewNote {
+  font-size: var(--axiom-size-caption);
+  color: var(--axiom-text-muted);
+  margin: 0 0 var(--axiom-gap-message) 0;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+.field {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--axiom-input-border);
+  border-radius: var(--axiom-radius-control);
+  padding: 4px var(--axiom-gap-chip);
+  margin-bottom: var(--axiom-gap-chip);
+  background: var(--axiom-pane-bg);
+  color: var(--axiom-text-primary);
+  font-family: system-ui,"Segoe UI","Noto Sans",sans-serif;
+  font-size: var(--axiom-size-small);
+  transition: border-color 200ms ease;
+}
+.field:focus {
+  border-color: var(--axiom-focus);
+}
+.settingRow {
+  display: flex;
+  align-items: center;
+  gap: var(--axiom-gap-chip);
+  margin-bottom: var(--axiom-gap-chip);
+  font-size: var(--axiom-size-small);
+  color: var(--axiom-text-secondary);
+}
+.settingName {
+  flex: 1;
+  overflow-wrap: break-word;
+}
+.viewFoot {
+  margin-top: auto;
+  padding-top: var(--axiom-gap-chip);
+}
+.auditLine {
+  margin: 0 0 var(--axiom-gap-tool-line) 0;
+  font-family: "Consolas","DejaVu Sans Mono",monospace;
+  font-size: var(--axiom-size-tool-id);
+  color: var(--axiom-text-secondary);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+.auditTime {
+  color: var(--axiom-text-muted);
+}
+.segBtn {
+  background: var(--axiom-pane-bg);
+  border: 1px solid var(--axiom-chip-border);
+  border-radius: var(--axiom-radius-control);
+  padding: 4px var(--axiom-pad-x);
+  color: var(--axiom-chip-fg);
+  font-family: system-ui,"Segoe UI","Noto Sans",sans-serif;
+  font-size: var(--axiom-size-caption);
+  cursor: pointer;
+  transition: background-color 200ms ease, border-color 200ms ease;
+}
+.segBtn:hover {
+  background: var(--axiom-chip-hover);
+}
+.segBtn:active {
+  opacity: 0.85;
+}
+.segBtnOn {
+  background: var(--axiom-action-bg);
+  border-color: var(--axiom-action-bg);
+  color: var(--axiom-on-action);
+}
+button:focus,
+.chip:focus,
+#input:focus,
+.field:focus {
+  outline: 2px solid var(--axiom-focus);
+  outline-offset: 1px;
+}
+.btnPrimary:disabled,
+.btnSecondary:disabled,
+.btnDanger:disabled,
+.chip:disabled,
+.link:disabled {
+  background: var(--axiom-disabled-bg);
+  color: var(--axiom-disabled-fg);
+  border-color: var(--axiom-disabled-bg);
+  cursor: default;
+  text-decoration: none;
+}
