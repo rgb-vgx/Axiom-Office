@@ -5,6 +5,14 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — Data race trên trạng thái lượt chạy của Core (20/10/2026)
+- `Execute` ghi `Status`, `Error`, `Finished`, `Transcript`… của `agent.Run` trên goroutine riêng, không khoá, trong
+  khi `GET /v1/runs/{id}`, vòng chờ `conversationId` của `POST /v1/runs`, nút Huỷ và `Manager` (`Running`,
+  `TryStart`, dọn lượt cũ) đọc cùng lúc. Mutex của `Manager` chỉ giữ map, không giữ từng lượt.
+- `Run` nay có khoá riêng: ghi qua `update`/`appendTranscript`, đọc từ goroutine khác qua `JSON`,
+  `CurrentStatus`, `StatusAndConversation`. Test mới `TestRunReadableWhileExecuteWrites` báo 4 `DATA RACE` trên mã
+  cũ; `make test-go` nay chạy `go test -race` (~15 s).
+
 ### Fixed — `install.sh` chọn sai `.oxt`, từ chối máy dùng venv; CI bỏ sót test (20/10/2026)
 - `install.sh` chọn `.oxt` bằng `sort | tail -1` (xếp theo chữ: 0.10.0 đứng trước 0.9.0 → cài nhầm bản cũ); nay
   `sort -V`. Kiểm Python UNO chỉ bằng `python3 -c 'import uno'` nên từ chối máy có venv/pyenv đầu PATH dù

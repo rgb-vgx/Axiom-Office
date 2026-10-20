@@ -138,11 +138,13 @@ func serveStartRun(w http.ResponseWriter, deps *Deps, request *agent.Request) {
 
 	// Hoi thoai duoc tao ngay dau luot chay: cho toi da 10s de tra ve conversationId nhu tai lieu.
 	deadline := time.Now().Add(conversationWaitLimit)
-	for run.ConversationID == "" && run.Status == agent.StatusRunning && time.Now().Before(deadline) {
+	status, conversationID := run.StatusAndConversation()
+	for conversationID == "" && status == agent.StatusRunning && time.Now().Before(deadline) {
 		time.Sleep(25 * time.Millisecond)
+		status, conversationID = run.StatusAndConversation()
 	}
 	OK(w, map[string]any{
-		"runId": run.ID, "conversationId": nilIfEmpty(run.ConversationID), "status": run.Status,
+		"runId": run.ID, "conversationId": nilIfEmpty(conversationID), "status": status,
 	})
 }
 
@@ -164,10 +166,10 @@ func serveCancelRun(w http.ResponseWriter, deps *Deps, runID string) {
 		return
 	}
 	if !deps.Manager.Cancel(run.ID) {
-		Error(w, http.StatusConflict, "run is not running (status "+run.Status+")")
+		Error(w, http.StatusConflict, "run is not running (status "+run.CurrentStatus()+")")
 		return
 	}
-	OK(w, map[string]any{"cancelled": true, "status": run.Status})
+	OK(w, map[string]any{"cancelled": true, "status": run.CurrentStatus()})
 }
 
 // serveConfirmRun: tra loi yeu cau xac nhan cua policy (dung chung cho /v1 va /wps).

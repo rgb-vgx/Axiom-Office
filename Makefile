@@ -29,8 +29,9 @@ help:
 
 test: test-go test-lo test-wps test-wps-e2e test-core test-mcp test-oracle test-install test-package
 
+# -race: Execute ghi trang thai luot tren goroutine rieng trong khi API doc (agent.Run co khoa rieng).
 test-go:
-	cd core-go && go test ./...
+	cd core-go && go test -race ./...
 
 test-lo:
 	python3 -m unittest discover -s tests/lo -v

@@ -240,7 +240,7 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 		return
 	}
 
-	run.ConversationID = conversation.ID
+	run.update(func() { run.ConversationID = conversation.ID })
 	o.Runs.Insert(run.ID, &conversation.ID, client.Model)
 	mode := "act"
 	if request.Plan {
@@ -392,7 +392,7 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 
 	liveReasoning, liveStatus := "", ""
 	callbacks := model.AgentCallbacks{
-		Transcript: func(line string) { run.Transcript = append(run.Transcript, line) },
+		Transcript: run.appendTranscript,
 		// Suy luan cua model hien cho nguoi dung xem (muc 7.4): chi co khi nguoi dung bat
 		// LlmShowReasoning - xem model.Client.ShowReasoning. Pane nao khong biet su kien nay thi bo qua.
 		Reasoning: func(round int, text string) {
@@ -431,7 +431,7 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 		},
 
 		ToolStarted: func(call model.ToolCall) {
-			run.ToolCalls++
+			run.update(func() { run.ToolCalls++ })
 			action, params := readCall(call)
 			actions.put(call.ID, action, params)
 			run.Events.Publish("tool.started", map[string]any{
@@ -456,7 +456,7 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 				// tra qua lon (thong le: ghi kich thuoc tung lan goi tool, canh bao khi p95 vuot nguong).
 				"resultBytes": len(result.ResultJSON),
 			})
-			o.Runs.AddToolCall(run.ID, len(run.Transcript), result.Name, optional(info.action), optional(info.params),
+			o.Runs.AddToolCall(run.ID, run.transcriptLen(), result.Name, optional(info.action), optional(info.params),
 				result.OK, optional(errorText), result.Ms)
 			label := info.action
 			if label == "" {
@@ -483,17 +483,18 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 			return executeTool(inner, registry, call, runContext)
 		}, options, callbacks)
 
-	run.Rounds = result.Rounds
-	run.InputTokens = result.InputTokens
-	run.OutputTokens = result.OutputTokens
-	run.CachedTokens = result.CachedTokens
-	run.Verified = result.Verified
-	run.Seconds = result.Seconds
+	run.update(func() {
+		run.Rounds = result.Rounds
+		run.InputTokens = result.InputTokens
+		run.OutputTokens = result.OutputTokens
+		run.CachedTokens = result.CachedTokens
+		run.Verified = result.Verified
+		run.Seconds = result.Seconds
+	})
 
 	switch {
 	case result.OK:
-		run.Status = StatusCompleted
-		run.Reply = result.Text
+		run.update(func() { run.Status, run.Reply = StatusCompleted, result.Text })
 		o.Conversations.AppendMessage(conversation.ID, "assistant", result.Text)
 		run.Events.Publish("run.completed", map[string]any{
 			"reply": result.Text, "rounds": result.Rounds, "seconds": round2(result.Seconds),
@@ -502,15 +503,13 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 			"verified": result.Verified, "model": result.Model,
 		})
 	case result.Cancelled:
-		run.Status = StatusCancelled
+		run.update(func() { run.Status = StatusCancelled })
 		run.Events.Publish("run.cancelled", map[string]any{"seconds": round2(result.Seconds)})
 	case result.TimedOut:
-		run.Status = StatusTimedOut
-		run.Error, run.ErrorKind = result.Error, "timeout"
+		run.update(func() { run.Status, run.Error, run.ErrorKind = StatusTimedOut, result.Error, "timeout" })
 		run.Events.Publish("run.timedout", map[string]any{"seconds": round2(result.Seconds), "error": result.Error})
 	case result.Stopped:
-		run.Status = StatusStopped
-		run.Error, run.ErrorKind = result.Error, "budget"
+		run.update(func() { run.Status, run.Error, run.ErrorKind = StatusStopped, result.Error, "budget" })
 		run.Events.Publish("run.stopped", map[string]any{
 			"error": result.Error, "rounds": result.Rounds,
 			"inputTokens": result.InputTokens, "outputTokens": result.OutputTokens,
@@ -529,7 +528,7 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 	}
 
 	if result.ToolsDisabled {
-		run.Transcript = append(run.Transcript, "(provider khong ho tro tools - chay che do thuong)")
+		run.appendTranscript("(provider khong ho tro tools - chay che do thuong)")
 	}
 
 	o.Runs.Finish(run.ID, run.Status, run.Rounds, run.InputTokens, run.OutputTokens, o.errorPtr(run), nil)
@@ -620,7 +619,7 @@ func (o *Orchestrator) unlockSelection(run *Run) {
 func (o *Orchestrator) finish(run *Run) {
 	o.unlockSelection(run)
 	now := time.Now().UTC()
-	run.Finished = &now
+	run.update(func() { run.Finished = &now })
 	run.Events.Complete()
 	message := "run " + run.ID + " " + run.Status + ": " + strconv.Itoa(run.Rounds) + " rounds, " +
 		strconv.Itoa(run.ToolCalls) + " tool calls, " + strconv.Itoa(run.InputTokens) + "+" +
@@ -640,8 +639,7 @@ func (o *Orchestrator) finish(run *Run) {
 }
 
 func (o *Orchestrator) fail(run *Run, errorText, kind string) {
-	run.Status = StatusFailed
-	run.Error, run.ErrorKind = errorText, kind
+	run.update(func() { run.Status, run.Error, run.ErrorKind = StatusFailed, errorText, kind })
 	run.Events.Publish("run.failed", map[string]any{"error": errorText, "kind": kind})
 	corelog.Error("run %s failed [%s]: %s", run.ID, kind, errorText)
 }

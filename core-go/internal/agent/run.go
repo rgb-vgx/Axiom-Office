@@ -25,7 +25,13 @@ const (
 const RetentionMinutes = 30
 
 // Run: trang thai mot luot chay (docs/architecture/core.md muc 7.3, 8.1).
+//
+// Execute ghi cac truong tren goroutine rieng trong khi API (GET /v1/runs/{id}, cho conversationId, huy) va
+// Manager doc cung luc: moi lan ghi tu Execute di qua update/appendTranscript, moi lan doc tu goroutine khac
+// di qua JSON/CurrentStatus/StatusAndConversation (giu mu). Doc tren chinh goroutine Execute khong can khoa.
 type Run struct {
+	mu sync.Mutex
+
 	ID             string
 	Port           int
 	ConversationID string
@@ -77,8 +83,47 @@ func (r *Run) finishedText() any {
 	return r.Finished.UTC().Format("2006-01-02T15:04:05.000Z")
 }
 
+// update: doi trang thai luot duoi khoa (goi tu goroutine Execute).
+func (r *Run) update(change func()) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	change()
+}
+
+func (r *Run) appendTranscript(line string) {
+	r.update(func() { r.Transcript = append(r.Transcript, line) })
+}
+
+func (r *Run) transcriptLen() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.Transcript)
+}
+
+// CurrentStatus: trang thai hien tai, doc an toan tu goroutine khac goroutine chay luot.
+func (r *Run) CurrentStatus() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.Status
+}
+
+// StatusAndConversation: trang thai + hoi thoai cua luot, doc an toan tu goroutine khac.
+func (r *Run) StatusAndConversation() (string, string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.Status, r.ConversationID
+}
+
+func (r *Run) expiredBefore(cutoff time.Time) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.Status != StatusRunning && r.Finished != nil && r.Finished.Before(cutoff)
+}
+
 // JSON: hinh dang GET /v1/runs/{id}.
 func (r *Run) JSON() map[string]any {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	transcript := make([]string, len(r.Transcript))
 	copy(transcript, r.Transcript)
 	payload := map[string]any{
@@ -117,7 +162,7 @@ func (m *Manager) TryStart(port int) (*Run, string) {
 	defer m.mu.Unlock()
 	m.cleanup()
 	for _, existing := range m.runs {
-		if existing.Port == port && existing.Status == StatusRunning {
+		if existing.Port == port && existing.CurrentStatus() == StatusRunning {
 			return nil, "busy: a run is already in progress on port " + strconv.Itoa(port) + " (run " + existing.ID + ")"
 		}
 	}
@@ -136,7 +181,7 @@ func (m *Manager) Cancel(id string) bool {
 	m.mu.Lock()
 	run, found := m.runs[id]
 	m.mu.Unlock()
-	if !found || run.Status != StatusRunning {
+	if !found || run.CurrentStatus() != StatusRunning {
 		return false
 	}
 	run.Cancel()
@@ -149,7 +194,7 @@ func (m *Manager) CancelRunning() int {
 	m.mu.Lock()
 	list := make([]*Run, 0, len(m.runs))
 	for _, run := range m.runs {
-		if run.Status == StatusRunning {
+		if run.CurrentStatus() == StatusRunning {
 			list = append(list, run)
 		}
 	}
@@ -172,7 +217,7 @@ func (m *Manager) Running() int {
 	defer m.mu.Unlock()
 	count := 0
 	for _, run := range m.runs {
-		if run.Status == StatusRunning {
+		if run.CurrentStatus() == StatusRunning {
 			count++
 		}
 	}
@@ -193,7 +238,7 @@ func (m *Manager) List() []*Run {
 func (m *Manager) cleanup() {
 	cutoff := time.Now().UTC().Add(-RetentionMinutes * time.Minute)
 	for id, run := range m.runs {
-		if run.Status != StatusRunning && run.Finished != nil && run.Finished.Before(cutoff) {
+		if run.expiredBefore(cutoff) {
 			delete(m.runs, id)
 		}
 	}
