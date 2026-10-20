@@ -55,6 +55,7 @@ mkdir -p "$STAGE/wps"
 cp -a "$ROOT/scripts/wps/install_jsaddon.py" "$STAGE/wps/install_jsaddon.py"
 
 cp "$ROOT/scripts/linux/install.sh" "$STAGE/install.sh"
+cp "$ROOT/scripts/linux/lo-common.sh" "$STAGE/lo-common.sh"
 cp "$ROOT/scripts/linux/axiom-office-core.service.in" "$STAGE/axiom-office-core.service.in"
 chmod +x "$STAGE/install.sh"
 cat >"$STAGE/README.txt" <<EOF

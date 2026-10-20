@@ -10,30 +10,19 @@ UNOPKG="${UNOPKG:-$(command -v unopkg || echo /usr/lib/libreoffice/program/unopk
 DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/axiom-office"
 RUNTIME_DIR="${XDG_RUNTIME_DIR:-$HOME/.cache}/axiom-office"
 EXTENSION_ID="org.axiomoffice.bridge"
-
-soffice_running() {
-    pgrep -u "$(id -u)" -f 'soffice\.bin' >/dev/null 2>&1
-}
+# shellcheck source=linux/lo-common.sh
+. "$ROOT/scripts/linux/lo-common.sh"
 
 assert_closed() {
     if soffice_running; then
-        echo "LibreOffice dang chay (pid $(pgrep -u "$(id -u)" -f 'soffice\.bin' | tr '\n' ' ')). Dong LibreOffice roi chay lai - script khong tu tat." >&2
+        echo "LibreOffice dang chay (pid $(pgrep -u "$(id -u)" -f '[s]office\.bin' | tr '\n' ' ')). Dong LibreOffice roi chay lai - script khong tu tat." >&2
         exit 1
     fi
 }
 
 check_python_uno() {
-    # Extension la component Python: can loader Python cua CHINH LibreOffice (pythonloader.py canh soffice: goi
-    # python3-uno tren Debian/Ubuntu, co san trong ban TDF). Khong chi dung `python3 -c 'import uno'`: python3 dau
-    # PATH co the khong phai Python he thong (venv, actions/setup-python) du LibreOffice van nap duoc extension.
-    local soffice
-    soffice="$(command -v soffice 2>/dev/null || true)"
-    if [ -n "$soffice" ] && [ -f "$(dirname "$(readlink -f "$soffice")")/pythonloader.py" ]; then
-        return 0
-    fi
-    if ! python3 -c 'import uno' >/dev/null 2>&1 && ! /usr/bin/python3 -c 'import uno' >/dev/null 2>&1; then
-        echo "Thieu Python UNO cua LibreOffice. Cai: sudo apt install python3-uno (Debian/Ubuntu) hoac" \
-             "sudo dnf install libreoffice-pyuno (Fedora)." >&2
+    if ! has_python_uno; then
+        echo "Thieu Python UNO cua LibreOffice. Cai: $PYTHON_UNO_HINT" >&2
         exit 1
     fi
 }

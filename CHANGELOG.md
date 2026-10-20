@@ -5,6 +5,16 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — `install.sh` chọn sai `.oxt`, từ chối máy dùng venv; CI bỏ sót test (20/10/2026)
+- `install.sh` chọn `.oxt` bằng `sort | tail -1` (xếp theo chữ: 0.10.0 đứng trước 0.9.0 → cài nhầm bản cũ); nay
+  `sort -V`. Kiểm Python UNO chỉ bằng `python3 -c 'import uno'` nên từ chối máy có venv/pyenv đầu PATH dù
+  LibreOffice vẫn nạp được extension; nay dùng chung cách kiểm của `scripts/libreoffice.sh` (loader
+  `pythonloader.py` cạnh `soffice`, rồi `/usr/bin/python3`) qua tệp mới `scripts/linux/lo-common.sh` (gói tarball
+  mang theo). Hai test mới trong `tests/linux/test_install_sh.py`, đỏ trên script cũ.
+- CI chép tay danh sách test và bỏ sót `test_pane_view.mjs`, `test_mini_view.mjs`; nay mọi bước gọi đích Makefile.
+  Thêm vào CI/`make test` các bộ trước đây không nơi nào chạy: `test-package` (mới), `test-oracle`,
+  `check_i18n.py` (trong `check-gen`).
+
 ### Fixed — "Hoàn tác lượt này" gỡ quá tay (20/10/2026)
 - Ba pane (LibreOffice, WPS, Windows) đếm "thao tác sửa" bằng danh sách lệnh **chỉ đọc chép tay** — lệnh nào
   không có trong danh sách thì bị tính là sửa. 18 lệnh không tạo bước Undo (vd `writer.outline` mà prompt bảo

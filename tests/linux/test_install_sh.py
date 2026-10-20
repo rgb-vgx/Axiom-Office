@@ -47,6 +47,7 @@ class InstallShTests(unittest.TestCase):
         os.makedirs(os.path.join(self.stage, "wps"))
         shutil.copy(os.path.join(ROOT, "scripts", "wps", "install_jsaddon.py"), os.path.join(self.stage, "wps"))
         shutil.copy(os.path.join(ROOT, "scripts", "linux", "install.sh"), self.stage)
+        shutil.copy(os.path.join(ROOT, "scripts", "linux", "lo-common.sh"), self.stage)
         shutil.copy(os.path.join(ROOT, "scripts", "linux", "axiom-office-core.service.in"), self.stage)
         self.unopkg_log = os.path.join(base, "unopkg.log")
         unopkg = os.path.join(base, "unopkg")
@@ -149,6 +150,37 @@ class InstallShTests(unittest.TestCase):
         text = self.read_publish()
         self.assertNotIn('name="axiomoffice"', text, out)
         self.assertIn(OTHER, text, "giu add-in khac")
+
+    def test_picks_newest_oxt_by_version_not_by_text(self):
+        # `sort | tail -1` xep theo chu: 0.10.0 dung truoc 0.9.0 -> cai nham ban cu.
+        for ver in ("0.9.0", "0.10.0"):
+            open(os.path.join(self.stage, "AxiomOffice-LibreOffice-%s.oxt" % ver), "w").close()
+        code, out = self.run_install()
+        self.assertEqual(code, 0, out)
+        with open(self.unopkg_log) as handle:
+            log = handle.read()
+        self.assertIn("AxiomOffice-LibreOffice-0.10.0.oxt", log, log)
+        self.assertNotIn("0.9.0", log)
+
+    def test_python_on_path_without_uno_is_ok_when_libreoffice_has_its_loader(self):
+        # venv / pyenv / actions/setup-python: python3 dau PATH khong co `uno` nhung LibreOffice van nap duoc
+        # extension bang loader Python cua chinh no (pythonloader.py canh soffice) - giong scripts/libreoffice.sh.
+        bin_dir = os.path.join(self.tmp.name, "bin")
+        program = os.path.join(self.tmp.name, "lo", "program")
+        os.makedirs(bin_dir)
+        os.makedirs(program)
+        with open(os.path.join(bin_dir, "python3"), "w") as handle:
+            handle.write('#!/bin/sh\n[ "$1" = "-c" ] && [ "$2" = "import uno" ] && exit 1\nexec /usr/bin/python3 "$@"\n')
+        os.chmod(os.path.join(bin_dir, "python3"), 0o755)
+        with open(os.path.join(program, "soffice"), "w") as handle:
+            handle.write("#!/bin/sh\nexit 0\n")
+        os.chmod(os.path.join(program, "soffice"), 0o755)
+        open(os.path.join(program, "pythonloader.py"), "w").close()
+        os.symlink(os.path.join(program, "soffice"), os.path.join(bin_dir, "soffice"))
+        self.env["PATH"] = bin_dir + ":" + self.env["PATH"]
+        code, out = self.run_install()
+        self.assertEqual(code, 0, out)
+        self.assertNotIn("thieu Python UNO", out.lower())
 
     def test_reinstall_keeps_user_data(self):
         self.assertEqual(self.run_install()[0], 0)

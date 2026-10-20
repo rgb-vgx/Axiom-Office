@@ -17,6 +17,8 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lo-common.sh
+. "$HERE/lo-common.sh"
 DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/axiom-office"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/axiom-office"
 CORE_DIR="$DATA_DIR/core"
@@ -81,7 +83,7 @@ remove_core_keep_data() {
 assert_libreoffice_closed() {
     # Test bo qua kiem tra nay bang AXIOM_INSTALL_SKIP_LO_CHECK=1.
     [ "${AXIOM_INSTALL_SKIP_LO_CHECK:-0}" = "1" ] && return 0
-    if pgrep -u "$(id -u)" -f '[s]office\.bin' >/dev/null 2>&1; then
+    if soffice_running; then
         die "LibreOffice dang chay - dong tat ca cua so LibreOffice roi chay lai (script khong tu tat)."
     fi
 }
@@ -189,12 +191,12 @@ unregister_wps_addin() {
 
 install() {
     local oxt
-    oxt="$(ls "$HERE"/AxiomOffice-LibreOffice-*.oxt 2>/dev/null | sort | tail -1)"
+    # sort -V: 0.10.0 moi hon 0.9.0 (sort thuong xep theo chu -> cai nham ban cu).
+    oxt="$(ls "$HERE"/AxiomOffice-LibreOffice-*.oxt 2>/dev/null | sort -V | tail -1)"
     [ -n "$oxt" ] || die "khong thay AxiomOffice-LibreOffice-*.oxt canh install.sh"
     [ -x "$HERE/core/AxiomOffice.Core" ] || die "khong thay core/AxiomOffice.Core canh install.sh"
     [ -x "$UNOPKG" ] || die "khong thay unopkg ($UNOPKG) - cai LibreOffice truoc (vd: sudo apt install libreoffice)."
-    python3 -c 'import uno' >/dev/null 2>&1 \
-        || die "thieu Python UNO: sudo apt install python3-uno (Debian/Ubuntu) hoac sudo dnf install libreoffice-pyuno (Fedora)."
+    has_python_uno || die "thieu Python UNO: $PYTHON_UNO_HINT"
     assert_libreoffice_closed
 
     echo "1/4 Agent Core -> $CORE_DIR"
