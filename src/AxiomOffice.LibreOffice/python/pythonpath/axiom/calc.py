@@ -1041,12 +1041,6 @@ def undo(env, params):
     return documents.undo(env.document, values.integer(params, "count", 1))
 
 
-def check_range(env, params):
-    from . import checks
-
-    return checks.range_report(env, params)
-
-
 command("et.newWorkbook", "et", lambda env, p: documents.open_document(env.ctx, "et", None), "Tạo sổ tính mới")
 command("et.open", "et", lambda env, p: documents.open_document(env.ctx, "et", values.string(p, "path")), "Mở .xlsx/.xls/.ods/.csv", req("path"))
 command("et.listSheets", "et", list_sheets, "Danh sách sheet + sheet đang active", agent=True)

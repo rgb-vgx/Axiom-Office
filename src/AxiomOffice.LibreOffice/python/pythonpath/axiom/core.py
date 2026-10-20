@@ -205,8 +205,13 @@ def stream_events(base: str, run_id: str, on_event, stop=None, after: int = 0, t
                 continue
 
 
-def wait_for_run(base: str, run_id: str, stop=None, on_tick=None, poll: float = RUN_POLL_SECONDS) -> dict:
-    """Khong dung SSE: cho bang cach hoi trang thai (du phong khi SSE bi chan)."""
+def wait_for_run(base: str, run_id: str, stop=None, on_tick=None, poll: float = RUN_POLL_SECONDS,
+                 timeout: float = 0) -> tuple[bool, dict]:
+    """Khong dung SSE: cho bang cach hoi trang thai (du phong khi SSE bi chan).
+
+    `timeout` > 0: het gio thi HUY luot tren Core va tra ve ngay. Tra (timed_out, run).
+    """
+    deadline = time.time() + timeout if timeout > 0 else None
     while True:
         if stop is not None and stop.is_set():
             cancel_run(base, run_id)
@@ -214,8 +219,12 @@ def wait_for_run(base: str, run_id: str, stop=None, on_tick=None, poll: float = 
         if on_tick:
             on_tick(run)
         if str(run.get("status")) in TERMINAL:
-            return run
-        time.sleep(poll)
+            return False, run
+        if deadline is not None and time.time() >= deadline:
+            # Core tu dung o maxSeconds, nhung neu no treo thi khong duoc bo mac luot chay tiep.
+            cancel_run(base, run_id)
+            return True, run
+        time.sleep(min(poll, max(0.0, deadline - time.time())) if deadline else poll)
 
 
 # ---------------------------------------------------------------- memory, skills

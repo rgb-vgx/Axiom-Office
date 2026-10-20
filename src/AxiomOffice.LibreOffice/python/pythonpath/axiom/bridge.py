@@ -6,7 +6,6 @@ from __future__ import annotations
 import json
 import os
 import threading
-import time
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -40,21 +39,27 @@ class Env:
 
 
 def execute(ctx, gate: UnoGate, kind: str, action: str, params: dict) -> dict:
+    """Lenh tu HTTP: qua gate khi lenh can main thread."""
+    return _invoke(ctx, gate, kind, action, params)
+
+
+def _invoke(ctx, gate: UnoGate, kind: str, action: str, params: dict, on_main: bool = False) -> dict:
     command = commands.REGISTRY.get(action)
     if command is None:
         return {"ok": False, "error": "unknown action: " + str(action)}
     if command.kind is not None and command.kind != kind:
         return {"ok": False, "error": "'%s' is not available on the %s port (use the port of app kind '%s')" % (action, kind, command.kind)}
+    params = params or {}
 
     def run():
         env = Env(ctx, kind, gate, params)
         if command.undo:
             with documents.undo_step(env.document, action):
-                return command.handler(env, params or {})
-        return command.handler(env, params or {})
+                return command.handler(env, params)
+        return command.handler(env, params)
 
     try:
-        result = gate.run(run) if command.gated else run()
+        result = run() if on_main or not command.gated else gate.run(run)
         return {"ok": True, "result": result}
     except (values.ParamError, ValueError) as exc:
         return {"ok": False, "error": "ArgumentException: " + str(exc)}
@@ -231,21 +236,4 @@ def pane_target(kind: str | None = None) -> tuple[str, int]:
 
 def run_on_main(ctx, uno_gate, kind: str, action: str, params: dict) -> dict:
     """Chay mot lenh NGAY tren thread dang goi (pane da o main thread: qua gate se tu treo)."""
-    command = commands.REGISTRY.get(action)
-    if command is None:
-        return {"ok": False, "error": "unknown action: " + str(action)}
-    try:
-        env = Env(ctx, kind, uno_gate)
-        if command.undo:
-            with documents.undo_step(env.document, action):
-                return {"ok": True, "result": command.handler(env, params or {})}
-        return {"ok": True, "result": command.handler(env, params or {})}
-    except (values.ParamError, ValueError) as exc:
-        return {"ok": False, "error": "ArgumentException: " + str(exc)}
-    except Exception as exc:  # noqa: BLE001
-        log.error("Action failed (pane): %s => %s" % (action, exc))
-        return {"ok": False, "error": "%s: %s" % (type(exc).__name__, exc)}
-
-
-def uptime_started() -> float:
-    return _STATE.setdefault("t0", time.time())
+    return _invoke(ctx, uno_gate, kind, action, params, on_main=True)

@@ -2,14 +2,10 @@
 from __future__ import annotations
 
 import base64
-import json
 import os
 import tempfile
-import time
-import urllib.error
-import urllib.request
 
-from . import config, documents, log, values
+from . import documents, log, values
 from .commands import command, opt, req
 
 SCREENSHOT_FILTERS = {"wps": "writer_png_Export", "et": "calc_png_Export", "wpp": "impress_png_Export"}
@@ -66,23 +62,6 @@ def _core_base_url():
         return None
 
 
-def _core_call(base: str, method: str, path: str, body=None, timeout: float = 30):
-    data = None if body is None else json.dumps(body).encode("utf-8")
-    request = urllib.request.Request(base + path, data=data, method=method)
-    request.add_header("Content-Type", "application/json")
-    token = config.token()
-    if token:
-        request.add_header("X-Auth-Token", token)
-    try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        payload = json.loads(exc.read().decode("utf-8") or "{}")
-    if not payload.get("ok"):
-        raise RuntimeError("Agent Core: %s" % payload.get("error"))
-    return payload.get("result")
-
-
 def ai_ask(env, params):
     prompt = values.string(params, "prompt")
     if not prompt:
@@ -90,31 +69,28 @@ def ai_ask(env, params):
     base = _core_base_url()
     if base is None:
         raise RuntimeError("Agent Core is not running (start AxiomOffice.Core or set CoreExe)")
-    from . import bridge
+    from . import bridge, core
 
     port = next((p for k, p, _ in bridge._STATE.get("servers", []) if k == env.kind), 0)  # noqa: SLF001
     info = env.gate.run_quiet(lambda: documents.describe(documents.active(env.ctx, env.kind, required=False)), 10.0, {})
-    started = _core_call(base, "POST", "/v1/runs", {
-        "prompt": prompt,
-        "office": {"port": port, "pid": os.getpid(), "app": env.kind, "family": "libreoffice"},
-        "document": {"name": (info or {}).get("name"), "fullName": (info or {}).get("fullName")},
+    started = core.start_run(
+        base, prompt, port, env.kind,
+        document={"name": (info or {}).get("name"), "fullName": (info or {}).get("fullName")},
         # ai.ask la RPC dong bo cho agent ben ngoai: khong the cho vo han, nen van tu dat tran 300s
         # (vong cho duoi day la 330s). Khac voi pane - duong do khong tran, co SSE va nut Dung.
-        "options": {"maxSeconds": 300, "maxTokens": 200000, "interactive": False},
-    })
+        interactive=False, max_seconds=300,
+    )
     run_id = started["runId"]
-    deadline = time.time() + 330
-    run = {}
-    while time.time() < deadline:
-        run = _core_call(base, "GET", "/v1/runs/" + run_id)
-        if run.get("status") != "running":
-            break
-        time.sleep(1.0)
+    timed_out, run = core.wait_for_run(base, run_id, timeout=330)
     ok = run.get("status") == "completed"
     reply = {"ok": ok, "transcript": run.get("transcript"), "seconds": run.get("seconds"),
              "rounds": run.get("rounds"), "viaCore": True, "runId": run_id, "status": run.get("status")}
     if ok:
         reply["reply"] = run.get("reply")
+    elif timed_out:
+        reply["status"] = "timeout"
+        reply["cancelled"] = True
+        reply["error"] = "Agent Core did not finish within 330s; the run was cancelled"
     else:
         reply["error"] = run.get("error") or ("run status " + str(run.get("status")))
     return reply

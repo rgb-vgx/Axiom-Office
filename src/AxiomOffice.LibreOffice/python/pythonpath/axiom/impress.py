@@ -290,12 +290,6 @@ def delete_slide(env, params):
     return {"deleted": index, "slideCount": _pages(doc).getCount()}
 
 
-def check_layout(env, params):
-    from . import checks
-
-    return checks.layout_report(env, params)
-
-
 command("wpp.newPresentation", "wpp", lambda env, p: documents.open_document(env.ctx, "wpp", None), "Tạo bài trình bày mới")
 command("wpp.open", "wpp", lambda env, p: documents.open_document(env.ctx, "wpp", values.string(p, "path")), "Mở .pptx/.ppt/.odp", req("path"))
 command("wpp.listSlides", "wpp", list_slides, "Số slide + text từng slide", opt("presentation", "full path of the presentation to work on; default: the active one"), opt("detail", "true = kem master/notes"), agent=True)
