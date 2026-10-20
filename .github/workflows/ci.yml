@@ -19,8 +19,10 @@ jobs:
         with:
           python-version: "3.12"
 
+      # Moi buoc test goi dich cua Makefile - Makefile la nguon duy nhat liet ke test (truoc day CI chep tay
+      # danh sach node --test va bo sot test_pane_view/test_mini_view).
       - name: Unit test extension LibreOffice (khong can LibreOffice)
-        run: python3 -m unittest discover -s tests/lo -v
+        run: make test-lo
 
       - uses: actions/setup-node@v4
         with:
@@ -32,9 +34,7 @@ jobs:
 
       # test_wps_bridge_live.py can WPS that + Xvfb + oem.ini bat JsApiPlugin: chi chay o may dev.
       - name: Unit test add-in WPS (trinh cai + registry/vong poll + probe, khong can WPS)
-        run: |
-          python3 tests/wps/test_install_jsaddon.py
-          node --test tests/wps/test_addin_fake.mjs tests/wps/test_addin.mjs tests/wps/test_addin_et.mjs tests/wps/test_addin_wpp.mjs tests/wps/test_addin_writer.mjs tests/wps/test_probe.mjs tests/wps/test_pane.mjs tests/wps/test_pane_theme.mjs
+        run: make test-wps
 
       - uses: actions/setup-go@v5
         with:
@@ -48,23 +48,15 @@ jobs:
           make lint
 
       - name: File sinh khong duoc lech nguon
-        run: |
-          python3 scripts/generate_setup_catalog.py --check
-          python3 scripts/generate_mcp_commands.py --check
-          python3 scripts/check_version.py
+        run: make check-gen
 
+      # go vet da chay trong `make lint`. test-core build Core vao dist/core/ (core-build) - cac buoc sau dung lai.
+      # Core sinh chinh no lam MCP server built-in "office" nen phan mcp chay duoc ca tren Linux.
       - name: Agent Core ban Go (go test + build + e2e day du)
-        run: |
-          cd core-go
-          go vet ./...
-          go test ./...
-          CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o "$RUNNER_TEMP/gocore/axiom-core" ./cmd/axiom-core
-          cp -r ../skills "$RUNNER_TEMP/gocore/"
-          cd ..
-          # Core sinh chinh no lam MCP server built-in "office" nen phan mcp chay duoc ca tren Linux.
-          export AXIOM_E2E_CORE_EXE="$RUNNER_TEMP/gocore/axiom-core"
-          PARTS=fake_bridge,guards,skills,confirm,memory,mcp,visual,setup,shutdown,anthropic,embeddings,summarize,cancel,mcp_http,verify
-          python3 tests/core/test_core_e2e.py --only "$PARTS"
+        run: make test-go test-core
+
+      - name: Bo test oracle (MCP Word/Excel/PowerPoint mau)
+        run: make test-oracle
 
       # Hai bo e2e nay chay Core that qua HTTP (dong vai add-in bang poll/result + LLM gia) nhung
       # KHONG can WPS; dich Makefile la nguon duy nhat liet ke chung.
@@ -74,7 +66,7 @@ jobs:
       - name: MCP server ban Go (khong can app dang mo)
         env:
           AXIOM_MCP_ARGS: mcp all
-        run: python3 tests/mcp-host/test_mcp_portable.py "$RUNNER_TEMP/gocore/axiom-core"
+        run: make test-mcp
 
       - name: Cai LibreOffice + Python UNO (+ xvfb cho phan giao dien)
         run: |
@@ -112,10 +104,12 @@ jobs:
         run: |
           setsid soffice --headless --calc --norestore >/tmp/soffice.out 2>&1 </dev/null &
           for _ in $(seq 40); do curl -s --max-time 1 http://127.0.0.1:47852/health >/dev/null && break; sleep 1; done
-          python3 tests/mcp-host/test_mcp_portable.py "$RUNNER_TEMP/gocore/axiom-core" --live
+          python3 tests/mcp-host/test_mcp_portable.py "$PWD/dist/core/axiom-core" --live
 
-      - name: Dong goi tarball (Core + MCP + oxt)
-        run: bash scripts/linux/package.sh
+      - name: Dong goi tarball (Core + MCP + oxt) + soi noi dung
+        run: |
+          make test-package
+          bash scripts/linux/package.sh
 
       - uses: actions/upload-artifact@v4
         with:

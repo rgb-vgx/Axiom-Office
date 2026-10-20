@@ -27,7 +27,7 @@ help:
 	@echo "  lint-py     - Kiem loi Python (ruff check)"
 	@echo "  lint-js     - Kiem loi JS (ESLint: add-in WPS ES5 + tests modern)"
 
-test: test-go test-lo test-wps test-wps-e2e test-core test-mcp test-oracle test-install
+test: test-go test-lo test-wps test-wps-e2e test-core test-mcp test-oracle test-install test-package
 
 test-go:
 	cd core-go && go test ./...
@@ -65,10 +65,15 @@ test-oracle:
 test-install:
 	python3 tests/linux/test_install_sh.py
 
+# Chay package.sh that (build Core + .oxt) roi soi tarball.
+test-package:
+	python3 tests/linux/test_package.py
+
 check-gen:
 	python3 scripts/generate_setup_catalog.py --check
 	python3 scripts/generate_mcp_commands.py --check
 	python3 scripts/check_version.py
+	python3 scripts/check_i18n.py
 
 package:
 	bash scripts/linux/package.sh
