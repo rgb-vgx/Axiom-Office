@@ -44,16 +44,16 @@ func mapRuns(mux *http.ServeMux, deps *Deps) {
 		serveStartRun(w, deps, request)
 	})
 
-	mux.HandleFunc("GET /v1/runs/{runId}", func(w http.ResponseWriter, r *http.Request) {
+	routeBoth(mux, deps, "GET /v1/runs/{runId}", func(w http.ResponseWriter, r *http.Request) {
 		serveGetRun(w, deps, r.PathValue("runId"))
 	})
 
-	mux.HandleFunc("POST /v1/runs/{runId}/cancel", func(w http.ResponseWriter, r *http.Request) {
+	routeBoth(mux, deps, "POST /v1/runs/{runId}/cancel", func(w http.ResponseWriter, r *http.Request) {
 		serveCancelRun(w, deps, r.PathValue("runId"))
 	})
 
 	// Tra loi yeu cau xac nhan cua policy (muc 7.3, 8.6): {"confirmationId", "approved": true|false}.
-	mux.HandleFunc("POST /v1/runs/{runId}/confirm", func(w http.ResponseWriter, r *http.Request) {
+	routeBoth(mux, deps, "POST /v1/runs/{runId}/confirm", func(w http.ResponseWriter, r *http.Request) {
 		body, parsed := readJSON(r)
 		if !parsed {
 			body = nil
@@ -78,7 +78,7 @@ func mapRuns(mux *http.ServeMux, deps *Deps) {
 		OK(w, map[string]any{"calls": calls})
 	})
 
-	mux.HandleFunc("GET /v1/runs/{runId}/events", func(w http.ResponseWriter, r *http.Request) {
+	routeBoth(mux, deps, "GET /v1/runs/{runId}/events", func(w http.ResponseWriter, r *http.Request) {
 		serveRunEvents(w, r, deps, r.PathValue("runId"))
 	})
 

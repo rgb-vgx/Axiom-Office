@@ -87,38 +87,7 @@ func mapWPSRuns(mux *http.ServeMux, deps *Deps) {
 		}
 		serveStartRun(w, deps, request)
 	})
-
-	mux.HandleFunc("GET /wps/v1/runs/{runId}", func(w http.ResponseWriter, r *http.Request) {
-		if !checkWPSAuth(w, r, deps) {
-			return
-		}
-		serveGetRun(w, deps, r.PathValue("runId"))
-	})
-
-	mux.HandleFunc("GET /wps/v1/runs/{runId}/events", func(w http.ResponseWriter, r *http.Request) {
-		if !checkWPSAuth(w, r, deps) {
-			return
-		}
-		serveRunEvents(w, r, deps, r.PathValue("runId"))
-	})
-
-	mux.HandleFunc("POST /wps/v1/runs/{runId}/cancel", func(w http.ResponseWriter, r *http.Request) {
-		if !checkWPSAuth(w, r, deps) {
-			return
-		}
-		serveCancelRun(w, deps, r.PathValue("runId"))
-	})
-
-	mux.HandleFunc("POST /wps/v1/runs/{runId}/confirm", func(w http.ResponseWriter, r *http.Request) {
-		if !checkWPSAuth(w, r, deps) {
-			return
-		}
-		body, parsed := readJSON(r)
-		if !parsed {
-			body = nil
-		}
-		serveConfirmRun(w, deps, r.PathValue("runId"), body)
-	})
+	// GET runs/{id}, events, cancel, confirm: dang ky mot lan cho ca /v1 va /wps/v1 bang routeBoth (runs.go).
 }
 
 // checkWPSAuth: xac thuc kenh add-in cho moi endpoint /wps/v1/* (giong wpsbridge.checkWPSAuth: Origin dung
