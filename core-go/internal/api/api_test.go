@@ -90,3 +90,16 @@ func TestLlmTestMissingEndpoint(t *testing.T) {
 		t.Fatalf("body = %s", body)
 	}
 }
+
+func TestReadJSONRejectsOversizedBody(t *testing.T) {
+	// wpsbridge.readBody da gioi han 8 MB; API chinh khong duoc doc body vo han.
+	body := `{"x":"` + strings.Repeat("a", (8<<20)+1) + `"}`
+	request := httptest.NewRequest("POST", "/v1/anything", strings.NewReader(body))
+	if _, ok := readJSON(request); ok {
+		t.Fatal("body > 8 MB phai bi tu choi")
+	}
+	small := httptest.NewRequest("POST", "/v1/anything", strings.NewReader(`{"x":1}`))
+	if got, ok := readJSON(small); !ok || got["x"] != float64(1) {
+		t.Fatalf("body nho van phai doc duoc: %v %v", got, ok)
+	}
+}

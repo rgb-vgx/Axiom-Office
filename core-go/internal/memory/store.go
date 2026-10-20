@@ -231,71 +231,37 @@ func (s *Store) addBatchOnce(items []NewMemory, actor, runID string, vectors map
 			confidence = &one
 		}
 		expires := ValidDate(raw.ExpiresAt)
-		_, err := tx.Exec(`INSERT INTO memories (id, scope, scope_key, text, hash, category, entities_json, expires_at, source,
-			  confidence, pinned, hits, created_at, updated_at, created_run_id)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?)`,
-			id, raw.Scope, nullText(scopeKey), text, hash, nullText(raw.Category), entitiesJSON(raw.Entities),
-			nullText(expires), actor, confidence, now, now, nullText(runID))
+		// SAVEPOINT tung muc: mot lenh phu (fts/link/history/vector) loi thi cuon lui RIENG muc do,
+		// khong de lai memory thieu chi muc/lich su va khong lam mat cac muc khac trong lo.
+		if _, err := tx.Exec("SAVEPOINT memory_item"); err != nil {
+			if isBusyError(err) {
+				results = append(results, OpResult{Event: "SKIPPED", Text: text, Reason: err.Error()})
+				for _, rest := range items[index+1:] {
+					results = append(results, OpResult{Event: "SKIPPED", Text: rest.Text, Reason: err.Error()})
+				}
+				return results, true
+			}
+			results = append(results, OpResult{Event: "SKIPPED", Text: text, Reason: err.Error()})
+			continue
+		}
+		err = insertMemory(tx, raw, text, scopeKey, hash, actor, runID, id, now, expires, confidence, vector, embeddingModel)
 		if err != nil {
-			if isBusyError(err) {
+			_, _ = tx.Exec("ROLLBACK TO memory_item")
+			_, _ = tx.Exec("RELEASE memory_item")
+			reason := err.Error()
+			if isBusyErrorString(reason) {
 				// Khoa ban giua lo: bo cac fact chua xu ly, rollback (defer) roi bao thu lai.
-				results = append(results, OpResult{Event: "SKIPPED", Text: text, Reason: err.Error()})
+				results = append(results, OpResult{Event: "SKIPPED", Text: text, Reason: reason})
 				for _, rest := range items[index+1:] {
-					results = append(results, OpResult{Event: "SKIPPED", Text: rest.Text, Reason: err.Error()})
+					results = append(results, OpResult{Event: "SKIPPED", Text: rest.Text, Reason: reason})
 				}
 				return results, true
 			}
-			results = append(results, OpResult{Event: "SKIPPED", Text: text, Reason: err.Error()})
+			results = append(results, OpResult{Event: "SKIPPED", Text: text, Reason: reason})
 			continue
 		}
-
-		var rowID int64
-		if err := tx.QueryRow("SELECT last_insert_rowid()").Scan(&rowID); err != nil {
-			if isBusyError(err) {
-				results = append(results, OpResult{Event: "SKIPPED", Text: text, Reason: err.Error()})
-				for _, rest := range items[index+1:] {
-					results = append(results, OpResult{Event: "SKIPPED", Text: rest.Text, Reason: err.Error()})
-				}
-				return results, true
-			}
+		if _, err := tx.Exec("RELEASE memory_item"); err != nil {
 			results = append(results, OpResult{Event: "SKIPPED", Text: text, Reason: err.Error()})
-			continue
-		}
-		// Cac lenh phu (fts/link/history/vector) loi -> khong bao ADD khi chua ghi het (xem
-		// concurrency_test.go); BUSY -> rollback roi thu lai ca lo.
-		failed := ""
-		if err := indexText(tx, rowID, text); err != nil {
-			failed = err.Error()
-		} else {
-			for _, linked := range distinct(raw.LinkedIDs) {
-				if exists(tx, linked) {
-					if _, err := tx.Exec("INSERT OR IGNORE INTO memory_links (memory_id, linked_memory_id, created_at) VALUES (?, ?, ?)",
-						id, linked, now); err != nil {
-						failed = err.Error()
-						break
-					}
-				}
-			}
-		}
-		if failed == "" {
-			if err := addHistory(tx, id, "ADD", "", text, actor, runID, ""); err != nil {
-				failed = err.Error()
-			}
-		}
-		if failed == "" && len(vector) > 0 && embeddingModel != "" {
-			if err := saveVector(tx, id, embeddingModel, vector, hash); err != nil {
-				failed = err.Error()
-			}
-		}
-		if failed != "" {
-			if isBusyErrorString(failed) {
-				results = append(results, OpResult{Event: "SKIPPED", Text: text, Reason: failed})
-				for _, rest := range items[index+1:] {
-					results = append(results, OpResult{Event: "SKIPPED", Text: rest.Text, Reason: failed})
-				}
-				return results, true
-			}
-			results = append(results, OpResult{Event: "SKIPPED", Text: text, Reason: failed})
 			continue
 		}
 		results = append(results, OpResult{Event: "ADD", Text: text, Item: getItem(tx, id)})
@@ -309,6 +275,45 @@ func (s *Store) addBatchOnce(items []NewMemory, actor, runID string, vectors map
 		return results, false
 	}
 	return results, false
+}
+
+// insertMemory ghi tron mot muc moi: memories + FTS + link + history + vector. Loi o bat ky lenh nao
+// tra ve de caller ROLLBACK TO savepoint cua muc do.
+func insertMemory(tx *sql.Tx, raw NewMemory, text, scopeKey, hash, actor, runID, id, now, expires string,
+	confidence *float64, vector []float32, embeddingModel string) error {
+	_, err := tx.Exec(`INSERT INTO memories (id, scope, scope_key, text, hash, category, entities_json, expires_at, source,
+		  confidence, pinned, hits, created_at, updated_at, created_run_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?)`,
+		id, raw.Scope, nullText(scopeKey), text, hash, nullText(raw.Category), entitiesJSON(raw.Entities),
+		nullText(expires), actor, confidence, now, now, nullText(runID))
+	if err != nil {
+		return err
+	}
+
+	var rowID int64
+	if err := tx.QueryRow("SELECT last_insert_rowid()").Scan(&rowID); err != nil {
+		return err
+	}
+	if err := indexText(tx, rowID, text); err != nil {
+		return err
+	}
+	for _, linked := range distinct(raw.LinkedIDs) {
+		if exists(tx, linked) {
+			if _, err := tx.Exec("INSERT OR IGNORE INTO memory_links (memory_id, linked_memory_id, created_at) VALUES (?, ?, ?)",
+				id, linked, now); err != nil {
+				return err
+			}
+		}
+	}
+	if err := addHistory(tx, id, "ADD", "", text, actor, runID, ""); err != nil {
+		return err
+	}
+	if len(vector) > 0 && embeddingModel != "" {
+		if err := saveVector(tx, id, embeddingModel, vector, hash); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *Store) Get(id string) *Item { return getItem(s.db.SQL(), id) }

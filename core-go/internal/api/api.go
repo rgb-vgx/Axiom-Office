@@ -129,9 +129,13 @@ func ErrorCode(w http.ResponseWriter, status int, code, message string) {
 }
 
 // readJSON doc body; body rong -> (nil, true); JSON hong -> (nil, false).
+// maxJSONBodyBytes: cung muc 8 MB voi wpsbridge.readBody. Body lon hon -> false (handler tra 400),
+// khong de mot request giu RAM tuy y.
+const maxJSONBodyBytes = 8 << 20
+
 func readJSON(r *http.Request) (map[string]any, bool) {
-	data, err := io.ReadAll(r.Body)
-	if err != nil {
+	data, err := io.ReadAll(io.LimitReader(r.Body, maxJSONBodyBytes+1))
+	if err != nil || len(data) > maxJSONBodyBytes {
 		return nil, false
 	}
 	if strings.TrimSpace(string(data)) == "" {

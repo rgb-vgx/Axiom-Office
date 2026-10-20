@@ -1310,7 +1310,7 @@ func pictureBoxes(area []float64, sizes [][2]float64) [][4]float64 {
 	return best
 }
 
-func round1(value float64) float64 { return float64(int(value*10+0.5)) / 10 }
+func round1(value float64) float64 { return math.Round(value*10) / 10 }
 
 type buildSummary struct {
 	built     []int

@@ -317,3 +317,38 @@ func fakeChatServer(t *testing.T, content string) *httptest.Server {
 	t.Cleanup(server.Close)
 	return server
 }
+
+// Mot muc loi khi ghi chi muc (FTS) khong duoc de lai nua muc trong memories: batch phai cuon lui
+// RIENG muc do (SAVEPOINT), khong bo cam ket ca lo va khong commit mot memory thieu chi muc/lich su.
+func TestAddBatchFailedItemLeavesNoPartialMemory(t *testing.T) {
+	repo := newTestStore(t)
+	first := repo.AddBatch([]NewMemory{{Scope: ScopeUser, Text: "Su that dau tien"}}, ActorUser, "", nil, "")[0]
+	if first.Item == nil {
+		t.Fatalf("khong tao duoc memory dau: %+v", first)
+	}
+	// Lich su cua DUNG muc dau loi (trigger), muc sau phai ghi binh thuong.
+	if _, err := repo.db.SQL().Exec(`CREATE TRIGGER chan_history BEFORE INSERT ON memory_history
+		WHEN NEW.new_text = 'Muc bi loi lich su' BEGIN SELECT RAISE(ABORT, 'chan'); END`); err != nil {
+		t.Fatal(err)
+	}
+
+	results := repo.AddBatch([]NewMemory{
+		{Scope: ScopeUser, Text: "Muc bi loi lich su"},
+		{Scope: ScopeUser, Text: "Muc van ghi duoc"},
+	}, ActorUser, "", nil, "")
+	if results[0].Event != "SKIPPED" {
+		t.Fatalf("muc dau phai SKIPPED vi chi muc loi: %+v", results[0])
+	}
+	if results[1].Event != "ADD" {
+		t.Fatalf("muc sau van phai ghi duoc: %+v", results[1])
+	}
+	items := repo.List("", "", true, "", 100)
+	if len(items) != 2 {
+		t.Fatalf("chi duoc co 2 memory (1 cu + 1 moi), co %d: %+v", len(items), items)
+	}
+	for _, item := range items {
+		if item.Text == "Muc bi loi lich su" {
+			t.Fatalf("muc loi lich su van duoc commit: %+v", item)
+		}
+	}
+}
