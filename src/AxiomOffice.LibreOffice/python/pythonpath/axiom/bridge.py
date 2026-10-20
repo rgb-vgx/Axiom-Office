@@ -21,16 +21,21 @@ PORT_ATTEMPTS = 5          # ban thi thu +10, +20...
 class Env:
     """Moi truong mot lenh: ctx UNO, loai app, tai lieu dich (tim khi can)."""
 
-    def __init__(self, ctx, kind: str, gate: UnoGate):
+    def __init__(self, ctx, kind: str, gate: UnoGate, params: dict | None = None):
         self.ctx = ctx
         self.kind = kind
         self.gate = gate
+        self.params = params or {}
         self._document = None
 
     @property
     def document(self):
         if self._document is None:
-            self._document = documents.active(self.ctx, self.kind)
+            target = self.params.get("presentation")
+            if target:
+                self._document = documents.find_open_path(self.ctx, self.kind, str(target))
+            else:
+                self._document = documents.active(self.ctx, self.kind)
         return self._document
 
 
@@ -42,7 +47,7 @@ def execute(ctx, gate: UnoGate, kind: str, action: str, params: dict) -> dict:
         return {"ok": False, "error": "'%s' is not available on the %s port (use the port of app kind '%s')" % (action, kind, command.kind)}
 
     def run():
-        env = Env(ctx, kind, gate)
+        env = Env(ctx, kind, gate, params)
         if command.undo:
             with documents.undo_step(env.document, action):
                 return command.handler(env, params or {})
