@@ -230,12 +230,24 @@ class EditCountTests(unittest.TestCase):
                        "et.listConditionalFormats", "et.closeAll", "wpp.sourceManifest", "wpp.open"):
             self.assertFalse(chat.is_edit(action), action)
 
+    def catalog(self, env=None):
+        proc = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "wps", "lo_catalog.py")],
+                              capture_output=True, text=True, encoding="utf-8", env=env)
+        # check=True nuot stderr: khi do tren Windows khong biet vi sao tien trinh con thoat ma 1.
+        self.assertEqual(proc.returncode, 0, "lo_catalog.py that bai:\n" + proc.stderr)
+        return json.loads(proc.stdout)
+
     def test_edit_is_exactly_registry_undo_flag(self):
         # Mot nguon: lenh co co undo trong registry = dung mot buoc Undo (documents.undo_step).
-        out = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "wps", "lo_catalog.py")],
-                             capture_output=True, text=True, check=True).stdout
-        for item in json.loads(out):
+        for item in self.catalog():
             self.assertEqual(chat.is_edit(item["name"]), bool(item.get("undo")), item["name"])
+
+    def test_catalog_writes_utf8_on_non_utf8_console(self):
+        # Windows (va CI windows) dat stdout cua tien trinh con la cp1252; json.dump(ensure_ascii=False)
+        # ghi ten lenh tieng Viet se chet voi UnicodeEncodeError. Script phai tu chuyen stdout sang UTF-8.
+        env = dict(os.environ, PYTHONIOENCODING="cp1252")
+        names = [item["name"] for item in self.catalog(env)]
+        self.assertIn("writer.getText", names)
 
     def test_unknown_tools_are_not_edits(self):
         for action in (None, "", "load_skill", "memory.list", "app.screenshot", "ui.askpane"):

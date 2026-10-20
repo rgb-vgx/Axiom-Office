@@ -55,6 +55,11 @@ jobs:
       - name: Agent Core ban Go (go test + build + e2e day du)
         run: make test-go test-core
 
+      - name: Cai dependencies cho bo test oracle
+        run: |
+          python3 -m pip install -r tests/oracle/word-mcp/requirements.txt \
+            -r tests/oracle/excel-mcp/requirements.txt -r tests/oracle/ppt-mcp/requirements.txt
+
       - name: Bo test oracle (MCP Word/Excel/PowerPoint mau)
         run: make test-oracle
 

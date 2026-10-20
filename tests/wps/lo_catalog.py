@@ -25,4 +25,8 @@ sys.path.insert(0, os.path.join(ROOT, "src", "AxiomOffice.LibreOffice", "python"
 from axiom import commands  # noqa: E402
 
 commands.load_all()
+# Windows: stdout cua tien trinh con la cp1252, json.dump(ensure_ascii=False) se chet voi ten lenh tieng Viet.
+# Tu chuyen sang UTF-8 de test_addin/test_pane (execFileSync) va test_chat doc duoc o moi noi.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 json.dump(commands.catalog(), sys.stdout, ensure_ascii=False)
