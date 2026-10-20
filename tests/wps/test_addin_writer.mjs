@@ -350,3 +350,32 @@ test("checkTables: nhieu bang -> bao cao theo tung bang, chi so 1-based", () => 
   assert.deepEqual(reply.issues.map((i) => i.table), [2], "chi bang 2 co o trong");
 });
 
+
+test("writer.save / writer.saveAs / writer.exportPdf: ghi that va tra dung duong dan", () => {
+  const ctx = loadAddin();
+  const app = makeWriterApp({ text: "Xin chao" });
+  const saved = run(ctx, app, "writer.save", {});
+  assert.equal(saved.saved, true);
+  assert.equal(saved.fullName, "/tmp/blank.docx");
+  assert.ok(callsOf(app).includes("doc.Save()"), "phai goi Save() cua WPS");
+
+  const as = run(ctx, app, "writer.saveAs", { path: "/tmp/moi.docx" });
+  assert.equal(as.saved, true);
+  assert.equal(as.fullName, "/tmp/moi.docx");
+  assert.equal(app.ActiveDocument.Name, "moi.docx");
+  assertFails(ctx, app, "writer.saveAs", {}, /'path' is required/);
+
+  const out = run(ctx, app, "writer.exportPdf", { path: "/tmp/writer-ra.pdf" });
+  assert.equal(out.exported, "/tmp/writer-ra.pdf");
+  assert.equal(app.FileSystem.existsSync("/tmp/writer-ra.pdf"), true, "phai ghi file that");
+  const pdf = app.FileSystem.ReadFile("/tmp/writer-ra.pdf");
+  assert.equal(pdf.slice(0, 5), "%PDF-", "phai la PDF that");
+  assert.ok(pdf.indexOf("%%EOF") > 0, "PDF phai co %%EOF");
+  assertFails(ctx, app, "writer.exportPdf", {}, /'path' is required/);
+});
+
+test("writer.exportPdf: thieu app.FileSystem thi bao loi, khong duoc bao 'da xuat' khi khong co file", () => {
+  const ctx = loadAddin();
+  const app = makeWriterApp({ text: "Xin chao", fileSystem: false });
+  assertFails(ctx, app, "writer.exportPdf", { path: "/tmp/writer-ra.pdf" }, /FileSystem/);
+});

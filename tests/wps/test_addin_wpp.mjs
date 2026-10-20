@@ -312,8 +312,15 @@ test("wpp.save / wpp.saveAs / wpp.closeAll", () => {
   assert.equal(closed.rescued.length, 1, "chi bai chua luu moi duoc cuu");
   assert.match(closed.rescued[0], /rescued/);
   const log = callsOf(two);
+  assert.ok(log.includes('FileSystem.Mkdir(/tmp/rescued)'), "phai tao thu muc cuu truoc khi SaveAs: " + log.slice(-8).join(" | "));
   assert.ok(log.some((line) => line.indexOf("SaveAs(") === 0 && line.indexOf("rescued") > 0),
     "phai SaveAs ban cuu ho truoc khi Close: " + log.slice(-6).join(" | "));
+
+  // Bai khong co ten (Name rong): ten mac dinh phai duoc dung, khong duoc thanh "/tmp/rescued/".
+  const unnamed = makeWppApp({ presentationName: "", slides: 1 });
+  unnamed.ActivePresentation.Saved = false;
+  const rescued = run(ctx, unnamed, "wpp.closeAll").rescued;
+  assert.deepEqual(rescued, ["/tmp/rescued/presentation.pptx"]);
 });
 
 test("wpp.checkLayout: soat bo cuc slide (ra ngoai, chu nho, chong nhau, qua nhieu chu)", () => {

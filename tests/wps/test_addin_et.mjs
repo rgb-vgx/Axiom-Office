@@ -434,6 +434,52 @@ test("et.undo {count}: go N buoc theo thu tu nguoc", () => {
   assert.deepEqual(run(ctx, app, "et.readRange", { range: "A1:A2" }).values, [["a0"], ["a1"]]);
 });
 
+test("et.undo: moi workbook giu ngan undo rieng, khong khoi phuc vao workbook dang active", () => {
+  const ctx = loadAddin();
+  const app = makeEtApp({ workbookName: "a.xlsx", sheets: [{ name: "S", cells: { A1: "a0" } }] });
+  const wb1 = app.Workbooks.Item(1);
+  run(ctx, app, "et.writeRange", { range: "A1", values: [["a1"]] });
+
+  // Workbook thu hai cung co sheet ten "S": khoa chi theo ten sheet se tron hai so vao nhau.
+  run(ctx, app, "et.newWorkbook");
+  run(ctx, app, "et.addSheet", { name: "S" });
+  run(ctx, app, "et.writeRange", { range: "A1", values: [["b1"]] });
+
+  const undone = run(ctx, app, "et.undo", { count: 3 });
+  assert.equal(undone.undone, 3, "buoc ghi cua hai so + buoc tao sheet");
+  assert.equal(wb1.Worksheets.Item(1).Cells.Item(1, 1).Value2, "a0",
+    "buoc cua workbook 1 phai khoi phuc trong workbook 1");
+  assert.equal(app.Workbooks.Item(2).Worksheets.Item(1).Cells.Item(1, 1).Value2, null,
+    "workbook 2 khong duoc nhan gia tri cua workbook 1");
+});
+
+test("et.undo: doi ten sheet thi buoc cu di theo ten moi, khong roi vao sheet dang active", () => {
+  const ctx = loadAddin();
+  const app = makeEtApp({ sheets: [{ name: "S", cells: { A1: "cu" } }, { name: "Khac", cells: { A1: "khac" } }] });
+  run(ctx, app, "et.writeRange", { range: "A1", values: [["moi"]] });
+  run(ctx, app, "et.renameSheet", { sheet: "S", name: "T" });
+  run(ctx, app, "et.activateSheet", { sheet: "Khac" });
+  run(ctx, app, "et.undo", { count: 2 });   // renameSheet giu cho "none", ghi de la buoc that
+
+  assert.equal(app.Workbooks.Item(1).Worksheets.Item(1).Cells.Item(1, 1).Value2, "cu",
+    "sheet T phai duoc khoi phuc");
+  assert.equal(app.Workbooks.Item(1).Worksheets.Item(2).Cells.Item(1, 1).Value2, "khac",
+    "sheet dang active khong duoc bi ghi de");
+});
+
+test("et.renameSheet: chuyen ca kho dinh dang co dieu kien sang ten moi", () => {
+  const ctx = loadAddin();
+  const app = makeEtApp({ sheets: [{ name: "S", cells: { A1: 1 } }] });
+  run(ctx, app, "et.setConditionalFormat", { range: "A1", rules: [{ operator: "less", formula1: "10" }] });
+  run(ctx, app, "et.renameSheet", { sheet: "S", name: "T" });
+  run(ctx, app, "et.addSheet", { name: "S" });
+
+  // Sheet "S" MOI khong co dinh dang nao. Neu kho cu con nam duoi khoa "S", lenh doc se tra nham
+  // dinh dang cua sheet cu.
+  const out = run(ctx, app, "et.listConditionalFormats", { sheet: "S", range: "A1" });
+  assert.deepEqual(out.formats, [], "kho dinh dang phai di theo sheet, khong o lai ten cu");
+});
+
 test("et.exportPdf: API goc khong ghi file -> tu dung PDF that", () => {
   const ctx = loadAddin();
   const app = makeEtApp({ sheets: [{ name: "S", cells: { A1: "Xin chao", A2: 42 } }] });
@@ -474,9 +520,16 @@ test("et.save / et.saveAs / et.closeAll", () => {
   assert.equal(closed.rescued.length, 1);
   assert.match(closed.rescued[0], /rescued/);
   const log = callsOf(app);
+  assert.ok(log.includes('FileSystem.Mkdir(/tmp/rescued)'), "phai tao thu muc cuu truoc khi SaveAs: " + log.slice(-8).join(" | "));
   // ET ghi nhat ky co tien to "Workbook." (ban WPP ghi tran "SaveAs(...)"), nen khop ca hai dang.
   assert.ok(log.some((line) => /(^|\.)SaveAs\(/.test(line) && line.indexOf("rescued") > 0),
     "phai SaveAs ban cuu ho truoc khi Close: " + log.slice(-6).join(" | "));
+
+  // So khong co ten (Name rong): ten mac dinh phai duoc dung, khong duoc thanh "/tmp/rescued/".
+  const unnamed = makeEtApp({ workbookName: "", sheets: [{ name: "S" }] });
+  unnamed.ActiveWorkbook.Saved = false;
+  const rescued = run(ctx, unnamed, "et.closeAll").rescued;
+  assert.deepEqual(rescued, ["/tmp/rescued/workbook.xlsx"]);
 });
 
 test("et.checkRange: soat bang du lieu (tieu de trong, kieu lan, so dang chu, o loi, numFmt)", () => {

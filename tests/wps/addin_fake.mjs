@@ -957,7 +957,7 @@ function makeWorkbook(state, wb, labelPath) {
 
 function newWorkbook({ name, fullPath }) {
   return {
-    name: name || "Book1",
+    name: name !== undefined ? name : "Book1",
     fullPath: fullPath || ("/tmp/" + (name || "Book1")),
     saved: true,
     closed: false,
@@ -1069,7 +1069,8 @@ function makeFileSystem(state) {
     methods: {
       Exists: (...args) => {
         push(state, prefix + ".Exists(" + fmtArgs(args) + ")");
-        return known(String(args[0]));
+        const p = String(args[0]);
+        return known(p) || !!(state.dirs && state.dirs[p]);
       },
       existsSync: (...args) => {
         push(state, prefix + ".existsSync(" + fmtArgs(args) + ")");
@@ -1094,6 +1095,17 @@ function makeFileSystem(state) {
       writeAsBinaryString: (...args) => {
         push(state, prefix + ".writeAsBinaryString(" + fmtArgs(args) + ")");
         state.files[String(args[0])] = binaryStringBytes(args[1]);
+      },
+      Mkdir: (...args) => {
+        push(state, prefix + ".Mkdir(" + fmtArgs(args) + ")");
+        if (args.length !== 1) throw new Error("参数太多.");
+        const p = String(args[0]);
+        const parent = splitPath(p).dir;
+        if (!state.dirs) state.dirs = {};
+        // WPS chi tao duoc mot cap: thu muc cha phai co san (do tren WPS that, xem REFERENCE.md).
+        if (parent && parent !== "/" && !state.dirs[parent]) throw new Error('"Wrong path!"');
+        state.dirs[p] = true;
+        return true;
       },
       tmpdir: () => {
         push(state, prefix + ".tmpdir()");
@@ -1203,7 +1215,7 @@ function applyInitialCell(sheet, addr, value) {
 }
 
 export function makeEtApp(options = {}) {
-  const workbookName = options.workbookName || "blank.xlsx";
+  const workbookName = options.workbookName !== undefined ? String(options.workbookName) : "blank.xlsx";
   const fullPath = options.path || ("/tmp/" + workbookName);
   const sheetDefs = Array.isArray(options.sheets) && options.sheets.length > 0
     ? options.sheets
@@ -1712,7 +1724,7 @@ function makePresentation(state, pres) {
 
 function newPresentation({ name, fullPath }) {
   return {
-    name: name || "Presentation1",
+    name: name !== undefined ? name : "Presentation1",
     fullPath: fullPath || ("/tmp/" + (name || "Presentation1")),
     saved: true,
     closed: false,
@@ -1784,7 +1796,7 @@ function makeActiveWindow(state) {
 // ---------------------------------------------------------------------------------------------
 
 export function makeWppApp(options = {}) {
-  const presentationName = options.presentationName || "blank.pptx";
+  const presentationName = options.presentationName !== undefined ? String(options.presentationName) : "blank.pptx";
   const fullPath = options.path || ("/tmp/" + presentationName);
 
   const state = {
@@ -1896,8 +1908,8 @@ function cloneTables(list) {
 }
 
 export function makeWriterApp(options = {}) {
-  const documentName = options.documentName || "blank.docx";
-  const fullPath = options.path || ("/tmp/" + documentName);
+  const documentName = options.documentName !== undefined ? String(options.documentName) : "blank.docx";
+  const fullPath = options.path !== undefined ? String(options.path) : ("/tmp/" + documentName);
   const lockable = options.selectionLockable !== false;
   const hasPositions = options.selectionPositions !== false;
   const hasRange = options.range !== false;
@@ -1905,6 +1917,11 @@ export function makeWriterApp(options = {}) {
   const state = {
     app: "wps",
     calls: [],
+    files: filesWithBytes(options.files),
+    dirs: {},
+    documentName: documentName,
+    fullPath: fullPath,
+    saved: true,
     text: options.text !== undefined ? String(options.text) : "",
     tables: (options.tables || []).map(normalizeTable),
     selection: {
@@ -2166,6 +2183,30 @@ export function makeWriterApp(options = {}) {
 
   function makeDocument() {
     const methods = {
+      Save: () => {
+        push(state, "doc.Save()");
+        state.saved = true;
+      },
+      SaveAs: (...args) => {
+        const path = args[0];
+        push(state, "doc.SaveAs(" + fmtArgs(args) + ")");
+        if (path !== undefined && path !== null) {
+          state.fullPath = String(path);
+          state.documentName = splitPath(state.fullPath).base;
+        }
+        state.saved = true;
+      },
+      SaveAs2: (...args) => {
+        const path = args[0];
+        push(state, "doc.SaveAs2(" + fmtArgs(args) + ")");
+        if (path !== undefined && path !== null) {
+          state.fullPath = String(path);
+          state.documentName = splitPath(state.fullPath).base;
+        }
+        state.saved = true;
+      },
+      // Writer: API goc cung KHONG ghi file (giong ET/WPP da do); add-in phai tu kiem file.
+      ExportAsFixedFormat: (...args) => push(state, "doc.ExportAsFixedFormat(" + fmtArgs(args) + ")"),
       Undo: (n) => {
         const steps = Number(n) || 1;
         push(state, "doc.Undo(" + steps + ")");
@@ -2184,9 +2225,10 @@ export function makeWriterApp(options = {}) {
     return strict("app.ActiveDocument", {
       state,
       props: {
-        Name: { get: () => documentName },
-        FullName: { get: () => fullPath },
-        Saved: { get: () => true },
+        Name: { get: () => state.documentName },
+        FullName: { get: () => state.fullPath },
+        Path: { get: () => splitPath(state.fullPath).dir },
+        Saved: { get: () => state.saved, set: (v) => { state.saved = !!v; } },
         Content: { get: () => makeRange(0, state.text.length, "doc.Content") },
         Tables: { get: () => makeTables() },
       },
@@ -2202,6 +2244,8 @@ export function makeWriterApp(options = {}) {
     Selection: { get: () => makeSelection() },
     UndoRecord: { get: () => makeUndoRecord() },
   };
+  // Ban WPS Writer cu/khac co the khong co FileSystem: writer.exportPdf phai bao loi, khong duoc bao da ghi.
+  if (options.fileSystem !== false) { props.FileSystem = { get: () => makeFileSystem(state) }; }
 
   const app = strict("app", { state, props, methods: {} });
   APPS.set(app, state);

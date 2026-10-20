@@ -767,9 +767,8 @@
     try { version = strProp(app, "Version"); } catch (e2) { version = ""; }
     if (!version) {
       try {
-        var build = app.Build;
-        if (typeof build === "function") { try { build = build.call(app); } catch (e3) {} }
-        if (build !== undefined && build !== null && String(build) !== "") { version = String(build); }
+        var build = strProp(app, "Build");
+        if (build !== "") { version = build; }
       } catch (e4) {}
     }
     try {
@@ -919,28 +918,7 @@
 
   function cmdSelection(app) {
     var sel = app.Selection;
-    var text = "";
-    var raw = sel.Text;
-    if (typeof raw === "function") { raw = raw.call(sel); }
-    text = (raw === undefined || raw === null) ? "" : String(raw);
-    var start = null, end = null;
-    try {
-      var s = sel.Start;
-      if (typeof s === "function") { s = s.call(sel); }
-      if (s !== undefined && s !== null) {
-        var n = Number(s);
-        if (!isNaN(n)) { start = n; }
-      }
-    } catch (e2) {}
-    try {
-      var en = sel.End;
-      if (typeof en === "function") { en = en.call(sel); }
-      if (en !== undefined && en !== null) {
-        var m = Number(en);
-        if (!isNaN(m)) { end = m; }
-      }
-    } catch (e3) {}
-    return { text: text, start: start, end: end };
+    return { text: strProp(sel, "Text"), start: numProp(sel, "Start"), end: numProp(sel, "End") };
   }
 
   function cmdTypeText(app, params) {
@@ -1320,6 +1298,33 @@
     return false;
   }
 
+  // Noi dung PDF (chi toan byte ASCII) -> chuoi nhi phan ma FileSystem.writeAsBinaryString nhan.
+  function pdfBinaryString(pdf) {
+    var codes = [];
+    for (var i = 0; i < pdf.length; i++) { codes.push(pdf.charCodeAt(i) & 0xFF); }
+    try {
+      var parts = [];
+      for (var k = 0; k < codes.length; k += 4096) {
+        parts.push(String.fromCharCode.apply(null, codes.slice(k, k + 4096)));
+      }
+      return parts.join("");
+    } catch (e) {
+      var data = "";
+      for (var m = 0; m < pdf.length; m++) { data += String.fromCharCode(pdf.charCodeAt(m) & 0xFF); }
+      return data;
+    }
+  }
+
+  // Duong du phong dung chung cho Writer/ET/WPP: tu dung PDF tu text roi ghi that, kiem tra lai file.
+  function writePdf(fs, path, text, appLabel) {
+    if (!fs || typeof fs.writeAsBinaryString !== "function") {
+      throw new Error("WPS " + appLabel + " does not expose app.FileSystem, so the PDF could not be written or verified");
+    }
+    fs.writeAsBinaryString(path, pdfBinaryString(buildPdf(text)));
+    if (!fsExists(fs, path)) { throw new Error("could not write PDF to '" + path + "'"); }
+    return { exported: path };
+  }
+
   function cmdExportPdf(app, params) {
     var path = paramString(params, "path", null);
     if (!path) { throw new Error("'path' is required"); }
@@ -1329,33 +1334,15 @@
     try { doc.ExportAsFixedFormat(path, 17); } catch (e0) {}
     var wfs = null;
     try { wfs = app.FileSystem; } catch (e1) { wfs = null; }
-    if (wfs !== undefined && wfs !== null) {
-      if (fsExists(wfs, path)) { return { exported: path }; }
-      var text = "";
-      try {
-        var raw = doc.Content.Text;
-        if (typeof raw === "function") { raw = raw.call(doc.Content); }
-        if (raw !== undefined && raw !== null) { text = String(raw); }
-      } catch (e2) {}
-      var pdf = buildPdf(text);
-      var codes = [];
-      for (var i = 0; i < pdf.length; i++) { codes.push(pdf.charCodeAt(i) & 0xFF); }
-      var data = "";
-      try {
-        var parts = [];
-        for (var k = 0; k < codes.length; k += 4096) {
-          parts.push(String.fromCharCode.apply(null, codes.slice(k, k + 4096)));
-        }
-        data = parts.join("");
-      } catch (e3) {
-        data = "";
-        for (var m = 0; m < pdf.length; m++) { data += String.fromCharCode(pdf.charCodeAt(m) & 0xFF); }
-      }
-      wfs.writeAsBinaryString(path, data);
-      if (!fsExists(wfs, path)) { throw new Error("could not write PDF to '" + path + "'"); }
-      return { exported: path };
+    if (wfs === undefined || wfs === null) {
+      // Khong co FileSystem thi khong kiem duoc file, cung khong tu dung duoc PDF: bao loi ro rang
+      // thay vi tra {exported} trong khi tren dia khong co gi (ET/WPP cung nem o nhanh nay).
+      throw new Error("WPS Writer does not expose app.FileSystem, so the PDF could not be written or verified");
     }
-    return { exported: path };
+    if (fsExists(wfs, path)) { return { exported: path }; }
+    var text = "";
+    try { text = strProp(doc.Content, "Text"); } catch (e2) {}
+    return writePdf(wfs, path, text, "Writer");
   }
 
   // ---- Khoa vung boi den (port cua CommandDispatcher.WriterScope.cs ben C#) --------------------
@@ -1652,29 +1639,60 @@
     return wb;
   }
 
+  // Khoa cua mot workbook: duong dan day du la dinh danh on dinh nhat (hai so cung ten "Book1" van khac nhau);
+  // so chua luu lan nao thi dung ten. Ngan undo va kho dinh dang dieu kien deu theo khoa nay, khong theo
+  // ten sheet tran - ten sheet lap lai o moi workbook.
+  function etWbKey(wb) {
+    var full = "";
+    try { full = strProp(wb, "FullName"); } catch (e) {}
+    if (full) { return "f:" + full; }
+    var name = "";
+    try { name = strProp(wb, "Name"); } catch (e2) {}
+    return "n:" + name;
+  }
+
+  function etSheetKey(wb, sheetName) {
+    return etWbKey(wb) + "\n" + String(sheetName);
+  }
+
+  function etFindWbByKey(app, key) {
+    var col = app.Workbooks;
+    var n = Number(col.Count);
+    for (var i = 1; i <= n; i++) {
+      var wb = col.Item(i);
+      if (etWbKey(wb) === key) { return wb; }
+    }
+    return null;
+  }
+
+  // Doi ten sheet: buoc undo va kho dinh dang dieu kien cua sheet do phai di theo ten moi.
+  function etRenameUndoSheet(list, bookKey, oldName, newName) {
+    for (var i = 0; i < list.length; i++) {
+      var e = list[i];
+      if (e.kind === "group") {
+        etRenameUndoSheet(e.entries, bookKey, oldName, newName);
+      } else if (e.book === bookKey && e.sheet === oldName) {
+        e.sheet = newName;
+      }
+    }
+  }
+
   function etSheetNames(wb) {
     var names = [];
     var col = wb.Worksheets;
-    var n = col.Count;
-    if (typeof n === "function") { n = n.call(col); }
-    n = Number(n);
+    var n = Number(numProp(col, "Count"));
     for (var i = 1; i <= n; i++) {
-      var ws = col.Item(i);
-      var nm = ws.Name;
-      if (typeof nm === "function") { nm = nm.call(ws); }
-      names.push(String(nm));
+      names.push(strProp(col.Item(i), "Name"));
     }
     return names;
   }
 
   function etFindSheet(wb, name) {
     var col = wb.Worksheets;
-    var n = Number(col.Count);
+    var n = Number(numProp(col, "Count"));
     for (var i = 1; i <= n; i++) {
       var ws = col.Item(i);
-      var nm = ws.Name;
-      if (typeof nm === "function") { nm = nm.call(ws); }
-      if (String(nm) === String(name)) { return ws; }
+      if (strProp(ws, "Name") === String(name)) { return ws; }
     }
     return null;
   }
@@ -1690,16 +1708,11 @@
     }
     var active = app.ActiveSheet;
     if (active === undefined || active === null) { throw new Error("no active sheet (open one in WPS Spreadsheets first)"); }
-    var aname = active.Name;
-    if (typeof aname === "function") { aname = aname.call(active); }
-    return { wb: wb, ws: active, name: String(aname) };
+    return { wb: wb, ws: active, name: strProp(active, "Name") };
   }
 
   function etRangeAddrOf(ws) {
-    var ur = ws.UsedRange;
-    var fn = ur.Address;
-    var abs = (typeof fn === "function") ? fn.call(ur) : fn;
-    return etNormAddr(String(abs));
+    return etNormAddr(strProp(ws.UsedRange, "Address"));
   }
 
   function etStrictMatrix(raw) {
@@ -1769,25 +1782,18 @@
     }
   }
 
-  function etPushCells(sheetName, addrStr, snaps) {
-    etUndoStack.push({ kind: "cells", sheet: sheetName, range: addrStr, snaps: snaps });
+  function etPushCells(wb, sheetName, addrStr, snaps) {
+    etUndoStack.push({ kind: "cells", book: etWbKey(wb), sheet: sheetName, range: addrStr, snaps: snaps });
   }
 
   function etActiveSheetName(app) {
-    var s = app.ActiveSheet;
-    var n = s.Name;
-    if (typeof n === "function") { n = n.call(s); }
-    return String(n);
+    return strProp(app.ActiveSheet, "Name");
   }
 
   function etDocInfo(wb) {
-    var name = wb.Name;
-    if (typeof name === "function") { name = name.call(wb); }
-    var full = wb.FullName;
-    if (typeof full === "function") { full = full.call(wb); }
     var saved = wb.Saved;
     if (typeof saved === "function") { saved = saved.call(wb); }
-    return { name: String(name), fullName: String(full), saved: !!saved };
+    return { name: strProp(wb, "Name"), fullName: strProp(wb, "FullName"), saved: !!saved };
   }
 
   function cmdEtNewWorkbook(app) {
@@ -1880,7 +1886,7 @@
     }
     ws.Name = name;
     try { ws.Activate(); } catch (e) {}
-    etUndoStack.push({ kind: "addSheet", sheet: name });
+    etUndoStack.push({ kind: "addSheet", book: etWbKey(wb), sheet: name });
     return { sheet: name, sheets: etSheetNames(wb) };
   }
 
@@ -1899,6 +1905,14 @@
     }
     var ws = etFindSheet(wb, old);
     ws.Name = name;
+    var bookKey = etWbKey(wb);
+    etRenameUndoSheet(etUndoStack, bookKey, old, name);
+    var oldKey = bookKey + "\n" + old;
+    var newKey = bookKey + "\n" + name;
+    if (etCondStore[oldKey]) {
+      etCondStore[newKey] = etCondStore[oldKey];
+      delete etCondStore[oldKey];
+    }
     return { sheet: name, sheets: etSheetNames(wb) };
   }
 
@@ -1985,7 +1999,7 @@
     return { sheet: r.name, range: etAddrStr(box.r1, box.c1, box.r2, box.c2), values: out };
   }
 
-  function etDoWriteCells(ws, sheetName, topAddr, rows) {
+  function etDoWriteCells(wb, ws, sheetName, topAddr, rows) {
     var top = etParseAddr(topAddr);
     var r0 = top.r1, c0 = top.c1;
     var width = 1, i;
@@ -2005,7 +2019,7 @@
     var addrStr = etAddrStr(r0, c0, r0 + norm.length - 1, c0 + width - 1);
     var rng = ws.Range(addrStr);
     rng.Value2 = norm;
-    etPushCells(sheetName, addrStr, snaps);
+    etPushCells(wb, sheetName, addrStr, snaps);
     return { written: norm.length * width, range: addrStr };
   }
 
@@ -2019,7 +2033,7 @@
     var top = etTopLeft(addr);
     etParseAddr(top);
     var r = etResolveSheet(app, params);
-    var res = etDoWriteCells(r.ws, r.name, top, rows);
+    var res = etDoWriteCells(r.wb, r.ws, r.name, top, rows);
     return { written: res.written, sheet: r.name };
   }
 
@@ -2064,7 +2078,7 @@
       var rr = etResolveSheet(app, px.sheet ? px : {});
       // item co sheet rieng thi uu tien item
       if (p.sheet) { rr = etResolveSheet(app, { sheet: p.sheet }); }
-      var out = etDoWriteCells(rr.ws, rr.name, p.top, p.rows);
+      var out = etDoWriteCells(rr.wb, rr.ws, rr.name, p.top, p.rows);
       written += out.written;
       if (sheets.indexOf(rr.name) < 0) { sheets.push(rr.name); }
     }
@@ -2152,7 +2166,7 @@
       sheetName = nm;
       topAddr = "A1";
     }
-    var res = etDoWriteCells(ws, sheetName, topAddr, rows);
+    var res = etDoWriteCells(wb, ws, sheetName, topAddr, rows);
     void res;
     return { path: path, sheet: sheetName, range: topAddr, rows: rows.length, columns: width, cells: rows.length * width };
   }
@@ -2181,7 +2195,7 @@
       var rng = r.ws.Range(addrStr);
       rng.Formula = formula;
     }
-    etUndoStack.push({ kind: "cells", sheet: r.name, range: addrStr, snaps: snaps });
+    etUndoStack.push({ kind: "cells", book: etWbKey(r.wb), sheet: r.name, range: addrStr, snaps: snaps });
     var got = r.ws.Range(addrStr).Formula;
     if (typeof got === "function") { got = got.call(r.ws.Range(addrStr)); }
     var mat = got;
@@ -2328,8 +2342,9 @@
       if (hasParam(rule, "italic")) { fc.Font.Italic = paramBool(rule, "italic", false); }
       written.push({ operator: p.input, formula1: p.formula1, formula2: p.formula2 || null });
     }
-    if (!etCondStore[r.name]) { etCondStore[r.name] = []; }
-    var bucket = etCondStore[r.name];
+    var cfKey = etSheetKey(r.wb, r.name);
+    if (!etCondStore[cfKey]) { etCondStore[cfKey] = []; }
+    var bucket = etCondStore[cfKey];
     var bi;
     for (bi = bucket.length - 1; bi >= 0; bi--) {
       if (bucket[bi].range === addrStr) { bucket.splice(bi, 1); }
@@ -2340,7 +2355,7 @@
 
   function cmdEtListCondFormats(app, params) {
     var r = etResolveSheet(app, params);
-    var bucket = etCondStore[r.name] || [];
+    var bucket = etCondStore[etSheetKey(r.wb, r.name)] || [];
     var addr = paramString(params, "range", null);
     if (addr) {
       var box = etParseAddr(etNormAddr(addr));
@@ -2355,11 +2370,11 @@
       var rng = r.ws.Range(want);
       var fcCol = rng.FormatConditions;
       var n = Number(fcCol.Count);
+      if (n === 0) { return { sheet: r.name, formats: [] }; }
       var rules = [];
       for (i = 1; i <= n; i++) {
         var fc = fcCol.Item(i);
-        var op = fc.Operator;
-        if (typeof op === "function") { op = op.call(fc); }
+        var op = numProp(fc, "Operator");
         var f1 = fc.Formula1;
         if (typeof f1 === "function") { f1 = f1.call(fc); }
         var f2 = fc.Formula2;
@@ -2387,10 +2402,8 @@
             var k;
             for (k = 1; k <= cnt; k++) {
               var f = col2.Item(k);
-              var t = f.Type;
-              if (typeof t === "function") { t = t.call(f); }
-              var o = f.Operator;
-              if (typeof o === "function") { o = o.call(f); }
+              var t = numProp(f, "Type");
+              var o = numProp(f, "Operator");
               var a1 = f.Formula1;
               if (typeof a1 === "function") { a1 = a1.call(f); }
               var a2 = f.Formula2;
@@ -2434,9 +2447,7 @@
     if (isNaN(h)) { h = 7; }
     var ptsW = w * 28.3465, ptsH = h * 28.3465;
     var cell = r.ws.Range(anchorStr);
-    var left = cell.Left, top = cell.Top;
-    if (typeof left === "function") { left = left.call(cell); }
-    if (typeof top === "function") { top = top.call(cell); }
+    var left = numProp(cell, "Left"), top = numProp(cell, "Top");
     var objs = r.ws.ChartObjects();
     var obj = objs.Add(Number(left), Number(top), ptsW, ptsH);
     var chart = obj.Chart;
@@ -2451,12 +2462,10 @@
         titleApplied = true;
       } catch (e2) { titleApplied = false; }
     }
-    var nm = obj.Name;
-    if (typeof nm === "function") { nm = nm.call(obj); }
-    var actual = ET_CHART_BACK[Number(chart.ChartType)] || kind;
+    var nm = strProp(obj, "Name");
+    var actual = ET_CHART_BACK[Number(numProp(chart, "ChartType"))] || kind;
     if (typeof actual === "string") {
-      var chk = obj.Chart.ChartType;
-      if (typeof chk === "function") { chk = chk.call(obj.Chart); }
+      var chk = numProp(obj.Chart, "ChartType");
       actual = ET_CHART_BACK[Number(chk)] || kind;
     }
     return { chart: String(nm), sheet: r.name, type: kind, diagram: actual, typeApplied: (actual === kind), titleApplied: titleApplied, range: addrStr, anchor: anchorStr };
@@ -2465,25 +2474,18 @@
   function cmdEtListCharts(app, params) {
     var r = etResolveSheet(app, params);
     var objs = r.ws.ChartObjects();
-    var n = Number(objs.Count);
+    var n = Number(numProp(objs, "Count"));
     var charts = [], i;
     for (i = 1; i <= n; i++) {
       var o = objs.Item(i);
-      var nm = o.Name;
-      if (typeof nm === "function") { nm = nm.call(o); }
-      var ct = o.Chart.ChartType;
-      if (typeof ct === "function") { ct = ct.call(o.Chart); }
-      charts.push({ name: String(nm), diagram: ET_CHART_BACK[Number(ct)] || "" });
+      charts.push({ name: strProp(o, "Name"), diagram: ET_CHART_BACK[Number(numProp(o.Chart, "ChartType"))] || "" });
     }
     var shapes = [];
     try {
       var sh = r.ws.Shapes;
-      var cnt = Number(sh.Count);
+      var cnt = Number(numProp(sh, "Count"));
       for (i = 1; i <= cnt; i++) {
-        var s = sh.Item(i);
-        var label = null;
-        try { label = s.Name; if (typeof label === "function") { label = label.call(s); } } catch (e) {}
-        shapes.push(label === undefined || label === null ? "" : String(label));
+        shapes.push(strProp(sh.Item(i), "Name"));
       }
     } catch (e2) {}
     return { sheet: r.name, charts: charts, shapes: shapes };
@@ -2526,20 +2528,22 @@
     }
     if (entry.kind === "addSheet") {
       try {
-        var ws = etFindSheet(etWb(app), entry.sheet);
+        var wbAdd = etFindWbByKey(app, entry.book);
+        var ws = wbAdd ? etFindSheet(wbAdd, entry.sheet) : null;
         if (ws) { ws.Delete(); }
       } catch (e) {}
       // Xoa ca ghi nhan dinh dang co dieu kien cua sheet do
-      try { delete etCondStore[entry.sheet]; } catch (e2) {}
+      try { delete etCondStore[entry.book + "\n" + entry.sheet]; } catch (e2) {}
       restored.push({ sheet: entry.sheet, deleted: true });
       return true;
     }
     try {
-      var ws2 = etFindSheet(etWb(app), entry.sheet);
-      if (!ws2) {
-        // Sheet bi doi ten/xoa: thu sheet dang active
-        ws2 = app.ActiveSheet;
-      }
+      var wb2 = etFindWbByKey(app, entry.book);
+      // Workbook da dong (hoac doi duong dan): bo qua, KHONG khoi phuc vao tai lieu dang mo.
+      if (!wb2) { return false; }
+      var ws2 = etFindSheet(wb2, entry.sheet);
+      // Sheet da bi xoa/doi ten ngoai add-in: bo qua, KHONG lui ve sheet dang active.
+      if (!ws2) { return false; }
       etRestoreCells(ws2, entry.snaps);
       restored.push({ sheet: entry.sheet, range: entry.range, cells: entry.snaps.length });
       return true;
@@ -2562,21 +2566,47 @@
     return out;
   }
 
-  function etPdfWrite(fs, path, pdf) {
-    var codes = [];
-    for (var i = 0; i < pdf.length; i++) { codes.push(pdf.charCodeAt(i) & 0xFF); }
-    var data = "";
+  // Thu muc cuu ban chua luu: <tmpdir>/rescued. WPS Mkdir chi tao duoc MOT cap, ma tmpdir da ton tai
+  // nen tao thang "/tmp/rescued" la du. Loi tao thu muc khong chan viec dong tai lieu.
+  function rescueDir(app) {
+    var tmp = "/tmp";
+    var fs = null;
     try {
-      var parts = [];
-      for (var q = 0; q < codes.length; q += 4096) {
-        parts.push(String.fromCharCode.apply(null, codes.slice(q, q + 4096)));
+      fs = app.FileSystem;
+      tmp = strProp(fs, "tmpdir") || "/tmp";
+    } catch (e) {}
+    var dir = tmp.replace(/[/\\]+$/, "") + "/rescued";
+    try {
+      if (fs && !fsExists(fs, dir) && typeof fs.Mkdir === "function") { fs.Mkdir(dir); }
+    } catch (e2) {}
+    return dir;
+  }
+
+  function rescueName(obj, fallback) {
+    var nm = "";
+    try { nm = strProp(obj, "Name"); } catch (e) {}
+    return nm || fallback;
+  }
+
+  // Dong ca bo tai lieu dang mo: cuu ban CHUA LUU vao <tmpdir>/rescued truoc, roi dong tung cai.
+  // closeDoc khac nhau giua ET (Close(false)) va WPP (Close() khong tham so) nen do ben goi truyen vao.
+  function closeAllDocuments(app, collection, fallbackName, closeDoc) {
+    var n = Number(collection.Count);
+    var items = [], i;
+    for (i = 1; i <= n; i++) { items.push(collection.Item(i)); }
+    var dir = rescueDir(app);
+    var rescued = [], closed = 0;
+    for (i = 0; i < items.length; i++) {
+      var doc = items[i];
+      var saved = doc.Saved;
+      if (typeof saved === "function") { saved = saved.call(doc); }
+      if (!saved) {
+        var rp = dir + "/" + rescueName(doc, fallbackName);
+        try { doc.SaveAs(rp); rescued.push(rp); } catch (e2) {}
       }
-      data = parts.join("");
-    } catch (e) {
-      data = "";
-      for (var m = 0; m < pdf.length; m++) { data += String.fromCharCode(pdf.charCodeAt(m) & 0xFF); }
+      try { closeDoc(doc); closed++; } catch (e3) {}
     }
-    fs.writeAsBinaryString(path, data);
+    return { closed: closed, rescued: rescued };
   }
 
   function cmdEtExportPdf(app, params) {
@@ -2599,10 +2629,7 @@
         for (rr = box.r1; rr <= box.r2; rr++) {
           var rowVals = [];
           for (cc = box.c1; cc <= box.c2; cc++) {
-            var cell = ws.Cells.Item(rr, cc);
-            var t = cell.Text;
-            if (typeof t === "function") { t = t.call(cell); }
-            rowVals.push(t === undefined || t === null ? "" : String(t));
+            rowVals.push(strProp(ws.Cells.Item(rr, cc), "Text"));
           }
           lines.push(rowVals.join("\t"));
         }
@@ -2610,16 +2637,12 @@
       }
       text = lines.join("\n");
     } catch (e2) {}
-    var pdf = buildPdf(text);
-    etPdfWrite(fs, path, pdf);
-    if (!fsExists(fs, path)) { throw new Error("could not write PDF to '" + path + "'"); }
-    return { exported: path };
+    return writePdf(fs, path, text, "Spreadsheets");
   }
 
   function cmdEtSave(app) {
     var wb = etWb(app);
-    var p = wb.Path;
-    if (typeof p === "function") { p = p.call(wb); }
+    var p = strProp(wb, "Path");
     if (!p) { throw new Error("the document has never been saved - use saveAs with a 'path'"); }
     wb.Save();
     var info = etDocInfo(wb);
@@ -2636,32 +2659,7 @@
   }
 
   function cmdEtCloseAll(app) {
-    var wbs = app.Workbooks;
-    var n = Number(wbs.Count);
-    var items = [], i;
-    for (i = 1; i <= n; i++) { items.push(wbs.Item(i)); }
-    var tmp = "/tmp";
-    try {
-      var fs = app.FileSystem;
-      var t = fs.tmpdir();
-      if (typeof t === "function") { t = t.call(fs); }
-      if (t) { tmp = String(t); }
-    } catch (e) {}
-    var rescued = [], closed = 0;
-    for (i = 0; i < items.length; i++) {
-      var wb = items[i];
-      var saved = wb.Saved;
-      if (typeof saved === "function") { saved = saved.call(wb); }
-      if (!saved) {
-        var nm = wb.Name;
-        if (typeof nm === "function") { nm = nm.call(wb); }
-        nm = String(nm) || "workbook.xlsx";
-        var rp = tmp + "/rescued/" + nm;
-        try { wb.SaveAs(rp); rescued.push(rp); } catch (e2) {}
-      }
-      try { wb.Close(false); closed++; } catch (e3) {}
-    }
-    return { closed: closed, rescued: rescued };
+    return closeAllDocuments(app, app.Workbooks, "workbook.xlsx", function (wb) { wb.Close(false); });
   }
 
   var ET_ERR_TEXT = ["#DIV/0!", "#REF!", "#NAME?", "#NUM!", "#NULL!", "#VALUE!", "#N/A", "#ERR:", "Err:"];
@@ -2688,15 +2686,10 @@
     if (typeof v === "function") { v = v.call(cell); }
     var f = cell.Formula;
     if (typeof f === "function") { f = f.call(cell); }
-    var t = cell.Text;
-    if (typeof t === "function") { t = t.call(cell); }
-    var nf = cell.NumberFormat;
-    if (typeof nf === "function") { nf = nf.call(cell); }
     if (Array.isArray(v)) { v = null; }
     if (Array.isArray(f)) { f = null; }
     return { v: (v === undefined ? null : v), f: (f === undefined ? null : f),
-      t: (t === undefined || t === null ? "" : String(t)),
-      nf: (nf === undefined || nf === null ? "General" : String(nf)) };
+      t: strProp(cell, "Text"), nf: strProp(cell, "NumberFormat") || "General" };
   }
 
   function cmdEtCheckRange(app, params) {
@@ -2866,13 +2859,9 @@
   }
 
   function wppDocInfo(pres) {
-    var name = pres.Name;
-    if (typeof name === "function") { name = name.call(pres); }
-    var full = pres.FullName;
-    if (typeof full === "function") { full = full.call(pres); }
     var saved = pres.Saved;
     if (typeof saved === "function") { saved = saved.call(pres); }
-    return { name: String(name), fullName: String(full), saved: !!saved };
+    return { name: strProp(pres, "Name"), fullName: strProp(pres, "FullName"), saved: !!saved };
   }
 
   function wppNumber(params, name, dflt) {
@@ -2888,7 +2877,7 @@
   // Slide can thao tac: bo trong hoac ngoai khoang = slide CUOI (giong _page LibreOffice).
   function wppSlide(app, params) {
     var pres = wppPres(app);
-    var count = Number(pres.Slides.Count);
+    var count = Number(numProp(pres.Slides, "Count"));
     if (!(count > 0)) {
       throw new Error("presentation has no slides; call wpp.addSlide first");
     }
@@ -2920,32 +2909,29 @@
 
   function cmdWppListSlides(app, params) {
     var pres = wppPres(app);
-    var count = Number(pres.Slides.Count);
+    var count = Number(numProp(pres.Slides, "Count"));
     var slides = [], i, j;
     for (i = 1; i <= count; i++) {
       var slide = pres.Slides.Item(i);
-      var layout = slide.Layout;
-      if (typeof layout === "function") { layout = layout.call(slide); }
+      var layout = numProp(slide, "Layout");
       var texts = [];
-      var n = Number(slide.Shapes.Count);
+      var n = Number(numProp(slide.Shapes, "Count"));
       for (j = 1; j <= n; j++) {
         var t = wppShapeText(slide.Shapes.Item(j));
         if (t) { texts.push(t); }
       }
       var entry = { index: i, layout: Number(layout), shapeTexts: texts };
       if (paramBool(params, "detail", false)) {
-        try { var mn = slide.Master.Name; if (typeof mn === "function") { mn = mn.call(slide.Master); } entry.master = String(mn || ""); } catch (eM) {}
+        try { entry.master = strProp(slide.Master, "Name") || ""; } catch (eM) {}
         try {
-          var nn = []; var ns = slide.NotesPage.Shapes; var nc = Number(ns.Count);
+          var nn = []; var ns = slide.NotesPage.Shapes; var nc = Number(numProp(ns, "Count"));
           for (var k = 1; k <= nc; k++) { var nt = wppShapeText(ns.Item(k)); if (nt) { nn.push(nt); } }
           if (nn.length > 0) { entry.notes = nn; }
         } catch (eN) {}
       }
       slides.push(entry);
     }
-    var pname = pres.Name;
-    if (typeof pname === "function") { pname = pname.call(pres); }
-    return { presentation: String(pname), slideCount: count, slides: slides };
+    return { presentation: strProp(pres, "Name"), slideCount: count, slides: slides };
   }
 
   function cmdWppAddTable(app, params) {
@@ -2978,8 +2964,7 @@
         }
       }
     }
-    var nm = shape.Name;
-    if (typeof nm === "function") { nm = nm.call(shape); }
+    var nm = strProp(shape, "Name");
     return { slide: r.index, rows: rows, cols: cols, filled: filled, shape: String(nm) };
   }
 
@@ -3015,15 +3000,12 @@
     if (fsExists(fs, path)) { return { exported: path }; }
     var text = "";
     try { text = wppSlideTexts(pres); } catch (e1) {}
-    etPdfWrite(fs, path, buildPdf(text));
-    if (!fsExists(fs, path)) { throw new Error("could not write PDF to '" + path + "'"); }
-    return { exported: path };
+    return writePdf(fs, path, text, "Presentation");
   }
 
   function cmdWppSave(app) {
     var pres = wppPres(app);
-    var p = pres.Path;
-    if (typeof p === "function") { p = p.call(pres); }
+    var p = strProp(pres, "Path");
     if (!p) { throw new Error("the document has never been saved - use saveAs with a 'path'"); }
     pres.Save();
     var info = wppDocInfo(pres);
@@ -3041,38 +3023,15 @@
   }
 
   function cmdWppCloseAll(app) {
-    var col = app.Presentations;
-    var n = Number(col.Count);
-    var items = [], i;
-    for (i = 1; i <= n; i++) { items.push(col.Item(i)); }
-    var tmp = "/tmp";
-    try {
-      var fs = app.FileSystem;
-      var t = fs.tmpdir();
-      if (typeof t === "function") { t = t.call(fs); }
-      if (t) { tmp = String(t); }
-    } catch (e) {}
-    var rescued = [], closed = 0;
-    for (i = 0; i < items.length; i++) {
-      var pres = items[i];
-      var saved = pres.Saved;
-      if (typeof saved === "function") { saved = saved.call(pres); }
-      if (!saved) {
-        var nm = pres.Name;
-        if (typeof nm === "function") { nm = nm.call(pres); }
-        nm = String(nm) || "presentation.pptx";
-        var rp = tmp + "/rescued/" + nm;
-        try { pres.SaveAs(rp); rescued.push(rp); } catch (e2) {}
-      }
-      // WPP KHONG nhan tham so cho `Presentation.Close`: `Close(false)` bi tu choi bang "参数太多.", va vi loi
-      // bi nuot ngay day nen lenh truoc kia bao "thanh cong" ma khong dong bai nao (do 12/10/2026: hai bai dang
-      // mo ma `closed` = 0). Goi khong tham so moi dung: do duoc la dong that, `Presentations.Count` ve 0. Nhanh
-      // du phong cho ban WPS khac chi nhan dang co tham so — ET thi `Workbook.Close(false)` chay duoc.
-      // Do tren hai bai DA LUU (`Saved` = -1); duong cuu bai chua luu o tren giu cho Close() khong gap bai ban.
-      try { pres.Close(); closed++; }
-      catch (e3) { try { pres.Close(false); closed++; } catch (e4) {} }
-    }
-    return { closed: closed, rescued: rescued };
+    // WPP KHONG nhan tham so cho `Presentation.Close`: `Close(false)` bi tu choi bang "参数太多.", va vi loi
+    // bi nuot ngay day nen lenh truoc kia bao "thanh cong" ma khong dong bai nao (do 12/10/2026: hai bai dang
+    // mo ma `closed` = 0). Goi khong tham so moi dung: do duoc la dong that, `Presentations.Count` ve 0. Nhanh
+    // du phong cho ban WPS khac chi nhan dang co tham so — ET thi `Workbook.Close(false)` chay duoc.
+    // Do tren hai bai DA LUU (`Saved` = -1); duong cuu bai chua luu o tren giu cho Close() khong gap bai ban.
+    return closeAllDocuments(app, app.Presentations, "presentation.pptx", function (pres) {
+      try { pres.Close(); }
+      catch (e3) { pres.Close(false); }
+    });
   }
 
   // Soat bo cuc: khong bao `overflow` (WPS khong do duoc chieu cao chu that).
@@ -3094,8 +3053,7 @@
       var boxes = [];
       for (j = 1; j <= n; j++) {
         var shape = slide.Shapes.Item(j);
-        var nm = shape.Name;
-        if (typeof nm === "function") { nm = nm.call(shape); }
+        var nm = strProp(shape, "Name");
         var t = wppShapeText(shape);
         var size = 0;
         if (t) {
@@ -3191,8 +3149,7 @@
       if (bgr !== null) { shape.TextFrame.TextRange.Font.Color.RGB = bgr; }
     }
     if (wantAlign) { shape.TextFrame.TextRange.ParagraphFormat.Alignment = align; }
-    var nm = shape.Name;
-    if (typeof nm === "function") { nm = nm.call(shape); }
+    var nm = strProp(shape, "Name");
     return { slide: r.index, shape: String(nm) };
   }
 
@@ -3206,8 +3163,7 @@
     var r = wppSlide(app, params);
     var shape = r.slide.Shapes.AddTextbox(1, left, top, width, height);
     shape.TextFrame.TextRange.Text = text;
-    var nm = shape.Name;
-    if (typeof nm === "function") { nm = nm.call(shape); }
+    var nm = strProp(shape, "Name");
     return { slide: r.index, shape: String(nm) };
   }
 
@@ -3239,8 +3195,7 @@
       shape.Height = h;
       if (origW && origH) { shape.Width = origW * h / origH; }
     }
-    var nm = shape.Name;
-    if (typeof nm === "function") { nm = nm.call(shape); }
+    var nm = strProp(shape, "Name");
     return { slide: r.index, shape: String(nm) };
   }
 
