@@ -433,25 +433,24 @@
   // Kieu app ma moi nut soat thuoc ve (giong GetVisible cua ban Windows: tag -> Kind).
   var CHECK_KINDS = { checkLayout: "wpp", checkTables: "wps", checkRange: "et" };
 
-  // ---------------------------------------------------------------- icon tren ribbon
+  // ---------------------------------------------------------------- icon
   //
-  // Ban Windows ve icon cho moi nut (imageMso= trong RibbonUi.cs). Ban WPS cung co icon, nhung KHONG
-  // nhan data URI: getImage phai tra ve DUONG DAN TEP tuong doi so voi goc add-in. Do dung la cach SDK
-  // chinh thuc cua WPS lam - @wps-jsapi/wps/js/ribbon.js co `return "images/1.svg"`, va bo tep do ship
-  // kem images/1.svg (mot the <svg> chi co viewBox, khong width/height).
+  // Nut tren RIBBON dung imageMso trong ribbon.xml (bo icon co san cua WPS - do tren WPS that 20/10/2026), nen
+  // khong qua day. Day chi con lo icon cua MENU CHUOT PHAI (getImage="ribbon.OnGetImage"): imageMso trong menu
+  // ngu canh chua thu tren WPS, con duong getImage + tep SVG thi da chay.
   //
-  // Goc add-in o day la <core>/wps/addin/ (publish.xml: jspluginonline url=...), nen "images/askAi.svg"
-  // thanh <core>/wps/addin/images/askAi.svg - Core phuc vu bang ServeAddin, va ContentTypeFor da co san
-  // nhanh .svg -> image/svg+xml.
+  // getImage cua WPS KHONG nhan data URI: phai tra DUONG DAN TEP tuong doi so voi goc add-in - cach cua SDK chinh
+  // thuc (@wps-jsapi/wps/js/ribbon.js: `return "images/1.svg"`). Goc add-in o day la <core>/wps/addin/ (publish.xml:
+  // jspluginonline url=...), nen "images/askAi.svg" thanh <core>/wps/addin/images/askAi.svg - Core phuc vu bang
+  // ServeAddin (ContentTypeFor co nhanh .svg -> image/svg+xml).
   //
-  // Tep anh nam o src/AxiomOffice.WPS/images/<tag>.svg, mot tep cho moi tag trong ribbon.xml. Ten tep
-  // CHINH LA tag, nen khong co bang tra nao phai giu cho khop voi ribbon.xml.
-  // tests/wps/test_pane.mjs van doi chieu hai ben: them nut ma quen tep anh, hoac de lai tep anh khong
-  // nut nao dung, deu la spec do ngay.
-  //
-  // MAU: dung dung ACCENT cua he thiet ke pane (theme.py ACCENT = 0x0F6CBD) de ribbon va pane trong nhu
-  // cung mot san pham. Doi mau thi phai sua ca 12 tep trong images/ - spec kiem mau tung tep.
+  // Tep anh nam o src/AxiomOffice.WPS/images/<tag>.svg, ten tep CHINH LA tag. tests/wps/test_pane.mjs doi chieu hai
+  // ben: control co getImage ma thieu tep anh, hoac tep anh khong control nao dung, deu la spec do.
+  // MAU: ACCENT cua he thiet ke pane (theme.py ACCENT = 0x0F6CBD) - doi mau thi sua tung tep trong images/.
   var ICON_DIR = "images/";
+  // Tag co tep anh that trong images/ - spec test ghim khop dung danh sach tep. Tag khac (vd nut ribbon da chuyen
+  // sang imageMso) thi OnGetImage tra chuoi rong: tra duong dan khong ton tai la WPS ve dau "?".
+  var ICON_FILES = { askAi: true, quickMenu: true };
 
   function tagOf(control) {
     var tag = "";
@@ -532,17 +531,16 @@
     }
   }
 
-  // getImage: WPS hoi anh cho tung control co getImage= trong ribbon.xml, va doi mot DUONG DAN tuong doi
-  // (khong phai data URI - xem chu thich o dau muc "icon tren ribbon"). Ten tep chinh la tag nen chi con
-  // viec ghep duong dan; spec test bao dam moi tag trong ribbon.xml deu co tep images/<tag>.svg.
+  // getImage: WPS hoi anh cho tung control co getImage= trong ribbon.xml (nay chi con menu chuot phai), va doi
+  // mot DUONG DAN tuong doi (khong phai data URI - xem chu thich o dau muc "icon"). Ten tep chinh la tag.
   //
-  // Khong biet tag thi tra chuoi rong: WPS ve nut khong co anh, dung nhu ban cu. Tra ve mot duong dan
-  // khong ton tai thi con te hon - WPS ve dau "?" (dung cai da gap khi tra data URI).
+  // Tag khong co tep thi tra chuoi rong: WPS ve control khong co anh. Tra ve mot duong dan khong ton tai thi con
+  // te hon - WPS ve dau "?" (dung cai da gap khi tra data URI).
   function OnGetImage(control) {
     try {
       var tag = tagOf(control);
-      // Muc "quick:<muc>" khong co tep anh rieng (cung mot icon voi menu cha) - tra duong dan thi ra dau "?".
-      if (tag !== "" && tag.indexOf(QUICK_TAG) !== 0) { return ICON_DIR + tag + ".svg"; }
+      // Chi tag co tep that (ICON_FILES). Muc "quick:<muc>" va nut ribbon dung imageMso thi khong co tep rieng.
+      if (Object.prototype.hasOwnProperty.call(ICON_FILES, tag)) { return ICON_DIR + tag + ".svg"; }
     } catch (e) {}
     return "";
   }

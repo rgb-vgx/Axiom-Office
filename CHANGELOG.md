@@ -5,6 +5,14 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed — Icon ribbon WPS dùng bộ icon có sẵn của WPS (`imageMso`) (20/10/2026)
+- Như bản Windows dùng icon của Office: 12 nút ribbon WPS nay mang `imageMso` thay cho SVG tự vẽ. WPS ánh xạ tên
+  kiểu Office sang icon của nó qua bảng lệnh `res/commands/<app>/ongmani/*.kuip`; chỉ dùng tên có trong bảng (nút
+  dùng chung: tên có ở cả ba app). Năm tên Windows không có trong WPS được thay — bảng ở `docs/ribbon-ui.md` §5.3.
+  Đã thử trên WPS thật: hiện đúng icon.
+- Menu chuột phải vẫn dùng `getImage` + `images/askAi.svg`, `images/quickMenu.svg`; xoá 11 tệp SVG không còn dùng.
+  `OnGetImage` chỉ trả đường dẫn cho tag có tệp, tag khác trả rỗng (tránh dấu `?`).
+
 ### Fixed — `install.sh` (Linux) làm mất hội thoại và Bộ nhớ AI (20/10/2026)
 - Core lưu `core.db` (+ `-wal`, `-shm`) ngay trong `~/.local/share/axiom-office/core/` — chính thư mục `install.sh`
   thay khi cài. Trước bản sửa, **cài lại / nâng cấp** và cả **`--uninstall` không `--purge`** đều `rm -rf` cả thư

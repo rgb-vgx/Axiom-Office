@@ -443,7 +443,7 @@ function ribbonControls(part = "ribbon") {
     const attrs = found[2];
     const one = (name) => { const m = new RegExp("\\b" + name + '="([^"]*)"').exec(attrs); return m ? m[1] : ""; };
     out.push({ kind: found[1], id: one("id"), tag: one("tag"), getImage: one("getImage"), label: one("label"),
-      onAction: one("onAction"), idMso: one("idMso") });
+      onAction: one("onAction"), idMso: one("idMso"), imageMso: one("imageMso") });
   }
   return part === "ribbon" ? out.filter((c) => c.kind !== "menuSeparator") : out;
 }
@@ -454,22 +454,52 @@ function iconFiles() {
   return fs.readdirSync(dir).filter((n) => n.endsWith(".svg")).map((n) => n.slice(0, -4)).sort();
 }
 
-test("ribbon.xml: moi control co getImage, va moi tag co tep anh images/<tag>.svg", () => {
+// Icon nut ribbon = imageMso, bo icon co san cua WPS (do tren WPS 12.1.2 that 20/10/2026: hien dung icon). WPS tra
+// ten kieu Office qua bang lenh cua no (/opt/kingsoft/wps-office/office6/res/commands/<wps|et|wpp>/ongmani/*.kuip:
+// idMso="..." icon="..._kd"); ten khong co trong bang thi khong co icon. Bang duoi la DUNG bo ten da do - doi ten
+// nao thi phai tra lai bang lenh cua WPS (docs/ribbon-ui.md muc 5.3) va thu lai tren WPS that.
+const RIBBON_IMAGE_MSO = {
+  axiomAskAI: "Help", // ca ba app (question_kd)
+  axiomCheckLayout: "SlideShowFromCurrent", // chi trinh chieu - dung nut Soat bo cuc cua trinh chieu
+  axiomCheckTables: "TableInsertDialogWord", // chi van ban (TableInsert khong co trong Writer cua WPS)
+  axiomCheckRange: "DataValidation", // chi bang tinh
+  axiomMemory: "FileSave", // ca ba app; ban Windows dung RecordsSaveRecord - WPS khong co
+  axiomSkills: "JsAddInsDialog", // ca ba app
+  axiomSetup: "ApplicationOptionsDialog", // ca ba app; ban Windows dung ControlWizards - WPS khong co
+  axiomStatus: "About", // ca ba app; ban Windows dung Info - WPS khong co
+  axiomLog: "FileOpen", // ca ba app
+  axiomMoreMenu: "FileProperties", // ca ba app; ban Windows dung PropertySheet - WPS khong co
+  axiomTestModel: "ReviewNewComment", // ca ba app; ban Windows dung AcceptInvitation - WPS khong co
+  axiomCopyUrl: "Copy", // ca ba app
+};
+
+test("ribbon.xml: nut ribbon dung imageMso dung bang da do tren WPS that; khong getImage", () => {
   const controls = ribbonControls();
-  assert.ok(controls.length >= 11, "doc duoc control cua ribbon.xml: " + controls.length);
-  const files = iconFiles();
-  assert.ok(files.length >= 11, "doc duoc tep anh cua images/: " + files.length);
+  assert.deepEqual(controls.map((c) => c.id).sort(), Object.keys(RIBBON_IMAGE_MSO).sort(),
+    "them / bot nut ribbon thi phai chon icon (ten co trong bang lenh cua WPS) va them vao RIBBON_IMAGE_MSO");
   for (const control of controls) {
-    assert.equal(control.getImage, "ribbon.OnGetImage", "#" + control.id + " thieu getImage - nut khong co icon");
-    assert.ok(control.tag, "#" + control.id + " thieu tag - khong biet tra anh nao");
-    assert.ok(files.indexOf(control.tag) >= 0,
-      "images/: thieu tep cho tag '" + control.tag + "' (#" + control.id + ")");
+    assert.equal(control.imageMso, RIBBON_IMAGE_MSO[control.id], "#" + control.id + ": imageMso");
+    assert.equal(control.getImage, "", "#" + control.id + ": khong kem getImage (hai nguon icon tren mot nut)");
   }
-  // Chieu nguoc lai: tep anh chet (khong nut nao dung - ca ribbon lan menu chuot phai) cung la loi.
-  const tags = controls.concat(ribbonControls("context").filter((c) => c.getImage)).map((c) => c.tag);
+});
+
+test("menu chuot phai: control co getImage <-> tep images/<tag>.svg khop hai chieu, va khop ICON_FILES cua main.js", () => {
+  const withImage = ribbonControls("context").filter((c) => c.getImage);
+  assert.ok(withImage.length >= 2, "menu chuot phai co icon (Sua bang AI, Hoi AI ve doan nay)");
+  const files = iconFiles();
+  for (const control of withImage) {
+    assert.equal(control.getImage, "ribbon.OnGetImage");
+    assert.ok(files.indexOf(control.tag) >= 0, "images/: thieu tep cho tag '" + control.tag + "' (#" + control.id + ")");
+  }
+  const tags = withImage.map((c) => c.tag);
   for (const name of files) {
-    assert.ok(tags.indexOf(name) >= 0, "images/: co '" + name + ".svg' nhung ribbon.xml khong co nut nao dung");
+    assert.ok(tags.indexOf(name) >= 0, "images/: co '" + name + ".svg' nhung khong control nao dung");
   }
+  const main = fs.readFileSync(path.join(ADDIN, "main.js"), "utf8");
+  const known = /var ICON_FILES = \{([^}]*)\}/.exec(main);
+  assert.ok(known, "main.js phai khai ICON_FILES");
+  assert.deepEqual([...known[1].matchAll(/(\w+):/g)].map((m) => m[1]).sort(), files,
+    "ICON_FILES cua main.js phai dung bang danh sach tep trong images/");
 });
 
 test("OnGetImage: tra duong dan tuong doi images/<tag>.svg; khong biet tag thi tra chuoi rong", () => {
@@ -477,17 +507,20 @@ test("OnGetImage: tra duong dan tuong doi images/<tag>.svg; khong biet tag thi t
   const ctx = load(["probe.js", "commands.js", "main.js"], {
     Application: { CreateTaskPane: () => ({ Visible: false }) },
   });
-  const rel = ctx.ribbon.OnGetImage({ Id: "axiomAskAI" });
+  const rel = ctx.ribbon.OnGetImage({ Id: "axiomCtxAsk_t" });
   assert.equal(rel, "images/askAi.svg", "getImage phai tra duong dan tuong doi, khong phai data URI");
   // WPS co ban chi dien Tag (khong dien Id) - hai duong phai ra cung mot duong dan.
   assert.equal(ctx.ribbon.OnGetImage({ Tag: "askAi" }), rel);
+  // Nut ribbon da chuyen sang imageMso: khong co tep -> chuoi rong, KHONG phai duong dan 404 (WPS ve "?").
+  assert.equal(ctx.ribbon.OnGetImage({ Id: "axiomSetup" }), "");
+  assert.equal(ctx.ribbon.OnGetImage({ Tag: "quick:polish" }), "");
   // Control la thi tra chuoi rong: WPS ve nut khong anh (dung nhu ban cu), khong lam hong ribbon.
   // Tra ve mot duong dan 404 thi WPS con te hon - no ve dau "?" (dung cai da gap voi data URI).
   assert.equal(ctx.ribbon.OnGetImage({ Id: "khong-co-that" }), "");
   assert.equal(ctx.ribbon.OnGetImage(null), "");
   // Moi tep anh phai la MOT the <svg> khap kin, chi viewBox (de WPS tu co gian theo co nut: nut lon
   // 32px, nut nho 16px - y nhu tep mau cua SDK @wps-jsapi/wps/images/1.svg), va dung mau accent.
-  for (const control of ribbonControls().concat(ribbonControls("context").filter((c) => c.getImage))) {
+  for (const control of ribbonControls("context").filter((c) => c.getImage)) {
     assert.equal(ctx.ribbon.OnGetImage({ Tag: control.tag }), "images/" + control.tag + ".svg");
     const text = fs.readFileSync(path.join(ADDIN, "images", control.tag + ".svg"), "utf8");
     assert.match(text, /<svg[^>]*viewBox="0 0 20 20"[^>]*>[\s\S]*<\/svg>\s*$/,

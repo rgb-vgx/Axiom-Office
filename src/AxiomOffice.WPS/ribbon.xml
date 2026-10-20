@@ -12,13 +12,16 @@
      khong phai cua getVisible.
 
   Icon (giong ban Windows: moi nut deu co icon):
-   - Moi control o day co getImage="ribbon.OnGetImage"; main.js tra ve DUONG DAN TUONG DOI
-     "images/<tag>.svg", va cac tep do nam o src/AxiomOffice.WPS/images/ (Core phuc vu qua ServeAddin).
-   - WPS KHONG nhan data URI: no dem chuoi tra ve di phan giai nhu mot duong dan, truot thi ve dau "?".
-     Cach lam dung la theo SDK chinh thuc cua WPS (@wps-jsapi/wps/js/ribbon.js: `return "images/1.svg"`).
-   - Spec tests/wps/test_pane.mjs doi chieu hai ben: moi tag trong tep nay phai co tep anh, va moi tep
-     anh phai co nut dung - them nut ma quen ve anh la spec do ngay.
-   - Neu ban WPS nao bo qua getImage, nut tro lai dung nhu ban cu: chi co chu, khong co anh.
+   - Nut tren RIBBON dung imageMso = bo icon co san cua chinh WPS (do tren WPS 12.1.2 that 20/10/2026: hien
+     dung icon). WPS tra ten kieu Office qua bang lenh cua no - /opt/kingsoft/wps-office/office6/res/commands/
+     <wps|et|wpp>/ongmani/*.kuip, moi lenh co idMso="..." va icon="..._kd". CHI dung ten co trong bang do: ten
+     khong co thi WPS khong ve icon. Ten nao chi co o mot app (SlideShowFromCurrent: trinh chieu,
+     TableInsertDialogWord: van ban, DataValidation: bang tinh) thi chi dung cho nut cua dung app do (ba nut
+     Soat); nut dung chung ca ba app phai la ten co o CA BA bang. Bang ten + ly do: docs/ribbon-ui.md muc 5.3;
+     spec tests/wps/test_pane.mjs ghim.
+   - Menu CHUOT PHAI van dung getImage="ribbon.OnGetImage" -> main.js tra DUONG DAN TUONG DOI "images/<tag>.svg"
+     (askAi.svg, quickMenu.svg) - imageMso trong menu ngu canh chua thu. WPS KHONG nhan data URI cho getImage: no
+     phan giai chuoi tra ve nhu mot duong dan, truot thi ve dau "?" (SDK: @wps-jsapi/wps/js/ribbon.js).
 
   Menu chuot phai (<contextMenus> cuoi tep): "Sua bang AI >" 9 muc + "Hoi AI ve doan nay", tren chu thuong va tren
   dong danh sach. Bam mot muc thi mo KHUNG CHAT MINI canh doan boi den (mini.html, Application.ShowDialog); ban WPS
@@ -45,7 +48,7 @@
       <tab id="axiomTab" label="Axiom Office">
 
         <group id="axiomAssistantGroup" label="Trợ lý">
-          <button id="axiomAskAI" label="Ask AI" size="large" tag="askAi" onAction="ribbon.OnAction" getImage="ribbon.OnGetImage"
+          <button id="axiomAskAI" label="Ask AI" size="large" tag="askAi" onAction="ribbon.OnAction" imageMso="Help"
                   screentip="Ask AI"
                   supertip="Mở khung trò chuyện với AI bên cạnh tài liệu."/>
         </group>
@@ -55,43 +58,43 @@
              tra loi ro "lenh nay can ung dung kia" - xem commands.js: execute() kiem catalogEntry.kind. -->
         <group id="axiomCheckGroup" label="Kiểm tra">
           <button id="axiomCheckLayout" label="Soát bố cục" size="large" tag="checkLayout"
-                  getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction" getImage="ribbon.OnGetImage"
+                  getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction" imageMso="SlideShowFromCurrent"
                   screentip="Soát bố cục"
                   supertip="Tìm chữ tràn khung, khung ra ngoài slide, khung chồng nhau, chữ quá nhỏ. Chỉ đọc, không dùng AI."/>
           <button id="axiomCheckTables" label="Soát bảng" size="large" tag="checkTables"
-                  getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction" getImage="ribbon.OnGetImage"
+                  getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction" imageMso="TableInsertDialogWord"
                   screentip="Soát bảng"
                   supertip="Tìm ô trống và ô tiêu đề lẫn đoạn văn trong các bảng. Chỉ đọc, không dùng AI."/>
           <button id="axiomCheckRange" label="Soát vùng dữ liệu" size="large" tag="checkRange"
-                  getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction" getImage="ribbon.OnGetImage"
+                  getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction" imageMso="DataValidation"
                   screentip="Soát vùng dữ liệu"
                   supertip="Tìm cột thiếu tiêu đề, số lưu dạng chữ, ô lỗi, dữ liệu lạc ngoài bảng. Chỉ đọc, không dùng AI."/>
         </group>
 
         <group id="axiomManageGroup" label="Quản lý">
-          <button id="axiomMemory" label="Bộ nhớ AI…" size="large" tag="memory" onAction="ribbon.OnAction" getImage="ribbon.OnGetImage"
+          <button id="axiomMemory" label="Bộ nhớ AI…" size="large" tag="memory" onAction="ribbon.OnAction" imageMso="FileSave"
                   screentip="Bộ nhớ AI"
                   supertip="Xem, lọc theo phạm vi, xoá tạm, khôi phục, xoá vĩnh viễn những điều AI đã ghi nhớ về bạn và tài liệu."/>
-          <button id="axiomSkills" label="Kỹ năng…" size="large" tag="skills" onAction="ribbon.OnAction" getImage="ribbon.OnGetImage"
+          <button id="axiomSkills" label="Kỹ năng…" size="large" tag="skills" onAction="ribbon.OnAction" imageMso="JsAddInsDialog"
                   screentip="Kỹ năng"
                   supertip="Các kỹ năng AI đang có cho ứng dụng này; nạp lại sau khi thêm hoặc sửa kỹ năng."/>
         </group>
 
         <group id="axiomSystemGroup" label="Hệ thống">
-          <button id="axiomSetup" label="Thiết lập…" size="large" tag="setup" onAction="ribbon.OnAction" getImage="ribbon.OnGetImage"
+          <button id="axiomSetup" label="Thiết lập…" size="large" tag="setup" onAction="ribbon.OnAction" imageMso="ApplicationOptionsDialog"
                   screentip="Thiết lập"
                   supertip="Máy chủ AI, model, khoá API và các công tắc của Agent Core. Lưu xong có hiệu lực ngay."/>
-          <button id="axiomStatus" label="Trạng thái" tag="status" onAction="ribbon.OnAction" getImage="ribbon.OnGetImage"
+          <button id="axiomStatus" label="Trạng thái" tag="status" onAction="ribbon.OnAction" imageMso="About"
                   screentip="Trạng thái"
                   supertip="Kiểm tra thật: add-in có trả lời không, Agent Core có chạy không, model đang dùng."/>
-          <button id="axiomLog" label="Mở nhật ký" tag="openLog" onAction="ribbon.OnAction" getImage="ribbon.OnGetImage"
+          <button id="axiomLog" label="Mở nhật ký" tag="openLog" onAction="ribbon.OnAction" imageMso="FileOpen"
                   screentip="Mở nhật ký"
                   supertip="Xem phần cuối nhật ký của Agent Core (cùng tệp mà bản Windows mở bằng trình soạn thảo)."/>
-          <menu id="axiomMoreMenu" label="Khác" tag="more" getImage="ribbon.OnGetImage">
-            <button id="axiomTestModel" label="Kiểm tra mô hình" tag="testModel" onAction="ribbon.OnAction" getImage="ribbon.OnGetImage"
+          <menu id="axiomMoreMenu" label="Khác" tag="more" imageMso="FileProperties">
+            <button id="axiomTestModel" label="Kiểm tra mô hình" tag="testModel" onAction="ribbon.OnAction" imageMso="ReviewNewComment"
                     screentip="Kiểm tra mô hình"
                     supertip="Gửi một câu hỏi ngắn tới model đang cấu hình để xem có trả lời được không."/>
-            <button id="axiomCopyUrl" label="Sao chép API URL" tag="copyUrl" onAction="ribbon.OnAction" getImage="ribbon.OnGetImage"
+            <button id="axiomCopyUrl" label="Sao chép API URL" tag="copyUrl" onAction="ribbon.OnAction" imageMso="Copy"
                     screentip="Sao chép API URL"
                     supertip="Địa chỉ bridge của add-in kèm /health - dán vào trình duyệt để tự kiểm tra add-in còn trả lời không. API của Agent Core đòi token nên không dán thẳng vào trình duyệt được."/>
           </menu>

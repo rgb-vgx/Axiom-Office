@@ -110,11 +110,10 @@ bằng `Application.ShowDialog` — dùng cho khung chat mini — nhưng không 
   *Cài đặt nâng cao…*, *Tắt Agent Core…*, và menu ngôn ngữ (WPS không có tệp `lang/*.json`) — lý do ghi
   ngay trong chú thích đầu `ribbon.xml`. Menu *Tìm web* cũng không vẽ: chọn nguồn tìm kiếm ghi vào
   `mcp.json`, mà kênh `/wps/v1/*` không có route ghi tệp đó.
-  Mọi control mang `getImage="ribbon.OnGetImage"`; `main.js` trả **đường dẫn tệp tương đối**
-  `"images/<tag>.svg"` theo `tag` của control, và 13 tệp SVG (20×20, nét 1.5, màu `#0F6CBD`; tệp thứ 13
-  `quickMenu.svg` là icon của mục *Sửa bằng AI* trong menu chuột phải) nằm ở
-  `src/AxiomOffice.WPS/images/`. Hai bên khớp nhau bằng **spec hai chiều** (`test_pane.mjs`): thêm nút mà
-  quên vẽ ảnh, hoặc để tệp ảnh mồ côi, đều đỏ ngay. Vì sao là đường dẫn chứ không phải data URI — §5.3.
+  Icon: **nút ribbon dùng `imageMso`** — bộ icon có sẵn của chính WPS, giống cách bản Windows dùng bộ icon của
+  Office (bảng tên ở §5.3, `test_pane.mjs` ghim). **Menu chuột phải** vẫn dùng `getImage="ribbon.OnGetImage"`:
+  `main.js` trả đường dẫn tương đối `"images/<tag>.svg"`, hai tệp `askAi.svg` và `quickMenu.svg` (20×20, nét 1.5,
+  màu `#0F6CBD`) nằm ở `src/AxiomOffice.WPS/images/`; spec khớp hai chiều control ↔ tệp ↔ `ICON_FILES` của `main.js`.
   `ribbon.xml` còn có `<contextMenus>` (`ContextMenuText` + `ContextMenuList`): **Sửa bằng AI ▸** 9 mục +
   **Hỏi AI về đoạn này**, cả hai mở khung chat mini `mini.html`. Header pane có menu **⋯** chứa năm lối vào
   *Trò chuyện mới / Hội thoại trước… / Ghi nhớ / Nhật ký / Thiết lập* (Windows và LibreOffice bố trí khác —
@@ -250,13 +249,35 @@ Số đo đầy đủ (hình dạng JSON, ngữ nghĩa `lines`/`truncated`, cái
   thật, và `ServeAddin` phục vụ bằng `image/svg+xml` — `ContentTypeFor` **đã có sẵn** nhánh `.svg`.
   Đo trên máy: `curl` ba tệp bất kỳ qua Core đều `HTTP 200  image/svg+xml`. **Đã nghiệm thu trong WPS
   thật (19/10/2026)**: khởi động lại WPS, tab *Axiom Office* hiện đủ icon, không còn dấu `?`.
-- **Màu icon**: màu **hằng số** `#0F6CBD` nằm trong **từng tệp** `images/<tag>.svg` (trước đây là
-  `ICON_COLOR` trong `main.js`; nay không còn hằng số nào trong JS), **không** đọc từ `theme.py`. Cố ý:
-  `theme.py` là nguồn duy nhất cho **pane**, còn ảnh ribbon do WPS vẽ bằng bộ nạp ảnh của nó — nó không
-  biết `var(--axiom-*)`. Hai chỗ này có thể lệch màu, nên khi đổi bảng màu phải sửa **cả 13 tệp** trong
-  `images/`. Bù lại, `test_pane.mjs` nay **kiểm màu từng tệp** (`stroke="#0F6CBD"`), thứ mà bản dùng
-  `ICON_COLOR` trong JS không kiểm được. (`test_pane_theme.mjs` vẫn chỉ ràng buộc màu *bên trong*
-  `pane.html`.)
+- **`imageMso` trên WPS Linux — đã nghiệm thu trên WPS thật (20/10/2026): hiện đúng icon.** Sau khi tự vẽ 12 icon
+  SVG, ribbon WPS trông nhạt so với bộ icon của Office trên bản Windows. Thư viện ribbon của WPS (`libkshell.so`)
+  có nhận thuộc tính `imageMso`, và WPS có **bảng lệnh riêng** ánh xạ tên kiểu Office sang icon của nó:
+  `/opt/kingsoft/wps-office/office6/res/commands/<wps|et|wpp>/ongmani/*.kuip` — mỗi lệnh có `idMso="…"` và
+  `icon="…_kd"` (vd `idMso="SmartArtInsert"` → `smart_diagram_kd`). Bảng chia **theo từng app**, mà một ribbon
+  dùng chung cho cả ba, nên: nút dùng chung phải là tên có ở **cả ba** bảng; ba nút *Soát* (mỗi nút một app) dùng
+  tên của đúng app đó. Năm tên bản Windows dùng **không có** trong WPS nên được thay:
+
+  | Nút | `imageMso` | Có ở | Ghi chú |
+  |---|---|---|---|
+  | Ask AI | `Help` | cả ba | như Windows |
+  | Soát bố cục | `SlideShowFromCurrent` | trình chiếu | như Windows |
+  | Soát bảng | `TableInsertDialogWord` | văn bản | Windows dùng `TableInsert` — Writer của WPS không có |
+  | Soát vùng dữ liệu | `DataValidation` | bảng tính | như Windows |
+  | Bộ nhớ AI… | `FileSave` | cả ba | thay `RecordsSaveRecord` |
+  | Kỹ năng… | `JsAddInsDialog` | cả ba | thay `SmartArtInsert` (chỉ có ở văn bản) |
+  | Thiết lập… | `ApplicationOptionsDialog` | cả ba | thay `ControlWizards` |
+  | Trạng thái | `About` | cả ba | thay `Info` |
+  | Mở nhật ký | `FileOpen` | cả ba | như Windows |
+  | Khác ▸ | `FileProperties` | cả ba | thay `PropertySheet` |
+  | Kiểm tra mô hình | `ReviewNewComment` | cả ba | thay `AcceptInvitation` |
+  | Sao chép API URL | `Copy` | cả ba | như Windows |
+
+  Đổi tên nào thì phải tra lại bảng lệnh của WPS và thử trên WPS thật — tên không có thì nút không có icon. Người
+  dùng xác nhận "hiện icon" (20/10/2026) nhưng chưa nhìn riêng từng app — ba nút *Soát* dùng tên chỉ có ở một app,
+  nên trong app khác (nếu WPS bỏ qua `getVisible`) chúng có thể không có icon.
+- **Màu icon menu chuột phải**: hằng số `#0F6CBD` nằm trong **từng tệp** `images/<tag>.svg` (không đọc từ
+  `theme.py` — ảnh do WPS vẽ, nó không biết `var(--axiom-*)`); đổi bảng màu thì sửa cả hai tệp, `test_pane.mjs`
+  kiểm màu từng tệp. Icon ribbon (`imageMso`) là của WPS, theo giao diện WPS.
 - **Menu chuột phải — đã nghiệm thu trên WPS thật (20/10/2026)**: WPS Linux nhận `<contextMenus>` (ghi chú
   "WPS không nhận chắc" trong `RibbonUi.cs` của bản Windows không đúng với WPS Linux). Bấm *Sửa lỗi chính tả*
   chạy trọn tới Core (§8). Lần đầu model **hỏi lại** thay vì sửa — đã thêm `QuickEditRule` (§8, đợt I).
@@ -351,3 +372,4 @@ Số đo đầy đủ (hình dạng JSON, ngữ nghĩa `lines`/`truncated`, cái
 | 20/10/2026 | WPS Linux + Core | **Nghiệm thu menu chuột phải trên WPS thật: menu HIỆN** (WPS Linux nhận `contextMenus` — ghi chú "không nhận chắc" của bản Windows là không đúng với WPS Linux). Chuỗi chạy trọn (đọc `core.db`): chuột phải → *Sửa lỗi chính tả* → Core khoá 120 ký tự bôi đen → model trả lời sau 27 s. Nhưng **0 thao tác**: model tìm ra 2 lỗi rồi **hỏi** "Bạn muốn tôi áp dụng luôn 2 sửa này…?" — người dùng bấm lệnh mà không thấy gì đổi. Câu lệnh trong tin nhắn đã ghi "sửa thẳng vào tài liệu" mà không đủ (lượt đó là tin thứ 15 của một hội thoại dài). Sửa: system prompt nối thêm `QuickEditRule` (bấm lệnh là đã quyết — sửa ngay, không xin phép, hoàn tác một cú bấm; lỗi nhỏ dùng `replaceAll` để giữ định dạng) hoặc `QuickAnswerRule` cho mục chỉ trả lời; e2e ghim cả ba trường hợp (93). **Chưa** đo lại với model thật. |
 | 20/10/2026 | WPS Linux + Core | **Đợt I — khung chat mini cạnh đoạn bôi đen** (người dùng đề xuất; làm thẳng, không qua bản thử). Mục chuột phải mở `mini.html` bằng `Application.ShowDialog` (hàm có trong SDK chính thức `@wps-jsapi/*/js/ribbon.js`, gọi y cách SDK: kích thước × `devicePixelRatio`, không modal). Trang dùng lại `pane-core.js`; khác duy nhất là `create({requireSelection: true})` — **Core** thêm `options.requireSelection` (`Request.RequireSelection`, lệnh nhanh luôn bật) để câu gõ tay trong khung mini không bị hiểu thành sửa cả tài liệu. `:root` của `mini.html` chép nguyên từ `pane.html`, spec bắt hai bản giống hệt. Đường relay qua Core (đợt H) giữ làm **dự phòng** khi WPS không có `ShowDialog`. Spec: `test_mini_view.mjs` (7), `test_pane.mjs` +2 (181), e2e +1 (94), Go +1; thử phá bốn chỗ đều đỏ. **Chưa biết**: `ShowDialog` không nhận toạ độ nên cửa sổ có thể **không** nằm sát đoạn bôi đen; và sau khi model `typeText` thay cả đoạn, vùng chọn có thể co về con trỏ — khi đó câu gõ thêm sẽ báo "Hãy bôi đen…" thay vì sửa tiếp (an toàn, nhưng phải bôi đen lại). |
 | 20/10/2026 | WPS Linux | **Thử khung chat mini trên WPS thật**: người dùng đánh giá "khá ổn" và cho commit. Chưa có số đo riêng về vị trí cửa sổ, về việc model còn hỏi lại hay không sau `QuickEditRule`, hay về gõ thêm sau khi vùng chọn co lại — ghi vào đây khi có. |
+| 20/10/2026 | WPS Linux | **Icon ribbon chuyển sang `imageMso`** (người dùng thấy ribbon WPS kém bản Word: icon SVG tự vẽ một màu nét mảnh, trong khi bản Windows dùng bộ icon của Office). WPS có bảng lệnh riêng ánh xạ `idMso` → icon của nó (`res/commands/<app>/ongmani/*.kuip`, 965 tên); chọn tên có ở cả ba app cho nút dùng chung, tên của đúng app cho ba nút *Soát*; năm tên Windows không có trong WPS được thay (bảng §5.3). Thử trên bản cài trước (mã nguồn chưa đụng) → người dùng xác nhận **hiện icon**. Rồi mới đưa vào nguồn: 12 nút ribbon `imageMso`, bỏ `getImage`; xoá 11 tệp SVG mồ côi, còn `askAi.svg` + `quickMenu.svg` cho menu chuột phải; `OnGetImage` chỉ trả đường dẫn cho tag có tệp (`ICON_FILES`) — tag khác trả rỗng chứ không trả đường dẫn 404 (WPS sẽ vẽ `?`). Spec `test_pane.mjs` ghim bảng tên đã đo, khớp control ↔ tệp ↔ `ICON_FILES` (182); thử phá ba chỗ đều đỏ. |
