@@ -5,6 +5,12 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — CI Windows: `test_bridge_env` ghim đường dẫn POSIX nên đỏ trên Windows (22/10/2026)
+- Test dựng tài liệu giả bằng `file:///tmp/hai.odp` nhưng production (`documents.find_open_path`) dựng URL từ
+  `os.path.abspath`, nên trên Windows ra `D:\...` và không khớp — job **windows** đỏ ở bước unit test extension
+  (Linux vẫn xanh, nên chỉ thấy khi push). Nay test dựng cả đường dẫn lẫn URL bằng chính hàm production
+  (`os.path` + `documents.to_url`). Đã kiểm bằng cách mô phỏng ngữ nghĩa `ntpath`: test cũ đỏ, test mới xanh.
+
 ### Added — Spec ghim hành vi `checkLayout` của LibreOffice: gọi lại cho cùng kết quả (22/10/2026)
 - `tests/lo/test_impress_checks.py` (8 ca) ghim hành vi đã sửa ngày 13/10: `checks._shape_text_height` bật
   `TextAutoGrowHeight` để đo nhưng phải trả lại **cả tham số lẫn hình học**, vì autogrow chỉ lớn ra chứ không

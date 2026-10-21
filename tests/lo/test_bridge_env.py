@@ -109,22 +109,32 @@ class Ctx:
         self.ServiceManager = ServiceManager(Desktop(items))
 
 
+def _path(name: str) -> str:
+    """Duong dan tuyet doi chay duoc ca Windows lan Linux (CI chay ca hai)."""
+    return os.path.join(os.path.abspath(os.sep), name)
+
+
+def _url(path: str) -> str:
+    """URL dung CUNG ham voi production, neu khong tren Windows se lech o dia/thu muc goc."""
+    return documents.to_url(os.path.abspath(path))
+
+
 class BridgeEnvTest(unittest.TestCase):
     def test_presentation_chon_dung_tai_lieu_dang_mo(self):
-        first = Document("file:///tmp/mot.odp")
-        second = Document("file:///tmp/hai.odp")
+        first_path, second_path = _path("mot.odp"), _path("hai.odp")
+        first, second = Document(_url(first_path)), Document(_url(second_path))
         ctx = Ctx([first, second])          # bai dang active la bai DAU
-        env = bridge.Env(ctx, "wpp", None, {"presentation": "/tmp/hai.odp"})
+        env = bridge.Env(ctx, "wpp", None, {"presentation": second_path})
         self.assertIs(second, env.document)
 
     def test_khong_co_presentation_van_dung_tai_lieu_active(self):
-        first = Document("file:///tmp/mot.odp")
+        first = Document(_url(_path("mot.odp")))
         ctx = Ctx([first])
         self.assertIs(first, bridge.Env(ctx, "wpp", None, {}).document)
 
     def test_presentation_khong_mo_thi_bao_loi_ro_rang(self):
-        ctx = Ctx([Document("file:///tmp/mot.odp")])
-        env = bridge.Env(ctx, "wpp", None, {"presentation": "/tmp/khong-mo.odp"})
+        ctx = Ctx([Document(_url(_path("mot.odp")))])
+        env = bridge.Env(ctx, "wpp", None, {"presentation": _path("khong-mo.odp")})
         with self.assertRaises(documents.NoDocumentError) as caught:
             _ = env.document
         self.assertIn("khong-mo.odp", str(caught.exception))
