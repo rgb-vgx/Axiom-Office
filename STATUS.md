@@ -1,8 +1,8 @@
-# Tình trạng dự án Axiom Office
+﻿# Tình trạng dự án Axiom Office
 
-Cập nhật: **20/10/2026** · nhánh `main` · **7 commit chưa push remote** (18–20/10: khoá vùng bôi đen trên WPS →
-khung chat mini; remote dừng ở 16/10) — chỉ commit, không push, theo yêu cầu của bạn. Số liệu kiểm chứng ở §2.4 là
-lượt đo **01/10/2026**; số mới của đợt WPS ở §2.6.
+Cập nhật: **22/10/2026** · nhánh `main` · **10 commit chưa push remote** (đợt sửa lỗi + refactor 20/10, spec
+`checkLayout` 22/10; `origin/main` dừng ở `d206f27`) — chỉ commit, không push, theo yêu cầu của bạn. Số liệu kiểm
+chứng ở §2.4 là lượt đo **01/10/2026**; số mới của đợt WPS ở §2.6 và lượt đo lại toàn bộ ở §2.7.
 
 Tài liệu này là ảnh chụp nhanh "đã làm được gì / chưa làm được gì". Chi tiết thiết kế nằm ở
 [docs/architecture/core.md](docs/architecture/core.md) (Core + add-in) và [docs/architecture/libreoffice.md](docs/architecture/libreoffice.md) (LibreOffice);
@@ -117,6 +117,35 @@ hành) và bộ MCP portable nhắm vào `AxiomOffice.Host.exe mcp`.
   `Application.ShowDialog`); `options.requireSelection`; `QuickEditRule` (sửa ngay, không hỏi lại).
 - **Đã thử trên WPS thật**: icon ribbon, menu chuột phải (chạy trọn tới Core), khung chat mini (người dùng: "khá ổn").
 - **Số liệu 20/10/2026**: `make test-wps` 181 · `make test-wps-e2e` 94 · bridge e2e 36 · Core e2e 169 · `go test` xanh.
+  (Đo lại 22/10: `make test-wps` **189**, xem §2.7.)
+
+### 2.7 Đợt 20–22/10/2026: sửa lỗi, refactor và đo lại
+
+**Sửa lỗi (20/10)** — chi tiết ở `CHANGELOG.md`:
+
+- WPS: ngăn undo của ET và kho định dạng điều kiện khoá theo **workbook + sheet** thay vì tên sheet trần (`Sheet1`
+  lặp lại ở mọi sổ); `closeAll` tạo thư mục cứu hộ trước khi ghi, `exportPdf` báo lỗi khi không có `FileSystem`.
+- LibreOffice: `Env` nhận `params` và chọn đúng tài liệu qua `documents.find_open_path` (trước đây luôn lấy tài liệu
+  active); client Core gom về `core.call`, `wait_for_run` có `timeout` và **huỷ lượt** khi hết giờ.
+- Core: `AddBatch` dùng `SAVEPOINT` từng mục (trước đây mục lỗi giữa lô vẫn để lại các mục trước); `readJSON` chặn
+  8 MB; `round1` dùng `math.Round` (số âm trước đây làm tròn sai).
+- CI: job Windows hết vỡ console cp1252 khi in tên lệnh tiếng Việt; job Linux cài `requirements.txt` cho oracle.
+
+**Refactor (20/10)**: `Execute` tách `prepareExecution`/`buildCallbacks`/`applyResult`; `wpsbridge.go` tách
+`auth.go`/`http.go`/`session.go`; CSS/JS pane và mini WPS tách khỏi HTML, helper DOM dùng chung `pane-dom.js`;
+LibreOffice đi một đường chạy lệnh duy nhất, bỏ mã chết.
+
+**Đo lại toàn bộ tại máy (22/10/2026)**:
+
+| Bộ | Kết quả |
+|---|---|
+| `tests/lo` (`make test-lo`) | **225 ok**, 1 skip |
+| `make test-wps` | **189 pass** |
+| `make test-core` — e2e Core Go | **169 passed, 0 failed** |
+| `go test ./...` (core-go) | 24 gói ok (4 gói không có test) |
+| `make check-gen` | ba file sinh khớp nguồn, `VERSION` khớp 4 chỗ, i18n 0 thiếu/thừa |
+| `gofmt` + `go vet` + `ruff` + `eslint` | sạch |
+| `tests/lo/test_impress_checks.py` (mới) | **8/8**; trên `checks.py` trước bản vá 13/10: 4/8 đỏ |
 
 ## 3. Chưa làm / chưa kiểm chứng
 
@@ -126,7 +155,7 @@ hành) và bộ MCP portable nhắm vào `AxiomOffice.Host.exe mcp`.
 | e2e `--office` (Office thật + add-in, `test_office`) | Chưa chạy trong đợt này | Cần mở Excel thật; đã có từ các đợt trước |
 | Trích xuất memory với **LLM thật** | Chưa | Đã kiểm bằng LLM giả (e2e) và unit test `ParseFacts`; chưa chạy model thật |
 | Đọc/ghi **HKCU** bằng test tự động trên Windows | Một phần | Đối chiếu tay: Core Go đọc đúng endpoint/model/token/DPAPI của bạn; test tự động hiện dùng `AXIOM_*` |
-| **Push remote** | Chưa | Bạn yêu cầu chỉ commit |
+| **Push remote** | Đã push 22/10/2026 | 10 commit của đợt 18–22/10; xem §2.7 |
 | Merge `feat/setup-wizard` + `feat/core-go` vào `main` | **Đã xong** | Fast-forward, lịch sử thẳng |
 | Nền tảng khác | Chưa | Chỉ build được Windows (amd64) và Linux (amd64/arm64); chưa có macOS hay Windows ARM |
 | Embedding với máy chủ thật | Chưa | Chỉ kiểm bằng máy chủ giả trả vector điều khiển được |
