@@ -5,6 +5,12 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Spec ghim hành vi `checkLayout` của LibreOffice: gọi lại cho cùng kết quả (22/10/2026)
+- `tests/lo/test_impress_checks.py` (8 ca) ghim hành vi đã sửa ngày 13/10: `checks._shape_text_height` bật
+  `TextAutoGrowHeight` để đo nhưng phải trả lại **cả tham số lẫn hình học**, vì autogrow chỉ lớn ra chứ không
+  tự nhỏ lại. Fake mô phỏng đúng ba điều đo được trên LibreOffice thật: autogrow chỉ lớn, bị chặn ở 900pt, và
+  tắt autogrow không trả chiều cao về cũ. Chạy spec này với `checks.py` trước bản vá: 4/8 đỏ; với mã hiện tại: 8/8 xanh.
+
 ### Fixed — CI Windows: tên lệnh tiếng Việt làm vỡ console cp1252 (20/10/2026)
 - `tests/wps/lo_catalog.py` in catalog bằng `json.dump(ensure_ascii=False)`; trên Windows stdout của tiến trình con là
   cp1252 nên gặp tên lệnh tiếng Việt là `UnicodeEncodeError`, job đỏ trước khi vào test. Nay script tự
