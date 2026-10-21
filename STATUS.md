@@ -146,6 +146,7 @@ LibreOffice đi một đường chạy lệnh duy nhất, bỏ mã chết.
 | `make check-gen` | ba file sinh khớp nguồn, `VERSION` khớp 4 chỗ, i18n 0 thiếu/thừa |
 | `gofmt` + `go vet` + `ruff` + `eslint` | sạch |
 | `tests/lo/test_impress_checks.py` (mới) | **8/8**; trên `checks.py` trước bản vá 13/10: 4/8 đỏ |
+| `tests/lo/test_bridge_env.py` (sửa 22/10) | **3/3**; trước khi sửa: đỏ khi mô phỏng `ntpath` (Windows) |
 
 ## 3. Chưa làm / chưa kiểm chứng
 
@@ -155,7 +156,8 @@ LibreOffice đi một đường chạy lệnh duy nhất, bỏ mã chết.
 | e2e `--office` (Office thật + add-in, `test_office`) | Chưa chạy trong đợt này | Cần mở Excel thật; đã có từ các đợt trước |
 | Trích xuất memory với **LLM thật** | Chưa | Đã kiểm bằng LLM giả (e2e) và unit test `ParseFacts`; chưa chạy model thật |
 | Đọc/ghi **HKCU** bằng test tự động trên Windows | Một phần | Đối chiếu tay: Core Go đọc đúng endpoint/model/token/DPAPI của bạn; test tự động hiện dùng `AXIOM_*` |
-| **Push remote** | Đã push 22/10/2026 | 10 commit của đợt 18–22/10; xem §2.7 |
+| **Push remote** | Đã push 22/10/2026 | 11 commit của đợt 18–22/10; xem §2.7 |
+| CI job **windows** | Đỏ ở bước `go test` | `TestWPSConfigWrite` giả định nguồn cấu hình là `config.json`, nhưng trên Windows `DefaultSource()` là HKCU nên không có file để đọc lại. **Bỏ qua theo yêu cầu 22/10** (trọng tâm là Linux); job `linux` xanh |
 | Merge `feat/setup-wizard` + `feat/core-go` vào `main` | **Đã xong** | Fast-forward, lịch sử thẳng |
 | Nền tảng khác | Chưa | Chỉ build được Windows (amd64) và Linux (amd64/arm64); chưa có macOS hay Windows ARM |
 | Embedding với máy chủ thật | Chưa | Chỉ kiểm bằng máy chủ giả trả vector điều khiển được |
