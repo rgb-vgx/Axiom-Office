@@ -256,7 +256,9 @@ body {
   margin: 0 0 var(--axiom-gap-chip) 0;
 }
 .chip {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: var(--axiom-gap-chip);
   width: 100%;
   box-sizing: border-box;
   min-height: var(--axiom-chip-h);
@@ -271,6 +273,22 @@ body {
   font-size: var(--axiom-size-body);
   cursor: pointer;
   transition: background-color 200ms ease, border-color 200ms ease;
+}
+.chipText {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+/* Mui ten chi hien khi ro: trang thai hover, de mat khong bi roi vao tung dong goi y. */
+.chipArrow {
+  flex: 0 0 auto;
+  color: var(--axiom-chip-fg);
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+.chip:hover .chipArrow,
+.chip:focus .chipArrow {
+  opacity: 1;
 }
 .chip:hover {
   background: var(--axiom-chip-hover);
@@ -444,7 +462,14 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Nut Dung: la hanh dong khan cap nhung khong pha huy du lieu -> nut co vien, tach khoi cac lien ket
+   nho ben trai, va vung bam cao hon dong chu footer. */
 #stopBtn {
+  margin-left: auto;
+  padding: 2px var(--axiom-pad-x);
+  min-height: 22px;
+}
+.footStop {
   margin-left: auto;
 }
 /* Nut "..." tren header (Word Copilot: tieu de + mot nut ...). Mo ra menu #moreMenu. */
@@ -515,6 +540,13 @@ body {
 }
 .menuItem:active {
   background: var(--axiom-chip-border);
+}
+/* Tieu de nhom trong menu "..." (du lieu vs cai dat): chu hoa nho, khong bam duoc. */
+.menuGroup {
+  padding: 2px var(--axiom-pad-x);
+  font-size: var(--axiom-size-caption);
+  font-weight: 600;
+  color: var(--axiom-text-muted);
 }
 /* Vach ngan giua nhom "lam viec" va nhom "xem" trong menu. */
 .menuSep {
@@ -600,7 +632,8 @@ body {
   color: var(--axiom-text-muted);
   text-decoration: line-through;
 }
-#planToggle {
+#planToggle,
+.planToggle {
   display: flex;
   align-items: center;
   gap: var(--axiom-gap-chip);
@@ -643,6 +676,8 @@ body {
 .footLink:disabled {
   background: transparent;
 }
+/* Man hinh phu: thanh tieu de dinh tren + than cuon rieng + chan dinh duoi.
+   Truoc day ca man hinh cuon chung, nen tieu de va nut "Dong" troi mat khi danh sach dai. */
 #view {
   position: fixed;
   left: 0;
@@ -652,18 +687,77 @@ body {
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-  padding: var(--axiom-gap-message) var(--axiom-pad-x);
   background: var(--axiom-pane-bg);
-  overflow-y: auto;
 }
 #view[hidden] {
   display: none;
+}
+.viewBar {
+  display: flex;
+  align-items: center;
+  min-height: var(--axiom-header-h);
+  padding: 0 var(--axiom-pad-x);
+  background: var(--axiom-pane-bg);
+  border-bottom: 1px solid var(--axiom-divider);
+}
+.viewHeading {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--axiom-size-title);
+  font-weight: 600;
+  color: var(--axiom-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Nut dong: vung bam 28x28 nhu nut "..." tren header (chuan 44pt khong ap dung duoc cho pane hep cua desktop,
+   nhung van lon hon icon va co vien focus rieng). */
+.viewClose {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--axiom-radius-control);
+  color: var(--axiom-text-secondary);
+  font-family: system-ui,"Segoe UI","Noto Sans",sans-serif;
+  font-size: var(--axiom-size-title);
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 200ms ease, color 200ms ease;
+}
+.viewClose:hover {
+  background: var(--axiom-chip-hover);
+  color: var(--axiom-text-primary);
+}
+.viewClose:active {
+  background: var(--axiom-chip-border);
+}
+.viewBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--axiom-gap-message) var(--axiom-pad-x);
 }
 .viewTitle {
   font-size: var(--axiom-size-title);
   font-weight: 600;
   color: var(--axiom-text-primary);
   margin-bottom: var(--axiom-gap-chip);
+}
+/* Nhom thong tin trong mot man hinh: nhan nhom nho, chu hoa nhe (khong dung mau de phan biet). */
+.sectionTitle {
+  font-size: var(--axiom-size-caption);
+  font-weight: 600;
+  color: var(--axiom-text-muted);
+  margin: var(--axiom-gap-message) 0 var(--axiom-gap-chip) 0;
+}
+.sectionTitle:first-child {
+  margin-top: 0;
 }
 .viewNote {
   font-size: var(--axiom-size-caption);
@@ -688,6 +782,45 @@ body {
 .field:focus {
   border-color: var(--axiom-focus);
 }
+/* O cau hinh: nhan tren, o nhap duoi, ghi chu duoi cung. */
+.settingBlock {
+  margin-bottom: var(--axiom-gap-chip);
+}
+.settingLabel {
+  display: block;
+  font-size: var(--axiom-size-caption);
+  font-weight: 600;
+  color: var(--axiom-text-secondary);
+  margin-bottom: var(--axiom-gap-tool-line);
+}
+.settingBlock .field {
+  margin-bottom: 0;
+}
+/* Cong tac: ca hop kiem lan nhan la mot <label>, nen bam vao chu cung bat/tat - vung bam rong hon hop
+   kiem 12px. */
+.settingToggle {
+  margin-bottom: var(--axiom-gap-chip);
+}
+.checkLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--axiom-gap-chip);
+  margin-bottom: 0;
+  cursor: pointer;
+  font-size: var(--axiom-size-small);
+  font-weight: 400;
+  color: var(--axiom-text-primary);
+}
+.check {
+  margin: 0;
+  cursor: pointer;
+}
+.settingHint {
+  margin-top: var(--axiom-gap-tool-line);
+  font-size: var(--axiom-size-caption);
+  color: var(--axiom-text-muted);
+  overflow-wrap: break-word;
+}
 .settingRow {
   display: flex;
   align-items: center;
@@ -700,9 +833,106 @@ body {
   flex: 1;
   overflow-wrap: break-word;
 }
+/* Chan man hinh: dinh duoi khung (position: sticky) de nut hanh dong chinh luon trong tam tay, khong phai
+   cuon het danh sach. Nen = nen pane + vien tren de tach khoi noi dung dang cuon ben duoi. */
 .viewFoot {
+  position: sticky;
+  bottom: 0;
   margin-top: auto;
-  padding-top: var(--axiom-gap-chip);
+  padding: var(--axiom-gap-chip) 0 var(--axiom-gap-tool-line) 0;
+  background: var(--axiom-pane-bg);
+  border-top: 1px solid var(--axiom-divider);
+}
+/* Bao cao soat: boi canh (nho, xam) - tong ket (dam) - tung van de (thut le, xuong dong duoc). */
+.checkContext {
+  margin: 0 0 var(--axiom-gap-chip) 0;
+  font-size: var(--axiom-size-caption);
+  color: var(--axiom-text-muted);
+  overflow-wrap: break-word;
+}
+.checkSummary {
+  margin: 0 0 var(--axiom-gap-chip) 0;
+  font-size: var(--axiom-size-small);
+  font-weight: 600;
+  color: var(--axiom-text-primary);
+}
+.checkIssue {
+  margin: 0 0 var(--axiom-gap-tool-line) 0;
+  padding-left: var(--axiom-pad-x);
+  font-size: var(--axiom-size-small);
+  color: var(--axiom-text-secondary);
+  text-indent: calc(-1 * var(--axiom-pad-x));
+  overflow-wrap: break-word;
+}
+.checkClean {
+  margin: 0;
+  font-size: var(--axiom-size-small);
+  font-weight: 600;
+  color: var(--axiom-success);
+}
+/* Dong cua man hinh Trang thai. Dong chinh (✓/✗/•) dam hon dong giai thich thut le ben duoi. */
+.statusLine {
+  margin: 0 0 var(--axiom-gap-tool-line) 0;
+  font-size: var(--axiom-size-small);
+  color: var(--axiom-text-secondary);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+.statusLineHead {
+  color: var(--axiom-text-primary);
+  font-weight: 600;
+  margin-top: var(--axiom-gap-chip);
+}
+.statusLineErr {
+  color: var(--axiom-danger-fg);
+}
+/* Mot dong nhat ky: dau trang thai + nhan (co the xuong dong) + gio o cuoi. */
+.auditRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--axiom-gap-chip);
+  margin-bottom: var(--axiom-gap-chip);
+  font-size: var(--axiom-size-small);
+  color: var(--axiom-text-secondary);
+}
+.auditRow .toolIcon {
+  margin-right: 0;
+  margin-top: var(--axiom-gap-tool-line);
+}
+.auditBody {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+.auditBody .toolCode {
+  margin-left: var(--axiom-gap-chip);
+}
+.auditRowErr .auditBody .toolCode {
+  color: var(--axiom-danger-fg);
+}
+.auditRow .auditTime {
+  flex: 0 0 auto;
+  font-family: "Consolas","DejaVu Sans Mono",monospace;
+  font-size: var(--axiom-size-tool-id);
+}
+/* Loi cua luot goi: thut vao duoi nhan, khong lan voi dong ke tiep. */
+.auditErr {
+  margin: 0 0 var(--axiom-gap-message) var(--axiom-icon);
+  padding-left: var(--axiom-gap-chip);
+  border-left: 1px solid var(--axiom-danger-border);
+  font-family: "Consolas","DejaVu Sans Mono",monospace;
+  font-size: var(--axiom-size-tool-id);
+  color: var(--axiom-danger-fg);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+/* Khoi van ban dai cua nhat ky: nen nhe + vien, cuon ngang khong bao gio (xuong dong mem). */
+.logBlock {
+  margin-bottom: var(--axiom-gap-message);
+  padding: var(--axiom-bubble-pad-y) var(--axiom-bubble-pad-x);
+  background: var(--axiom-ai-bg);
+  border: 1px solid var(--axiom-ai-border);
+  border-radius: var(--axiom-radius-control);
 }
 .auditLine {
   margin: 0 0 var(--axiom-gap-tool-line) 0;
@@ -714,6 +944,70 @@ body {
 }
 .auditTime {
   color: var(--axiom-text-muted);
+}
+/* Hang nut phan doan (loc pham vi): mot hang, moi nut ngang bang nhau. */
+.segRow {
+  display: flex;
+  gap: var(--axiom-gap-chip);
+  margin-bottom: var(--axiom-gap-chip);
+}
+.segRow .segBtn {
+  flex: 1;
+  text-align: center;
+}
+/* Mot hoi thoai: ca dong la nut, tieu de tren - ngay/tai lieu duoi. */
+.convoRow {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: var(--axiom-gap-chip);
+  padding: var(--axiom-bubble-pad-y) var(--axiom-pad-x);
+  text-align: left;
+  background: var(--axiom-pane-bg);
+  border: 1px solid var(--axiom-chip-border);
+  border-radius: var(--axiom-radius-control);
+  font-family: system-ui,"Segoe UI","Noto Sans",sans-serif;
+  cursor: pointer;
+  transition: background-color 200ms ease, border-color 200ms ease;
+}
+.convoRow:hover {
+  background: var(--axiom-chip-hover);
+}
+.convoRow:active {
+  background: var(--axiom-chip-border);
+}
+.convoTitle {
+  display: block;
+  font-size: var(--axiom-size-small);
+  font-weight: 600;
+  color: var(--axiom-text-primary);
+  overflow-wrap: break-word;
+}
+.convoMeta {
+  display: block;
+  margin-top: var(--axiom-gap-tool-line);
+  font-size: var(--axiom-size-caption);
+  color: var(--axiom-text-muted);
+  overflow-wrap: break-word;
+}
+/* The ky nang: ten dam o dong dau, mo ta + pham vi + nguon o dong duoi (mot dong, giong ban Windows). */
+.skillCard {
+  border-left-color: var(--axiom-chip-border);
+}
+.cardBad {
+  border-left-color: var(--axiom-danger);
+  background: var(--axiom-danger-bg);
+}
+.cardTitleErr {
+  color: var(--axiom-danger-fg);
+}
+/* Muc ghi nho: chu chiem tron dong, meta va nut hanh dong xuong duoi - khong de nut day chu ra ngoai. */
+.memCard {
+  border-left-color: var(--axiom-chip-border);
+}
+.memCardGone {
+  border-left-color: var(--axiom-text-muted);
+  background: var(--axiom-pane-bg);
 }
 .segBtn {
   background: var(--axiom-pane-bg);

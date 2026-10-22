@@ -399,8 +399,18 @@
         chip.className = "chip";
         chip.setAttribute("data-act", "suggestion");
         chip.setAttribute("data-value", text);
+        // Goi y chi DIEN vao o soan, khong gui ngay: noi ro de nguoi dung biet minh con sua duoc.
+        chip.setAttribute("title", "Điền câu này vào ô soạn");
       } catch (e6) {}
-      addText(chip, text);
+      // Mui ten cho biet bam vao la DIEN VAO O SOAN chu khong gui ngay (khac nut Gui).
+      var arrow = document.createElement("span");
+      try { arrow.className = "chipArrow"; arrow.setAttribute("aria-hidden", "true"); } catch (e7) {}
+      addText(arrow, "→");
+      var body = document.createElement("span");
+      try { body.className = "chipText"; } catch (e8) {}
+      addText(body, text);
+      chip.appendChild(body);
+      chip.appendChild(arrow);
       frag.appendChild(chip);
     }
     return frag;
@@ -607,7 +617,27 @@
     }
   }
 
+  // ---- Vỏ chung của màn hình phụ -------------------------------------------------------------
+  // Trước đây mỗi màn hình tự dựng tiêu đề rồi tự thêm nút "Đóng" ở cuối, nên thanh tiêu đề trôi mất khi
+  // cuộn và người dùng phải cuộn hết danh sách mới đóng được. Nay mọi màn hình nằm trong một khung có
+  // thanh tiêu đề DÍNH trên cùng (tiêu đề + nút đóng + Esc), phần thân cuộn riêng, chân dính dưới cùng.
+
+  function viewSection(box, title) {
+    var head = document.createElement("div");
+    try { head.className = "sectionTitle"; } catch (e) {}
+    addText(head, title);
+    box.appendChild(head);
+    return head;
+  }
+
+  // Tiêu đề màn hình nằm ở thanh DÍNH trên cùng (#viewHeading), không trôi theo danh sách.
   function viewTitle(box, text) {
+    var head = $("viewHeading");
+    if (head) {
+      clearNode(head);
+      addText(head, text);
+      return;
+    }
     var title = document.createElement("div");
     try { title.className = "viewTitle"; } catch (e) {}
     addText(title, text);
@@ -637,6 +667,7 @@
   function viewFoot(box, extra) {
     var foot = document.createElement("div");
     try { foot.className = "viewFoot"; } catch (e) {}
+    try { foot.setAttribute("role", "group"); } catch (e2) {}
     if (extra) { foot.appendChild(extra); }
     var row = document.createElement("div");
     try { row.className = "btnRow"; } catch (e2) {}
@@ -661,33 +692,70 @@
 
   function renderMemoryView(box) {
     viewTitle(box, "Bộ nhớ AI");
-    if (view.note) { viewNote(box, view.note); }
-    if (view.busy) { viewNote(box, "Đang tải…"); return; }
-    var row = document.createElement("div");
-    try { row.className = "settingRow"; } catch (e) {}
+    // Bộ lọc phạm vi đứng TRƯỚC dòng ghi chú: nó là điều khiển của màn hình, không phải thông tin phụ.
+    var segs = document.createElement("div");
+    try { segs.className = "segRow"; } catch (e0) {}
+    segs.setAttribute("role", "group");
+    segs.setAttribute("aria-label", "Lọc theo phạm vi");
     var scopes = [["all", "Tất cả"], ["user", "Người dùng"], ["document", "Tài liệu"]];
     for (var i = 0; i < scopes.length; i++) {
       var seg = document.createElement("button");
+      var on = view.scope === scopes[i][0];
       try {
         seg.type = "button";
-        seg.className = "segBtn" + (view.scope === scopes[i][0] ? " segBtnOn" : "");
+        seg.className = "segBtn" + (on ? " segBtnOn" : "");
         seg.setAttribute("data-act", "memScope");
         seg.setAttribute("data-value", scopes[i][0]);
+        // Trang thai chon phai duoc bao cho trinh doc man hinh, khong chi bang mau.
+        seg.setAttribute("aria-pressed", on ? "true" : "false");
       } catch (e2) {}
       addText(seg, scopes[i][1]);
-      row.appendChild(seg);
+      segs.appendChild(seg);
     }
-    box.appendChild(row);
+    box.appendChild(segs);
+
+    if (view.note) { viewNote(box, view.note); }
+    if (view.busy) { viewNote(box, "Đang tải…"); return; }
     var items = view.data || [];
-    viewNote(box, items.length + " mục · xoá tạm thì khôi phục được, xoá vĩnh viễn thì không");
+    if (items.length === 0) {
+      viewNote(box, view.scope === "all"
+        ? "Chưa có gì được ghi nhớ. AI ghi nhớ sở thích và ngữ cảnh sau mỗi lượt trò chuyện."
+        : "Không có mục nào trong phạm vi này.");
+    } else {
+      viewNote(box, items.length + " mục · xoá tạm thì khôi phục được, xoá vĩnh viễn thì không");
+    }
+
+    // Hai nhom tach bang duong ke: muc dang dung va muc da xoa tam - truoc day lan lon cung mot danh sach
+    // nen nguoi dung khong biet con bao nhieu muc AI thuc su dang dung.
+    var live = [];
+    var gone = [];
+    for (var q = 0; q < items.length; q++) {
+      if (items[q] && items[q].deletedAt) { gone.push(items[q]); } else { live.push(items[q]); }
+    }
+    appendMemoryGroup(box, live, false);
+    appendMemoryGroup(box, gone, true);
+
+    var extra = document.createElement("div");
+    try { extra.className = "btnRow"; } catch (e8) {}
+    viewButton(extra, "Tải lại", "memReload", "", false);
+    // Xoa vinh vien la hanh dong khong khoi phuc duoc: to mau nguy hiem, tach khoi nut thuong.
+    var purge = viewButton(extra, "Xoá vĩnh viễn…", "memPurge", view.scope, false);
+    try { purge.className = "btnDanger"; } catch (e9) {}
+    viewFoot(box, extra);
+  }
+
+  // Mot nhom muc ghi nho. Moi muc: chu (muc da xoa thi gach ngang) + dong meta + nut hanh dong rieng.
+  function appendMemoryGroup(box, items, deleted) {
+    if (items.length === 0) { return; }
+    viewSection(box, deleted ? "Đã xoá tạm (" + items.length + ")" : "Đang dùng (" + items.length + ")");
     for (var k = 0; k < items.length; k++) {
       var item = items[k] || {};
       var card = document.createElement("div");
-      try { card.className = "card"; } catch (e3) {}
+      try { card.className = "card memCard" + (deleted ? " memCardGone" : ""); } catch (e3) {}
       var line = document.createElement("div");
       try { line.className = "memRow"; } catch (e4) {}
       var text = document.createElement("span");
-      try { text.className = item.deletedAt ? "memText memGone" : "memText"; } catch (e5) {}
+      try { text.className = deleted ? "memText memGone" : "memText"; } catch (e5) {}
       addText(text, textOf(item.text));
       line.appendChild(text);
       card.appendChild(line);
@@ -702,7 +770,7 @@
       card.appendChild(meta);
       var actions = document.createElement("div");
       try { actions.className = "btnRow"; } catch (e7) {}
-      if (item.deletedAt) {
+      if (deleted) {
         viewButton(actions, "Khôi phục", "memRestore", textOf(item.id), false);
       } else {
         viewButton(actions, "Xoá tạm", "memDelete", textOf(item.id), false);
@@ -710,11 +778,6 @@
       card.appendChild(actions);
       box.appendChild(card);
     }
-    var extra = document.createElement("div");
-    try { extra.className = "btnRow"; } catch (e8) {}
-    viewButton(extra, "Tải lại", "memReload", "", false);
-    viewButton(extra, "Xoá vĩnh viễn…", "memPurge", view.scope, false);
-    viewFoot(box, extra);
   }
 
   function clockOf(value) {
@@ -730,23 +793,43 @@
     if (view.note) { viewNote(box, view.note); }
     if (view.busy) { viewNote(box, "Đang tải…"); return; }
     var calls = view.data || [];
-    viewNote(box, calls.length + " lượt gọi công cụ gần nhất (giờ máy)");
+    if (calls.length === 0) {
+      viewNote(box, "Chưa có lượt gọi công cụ nào. Nhật ký ghi lại mọi thao tác AI làm trên tài liệu.");
+    } else {
+      viewNote(box, calls.length + " lượt gọi công cụ gần nhất (giờ máy)");
+    }
     for (var i = 0; i < calls.length; i++) {
       var call = calls[i] || {};
-      var line = document.createElement("p");
-      try { line.className = "auditLine"; } catch (e) {}
-      var time = document.createElement("span");
-      try { time.className = "auditTime"; } catch (e2) {}
-      addText(time, clockOf(call.createdAt) + " ");
-      line.appendChild(time);
+      // Mot dong = mot the, khong phai doan chu mono lien: ten lenh, ma lenh va thoi gian la ba cap
+      // thong tin khac nhau, nen tach bang khoang cach va co chu thay vi cung mot co.
+      var line = document.createElement("div");
+      try { line.className = call.ok ? "auditRow" : "auditRow auditRowErr"; } catch (e) {}
+      var mark = document.createElement("span");
+      try { mark.className = call.ok ? "toolIcon iconOk" : "toolIcon iconErr"; } catch (eM) {}
+      addText(mark, call.ok ? "✓" : "✕");
+      line.appendChild(mark);
+      // Khoang trang that giua dau va nhan: khop cau cua ban Windows/LibreOffice ("✓ <nhan>") va
+      // trang tri dua vao CSS (gap), khong dua vao chuoi trong dau.
+      addText(line, " ");
       var label = "";
       try { label = AxiomPaneCore.labelFor(call.action); } catch (e3) { label = textOf(call.action); }
-      addText(line, (call.ok ? "✓ " : "✕ ") + label + " (" + textOf(call.action) + ", " + textOf(call.ms) + "ms)");
+      var body = document.createElement("span");
+      try { body.className = "auditBody"; } catch (eN) {}
+      addText(body, label);
+      var code = document.createElement("span");
+      try { code.className = "toolCode"; } catch (eC) {}
+      addText(code, " (" + textOf(call.action) + ", " + textOf(call.ms) + "ms)");
+      body.appendChild(code);
+      line.appendChild(body);
+      var time = document.createElement("span");
+      try { time.className = "auditTime"; } catch (e2) {}
+      addText(time, clockOf(call.createdAt));
+      line.appendChild(time);
       box.appendChild(line);
       if (!call.ok && call.error) {
         var why = document.createElement("p");
-        try { why.className = "auditLine"; } catch (e4) {}
-        addText(why, "    " + textOf(call.error));
+        try { why.className = "auditErr"; } catch (e4) {}
+        addText(why, textOf(call.error));
         box.appendChild(why);
       }
     }
@@ -757,28 +840,46 @@
   }
 
   // Thiet lap: doc trang thai THAT (GET /wps/v1/setup) roi ghi bang POST /wps/v1/config.
-  function settingField(label, key, value, kind) {
+  // O nhap co NHAN THAT (label for=...) nam tren o, khong phai chu nam ngang ben canh: pane hep, de nhan
+  // ngang thi o nhap chi con vai chuc pixel. Cong tac (bool) thi nhan nam ben phai hop kiem - bam vao chu
+  // cung bat/tat duoc vi ca hai nam trong <label>.
+  function settingField(label, key, value, kind, note) {
     var row = document.createElement("div");
-    try { row.className = "settingRow"; } catch (e) {}
-    var name = document.createElement("span");
-    try { name.className = "settingName"; } catch (e2) {}
-    addText(name, label);
-    row.appendChild(name);
+    try { row.className = kind === "bool" ? "settingToggle" : "settingBlock"; } catch (e) {}
     var field = document.createElement("input");
     try {
-      field.className = "field";
       field.id = "set_" + key;
       field.setAttribute("data-key", key);
-      field.style.marginBottom = "0";
       if (kind === "bool") {
+        field.className = "check";
         field.type = "checkbox";
         field.checked = !!value;
       } else {
+        field.className = "field";
         field.type = "text";
         field.value = textOf(value);
       }
     } catch (e3) {}
-    row.appendChild(field);
+    if (kind === "bool") {
+      var wrap = document.createElement("label");
+      try { wrap.className = "settingLabel checkLabel"; wrap.setAttribute("for", "set_" + key); } catch (eL) {}
+      wrap.appendChild(field);
+      addText(wrap, " " + label);
+      row.appendChild(wrap);
+    } else {
+      var name = document.createElement("label");
+      try { name.className = "settingLabel"; name.setAttribute("for", "set_" + key); } catch (e2) {}
+      addText(name, label);
+      row.appendChild(name);
+      row.appendChild(field);
+    }
+    // Ghi chu duoi o: noi ro tac dung that (vd o chua co tac dung thi noi thang), khong giau trong tooltip.
+    if (note) {
+      var hint = document.createElement("div");
+      try { hint.className = "settingHint"; } catch (eN) {}
+      addText(hint, note);
+      row.appendChild(hint);
+    }
     return row;
   }
 
@@ -790,6 +891,7 @@
     if (!data) { viewFoot(box, null); return; }
     var current = data.current || {};
     var problems = data.problems || [];
+    var item = null;
     if (problems.length > 0) {
       var card = document.createElement("div");
       try { card.className = "card"; } catch (e) {}
@@ -818,16 +920,22 @@
         VerifyWorkEnabled: !!current.verifyWorkEnabled
       };
     }
-    viewNote(box, "Khoá API để trống nghĩa là giữ khoá đã lưu (" + (current.hasKey ? "đã có khoá" : "chưa có khoá") + ").");
+    viewSection(box, "Máy chủ AI");
     box.appendChild(settingField("Máy chủ AI", "LlmEndpoint", view.fields.LlmEndpoint, "text"));
     box.appendChild(settingField("Model", "LlmModel", view.fields.LlmModel, "text"));
-    box.appendChild(settingField("Khoá API", "LlmApiKey", view.fields.LlmApiKey, "text"));
+    box.appendChild(settingField("Khoá API", "LlmApiKey", view.fields.LlmApiKey, "text",
+      "Để trống nghĩa là giữ khoá đã lưu (" + (current.hasKey ? "đã có khoá" : "chưa có khoá") + ")."));
     box.appendChild(settingField("Khoá Tavily", "TavilyApiKey", view.fields.TavilyApiKey, "text"));
-    box.appendChild(settingField("Nhìn tài liệu", "VisualQaEnabled", view.fields.VisualQaEnabled, "bool"));
+
+    viewSection(box, "AI làm được gì");
+    item = box.appendChild(settingField("Nhìn tài liệu", "VisualQaEnabled", view.fields.VisualQaEnabled, "bool"));
     // Cau that, khong phai loi khuyen: add-in WPS thieu lenh app.screenshot (ban Windows:
     // CommandDispatcher.AppScreenshot; LibreOffice: general.py app_screenshot), nen bat o day thi Core se
     // bat tool look_at_document va tool do se loi. Xem docs/architecture/ribbon-ui.md muc 5.1.
-    viewNote(box, "WPS chưa chụp được trang — add-in thiếu lệnh app.screenshot, nên bật \"Nhìn tài liệu\" ở đây chưa có tác dụng.");
+    var off = document.createElement("div");
+    try { off.className = "settingHint"; } catch (eOff) {}
+    addText(off, "WPS chưa chụp được trang — add-in thiếu lệnh app.screenshot, nên bật \"Nhìn tài liệu\" ở đây chưa có tác dụng.");
+    item.appendChild(off);
     box.appendChild(settingField("Ghi nhớ", "MemoryEnabled", view.fields.MemoryEnabled, "bool"));
     box.appendChild(settingField("Hiện suy luận", "LlmShowReasoning", view.fields.LlmShowReasoning, "bool"));
     box.appendChild(settingField("Tìm web (Tavily)", "TavilyEnabled", view.fields.TavilyEnabled, "bool"));
@@ -866,13 +974,20 @@
     }
     if (used.length > 0) { bits.push("nguồn: " + used.join(", ")); }
     viewNote(box, bits.join(" · ") + ". AI tự chọn kỹ năng hợp với yêu cầu.");
-    if (skills.length === 0 && failures.length === 0) { viewNote(box, "Chưa có kỹ năng nào."); }
+    if (skills.length === 0 && failures.length === 0) {
+      viewNote(box, "Chưa có kỹ năng nào. Đặt thư mục kỹ năng vào nguồn \"cá nhân\" rồi bấm Nạp lại.");
+    }
+    // Moi ky nang mot card: ten dam + nhan nguon nho o goc phai, mo ta xuong dong rieng. Nhan
+    // "dung cho ..." chi hien khi ky nang bi gioi han app (dung cho moi app la mac dinh, khong can noi).
+    if (skills.length > 0) { viewSection(box, "Đang có (" + skills.length + ")"); }
     for (var i = 0; i < skills.length; i++) {
       var skill = skills[i] || {};
       var apps = skill.apps || [];
-      var card = makeCard(textOf(skill.name), "", "");
+      var card = makeCard(textOf(skill.name), "skillCard", "");
       var body = document.createElement("div");
       try { body.className = "cardBody"; } catch (e) {}
+      // Mot dong "mo ta · dung cho · nguon" - cung thu tu voi ban Windows (AdminForms.cs: SkillsForm) va
+      // ban LibreOffice (dialogs.py: skill_lines), spec test_pane_view ghim.
       var parts = [];
       if (trimText(skill.description) !== "") { parts.push(textOf(skill.description)); }
       parts.push(apps.length > 0 ? "dùng cho: " + apps.join(", ") : "dùng cho mọi ứng dụng");
@@ -881,11 +996,16 @@
       card.appendChild(body);
       box.appendChild(card);
     }
+    if (failures.length > 0) {
+      viewSection(box, "Không nạp được (" + failures.length + ")");
+    }
     for (var k = 0; k < failures.length; k++) {
       var failure = failures[k] || {};
-      var bad = makeCard("⚠ Không nạp được", "", "");
+      var bad = makeCard("⚠ Không nạp được", "cardBad", "cardTitleErr");
+      bad.setAttribute("role", "alert");
       var why = document.createElement("div");
       try { why.className = "cardBody"; } catch (e2) {}
+      // "<thu muc>: <loi>" - cung cau voi ban Windows/LibreOffice, spec ghim.
       addText(why, textOf(failure.directory) + ": " + textOf(failure.error));
       bad.appendChild(why);
       box.appendChild(bad);
@@ -924,53 +1044,62 @@
     return "http://127.0.0.1:" + Math.floor(value) + "/health";
   }
 
+  // Mỗi dòng trả về {group, text}: text giữ NGUYÊN câu cũ (bản Windows/LibreOffice dùng chung câu chữ),
+  // group chỉ để pane xếp thành nhóm có tiêu đề - người dùng cần biết dòng nào thuộc add-in, dòng nào
+  // thuộc Agent Core, thay vì một khối chữ phẳng.
+  function statusLine(group, text) {
+    return { group: group, text: text };
+  }
+
   function statusLines(data) {
     var addin = data.addin || {};
     var core = data.core || {};
     var doc = addin.document || {};
     var lines = [];
     if (addin.connected) {
-      lines.push("✓ Add-in: đang trả lời ở cổng " + textOf(addin.bridgePort) +
-        " (phiên bản " + textOf(addin.addinVersion) + ").");
+      lines.push(statusLine("addin", "✓ Add-in: đang trả lời ở cổng " + textOf(addin.bridgePort) +
+        " (phiên bản " + textOf(addin.addinVersion) + ")."));
     } else if (addin.everPoll) {
-      lines.push("✗ Add-in: không trả lời — lần trả lời cuối cách đây " + uptimeText(addin.lastPollSeconds) + ".");
-      lines.push("   AI sẽ không đọc/sửa được tài liệu này. Mở lại tài liệu trong WPS, hoặc bấm Ask AI.");
+      lines.push(statusLine("addin", "✗ Add-in: không trả lời — lần trả lời cuối cách đây " + uptimeText(addin.lastPollSeconds) + "."));
+      lines.push(statusLine("addin", "   AI sẽ không đọc/sửa được tài liệu này. Mở lại tài liệu trong WPS, hoặc bấm Ask AI."));
     } else {
-      lines.push("✗ Add-in: chưa kết nối lần nào kể từ khi Agent Core khởi động.");
-      lines.push("   Mở một tài liệu trong WPS để add-in kết nối.");
+      lines.push(statusLine("addin", "✗ Add-in: chưa kết nối lần nào kể từ khi Agent Core khởi động."));
+      lines.push(statusLine("addin", "   Mở một tài liệu trong WPS để add-in kết nối."));
     }
-    if (trimText(doc.name) !== "") { lines.push("   Tài liệu: " + textOf(doc.name)); }
+    if (trimText(doc.name) !== "") { lines.push(statusLine("addin", "   Tài liệu: " + textOf(doc.name))); }
     var pending = (numberOf(addin.queued) || 0) + (numberOf(addin.waiting) || 0);
-    if (addin.running) { lines.push("• Add-in đang chạy một lệnh"); }
-    else if (pending > 0) { lines.push("• Đang chờ add-in: " + pending + " lệnh"); }
+    if (addin.running) { lines.push(statusLine("addin", "• Add-in đang chạy một lệnh")); }
+    else if (pending > 0) { lines.push(statusLine("addin", "• Đang chờ add-in: " + pending + " lệnh")); }
 
     if (trimText(core.version) === "") {
       // Tra loi duoc nhung thieu truong: ban Core cu hon pane. Noi thang con hon bia ra mot bao cao
       // trong nhu that.
-      lines.push("✗ Agent Core: trả lời thiếu thông tin — bản Core này cũ hơn pane.");
+      lines.push(statusLine("core", "✗ Agent Core: trả lời thiếu thông tin — bản Core này cũ hơn pane."));
       return lines;
     }
-    lines.push("✓ Agent Core: đang chạy (phiên bản " + textOf(core.version) + ", pid " + textOf(core.pid) +
-      ", đã chạy " + uptimeText(core.uptimeSeconds) + ").");
-    lines.push("   Model: " + (trimText(core.model) !== "" ? textOf(core.model) : "(chưa chọn - bấm Thiết lập…)"));
+    lines.push(statusLine("core", "✓ Agent Core: đang chạy (phiên bản " + textOf(core.version) + ", pid " + textOf(core.pid) +
+      ", đã chạy " + uptimeText(core.uptimeSeconds) + ")."));
+    lines.push(statusLine("core", "   Model: " + (trimText(core.model) !== "" ? textOf(core.model) : "(chưa chọn - bấm Thiết lập…)")));
     if (trimText(core.memoryError) !== "") {
-      lines.push("   ✗ Bộ nhớ AI lỗi: " + textOf(core.memoryError));
+      lines.push(statusLine("core", "   ✗ Bộ nhớ AI lỗi: " + textOf(core.memoryError)));
     } else if (core.memory === "off") {
-      lines.push("   Bộ nhớ AI: đang tắt");
+      lines.push(statusLine("core", "   Bộ nhớ AI: đang tắt"));
     } else if (core.memory === "unavailable") {
-      lines.push("   ✗ Bộ nhớ AI: không mở được (kiểm tra thư mục dữ liệu)");
+      lines.push(statusLine("core", "   ✗ Bộ nhớ AI: không mở được (kiểm tra thư mục dữ liệu)"));
     } else {
-      lines.push("   Bộ nhớ AI: đang bật");
+      lines.push(statusLine("core", "   Bộ nhớ AI: đang bật"));
     }
     var skillErrors = numberOf(core.skillErrors) || 0;
-    lines.push("   Kỹ năng: " + textOf(core.skills) +
-      (skillErrors > 0 ? " (" + skillErrors + " thư mục nạp lỗi)" : ""));
+    lines.push(statusLine("core", "   Kỹ năng: " + textOf(core.skills) +
+      (skillErrors > 0 ? " (" + skillErrors + " thư mục nạp lỗi)" : "")));
 
     var url = bridgeUrl(addin.bridgePort);
-    if (url !== "") { lines.push("API URL: " + url); }
-    lines.push("Nhật ký: " + textOf(core.logFile));
+    if (url !== "") { lines.push(statusLine("paths", "API URL: " + url)); }
+    lines.push(statusLine("paths", "Nhật ký: " + textOf(core.logFile)));
     return lines;
   }
+
+  var STATUS_GROUPS = { addin: "Add-in của ", core: "Agent Core", paths: "Đường dẫn" };
 
   function renderStatusView(box) {
     viewTitle(box, "Trạng thái");
@@ -979,14 +1108,24 @@
     var data = view.data;
     if (!data) { viewFoot(box, null); return; }
     var lines = statusLines(data);
+    var shown = "";
     for (var i = 0; i < lines.length; i++) {
+      var item = lines[i];
+      if (item.group !== shown) {
+        shown = item.group;
+        var group = Object.prototype.hasOwnProperty.call(STATUS_GROUPS, shown) ? STATUS_GROUPS[shown] : shown;
+        viewSection(box, shown === "addin" ? group + appName() : group);
+      }
       var line = document.createElement("p");
-      try { line.className = "auditLine"; } catch (e) {}
-      addText(line, lines[i]);
+      // Dong chinh (bat dau bang ✓/✗/•) dam hon dong giai thich thut le - mat nguoi doc quet theo cot.
+      var isHead = /^[✓✗•]/.test(item.text);
+      try { line.className = isHead ? "statusLine statusLineHead" : "statusLine"; } catch (e) {}
+      if (/^✗/.test(item.text)) { try { line.className = "statusLine statusLineHead statusLineErr"; } catch (e2) {} }
+      addText(line, item.text);
       box.appendChild(line);
     }
     var extra = document.createElement("div");
-    try { extra.className = "btnRow"; } catch (e2) {}
+    try { extra.className = "btnRow"; } catch (e3) {}
     viewButton(extra, "Kiểm tra mô hình", "statusTest", "", false);
     if (bridgeUrl((data.addin || {}).bridgePort) !== "") {
       viewButton(extra, "Sao chép API URL", "statusCopyUrl", "", false);
@@ -1161,9 +1300,21 @@
     var data = view.data;
     if (!data) { viewFoot(box, checkButtons()); return; }
     var lines = checkReportLines(data);
+    // Dong dau la boi canh (so trang/vung/bang), dong thu hai la tong ket: tach hai dong nay ra khoi
+    // danh sach van de, con moi van de la mot dong co dau "•" thut le - de quet hon mot khoi chu.
+    var hasIssues = (data.issues || []).length > 0;
+    var summaryAt = hasIssues ? 1 : -1;
     for (var i = 0; i < lines.length; i++) {
       var line = document.createElement("p");
-      try { line.className = "auditLine"; } catch (e) {}
+      if (i === 0) {
+        try { line.className = "checkContext"; } catch (e0) {}
+      } else if (i === summaryAt) {
+        try { line.className = "checkSummary"; } catch (e1) {}
+      } else if (hasIssues) {
+        try { line.className = "checkIssue"; } catch (e2) {}
+      } else {
+        try { line.className = "checkClean"; } catch (e3) {}
+      }
       addText(line, lines[i]);
       box.appendChild(line);
     }
@@ -1188,12 +1339,19 @@
         " · " + textOf(data.path));
     }
     var lines = data.lines || [];
+    // Nhat ky la van ban dai: mot khoi mono co vien rieng, de phan biet voi cac dong ghi chu phia tren va
+    // de mat khong phai nhay giua co chu thuong va mono tren tung dong.
+    var block = document.createElement("div");
+    try { block.className = "logBlock"; } catch (eB) {}
+    block.setAttribute("role", "log");
+    block.setAttribute("aria-label", "Dòng nhật ký của Agent Core");
     for (var i = 0; i < lines.length; i++) {
       var line = document.createElement("p");
       try { line.className = "auditLine"; } catch (e) {}
       addText(line, textOf(lines[i]));
-      box.appendChild(line);
+      block.appendChild(line);
     }
+    box.appendChild(block);
     var extra = document.createElement("div");
     try { extra.className = "btnRow"; } catch (e2) {}
     if (data.truncated) { viewButton(extra, "Xem thêm", "logMore", "", false); }
@@ -1284,15 +1442,30 @@
     viewNote(box, rows.length + " hội thoại gần đây · bấm một dòng để xem lại nội dung");
     for (var i = 0; i < rows.length; i++) {
       var row = rows[i] || {};
+      // Ca dong la mot nut: tieu de dam o dong dau, ngay + tai lieu + app o dong duoi. Mot dong chip
+      // nhu cu thi tieu de dai bi cat mat duoi.
       var item = document.createElement("button");
       try {
         item.type = "button";
-        item.className = "chip";
+        item.className = "convoRow";
         item.setAttribute("data-act", "convoOpen");
         item.setAttribute("data-value", textOf(row.id));
       } catch (e) {}
+      var head = document.createElement("span");
+      try { head.className = "convoTitle"; } catch (eT) {}
+      addText(head, convoTitle(row));
+      item.appendChild(head);
       var when = convoWhen(row.updatedAt || row.createdAt);
-      addText(item, convoTitle(row) + (when ? "  ·  " + when : ""));
+      var name = trimText(row.documentName);
+      var metaBits = [];
+      if (when) { metaBits.push(when); }
+      if (name) { metaBits.push(name); }
+      if (metaBits.length > 0) {
+        var meta = document.createElement("span");
+        try { meta.className = "convoMeta"; } catch (eM) {}
+        addText(meta, metaBits.join(" · "));
+        item.appendChild(meta);
+      }
       box.appendChild(item);
     }
     var extra = document.createElement("div");
@@ -1332,6 +1505,8 @@
     else { renderConvoList(box); }
   }
 
+  // Mỗi màn hình phụ có ba phần cố định: thanh tiêu đề dính trên (tiêu đề + Đóng), thân cuộn, chân dính.
+  // "Đóng" nằm trong thanh tiêu đề nên luôn bấm được, kể cả khi danh sách dài; Esc cũng đóng (xem boot).
   function renderView() {
     var host = $("view");
     if (!host) { return; }
@@ -1339,14 +1514,38 @@
       clearNode(host);
       if (!view.name) { host.setAttribute("hidden", "hidden"); return; }
       host.removeAttribute("hidden");
-      if (view.name === "memory") { renderMemoryView(host); }
-      else if (view.name === "audit") { renderAuditView(host); }
-      else if (view.name === "setup") { renderSetupView(host); }
-      else if (view.name === "skills") { renderSkillsView(host); }
-      else if (view.name === "status") { renderStatusView(host); }
-      else if (view.name === "check") { renderCheckView(host); }
-      else if (view.name === "log") { renderLogView(host); }
-      else if (view.name === "conversations") { renderConversationsView(host); }
+
+      var bar = document.createElement("div");
+      try { bar.className = "viewBar"; } catch (eBar) {}
+      var heading = document.createElement("div");
+      try { heading.id = "viewHeading"; heading.className = "viewHeading"; } catch (eHead) {}
+      heading.setAttribute("role", "heading");
+      heading.setAttribute("aria-level", "2");
+      bar.appendChild(heading);
+      var close = document.createElement("button");
+      try {
+        close.type = "button";
+        close.className = "viewClose";
+        close.setAttribute("data-act", "closeView");
+        close.setAttribute("title", "Đóng (Esc)");
+        close.setAttribute("aria-label", "Đóng");
+      } catch (eClose) {}
+      addText(close, "×");
+      bar.appendChild(close);
+      host.appendChild(bar);
+
+      var body = document.createElement("div");
+      try { body.className = "viewBody"; } catch (eBody) {}
+      host.appendChild(body);
+
+      if (view.name === "memory") { renderMemoryView(body); }
+      else if (view.name === "audit") { renderAuditView(body); }
+      else if (view.name === "setup") { renderSetupView(body); }
+      else if (view.name === "skills") { renderSkillsView(body); }
+      else if (view.name === "status") { renderStatusView(body); }
+      else if (view.name === "check") { renderCheckView(body); }
+      else if (view.name === "log") { renderLogView(body); }
+      else if (view.name === "conversations") { renderConversationsView(body); }
     } catch (e) {}
   }
 

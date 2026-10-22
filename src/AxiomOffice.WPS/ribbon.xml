@@ -47,31 +47,36 @@
     <tabs>
       <tab id="axiomTab" label="Axiom Office">
 
+        <!-- Thứ tự nhóm theo việc người dùng làm, không theo hệ thống: viết (Trợ lý) -> kiểm (Kiểm tra)
+             -> quản lý dữ liệu AI (Bộ nhớ, Kỹ năng) -> cấu hình/máy móc (Hệ thống, đẩy về cuối). Nhóm
+             "Quản lý" cũ gộp Bộ nhớ + Kỹ năng (dữ liệu AI) nhưng lại đứng cạnh Hệ thống (cấu hình), nên
+             người dùng phải đọc kỹ mới biết nhóm nào dùng hằng ngày. -->
         <group id="axiomAssistantGroup" label="Trợ lý">
+          <!-- Nút chính của cả add-in: đứng một mình, nhãn nêu đúng việc (mở khung trò chuyện). -->
           <button id="axiomAskAI" label="Ask AI" size="large" tag="askAi" onAction="ribbon.OnAction" imageMso="Help"
-                  screentip="Ask AI"
-                  supertip="Mở khung trò chuyện với AI bên cạnh tài liệu."/>
+                  screentip="Mở khung trò chuyện với AI"
+                  supertip="Hỏi AI ngay bên cạnh tài liệu. AI đọc và sửa trực tiếp tài liệu đang mở; mỗi lượt sửa là một bước Hoàn tác."/>
         </group>
 
-        <!-- Ba nut soat chi doc, moi nut mot app (giong ban Windows: tag ung voi kieu app trong
-             OnGetVisible). WPS bo qua getVisible thi ca ba deu hien, va bam sai app se duoc add-in
-             tra loi ro "lenh nay can ung dung kia" - xem commands.js: execute() kiem catalogEntry.kind. -->
-        <group id="axiomCheckGroup" label="Kiểm tra">
+        <!-- Ba nút soát: chỉ đọc, không dùng AI, mỗi nút một ứng dụng. Nhãn nêu rõ đối tượng được soát để
+             người dùng không bấm nhầm nút của ứng dụng khác (WPS có thể bỏ qua getVisible). -->
+        <group id="axiomCheckGroup" label="Kiểm tra tài liệu">
           <button id="axiomCheckLayout" label="Soát bố cục" size="large" tag="checkLayout"
                   getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction" imageMso="SlideShowFromCurrent"
-                  screentip="Soát bố cục"
-                  supertip="Tìm chữ tràn khung, khung ra ngoài slide, khung chồng nhau, chữ quá nhỏ. Chỉ đọc, không dùng AI."/>
+                  screentip="Soát bố cục bài trình chiếu"
+                  supertip="Tìm chữ tràn khung, khung ra ngoài trang, khung chồng nhau, chữ quá nhỏ. Chỉ đọc, không sửa tài liệu và không dùng AI."/>
           <button id="axiomCheckTables" label="Soát bảng" size="large" tag="checkTables"
                   getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction" imageMso="TableInsertDialogWord"
-                  screentip="Soát bảng"
-                  supertip="Tìm ô trống và ô tiêu đề lẫn đoạn văn trong các bảng. Chỉ đọc, không dùng AI."/>
+                  screentip="Soát bảng trong văn bản"
+                  supertip="Tìm ô trống và ô tiêu đề lẫn cả đoạn văn trong các bảng. Chỉ đọc, không sửa tài liệu và không dùng AI."/>
           <button id="axiomCheckRange" label="Soát vùng dữ liệu" size="large" tag="checkRange"
                   getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction" imageMso="DataValidation"
-                  screentip="Soát vùng dữ liệu"
-                  supertip="Tìm cột thiếu tiêu đề, số lưu dạng chữ, ô lỗi, dữ liệu lạc ngoài bảng. Chỉ đọc, không dùng AI."/>
+                  screentip="Soát vùng dữ liệu bảng tính"
+                  supertip="Tìm cột thiếu tiêu đề, số lưu dạng chữ, ô lỗi, dữ liệu lạc ngoài bảng. Chỉ đọc, không sửa tài liệu và không dùng AI."/>
         </group>
 
-        <group id="axiomManageGroup" label="Quản lý">
+        <!-- Du lieu AI va ky nang: thu nguoi dung muon XEM/SUA, khac han nhom He thong ben duoi. -->
+        <group id="axiomManageGroup" label="Bộ nhớ & kỹ năng">
           <button id="axiomMemory" label="Bộ nhớ AI…" size="large" tag="memory" onAction="ribbon.OnAction" imageMso="FileSave"
                   screentip="Bộ nhớ AI"
                   supertip="Xem, lọc theo phạm vi, xoá tạm, khôi phục, xoá vĩnh viễn những điều AI đã ghi nhớ về bạn và tài liệu."/>
@@ -80,6 +85,7 @@
                   supertip="Các kỹ năng AI đang có cho ứng dụng này; nạp lại sau khi thêm hoặc sửa kỹ năng."/>
         </group>
 
+        <!-- Cau hinh va chan doan: dat CUOI CUNG vi day la viec lam mot lan, khong phai viec hang ngay. -->
         <group id="axiomSystemGroup" label="Hệ thống">
           <button id="axiomSetup" label="Thiết lập…" size="large" tag="setup" onAction="ribbon.OnAction" imageMso="ApplicationOptionsDialog"
                   screentip="Thiết lập"
@@ -90,6 +96,7 @@
           <button id="axiomLog" label="Mở nhật ký" tag="openLog" onAction="ribbon.OnAction" imageMso="FileOpen"
                   screentip="Mở nhật ký"
                   supertip="Xem phần cuối nhật ký của Agent Core (cùng tệp mà bản Windows mở bằng trình soạn thảo)."/>
+          <!-- Menu "Khác" gom viec chan doan phu, de nhom He thong chi con ba nut chinh. -->
           <menu id="axiomMoreMenu" label="Khác" tag="more" imageMso="FileProperties">
             <button id="axiomTestModel" label="Kiểm tra mô hình" tag="testModel" onAction="ribbon.OnAction" imageMso="ReviewNewComment"
                     screentip="Kiểm tra mô hình"

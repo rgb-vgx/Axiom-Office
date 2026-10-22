@@ -23,8 +23,13 @@
 <div id="mini">
   <header id="miniHeader">
     <span class="dot" aria-hidden="true"></span>
-    <span id="miniTitle">Sửa bằng AI</span>
+    <div class="miniHead">
+      <span id="miniTitle">Sửa bằng AI</span>
+      <span id="miniSelection">Đoạn đang bôi đen</span>
+    </div>
     <span id="miniModel"></span>
+    <button id="miniCloseX" class="miniClose" type="button" data-act="close" title="Đóng (Esc)"
+            aria-label="Đóng">×</button>
   </header>
   <main id="miniBody" role="log" aria-live="polite" aria-label="Kết quả"></main>
   <div id="miniComposer">

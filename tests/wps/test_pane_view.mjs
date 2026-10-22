@@ -820,3 +820,150 @@ test("chan o soan: chua do duoc layout -> doan theo be rong o soan", () => {
   narrow.pane.click("planToggle"); // bat ky thao tac nao cung ve lai
   assert.equal(narrow.pane.text("composerHint"), "Enter để gửi");
 });
+
+// ---- Thiet ke lai 22/10/2026: khung man hinh phu, phan nhom, va nhan trang thai ------------------
+// Moi thu duoi day deu la HOP DONG cho lan sua sau: neu bo thanh tieu de dinh thi nut "Dong" lai troi mat
+// khi danh sach dai, va neu bo nhom cho "Dang dung/Da xoa tam" thi nguoi dung lai khong biet muc nao con
+// hieu luc. Test khong kiem CSS (DOM gia khong co layout) - kiem cau truc va chuoi.
+
+test("man hinh phu: thanh tieu de dinh co tieu de + nut Dong, than cuon rieng", async () => {
+  const { pane } = paneWith({ "GET /memory": [200, { ok: true, result: { memories: [] } }] },
+    { search: "?app=wps&view=memory" });
+  await tick();
+  const heading = pane.byId("viewHeading");
+  assert.ok(heading, "man hinh phu phai co #viewHeading (tieu de o thanh dinh)");
+  assert.equal(heading.text, "Bộ nhớ AI");
+  assert.equal(heading.getAttribute("role"), "heading");
+  const close = pane.find((el) => el.className === "viewClose");
+  assert.ok(close, "thanh tieu de phai co nut Dong");
+  assert.equal(close.getAttribute("data-act"), "closeView");
+  assert.equal(close.getAttribute("aria-label"), "Đóng", "nut chi co dau x phai co nhan cho trinh doc man hinh");
+  // Nut dong nam TRONG thanh tieu de, khong nam cuoi danh sach.
+  const bar = pane.find((el) => el.className === "viewBar");
+  assert.equal(close.parentNode, bar, "nut Dong phai nam trong thanh tieu de");
+  const body = pane.find((el) => el.className === "viewBody");
+  assert.ok(body, "than man hinh phai la mot vung cuon rieng");
+  pane.click(close);
+  assert.ok(pane.byId("view").hasAttribute("hidden"), "bam nut Dong thi dong man hinh");
+});
+
+test("man hinh Ghi nho: tach 'Dang dung' va 'Da xoa tam', bo loc bao trang thai aria", async () => {
+  const memories = [
+    { id: "m1", scope: "user", text: "Thích văn phong ngắn" },
+    { id: "m2", scope: "document", scopeKey: "a.docx", text: "Báo cáo tuần", deletedAt: "2026-10-19T02:00:00Z" },
+    { id: "m3", scope: "user", text: "Dùng tiếng Việt" },
+  ];
+  const { pane } = paneWith({ "GET /memory": [200, { ok: true, result: { memories } }] },
+    { search: "?app=wps&view=memory" });
+  await tick();
+  const shown = pane.text("view");
+  assert.match(shown, /Đang dùng \(2\)/, "muc con hieu luc nam trong nhom rieng");
+  assert.match(shown, /Đã xoá tạm \(1\)/, "muc da xoa tam nam trong nhom rieng");
+  // Nhom "Dang dung" phai dung TRUOC nhom da xoa.
+  assert.ok(shown.indexOf("Đang dùng (2)") < shown.indexOf("Đã xoá tạm (1)"));
+  const segs = pane.findAll((el) => el.className && el.className.indexOf("segBtn") === 0);
+  assert.deepEqual(segs.map((el) => el.getAttribute("aria-pressed")), ["true", "false", "false"],
+    "nut loc dang chon phai bao aria-pressed=true, khong chi doi mau");
+});
+
+test("man hinh Ghi nho: khong co muc nao thi noi ro theo pham vi, khong de trang", async () => {
+  const { pane } = paneWith({ "GET /memory": [200, { ok: true, result: { memories: [] } }] },
+    { search: "?app=wps&view=memory" });
+  await tick();
+  assert.match(pane.text("view"), /Chưa có gì được ghi nhớ/);
+});
+
+test("man hinh Nhat ky: moi dong co dau trang thai + nhan + gio, loi nam duoi dong cua no", async () => {
+  const { pane } = paneWith({ "GET /audit": [200, { ok: true, result: { calls: [
+    { id: 1, action: "writer.insertTable", ok: false, ms: 30, error: "bảng quá rộng", createdAt: "2026-10-19T02:03:05Z" },
+  ] } }] }, { search: "?app=wps&view=audit" });
+  await tick();
+  const row = pane.find((el) => el.className && el.className.indexOf("auditRow") === 0);
+  assert.ok(row, "moi luot goi la mot dong (auditRow), khong phai doan chu phang");
+  assert.equal(row.text.indexOf("✕"), 0, "dau that bai dung truoc nhan");
+  assert.equal(row.className, "auditRow auditRowErr", "loi phai co lop rieng, khong chi doi mau chu");
+  const why = pane.find((el) => el.className === "auditErr");
+  assert.ok(why, "loi cua luot goi nam trong khoi rieng duoi dong");
+  assert.equal(why.text, "bảng quá rộng");
+});
+
+test("man hinh Trang thai: chia nhom Add-in / Agent Core / Duong dan", async () => {
+  const { pane } = paneWith({ "GET /status": [200, STATUS] }, { search: "?app=wps&view=status" });
+  await tick();
+  const groups = pane.findAll((el) => el.className === "sectionTitle").map((el) => el.text);
+  assert.deepEqual(groups, ["Add-in của Writer", "Agent Core", "Đường dẫn"]);
+  // DOM gia ghi className thanh thuoc tinh rieng (khong vao attributes), nen doc thang .className.
+  const heads = pane.findAll((el) => typeof el.className === "string" && el.className.indexOf("statusLineHead") >= 0).length;
+  assert.ok(heads >= 2, "dong chinh (✓/✗) phai co lop dam hon dong giai thich");
+});
+
+test("man hinh Thiet lap: nhan la <label for>, o nhap dung id, cong tac co ghi chu that", async () => {
+  const { pane } = paneWith({ "GET /setup": [200, { ok: true, result: {
+    current: { endpoint: "https://api.example/v1", model: "m", hasKey: true }, problems: [],
+  } }] }, { search: "?app=wps&view=setup" });
+  await tick();
+  const label = pane.find((el) => el.tagName === "LABEL" && el.getAttribute("for") === "set_LlmEndpoint");
+  assert.ok(label, "o nhap phai co nhan that (label for=), khong chi chu ben canh");
+  assert.equal(label.text, "Máy chủ AI");
+  const groups = pane.findAll((el) => el.className === "sectionTitle").map((el) => el.text);
+  assert.deepEqual(groups, ["Máy chủ AI", "AI làm được gì"]);
+  assert.match(pane.text("view"), /add-in thiếu lệnh app\.screenshot/,
+    "canh bao Nhin tai lieu chua dung duoc phai nam ngay duoi cong tac do");
+});
+
+test("man hinh Ky nang: nhom 'Dang co' va 'Khong nap duoc', the loi co vien nguy hiem", async () => {
+  const { pane } = paneWith({ "GET /skills": [200, { ok: true, result: {
+    skills: [{ name: "a", description: "x", apps: [], source: "builtin" }],
+    errors: [{ directory: "/z", error: "hỏng" }],
+    sources: [],
+  } }] }, { search: "?app=wps&view=skills" });
+  await tick();
+  const groups = pane.findAll((el) => el.className === "sectionTitle").map((el) => el.text);
+  assert.deepEqual(groups, ["Đang có (1)", "Không nạp được (1)"]);
+  const bad = pane.find((el) => el.className && el.className.indexOf("cardBad") >= 0);
+  assert.ok(bad, "the nap loi phai co lop rieng (vien nguy hiem)");
+});
+
+test("man hinh Soat: boi canh / tong ket / tung van de la ba lop khac nhau", async () => {
+  const { pane } = paneWith({ "POST /exec": [200, { ok: true, result: { tableCount: 1, issueCount: 1,
+    issues: [{ type: "empty-cells", detail: "Bảng 1: ô (2,2) trống" }] } }] },
+  { search: "?app=wps&view=check&check=writer.checkTables" });
+  await tick();
+  assert.ok(pane.find((el) => el.className === "checkContext"), "dong boi canh co lop rieng");
+  assert.ok(pane.find((el) => el.className === "checkSummary"), "dong tong ket co lop rieng");
+  assert.ok(pane.find((el) => el.className === "checkIssue"), "tung van de co lop rieng");
+});
+
+test("man hinh Hoi thoai: moi dong la nut hai tang (tieu de / ngay + tai lieu)", async () => {
+  const { pane } = paneWith({ "GET /conversations": [200, { ok: true, result: { conversations: [
+    { id: "c1", title: "Giáo án tuần 3", documentName: "giaoan.docx", updatedAt: "2026-10-19T08:31:07Z" },
+  ] } }] }, { search: "?app=wps&view=conversations" });
+  await tick();
+  const row = pane.find((el) => el.className === "convoRow");
+  assert.ok(row, "moi hoi thoai la mot nut ca dong");
+  assert.equal(row.getAttribute("data-act"), "convoOpen");
+  assert.match(row.text, /Giáo án tuần 3/);
+  assert.match(row.text, /2026-10-19 08:31 · giaoan\.docx/, "ngay va ten tai lieu o dong duoi");
+});
+
+test("goi y man hinh trong: bam la DIEN vao o soan, mui ten noi ro dieu do", () => {
+  const { pane } = paneWith({});
+  const chips = pane.findAll((el) => el.getAttribute && el.getAttribute("data-act") === "suggestion");
+  assert.ok(chips.length > 0, "man hinh trong phai co goi y");
+  for (const chip of chips) {
+    assert.equal(chip.getAttribute("title"), "Điền câu này vào ô soạn",
+      "nut goi y phai noi ro bam la dien chu khong gui ngay");
+    assert.ok(pane.find((el) => el.className === "chipArrow"), "goi y co mui ten chi vao o soan");
+  }
+});
+
+test("menu '...': co tieu de nhom va vai tro menu cho trinh doc man hinh", () => {
+  const { pane } = paneWith({});
+  const menu = pane.byId("moreMenu");
+  assert.equal(menu.getAttribute("role"), "menu");
+  const groups = pane.findAll((el) => el.className === "menuGroup").map((el) => el.text);
+  assert.deepEqual(groups, ["Trò chuyện", "Dữ liệu & cài đặt"]);
+  const items = pane.findAll((el) => el.className === "menuItem");
+  assert.equal(items.length, 5);
+  for (const item of items) { assert.equal(item.getAttribute("role"), "menuitem"); }
+});

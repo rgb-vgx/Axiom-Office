@@ -5,6 +5,35 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed — WPS: thiết kế lại pane Ask AI, khung chat mini và ribbon (22/10/2026)
+Giữ nguyên hệ thiết kế của `theme.py` (màu, cỡ chữ, khoảng cách, chuỗi nhãn mà `test_pane_theme.mjs` đối chiếu) —
+chỉ đổi **bố cục, phân cấp và trạng thái**. Bốn bề mặt:
+
+- **Khung màn hình phụ**: mỗi màn hình (`#view`) nay có thanh tiêu đề **dính** (tiêu đề + nút × + `role=heading`,
+  `aria-label="Đóng"`), thân cuộn riêng, chân **dính** đáy. Trước đây cả màn hình cuộn chung nên tiêu đề và nút
+  "Đóng" trôi mất khi danh sách dài; Esc vẫn đóng như cũ.
+- **Bộ nhớ AI**: tách nhóm *Đang dùng (n)* / *Đã xoá tạm (n)*; bộ lọc phạm vi lên trước nội dung và báo
+  `aria-pressed`; nút *Xoá vĩnh viễn…* dùng kiểu nguy hiểm; trạng thái rỗng nói rõ theo phạm vi.
+- **Nhật ký hoạt động**: mỗi lượt gọi là một dòng (dấu ✓/✕ + nhãn + mã lệnh/ms + giờ), lỗi nằm trong khối riêng
+  dưới dòng của nó thay vì hoà vào một khối chữ mono.
+- **Trạng thái**: chia ba nhóm (Add-in của <app> / Agent Core / Đường dẫn), dòng chính đậm hơn dòng giải thích.
+  Câu chữ giữ nguyên (bản Windows/LibreOffice dùng chung).
+- **Thiết lập**: nhóm *Máy chủ AI* / *AI làm được gì*; nhãn là `<label for>` đặt **trên** ô nhập (ô rộng hết pane);
+  công tắc bọc trong `<label>` nên bấm vào chữ cũng bật/tắt; cảnh báo "WPS chưa chụp được trang" nằm ngay dưới
+  công tắc *Nhìn tài liệu*.
+- **Kỹ năng / Soát tài liệu / Hội thoại trước / Nhật ký Core**: thêm tiêu đề nhóm; thẻ lỗi có kiểu nguy hiểm; báo
+  cáo soát tách bối cảnh / tổng kết / từng vấn đề; mỗi hội thoại là nút hai tầng (tiêu đề, rồi ngày + tài liệu);
+  nhật ký nằm trong khối riêng có `role=log`.
+- **Khung chat chính**: menu "…" có tiêu đề nhóm + `role=menu/menuitem`; gợi ý ở màn hình trống nói rõ bấm là
+  **điền vào ô soạn** (mũi tên, tooltip); nút *Dừng* thành nút có viền; footer có `role=status`.
+- **Khung chat mini**: tiêu đề hai tầng (tên việc · "đoạn đang bôi đen"), nút × đóng ở góc phải, chip có phản hồi
+  khi bấm.
+- **Ribbon**: nhóm lại theo việc người dùng làm — *Trợ lý* → *Kiểm tra tài liệu* (ba nút soát) → *Bộ nhớ & kỹ năng*
+  → *Hệ thống* (đẩy về cuối); screentip/supertip nói rõ "chỉ đọc, không sửa tài liệu và không dùng AI" và nêu đúng
+  đối tượng của từng nút soát. Danh sách id/`imageMso` không đổi.
+
+Test mới trong `tests/wps/test_pane_view.mjs` (11 ca) ghim cấu trúc vừa đổi; `make test-wps` 200 ca xanh.
+
 ### Fixed — CI Windows: `test_bridge_env` ghim đường dẫn POSIX nên đỏ trên Windows (22/10/2026)
 - Test dựng tài liệu giả bằng `file:///tmp/hai.odp` nhưng production (`documents.find_open_path`) dựng URL từ
   `os.path.abspath`, nên trên Windows ra `D:\...` và không khớp — job **windows** đỏ ở bước unit test extension

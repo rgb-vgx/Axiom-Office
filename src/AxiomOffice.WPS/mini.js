@@ -105,6 +105,20 @@
       renderBody(state);
       var model = $("miniModel");
       if (model) { clearNode(model); model.appendChild(document.createTextNode(trimText(state.model))); }
+      // Dong ngu canh: viec gi dang lam tren doan boi den. Nhan cua muc nam o state.quickActions (Core:
+      // quickactions.go); khong tim thay (chua nap xong danh sach) thi chi noi "doan dang boi den".
+      var sel = $("miniSelection");
+      if (sel) {
+        var label = "";
+        try {
+          var list = state.quickActions || [];
+          for (var qi = 0; qi < list.length; qi++) {
+            if (list[qi] && list[qi].id === QUICK) { label = trimText(list[qi].label); }
+          }
+        } catch (eSel) { label = ""; }
+        clearNode(sel);
+        sel.appendChild(document.createTextNode(label !== "" ? label + " · đoạn đang bôi đen" : "Đoạn đang bôi đen"));
+      }
       var status = $("miniStatus");
       if (status) {
         var text = state.running ? (state.status || "Đang chạy…") : "";

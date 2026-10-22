@@ -17,13 +17,15 @@
     </div>
     <button id="moreBtn" type="button" data-act="more" aria-haspopup="true" aria-expanded="false"
             aria-controls="moreMenu" aria-label="Thêm" title="Thêm">⋯</button>
-    <div id="moreMenu" class="headerLinks" hidden>
-      <button id="newBtn" class="menuItem" type="button" data-act="new">Trò chuyện mới</button>
-      <button id="historyBtn" class="menuItem" type="button" data-act="view" data-value="conversations">Hội thoại trước…</button>
+    <div id="moreMenu" class="headerLinks" role="menu" aria-label="Tuỳ chọn" hidden>
+      <span class="menuGroup" role="presentation">Trò chuyện</span>
+      <button id="newBtn" class="menuItem" type="button" role="menuitem" data-act="new">Trò chuyện mới</button>
+      <button id="historyBtn" class="menuItem" type="button" role="menuitem" data-act="view" data-value="conversations">Hội thoại trước…</button>
       <span class="menuSep" aria-hidden="true"></span>
-      <button id="memoryBtn" class="menuItem" type="button" data-act="view" data-value="memory">Ghi nhớ</button>
-      <button id="auditBtn" class="menuItem" type="button" data-act="view" data-value="audit">Nhật ký</button>
-      <button id="setupBtn" class="menuItem" type="button" data-act="view" data-value="setup">Thiết lập</button>
+      <span class="menuGroup" role="presentation">Dữ liệu &amp; cài đặt</span>
+      <button id="memoryBtn" class="menuItem" type="button" role="menuitem" data-act="view" data-value="memory">Ghi nhớ</button>
+      <button id="auditBtn" class="menuItem" type="button" role="menuitem" data-act="view" data-value="audit">Nhật ký</button>
+      <button id="setupBtn" class="menuItem" type="button" role="menuitem" data-act="view" data-value="setup">Thiết lập</button>
     </div>
   </header>
   <main id="chat" role="log" aria-live="polite" aria-label="Hội thoại"></main>
@@ -31,18 +33,19 @@
     <div id="composerBox">
       <textarea id="input" rows="2" aria-label="Yêu cầu cho AI" placeholder="Nhập yêu cầu cho tài liệu này…"></textarea>
       <div class="composerFoot">
-        <button id="planToggle" type="button" data-act="plan" aria-pressed="false">○ Lập kế hoạch trước</button>
+        <button id="planToggle" class="planToggle" type="button" data-act="plan" aria-pressed="false"
+                title="AI soạn kế hoạch trước, chưa sửa tài liệu - bạn xem rồi mới cho chạy">○ Lập kế hoạch trước</button>
         <span id="composerHint" class="hint">Enter để gửi · Shift+Enter xuống dòng</span>
         <button id="sendBtn" class="btnPrimary" type="button" data-act="send" title="Enter để gửi · Shift+Enter xuống dòng">Gửi</button>
       </div>
     </div>
   </div>
-  <footer id="paneFooter">
+  <footer id="paneFooter" role="status" aria-live="polite">
     <span id="busyDot" class="dot dotSmall" aria-hidden="true" hidden></span>
     <span id="statusText" class="caption">Sẵn sàng</span>
     <button id="undoBtn" class="footLink" type="button" data-act="undo" hidden>Hoàn tác lượt này</button>
     <button id="insertBtn" class="footLink" type="button" data-act="insert" hidden>Chèn trả lời</button>
-    <button id="stopBtn" class="link" type="button" data-act="stop" hidden>Dừng</button>
+    <button id="stopBtn" class="btnSecondary footStop" type="button" data-act="stop" title="Dừng lượt đang chạy" hidden>Dừng</button>
   </footer>
 </div>
 <div id="view" hidden></div>

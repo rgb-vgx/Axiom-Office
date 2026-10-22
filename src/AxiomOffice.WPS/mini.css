@@ -71,11 +71,56 @@ body {
   flex-direction: column;
   height: 100vh;
 }
+/* Thanh tieu de: cham mau + ten viec (dam) / ngu canh (nho) + model + nut dong. */
 #miniHeader {
   display: flex;
   align-items: center;
   gap: var(--axiom-gap-chip);
-  padding: 10px var(--axiom-pad-x) 6px var(--axiom-pad-x);
+  padding: 8px var(--axiom-pad-x) 6px var(--axiom-pad-x);
+  border-bottom: 1px solid var(--axiom-divider);
+}
+.miniHead {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+#miniSelection {
+  font-size: var(--axiom-size-caption);
+  color: var(--axiom-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Nut dong o goc phai: cua so ShowDialog khong co thanh tieu de he dieu hanh, nen phai co nut rieng. */
+.miniClose {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--axiom-radius-control);
+  color: var(--axiom-text-secondary);
+  font-family: system-ui,"Segoe UI","Noto Sans",sans-serif;
+  font-size: var(--axiom-size-title);
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 200ms ease, color 200ms ease;
+}
+.miniClose:hover {
+  background: var(--axiom-chip-hover);
+  color: var(--axiom-text-primary);
+}
+.miniClose:active {
+  background: var(--axiom-chip-border);
+}
+.miniClose:focus {
+  outline: 2px solid var(--axiom-focus);
+  outline-offset: 1px;
 }
 .dot {
   width: 8px;
@@ -89,7 +134,7 @@ body {
   font-weight: 600;
 }
 #miniModel {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
@@ -127,6 +172,9 @@ body {
 }
 .chip:hover {
   background: var(--axiom-chip-hover);
+}
+.chip:active {
+  background: var(--axiom-chip-border);
 }
 .chip:focus-visible {
   outline: 2px solid var(--axiom-focus);
