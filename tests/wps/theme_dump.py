@@ -53,4 +53,8 @@ payload = {
     "empty": {kind: {"title": theme.empty_state(kind)[0], "description": theme.empty_state(kind)[1],
                      "suggestions": list(theme.empty_state(kind)[2])} for kind in ("wps", "et", "wpp")},
 }
+# Windows (Python < 3.15): stdout cua tien trinh con la cp1252, json.dump(ensure_ascii=False) chet voi chu tieng
+# Viet (CI windows 24/10/2026: test_pane_theme.mjs do). Cung cach voi lo_catalog.py.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 json.dump(payload, sys.stdout, ensure_ascii=False)
