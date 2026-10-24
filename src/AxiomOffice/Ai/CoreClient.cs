@@ -530,7 +530,16 @@ namespace AxiomOffice.Ai
                             result.ConversationId = item.ConversationId;
                         }
 
-                        onEvent(item);
+                        try
+                        {
+                            onEvent(item);
+                        }
+                        catch (Exception callbackError)
+                        {
+                            // Loi ve giao dien (pane dang dong, ...) khong duoc che loi that cua luot chay
+                            // (do 24/10/2026: mot NullReferenceException trong callback bien loi 401 thanh NRE).
+                            Logger.Error("CoreClient: onEvent failed (" + item.Type + ")", callbackError);
+                        }
                         ApplyEvent(result, item);
                         if (item.Type == "tool.finished")
                         {
@@ -553,7 +562,8 @@ namespace AxiomOffice.Ai
                 }
 
                 result.Error = ex is WebException ? "mat ket noi voi Agent Core: " + ex.Message : ex.GetType().Name + ": " + ex.Message;
-                Logger.Info("CoreClient: doc su kien that bai: " + result.Error);
+                // Kem stack: truoc day chi co message nen khong biet NRE nam o dau (do 24/10/2026).
+                Logger.Error("CoreClient: doc su kien that bai", ex);
             }
             finally
             {

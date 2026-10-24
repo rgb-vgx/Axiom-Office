@@ -54,6 +54,14 @@ namespace AxiomOffice.Bridge
             get { return ReadInt("CoreEnabled", 1) != 0; }
         }
 
+        // Agent in-process chi la duong du phong: MAC DINH TAT (0) de moi luot di qua Core, giu policy/audit/
+        // memory. Bat bang HKCU\Software\AxiomOffice\LegacyAgent=1 khi Core hong va nguoi dung chap nhan
+        // mat audit (docs/architecture/core.md muc 4.2).
+        public static bool LegacyAgent
+        {
+            get { return ReadInt("LegacyAgent", 0) != 0; }
+        }
+
         public static string LlmProvider
         {
             get { return ReadString("LlmProvider", "openai"); }

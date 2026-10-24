@@ -655,7 +655,19 @@ namespace AxiomOffice.Ai
                     }
                     else if (result == null)
                     {
-                        result = AiAgent.Run(host, promptText, progress, run.Token);
+                        // Mặc định KHÔNG chạy agent thứ hai: nó bỏ qua policy/confirm/audit/memory của Core
+                        // (docs/architecture/core.md §4.2). Chỉ dùng khi người dùng bật rõ LegacyAgent.
+                        if (!Config.LegacyAgent)
+                        {
+                            result = new LlmResult();
+                            result.Error = Ui.T("Agent Core không chạy được (")
+                                + (CoreClient.Instance.LastError ?? Ui.T("không rõ lý do"))
+                                + Ui.T("). Để dùng agent cũ trong add-in, đặt HKCU\\Software\\AxiomOffice\\LegacyAgent=1 rồi thử lại.");
+                        }
+                        else
+                        {
+                            result = AiAgent.Run(host, promptText, progress, run.Token);
+                        }
                     }
                 }
                 catch (Exception ex)

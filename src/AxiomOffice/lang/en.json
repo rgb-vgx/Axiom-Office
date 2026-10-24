@@ -417,5 +417,7 @@
   "← Quay lại": "← Back",
   "✓ Add-in: đang trả lời ở cổng ": "✓ Add-in: answering on port ",
   "✓ Agent Core: đang chạy (phiên bản ": "✓ Agent Core: running (version ",
-  "✗ Add-in: không trả lời ở cổng ": "✗ Add-in: not answering on port "
+  "✗ Add-in: không trả lời ở cổng ": "✗ Add-in: not answering on port ",
+  "Agent Core không chạy được (": "Agent Core is not running (",
+  "). Để dùng agent cũ trong add-in, đặt HKCU\\Software\\AxiomOffice\\LegacyAgent=1 rồi thử lại.": "). To use the legacy in-add-in agent, set HKCU\\Software\\AxiomOffice\\LegacyAgent=1 and try again."
 }
