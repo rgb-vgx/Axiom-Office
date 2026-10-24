@@ -1966,6 +1966,25 @@ export function makeWriterApp(options = {}) {
       throw new Error("Range(" + f + "," + t + ") ngoai tai lieu (dai " + state.text.length + ")");
     }
     const path = label + "(" + f + "," + t + ")";
+    // Dinh dang cua mot Range: appendText dat lai Font/ParagraphFormat tren doan vua noi vao
+    // (khong ke thua bold/can le cua doan cuoi). Fake chi can nhan setter, khong mo phong tung ky tu.
+    const rangeFont = () => strict(path + ".Font", {
+      state,
+      props: {
+        Bold: { get: () => 0, set: () => {} },
+        Italic: { get: () => 0, set: () => {} },
+        Underline: { get: () => 0, set: () => {} },
+        Size: { get: () => 12, set: () => {} },
+        Name: { get: () => "", set: () => {} },
+        Color: { get: () => 0, set: () => {} },
+      },
+      allowed: [],
+    });
+    const rangeParagraph = () => strict(path + ".ParagraphFormat", {
+      state,
+      props: { Alignment: { get: () => 0, set: () => {} } },
+      allowed: [],
+    });
     return strict(path, {
       state,
       props: {
@@ -1973,6 +1992,8 @@ export function makeWriterApp(options = {}) {
         End: { get: () => t },
         Text: { get: () => state.text.slice(f, t) },
         Find: { get: () => makeFind(f, t, path) },
+        Font: { get: rangeFont },
+        ParagraphFormat: { get: rangeParagraph },
       },
       methods: {
         // Chen ngay SAU ky tu cuoi cua Range. Voi doc.Content (Range(0, docEnd)) tuc la chen o

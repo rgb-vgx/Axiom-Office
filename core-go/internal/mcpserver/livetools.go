@@ -214,13 +214,14 @@ func wordLiveTools() []*Tool {
 				return live(a, "word", "writer.typeText", Clean("text", a.Req("text")), 0, false)
 			}),
 		NewTool("word_insert_styled_text",
-			"Insert text with formatting (color as '#RRGGBB'). Each call is one Ctrl+Z step.",
-			[]Param{ParamStr("text", "", true, nil), ParamBool("bold", "", false, nil), ParamBool("italic", "", false, nil), ParamBool("underline", "", false, nil), ParamInt("size", "", false, nil), ParamStr("color", "", false, nil), ParamStr("font", "", false, nil), appParam("word")},
+			"Insert text with formatting (color as '#RRGGBB'). Use alignment (left/center/right/justify) for a block: \\n splits paragraphs and the block ends with a paragraph break. Each call is one Ctrl+Z step.",
+			[]Param{ParamStr("text", "", true, nil), ParamBool("bold", "", false, nil), ParamBool("italic", "", false, nil), ParamBool("underline", "", false, nil), ParamInt("size", "", false, nil), ParamStr("color", "", false, nil), ParamStr("font", "", false, nil), ParamStr("alignment", "left/center/right/justify; makes this a block", false, nil), ParamBool("break", "paragraph break after the block (default true when alignment is set)", false, nil), appParam("word")},
 			func(a *ToolArgs) (any, error) {
 				return live(a, "word", "writer.insertStyledText", Clean(
 					"text", a.Req("text"),
 					"bold", a.BoolOrNil("bold"), "italic", a.BoolOrNil("italic"), "underline", a.BoolOrNil("underline"),
-					"size", a.IntOrNil("size"), "color", a.StrOrNil("color"), "font", a.StrOrNil("font")), 0, false)
+					"size", a.IntOrNil("size"), "color", a.StrOrNil("color"), "font", a.StrOrNil("font"),
+					"alignment", a.StrOrNil("alignment"), "break", a.BoolOrNil("break")), 0, false)
 			}),
 		NewTool("word_format_selection",
 			"Format the currently selected text (alignment: left/center/right/justify).",

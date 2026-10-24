@@ -514,7 +514,8 @@ def test_agent_tool():
         reply = json.loads(data[action])
         check(reply["ok"] is False and "not an available action" in reply["error"], "office_action từ chối " + action, reply)
     writer = data["definition:wps"]
-    check("writer.typeText {text}" in writer and "writer.appendText {text}" in writer, "office_action (Writer) có typeText/appendText", writer)
+    # appendText co them tham so dinh dang/can le (24/10/2026): chi kiem lenh co mat va `text` dung dau.
+    check("writer.typeText {text}" in writer and "writer.appendText {text," in writer, "office_action (Writer) có typeText/appendText", writer)
     listed = " ".join(data["definition:" + kind] for kind in ("wps", "et", "wpp"))
     check("writer.closeAll" not in listed and "ai.ask {" not in listed, "office_action không liệt kê writer.closeAll / ai.ask", listed)
 

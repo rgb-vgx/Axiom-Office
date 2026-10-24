@@ -114,21 +114,7 @@
     "kind": "wps",
     "agent": true,
     "undo": true,
-    "summary": "Nối vào cuối tài liệu",
-    "params": [
-      {
-        "name": "text",
-        "required": true,
-        "hint": null
-      }
-    ]
-  },
-  {
-    "name": "writer.insertStyledText",
-    "kind": "wps",
-    "agent": true,
-    "undo": true,
-    "summary": "Chèn text có định dạng tại con trỏ (`color` dạng `#RRGGBB`)",
+    "summary": "Nối một KHỐI đoạn văn vào cuối tài liệu; `\\n` tách đoạn, tự đặt lại định dạng (không kế thừa), `alignment` mặc định left",
     "params": [
       {
         "name": "text",
@@ -164,6 +150,65 @@
         "name": "font",
         "required": false,
         "hint": null
+      },
+      {
+        "name": "alignment",
+        "required": false,
+        "hint": "left/center/right/justify; mặc định left"
+      }
+    ]
+  },
+  {
+    "name": "writer.insertStyledText",
+    "kind": "wps",
+    "agent": true,
+    "undo": true,
+    "summary": "Chèn text có định dạng tại con trỏ; `\\n` tách đoạn, `alignment` áp cho từng đoạn (`color` dạng `#RRGGBB`)",
+    "params": [
+      {
+        "name": "text",
+        "required": true,
+        "hint": null
+      },
+      {
+        "name": "bold",
+        "required": false,
+        "hint": null
+      },
+      {
+        "name": "italic",
+        "required": false,
+        "hint": null
+      },
+      {
+        "name": "underline",
+        "required": false,
+        "hint": null
+      },
+      {
+        "name": "size",
+        "required": false,
+        "hint": null
+      },
+      {
+        "name": "color",
+        "required": false,
+        "hint": null
+      },
+      {
+        "name": "font",
+        "required": false,
+        "hint": null
+      },
+      {
+        "name": "alignment",
+        "required": false,
+        "hint": "left/center/right/justify; áp cho từng đoạn vừa chèn"
+      },
+      {
+        "name": "break",
+        "required": false,
+        "hint": "ngắt đoạn sau khối; mặc định true khi có `alignment`"
       }
     ]
   },

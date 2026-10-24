@@ -53,10 +53,7 @@
       summary: "Gõ tại con trỏ",
       params: [{ name: "text", required: true, hint: null }] },
     { name: "writer.appendText", kind: "wps", agent: true, undo: true,
-      summary: "Nối vào cuối tài liệu",
-      params: [{ name: "text", required: true, hint: null }] },
-    { name: "writer.insertStyledText", kind: "wps", agent: true, undo: true,
-      summary: "Chèn text có định dạng tại con trỏ (`color` dạng `#RRGGBB`)",
+      summary: "Nối một KHỐI đoạn văn vào cuối tài liệu; `\\n` tách đoạn, tự đặt lại định dạng (không kế thừa), `alignment` mặc định left",
       params: [
         { name: "text", required: true, hint: null },
         { name: "bold", required: false, hint: null },
@@ -64,7 +61,21 @@
         { name: "underline", required: false, hint: null },
         { name: "size", required: false, hint: null },
         { name: "color", required: false, hint: null },
-        { name: "font", required: false, hint: null }
+        { name: "font", required: false, hint: null },
+        { name: "alignment", required: false, hint: "left/center/right/justify; mặc định left" }
+      ] },
+    { name: "writer.insertStyledText", kind: "wps", agent: true, undo: true,
+      summary: "Chèn text có định dạng tại con trỏ; `\\n` tách đoạn, `alignment` áp cho từng đoạn (`color` dạng `#RRGGBB`)",
+      params: [
+        { name: "text", required: true, hint: null },
+        { name: "bold", required: false, hint: null },
+        { name: "italic", required: false, hint: null },
+        { name: "underline", required: false, hint: null },
+        { name: "size", required: false, hint: null },
+        { name: "color", required: false, hint: null },
+        { name: "font", required: false, hint: null },
+        { name: "alignment", required: false, hint: "left/center/right/justify; áp cho từng đoạn vừa chèn" },
+        { name: "break", required: false, hint: "ngắt đoạn sau khối; mặc định true khi có `alignment`" }
       ] },
     { name: "writer.heading", kind: "wps", agent: true, undo: true,
       summary: "Heading 1-9 (`level`, mặc định 1) + tự xuống dòng (`break`, mặc định true)",
@@ -930,18 +941,73 @@
 
   function cmdAppendText(app, params) {
     var text = paramString(params, "text", null);
-    if (text === null || text === undefined) { return { appended: 0 }; }
+    if (text === null || text === undefined || text === "") { return { appended: 0, paragraphs: 0 }; }
     var doc = app.ActiveDocument;
-    doc.Content.InsertAfter(text);
-    return { appended: text.length };
+    var alignment = paramString(params, "alignment", "left");
+    // '\n' dau chuoi chi la y dinh "mo doan": bo di, de chi con MOT lan ngat doan do needBreak quyet dinh
+    // (tranh them doan rong khi caller da gui "\r...", va tranh Range bat dau tren paragraph mark cua doan cu).
+    var normalized = String(text).replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/^\n+/, "");
+    if (!normalized.length) { return { appended: 0, paragraphs: 0 }; }
+    var needBreak = false;
+    try {
+      var docParagraphs = doc.Paragraphs;
+      var count = numProp(docParagraphs, "Count");
+      if (count > 0) {
+        var lastText = String(docParagraphs.Item(count).Range.Text)
+          .replace(/\r/g, "").split("\u0007").join("").replace(/^\s+|\s+$/g, "");
+        needBreak = lastText.length > 0;
+      }
+    } catch (eBreak) { needBreak = false; }
+    var content = doc.Content;
+    // Ngat doan TRUOC khi do vi tri bat dau: Range chi phu phan text moi, khong dat lai can le cua doan cu.
+    if (needBreak) { content.InsertAfter("\r"); }
+    var before = numProp(content, "End");
+    content.InsertAfter(normalized.replace(/\n/g, "\r"));
+    var after = numProp(content, "End");
+    if (after > before) {
+      try {
+        var inserted = doc.Range(before, after);
+        applyFontReset(inserted.Font, params);
+        if (alignment) { inserted.ParagraphFormat.Alignment = parseAlignment(alignment); }
+      } catch (eFmt) {
+        // Host thieu doc.Range (ban WPS cu): text da noi duoc, chi bo qua dat lai dinh dang.
+      }
+    }
+    return { appended: normalized.length, paragraphs: normalized.split("\n").length };
+  }
+
+  // Nhu applyFont nhung dat TUONG MINH ca thuoc tinh khong truyen: Selection giu bold/underline/mau cua lan
+  // chen truoc, nen bo qua se lam dinh dinh dang sang cac doan sau (do 24/10/2026 tren Word). Chi dung cho
+  // KHOI (append / insert co alignment); chen inline thi goi applyFont de giu dinh dang xung quanh.
+  function applyFontReset(font, params) {
+    font.Bold = hasParam(params, "bold") && paramBool(params, "bold", false) ? -1 : 0;
+    font.Italic = hasParam(params, "italic") && paramBool(params, "italic", false) ? -1 : 0;
+    font.Underline = hasParam(params, "underline") && paramBool(params, "underline", false) ? 1 : 0;
+    font.Size = hasParam(params, "size") ? paramInt(params, "size", 13) : 13;
+    font.Name = hasParam(params, "font") ? paramString(params, "font", "Times New Roman") : "Times New Roman";
+    var color = parseBgrColor(hasParam(params, "color") ? paramString(params, "color", null) : null);
+    font.Color = color !== null ? color : -16777216; // wdColorAutomatic
   }
 
   function cmdInsertStyledText(app, params) {
     var text = paramString(params, "text", null);
-    if (!text) { return { inserted: 0 }; }
-    applyFont(app.Selection.Font, params);
-    app.Selection.TypeText(text);
-    return { inserted: text.length };
+    if (!text) { return { inserted: 0, paragraphs: 0 }; }
+    var alignment = paramString(params, "alignment", null);
+    // Co alignment = mot KHOI doan van: tu ngat doan sau khoi de lan goi ke tiep khong dinh vao doan nay.
+    // Khong alignment = chen inline, giu nguyen dinh dang xung quanh.
+    var block = !!alignment;
+    var breakAfter = hasParam(params, "break") ? paramBool(params, "break", true) : block;
+    // '\n' (hoac '\r') = doan moi: model gui ca khoi van ban mot lan thay vi moi dong mot lenh.
+    var lines = String(text).replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+    var sel = app.Selection;
+    for (var i = 0; i < lines.length; i++) {
+      if (block) { applyFontReset(sel.Font, params); } else { applyFont(sel.Font, params); }
+      if (block) { sel.ParagraphFormat.Alignment = parseAlignment(alignment); }
+      if (lines[i].length) { sel.TypeText(lines[i]); }
+      if (i < lines.length - 1) { sel.TypeParagraph(); }
+    }
+    if (breakAfter && lines[lines.length - 1].length) { sel.TypeParagraph(); }
+    return { inserted: text.length, paragraphs: lines.length };
   }
 
   function cmdHeading(app, params) {

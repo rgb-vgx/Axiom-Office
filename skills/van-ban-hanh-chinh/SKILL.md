@@ -28,9 +28,18 @@ Dùng cùng skill `the-thuc-van-ban` cho phần nội dung.
 
 - Bảng phần đầu: `writer.insertTable {values: [["<CƠ QUAN>","CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM"],["Số: …/…","Độc lập - Tự do - Hạnh phúc"],["V/v …","<Địa danh>, ngày … tháng … năm …"]]}`
   rồi `writer.formatTable {borders: false, font: "Times New Roman", size: 13, alignment: "center"}`.
-- Nội dung: `writer.insertStyledText {text, font: "Times New Roman", size: 13}` +
-  `writer.setParagraphAlignment {alignment: "justify"}`.
-- Phần cuối: bảng 2 cột như trên, `borders: false`.
+- **Mỗi lần gọi `writer.insertStyledText` là một KHỐI đoạn văn**: dùng `\n` để tách các dòng thành đoạn
+  riêng và truyền `alignment` cho cả khối. **Không** gọi `writer.setParagraphAlignment` sau từng dòng —
+  mọi dòng sẽ dồn vào một đoạn và lần căn cuối cùng đè lên cả khối.
+  - Quốc hiệu + tiêu ngữ + tên loại/trích yếu: một lần, `alignment: "center"`.
+  - Thân văn bản (Kính gửi, các đoạn nội dung): một lần, `alignment: "justify"`.
+  - Phần ký (Trân trọng / Người làm đơn / họ tên): một lần, `alignment: "center"` (hoặc `right`).
+  - Chỉ tách thêm lần gọi khi **định dạng chữ khác nhau** (đậm/nhạt/cỡ/màu); các dòng cùng định dạng thì gộp.
+  - Khối có `alignment` **tự ngắt đoạn sau khi chèn** (`break` mặc định true), nên lần gọi kế tiếp bắt đầu
+    đoạn mới — **không thêm dòng trống** (`\n\n`) để tạo khoảng cách; dùng một `\n` giữa các đoạn.
+- `bold`/`italic`/`underline`/`color` được đặt tường minh cho từng lần gọi: khối không truyền `bold` sẽ là
+  chữ thường, không kế thừa khối trước.
+- Phần cuối dạng bảng: như trên, `borders: false`.
 
 Thông tin người dùng chưa cho (số văn bản, ngày, người ký) → để "…" và nhắc trong câu trả lời, **không
 bịa**.

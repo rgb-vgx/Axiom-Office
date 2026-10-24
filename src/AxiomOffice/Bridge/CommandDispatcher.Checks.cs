@@ -17,7 +17,9 @@ namespace AxiomOffice.Bridge
             return new[]
             {
                 Command("writer.checkTables", "wps", WriterCheckTables,
-                    "Soát các bảng (chỉ đọc): số dòng/cột, ô trống, ô tiêu đề lẫn đoạn văn").ForAgent(),
+                    "Soát các bảng (chỉ đọc): số dòng/cột, ô trống, ô tiêu đề lẫn đoạn văn. Bảng dàn trang — bảng đã gọi "
+                    + "writer.formatTable với borders:false — được đánh dấu layout và KHÔNG báo empty-cells (ô trống ở đó "
+                    + "là cố ý: khoảng trống ký, ô chờ điền)").ForAgent(),
                 Command("et.checkRange", "et", EtCheckRange,
                     "Soát bảng dữ liệu (chỉ đọc): tiêu đề trống, kiểu lẫn lộn, số dạng chữ, number format, dữ liệu lạc ngoài bảng",
                     Opt("range", "default: the used range"), Opt("sheet")).ForAgent(),
@@ -708,7 +710,10 @@ namespace AxiomOffice.Bridge
                     {
                     }
                 }
-                if (empty > 0)
+                // Ô trống ở bảng dàn trang là CỐ Ý (khoảng trống ký, ô chờ điền) nên không báo - cùng quy tắc với
+                // LibreOffice (checks.py) và WPS. "long-header-cell" vẫn báo cho mọi bảng.
+                bool layout = IsLayoutTable(table);
+                if (empty > 0 && !layout)
                 {
                     issues.Add(Issue("empty-cells", "table " + t + " has " + empty + " empty cell(s)", new Dictionary<string, object> { { "table", t } }));
                 }
@@ -730,7 +735,8 @@ namespace AxiomOffice.Bridge
                     { "rows", rows },
                     { "cols", cols },
                     { "emptyCells", empty },
-                    { "header", header }
+                    { "header", header },
+                    { "layout", layout }
                 });
             }
             return new Dictionary<string, object>

@@ -86,6 +86,20 @@ def _apply_font(target, params) -> None:
         target.CharColor = color
 
 
+def _apply_font_reset(target, params) -> None:
+    """Nhu _apply_font nhung dat tuong minh ca thuoc tinh khong truyen, cho KHOI doan van: cursor giu
+    bold/underline/mau/co/font cua lan chen truoc nen bo qua se lam dinh sang cac doan sau (do 24/10/2026
+    tren Word). Khoi khong truyen size/font nhan mac dinh than van ban cua design (Times New Roman 13)."""
+    target.CharWeight = BOLD if values.boolean(params, "bold", False) else NORMAL
+    target.CharPosture = uno.Enum("com.sun.star.awt.FontSlant",
+                                  "ITALIC" if values.boolean(params, "italic", False) else "NONE")
+    target.CharUnderline = 1 if values.boolean(params, "underline", False) else 0
+    target.CharHeight = float(values.number(params, "size", 13)) if values.has(params, "size") else 13.0
+    target.CharFontName = values.string(params, "font") if values.has(params, "font") else "Times New Roman"
+    color = values.color(values.string(params, "color"))
+    target.CharColor = color if color is not None else -1  # -1 = automatic
+
+
 def _alignment(name: str):
     key = (name or "left").strip().lower()
     if key not in ALIGN:
@@ -217,21 +231,59 @@ def type_text(env, params):
 
 def append_text(env, params):
     text = values.string(params, "text")
-    if text is None:
-        return {"appended": 0}
+    if not text:
+        return {"appended": 0, "paragraphs": 0}
+    alignment = values.string(params, "alignment", "left")
+    # '\n' dau chuoi chi la y dinh "mo doan": bo di, de chi con MOT lan ngat doan do doan cuoi quyet dinh.
+    normalized = _normalize(text).lstrip("\n")
+    if not normalized:
+        return {"appended": 0, "paragraphs": 0}
+    parts = normalized.split("\n")
     body = env.document.getText()
     cursor = body.createTextCursorByRange(body.getEnd())
-    _insert(body, cursor, text)
-    return {"appended": len(text)}
+    # Ngat doan TRUOC khi chen: chi dat dinh dang/can le cho doan moi, khong cham doan cuoi.
+    if _paragraph_has_text_before(body, cursor):
+        body.insertControlCharacter(cursor, PARAGRAPH_BREAK, False)
+    for index, part in enumerate(parts):
+        _apply_font_reset(cursor, params)
+        if alignment:
+            cursor.ParaAdjust = _alignment(alignment)
+        if part:
+            body.insertString(cursor, part, False)
+        if index < len(parts) - 1:
+            body.insertControlCharacter(cursor, PARAGRAPH_BREAK, False)
+    return {"appended": len(normalized), "paragraphs": len(parts)}
 
 
 def insert_styled_text(env, params):
     text = values.string(params, "text")
     if not text:
-        return {"inserted": 0}
-    cursor = _insert_at_view(env.document, text)
-    _apply_font(cursor, params)
-    return {"inserted": len(text)}
+        return {"inserted": 0, "paragraphs": 0}
+    alignment = values.string(params, "alignment")
+    # Co alignment = mot KHOI doan van: tu ngat doan sau khoi de lan goi ke tiep khong dinh vao doan nay.
+    # Khong alignment = chen inline, giu nguyen hanh vi cu.
+    block = bool(alignment)
+    break_after = values.boolean(params, "break", True) if values.has(params, "break") else block
+    view = _view_cursor(env.document)
+    text_obj = view.getText()
+    cursor = text_obj.createTextCursorByRange(view.getEnd())
+    parts = _normalize(text).split("\n")
+    for index, part in enumerate(parts):
+        # Khoi: dat lai toan bo dinh dang (tranh dinh bold/underline/mau tu doan truoc). Inline: chi dat
+        # thuoc tinh duoc truyen, de chu chen giua cau giu dinh dang xung quanh.
+        if block:
+            _apply_font_reset(cursor, params)
+            cursor.ParaAdjust = _alignment(alignment)
+        else:
+            _apply_font(cursor, params)
+        if part:
+            text_obj.insertString(cursor, part, False)
+        if index < len(parts) - 1:
+            text_obj.insertControlCharacter(cursor, PARAGRAPH_BREAK, False)
+    if break_after and parts[-1]:
+        text_obj.insertControlCharacter(cursor, PARAGRAPH_BREAK, False)
+    view.gotoRange(cursor.getEnd(), False)
+    return {"inserted": len(text), "paragraphs": len(parts)}
 
 
 def _paragraph_has_text_before(text_obj, cursor) -> bool:
@@ -595,9 +647,15 @@ command("writer.open", "wps", lambda env, p: documents.open_document(env.ctx, "w
 command("writer.getText", "wps", get_text, "Đọc toàn bộ text", opt("maxChars"), agent=True)
 command("writer.selection", "wps", selection, "Text + vị trí đang chọn", agent=True)
 command("writer.typeText", "wps", type_text, "Gõ tại con trỏ", req("text"), agent=True, undo=True)
-command("writer.appendText", "wps", append_text, "Nối vào cuối tài liệu", req("text"), agent=True, undo=True)
-command("writer.insertStyledText", "wps", insert_styled_text, "Chèn text có định dạng tại con trỏ (`color` dạng `#RRGGBB`)",
-        req("text"), opt("bold"), opt("italic"), opt("underline"), opt("size"), opt("color"), opt("font"), agent=True, undo=True)
+command("writer.appendText", "wps", append_text,
+        "Nối một KHỐI đoạn văn vào cuối tài liệu; `\\n` tách đoạn, tự đặt lại định dạng (không kế thừa), `alignment` mặc định left",
+        req("text"), opt("bold"), opt("italic"), opt("underline"), opt("size"), opt("color"), opt("font"),
+        opt("alignment", "left/center/right/justify; mặc định left"), agent=True, undo=True)
+command("writer.insertStyledText", "wps", insert_styled_text,
+        "Chèn text có định dạng tại con trỏ; `\\n` tách đoạn, `alignment` áp cho từng đoạn (`color` dạng `#RRGGBB`)",
+        req("text"), opt("bold"), opt("italic"), opt("underline"), opt("size"), opt("color"), opt("font"),
+        opt("alignment", "left/center/right/justify; áp cho từng đoạn vừa chèn"),
+        opt("break", "ngắt đoạn sau khối; mặc định true khi có `alignment`"), agent=True, undo=True)
 command("writer.heading", "wps", heading, "Heading 1-9 (`level`, mặc định 1) + tự xuống dòng (`break`, mặc định true)",
         opt("text"), opt("level"), opt("break"), agent=True, undo=True)
 command("writer.formatSelection", "wps", format_selection, "Định dạng vùng chọn",

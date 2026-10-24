@@ -79,6 +79,30 @@ test("lenh chi doc khong mo UndoRecord", () => {
   }
 });
 
+// Loi 24/10/2026: model goi insertStyledText cho tung dong, khong co paragraph break -> ca la don thanh
+// mot doan, lan can le cuoi cung de len tat ca. Nay '\n' phai tao doan that.
+test("writer.insertStyledText: '\\n' tach doan (TypeParagraph), mot UndoRecord cho ca khoi", () => {
+  const ctx = loadAddin();
+  const log = [];
+  const reply = run(ctx, mockApp(log), "writer.insertStyledText", {
+    text: "Dòng 1\nDòng 2\nDòng 3", font: "Times New Roman", size: 13, alignment: "center",
+  });
+  assert.equal(reply.paragraphs, 3);
+  assert.equal(reply.inserted, "Dòng 1\nDòng 2\nDòng 3".length);
+  assert.equal(log.filter((entry) => entry === "call:app.Selection.TypeText").length, 3, "moi dong mot lan TypeText");
+  // 2 lan giua 3 dong + 1 lan sau khoi (alignment => block, tu ngat doan).
+  assert.equal(log.filter((entry) => entry === "call:app.Selection.TypeParagraph").length, 3,
+    "alignment = khoi: ngat sau moi dong va sau ca khoi");
+  assert.deepEqual(log.filter((entry) => entry.startsWith("start:") || entry === "end"),
+    ["start:AI: writer.insertStyledText", "end"], "ca khoi chi mot buoc Undo");
+
+  // Khong alignment = chen inline: khong tu ngat doan (giu nguyen hanh vi cu).
+  const inline = [];
+  run(ctx, mockApp(inline), "writer.insertStyledText", { text: "chen giua cau" });
+  assert.equal(inline.filter((entry) => entry === "call:app.Selection.TypeParagraph").length, 0,
+    "inline khong duoc ngat doan");
+});
+
 test("execute khong bao gio throw: loi object model -> ok:false + error, End van duoc goi", () => {
   const ctx = loadAddin();
   for (const action of ["writer.appendText", "writer.getText", "writer.insertTable"]) {

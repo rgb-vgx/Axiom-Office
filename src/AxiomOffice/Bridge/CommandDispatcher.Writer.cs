@@ -18,9 +18,15 @@ namespace AxiomOffice.Bridge
                 Command("writer.getText", "wps", WriterGetText, "Đọc toàn bộ text", Opt("maxChars")).ForAgent(),
                 Command("writer.selection", "wps", WriterSelection, "Text + vị trí đang chọn").ForAgent(),
                 Command("writer.typeText", "wps", WriterTypeText, "Gõ tại con trỏ", Req("text")).ForAgent(),
-                Command("writer.appendText", "wps", WriterAppendText, "Nối vào cuối tài liệu", Req("text")).ForAgent(),
-                Command("writer.insertStyledText", "wps", WriterInsertStyledText, "Chèn text có định dạng tại con trỏ (`color` dạng `#RRGGBB`)",
-                    Req("text"), Opt("bold"), Opt("italic"), Opt("underline"), Opt("size"), Opt("color"), Opt("font")).ForAgent(),
+                Command("writer.appendText", "wps", WriterAppendText,
+                    "Nối một KHỐI đoạn văn vào cuối tài liệu; `\\n` tách đoạn, tự đặt lại định dạng (không kế thừa), `alignment` mặc định left",
+                    Req("text"), Opt("bold"), Opt("italic"), Opt("underline"), Opt("size"), Opt("color"), Opt("font"),
+                    Opt("alignment", "left/center/right/justify; mặc định left")).ForAgent(),
+                Command("writer.insertStyledText", "wps", WriterInsertStyledText,
+                    "Chèn text có định dạng tại con trỏ; `\\n` tách đoạn, `alignment` áp cho từng đoạn (`color` dạng `#RRGGBB`)",
+                    Req("text"), Opt("bold"), Opt("italic"), Opt("underline"), Opt("size"), Opt("color"), Opt("font"),
+                    Opt("alignment", "left/center/right/justify; áp cho từng đoạn vừa chèn"),
+                    Opt("break", "ngắt đoạn sau khối; mặc định true khi có `alignment`")).ForAgent(),
                 Command("writer.heading", "wps", WriterHeading, "Heading 1-9 (`level`, mặc định 1) + tự xuống dòng (`break`, mặc định true)",
                     Opt("text"), Opt("level"), Opt("break")).ForAgent(),
                 Command("writer.formatSelection", "wps", WriterFormatSelection, "Định dạng vùng chọn",
@@ -129,17 +135,60 @@ namespace AxiomOffice.Bridge
         private static Dictionary<string, object> WriterAppendText(IAppHost host, Dictionary<string, object> p)
         {
             string text = ParamString(p, "text", null);
-            if (text == null)
+            if (string.IsNullOrEmpty(text))
             {
-                return new Dictionary<string, object> { { "appended", 0 } };
+                return new Dictionary<string, object> { { "appended", 0 }, { "paragraphs", 0 } };
             }
             dynamic app = host.Application;
             dynamic doc = app.ActiveDocument;
+            string alignment = ParamString(p, "alignment", "left");
+            // Word nhan '\r' la paragraph mark. '\n' dau chuoi chi la y dinh "mo doan": bo di, de chi con
+            // MOT lan ngat doan do needBreak quyet dinh. Tranh Range bat dau tren paragraph mark cua doan cu
+            // (se dat lai can le ca doan cu) va tranh doan rong khi caller da gui "\r...".
+            string normalized = text.Replace("\r\n", "\n").Replace('\r', '\n').TrimStart('\n');
+            if (normalized.Length == 0)
+            {
+                return new Dictionary<string, object> { { "appended", 0 }, { "paragraphs", 0 } };
+            }
+            normalized = normalized.Replace("\n", "\r");
+            bool needBreak = false;
+            try
+            {
+                dynamic docParagraphs = doc.Paragraphs;
+                int count = Convert.ToInt32(docParagraphs.Count);
+                if (count > 0)
+                {
+                    dynamic last = docParagraphs.Item(count);
+                    string lastText = Convert.ToString(last.Range.Text).Replace("\r", "").Replace("\a", "").Trim();
+                    needBreak = lastText.Length > 0;
+                }
+            }
+            catch
+            {
+                needBreak = false;
+            }
             using (new UndoRecordScope(host.Application, "AI: append text"))
             {
-                doc.Content.InsertAfter(text);
+                // Ngat doan TRUOC khi do vi tri bat dau: Range chi phu text moi, khong dat lai can le doan cu.
+                if (needBreak)
+                {
+                    doc.Content.InsertAfter("\r");
+                }
+                int before = Convert.ToInt32(doc.Content.End);
+                doc.Content.InsertAfter(normalized);
+                int after = Convert.ToInt32(doc.Content.End);
+                if (after > before)
+                {
+                    dynamic inserted = doc.Range(before, after);
+                    ApplyWriterFontReset(inserted.Font, p);
+                    if (!string.IsNullOrEmpty(alignment))
+                    {
+                        inserted.ParagraphFormat.Alignment = ParseAlignment(alignment);
+                    }
+                }
             }
-            return new Dictionary<string, object> { { "appended", text.Length } };
+            int paragraphs = normalized.Split('\r').Length;
+            return new Dictionary<string, object> { { "appended", normalized.Length }, { "paragraphs", paragraphs } };
         }
 
         private static Dictionary<string, object> WriterReplaceAll(IAppHost host, Dictionary<string, object> p)
@@ -320,20 +369,68 @@ namespace AxiomOffice.Bridge
             }
         }
 
+        // Nhu ApplyWriterFont nhung dat TUONG MINH ca thuoc tinh khong truyen, cho KHOI doan van: Selection
+        // giu bold/underline/mau/cỡ/font cua lan chen truoc, nen bo qua se lam dinh sang cac doan sau (do
+        // 24/10/2026: ca la don bi bold + gach chan + mau xanh vi hai lan dau bat bold/underline). Khoi
+        // khong truyen size/font nhan mac dinh than van ban cua design (Times New Roman 13).
+        private static void ApplyWriterFontReset(dynamic font, Dictionary<string, object> p)
+        {
+            font.Bold = HasParam(p, "bold") && ParamBool(p, "bold", false) ? -1 : 0;
+            font.Italic = HasParam(p, "italic") && ParamBool(p, "italic", false) ? -1 : 0;
+            font.Underline = HasParam(p, "underline") && ParamBool(p, "underline", false) ? 1 : 0;
+            font.Size = HasParam(p, "size") ? ParamInt(p, "size", 13) : 13;
+            font.Name = HasParam(p, "font") ? ParamString(p, "font", "Times New Roman") : "Times New Roman";
+            int? color = ParseBgrColor(ParamString(p, "color", null));
+            font.Color = color.HasValue ? color.Value : -16777216; // wdColorAutomatic
+        }
+
         private static Dictionary<string, object> WriterInsertStyledText(IAppHost host, Dictionary<string, object> p)
         {
             string text = ParamString(p, "text", null);
             if (string.IsNullOrEmpty(text))
             {
-                return new Dictionary<string, object> { { "inserted", 0 } };
+                return new Dictionary<string, object> { { "inserted", 0 }, { "paragraphs", 0 } };
             }
             dynamic app = host.Application;
+            string alignment = ParamString(p, "alignment", null);
+            // Có alignment = một KHỐI đoạn văn: tự ngắt đoạn sau khối để lần gọi kế tiếp không dính vào
+            // đoạn này (đo 24/10/2026: 4 lời gọi header rời nhau dồn thành một đoạn). Không alignment =
+            // chèn inline, giữ nguyên hành vi cũ.
+            bool block = !string.IsNullOrEmpty(alignment);
+            bool breakAfter = HasParam(p, "break") ? ParamBool(p, "break", true) : block;
+            // '\n' (hoac '\r') = doan moi: model gui ca khoi van ban mot lan thay vi moi dong mot lenh.
+            string[] lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
             using (new UndoRecordScope(host.Application, "AI: insert styled text"))
             {
-                ApplyWriterFont(app.Selection.Font, p);
-                app.Selection.TypeText(text);
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    // Khoi: dat lai toan bo dinh dang. Inline: chi dat thuoc tinh duoc truyen, de chu chen
+                    // giua cau giu bold/mau cua van ban xung quanh (nut "Chen tra loi" chi gui text).
+                    if (block)
+                    {
+                        ApplyWriterFontReset(app.Selection.Font, p);
+                        app.Selection.ParagraphFormat.Alignment = ParseAlignment(alignment);
+                    }
+                    else
+                    {
+                        ApplyWriterFont(app.Selection.Font, p);
+                    }
+                    if (lines[i].Length > 0)
+                    {
+                        app.Selection.TypeText(lines[i]);
+                    }
+                    if (i < lines.Length - 1)
+                    {
+                        app.Selection.TypeParagraph();
+                    }
+                }
+                // Nếu text đã kết thúc bằng '\n' thì con trỏ đã ở đoạn mới; không thêm dòng trống nữa.
+                if (breakAfter && lines[lines.Length - 1].Length > 0)
+                {
+                    app.Selection.TypeParagraph();
+                }
             }
-            return new Dictionary<string, object> { { "inserted", text.Length } };
+            return new Dictionary<string, object> { { "inserted", text.Length }, { "paragraphs", lines.Length } };
         }
 
         private static Dictionary<string, object> WriterFormatSelection(IAppHost host, Dictionary<string, object> p)
@@ -460,6 +557,43 @@ namespace AxiomOffice.Bridge
         // Định dạng bảng đã có. Trước đây không có lệnh này nên agent phải undo rồi dựng lại cả bảng
         // (log 30/09 01:47). Mỗi phần định dạng bọc try riêng: phần nào host không hỗ trợ (WPS) thì bỏ qua
         // và báo trong "skipped" thay vì làm hỏng cả lệnh.
+        // Bảng dàn trang (phần đầu / phần ký văn bản hành chính) mang tem trong Table.Title (Word 2010+), giữ
+        // theo .docx sang lần mở sau. Cùng tên với LibreOffice (tên bảng) và WPS (Title) để báo cáo thống nhất.
+        internal const string LayoutTableName = "AxiomLayout";
+        private const string DataTableName = "AxiomTable";
+
+        private static void MarkLayoutTable(dynamic table, bool layout)
+        {
+            string current = "";
+            try
+            {
+                current = Convert.ToString(table.Title) ?? "";
+            }
+            catch
+            {
+            }
+            if (layout)
+            {
+                table.Title = LayoutTableName;
+            }
+            else if (current.StartsWith(LayoutTableName, StringComparison.Ordinal))
+            {
+                table.Title = DataTableName;
+            }
+        }
+
+        internal static bool IsLayoutTable(dynamic table)
+        {
+            try
+            {
+                return (Convert.ToString(table.Title) ?? "").StartsWith(LayoutTableName, StringComparison.Ordinal);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private static Dictionary<string, object> WriterFormatTable(IAppHost host, Dictionary<string, object> p)
         {
             dynamic app = host.Application;
@@ -539,7 +673,25 @@ namespace AxiomOffice.Bridge
                 {
                     // Bảng dàn trang (vd phần đầu công văn: cơ quan | quốc hiệu) không có viền.
                     bool borders = ParamBool(p, "borders", true);
-                    step("borders", delegate { table.Borders.Enable = borders ? 1 : 0; });
+                    // Kẻ khung = bảng dữ liệu, bỏ khung = bảng dàn trang: kèm luôn tem (cùng tên với LibreOffice/WPS)
+                    // để checkTables miễn empty-cells và restyle không kẻ lại khung. Không đoán theo nét kẻ - bảng
+                    // dữ liệu trần cũng không có nét kẻ.
+                    step("borders", delegate
+                    {
+                        table.Borders.Enable = borders ? 1 : 0;
+                        MarkLayoutTable(table, !borders);
+                    });
+                    if (!borders)
+                    {
+                        // Đọc lại để XÁC NHẬN tem đã ghi thật (Table.Title cần Word 2010+), như bản LibreOffice.
+                        step("layout-table", delegate
+                        {
+                            if (!IsLayoutTable(table))
+                            {
+                                throw new InvalidOperationException("could not mark the table as a layout table (Table.Title)");
+                            }
+                        });
+                    }
                 }
                 int? borderColor = ParseBgrColor(ParamString(p, "borderColor", null));
                 if (borderColor.HasValue)
@@ -549,6 +701,7 @@ namespace AxiomOffice.Bridge
                         table.Borders.Enable = 1;
                         table.Borders.OutsideColor = borderColor.Value;
                         table.Borders.InsideColor = borderColor.Value;
+                        MarkLayoutTable(table, false);
                     });
                 }
 

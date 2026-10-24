@@ -17,8 +17,11 @@ apps: [wps]
    giả heading bằng chữ đậm. Tối đa 3 cấp.
 2. **Font**: văn bản hành chính và báo cáo dùng `fonts.document` (Times New Roman) cỡ `type.body`
    (13); chữ trong bảng cỡ `type.table`.
-3. **Đoạn văn**: nội dung căn đều (`writer.setParagraphAlignment {alignment: "justify"}`), tiêu đề văn
-   bản căn giữa.
+3. **Đoạn văn**: dùng `writer.insertStyledText {text, font, size, alignment: "justify"}` với `\n` giữa các
+   đoạn — khối có `alignment` tự ngắt đoạn. **Không** gọi `writer.setParagraphAlignment` sau từng dòng và
+   **không** gõ dòng trống: mọi dòng sẽ dồn vào một đoạn, lần căn cuối đè lên cả khối. Tiêu đề văn bản căn
+   giữa; tiêu đề mục dùng `writer.heading`. `writer.appendText` chỉ để nối đoạn văn thường vào cuối — nó
+   cũng tự đặt lại định dạng, không kế thừa bold/căn lề của đoạn trước.
 4. **Bảng**: chèn bằng `writer.insertTable {values, style}` với `values` là mảng 2 chiều đầy đủ (hàng
    đầu là tiêu đề), rồi `writer.formatTable` với `style` = `document.tableStyle`, `font`, `size`.
    Đặt một dòng chú thích ngắn ngay dưới bảng ("Bảng 1. …").

@@ -1,4 +1,4 @@
-.PHONY: help test test-go test-lo test-wps test-wps-e2e test-core test-mcp test-oracle test-install core-build check-gen package clean fmt lint lint-go lint-py lint-js
+.PHONY: help test test-go test-lo test-wps test-wps-e2e test-core test-mcp test-oracle test-install test-live-format core-build check-gen package clean fmt lint lint-go lint-py lint-js
 
 GOBIN := $(shell go env GOPATH)/bin
 RUFF ?= $(shell command -v ruff 2>/dev/null || echo python3 -m ruff)
@@ -13,6 +13,7 @@ help:
 	@echo "  test-lo     - Kiem thu extension LibreOffice"
 	@echo "  test-wps    - Kiem thu add-in WPS"
 	@echo "  test-wps-e2e- E2e kenh WPS + pane tren Core that (khong can WPS)"
+	@echo "  test-live-format - Hoi quy dinh dang Word that (can Office x64 + add-in)"
 	@echo "  test-core   - Build Agent Core Go va kiem thu e2e"
 	@echo "  test-mcp    - Kiem thu MCP portable tren binary vua build"
 	@echo "  test-oracle - Kiem thu ban doi chieu (oracle) tests/oracle/*-mcp"
@@ -65,6 +66,10 @@ test-oracle:
 
 test-install:
 	python3 tests/linux/test_install_sh.py
+
+# Can Microsoft Office x64 + add-in da cai; khong nam trong `test` vi CI khong co Office.
+test-live-format:
+	python3 tests/live/test_writer_format.py
 
 # Chay package.sh that (build Core + .oxt) roi soi tarball.
 test-package:
