@@ -120,6 +120,10 @@ func mapWPSAdmin(mux *http.ServeMux, deps *Deps) {
 		}
 
 		source := config.DefaultSource()
+		if deps.ConfigSource != nil {
+			// Nguon inject (test): ghi vao file tam, khong dung vao config that.
+			source = deps.ConfigSource
+		}
 		for _, name := range names {
 			value := body[name]
 			// Khoa API: ma hoa truoc khi ghi (Windows DPAPI; Linux giu nguyen, file 0600) - giong

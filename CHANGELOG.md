@@ -5,6 +5,21 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — CI Windows: hai lỗi làm job `windows` đỏ (24/10/2026)
+
+- **`TestWPSConfigWrite` đỏ trên Windows**: test giả định nguồn cấu hình là file `config.json`, nhưng
+  `config.DefaultSource()` trên Windows là **HKCU** (`HKCU\Software\AxiomOffice`) — nên handler
+  `POST /wps/v1/config` ghi vào registry, không có file để đọc lại. Nay `api.Deps` có thêm
+  `ConfigSource` (nil = `DefaultSource()` như production); test inject `config.JSONSource` trỏ file trong
+  thư mục tạm nên **chạy giống nhau trên cả hai nền tảng**. Hệ quả có lợi: test cũ ghi đè cấu hình thật
+  của máy dev trong registry (`LlmModel`, `VisualQaEnabled`) — nay không còn; kiểm tra quyền `0600` chỉ áp
+  dụng cho non-Windows (Windows dùng ACL).
+- **Add-in Windows không biên dịch được**: `src/AxiomOffice/Ai/AskAiPane.cs` có một dấu `}` thừa (dòng 1128,
+  còn sót từ lần thay khối `switch` ở commit `d808b28`) khiến class `AskAiPane` đóng sớm → `CS1519/CS1513/CS1022`.
+  Lỗi này chặn cả bước build net48 của CI lẫn `build.ps1` chạy local. Đã bỏ dấu `}` thừa.
+- Đã đo lại toàn bộ job `windows` tại máy (Windows, cùng lệnh với CI): unit test extension **225 ok**
+  (1 skip) · `go test ./...` **xanh** · build net48 **OK** · e2e Core **169/169** · MCP portable **61/61**.
+
 ### Changed — WPS: thiết kế lại pane Ask AI, khung chat mini và ribbon (22/10/2026)
 Giữ nguyên hệ thiết kế của `theme.py` (màu, cỡ chữ, khoảng cách, chuỗi nhãn mà `test_pane_theme.mjs` đối chiếu) —
 chỉ đổi **bố cục, phân cấp và trạng thái**. Bốn bề mặt:

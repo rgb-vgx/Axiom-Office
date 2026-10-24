@@ -1125,7 +1125,6 @@ namespace AxiomOffice.Ai
         {
             return !string.IsNullOrEmpty(action) && WordEditActions.Contains(action);
         }
-        }
 
         // "Hoàn tác lượt này" (docs/architecture/core.md mục 9.2, chỉ Word): writer.undo {count: số thao tác sửa của lượt}.
         // Excel/PowerPoint không hoàn tác được thay đổi qua COM nên không có nút.

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -14,10 +15,17 @@ import (
 	"axiomoffice/core/internal/wpsbridge"
 )
 
+// wpsHandler: handler + duong dan file config.json tam (nguon cau hinh inject trong test).
+type wpsHandler struct {
+	http.Handler
+	configPath string
+}
+
 // newWPSHandler: Core co bat kenh WPS (mapWPS chi dang ky /wps/v1/* khi deps.WPS khac nil).
-// Cau hinh doc lai moi lan goi (LoadConfig) va ghi vao XDG_CONFIG_HOME tam - dung nhu luc chay that,
-// de kiem duoc ca vong "ghi roi doc lai".
-func newWPSHandler(t *testing.T) http.Handler {
+// Cau hinh doc lai moi lan goi (LoadConfig) va ghi vao file config.json tam - dung nhu luc chay
+// that (Linux), de kiem duoc ca vong "ghi roi doc lai" tren moi nen tang: nguon cau hinh mac dinh
+// cua Core la HKCU tren Windows (registry), nen test khong ghi vao config that cua nguoi dung.
+func newWPSHandler(t *testing.T) *wpsHandler {
 	t.Helper()
 	root := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(root, "config"))
@@ -27,15 +35,18 @@ func newWPSHandler(t *testing.T) http.Handler {
 	bridge := wpsbridge.New(wpsbridge.Options{
 		AddinDir: root, SessionDir: root, Token: "tok", CorePort: 1234, Version: "1.0.0",
 	})
-	return Handler(&Deps{
+	source := config.JSONSource{Path: filepath.Join(root, "config", "axiom-office", "config.json")}
+	return &wpsHandler{Handler: Handler(&Deps{
 		Config:     config.Config{Token: "tok", MemoryEnabled: true, LlmProvider: "openai", LlmModel: "m"},
-		LoadConfig: config.Load,
-		Paths:      paths,
-		Runtime:    &Runtime{Port: 1234, Started: time.Now(), Version: "1.0.0"},
-		HTTP:       http.DefaultClient,
-		Stores:     stores,
-		WPS:        bridge,
-	}, http.NewServeMux())
+		LoadConfig: func() config.Config { return config.From(os.Getenv, source) },
+		// Nguon ghi: file tam thay vi HKCU/config.json that (Windows: registry that cua nguoi dung).
+		ConfigSource: source,
+		Paths:        paths,
+		Runtime:      &Runtime{Port: 1234, Started: time.Now(), Version: "1.0.0"},
+		HTTP:         http.DefaultClient,
+		Stores:       stores,
+		WPS:          bridge,
+	}, http.NewServeMux()), configPath: source.Path}
 }
 
 // origin: header Origin dung bang origin cua Core - trinh duyet gui header nay khi pane (trang cua
@@ -99,7 +110,7 @@ func TestWPSConfigWrite(t *testing.T) {
 	}
 
 	// Ghi that vao config.json (cung file extension LibreOffice dung), giu nguyen khoa khac.
-	path := config.DefaultJSONPath()
+	path := handler.configPath
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("config.json phai duoc ghi: %v", err)
@@ -111,8 +122,11 @@ func TestWPSConfigWrite(t *testing.T) {
 	if values["VisualQaEnabled"] != true || values["LlmModel"] != "m2" {
 		t.Fatalf("config.json = %v", values)
 	}
-	if info, err := os.Stat(path); err != nil || info.Mode().Perm() != 0o600 {
-		t.Fatalf("config.json phai la 0600: %v %v", info, err)
+	// 0600 chi co y nghia tren Linux (Windows: ACL cua file, khong phai bit quyen unix).
+	if runtime.GOOS != "windows" {
+		if info, err := os.Stat(path); err != nil || info.Mode().Perm() != 0o600 {
+			t.Fatalf("config.json phai la 0600: %v %v", info, err)
+		}
 	}
 
 	// Core doc lai duoc: nut toggle doc trang thai THAT chu khong suy dien tu viec ghi thanh cong.

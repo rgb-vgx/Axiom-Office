@@ -1,8 +1,8 @@
 ﻿# Tình trạng dự án Axiom Office
 
-Cập nhật: **22/10/2026** · nhánh `main` · **10 commit chưa push remote** (đợt sửa lỗi + refactor 20/10, spec
-`checkLayout` 22/10; `origin/main` dừng ở `d206f27`) — chỉ commit, không push, theo yêu cầu của bạn. Số liệu kiểm
-chứng ở §2.4 là lượt đo **01/10/2026**; số mới của đợt WPS ở §2.6 và lượt đo lại toàn bộ ở §2.7.
+Cập nhật: **24/10/2026** · nhánh `main` · đã push (đợt sửa CI Windows 24/10 — xem §2.8). Số liệu kiểm
+chứng ở §2.4 là lượt đo **01/10/2026**; số mới của đợt WPS ở §2.6, lượt đo lại toàn bộ ở §2.7 và
+lượt đo lại job Windows ở §2.8.
 
 Tài liệu này là ảnh chụp nhanh "đã làm được gì / chưa làm được gì". Chi tiết thiết kế nằm ở
 [docs/architecture/core.md](docs/architecture/core.md) (Core + add-in) và [docs/architecture/libreoffice.md](docs/architecture/libreoffice.md) (LibreOffice);
@@ -102,7 +102,7 @@ không lệch nguồn, `go vet`/`go test`, e2e **15 phần** (đã gồm `mcp`, 
 test add-in WPS (Node), e2e kênh WPS + pane (`make test-wps-e2e`), bộ MCP portable nhắm vào binary Go, trình cài
 `install.sh`, rồi cài LibreOffice chạy bộ live + wizard và đóng gói tarball. Job **windows**
 chạy unit test, `go test`, build net48, **toàn bộ e2e của bản Go** (kèm `AxiomOffice.Host.exe` như gói phát
-hành) và bộ MCP portable nhắm vào `AxiomOffice.Host.exe mcp`.
+hành) và bộ MCP portable nhắm vào `AxiomOffice.Host.exe mcp`. Cả hai job **xanh** (đợt 24/10 — §2.8).
 
 ### 2.6 Đợt 18–20/10/2026: WPS Office for Linux
 
@@ -148,6 +148,34 @@ LibreOffice đi một đường chạy lệnh duy nhất, bỏ mã chết.
 | `tests/lo/test_impress_checks.py` (mới) | **8/8**; trên `checks.py` trước bản vá 13/10: 4/8 đỏ |
 | `tests/lo/test_bridge_env.py` (sửa 22/10) | **3/3**; trước khi sửa: đỏ khi mô phỏng `ntpath` (Windows) |
 
+### 2.8 Đợt 24/10/2026: sửa CI Windows
+
+Job `windows` trước đó đỏ ở **hai** chỗ (đều do nguyên nhân riêng, không liên quan đến nhau):
+
+- **`go test ./...` đỏ**: `TestWPSConfigWrite` giả định nguồn cấu hình là file `config.json`, nhưng
+  `config.DefaultSource()` trên Windows là **HKCU** → handler `POST /wps/v1/config` ghi registry nên không có
+  file để đọc lại. Sửa: `api.Deps.ConfigSource` (nil = `DefaultSource()` như production) + test inject
+  `config.JSONSource` trỏ file tạm → test chạy giống nhau trên hai nền tảng; **test cũ còn ghi đè cấu hình thật
+  của máy dev trong registry** (`LlmModel`, `VisualQaEnabled`) — nay không còn; kiểm tra quyền `0600` chỉ áp
+  dụng cho non-Windows.
+- **Build net48 đỏ**: `src/AxiomOffice/Ai/AskAiPane.cs` có một dấu `}` thừa (dòng 1128, sót từ lần thay khối
+  `switch` ở commit `d808b28`) khiến class `AskAiPane` đóng sớm (`CS1519/CS1513/CS1022`) — add-in Windows
+  **không biên dịch được** (kể cả `build.ps1` local). Đã bỏ dấu `}` thừa.
+
+**Đo lại job `windows` tại máy (24/10/2026, cùng lệnh với CI)**:
+
+| Bước CI | Kết quả |
+|---|---|
+| Unit test extension LibreOffice | **225 ok**, 1 skip |
+| `go test ./...` (core-go) | xanh (trước đây đỏ 1 test) |
+| Build add-in + Host (net48) | OK (trước đây lỗi cú pháp C#) |
+| e2e Core (binary Go) | **169 passed, 0 failed** |
+| `test_mcp_portable.py` (binary Go) | **61 passed, 0 failed** |
+| `scripts/generate_mcp_commands.py --check` | khớp (khối sinh tự động trong `AskAiPane.cs` không đổi) |
+
+Còn thiếu: job `windows` chưa chạy `make lint` / `make check-gen` / test WPS (Node) — các bước này mới chỉ có
+ở job `linux`, nên lỗi kiểu C# ở trên chỉ bị bắt muộn ở bước build net48.
+
 ## 3. Chưa làm / chưa kiểm chứng
 
 | Việc | Tình trạng | Ghi chú |
@@ -155,9 +183,9 @@ LibreOffice đi một đường chạy lệnh duy nhất, bỏ mã chết.
 | **Wizard Windows bấm tay trong Word/Excel/WPS** | Chưa | Đã biên dịch sạch và dựng vào `bin\Release`; cần bạn mở app bấm thử (máy này không chạy Office) |
 | e2e `--office` (Office thật + add-in, `test_office`) | Chưa chạy trong đợt này | Cần mở Excel thật; đã có từ các đợt trước |
 | Trích xuất memory với **LLM thật** | Chưa | Đã kiểm bằng LLM giả (e2e) và unit test `ParseFacts`; chưa chạy model thật |
-| Đọc/ghi **HKCU** bằng test tự động trên Windows | Một phần | Đối chiếu tay: Core Go đọc đúng endpoint/model/token/DPAPI của bạn; test tự động hiện dùng `AXIOM_*` |
-| **Push remote** | Đã push 22/10/2026 | 11 commit của đợt 18–22/10; xem §2.7 |
-| CI job **windows** | Đỏ ở bước `go test` | `TestWPSConfigWrite` giả định nguồn cấu hình là `config.json`, nhưng trên Windows `DefaultSource()` là HKCU nên không có file để đọc lại. **Bỏ qua theo yêu cầu 22/10** (trọng tâm là Linux); job `linux` xanh |
+| Đọc/ghi **HKCU** bằng test tự động trên Windows | Một phần | Đối chiếu tay: Core Go đọc đúng endpoint/model/token/DPAPI của bạn; test tự động hiện dùng `AXIOM_*`. Từ 24/10 test cũng **không còn ghi vào HKCU thật** (nguồn cấu hình inject file tạm — §2.8) |
+| **Push remote** | Đã push 24/10/2026 | Đợt 18–22/10 (11 commit) + đợt sửa CI Windows 24/10; xem §2.7 và §2.8 |
+| CI job **windows** | **Xanh (24/10/2026)** | Trước đó đỏ ở bước `go test` (`TestWPSConfigWrite` giả định nguồn cấu hình là `config.json`, nhưng trên Windows `DefaultSource()` là HKCU) và ở bước build net48 (`}` thừa trong `AskAiPane.cs`). Đã sửa cả hai — xem §2.8 |
 | Merge `feat/setup-wizard` + `feat/core-go` vào `main` | **Đã xong** | Fast-forward, lịch sử thẳng |
 | Nền tảng khác | Chưa | Chỉ build được Windows (amd64) và Linux (amd64/arm64); chưa có macOS hay Windows ARM |
 | Embedding với máy chủ thật | Chưa | Chỉ kiểm bằng máy chủ giả trả vector điều khiển được |

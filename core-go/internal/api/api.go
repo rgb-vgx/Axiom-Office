@@ -43,6 +43,12 @@ type Deps struct {
 	// LoadConfig doc lai cau hinh tu nguon moi lan goi. nil = dung Config (cho test).
 	LoadConfig func() config.Config
 
+	// ConfigSource: nguon cau hinh ghi cho /wps/v1/config. nil = config.DefaultSource() (Windows:
+	// HKCU\Software\AxiomOffice, Linux: ~/.config/axiom-office/config.json). Test inject nguon tam
+	// (file trong thu muc tam) de kiem tra "ghi xong doc lai duoc" tren moi nen tang ma khong
+	// dung vao cau hinh that cua nguoi dung (Windows: HKCU that).
+	ConfigSource config.Source
+
 	Paths   config.Paths
 	Runtime *Runtime
 	HTTP    *http.Client
