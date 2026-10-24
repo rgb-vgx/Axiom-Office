@@ -5,6 +5,57 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — Word: bảng dàn trang và `writer.restyle` cho văn bản hành chính (24/10/2026)
+
+- **`writer.formatTable {borders:false}`** (C#) nay đặt tem `AxiomLayout` vào `Table.Title` (lưu theo `.docx`,
+  `tblCaption`) và có bước `layout-table` đọc lại để xác nhận; `borderColor` / `borders:true` bỏ tem. Trước đây
+  chỉ LibreOffice/WPS có tem, nên trên Word `checkTables` báo `empty-cells` ở khoảng trống ký và model điền
+  "—" vào, sai thể thức. Hai test live có sẵn cho việc này (`test_live_commands.py`) trước đây fail trên Word.
+- **`writer.checkTables`** (C#): trả `layout` cho từng bảng, không báo `empty-cells` với bảng dàn trang (cùng
+  quy tắc `checks.py`/WPS); mô tả lệnh khớp hai bản kia.
+- **`writer.restyle`**: tài liệu có quốc hiệu → chế độ `administrative`: chữ đen (không tô `#2E5C8A`), không kẻ
+  gạch dưới tiêu đề mục, **giữ dòng trống** (khoảng trống ký). Mọi tài liệu: bỏ qua bảng dàn trang (trước đây
+  kẻ khung + tô nền hàng đầu cho cả bảng phần đầu/phần ký). Kết quả có `mode` và `layoutTables`.
+- `tests/live/test_writer_format.py` thêm 9 check (checkTables layout, restyle hành chính/thiết kế,
+  bảng không viền sau restyle, giữ khoảng trống ký): **19/19** trên Word x64.
+
+### Changed — CI Windows dùng `build.ps1` và chạy thêm lint/check-gen/test WPS (24/10/2026)
+
+- Bỏ đoạn `csc` chép tay trong `ci.yml`, gọi thẳng `scripts/build.ps1` (một nguồn tham số build).
+- Thêm vào job `windows`: `check-gen` + version + i18n, ESLint, unit test add-in WPS (Node, `PYTHON=python`).
+- Unit test LibreOffice chạy **sau** build, nên `test_catalog_matches_csharp` (đối chiếu registry C#) không
+  còn bị skip trên CI.
+- `tests/wps`: harness gọi Python qua `PYTHON` (mặc định `python3`) để chạy được trên Windows.
+
+### Changed — Agent in-process thành opt-in (24/10/2026)
+
+- Trước đây Core không chạy được là pane tự chạy agent trong add-in (`AiAgent`). Đường này **bỏ qua
+  policy/xác nhận/audit/memory của Core** và có prompt riêng, nên mặc định **tắt** (`LegacyAgent=0`).
+  Core lỗi → pane báo lỗi rõ; muốn dùng lại agent cũ thì đặt
+  `HKCU\Software\AxiomOffice\LegacyAgent=1`.
+- `README.md`, `docs/architecture/core.md` §4.2/§4.3/§7.6 và `STATUS.md` §4 cập nhật theo hành vi mới.
+
+### Fixed — Định dạng văn bản Word: mỗi khối phải là đoạn riêng (24/10/2026)
+
+- **`writer.insertStyledText`** (C#/WPS/LibreOffice): `\n` (và `\r`) tách đoạn thật; **đặt lại tường minh**
+  `bold`/`italic`/`underline`/màu khi không truyền (trước đây `Selection` giữ định dạng của lần gọi trước nên
+  bold + gạch chân + màu xanh dính sang toàn bộ lá đơn); thêm `alignment` áp cho từng đoạn vừa chèn. Khối có
+  `alignment` **tự ngắt đoạn sau** (`break`, mặc định true) để lần gọi kế tiếp không dính vào đoạn này.
+- **`writer.appendText`** (C#/WPS/LibreOffice): cùng cách đặt lại định dạng + `alignment` (mặc định `left`);
+  tự mở đoạn mới khi đoạn cuối còn chữ. Trước đây nối thẳng vào cuối tài liệu nên kế thừa bold + căn giữa của
+  khối trước.
+- **Skill** `van-ban-hanh-chinh`, `the-thuc-van-ban`: bỏ lối gọi `setParagraphAlignment` sau từng dòng (mọi
+  dòng dồn vào một đoạn, lần căn cuối đè cả khối); dặn dùng `\n` giữa các đoạn và không gõ dòng trống.
+- **`CoreClient`**: lỗi trong callback UI không còn che lỗi thật của lượt chạy (trước đây một
+  `NullReferenceException` biến lỗi HTTP 401 thành NRE); log kèm stack.
+- Metadata sinh lại (`catalog/live-commands.json`, Go MCP, WPS catalog): `appendText`/`insertStyledText` có
+  thêm `alignment`/`break`.
+- **Kiểm chứng** (24/10/2026): WPS **201**; LibreOffice **225 OK**; `go test ./...` xanh; `check-gen` + i18n
+  khớp; Excel e2e **6/6**; test định dạng tất định trên Word 12 đoạn, đúng căn lề, 0 màu, 0 đoạn rỗng; 3 lượt
+  LLM thật soạn đơn xin việc hoàn tất (lượt cuối 36,3 s / 12 vòng / 10 tool, tự kiểm chứng).
+- **Office 32-bit không hỗ trợ**: add-in tối giản (AnyCPU và x86) cũng làm Office 32-bit crash
+  `mso98win32client.dll`; đã bỏ các thay đổi 32-bit. Office x64 (2019, 16.0.14026.20302) chạy đủ lifecycle.
+
 ### Fixed — CI Windows: hai lỗi làm job `windows` đỏ (24/10/2026)
 
 - **`TestWPSConfigWrite` đỏ trên Windows**: test giả định nguồn cấu hình là file `config.json`, nhưng

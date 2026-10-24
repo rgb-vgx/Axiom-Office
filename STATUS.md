@@ -1,8 +1,8 @@
 ﻿# Tình trạng dự án Axiom Office
 
 Cập nhật: **24/10/2026** · nhánh `main` · đã push (đợt sửa CI Windows 24/10 — xem §2.8). Số liệu kiểm
-chứng ở §2.4 là lượt đo **01/10/2026**; số mới của đợt WPS ở §2.6, lượt đo lại toàn bộ ở §2.7 và
-lượt đo lại job Windows ở §2.8.
+chứng ở §2.4 là lượt đo **01/10/2026**; số mới của đợt WPS ở §2.6, lượt đo lại toàn bộ ở §2.7, lượt đo
+lại job Windows ở §2.8 và đợt Office x64 + sửa định dạng văn bản ở §2.9.
 
 Tài liệu này là ảnh chụp nhanh "đã làm được gì / chưa làm được gì". Chi tiết thiết kế nằm ở
 [docs/architecture/core.md](docs/architecture/core.md) (Core + add-in) và [docs/architecture/libreoffice.md](docs/architecture/libreoffice.md) (LibreOffice);
@@ -12,18 +12,18 @@ hướng dẫn dùng ở [README.md](README.md); lịch sử thay đổi ở [CH
 
 | Thành phần | Nền tảng | Trạng thái |
 |---|---|---|
-| **Add-in COM** (`src/AxiomOffice`, net48) | Word/Excel/PowerPoint + WPS, Windows | Chạy được; đã kiểm chứng trên Office/WPS thật ở các đợt trước. Đợt này **chưa** chạy lại làn `--office` |
+| **Add-in COM** (`src/AxiomOffice`, net48) | Word/Excel/PowerPoint + WPS, Windows | Chạy trên **Office 2019 x64** (24/10: Word đủ lifecycle, Excel e2e 6/6, LLM thật — §2.9). **Không hỗ trợ Office 32-bit**: mọi add-in .NET làm Office 32-bit crash (§2.9) |
 | **Agent Core** (`core-go/`, Go) | Windows + Linux | **Đã thay bản .NET làm bản phát hành** (G1–G10), qua toàn bộ e2e của bản .NET |
 | **MCP server** (`core-go/internal/mcpserver`, Go) | Windows + Linux | **Một bản duy nhất**, chạy bằng `AxiomOffice.Core.exe mcp`; 61/61 trên cả hai nền tảng (và 103/103 ở bộ parity sâu). Bản C# đã xoá; `AxiomOffice.Host.exe mcp` còn 232 dòng **chuyển tiếp byte** sang Core nên cấu hình cũ không phải đổi |
 | **Extension LibreOffice** (Python UNO) | Windows + Linux (LibreOffice) | Chạy được; 281/281 trên LibreOffice thật + wizard 20/20 với Core Go (01/10) |
 | **Add-in WPS Linux** (`src/AxiomOffice.WPS`, JS ES5; Core phục vụ + bridge cổng 47861) | Linux (WPS 12) | Chạy trên WPS thật: 58/80 lệnh có handler (22 chưa — `docs/architecture/wps-bridge.md` §6); ribbon 4 nhóm có icon; khung chat với menu ⋯ và 8 màn hình phụ; menu chuột phải *Sửa bằng AI* + khung chat mini (§2.6) |
-| **Wizard thiết lập** | Windows (WinForms) + Linux (awt) | Bản Linux đã chạy thật (20/20); **bản Windows mới chỉ biên dịch sạch, chưa bấm tay trong Office** |
+| **Wizard thiết lập** | Windows (WinForms) + Linux (awt) | Bản Linux đã chạy thật (20/20); **bản Windows đã dùng thật trong Word** (24/10: lưu cấu hình + `Thử ngay` OK — §2.9) |
 
 ## 2. Đã làm được
 
 ### 2.1 Agent Core viết lại bằng Go (`core-go/`) — G1 → G10
 
-Bản Go dùng **chung hợp đồng** với bản .NET: cùng Core API v1, cùng `core.json`, cùng `core.db` (schema 2),
+Bản Go dùng **chung hợp đồng** với bản .NET: cùng Core API v1, cùng `core.json`, cùng `core.db` (schema 3),
 cùng nguồn cấu hình (`AXIOM_*` → HKCU/DPAPI hoặc `~/.config/axiom-office/config.json` + libsecret), cùng tên
 mutex một-phiên-bản. Nhờ vậy add-in/extension/MCP không phải đổi gì.
 
@@ -173,16 +173,48 @@ Job `windows` trước đó đỏ ở **hai** chỗ (đều do nguyên nhân ri�
 | `test_mcp_portable.py` (binary Go) | **61 passed, 0 failed** |
 | `scripts/generate_mcp_commands.py --check` | khớp (khối sinh tự động trong `AskAiPane.cs` không đổi) |
 
-Còn thiếu: job `windows` chưa chạy `make lint` / `make check-gen` / test WPS (Node) — các bước này mới chỉ có
-ở job `linux`, nên lỗi kiểu C# ở trên chỉ bị bắt muộn ở bước build net48.
+~~Còn thiếu: job `windows` chưa chạy `make lint` / `make check-gen` / test WPS (Node).~~ Đã thêm ngày
+24/10/2026 (§2.9): job `windows` gọi `build.ps1`, chạy check-gen + i18n + ESLint + test WPS (Node). Ruff/gofmt/
+staticcheck vẫn chỉ ở job `linux` (không phụ thuộc nền tảng).
+
+### 2.9 Đợt 24/10/2026 (tiếp): Office x64, LLM thật và sửa định dạng văn bản
+
+- **Office 32-bit: không hỗ trợ.** Add-in tối giản chỉ có `IDTExtensibility2` (build cả AnyCPU lẫn x86)
+  cũng làm Word/Excel/PowerPoint crash trong `mso98win32client.dll` (`0xc0000005`, offset `0x002152ad`)
+  ngay sau `OnAddInsUpdate`; Office tự đưa add-in vào `Resiliency\DisabledItems`. Đã bỏ các thay đổi
+  32-bit (`Wow6432Node`, `-Platform anycpu`); README vẫn yêu cầu Office x64.
+- **Office x64 (2019, 16.0.14026.20302):** Word nạp đủ lifecycle (`OnConnection → OnAddInsUpdate →
+  CTPFactoryAvailable → GetCustomUI → OnRibbonLoad → OnStartupComplete`), không crash; Excel e2e
+  `--office` **6/6**; tài liệu thật đổi đúng.
+- **LLM thật** (endpoint LAN + `ocg/beam-free` qua wizard): 3 lượt *"Soạn đơn xin việc vị trí kế toán"*
+  hoàn tất (lượt cuối 36,3 s, 12 vòng, 10 tool, tự kiểm chứng); memory trích 1 fact.
+- **Sửa lỗi định dạng** (phát hiện từ `Đơn xin.docx`: 1 đoạn, toàn bộ bold + gạch chân + xanh, căn giữa):
+  - `writer.insertStyledText` (C#/WPS/LO): `\n` = đoạn thật; **reset tường minh** bold/italic/underline/
+    màu; thêm `alignment` áp từng đoạn; khối có `alignment` tự ngắt đoạn sau (`break`).
+  - `writer.appendText`: cùng reset/alignment, tự mở đoạn mới khi đoạn cuối có chữ.
+  - Skill `van-ban-hanh-chinh`/`the-thuc-van-ban`: bỏ `setParagraphAlignment` sau từng dòng, dặn `\n`
+    và không gõ dòng trống.
+  - `CoreClient`: lỗi callback không còn che lỗi lượt chạy; log kèm stack.
+- **Đo lại:** `make test-wps` **201**; `tests/lo` **225 OK**; `go test ./...` xanh; `check-gen` + i18n
+  khớp; e2e Excel **6/6**. Test định dạng tất định trên Word: 12 đoạn, đúng căn lề, 0 màu, 0 đoạn rỗng.
+- **Bảng dàn trang + `restyle` (Word):** `formatTable {borders:false}` bản C# nay đặt tem `AxiomLayout`
+  (`Table.Title`) như LibreOffice/WPS; `checkTables` trả `layout` và miễn `empty-cells`. `restyle` nhận văn
+  bản hành chính (có quốc hiệu): chữ đen, giữ khoảng trống ký, không kẻ khung bảng dàn trang.
+  `tests/live/test_writer_format.py` **19/19**.
+- **CI Windows** gọi `build.ps1` (bỏ lệnh `csc` chép tay), thêm check-gen/i18n/ESLint/test WPS (Node); test
+  LibreOffice chạy sau build nên đối chiếu registry C# không còn bị skip.
+- **Còn lại:** model vẫn có thể tự dùng dòng trống (`\n\n`) — tạo đoạn rỗng (lượt thật cuối: 14 đoạn);
+  nội dung và định dạng đúng, chỉ là khoảng cách. Live suite còn check *"mọi lệnh trong registry đều có
+  test"* fail **từ trước**: 24 lệnh (`et.addChart`, `wpp.addGrid`, `writer.restyle`…) chưa có ca live.
 
 ## 3. Chưa làm / chưa kiểm chứng
 
 | Việc | Tình trạng | Ghi chú |
 |---|---|---|
-| **Wizard Windows bấm tay trong Word/Excel/WPS** | Chưa | Đã biên dịch sạch và dựng vào `bin\Release`; cần bạn mở app bấm thử (máy này không chạy Office) |
-| e2e `--office` (Office thật + add-in, `test_office`) | Chưa chạy trong đợt này | Cần mở Excel thật; đã có từ các đợt trước |
-| Trích xuất memory với **LLM thật** | Chưa | Đã kiểm bằng LLM giả (e2e) và unit test `ParseFacts`; chưa chạy model thật |
+| **Wizard Windows bấm tay trong Word/Excel/WPS** | **Đã (24/10/2026, trong Word x64)** | Lưu cấu hình + `Thử ngay` OK (§2.9) |
+| e2e `--office` (Office thật + add-in, `test_office`) | **Đã chạy 24/10/2026** | Excel x64: 6/6 (§2.9) |
+| Trích xuất memory với **LLM thật** | **Đã (24/10/2026)** | Lượt thật trích 1 fact (`core.log`: `1 added`) |
+| **Office 32-bit** | **Không hỗ trợ** | Add-in .NET làm Office 32-bit crash `mso98win32client.dll`; kiểm bằng add-in tối giản (§2.9) |
 | Đọc/ghi **HKCU** bằng test tự động trên Windows | Một phần | Đối chiếu tay: Core Go đọc đúng endpoint/model/token/DPAPI của bạn; test tự động hiện dùng `AXIOM_*`. Từ 24/10 test cũng **không còn ghi vào HKCU thật** (nguồn cấu hình inject file tạm — §2.8) |
 | **Push remote** | Đã push 24/10/2026 | Đợt 18–22/10 (11 commit) + đợt sửa CI Windows 24/10; xem §2.7 và §2.8 |
 | CI job **windows** | **Xanh (24/10/2026)** | Trước đó đỏ ở bước `go test` (`TestWPSConfigWrite` giả định nguồn cấu hình là `config.json`, nhưng trên Windows `DefaultSource()` là HKCU) và ở bước build net48 (`}` thừa trong `AskAiPane.cs`). Đã sửa cả hai — xem §2.8 |
@@ -194,7 +226,7 @@ Còn thiếu: job `windows` chưa chạy `make lint` / `make check-gen` / test W
 | Add-in WPS: 22 lệnh chưa có handler | Chưa | `docs/architecture/wps-bridge.md` §6; thiếu `app.screenshot` nên chưa có QA thị giác trên WPS |
 | Bộ nhớ AI trên WPS: sửa / ghim / đặt hạn | Chưa | Màn hình WPS có xoá tạm, khôi phục, xoá vĩnh viễn, lọc phạm vi |
 | Bấm từng nút ribbon WPS trên WPS thật | Chưa | Mới đo qua Core thật + add-in giả; menu chuột phải và khung mini đã thử thật |
-| *Sửa bằng AI* với model thật trên nhiều trường hợp | Một phần | Một lượt thật (model hỏi lại thay vì sửa → đã thêm `QuickEditRule`); chưa đo lại sau khi sửa. Vị trí cửa sổ `ShowDialog` không chỉnh được |
+| *Sửa bằng AI* với model thật trên nhiều trường hợp | **Đã chạy 3 lượt thật (24/10/2026)** | Soạn đơn xin việc: 36,3 s / 12 vòng / 10 tool, tự kiểm chứng; đã sửa lỗi định dạng phát hiện từ file kết quả (§2.9). Vị trí cửa sổ `ShowDialog` vẫn không chỉnh được |
 
 ## 4. Ghi chú hành vi (khác bản .NET đã bỏ ngày 01/10/2026)
 
@@ -208,6 +240,8 @@ Ghi ở [core-go/README.md](core-go/README.md); tóm tắt:
 4. `conversationId` gửi kèm khoảng trắng được cắt bỏ (bản .NET coi là hội thoại mới).
 5. `Normalize` của memory dùng bảng bỏ dấu tiếng Việt tường minh (giống bản .NET); chữ Latin có dấu khác chỉ
    được bỏ dấu nếu văn bản đã ở dạng phân rã sẵn.
+6. **Agent in-process là opt-in**: `HKCU\Software\AxiomOffice\LegacyAgent=1` (mặc định 0). Lý do: đường này
+   bỏ qua policy/xác nhận/audit/memory của Core; mặc định Core lỗi thì pane báo lỗi thay vì chạy agent thứ hai.
 
 ## 5. Lệnh hay dùng
 

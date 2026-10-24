@@ -107,7 +107,7 @@ Các quy tắc này do người dùng đặt ra từ trước, **không được
 
 > **Cập nhật 01/10/2026**: Agent Core đã được viết lại bằng Go (`core-go/`, binary một file không cần runtime)
 > và **bản .NET (`src/AxiomOffice.Core`) đã bỏ khỏi repo**. Hợp đồng bên ngoài giữ nguyên: Core API v1,
-> `core.json`, `core.db` schema 2, nguồn cấu hình `AXIOM_*`/HKCU/`config.json`, tên mutex một-phiên-bản — nên
+> `core.json`, `core.db` schema 3, nguồn cấu hình `AXIOM_*`/HKCU/`config.json`, tên mutex một-phiên-bản — nên
 > add-in, extension LibreOffice và MCP không phải đổi. Các chi tiết về .NET trong tài liệu này là **thiết kế
 > ban đầu**; phần cài đặt hiện tại xem `core-go/README.md`.
 
@@ -164,7 +164,7 @@ flowchart LR
 
 | Thành phần | Giữ / thêm | Không làm |
 |---|---|---|
-| **Add-in** | UI pane, bridge, registry lệnh, ComGate, Undo, SSE; khởi động Core; client của Core; agent dự phòng | Không thêm memory, skill, MCP client vào add-in |
+| **Add-in** | UI pane, bridge, registry lệnh, ComGate, Undo, SSE; khởi động Core; client của Core; agent dự phòng **chỉ khi `LegacyAgent=1`** | Không thêm memory, skill, MCP client vào add-in |
 | **Agent Core** | Vòng agent, gọi LLM, tool registry, skills, memory, policy, audit, MCP client, lưu hội thoại | Không gọi COM trực tiếp; mọi thao tác tài liệu đi qua `POST /cmd` của bridge |
 | **Host.exe** | Giữ nguyên trên Windows (MCP server 50 tool, companion, `commands`, `llm-test`) | Không gộp vào Core. **Cập nhật 01/10/2026**: bản Linux không dùng Host.exe — MCP server là subcommand `mcp` của Core Go, cùng hợp đồng tool |
 
@@ -176,8 +176,9 @@ flowchart LR
   route qua Core), không khởi động theo Windows.
 - Core **tự thoát** khi không còn run nào và không còn session bridge nào sống (dựa trên thư mục
   `sessions`) trong 10 phút.
-- Core crash hoặc không khởi động được → pane dùng agent in-process như hiện tại và hiện một dòng
-  trạng thái nhỏ ("Đang dùng chế độ cơ bản"). Không được làm hỏng trải nghiệm đang có.
+- Core crash hoặc không khởi động được → pane báo lỗi rõ. Agent in-process chỉ chạy khi
+  `LegacyAgent=1` (mặc định 0): nó bỏ qua policy/xác nhận/audit/memory của Core, nên chỉ dành cho
+  trường hợp khẩn cấp có người dùng chấp nhận mất audit. Mọi lượt bình thường đi qua Core.
 
 ## 5. Quyết định công nghệ
 
@@ -405,7 +406,8 @@ bằng `BeginInvoke` (như `PostToUi` hiện có). **Không** chặn UI thread.
 | Giá trị | Mặc định | Ý nghĩa |
 |---|---|---|
 | `CorePort` | 47840 | Port Core |
-| `CoreEnabled` | 1 | 0 = pane luôn dùng agent in-process |
+| `CoreEnabled` | 1 | 0 = không khởi động Core; chỉ dùng được AI nếu `LegacyAgent=1` |
+| `LegacyAgent` | 0 | 1 = cho phép agent in-process khi Core lỗi (bỏ qua policy/audit/memory — chỉ dùng khẩn cấp) |
 | `MemoryEnabled` | 1 | 0 = không đọc/ghi memory dài hạn (hội thoại vẫn lưu) |
 | `MemoryAutoExtract` | 1 | 0 = không tự trích xuất sau run (chỉ `remember` và người dùng ghi) |
 | `MemoryModel` | rỗng | Model cho trích xuất/gộp memory (rỗng = `LlmModel`) |

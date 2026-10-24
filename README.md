@@ -156,9 +156,10 @@ cùng API cho Office và WPS; host không hỗ trợ thì mở cửa sổ nổi)
    liệu đang mở — chỉ các lệnh có dấu ✓ ở cột **Ask AI** trong [bảng lệnh](#danh-sách-lệnh-post-cmd);
    lệnh khác (vd `writer.closeAll`, `ai.ask`) bị từ chối. Mỗi thao tác hiện thành một dòng: dấu tick
    xanh / x đỏ, nhãn tiếng Việt và mã action. Lượt chạy đi qua **Agent Core** (`AxiomOffice.Core.exe`)
-   khi có; Core không chạy được (không khởi động/không nhận lượt chạy) thì pane tự chạy agent trong
-   add-in và ghi chú "chế độ cơ bản" ở dòng trạng thái. Core đã nhận lượt chạy thì **không bao giờ**
-   chạy lại in-process (tránh sửa tài liệu hai lần) — lỗi của Core hiện thẳng cho người dùng.
+   khi có; Core không chạy được (không khởi động/không nhận lượt chạy) thì pane báo lỗi rõ. Agent
+   in-process chỉ chạy khi bật rõ `HKCU\Software\AxiomOffice\LegacyAgent=1` (mặc định tắt) — nó bỏ qua
+   policy/xác nhận/audit/memory của Core nên không dùng làm đường mặc định. Core đã nhận lượt chạy thì
+   **không bao giờ** chạy lại in-process (tránh sửa tài liệu hai lần).
 3. Xong thì AI trả lời ngắn. Với Word: mỗi thao tác của AI = **1 bước Ctrl+Z**; link **Chèn trả
    lời** chèn câu trả lời vào tài liệu.
 
@@ -167,8 +168,8 @@ Hành vi:
 - **Không giới hạn số vòng** gọi model/tool. Lượt chạy qua **Agent Core** dừng khi AI trả lời xong, khi bấm
   **Dừng** (hủy ngay request đang chờ), hoặc khi model im lặng **300 giây** (không gửi byte nào); Core không đặt
   trần thời gian cho cả lượt. Lượt quá dài (tới vòng 30, hoặc 500k token) thì pane **hỏi** chạy tiếp hay dừng.
-  Riêng **chế độ cơ bản** (agent chạy trong add-in khi không có Core) vẫn giữ trần 5 phút
-  (`LlmClient.AgentTimeoutMs`) và 60 giây cho mỗi request LLM.
+  Riêng **agent in-process** (chỉ khi `LegacyAgent=1`) vẫn giữ trần 5 phút (`LlmClient.AgentTimeoutMs`)
+  và 60 giây cho mỗi request LLM.
 - Agent **không tự lưu / lưu thành / xuất PDF** nếu người dùng không yêu cầu: thay đổi đã hiện
   trong tài liệu đang mở, người dùng tự quyết khi nào lưu và lưu ở đâu.
 - **Nhớ theo tài liệu**: các lượt trong cùng một tài liệu nối thành một cuộc trò chuyện (lưu ở
