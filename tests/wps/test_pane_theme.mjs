@@ -36,7 +36,8 @@ const PANE_JS = path.join(ADDIN, "pane.js");
 
 // He thiet ke cua pane LibreOffice (nguon doi chieu duy nhat - khong chep tay so nao vao day).
 function theme() {
-  return JSON.parse(execFileSync("python3", [path.join(ROOT, "tests", "wps", "theme_dump.py")],
+  const python = process.env.PYTHON || "python3";
+  return JSON.parse(execFileSync(python, [path.join(ROOT, "tests", "wps", "theme_dump.py")],
     { encoding: "utf8", maxBuffer: 8 * 1024 * 1024 }));
 }
 function paneHtml() {

@@ -126,16 +126,13 @@ jobs:
   # runner nen chi chay phan khong can app: unit test, Agent Core, build net48 va bo test MCP portable.
   windows:
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
-      - name: Unit test extension LibreOffice
-        run: python -m unittest discover -s tests/lo -v
 
       - uses: actions/setup-go@v5
         with:
@@ -146,34 +143,49 @@ jobs:
         working-directory: core-go
         run: go test ./...
 
-      - name: Build add-in + Host (net48)
+      # Goi CHINH build.ps1 (tim csc bang vswhere, build add-in + Host + Core Go, chep skills) thay vi chep tay
+      # lenh csc: truoc 24/10/2026 hai noi giu hai bo tham so rieng va lech nhau. Runner sach nen khong co app
+      # nao giu DLL.
+      - name: Build add-in + Host (net48) + Agent Core bang scripts/build.ps1
         shell: pwsh
         run: |
-          # build.ps1 cua project tat app dang giu DLL; runner sach nen chi can phan build.
-          # csc Roslyn cua ban Visual Studio / Build Tools moi nhat tren runner (image windows-latest doi ban VS
-          # nen khong co dinh duong dan 2022\BuildTools).
-          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-          $csc = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -find "MSBuild\**\Bin\Roslyn\csc.exe" | Select-Object -First 1
-          if (-not $csc -or -not (Test-Path $csc)) { throw "khong thay csc (Roslyn) cua Visual Studio / Build Tools" }
-          Write-Host "csc: $csc"
-          $fw = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319"
-          $stage = Join-Path $env:TEMP "axiom-ci"
-          New-Item -ItemType Directory -Force -Path $stage | Out-Null
-          $addin = @(Get-ChildItem -Path src\AxiomOffice -Recurse -Filter *.cs | Where-Object { $_.FullName -notlike "*\bin\*" -and $_.FullName -notlike "*\obj\*" } | ForEach-Object { $_.FullName })
-          $hosts = @($addin + @(Get-ChildItem -Path src\AxiomOffice.Host -Recurse -Filter *.cs | ForEach-Object { $_.FullName }))
-          $common = @("/nologo", "/platform:x64", "/langversion:7.3", "/codepage:65001",
-                      "/r:$fw\mscorlib.dll", "/r:$fw\System.dll", "/r:$fw\System.Core.dll",
-                      "/r:$fw\System.Web.Extensions.dll", "/r:$fw\System.Windows.Forms.dll",
-                      "/r:$fw\System.Drawing.dll", "/r:$fw\System.Security.dll", "/r:$fw\Microsoft.CSharp.dll",
-                      # ZipArchive: wpp.addSlideFromTemplate doc kho slide trong tep mau .pptx (khong chi Host).
-                      "/r:$fw\System.IO.Compression.dll")
-          $hostOnly = @("/r:$fw\System.IO.Compression.dll", "/r:$fw\System.IO.Compression.FileSystem.dll",
-                        "/r:$fw\System.Xml.dll", "/r:$fw\System.Xml.Linq.dll")
-          & $csc @common /target:library "/out:$stage\AxiomOffice.dll" $addin
-          if ($LASTEXITCODE -ne 0) { throw "add-in build failed" }
-          & $csc @common @hostOnly /target:exe "/out:$stage\AxiomOffice.Host.exe" $hosts
-          if ($LASTEXITCODE -ne 0) { throw "host build failed" }
-          Write-Host "net48 build OK"
+          & .\scripts\build.ps1
+          if ($LASTEXITCODE -ne 0) { throw "build.ps1 failed" }
+          foreach ($f in "AxiomOffice.dll", "AxiomOffice.Host.exe", "AxiomOffice.Core.exe") {
+            if (-not (Test-Path "src\AxiomOffice\bin\Release\$f")) { throw "thieu $f sau build.ps1" }
+          }
+
+      # SAU build: test_catalog_matches_csharp so registry Python voi `AxiomOffice.Host.exe commands --json` -
+      # truoc day buoc nay chay truoc khi build nen test do luon bi skip tren CI.
+      - name: Unit test extension LibreOffice (kem doi chieu registry C#)
+        run: python -m unittest discover -s tests/lo -v
+
+      # Cac buoc nay truoc day chi co o job linux, nen loi C#/JS chi bi bat muon (hoac khong bi bat) tren Windows.
+      - name: File sinh khong duoc lech nguon + i18n add-in
+        run: |
+          python scripts/generate_setup_catalog.py --check
+          python scripts/generate_mcp_commands.py --check
+          python scripts/check_version.py
+          python scripts/check_i18n.py
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Lint JS + unit test add-in WPS (Node)
+        shell: pwsh
+        env:
+          # Test Node goi Python de lay registry/theme; Windows chi co `python`, khong co `python3`.
+          PYTHON: python
+        run: |
+          npm ci
+          npx --no-install eslint .
+          if ($LASTEXITCODE -ne 0) { throw "eslint failed" }
+          node --test tests/wps/test_addin_fake.mjs tests/wps/test_addin.mjs tests/wps/test_addin_et.mjs `
+            tests/wps/test_addin_wpp.mjs tests/wps/test_addin_writer.mjs tests/wps/test_probe.mjs tests/wps/test_pane.mjs `
+            tests/wps/test_pane_theme.mjs tests/wps/test_pane_view.mjs tests/wps/test_mini_view.mjs
+          if ($LASTEXITCODE -ne 0) { throw "WPS node tests failed" }
 
       - name: Agent Core ban Go (e2e day du tren Windows)
         shell: pwsh

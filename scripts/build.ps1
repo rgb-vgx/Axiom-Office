@@ -13,16 +13,23 @@ $stage = Join-Path $out ".stage"
 $coreExe = Join-Path $out "AxiomOffice.Core.exe"
 $skillsDir = Join-Path $root "skills"
 $fw = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319"
-$csc = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin\Roslyn\csc.exe"
 
 . (Join-Path $PSScriptRoot "core.ps1")
 
-if (-not (Test-Path -LiteralPath $csc)) {
-    $csc = "$fw\csc.exe"
-    if (-not (Test-Path -LiteralPath $csc)) {
-        throw "No C# compiler found. Install Visual Studio Build Tools or .NET Framework."
-    }
+# csc: Roslyn cua Visual Studio / Build Tools. Duong dan hard-code (VS 2022 BuildTools) khong con tren
+# moi image Windows (VS doi ten thu muc) - tim bang vswhere nhu CI, roi moi fallback ve csc cua
+# .NET Framework (C# 5: khong du cho /langversion:7.3 nen canh bao).
+$vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+$csc = $null
+if (Test-Path -LiteralPath $vswhere) {
+    $csc = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -find "MSBuild\**\Bin\Roslyn\csc.exe" |
+        Select-Object -First 1
 }
+if (-not $csc -or -not (Test-Path -LiteralPath $csc)) {
+    # csc cua .NET Framework chi la C# 5 va tu choi /langversion:7.3 -> khong the la fallback.
+    throw "Khong tim thay Roslyn csc.exe. Cai Visual Studio Build Tools (MSBuild + C#) - build can /langversion:7.3."
+}
+Write-Host "csc: $csc"
 
 # Build khi host con giu DLL tung lam DLL bien mat (csc doi ten file dang bi lock roi ghi hong).
 # Hoi Windows Restart Manager xem chinh xac tien trinh nao dang lock DLL/EXE dau ra

@@ -85,9 +85,11 @@ export function throwing(message) {
 let cachedCatalog = null;
 
 // Registry lenh cua extension LibreOffice: nguon duy nhat cho metadata (ten, kind, agent, summary, params).
+// PYTHON: tren Windows chi co `python` (khong co alias python3) - dat PYTHON=python khi chay local.
 export function loCatalog() {
   if (cachedCatalog === null) {
-    cachedCatalog = JSON.parse(execFileSync("python3", [path.join(ROOT, "tests", "wps", "lo_catalog.py")],
+    const python = process.env.PYTHON || "python3";
+    cachedCatalog = JSON.parse(execFileSync(python, [path.join(ROOT, "tests", "wps", "lo_catalog.py")],
       { encoding: "utf8" }));
   }
   return cachedCatalog;
