@@ -6,6 +6,7 @@ import (
 
 	"axiomoffice/core/internal/office"
 	"axiomoffice/core/internal/skills"
+	"axiomoffice/core/internal/tools"
 )
 
 // DocumentContext: ngu canh tai lieu ma pane gui kem (muc 7.3).
@@ -91,6 +92,37 @@ const PlanModeRule = "PLAN MODE for this turn: the user wants to approve a plan 
 	"choice (only the slide/section the user is looking at, keep the user's existing content and images, do " +
 	"not add new slides/sheets unless asked). Do not claim that anything was changed, and do not ask for " +
 	"permission inside the steps: the user will reply to run the plan."
+
+// PlanCapabilities: o lap ke hoach tool chi con lenh doc, nen model khong biet buoc thuc hien se co lenh gi (luot that
+// 25/10/2026: de 10 slide kien truc, ke hoach ve so do bang chu vi khong thay wpp.addShape/addConnector va
+// slides_from_brief). Liet ke lenh ghi + mo ta tool chi co khi chay - CHI de len ke hoach, khong goi duoc luc nay.
+func PlanCapabilities(full *tools.OfficeActionTool, act []tools.Tool) string {
+	writes := []string{}
+	for _, name := range full.AllowedActions() {
+		if !tools.ReadOnly(name) {
+			writes = append(writes, name)
+		}
+	}
+	extra := []string{}
+	for _, tool := range act {
+		if tool.Name() == tools.TodoToolName {
+			continue
+		}
+		extra = append(extra, tool.Name()+": "+tool.Description())
+	}
+	if len(writes) == 0 && len(extra) == 0 {
+		return ""
+	}
+	text := " WHEN THE USER RUNS THE PLAN you will also have the following (do not call them now; plan with them and " +
+		"prefer the most fitting one - e.g. real shapes, connectors and charts over text that only describes a diagram)."
+	if len(writes) > 0 {
+		text += " office_action write actions: " + strings.Join(writes, ", ") + "."
+	}
+	for _, line := range extra {
+		text += " Tool " + line
+	}
+	return text
+}
 
 // Base: phan 1 cua system prompt - vai tro va quy tac chung (giu hanh vi da kiem chung tren Office that).
 func Base(appName string) string {

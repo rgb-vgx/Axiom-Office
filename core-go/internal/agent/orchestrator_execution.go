@@ -145,24 +145,8 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 		officeTool = tools.NewReadOnlyOfficeActionTool(catalog, appKind)
 	}
 	list := []tools.Tool{officeTool}
-	// Dung lai ca bai theo mau tung lo (docs/architecture/template-design.md muc 6.6): chi trinh chieu, chi khi sua duoc, va
-	// chi khi bridge co lenh doc bai nguon (PowerPoint; LibreOffice/WPS chua co).
-	if appKind == "wpp" && !readOnly && catalog.Has("wpp.sourceManifest") {
-		list = append(list, tools.NewSlidesFromTemplateTool())
-	}
-	// Dung slide moi tu brief (docs/plans/18-s0 M4): Core tinh vi tri theo luoi + tokens, model chi viet chu.
-	if appKind == "wpp" && !readOnly && catalog.Has("wpp.addParagraphs") {
-		list = append(list, tools.NewSlidesFromBriefTool(o.Skills))
-	}
-	// Trinh bay lai tai lieu Word theo mau (khoi bo tron nen nhat): chi khi sua duoc va bridge co lenh dung khoi.
-	// Dang khoa vung boi den thi khong mo (doc_design trinh bay lai ca tai lieu, bridge se tu choi).
-	locked := request.Document != nil && request.Document.SelectionLocked
-	if appKind == "wps" && !readOnly && !locked && catalog.Has("writer.insertBlocks") {
-		list = append(list, tools.NewDocDesignTool())
-	}
-	// Danh sach viec (write_todos): chi khi lam that - lap ke hoach da tra ve ke hoach bang chu.
 	if !readOnly {
-		list = append(list, tools.NewTodoTool())
+		list = append(list, o.actTools(appKind, catalog, request)...)
 	}
 	if len(appSkills) > 0 && o.Skills != nil {
 		list = append(list, tools.NewLoadSkillTool(o.Skills, appKind), tools.NewReadSkillFileTool(o.Skills, appKind))
@@ -249,7 +233,10 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 	systemPrompt := Build(appKind, session, request.Document, appSkills, memoryContext.Lines, assembled.Summary,
 		assembled.RecentActionLines)
 	if request.Plan {
-		systemPrompt += "\n\n" + PlanModeRule
+		// Ke hoach phai dung lenh se CO khi chay: luot that 25/10/2026 (ocg/beam-free, de 10 slide kien truc) chi thay
+		// lenh doc nen len ke hoach so do bang chu, hoi "neu lenh ve khoi/mui ten khong kha dung".
+		systemPrompt += "\n\n" + PlanModeRule + PlanCapabilities(tools.NewOfficeActionTool(catalog, appKind),
+			o.actTools(appKind, catalog, request))
 	}
 	// Lenh nhanh "Sua bang AI": nguoi dung bam lenh la da quyet - sua ngay, khong hoi lai (quickactions.go).
 	if request.QuickAction != "" {
@@ -472,4 +459,28 @@ func targetDocument(document *DocumentContext, session *office.Session) string {
 		return strings.TrimSpace(session.Document)
 	}
 	return ""
+}
+
+// actTools: tool chi co khi LAM THAT - khong co o lap ke hoach / lenh nhanh chi tra loi (o lap ke hoach chi duoc
+// MO TA qua PlanCapabilities, de ke hoach dung dung lenh se co khi chay).
+func (o *Orchestrator) actTools(appKind string, catalog *office.CommandCatalog, request *Request) []tools.Tool {
+	list := []tools.Tool{}
+	// Dung lai ca bai theo mau tung lo (docs/architecture/template-design.md muc 6.6): chi trinh chieu, va chi khi
+	// bridge co lenh doc bai nguon (PowerPoint; LibreOffice/WPS chua co).
+	if appKind == "wpp" && catalog.Has("wpp.sourceManifest") {
+		list = append(list, tools.NewSlidesFromTemplateTool())
+	}
+	// Dung slide moi tu brief (docs/plans/18-s0 M4): Core tinh vi tri theo luoi + tokens, model chi viet chu.
+	if appKind == "wpp" && catalog.Has("wpp.addParagraphs") {
+		list = append(list, tools.NewSlidesFromBriefTool(o.Skills))
+	}
+	// Trinh bay lai tai lieu Word theo mau (khoi bo tron nen nhat): chi khi bridge co lenh dung khoi. Dang khoa vung
+	// boi den thi khong mo (doc_design trinh bay lai ca tai lieu, bridge se tu choi).
+	locked := request.Document != nil && request.Document.SelectionLocked
+	if appKind == "wps" && !locked && catalog.Has("writer.insertBlocks") {
+		list = append(list, tools.NewDocDesignTool())
+	}
+	// Danh sach viec (write_todos): chi khi lam that - lap ke hoach da tra ve ke hoach bang chu.
+	list = append(list, tools.NewTodoTool())
+	return list
 }
