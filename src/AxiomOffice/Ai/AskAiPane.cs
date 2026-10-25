@@ -1230,6 +1230,17 @@ namespace AxiomOffice.Ai
             {
                 message = Ui.T("Không kết nối được máy chủ AI (") + (Config.LlmEndpoint ?? "") + ").";
             }
+            else if (lower.Contains("repeated the same failing call"))
+            {
+                // Core chu dong dung (repeatedFailureGuard), khong phai may chu AI loi - luot that 25/10/2026 nguoi dung
+                // doc "May chu AI bao loi" va tuong AI hong.
+                message = Ui.T("AI gọi lại cùng một lệnh bị lỗi nhiều lần nên Axiom đã dừng lượt này (máy chủ AI không lỗi). Chi tiết: ")
+                    + Truncate(error, 300);
+            }
+            else if (!string.IsNullOrEmpty(result.ErrorKind) && result.ErrorKind != "provider" && result.ErrorKind != "config")
+            {
+                message = Ui.T("Axiom đã dừng lượt chạy: ") + Truncate(error, 300);
+            }
             else
             {
                 message = Ui.T("Máy chủ AI báo lỗi: ") + Truncate(error, 300);

@@ -413,5 +413,7 @@
   "✓ Agent Core: đang chạy (phiên bản ": "✓ Agent Core: running (version ",
   "✗ Add-in: không trả lời ở cổng ": "✗ Add-in: not answering on port ",
   "Agent Core không chạy được (": "Agent Core is not running (",
+  "AI gọi lại cùng một lệnh bị lỗi nhiều lần nên Axiom đã dừng lượt này (máy chủ AI không lỗi). Chi tiết: ": "The AI kept repeating the same failing command, so Axiom stopped this run (the AI server is fine). Details: ",
+  "Axiom đã dừng lượt chạy: ": "Axiom stopped the run: ",
   "AI không phản hồi kịp nên lượt chạy đã dừng.": "The AI did not respond in time, so the run stopped."
 }

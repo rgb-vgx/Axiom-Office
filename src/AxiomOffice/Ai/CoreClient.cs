@@ -831,6 +831,7 @@ namespace AxiomOffice.Ai
                     break;
                 case "run.failed":
                     result.Error = item.Error ?? "agent failed";
+                    result.ErrorKind = item.ErrorKind;
                     break;
             }
         }

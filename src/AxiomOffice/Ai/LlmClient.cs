@@ -16,6 +16,9 @@ namespace AxiomOffice.Ai
         public bool Ok;
         public string Text;
         public string Error;
+        // ErrorKind: loai loi Core bao (provider | config | internal | office | budget ...) - phan biet loi may chu AI
+        // voi viec Core chu dong dung luot (vd lap lai mot lenh hong). Rong khi khong qua Core.
+        public string ErrorKind;
         public double Seconds;
         public bool Cancelled;
         public bool TimedOut;
