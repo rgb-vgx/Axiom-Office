@@ -27,7 +27,8 @@ func NewSlidesFromBriefTool(index *skills.Index) *SlidesFromBriefTool {
 func (t *SlidesFromBriefTool) Name() string { return "slides_from_brief" }
 
 func (t *SlidesFromBriefTool) Description() string {
-	return "Add NEW slides at the end of the open presentation from a short spec, without a template file: you choose " +
+	return "Add NEW slides at the end of the open presentation from a short spec, without a template file (it adds the slides " +
+		"itself - do not call wpp.addSlide first): you choose " +
 		"each slide's layout and write the words; the tool places everything on the grid (positions, font sizes, " +
 		"colours) and checks the layout. Use it instead of wpp.addText / wpp.addTable for new slides. Layouts: " +
 		"cover {title, subtitle}; section {title}; content {title, points, callout}; cards {title, cards: [{title, " +
@@ -157,11 +158,40 @@ func (t *SlidesFromBriefTool) tokens() briefTokens {
 // briefFont: phong do suc chua (he so 0,53 / 1,21 do bang Arial) va phong chu tieng Viet an toan (template_build.go).
 const briefFont = "Arial"
 
+// nestedLayouts: kieu ma model yeu hay viet truong cua no LONG trong mot khoa cung ten - {"layout":"diagram",
+// "diagram":{"nodes":[...],"edges":[...]}} - vi chart thi dung la long ({"chart":{...}}). Luot that 25/10/2026
+// (ocg/beam-free, de 10 slide kien truc): tool doc nodes o cap slide nen thay 0 nut, bao NEED_2_TO_10_NODES, model
+// gui lai y het 3 lan va luot hong. Chart khong nam day (khoa "chart" chinh la truong cua no).
+var nestedLayouts = map[string]bool{"diagram": true, "process": true, "timeline": true, "cards": true, "figures": true,
+	"content": true, "cover": true}
+
+// unnestLayoutFields: chep truong trong khoa cung ten voi layout len cap slide (truong da co o cap slide giu nguyen).
+func unnestLayoutFields(list []any) {
+	for _, item := range list {
+		entry, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		layout := strings.TrimSpace(textOf(entry["layout"]))
+		nested, ok := entry[layout].(map[string]any)
+		if !ok || !nestedLayouts[layout] {
+			continue
+		}
+		for key, value := range nested {
+			if _, exists := entry[key]; !exists {
+				entry[key] = value
+			}
+		}
+		delete(entry, layout)
+	}
+}
+
 func parseBrief(value any) ([]briefSlide, []rowError) {
 	list, _ := value.([]any)
 	if len(list) == 0 {
 		return nil, []rowError{{Field: "slides", Error: "EMPTY", Allowed: "one or more slides"}}
 	}
+	unnestLayoutFields(list)
 	rows, errors := parseCompose(value)
 	slides := []briefSlide{}
 	for i, row := range rows {
@@ -428,7 +458,8 @@ func checkBrief(slides []briefSlide, grid slidelayout.Grid, tokens briefTokens) 
 			}
 		case "process":
 			if len(slide.Steps) < 3 || len(slide.Steps) > 5 {
-				errors = append(errors, rowError{Src: slot, Field: "steps", Error: "NEED_3_TO_5_STEPS", Actual: len(slide.Steps)})
+				errors = append(errors, rowError{Src: slot, Field: "steps", Error: "NEED_3_TO_5_STEPS", Actual: len(slide.Steps),
+					Allowed: `steps directly on the slide: {"layout":"process","title":"...","steps":[{"title":"...","text":"..."}]}`})
 				break
 			}
 			errors = append(errors, checkGroups(slot, slide)...)
@@ -443,7 +474,8 @@ func checkBrief(slides []briefSlide, grid slidelayout.Grid, tokens briefTokens) 
 			}
 		case "timeline":
 			if len(slide.Milestones) < 3 || len(slide.Milestones) > 6 {
-				errors = append(errors, rowError{Src: slot, Field: "milestones", Error: "NEED_3_TO_6_MILESTONES", Actual: len(slide.Milestones)})
+				errors = append(errors, rowError{Src: slot, Field: "milestones", Error: "NEED_3_TO_6_MILESTONES", Actual: len(slide.Milestones),
+					Allowed: `milestones directly on the slide: {"layout":"timeline","title":"...","milestones":[{"date":"...","text":"..."}]}`})
 				break
 			}
 			_, _, dates, texts := slidelayout.Timeline(area, len(slide.Milestones))
@@ -502,7 +534,8 @@ func shapeText(box slidelayout.Rect) slidelayout.Rect {
 // diagramLayers: nut theo tang (tang 1 tren cung), giu thu tu trong tang; kiem id, tang, canh.
 func diagramLayers(slide briefSlide) ([][]briefNode, []rowError) {
 	if len(slide.Nodes) < 2 || len(slide.Nodes) > 10 {
-		return nil, []rowError{{Field: "nodes", Error: "NEED_2_TO_10_NODES", Actual: len(slide.Nodes)}}
+		return nil, []rowError{{Field: "nodes", Error: "NEED_2_TO_10_NODES", Actual: len(slide.Nodes),
+			Allowed: `nodes and edges directly on the slide: {"layout":"diagram","title":"...","nodes":[{"id":"a","text":"...","layer":1}],"edges":[{"from":"a","to":"b"}]}`}}
 	}
 	errors := []rowError{}
 	byLayer := map[int][]briefNode{}

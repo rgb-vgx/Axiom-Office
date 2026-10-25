@@ -308,3 +308,31 @@ func TestSlidesFromBriefCoverSubtitleCentered(t *testing.T) {
 		t.Fatalf("tieu de va phu de phai can giua: %v", aligned)
 	}
 }
+
+// Luot that 25/10/2026: model viet {"layout":"diagram","diagram":{"nodes":[...],"edges":[...]}} (chart thi dung la long
+// trong khoa "chart"), tool thay 0 nut, model gui lai y het 3 lan va luot hong. Nay chap nhan dang long.
+func TestSlidesFromBriefAcceptsNestedLayoutFields(t *testing.T) {
+	run, calls := briefBridge(t)
+	result := NewSlidesFromBriefTool(nil).Invoke(context.Background(), brief(t, `[
+		{"layout":"diagram","title":"Ba tầng xử lý yêu cầu","diagram":{"nodes":[{"id":"a","text":"Gateway","layer":1},
+		 {"id":"b","text":"Orchestrator","layer":2}],"edges":[{"from":"a","to":"b"}]}},
+		{"layout":"process","title":"Ba bước tiếp nhận","process":{"steps":[{"title":"Nhận"},{"title":"Kiểm"},{"title":"Trả"}]}}
+	]`), run)
+	if !result.OK || !strings.Contains(result.JSON, `"built":2`) {
+		t.Fatalf("dang long phai dung duoc: %s", result.JSON)
+	}
+	connectors := 0
+	for _, call := range *calls {
+		if call.Action == "wpp.addConnector" {
+			connectors++
+		}
+	}
+	if connectors != 3 {
+		t.Fatalf("1 duong noi so do + 2 mui ten quy trinh, co %d", connectors)
+	}
+	// Thieu nut that su: loi chi ro cach viet dung.
+	bad := NewSlidesFromBriefTool(nil).Invoke(context.Background(), brief(t, `[{"layout":"diagram","title":"Trống","nodes":[]}]`), run)
+	if !strings.Contains(bad.JSON, "NEED_2_TO_10_NODES") || !strings.Contains(bad.JSON, "directly on the slide") {
+		t.Fatalf("loi phai chi cach viet dung: %s", bad.JSON)
+	}
+}
