@@ -5,6 +5,26 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — Sơ đồ slide: dây không cắt hộp, checkLayout thấy đường nối, nhóm màu (25/10/2026)
+
+Lượt thật (PowerPoint, `ocg/beam-free`, đề 10 slide kiến trúc AI Agent ngân hàng): sơ đồ kiến trúc có dây xuyên qua
+hai hộp, dây quay về chồng lên dây khác, mà `checkLayout` báo 0 lỗi; bìa lệch; slide quy trình không phân biệt được
+bước của AI với bước của hệ thống nghiệp vụ.
+
+- **`wpp.checkLayout`** tính đường đi THẬT của đường nối (thẳng/gấp khúc, lật, xoay, độ sâu đường vòng) và báo
+  `connector-crossing` (dây cắt qua hộp không phải đầu/cuối của nó; khung bao một đầu thì không tính) và
+  `connector-overlap` (hai dây chồng trên một quãng; toả nhánh / gom nhánh dùng chung thân thì không tính). Mỗi
+  đường nối trả thêm `path`, `from`, `to`.
+- **`wpp.addConnector`**: `fromSide` / `toSide` (top/bottom/left/right) và `offset` (độ sâu đường vòng chữ U).
+- **`slides_from_brief` / `diagram`**: dây được chọn đường (`slidelayout.RouteDiagram`) - tầng kề: đáy → đỉnh; cùng
+  hàng kề: thẳng; cùng hàng nhảy qua nút: vòng dưới (rồi trên) hàng, các vòng lệch độ sâu; vượt tầng / quay ngược:
+  vòng bên hông, ra ngoài hộp xa nhất.
+- **Nhóm màu**: `group` cho bước (`process`) và nút (`diagram`), tối đa 3 nhóm - mỗi nhóm một màu theo token và
+  một dòng chú thích ở đầu vùng nội dung.
+- **Bìa**: phụ đề căn giữa như tiêu đề.
+- Skill `trinh-bay-chuyen-nghiep`: vẽ đủ mũi tên quay về / nhảy nút, không bỏ thành phần xuyên suốt, dùng `group`.
+- Test: Go (`route_test.go` tái hiện sơ đồ hỏng; nhóm, chú thích, bìa), `test_live_slides.py` 22/22 trên PowerPoint x64.
+
 ### Fixed — Lỗi tìm ra khi phủ test live cho mọi lệnh (25/10/2026)
 
 - **`wpp.newFromTemplate` khi tệp mẫu đang mở**: `Presentations.Open` trả về chính bài đang mở, nên lệnh xoá hết

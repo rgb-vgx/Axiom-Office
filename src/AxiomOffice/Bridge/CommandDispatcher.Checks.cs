@@ -67,6 +67,10 @@ namespace AxiomOffice.Bridge
             // Đường nối (Shape.Connector): là đường, không có diện tích - khung bao của đường gấp khúc trùm lên các hộp
             // nó nối, không phải chồng.
             public bool Connector;
+            // Đường nối: đường đi thật (toạ độ slide) và tên hai hình nó bám vào (null = đầu tự do).
+            public List<double[]> Path;
+            public string BeginShape;
+            public string EndShape;
         }
 
         private static Dictionary<string, object> WppCheckLayout(IAppHost host, Dictionary<string, object> p)
@@ -92,15 +96,7 @@ namespace AxiomOffice.Bridge
                 slides.Add(new Dictionary<string, object>
                 {
                     { "index", i },
-                    { "shapes", boxes.Select(b => (object)new Dictionary<string, object>
-                        {
-                            { "name", b.Name },
-                            { "left", Math.Round(b.Left, 1) },
-                            { "top", Math.Round(b.Top, 1) },
-                            { "width", Math.Round(b.Width, 1) },
-                            { "height", Math.Round(b.Height, 1) },
-                            { "chars", b.Chars }
-                        }).ToList() },
+                    { "shapes", boxes.Select(b => (object)ShapeEntry(b)).ToList() },
                     { "issues", issues }
                 });
             }
@@ -111,6 +107,27 @@ namespace AxiomOffice.Bridge
                 { "issueCount", issueCount },
                 { "slides", slides }
             };
+        }
+
+        private static Dictionary<string, object> ShapeEntry(ShapeBox b)
+        {
+            var entry = new Dictionary<string, object>
+            {
+                { "name", b.Name },
+                { "left", Math.Round(b.Left, 1) },
+                { "top", Math.Round(b.Top, 1) },
+                { "width", Math.Round(b.Width, 1) },
+                { "height", Math.Round(b.Height, 1) },
+                { "chars", b.Chars }
+            };
+            // Đường nối: đường đi thật (để soát/đo) và hai hình nó nối.
+            if (b.Connector && b.Path != null)
+            {
+                entry["path"] = b.Path.Select(point => (object)new[] { Math.Round(point[0], 1), Math.Round(point[1], 1) }).ToList();
+                entry["from"] = b.BeginShape;
+                entry["to"] = b.EndShape;
+            }
+            return entry;
         }
 
         private static List<ShapeBox> ReadShapes(dynamic slide)
@@ -131,8 +148,12 @@ namespace AxiomOffice.Bridge
                         Height = Convert.ToDouble(shape.Height),
                         MinFont = 0
                     };
-                    RotateBox(box, ComDouble(() => shape.Rotation));
                     box.Connector = ComFlag(() => shape.Connector);
+                    if (box.Connector)
+                    {
+                        ReadConnector(shape, box);
+                    }
+                    RotateBox(box, ComDouble(() => shape.Rotation));
                     try
                     {
                         if (Convert.ToInt32(shape.HasTextFrame) == -1 && Convert.ToInt32(shape.TextFrame.HasText) == -1)
@@ -268,6 +289,7 @@ namespace AxiomOffice.Bridge
                     }
                 }
             }
+            ConnectorIssues(boxes, slideWidth, slideHeight, issues);
             if (totalChars > DenseSlideChars)
             {
                 issues.Add(Issue("dense", "the slide has " + totalChars + " characters; keep one message per slide and move details to notes (wpp.setNotes)"));

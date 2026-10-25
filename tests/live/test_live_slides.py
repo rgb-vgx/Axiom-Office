@@ -10,6 +10,8 @@ Kiem:
   - H4: wpp.addTable tra ten shape.
   - P2: wpp.addShape + wpp.addConnector (duong noi bam hai hinh), checkLayout khong bao chong; so do 3 tang noi
         theo huong "down" khong co duong cat hop.
+  - Duong noi: checkLayout tinh duong di that (connector-crossing, connector-overlap); addConnector fromSide/toSide +
+        offset ve duong vong duoi hang khong cat hop.
   - Bieu do goc: wpp.addChart (cot co don vi, tron), listSlides doc lai gia tri, checkLayout sach.
   - P3: wpp.renderSlide tra PNG cua slide theo so.
 """
@@ -125,20 +127,58 @@ def main() -> int:
     check(any(i.get("type") == "overlap" for i in layout["slides"][0]["issues"]), "P2 hai hop chong that van bao overlap",
           layout["slides"][0]["issues"])
 
+    # Day cat hop (luot that 25/10/2026, so do kien truc): checkLayout tinh duong di THAT cua duong noi.
+    b.ok("wpp.addSlide", {"layout": 12, "presentation": a})
+    slide = 4
+    row = {}
+    for n, key in enumerate(("p", "r", "k", "v")):
+        row[key] = b.ok("wpp.addShape", {"presentation": a, "slide": slide, "shape": "rounded", "left": 40 + n * 229, "top": 300,
+                                         "width": 193, "height": 60, "text": key, "line": "#1F4E79"})["shape"]
+    head = b.ok("wpp.addShape", {"presentation": a, "slide": slide, "shape": "rounded", "left": 360, "top": 150, "width": 240,
+                                 "height": 60, "text": "c", "line": "#1F4E79"})["shape"]
+    straight = b.ok("wpp.addConnector", {"presentation": a, "slide": slide, "from": row["p"], "to": row["k"]})["shape"]
+    layout = b.ok("wpp.checkLayout", {"presentation": a, "slide": slide})["slides"][0]
+    crossing = [i for i in layout["issues"] if i.get("type") == "connector-crossing"]
+    check(any(set(i.get("shapes", [])) == {straight, row["r"]} for i in crossing), "Day thang xuyen qua hop -> connector-crossing",
+          layout["issues"])
+    entry = next((s for s in layout["shapes"] if s["name"] == straight), {})
+    check(len(entry.get("path") or []) == 2 and entry.get("from") == row["p"] and entry.get("to") == row["k"],
+          "checkLayout tra duong di + hai dau cua duong noi", entry)
+    b.ok("wpp.deleteShapes", {"presentation": a, "slide": slide, "shapes": [straight]})
+    # Duong vong duoi hang (fromSide = toSide = bottom): khong cat hop; offset dat do sau, hai vong khong trung nhau.
+    loops = [b.ok("wpp.addConnector", {"presentation": a, "slide": slide, "from": row[x], "to": row[y], "elbow": True,
+                                       "fromSide": "bottom", "toSide": "bottom", "offset": offset})["shape"]
+             for x, y, offset in (("p", "k", 16), ("r", "v", 26))]
+    layout = b.ok("wpp.checkLayout", {"presentation": a, "slide": slide})["slides"][0]
+    wires = [i for i in layout["issues"] if i.get("type", "").startswith("connector-")]
+    check(not wires, "Duong vong duoi hang khong cat hop, khong chong nhau", wires)
+    depths = [max(point[1] for point in next(s for s in layout["shapes"] if s["name"] == name)["path"]) for name in loops]
+    check(abs(depths[0] - 376) < 3 and abs(depths[1] - 386) < 3, "Duong vong sau dung offset (day hop 360 + 16 / + 26)", depths)
+    # Hai duong nguoc chieu tren cung mot doan -> connector-overlap.
+    b.ok("wpp.addConnector", {"presentation": a, "slide": slide, "from": row["r"], "to": head, "direction": "up",
+                              "elbow": True})
+    b.ok("wpp.addConnector", {"presentation": a, "slide": slide, "from": head, "to": row["r"], "direction": "down",
+                              "elbow": True})
+    layout = b.ok("wpp.checkLayout", {"presentation": a, "slide": slide})["slides"][0]
+    check(any(i.get("type") == "connector-overlap" for i in layout["issues"]), "Hai duong chong nhau -> connector-overlap",
+          layout["issues"])
+    bad = b.call("wpp.addConnector", {"presentation": a, "slide": slide, "from": row["p"], "to": row["v"], "fromSide": "cheo"})
+    check(not bad.get("ok"), "fromSide sai -> loi", bad)
+
     # Bieu do goc: so lieu nam trong bang tinh nhung, listSlides doc lai duoc gia tri kem don vi.
     b.ok("wpp.addSlide", {"layout": 12, "presentation": a})
-    column = b.ok("wpp.addChart", {"presentation": a, "slide": 4, "type": "column", "categories": ["Q1", "Q2", "Q3", "Q4"],
+    column = b.ok("wpp.addChart", {"presentation": a, "slide": 5, "type": "column", "categories": ["Q1", "Q2", "Q3", "Q4"],
                                    "series": [{"name": "Doanh thu", "values": [28, 31, 33, 36]}], "unit": " tỷ",
                                    "colors": ["#1F4E79"], "font": "Arial", "left": 40, "top": 130, "width": 420, "height": 330})
-    pie = b.ok("wpp.addChart", {"presentation": a, "slide": 4, "type": "pie", "categories": ["Nhân sự", "Văn phòng", "Khác"],
+    pie = b.ok("wpp.addChart", {"presentation": a, "slide": 5, "type": "pie", "categories": ["Nhân sự", "Văn phòng", "Khác"],
                                 "series": [{"name": "Chi phí", "values": [55, 25, 20]}], "unit": "%",
                                 "colors": ["#1F4E79", "#2E75B6", "#849EB5"], "left": 500, "top": 130, "width": 420, "height": 330})
-    texts = "\n".join(b.ok("wpp.listSlides", {"presentation": a})["slides"][3]["shapeTexts"])
+    texts = "\n".join(b.ok("wpp.listSlides", {"presentation": a})["slides"][4]["shapeTexts"])
     check(bool(column.get("shape")) and bool(pie.get("shape")), "Chart addChart tra ten", (column, pie))
     check("Q4 36 tỷ" in texts and "Nhân sự 55%" in texts, "Chart listSlides doc gia tri kem don vi", texts)
-    layout = b.ok("wpp.checkLayout", {"presentation": a, "slide": 4})
+    layout = b.ok("wpp.checkLayout", {"presentation": a, "slide": 5})
     check(layout.get("issueCount") == 0, "Chart checkLayout sach", layout.get("slides"))
-    bad = b.call("wpp.addChart", {"presentation": a, "slide": 4, "type": "pie", "categories": ["a", "b"],
+    bad = b.call("wpp.addChart", {"presentation": a, "slide": 5, "type": "pie", "categories": ["a", "b"],
                                   "series": [{"name": "x", "values": [1, 2]}, {"name": "y", "values": [1, 2]}]})
     check(not bad.get("ok"), "Chart pie hai chuoi -> loi", bad)
 
@@ -147,7 +187,7 @@ def main() -> int:
     png = base64.b64decode(shot.get("base64") or "")
     check(png[:8] == b"\x89PNG\r\n\x1a\n" and shot.get("width") == 640 and shot.get("slide") == 2, "P3 renderSlide tra PNG",
           {k: v for k, v in shot.items() if k != "base64"})
-    bad = b.call("wpp.renderSlide", {"presentation": a, "slide": 9})
+    bad = b.call("wpp.renderSlide", {"presentation": a, "slide": 19})
     check(not bad.get("ok"), "P3 renderSlide slide khong co -> loi", bad)
 
     print("\n%d dat, %d loi (bai thu de lai mo: %s, %s - dong khong luu)" % (len(passed), len(failed), a, other))

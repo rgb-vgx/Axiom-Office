@@ -154,7 +154,12 @@ func TestSlidesFromBriefDrawsProcessAndDiagramWithConnectors(t *testing.T) {
 			}
 		case "wpp.addConnector":
 			connectors = append(connectors, [2]string{call.Params["from"].(string), call.Params["to"].(string)})
-			directions = append(directions, call.Params["direction"].(string))
+			// Quy trinh: direction; so do: canh ra/vao do RouteDiagram chon.
+			if direction, ok := call.Params["direction"].(string); ok {
+				directions = append(directions, direction)
+			} else {
+				directions = append(directions, call.Params["fromSide"].(string)+">"+call.Params["toSide"].(string))
+			}
 		}
 	}
 	if !shapes["Tiếp nhận\nkiểm tra danh mục"] || !shapes["Bộ định tuyến"] || len(shapes) != 7 {
@@ -166,7 +171,7 @@ func TestSlidesFromBriefDrawsProcessAndDiagramWithConnectors(t *testing.T) {
 		t.Fatalf("duong noi = %v", connectors)
 	}
 	// Huong noi tuong minh (khong de PowerPoint chon diem noi): quy trinh sang phai, so do tu day cha xuong dinh con.
-	wantDirections := []string{"right", "right", "down", "down", "down"}
+	wantDirections := []string{"right", "right", "bottom>top", "bottom>top", "bottom>top"}
 	for i := range want {
 		if connectors[i] != want[i] || directions[i] != wantDirections[i] {
 			t.Fatalf("duong noi %d = %v %s, muon %v %s", i, connectors[i], directions[i], want[i], wantDirections[i])
@@ -175,18 +180,6 @@ func TestSlidesFromBriefDrawsProcessAndDiagramWithConnectors(t *testing.T) {
 	// Slide va hinh do tool dung la cua luot: xoa slide 2 khong phai hoi.
 	if !run.ownedObjects().covers("wpp.deleteSlide", map[string]any{"slide": 2.0, "presentation": "Presentation3"}) {
 		t.Fatal("slide do tool dung phai ghi vao so cua luot")
-	}
-}
-
-func TestDiagramDirection(t *testing.T) {
-	cases := []struct {
-		fromLayer, fromPlace, toLayer, toPlace int
-		want                                   string
-	}{{0, 0, 1, 1, "down"}, {2, 0, 1, 0, "up"}, {1, 0, 1, 2, "right"}, {1, 2, 1, 0, "left"}}
-	for _, c := range cases {
-		if got := diagramDirection(c.fromLayer, c.fromPlace, c.toLayer, c.toPlace); got != c.want {
-			t.Fatalf("%+v -> %s", c, got)
-		}
 	}
 }
 
@@ -238,5 +231,80 @@ func TestSlidesFromBriefRejectsBadChart(t *testing.T) {
 		if call.Action != "wpp.checkLayout" {
 			t.Fatalf("co loi thi khong duoc dung gi, da goi %s", call.Action)
 		}
+	}
+}
+
+// Nhom mau (luot that 25/10/2026: slide vong doi yeu cau phai phan biet buoc cua AI voi buoc cua he thong nghiep vu):
+// moi nhom mot mau, mot dong chu thich o dau vung noi dung; so do va quy trinh day xuong duoi chu thich.
+func TestSlidesFromBriefGroupsColourStepsAndAddLegend(t *testing.T) {
+	run, calls := briefBridge(t)
+	result := NewSlidesFromBriefTool(nil).Invoke(context.Background(), brief(t, `[
+		{"layout":"process","title":"AI đề xuất, hệ thống nghiệp vụ xác minh","steps":[
+		 {"title":"Phân loại intent","group":"AI"},{"title":"Kiểm tra quyền","group":"Nghiệp vụ"},
+		 {"title":"Soạn trả lời","group":"AI"},{"title":"Ghi audit","group":"Nghiệp vụ"}]}
+	]`), run)
+	if !result.OK || !strings.Contains(result.JSON, `"built":1`) {
+		t.Fatalf("phai dung duoc: %s", result.JSON)
+	}
+	fills := map[string]string{}
+	labels, swatches, stepTop := []string{}, 0, 0.0
+	for _, call := range *calls {
+		switch call.Action {
+		case "wpp.addShape":
+			if text, ok := call.Params["text"].(string); ok {
+				fills[text] = call.Params["fill"].(string)
+				stepTop = call.Params["top"].(float64)
+			} else if call.Params["shape"] == "rect" {
+				swatches++
+			}
+		case "wpp.addParagraphs":
+			paras := call.Params["paragraphs"].([]any)
+			if text := paras[0].(map[string]any)["t"].(string); text == "AI" || text == "Nghiệp vụ" {
+				labels = append(labels, text)
+			}
+		}
+	}
+	if fills["Phân loại intent"] != fills["Soạn trả lời"] || fills["Phân loại intent"] == fills["Kiểm tra quyền"] {
+		t.Fatalf("cung nhom cung mau, khac nhom khac mau: %v", fills)
+	}
+	if swatches != 2 || strings.Join(labels, ",") != "AI,Nghiệp vụ" {
+		t.Fatalf("chu thich = %d o mau, nhan %v", swatches, labels)
+	}
+	if stepTop < 130+legendHeight {
+		t.Fatalf("buoc phai nam duoi dong chu thich, top = %v", stepTop)
+	}
+}
+
+func TestSlidesFromBriefRejectsTooManyGroups(t *testing.T) {
+	run, calls := briefBridge(t)
+	result := NewSlidesFromBriefTool(nil).Invoke(context.Background(), brief(t, `[
+		{"layout":"process","title":"Bốn nhóm thì quá nhiều màu","steps":[{"title":"A","group":"1"},{"title":"B","group":"2"},
+		 {"title":"C","group":"3"},{"title":"D","group":"4"}]}
+	]`), run)
+	if !strings.Contains(result.JSON, "MAX_3_GROUPS") {
+		t.Fatalf("phai tu choi: %s", result.JSON)
+	}
+	for _, call := range *calls {
+		if call.Action != "wpp.checkLayout" {
+			t.Fatalf("co loi thi khong duoc dung gi, da goi %s", call.Action)
+		}
+	}
+}
+
+// Bia: phu de can giua nhu tieu de (truoc day can trai).
+func TestSlidesFromBriefCoverSubtitleCentered(t *testing.T) {
+	run, calls := briefBridge(t)
+	NewSlidesFromBriefTool(nil).Invoke(context.Background(), brief(t, `[
+		{"layout":"cover","title":"AI Agent Platform for Digital Banking","subtitle":"Secure, Governed and Observable"}
+	]`), run)
+	aligned := []string{}
+	for _, call := range *calls {
+		if call.Action == "wpp.addParagraphs" {
+			para := call.Params["paragraphs"].([]any)[0].(map[string]any)
+			aligned = append(aligned, textOf(para["a"]))
+		}
+	}
+	if strings.Join(aligned, ",") != "center,center" {
+		t.Fatalf("tieu de va phu de phai can giua: %v", aligned)
 	}
 }

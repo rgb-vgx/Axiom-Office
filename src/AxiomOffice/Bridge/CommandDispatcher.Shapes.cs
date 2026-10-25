@@ -28,6 +28,9 @@ namespace AxiomOffice.Bridge
                     Req("from", "shape name"), Req("to", "shape name"), Opt("slide"),
                     Opt("elbow", "true = elbow connector (default straight)"),
                     Opt("direction", "down, up, right or left: leave 'from' on that side and enter 'to' on the opposite side; default: nearest sides"),
+                    Opt("fromSide", "top, bottom, left or right side of 'from' (overrides direction)"),
+                    Opt("toSide", "top, bottom, left or right side of 'to' (overrides direction); same side as fromSide + elbow = a loop around the row"),
+                    Opt("offset", "loop only: how far (pt) the loop goes beyond the farther end (default: PowerPoint's choice)"),
                     Opt("color", "#RRGGBB"), Opt("weight", "points"),
                     Opt("presentation", "full path of the presentation to work on; default: the active one")),
                 ChartCommand()
@@ -136,14 +139,22 @@ namespace AxiomOffice.Bridge
             // MsoConnectorType: 1 thẳng, 2 gấp khúc. Có hướng thì nối đúng cạnh (đáy cha -> đỉnh con): RerouteConnections
             // chọn "điểm gần nhất" có thể cho đường gấp khúc cắt ngang hộp bên cạnh (benchmark s17, docs/plans/18-s0 9.3).
             string direction = ParamString(p, "direction", null);
-            int begin = ConnectSite(from, direction, false);
-            int end = ConnectSite(to, direction, true);
+            string fromSide = ParamString(p, "fromSide", null), toSide = ParamString(p, "toSide", null);
+            int begin = string.IsNullOrWhiteSpace(fromSide) ? ConnectSite(from, direction, false) : SideSite(from, fromSide, "fromSide");
+            int end = string.IsNullOrWhiteSpace(toSide) ? ConnectSite(to, direction, true) : SideSite(to, toSide, "toSide");
             dynamic connector = slide.Shapes.AddConnector(ParamBool(p, "elbow", false) ? 2 : 1, 0, 0, 10, 10);
             connector.ConnectorFormat.BeginConnect(from, begin > 0 ? begin : 1);
             connector.ConnectorFormat.EndConnect(to, end > 0 ? end : 1);
             if (begin == 0 || end == 0)
             {
                 connector.RerouteConnections();
+            }
+            // Đường vòng (cùng một cạnh ở hai đầu, gấp khúc): đặt độ sâu để hai đường vòng của cùng hàng không trùng nhau.
+            double offset = ParamDouble(p, "offset", 0);
+            if (offset > 0 && ParamBool(p, "elbow", false) && !string.IsNullOrWhiteSpace(fromSide)
+                && string.Equals(fromSide.Trim(), (toSide ?? "").Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                SetLoopOffset(connector, fromSide.Trim().ToLowerInvariant(), offset);
             }
             connector.Line.EndArrowheadStyle = 2; // msoArrowheadTriangle
             connector.Line.Weight = (float)ParamDouble(p, "weight", 1.75);
@@ -178,6 +189,22 @@ namespace AxiomOffice.Bridge
             }
             int count = Convert.ToInt32(shape.ConnectionSiteCount);
             return count > 0 && count % 4 == 0 ? 1 + side * count / 4 : 0;
+        }
+
+        // Điểm nối ở giữa một cạnh (top/left/bottom/right) - cùng cách đánh số với ConnectSite.
+        private static int SideSite(dynamic shape, string side, string param)
+        {
+            int index;
+            switch (side.Trim().ToLowerInvariant())
+            {
+                case "top": index = 0; break;
+                case "left": index = 1; break;
+                case "bottom": index = 2; break;
+                case "right": index = 3; break;
+                default: throw new ArgumentException("'" + param + "' must be top, bottom, left or right, got " + side);
+            }
+            int count = Convert.ToInt32(shape.ConnectionSiteCount);
+            return count > 0 && count % 4 == 0 ? 1 + index * count / 4 : 0;
         }
 
         private static dynamic ConnectEnd(dynamic slide, string name)

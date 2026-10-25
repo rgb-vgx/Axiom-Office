@@ -19,7 +19,10 @@ dưới đây không áp dụng. Không tự vẽ lại mẫu bằng `wpp.addTex
 `section`, `content`, `cards`, `table`, `figures`; quy trình `process`, dòng thời gian `timeline`, sơ đồ khối
 `diagram` vẽ bằng hình khối và mũi tên sửa được; biểu đồ `chart` cột/thanh/đường/tròn là biểu đồ thật của
 PowerPoint: số trong `values` là số trần, đơn vị để ở `unit`) và viết chữ; tool tự đặt vị trí, cỡ chữ, màu theo lưới mục 1–2
-và tự soát. Gặp lỗi `TOO_LONG` thì rút chữ theo gợi ý rồi gọi lại với **cả** danh sách slide. Bảng toạ độ mục 1,
+và tự soát. Mũi tên của `diagram` được tự đi vòng quanh các hộp khác, nên vẽ đủ cả mũi tên quay về và mũi tên nhảy qua
+một nút; mỗi tầng tối đa 4 nút - thành phần xuyên suốt (giám sát, nhật ký) đặt ở tầng riêng, đừng bỏ. Đề bài cần
+phân biệt ai làm bước nào (vd AI và hệ thống nghiệp vụ) → gán `group` cho từng bước/nút (2–3 nhóm, tên ngắn): mỗi
+nhóm một màu và có chú thích. Gặp lỗi `TOO_LONG` thì rút chữ theo gợi ý rồi gọi lại với **cả** danh sách slide. Bảng toạ độ mục 1,
 mục 3 và `wpp.addText` chỉ dùng khi không có tool này hoặc để sửa lẻ một hộp chữ có sẵn. Mục 4 vẫn áp dụng.
 
 **Nguồn là văn bản của cơ quan Đảng, Nhà nước** (nghị quyết, kế hoạch, báo cáo, chuyên đề có quốc hiệu

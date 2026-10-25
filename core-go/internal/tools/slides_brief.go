@@ -32,9 +32,12 @@ func (t *SlidesFromBriefTool) Description() string {
 		"colours) and checks the layout. Use it instead of wpp.addText / wpp.addTable for new slides. Layouts: " +
 		"cover {title, subtitle}; section {title}; content {title, points, callout}; cards {title, cards: [{title, " +
 		"points}] 2-4}; table {title, table: [[header...], [row...]...] up to 7 rows x 5 columns}; figures {title, " +
-		"figures: [{value, label}] 2-3 big numbers}; process {title, steps: [{title, text}] 3-5 steps joined by arrows}; " +
-		"timeline {title, milestones: [{date, text}] 3-6}; diagram {title, nodes: [{id, text, layer}] up to 10 (layer 1 = " +
-		"top row, up to 4 nodes per layer), edges: [{from, to}] arrows between node ids}; chart {title, chart: {type column|bar|line|pie, " +
+		"figures: [{value, label}] 2-3 big numbers}; process {title, steps: [{title, text, group}] 3-5 steps joined by arrows}; " +
+		"timeline {title, milestones: [{date, text}] 3-6}; diagram {title, nodes: [{id, text, layer, group}] up to 10 (layer 1 = " +
+		"top row, up to 4 nodes per layer), edges: [{from, to}] arrows between node ids - arrows are routed around the " +
+		"other boxes, so back arrows and arrows that skip a node are fine}; optional group on steps/nodes (2-3 short names, " +
+		"e.g. \"AI\" / \"Business system\"): each group gets its own colour and a legend, to show who does which step; " +
+		"chart {title, chart: {type column|bar|line|pie, " +
 		"categories: [...] 2-12, series: [{name, values: [numbers]}] 1-4 (pie: 1), unit e.g. \"%\" or \" tỷ\"}} - a real, " +
 		"editable PowerPoint chart with value labels. Any slide may add notes (speaker notes) and source (one line). " +
 		"title: a short conclusion sentence. points: short phrases, \"**word**\" to stress, \"- \" for level 2. Make " +
@@ -53,13 +56,16 @@ var briefLayouts = []string{"cover", "section", "content", "cards", "table", "fi
 
 type briefFigure struct{ Value, Label string }
 
-// briefItem: mot buoc (title, text) hoac mot moc (date, text).
-type briefItem struct{ Title, Text string }
+// briefItem: mot buoc (title, text) hoac mot moc (date, text). Group: nhom mau cua buoc (vd "AI" / "Nghiệp vụ").
+type briefItem struct{ Title, Text, Group string }
 
 type briefNode struct {
-	ID, Text string
-	Layer    int
+	ID, Text, Group string
+	Layer           int
 }
+
+// maxGroups: so nhom mau toi da tren mot slide quy trinh / so do (mau: primary, muted, accent).
+const maxGroups = 3
 
 type briefEdge struct{ From, To string }
 
@@ -98,7 +104,8 @@ func briefItems(value any, titleKey, textKey string) []briefItem {
 		case string:
 			items = append(items, briefItem{Title: strings.TrimSpace(entry)})
 		case map[string]any:
-			items = append(items, briefItem{Title: strings.TrimSpace(textOf(entry[titleKey])), Text: strings.TrimSpace(textOf(entry[textKey]))})
+			items = append(items, briefItem{Title: strings.TrimSpace(textOf(entry[titleKey])), Text: strings.TrimSpace(textOf(entry[textKey])),
+				Group: strings.TrimSpace(textOf(entry["group"]))})
 		}
 	}
 	return items
@@ -167,7 +174,8 @@ func parseBrief(value any) ([]briefSlide, []rowError) {
 				for _, item := range nodes {
 					if node, ok := item.(map[string]any); ok {
 						slide.Nodes = append(slide.Nodes, briefNode{ID: strings.TrimSpace(textOf(node["id"])),
-							Text: strings.TrimSpace(textOf(node["text"])), Layer: asInt(node["layer"])})
+							Text: strings.TrimSpace(textOf(node["text"])), Group: strings.TrimSpace(textOf(node["group"])),
+							Layer: asInt(node["layer"])})
 					}
 				}
 			}
@@ -423,7 +431,8 @@ func checkBrief(slides []briefSlide, grid slidelayout.Grid, tokens briefTokens) 
 				errors = append(errors, rowError{Src: slot, Field: "steps", Error: "NEED_3_TO_5_STEPS", Actual: len(slide.Steps)})
 				break
 			}
-			for s, box := range slidelayout.Process(area, len(slide.Steps)) {
+			errors = append(errors, checkGroups(slot, slide)...)
+			for s, box := range slidelayout.Process(shapesArea(area, slide), len(slide.Steps)) {
 				step := slide.Steps[s]
 				field := fmt.Sprintf("steps[%d]", s)
 				if step.Title == "" {
@@ -461,7 +470,8 @@ func checkBrief(slides []briefSlide, grid slidelayout.Grid, tokens briefTokens) 
 			if len(problems) > 0 {
 				break
 			}
-			rows := slidelayout.Diagram(area, layerCounts(layers))
+			errors = append(errors, checkGroups(slot, slide)...)
+			rows := slidelayout.Diagram(shapesArea(area, slide), layerCounts(layers))
 			for l, layer := range layers {
 				for n, node := range layer {
 					fits(slot, "nodes["+node.ID+"]", node.Text, shapeText(rows[l][n]), body)
@@ -611,7 +621,12 @@ func buildBriefSlide(bridge func(string, map[string]any) (map[string]any, string
 		})
 		if slide.Subtitle != "" {
 			steps = append(steps, func() string {
-				return text(parasFromText(slide.Subtitle), subtitle, tokens.Slide.Type.Subtitle, colors.Muted, nil)
+				// Can giua nhu tieu de (truoc day phu de can trai duoi tieu de can giua - luot that 25/10/2026).
+				paras := parasFromText(slide.Subtitle)
+				for p := range paras {
+					paras[p].A = "center"
+				}
+				return text(paras, subtitle, tokens.Slide.Type.Subtitle, colors.Muted, nil)
 			})
 		}
 	case "section":
@@ -755,14 +770,41 @@ func briefShapes(bridge func(string, map[string]any) (map[string]any, string), i
 			return problem
 		}
 	}
-	style := func(filled bool) map[string]any {
+	// connectRoute: so do - canh ra/vao do RouteDiagram chon (tranh hop khac, duong vong co do sau rieng).
+	connectRoute := func(from, to *string, route slidelayout.Route) func() string {
+		return func() string {
+			params := map[string]any{"slide": index, "from": *from, "to": *to, "elbow": route.Elbow, "fromSide": route.FromSide,
+				"toSide": route.ToSide, "color": colors.Muted}
+			if route.Offset > 0 {
+				params["offset"] = slidelayout.Round1(route.Offset)
+			}
+			_, problem := bridge("wpp.addConnector", params)
+			return problem
+		}
+	}
+	groups := groupsOf(slide)
+	palette := groupPalette(colors)
+	style := func(filled bool, group string) map[string]any {
 		values := map[string]any{"line": colors.Primary, "boldFirst": true}
 		if filled {
 			values["fill"] = slidelayout.Tint(colors.Primary, 0.9)
 		}
+		// Co nhom: moi nhom mot mau (nen nhat + vien dam), ke ca hop khong nhom dung mau nhom dau.
+		if len(groups) > 0 {
+			swatch := palette[max(0, indexOf(groups, group))]
+			values["fill"], values["line"] = swatch.Fill, swatch.Line
+		}
 		return values
 	}
-	area := grid.Content()
+	area := shapesArea(grid.Content(), slide)
+	if len(groups) > 0 {
+		steps = append(steps, legendSteps(groups, palette, grid.Content(), func(box slidelayout.Rect, swatch groupSwatch) string {
+			_, problem := shape(box, "rect", "", map[string]any{"fill": swatch.Fill, "line": swatch.Line})
+			return problem
+		}, func(label string, box slidelayout.Rect) string {
+			return text([]sourcePara{{T: label}}, box, tokens.Slide.Type.Caption, colors.Text, map[string]any{"anchor": "middle"})
+		})...)
+	}
 	switch slide.Layout {
 	case "process":
 		names := make([]string, len(slide.Steps))
@@ -770,7 +812,7 @@ func briefShapes(bridge func(string, map[string]any) (map[string]any, string), i
 			s, rect, step := s, rect, slide.Steps[s]
 			steps = append(steps, func() string {
 				var problem string
-				names[s], problem = shape(rect, "rounded", stepText(step), style(true))
+				names[s], problem = shape(rect, "rounded", stepText(step), style(true, step.Group))
 				return problem
 			})
 		}
@@ -809,32 +851,107 @@ func briefShapes(bridge func(string, map[string]any) (map[string]any, string), i
 				names[node.ID], layerOf[node.ID], place[node.ID] = name, l, n
 				steps = append(steps, func() string {
 					var problem string
-					*name, problem = shape(rect, "rounded", node.Text, style(first))
+					*name, problem = shape(rect, "rounded", node.Text, style(first, node.Group))
 					return problem
 				})
 			}
 		}
+		edges := []slidelayout.Edge{}
 		for _, edge := range slide.Edges {
-			steps = append(steps, connect(names[edge.From], names[edge.To], layerOf[edge.From] != layerOf[edge.To],
-				diagramDirection(layerOf[edge.From], place[edge.From], layerOf[edge.To], place[edge.To])))
+			edges = append(edges, slidelayout.Edge{FromLayer: layerOf[edge.From], FromPlace: place[edge.From],
+				ToLayer: layerOf[edge.To], ToPlace: place[edge.To]})
+		}
+		for e, route := range slidelayout.RouteDiagram(rows, edges) {
+			steps = append(steps, connectRoute(names[slide.Edges[e].From], names[slide.Edges[e].To], route))
 		}
 	}
 	return steps
 }
 
-// diagramDirection: tang tren xuong tang duoi thi "down" (day cha -> dinh con, kieu so do to chuc); cung tang thi
-// sang ngang theo thu tu trong tang.
-func diagramDirection(fromLayer, fromPlace, toLayer, toPlace int) string {
-	switch {
-	case toLayer > fromLayer:
-		return "down"
-	case toLayer < fromLayer:
-		return "up"
-	case toPlace > fromPlace:
-		return "right"
-	default:
-		return "left"
+// Nhom mau cua quy trinh / so do (vd buoc cua AI va buoc xac minh cua he thong nghiep vu): moi nhom mot mau theo
+// token (primary, muted, accent) va mot dong chu thich o day vung noi dung.
+
+type groupSwatch struct{ Fill, Line string }
+
+// legendHeight: dong chu thich (o mau 14 pt + nhan) va khe phia tren no.
+const legendHeight = 34.0
+
+func groupPalette(colors struct{ Primary, Accent, Text, Muted string }) []groupSwatch {
+	return []groupSwatch{{slidelayout.Tint(colors.Primary, 0.9), colors.Primary}, {slidelayout.Tint(colors.Muted, 0.88), colors.Muted},
+		{slidelayout.Tint(colors.Accent, 0.82), colors.Accent}}
+}
+
+// groupsOf: ten nhom theo thu tu xuat hien (bo trong = khong nhom).
+func groupsOf(slide briefSlide) []string {
+	names := []string{}
+	add := func(group string) {
+		if group != "" && indexOf(names, group) < 0 {
+			names = append(names, group)
+		}
 	}
+	switch slide.Layout {
+	case "process":
+		for _, step := range slide.Steps {
+			add(step.Group)
+		}
+	case "diagram":
+		for _, node := range slide.Nodes {
+			add(node.Group)
+		}
+	}
+	return names
+}
+
+func indexOf(list []string, value string) int {
+	for i, item := range list {
+		if item == value {
+			return i
+		}
+	}
+	return -1
+}
+
+// shapesArea: vung ve hinh cua quy trinh / so do - co nhom thi chua dong chu thich o DAU vung (o day, duong vong duoi
+// hang cuoi cua so do se cat qua chu thich).
+func shapesArea(area slidelayout.Rect, slide briefSlide) slidelayout.Rect {
+	if len(groupsOf(slide)) == 0 {
+		return area
+	}
+	return slidelayout.Rect{area[0], area[1] + legendHeight, area[2], area[3] - legendHeight}
+}
+
+func checkGroups(slot int, slide briefSlide) []rowError {
+	errors := []rowError{}
+	groups := groupsOf(slide)
+	if len(groups) > maxGroups {
+		errors = append(errors, rowError{Src: slot, Field: "group", Error: "MAX_3_GROUPS", Actual: len(groups),
+			Allowed: "2-3 groups, e.g. \"AI\" and \"Business system\""})
+	}
+	for _, group := range groups {
+		if len([]rune(group)) > 24 {
+			errors = append(errors, rowError{Src: slot, Field: "group", Error: "GROUP_NAME_TOO_LONG", Max: 24, Actual: len([]rune(group))})
+		}
+	}
+	return errors
+}
+
+// legendSteps: o mau + nhan cua tung nhom, mot hang can trai o dau vung noi dung.
+func legendSteps(groups []string, palette []groupSwatch, content slidelayout.Rect, swatch func(slidelayout.Rect, groupSwatch) string,
+	label func(string, slidelayout.Rect) string) []func() string {
+	steps := []func() string{}
+	const square, labelWidth = 14.0, 200.0
+	y := content[1]
+	for g, group := range groups {
+		if g >= len(palette) {
+			break
+		}
+		left := content[0] + float64(g)*(square+8+labelWidth+16)
+		box := slidelayout.Rect{slidelayout.Round1(left), slidelayout.Round1(y + 5), square, square}
+		text := slidelayout.Rect{slidelayout.Round1(left + square + 8), slidelayout.Round1(y), labelWidth, 24}
+		group, colors := group, palette[g]
+		steps = append(steps, func() string { return swatch(box, colors) }, func() string { return label(group, text) })
+	}
+	return steps
 }
 
 func floatOf(value any, fallback float64) float64 {

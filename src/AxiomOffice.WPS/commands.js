@@ -599,6 +599,9 @@
         { name: "slide", required: false, hint: null },
         { name: "elbow", required: false, hint: "true = elbow connector (default straight)" },
         { name: "direction", required: false, hint: "down, up, right or left: leave 'from' on that side and enter 'to' on the opposite side; default: nearest sides" },
+        { name: "fromSide", required: false, hint: "top, bottom, left or right side of 'from' (overrides direction)" },
+        { name: "toSide", required: false, hint: "top, bottom, left or right side of 'to' (overrides direction); same side as fromSide + elbow = a loop around the row" },
+        { name: "offset", required: false, hint: "loop only: how far (pt) the loop goes beyond the farther end (default: PowerPoint's choice)" },
         { name: "color", required: false, hint: "#RRGGBB" },
         { name: "weight", required: false, hint: "points" },
         { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
