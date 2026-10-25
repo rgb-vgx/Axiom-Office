@@ -16,7 +16,7 @@ hướng dẫn dùng ở [README.md](README.md); lịch sử thay đổi ở [CH
 | **Agent Core** (`core-go/`, Go) | Windows + Linux | **Đã thay bản .NET làm bản phát hành** (G1–G10), qua toàn bộ e2e của bản .NET |
 | **MCP server** (`core-go/internal/mcpserver`, Go) | Windows + Linux | **Một bản duy nhất**, chạy bằng `AxiomOffice.Core.exe mcp`; 61/61 trên cả hai nền tảng (và 103/103 ở bộ parity sâu). Bản C# đã xoá; `AxiomOffice.Host.exe mcp` còn 232 dòng **chuyển tiếp byte** sang Core nên cấu hình cũ không phải đổi |
 | **Extension LibreOffice** (Python UNO) | Windows + Linux (LibreOffice) | **Dừng hỗ trợ từ 25/10/2026**: không phát triển tiếp, không đưa vào plan mới. Lần đo cuối: 281/281 trên LibreOffice thật + wizard 20/20 với Core Go (01/10). Code và CI còn nguyên, gỡ là quyết định riêng |
-| **Add-in WPS Linux** (`src/AxiomOffice.WPS`, JS ES5; Core phục vụ + bridge cổng 47861) | Linux (WPS 12) | Chạy trên WPS thật: 58/80 lệnh có handler (22 chưa — `docs/architecture/wps-bridge.md` §6); ribbon 4 nhóm có icon; khung chat với menu ⋯ và 8 màn hình phụ; menu chuột phải *Sửa bằng AI* + khung chat mini (§2.6) |
+| **Add-in WPS Linux** (`src/AxiomOffice.WPS`, JS ES5; Core phục vụ + bridge cổng 47861) | Linux (WPS 12) | Chạy trên WPS thật: 58/84 mục registry có handler (26 chưa: 25 lệnh Windows + `ui.setup` — `docs/architecture/wps-bridge.md` §6); ba tool lớn `slides_from_brief`/`slides_from_template`/`doc_design` chưa chạy trên WPS; ribbon 4 nhóm có icon; khung chat với menu ⋯ và 8 màn hình phụ; menu chuột phải *Sửa bằng AI* + khung chat mini (§2.6) |
 | **Wizard thiết lập** | Windows (WinForms) + Linux (awt) | Bản Linux đã chạy thật (20/20); **bản Windows đã dùng thật trong Word** (24/10: lưu cấu hình + `Thử ngay` OK — §2.9) |
 
 ## 2. Đã làm được
@@ -268,7 +268,7 @@ trúc không dây cắt hộp. Sửa: sơ đồ lồng trong khoá `diagram`, `r
 | Embedding với máy chủ thật | Chưa | Chỉ kiểm bằng máy chủ giả trả vector điều khiển được |
 | Lỗi `install.sh` xoá `core.db` | **Đã sửa 20/10/2026** | Cài lại / nâng cấp chuyển `core.db*` sang bản mới; `--uninstall` không `--purge` giữ lại; `tests/linux/test_install_sh.py` +2 ca (đỏ trước khi sửa). Gói phát hành trước ngày này vẫn mang `install.sh` cũ |
 | *Sửa bằng AI* / khung chat mini trên Windows và LibreOffice | Chưa | Mới có trên WPS Linux; Core đã sẵn. LibreOffice cần **khoá vùng bôi đen** trước (chưa có) |
-| Add-in WPS: 22 lệnh chưa có handler | Chưa | `docs/architecture/wps-bridge.md` §6; thiếu `app.screenshot` nên chưa có QA thị giác trên WPS |
+| Add-in WPS: 26 mục registry chưa có handler (25 lệnh Windows + `ui.setup`) | Chưa | `docs/architecture/wps-bridge.md` §6; hậu quả: `slides_from_brief`, `slides_from_template`, `doc_design` không chạy trên WPS; thiếu `app.screenshot`/`wpp.renderSlide` nên chưa có QA thị giác |
 | Bộ nhớ AI trên WPS: sửa / ghim / đặt hạn | Chưa | Màn hình WPS có xoá tạm, khôi phục, xoá vĩnh viễn, lọc phạm vi |
 | Bấm từng nút ribbon WPS trên WPS thật | Chưa | Mới đo qua Core thật + add-in giả; menu chuột phải và khung mini đã thử thật |
 | *Sửa bằng AI* với model thật trên nhiều trường hợp | **Đã chạy 3 lượt thật (24/10/2026)** | Soạn đơn xin việc: 36,3 s / 12 vòng / 10 tool, tự kiểm chứng; đã sửa lỗi định dạng phát hiện từ file kết quả (§2.9). Vị trí cửa sổ `ShowDialog` vẫn không chỉnh được |

@@ -4,7 +4,8 @@ Trạng thái: **đã chạy trên WPS thật** (11/10/2026): Core (T1), trình 
 (T2b, T2c). Đóng gói + `install.sh` (T3) xong, đăng ký cả ba app (T5) xong, nhận biết app + đủ 38 lệnh
 `et.*`/`wpp.*` (T6–T8) xong, pane Ask AI trong WPS (T4) xong, ribbon đầy đủ (đợt C — `docs/architecture/ribbon-ui.md`), menu
 chuột phải *Sửa bằng AI* + khung chat mini (20/10/2026, đã thử trên WPS thật — mục 7.3).
-Còn lại: **22/80 lệnh registry chưa có handler ở add-in WPS** (danh sách + lý do ở mục 6). Cơ sở thực nghiệm:
+Còn lại: **26/84 mục registry chưa có handler ở add-in WPS** — 25 lệnh Windows + `ui.setup` của LibreOffice
+(danh sách + lý do ở mục 6). Cơ sở thực nghiệm:
 [docs/research/wps-spike.md](../research/wps-spike.md) (hướng B) và [tests/wps/REFERENCE.md](../../tests/wps/REFERENCE.md).
 
 ## 1. Bài toán
@@ -81,8 +82,8 @@ Cùng giao thức và cùng guard với bridge LibreOffice (`Origin` → 403, to
   (giống VBA/COM — viết theo handler C# trong `src/AxiomOffice/Bridge/CommandDispatcher.Writer.cs`).
   Lệnh sửa tài liệu chạy trong `Application.UndoRecord.StartCustomRecord("AI: <lệnh>")`/`EndCustomRecord()`
   ⇒ mỗi lệnh AI = một bước Undo. Lỗi handler → `{ok:false, error}`, không bao giờ làm treo vòng lặp.
-- **80 lệnh** trong `commands.js` (đo 19/10/2026): 2 `app.*` + 1 `ai.*` + 2 `ui.*` + 28 `writer.*` + 23 `et.*` +
-  24 `wpp.*` (metadata lấy từ registry LibreOffice). 58 lệnh đã có handler; chỉ **9 lệnh `writer.*`** mở
+- **84 lệnh** trong `commands.js` (đo 26/10/2026): 2 `app.*` + 1 `ai.*` + 2 `ui.*` + 28 `writer.*` + 23 `et.*` +
+  28 `wpp.*` (metadata lấy từ registry LibreOffice). 58 lệnh đã có handler; chỉ **9 lệnh `writer.*`** mở
   `UndoRecord` (danh sách `MUTATING`) — ET/WPP không có nó (mục 6). Lệnh chưa có handler trả
   `unknown action: <lệnh>`; `tests/wps/test_addin.mjs` ghim danh sách lệnh registry chưa có handler (mục 6) và
   **bắt bỏ tên khỏi danh sách ngay khi viết handler**, để lệnh registry không âm thầm rơi vào `unknown action`
@@ -142,30 +143,38 @@ Cùng giao thức và cùng guard với bridge LibreOffice (`Origin` → 403, to
   `may have been applied`); hết giờ này thì job được bỏ nên vòng session mới xoá file session.
 - Object model ET/WPP khác Writer ở vài chỗ (`Cells.Item(r,c)`, `UsedRange.Address()` là hàm, màu BGR, chỉ số
   1-based, `Application.Documents` không có) — bảng đầy đủ ở `tests/wps/REFERENCE.md`.
-- **22 lệnh trong registry (80 lệnh) chưa có handler ở add-in WPS** (19/10/2026). Nguồn duy nhất của danh sách
-  là `CHUA_CO_HANDLER` trong `tests/wps/test_addin.mjs` — **đừng chép số vào đây**, spec sẽ đỏ khi một lệnh được
-  viết handler mà còn nằm trong danh sách, và khi add-in khai với Core một lệnh chưa có handler. Chia làm ba nhóm:
-  - **Bốn lệnh `kind` rỗng** — `ai.ask`, `ui.askpane`, `ui.setup`, `app.screenshot`. **Sửa lại một câu cũ ở đây
+- **26 mục registry (84) chưa có handler ở add-in WPS** (26/10/2026) — 25 lệnh của bản Windows + `ui.setup`.
+  Nguồn duy nhất của danh sách là `CHUA_CO_HANDLER` trong `tests/wps/test_addin.mjs` — **đừng chép số vào đây**,
+  spec sẽ đỏ khi một lệnh được viết handler mà còn nằm trong danh sách, và khi add-in khai với Core một lệnh chưa
+  có handler. Chia làm ba nhóm lệnh Windows; mục cuối là đường riêng của LibreOffice:
+  - **Ba lệnh `kind` rỗng của Windows** — `ai.ask`, `ui.askpane`, `app.screenshot`. **Sửa lại một câu cũ ở đây
     (19/10/2026):** trước kia tài liệu này viết chúng "không phải lệnh của app văn phòng, add-in không bao giờ
-    nhận" — **sai**. Ba trong bốn (`ai.ask`, `ui.askpane`, `app.screenshot`) **là** lệnh của add-in ở bản Windows
-    (`CommandDispatcher.cs`: `AiAsk`, `UiAskPane`, `AppScreenshot`); chỉ `ui.setup` là đường riêng của
-    LibreOffice. Ở add-in WPS, `app.info` có handler còn ba lệnh kia thì không — nên Core gọi chúng qua bridge sẽ
-    nhận `unknown action`. Hệ quả đang thấy được: thiếu `app.screenshot` là **đúng lý do** toggle *Nhìn tài liệu*
+    nhận" — **sai**. Ba lệnh này **là** lệnh của add-in ở bản Windows (`CommandDispatcher.cs`: `AiAsk`, `UiAskPane`,
+    `AppScreenshot`); ở add-in WPS, `app.info` có handler còn ba lệnh kia thì không — nên Core gọi chúng qua bridge
+    sẽ nhận `unknown action`. Hệ quả đang thấy được: thiếu `app.screenshot` là **đúng lý do** toggle *Nhìn tài liệu*
     chưa lên được ribbon WPS (`docs/architecture/ribbon-ui.md` §5.1).
   - **Chín lệnh `writer.*`**: `newDocument`, `open`, `closeAll`, `formatTable`, `insertImage`, `insertHyperlink`,
     `replaceMany`, cộng hai lệnh thiết kế chỉ có ở add-in Windows (`restyle`, `insertBlocks`). `writer.checkTables`
     **đã ra khỏi danh sách** — handler viết xong (`commands.js:873`), nên nút *Soát bảng* trên ribbon chạy được.
-  - **Chín lệnh `wpp.*`**: chỉ PowerPoint/đường compose có (`newFromTemplate`, `addSlideFromTemplate`,
-    `sourceManifest`, `setShapeText`, `deleteShapes`, `copyPicture`, `addParagraphs`, `addGrid`, `deleteTagged`).
-  - **Mười trong 22 lệnh có `agent=true`** (`writer.formatTable`, `writer.insertImage`, `writer.insertHyperlink`,
-    `writer.replaceMany`, và sáu lệnh `wpp.*`) — nghĩa là Core **vẫn đưa chúng cho agent như tool**, và trên máy
+    Dù `restyle`/`insertBlocks` có `agent=false`, `doc_design` gọi thẳng hai lệnh này nên tool đó không chạy trên
+    WPS Writer.
+  - **Mười ba lệnh `wpp.*`**: `newFromTemplate`, `addSlideFromTemplate`, `sourceManifest`, `setShapeText`,
+    `deleteShapes`, `copyPicture` (đường template), `addParagraphs`, `addGrid`, `deleteTagged` (đường compose),
+    `addShape`, `addConnector`, `addChart` (sơ đồ/biểu đồ của `slides_from_brief`), `renderSlide` (ảnh slide cho
+    `look_at_document`). Vì `slides_from_brief` gọi `addParagraphs`/`addGrid` cho **mọi** layout, thiếu các lệnh này
+    làm **cả tool** dừng ở slide đầu trên WPS, không riêng layout sơ đồ.
+  - **Mười trong 26 mục có `agent=true`** (`writer.formatTable`, `writer.insertImage`, `writer.insertHyperlink`,
+    `writer.replaceMany`, và sáu lệnh `wpp.*`: `newFromTemplate`, `addSlideFromTemplate`, `sourceManifest`,
+    `setShapeText`, `deleteShapes`, `copyPicture`) — nghĩa là Core **vẫn đưa chúng cho agent như tool**, và trên máy
     đang chạy WPS agent sẽ nhận `unknown action`. Đây là khoảng trống thật, không phải lỗi hiển thị.
+  - **`ui.setup`** là lệnh của extension LibreOffice (wizard), không có ở bản Windows lẫn add-in WPS.
 - **`FileSystem.readFileString`/`writeFileString` bị sandbox** (đo 11/10/2026): mọi đường dẫn có `/` hoặc `\` đều
   ném `path cannot contains "/" or "\"`, tên file trần trả `null`, và chúng không đọc/ghi được file nào — dù tài
   liệu WPS mô tả chúng như API đọc file. Đọc file thật phải bằng **`FileSystem.ReadFile`** (UTF-8, ném
   `"Wrong path!"` khi thiếu file, cắt ở byte NUL đầu tiên); ghi byte bằng `writeAsBinaryString`. Đây là lớp lỗi
-  mà fake "thân thiện" che mất: `et.importCsv` đã đọc bằng `readFileString` nên **không bao giờ chạy được trên WPS
-  thật** trong khi 71 test node vẫn xanh. Bảng API đầy đủ ở `tests/wps/REFERENCE.md`,
+  mà fake "thân thiện" che mất: `et.importCsv` từng đọc bằng `readFileString` nên **không chạy được trên WPS thật**
+  trong khi 71 test node vẫn xanh; nay đã chuyển sang `FileSystem.ReadFile` và có ca đọc file thật. Bảng API đầy đủ
+  ở `tests/wps/REFERENCE.md`,
   `tests/wps/test_addin_fake.mjs` ghim lại từng hành vi.
 - **ET ép kiểu khi ghi `Value2`**: gán chuỗi trông-như-số (`"42"`) hay trông-như-ngày (`"01/01"`) thì WPS tự ép
   thành số/ngày — đường ghi **không** tạo được "số dạng text". `numbers-as-text` chỉ còn đúng với ô đã có sẵn

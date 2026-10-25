@@ -5,6 +5,84 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Docs — WPS còn thiếu gì so với bản Windows (26/10/2026)
+
+Đối chiếu `catalog/live-commands.json` (**84** lệnh), bảng `HANDLERS` trong `src/AxiomOffice.WPS/commands.js` và
+`CHUA_CO_HANDLER` trong `tests/wps/test_addin.mjs`: bản Windows (C#) có **81** lệnh; add-in WPS có handler cho
+**58** lệnh, trong đó `et.closeAll`/`wpp.closeAll` là hai lệnh chỉ có ở catalog LibreOffice (Windows không khai).
+Vì vậy WPS thiếu **25 lệnh Windows**; mục "26 mục registry chưa có handler" = 25 lệnh đó + `ui.setup` (đường riêng
+của LibreOffice, không có ở Windows). Đợt này **chỉ ghi tài liệu**, không viết thêm handler.
+
+**10 lệnh `agent=true` — agent gọi trên WPS sẽ nhận `unknown action`:**
+
+| Lệnh | Việc bị thiếu |
+|---|---|
+| `writer.formatTable` | định dạng bảng có sẵn: kiểu, font, màu hàng tiêu đề/sọc, viền, căn lề, co giãn |
+| `writer.insertImage` | chèn ảnh tại con trỏ |
+| `writer.insertHyperlink` | chèn liên kết |
+| `writer.replaceMany` | thay nhiều chỗ trong một lần (`edits: [{find, replace}]`) |
+| `wpp.newFromTemplate` | tạo bài mới từ `.pptx`/`.potx`, giữ khổ + master |
+| `wpp.addSlideFromTemplate` | chèn bản sao slide mẫu, giữ nền/khung/định dạng |
+| `wpp.sourceManifest` | đọc bài nguồn theo slide (tiêu đề, chữ, ảnh) để dựng lại |
+| `wpp.setShapeText` | thay chữ khung theo tên shape, giữ định dạng |
+| `wpp.deleteShapes` | xoá shape theo tên (mục lặp của slide mẫu) |
+| `wpp.copyPicture` | chép ảnh từ bài khác, co vừa khung |
+
+**15 lệnh `agent=false` — script/MCP/đường nội bộ gọi thẳng bridge sẽ lỗi:**
+
+- **Chung (3)**: `ai.ask` (agent in-process của add-in Windows), `ui.askpane` (mở pane bằng lệnh), `app.screenshot`
+  (ảnh trang/slide — thiếu lệnh này là lý do toggle *Nhìn tài liệu* chưa lên ribbon WPS).
+- **Writer (5)**: `newDocument`, `open`, `closeAll` (tạo/mở/đóng tài liệu), `restyle` (trình bày lại nền chung) và
+  `insertBlocks` (chèn khối bo tròn). Hai lệnh cuối tuy `agent=false` nhưng **`doc_design` gọi thẳng**.
+- **WPP (7)**: `addParagraphs`, `addGrid` (khung chữ nhiều đoạn, bảng có định dạng), `deleteTagged` (dựng lại một lô
+  slide), `addShape`, `addConnector`, `addChart` (hình khối, đường nối, biểu đồ gốc), `renderSlide` (ảnh một slide).
+
+**Hậu quả với các tool lớn (không chỉ là "thiếu vài lệnh lẻ"):**
+
+- **`slides_from_brief`**: mọi layout đều gọi `wpp.addParagraphs` (layout bảng gọi `wpp.addGrid`); `process`/
+  `timeline`/`diagram` gọi `wpp.addShape` + `wpp.addConnector`; `chart` gọi `wpp.addChart` → **cả tool** dừng ở
+  slide đầu trên WPS, không riêng các layout sơ đồ.
+- **`slides_from_template`**: cần `wpp.newFromTemplate`, `sourceManifest`, `addSlideFromTemplate`, `setShapeText`,
+  `deleteShapes`, `copyPicture`, `addParagraphs`, `deleteTagged` → không dựng được bài từ mẫu trên WPS.
+- **`doc_design`**: cần `writer.restyle` + `writer.insertBlocks` → không trình bày lại văn bản trên WPS Writer.
+- **QA thị giác (`look_at_document`)**: bản PowerPoint dùng `wpp.renderSlide`; không có thì rơi về `app.screenshot`.
+  WPS thiếu **cả hai**, nên model không có ảnh trang/slide để soát.
+
+**Khác biệt hành vi (cùng đích "tương đương", không phải lệnh thiếu):**
+
+- `wpp.checkLayout`: WPS thiếu `overflow` (object model không đo chiều cao chữ) và hai loại `connector-crossing`/
+  `connector-overlap`; các loại còn lại giữ ngưỡng của LibreOffice.
+- **Hoàn tác**: ET/WPP không có `UndoRecord`; `et.undo` chỉ khôi phục snapshot trong **cùng phiên add-in** (đóng WPS
+  là mất), registry **không có** `wpp.undo`; `writer.undo` gỡ N bước gần nhất và **không phân biệt** bước AI với
+  người (LibreOffice chỉ gỡ bước `AI: …`).
+- **PDF**: ET/WPP thử `ExportAsFixedFormat` nhưng WPS thường không ghi tệp; add-in tự dựng PDF tối giản **chỉ có
+  chữ**, mất định dạng và biểu đồ.
+- **Một app tại một thời điểm**: bridge WPS có một hàng đợi + một file session; mở Writer và Spreadsheets cùng lúc
+  thì chỉ app vừa poll được phục vụ.
+- **Khởi động**: phải chạy Core **trước** khi mở WPS, bật `JsApiPlugin=true`; cài/đăng ký add-in xong phải **mở
+  lại WPS**.
+- **Ghi ô ET**: `Value2` tự ép chuỗi trông-như-số/ngày thành số/ngày; `et.save`/`wpp.save` từ chối tài liệu chưa
+  lưu lần nào. `FileSystem.readFileString` bị sandbox — `et.importCsv` đã chuyển sang `FileSystem.ReadFile`.
+
+**UI/ribbon còn thiếu so với bản Windows:**
+
+- *Nhìn tài liệu* (toggle QA thị giác) — thiếu `app.screenshot`.
+- *Cài đặt nâng cao…* — pane *Thiết lập* đã có đủ trường; thêm nút mở lại đúng màn hình đó là nút giả.
+- *Tắt Agent Core…* — Core đang phục vụ pane; `/v1/admin/shutdown` cũng không có trên kênh `/wps/v1/*`.
+- *Công cụ ngoài…*/MCP, *Tìm web* — kênh `/wps/v1/*` không có route ghi `mcp.json`.
+- Menu ngôn ngữ — WPS không có `lang/*.json`.
+- *Hội thoại trước…*: WPS liệt kê 30 hội thoại gần nhất của **mọi tài liệu**, Windows lọc theo tài liệu đang mở.
+- *Bộ nhớ AI*: WPS mới **3/6** việc của nghiệm thu (xoá tạm, khôi phục, xoá vĩnh viễn) + đọc/lọc/tải lại; thiếu
+  **sửa, ghim, đặt hạn** (`PATCH /wps/v1/memory/{id}` có sẵn nhưng chưa có form).
+
+**WPS có thêm so với bản Windows:** `et.closeAll` và `wpp.closeAll` (Windows không khai trong registry), menu chuột
+phải *Sửa bằng AI* + khung chat mini. `ui.setup` là đường LibreOffice, không phải lệnh Windows.
+
+**Nguồn số liệu:** 84 lệnh trong `catalog/live-commands.json`; 81 lệnh khai bằng `Command("…")` trong
+`src/AxiomOffice/Bridge/*.cs`; 58 handler trong `HANDLERS` của `commands.js`. `node --test tests/wps/test_addin.mjs`
+ghim đúng 26 mục `CHUA_CO_HANDLER` và chiều "registry ⊆ handler". Đã cập nhật `docs/architecture/wps-bridge.md` §6
+và `STATUS.md` §1/§3 từ 22/80 lên 26/84.
+
 ### Fixed — Sơ đồ tự đi lại dây khi PowerPoint vẽ lệch mô hình (25/10/2026)
 
 Lượt thật `r_894e42ac…` (đề ngân hàng, lần dựng đầu slide 4): `RouteDiagram` chọn đường "sạch" theo mô hình nhưng

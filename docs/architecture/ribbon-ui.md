@@ -311,7 +311,7 @@ Số đo đầy đủ (hình dạng JSON, ngữ nghĩa `lines`/`truncated`, cái
 
 | Rủi ro | Cách chống |
 |---|---|
-| Ribbon thành danh mục API (80 lệnh trong `catalog/live-commands.json`) | Chỉ đưa nút có workflow hoàn chỉnh; còn lại qua pane. Tên nhãn theo kết quả, không theo lệnh |
+| Ribbon thành danh mục API (84 lệnh trong `catalog/live-commands.json`) | Chỉ đưa nút có workflow hoàn chỉnh; còn lại qua pane. Tên nhãn theo kết quả, không theo lệnh |
 | Một tab duy nhất bị nhồi nút | Thứ ít dùng nằm trong **Khác ▸** hoặc menu **⋯** của pane (vẫn cùng một tab) — thêm nút mới thì phải bỏ một nút ra khỏi hàng, không nới hàng |
 | Người dùng không biết AI đang làm gì | Pane là nguồn duy nhất hiển thị tiến trình (công cụ, skill, ghi nhớ, xác nhận, kết quả) trên cả ba nền tảng |
 | UI hiển thị một trạng thái, Core làm trạng thái khác | Toggle đọc trạng thái **thật** (`GET /v1/setup`), ghi thành công rồi mới đổi hình; không suy ra "Core khỏe" từ việc mở được cổng TCP |
