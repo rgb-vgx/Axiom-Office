@@ -349,7 +349,7 @@ func (o *Orchestrator) maybeSummarize(ctx context.Context, client *model.Client,
 func executeTool(ctx context.Context, registry *tools.Registry, call model.ToolCall, run *tools.RunContext) model.ToolResult {
 	tool := registry.Find(call.Name)
 	if tool == nil {
-		return model.ToolResult{CallID: call.ID, Name: call.Name, ResultJSON: tools.ErrorJSON("unknown tool: " + call.Name)}
+		return model.ToolResult{CallID: call.ID, Name: call.Name, ResultJSON: tools.ErrorJSON(unknownToolMessage(registry, call.Name))}
 	}
 	var arguments map[string]any
 	if json.Unmarshal([]byte(call.Arguments), &arguments) != nil {

@@ -259,6 +259,14 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 	options.FallbackModels = o.Config().LlmFallbackModels
 	options.ContextWindow = client.ModelInfo(ctx, client.Model).ContextWindow
 	options.OncePerReply = []string{tools.TodoToolName}
+	// Lop 3 cua repair.go: ten lenh dung lam ten tool -> office_action (chi khi khop chinh xac lenh duoc phep).
+	options.RepairToolCall = func(call model.ToolCall) (model.ToolCall, bool) {
+		fixed, ok := repairToolCall(registry, call)
+		if ok {
+			corelog.Info("run %s: tool call '%s' repaired to office_action %s", run.ID, call.Name, model.Truncate(fixed.Arguments, 120))
+		}
+		return fixed, ok
+	}
 
 	return &execution{
 		request:           request,

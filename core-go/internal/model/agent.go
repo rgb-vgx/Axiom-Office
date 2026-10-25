@@ -60,6 +60,10 @@ type AgentOptions struct {
 	FallbackModels []string
 	// OncePerReply: tool chi chay mot lan moi phan hoi cua model (vd write_todos ghi de ca danh sach).
 	OncePerReply []string
+	// RepairToolCall: sua tool call goi nham (vd ten lenh "writer.getText" dung lam ten tool) TRUOC khi ghi luot
+	// assistant vao lich su va truoc ToolStarted - lich su, su kien, audit va ket qua deu thay dung mot cuoc goi.
+	// Tra (call, false) neu khong sua. nil = khong sua (giong AI SDK experimental_repairToolCall).
+	RepairToolCall func(call ToolCall) (ToolCall, bool)
 }
 
 // FitWindow: chinh nguong theo cua so ngu canh cua model (LangChain trigger ("fraction", x)). Nguong don giu
@@ -146,6 +150,8 @@ type AgentResult struct {
 	Verified bool
 	// Model: model tra loi cuoi cung (khac Client.Model khi da chuyen sang model du phong).
 	Model string
+	// RepairedToolCalls: so tool call da duoc AgentOptions.RepairToolCall sua. Cao = tin hieu chinh prompt/schema.
+	RepairedToolCalls int
 }
 
 // BillableTokens: so token phai tra that, tuc la phan nha cung cap THAT SU phai tinh.
@@ -268,6 +274,9 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 			return done(false, "", failure.detail, "provider")
 		}
 
+		if options.RepairToolCall != nil {
+			result.RepairedToolCalls += repairTurnToolCalls(turn, options.RepairToolCall)
+		}
 		loop.turns = c.Codec.AppendAssistant(loop.turns, turn)
 		results := make([]ToolResult, 0, len(turn.ToolCalls))
 		for _, call := range turn.ToolCalls {

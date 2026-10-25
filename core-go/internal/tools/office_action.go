@@ -109,22 +109,55 @@ func (t *OfficeActionTool) Description() string {
 	if _, ok := t.allowed["writer.replaceMany"]; ok {
 		batch = BatchEditRule
 	}
+	// Cau dau noi RO "lenh la gia tri cua action, khong phai tool": luot that 24/10/2026 (ocg/beam-free) goi
+	// thang writer.getText nhu mot tool rieng -> "unknown tool", mat mot vong. Danh sach chu ky "ten {tham so}"
+	// o cuoi mo ta trong giong mot loat ham, nen phai noi truoc.
 	return "Read and modify the LIVE document that is currently open in the office application. " +
+		"Every document command below (writer.*, et.*, wpp.*, app.*) is a value of this tool's `action` argument, " +
+		"not a separate tool: call office_action {\"action\": \"writer.getText\", \"params\": {...}}. " +
 		"Call this for every document change the user asks for so it happens immediately on screen. " +
 		"Array params such as values must be real JSON arrays of rows, not objects. " +
 		UndoRule + " " + ChunkRule + SheetRefRule + batch + TruncationContract +
 		"Available actions (with params): " + t.signatures
 }
 
+// Parameters: `action` la enum dung danh sach lenh duoc phep - chuan JSON Schema cho gia tri dong (nhu web_sources,
+// write_todos): model thay ro day la GIA TRI cua tham so, va nha cung cap co constrained decoding chan luon ten
+// sai. Mo ta tool van giu chu ky "ten {tham so}" vi enum khong mang tham so cua tung lenh.
 func (t *OfficeActionTool) Parameters() json.RawMessage {
-	return json.RawMessage(`{"type":"object","properties":{` +
-		`"action":{"type":"string","description":"Action name, e.g. writer.insertStyledText or wpp.addSlide"},` +
-		`"params":{"type":"object","description":"Action parameters as an object (may be omitted)"}},` +
-		`"required":["action"]}`)
+	action := map[string]any{"type": "string",
+		"description": "Document command to run, e.g. writer.insertStyledText or wpp.addSlide (one of the listed values)"}
+	if len(t.names) > 0 {
+		action["enum"] = t.names
+	}
+	schema := map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"action": action,
+			"params": map[string]any{"type": "object", "description": "Action parameters as an object (may be omitted)"},
+		},
+		"required": []string{"action"},
+	}
+	raw, err := json.Marshal(schema)
+	if err != nil {
+		return json.RawMessage(`{"type":"object","properties":{"action":{"type":"string"},"params":{"type":"object"}},"required":["action"]}`)
+	}
+	return raw
 }
 
 // AllowedActions: danh sach lenh duoc phep (test dung).
 func (t *OfficeActionTool) AllowedActions() []string { return t.names }
+
+// ResolveAction: `name` (sau CanonicalAction: khac hoa/thuong, "et_writeRange") co phai mot lenh duoc phep khong.
+// Dung de sua tool call goi nham ten lenh lam ten tool (agent/repair.go) - CHI khop chinh xac, khong doan gan dung.
+func (t *OfficeActionTool) ResolveAction(name string) (string, bool) {
+	action := CanonicalAction(name, t.names)
+	_, ok := t.allowed[action]
+	return action, ok
+}
+
+// AvailableLine: cau liet ke lenh con lai (cung nhom voi `action` neu co) - xem availableLine.
+func (t *OfficeActionTool) AvailableLine(action string) string { return t.availableLine(action) }
 
 // availableLine: cau noi ro con nhung lenh nao. Cung nhom (cung tien to "et."/"writer."/"wpp.") thi chi
 // liet ke nhom do - model go sai tien to thi can biet ca nhom con lai; go sai giua chung thi can thay het.
