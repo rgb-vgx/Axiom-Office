@@ -55,6 +55,12 @@ jobs:
       - name: Agent Core ban Go (go test + build + e2e day du)
         run: make test-go test-core
 
+      - name: Bo cham benchmark slide (thuan, khong can PowerPoint)
+        run: make test-bench
+
+      - name: Catalog lenh bridge (nguon chuan, tham so chon tai lieu)
+        run: make test-catalog
+
       - name: Cai dependencies cho bo test oracle
         run: |
           python3 -m pip install -r tests/oracle/word-mcp/requirements.txt \
@@ -157,6 +163,10 @@ jobs:
 
       # SAU build: test_catalog_matches_csharp so registry Python voi `AxiomOffice.Host.exe commands --json` -
       # truoc day buoc nay chay truoc khi build nen test do luon bi skip tren CI.
+      # SAU build: so catalog/live-commands.json voi `AxiomOffice.Host.exe commands --json`.
+      - name: Catalog lenh bridge khop ban C#
+        run: python -m unittest discover -s tests/catalog -v
+
       - name: Unit test extension LibreOffice (kem doi chieu registry C#)
         run: python -m unittest discover -s tests/lo -v
 

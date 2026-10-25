@@ -21,7 +21,10 @@ $fw = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319"
 # .NET Framework (C# 5: khong du cho /langversion:7.3 nen canh bao).
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
 $csc = $null
-if (Test-Path -LiteralPath $vswhere) {
+# AXIOM_CSC: may khong co Visual Studio - tro toi csc.exe cua goi NuGet Microsoft.Net.Compilers.Toolset (tasks\net472).
+if ($env:AXIOM_CSC) {
+    $csc = $env:AXIOM_CSC
+} elseif (Test-Path -LiteralPath $vswhere) {
     $csc = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -find "MSBuild\**\Bin\Roslyn\csc.exe" |
         Select-Object -First 1
 }

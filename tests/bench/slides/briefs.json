@@ -1,0 +1,223 @@
+{
+  "about": "Bộ brief đo chất lượng slide (docs/plans/18-s0-slide-do-va-spec.md). Mỗi brief mang sẵn số liệu để chấm được bằng lệnh đọc (mustContain), không để model tự bịa. slides = [ít nhất, nhiều nhất]. needs = khả năng bản hiện tại CHƯA có (biểu đồ, hình khối, đường nối): baseline ghi nhận cách agent xử lý, không tính là lỗi của brief. smoke = tập con chạy trước mỗi thay đổi lớn.",
+  "version": 1,
+  "briefs": [
+    {
+      "id": "s01-bia",
+      "category": "cover",
+      "smoke": true,
+      "prompt": "Tạo slide bìa cho bài trình bày \"Báo cáo kết quả công tác quý III/2026\" của Phòng Hành chính – Tổng hợp, người trình bày: Nguyễn Thị Lan, ngày 15/10/2026.",
+      "slides": [1, 1],
+      "mustContain": ["quý III/2026", "Nguyễn Thị Lan", "15/10/2026"],
+      "needs": []
+    },
+    {
+      "id": "s02-chia-muc",
+      "category": "section",
+      "smoke": false,
+      "prompt": "Thêm ba slide chia mục cho bài thuyết trình: Phần 1 – Kết quả đạt được; Phần 2 – Tồn tại, hạn chế; Phần 3 – Phương hướng quý IV.",
+      "slides": [3, 3],
+      "mustContain": ["Kết quả đạt được", "Tồn tại", "Phương hướng quý IV"],
+      "needs": []
+    },
+    {
+      "id": "s03-noi-dung-ngan",
+      "category": "content",
+      "smoke": true,
+      "prompt": "Làm một slide nêu kết quả chính quý III: tiếp nhận 1.240 hồ sơ, giải quyết đúng hạn 98,5%, số hóa 3.600 trang tài liệu lưu trữ, tổ chức 4 lớp tập huấn cho 210 lượt cán bộ.",
+      "slides": [1, 2],
+      "mustContain": ["1.240", "98,5%", "3.600", "210"],
+      "needs": []
+    },
+    {
+      "id": "s04-muc-tieu",
+      "category": "content",
+      "smoke": false,
+      "prompt": "Làm slide \"Mục tiêu bài học\" cho bài giảng An toàn thông tin cơ bản: (1) nhận biết thư lừa đảo; (2) đặt và quản lý mật khẩu mạnh; (3) bật xác thực hai lớp cho tài khoản công việc.",
+      "slides": [1, 1],
+      "mustContain": ["thư lừa đảo", "mật khẩu", "xác thực hai lớp"],
+      "needs": []
+    },
+    {
+      "id": "s05-so-sanh-hai-phuong-an",
+      "category": "comparison",
+      "smoke": true,
+      "prompt": "Làm một slide so sánh hai phương án lưu trữ hồ sơ: Phương án A – máy chủ tại chỗ: chi phí đầu tư 850 triệu, tự quản lý bảo mật, cần 1 cán bộ IT chuyên trách. Phương án B – đám mây: 18 triệu/tháng, nhà cung cấp chịu trách nhiệm hạ tầng, phụ thuộc đường truyền internet. Kết luận đề xuất chọn phương án B.",
+      "slides": [1, 2],
+      "mustContain": ["850 triệu", "18 triệu", "phương án B"],
+      "needs": []
+    },
+    {
+      "id": "s06-van-de-giai-phap",
+      "category": "comparison",
+      "smoke": false,
+      "prompt": "Làm slide vấn đề – giải pháp: Vấn đề: thời gian xử lý hồ sơ trung bình 7 ngày, 30% hồ sơ phải bổ sung giấy tờ. Giải pháp: công bố danh mục giấy tờ trên cổng dịch vụ công, kiểm tra hồ sơ trực tuyến trước khi nộp, mục tiêu rút xuống 4 ngày.",
+      "slides": [1, 2],
+      "mustContain": ["7 ngày", "30%", "4 ngày"],
+      "needs": []
+    },
+    {
+      "id": "s07-ba-con-so",
+      "category": "cards-kpi",
+      "smoke": true,
+      "prompt": "Làm một slide nổi bật ba chỉ số năm 2026: doanh thu 128 tỷ đồng (tăng 12%), 4.500 khách hàng mới, mức hài lòng 92%.",
+      "slides": [1, 1],
+      "mustContain": ["128 tỷ", "12%", "4.500", "92%"],
+      "needs": []
+    },
+    {
+      "id": "s08-bon-the",
+      "category": "cards-kpi",
+      "smoke": false,
+      "prompt": "Làm slide bốn nhiệm vụ trọng tâm quý IV, mỗi nhiệm vụ một khối: Chuyển đổi số (triển khai chữ ký số cho 100% lãnh đạo phòng); Đào tạo (2 lớp kỹ năng soạn thảo văn bản); Cải cách hành chính (rút ngắn thời gian xử lý còn 4 ngày); Tiết kiệm (giảm 10% chi phí văn phòng phẩm).",
+      "slides": [1, 2],
+      "mustContain": ["Chuyển đổi số", "Đào tạo", "Cải cách hành chính", "Tiết kiệm"],
+      "needs": []
+    },
+    {
+      "id": "s09-bang-so-lieu",
+      "category": "table-chart",
+      "smoke": true,
+      "prompt": "Làm slide bảng kết quả tuyển sinh 2024–2026: năm 2024 chỉ tiêu 500, nhập học 470; năm 2025 chỉ tiêu 550, nhập học 541; năm 2026 chỉ tiêu 600, nhập học 612. Thêm cột tỷ lệ đạt chỉ tiêu.",
+      "slides": [1, 1],
+      "mustContain": ["2024", "470", "541", "612"],
+      "needs": []
+    },
+    {
+      "id": "s10-bieu-do-cot",
+      "category": "table-chart",
+      "smoke": false,
+      "prompt": "Vẽ biểu đồ cột doanh thu bốn quý năm 2026: Q1 28 tỷ, Q2 31 tỷ, Q3 33 tỷ, Q4 36 tỷ. Tiêu đề nêu kết luận.",
+      "slides": [1, 1],
+      "mustContain": ["28", "31", "33", "36"],
+      "needs": ["chart"]
+    },
+    {
+      "id": "s11-bieu-do-tron",
+      "category": "table-chart",
+      "smoke": false,
+      "prompt": "Làm slide cơ cấu chi phí năm 2026 dạng biểu đồ tròn: nhân sự 55%, thuê văn phòng 20%, công nghệ 15%, khác 10%.",
+      "slides": [1, 1],
+      "mustContain": ["55%", "20%", "15%", "10%"],
+      "needs": ["chart"]
+    },
+    {
+      "id": "s12-bang-rong",
+      "category": "table-chart",
+      "smoke": false,
+      "prompt": "Làm slide bảng phân công: 6 công việc (Lập kế hoạch, Khảo sát, Soạn dự thảo, Lấy ý kiến, Hoàn thiện, Trình ký) với các cột Người phụ trách (lần lượt: Lan, Minh, Hà, Tuấn, Lan, Minh), Hạn (05/11, 12/11, 20/11, 27/11, 03/12, 10/12) và Trạng thái (Xong, Xong, Đang làm, Chưa, Chưa, Chưa).",
+      "slides": [1, 2],
+      "mustContain": ["Khảo sát", "Trình ký", "10/12", "Đang làm"],
+      "needs": []
+    },
+    {
+      "id": "s13-dong-thoi-gian",
+      "category": "timeline-process",
+      "smoke": true,
+      "prompt": "Làm slide lộ trình triển khai phần mềm quản lý văn bản: tháng 11/2026 khảo sát; tháng 12/2026 cài đặt thử; tháng 01/2027 đào tạo; tháng 02/2027 vận hành chính thức.",
+      "slides": [1, 1],
+      "mustContain": ["11/2026", "12/2026", "01/2027", "02/2027"],
+      "needs": ["shape"]
+    },
+    {
+      "id": "s14-quy-trinh",
+      "category": "timeline-process",
+      "smoke": false,
+      "prompt": "Làm slide quy trình 5 bước tiếp nhận hồ sơ một cửa: Tiếp nhận → Kiểm tra → Chuyển phòng chuyên môn → Phê duyệt → Trả kết quả. Mỗi bước một dòng mô tả ngắn.",
+      "slides": [1, 1],
+      "mustContain": ["Tiếp nhận", "Kiểm tra", "Phê duyệt", "Trả kết quả"],
+      "needs": ["shape", "connector"]
+    },
+    {
+      "id": "s15-chu-trinh",
+      "category": "timeline-process",
+      "smoke": false,
+      "prompt": "Làm slide chu trình PDCA cho cải tiến chất lượng: Lập kế hoạch (Plan), Thực hiện (Do), Kiểm tra (Check), Điều chỉnh (Act), mỗi giai đoạn một câu giải thích.",
+      "slides": [1, 1],
+      "mustContain": ["Plan", "Do", "Check", "Act"],
+      "needs": ["shape", "connector"]
+    },
+    {
+      "id": "s16-kien-truc-he-thong",
+      "category": "architecture",
+      "smoke": false,
+      "prompt": "Làm slide kiến trúc hệ thống tiếp nhận yêu cầu AI: Người dùng gửi yêu cầu tới API Gateway; Gateway chuyển tới Bộ định tuyến; Bộ định tuyến chọn Mô hình ngôn ngữ A, Mô hình ngôn ngữ B hoặc Dịch vụ công cụ. Tiêu đề: Bộ định tuyến quyết định mô hình và công cụ.",
+      "slides": [1, 1],
+      "mustContain": ["API Gateway", "Bộ định tuyến", "Dịch vụ công cụ"],
+      "needs": ["shape", "connector"]
+    },
+    {
+      "id": "s17-so-do-to-chuc",
+      "category": "architecture",
+      "smoke": false,
+      "prompt": "Làm slide sơ đồ tổ chức: Giám đốc; dưới là hai Phó Giám đốc (phụ trách Kinh doanh, phụ trách Vận hành); dưới Phó GĐ Kinh doanh có Phòng Bán hàng và Phòng Marketing; dưới Phó GĐ Vận hành có Phòng Kỹ thuật và Phòng Hành chính.",
+      "slides": [1, 1],
+      "mustContain": ["Giám đốc", "Phòng Bán hàng", "Phòng Marketing", "Phòng Kỹ thuật", "Phòng Hành chính"],
+      "needs": ["shape", "connector"]
+    },
+    {
+      "id": "s18-dai-tach-slide",
+      "category": "dense",
+      "smoke": true,
+      "prompt": "Làm slide từ đoạn sau, giữ đủ ý: Năm 2026, đơn vị đã hoàn thành 12/12 chỉ tiêu được giao. Công tác cải cách hành chính có nhiều chuyển biến: 100% thủ tục được công khai trên cổng dịch vụ công, tỷ lệ hồ sơ trực tuyến đạt 76%, thời gian xử lý trung bình giảm từ 7 xuống 5 ngày. Công tác chuyển đổi số triển khai chữ ký số cho 45 cán bộ, số hóa 3.600 trang hồ sơ lưu trữ, đưa vào dùng phần mềm quản lý văn bản mới. Công tác đào tạo tổ chức 4 lớp với 210 lượt cán bộ, nội dung tập trung vào kỹ năng số và an toàn thông tin. Tồn tại: hạ tầng mạng ở hai chi nhánh còn chậm, một số cán bộ lớn tuổi chưa quen phần mềm mới, kinh phí bảo trì thiết bị còn thiếu.",
+      "slides": [2, 4],
+      "mustContain": ["12/12", "76%", "45 cán bộ", "3.600", "210", "hai chi nhánh"],
+      "needs": []
+    },
+    {
+      "id": "s19-bang-dai",
+      "category": "dense",
+      "smoke": false,
+      "prompt": "Làm slide bảng điểm trung bình 12 lớp khối 10 (10A1 8,1; 10A2 7,9; 10A3 7,6; 10A4 7,4; 10A5 7,2; 10A6 7,0; 10A7 6,9; 10A8 6,8; 10A9 6,6; 10A10 6,5; 10A11 6,3; 10A12 6,1) và nêu lớp dẫn đầu.",
+      "slides": [1, 2],
+      "mustContain": ["10A1", "8,1", "10A12", "6,1"],
+      "needs": []
+    },
+    {
+      "id": "s20-tieu-de-dai",
+      "category": "dense",
+      "smoke": false,
+      "prompt": "Làm một slide với tiêu đề \"Báo cáo tổng kết tình hình thực hiện nhiệm vụ phát triển kinh tế – xã hội, bảo đảm quốc phòng – an ninh năm 2026 và phương hướng, nhiệm vụ năm 2027\" và ba ý: tăng trưởng 7,2%; thu ngân sách đạt 104% dự toán; giải quyết việc làm cho 3.100 lao động.",
+      "slides": [1, 1],
+      "mustContain": ["7,2%", "104%", "3.100"],
+      "needs": []
+    },
+    {
+      "id": "s21-anh-va-chu",
+      "category": "content",
+      "smoke": false,
+      "prompt": "Làm slide giới thiệu trụ sở mới gồm một ảnh minh họa (dùng ảnh tại đường dẫn {image}) và ba ý: diện tích 2.400 m²; 6 phòng họp có thiết bị họp trực tuyến; khai trương ngày 01/12/2026.",
+      "slides": [1, 1],
+      "mustContain": ["2.400", "6 phòng họp", "01/12/2026"],
+      "needs": [],
+      "fixtures": { "image": "fixtures/tru-so.png" }
+    },
+    {
+      "id": "s22-trich-dan",
+      "category": "content",
+      "smoke": false,
+      "prompt": "Làm slide trích dẫn nổi bật: \"Chất lượng không phải là một hành động, nó là một thói quen.\" – Aristotle. Dùng làm slide mở đầu phần Chất lượng dịch vụ.",
+      "slides": [1, 1],
+      "mustContain": ["thói quen", "Aristotle"],
+      "needs": []
+    },
+    {
+      "id": "s23-tom-tat-quyet-dinh",
+      "category": "comparison",
+      "smoke": false,
+      "prompt": "Làm slide tóm tắt cho lãnh đạo ra quyết định: Đề xuất mua 40 máy tính mới thay máy đã dùng trên 7 năm. Chi phí 720 triệu. Lợi ích: giảm 60% thời gian chờ khởi động, giảm chi sửa chữa 90 triệu/năm. Rủi ro: chậm giao hàng 3–4 tuần. Cần quyết định trước 30/11/2026.",
+      "slides": [1, 1],
+      "mustContain": ["40 máy tính", "720 triệu", "90 triệu", "30/11/2026"],
+      "needs": []
+    },
+    {
+      "id": "s24-ca-bai-ngan",
+      "category": "deck",
+      "smoke": false,
+      "prompt": "Làm bài thuyết trình 6 slide giới thiệu chương trình \"Văn phòng xanh 2027\": bìa; mục tiêu (giảm 20% điện, giảm 30% giấy in, 100% phòng có thùng phân loại rác); ba nhóm giải pháp (tiết kiệm điện, số hóa văn bản, phân loại rác); lộ trình 4 quý; phân công (Phòng Hành chính chủ trì, các phòng phối hợp); slide kết thúc cảm ơn.",
+      "slides": [5, 8],
+      "mustContain": ["Văn phòng xanh 2027", "20%", "30%", "phân loại rác", "Phòng Hành chính"],
+      "needs": ["shape"]
+    }
+  ]
+}

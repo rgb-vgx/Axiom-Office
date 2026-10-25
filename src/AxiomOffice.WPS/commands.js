@@ -45,13 +45,19 @@
       params: [{ name: "path", required: true, hint: null }] },
     { name: "writer.getText", kind: "wps", agent: true, undo: false,
       summary: "Đọc toàn bộ text",
-      params: [{ name: "maxChars", required: false, hint: null }] },
+      params: [
+        { name: "maxChars", required: false, hint: null },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
     { name: "writer.selection", kind: "wps", agent: true, undo: false,
       summary: "Text + vị trí đang chọn",
-      params: [] },
+      params: [{ name: "document", required: false, hint: "full path of the document to work on; default: the active one" }] },
     { name: "writer.typeText", kind: "wps", agent: true, undo: true,
       summary: "Gõ tại con trỏ",
-      params: [{ name: "text", required: true, hint: null }] },
+      params: [
+        { name: "text", required: true, hint: null },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
     { name: "writer.appendText", kind: "wps", agent: true, undo: true,
       summary: "Nối một KHỐI đoạn văn vào cuối tài liệu; `\\n` tách đoạn, tự đặt lại định dạng (không kế thừa), `alignment` mặc định left",
       params: [
@@ -62,7 +68,8 @@
         { name: "size", required: false, hint: null },
         { name: "color", required: false, hint: null },
         { name: "font", required: false, hint: null },
-        { name: "alignment", required: false, hint: "left/center/right/justify; mặc định left" }
+        { name: "alignment", required: false, hint: "left/center/right/justify; mặc định left" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
       ] },
     { name: "writer.insertStyledText", kind: "wps", agent: true, undo: true,
       summary: "Chèn text có định dạng tại con trỏ; `\\n` tách đoạn, `alignment` áp cho từng đoạn (`color` dạng `#RRGGBB`)",
@@ -75,14 +82,16 @@
         { name: "color", required: false, hint: null },
         { name: "font", required: false, hint: null },
         { name: "alignment", required: false, hint: "left/center/right/justify; áp cho từng đoạn vừa chèn" },
-        { name: "break", required: false, hint: "ngắt đoạn sau khối; mặc định true khi có `alignment`" }
+        { name: "break", required: false, hint: "ngắt đoạn sau khối; mặc định true khi có `alignment`" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
       ] },
     { name: "writer.heading", kind: "wps", agent: true, undo: true,
       summary: "Heading 1-9 (`level`, mặc định 1) + tự xuống dòng (`break`, mặc định true)",
       params: [
         { name: "text", required: false, hint: null },
         { name: "level", required: false, hint: null },
-        { name: "break", required: false, hint: null }
+        { name: "break", required: false, hint: null },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
       ] },
     { name: "writer.formatSelection", kind: "wps", agent: true, undo: true,
       summary: "Định dạng vùng chọn",
@@ -93,18 +102,23 @@
         { name: "size", required: false, hint: null },
         { name: "color", required: false, hint: null },
         { name: "font", required: false, hint: null },
-        { name: "alignment", required: false, hint: null }
+        { name: "alignment", required: false, hint: null },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
       ] },
     { name: "writer.setParagraphAlignment", kind: "wps", agent: true, undo: true,
       summary: "Căn đoạn: left/center/right/justify",
-      params: [{ name: "alignment", required: true, hint: null }] },
+      params: [
+        { name: "alignment", required: true, hint: null },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
     { name: "writer.insertTable", kind: "wps", agent: true, undo: true,
       summary: "Chèn bảng; `rows`/`cols` tự suy ra/nới theo `values`",
       params: [
         { name: "rows", required: false, hint: null },
         { name: "cols", required: false, hint: null },
         { name: "values", required: false, hint: "2D array of rows" },
-        { name: "style", required: false, hint: null }
+        { name: "style", required: false, hint: null },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
       ] },
     { name: "writer.formatTable", kind: "wps", agent: true, undo: true,
       summary: "Định dạng bảng CÓ SẴN (không tạo lại): kiểu, font, màu hàng tiêu đề, màu sọc, viền, căn lề, co giãn",
@@ -121,68 +135,89 @@
         { name: "borderColor", required: false, hint: "#RRGGBB" },
         { name: "borders", required: false, hint: "false = no borders (layout tables)" },
         { name: "alignment", required: false, hint: "left/center/right" },
-        { name: "autoFit", required: false, hint: "content/window" }
+        { name: "autoFit", required: false, hint: "content/window" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
       ] },
     { name: "writer.insertPageBreak", kind: "wps", agent: true, undo: true,
       summary: "Ngắt trang",
-      params: [] },
+      params: [{ name: "document", required: false, hint: "full path of the document to work on; default: the active one" }] },
     { name: "writer.insertImage", kind: "wps", agent: true, undo: true,
       summary: "Chèn ảnh tại con trỏ (kích thước theo point)",
       params: [
         { name: "path", required: true, hint: null },
         { name: "width", required: false, hint: null },
-        { name: "height", required: false, hint: null }
+        { name: "height", required: false, hint: null },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
       ] },
     { name: "writer.insertHyperlink", kind: "wps", agent: true, undo: true,
       summary: "Chèn liên kết",
       params: [
         { name: "url", required: true, hint: null },
-        { name: "text", required: false, hint: null }
+        { name: "text", required: false, hint: null },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
       ] },
     { name: "writer.replaceAll", kind: "wps", agent: true, undo: true,
       summary: "Tìm và thay toàn bộ",
       params: [
         { name: "find", required: true, hint: null },
-        { name: "replace", required: false, hint: null }
+        { name: "replace", required: false, hint: null },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
       ] },
     { name: "writer.replaceMany", kind: "wps", agent: true, undo: true,
       summary: "Thay NHIỀU chỗ trong một lần: `edits` = [{find, replace}] theo thứ tự (mỗi cặp thay mọi chỗ khớp) - dùng thay cho nhiều lần writer.replaceAll; trả số chỗ đã thay của từng cặp",
-      params: [{ name: "edits", required: true, hint: "array of {find, replace}; up to 200" }] },
+      params: [
+        { name: "edits", required: true, hint: "array of {find, replace}; up to 200" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
     { name: "writer.lockSelection", kind: "wps", agent: false, undo: false,
       summary: "Khoá vùng đang bôi đen: tới khi mở khoá, lệnh writer.* chỉ được đổi chữ trong vùng đó (chars = 0: không bôi đen, không khoá)",
-      params: [] },
+      params: [{ name: "document", required: false, hint: "full path of the document to work on; default: the active one" }] },
     { name: "writer.unlockSelection", kind: "wps", agent: false, undo: false,
       summary: "Mở khoá vùng bôi đen",
-      params: [] },
+      params: [{ name: "document", required: false, hint: "full path of the document to work on; default: the active one" }] },
     { name: "writer.outline", kind: "wps", agent: true, undo: false,
       summary: "Dàn bài tài liệu: các đoạn (số thứ tự toàn tài liệu, chữ rút gọn, số tự động) và bảng (số hàng, cột, hàng tiêu đề)",
-      params: [{ name: "maxChars", required: false, hint: "characters per paragraph (default 160)" }] },
+      params: [
+        { name: "maxChars", required: false, hint: "characters per paragraph (default 160)" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
     { name: "writer.restyle", kind: "wps", agent: false, undo: true,
       summary: "Trình bày lại nền chung KHÔNG đổi chữ: tiêu đề mục (I., A., *), tiêu đề con (1.), nhãn (a. ...:), gạch đầu dòng hai cấp, bỏ dòng trống thừa, bảng (viền mảnh, hàng tiêu đề nhạt lặp lại), lề trang, số trang",
       params: [
         { name: "accent", required: false, hint: "#RRGGBB headings (default #2E5C8A)" },
         { name: "font", required: false, hint: "default Times New Roman" },
-        { name: "size", required: false, hint: "body size (default 13)" }
+        { name: "size", required: false, hint: "body size (default 13)" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
       ] },
     { name: "writer.insertBlocks", kind: "wps", agent: false, undo: true,
       summary: "Chèn khối bo tròn nền nhạt (ô ghi chú, cảnh báo, thẻ cạnh nhau) - thay các đoạn [replaceFrom, replaceTo] hoặc chèn trước đoạn `before`",
       params: [
         { name: "blocks", required: true, hint: "array of {before | replaceFrom, replaceTo, kind: box|row, gap, after, cells: [{tone, lines: [{k: title|bullet|text|small|center, t, size, bold}]}]}" },
         { name: "accent", required: false, hint: null },
-        { name: "font", required: false, hint: null }
+        { name: "font", required: false, hint: null },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
       ] },
     { name: "writer.undo", kind: "wps", agent: true, undo: false,
       summary: "Hoàn tác (mỗi thao tác AI = 1 bước)",
-      params: [{ name: "count", required: false, hint: null }] },
+      params: [
+        { name: "count", required: false, hint: null },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
     { name: "writer.exportPdf", kind: "wps", agent: true, undo: false,
       summary: "Xuất PDF",
-      params: [{ name: "path", required: true, hint: null }] },
+      params: [
+        { name: "path", required: true, hint: null },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
     { name: "writer.save", kind: "wps", agent: true, undo: false,
       summary: "Lưu",
-      params: [] },
+      params: [{ name: "document", required: false, hint: "full path of the document to work on; default: the active one" }] },
     { name: "writer.saveAs", kind: "wps", agent: true, undo: false,
       summary: "Lưu thành file mới",
-      params: [{ name: "path", required: true, hint: null }] },
+      params: [
+        { name: "path", required: true, hint: null },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
     { name: "writer.closeAll", kind: "wps", agent: false, undo: false,
       summary: "**Đóng mọi tài liệu, không lưu**",
       params: [] },
@@ -194,38 +229,45 @@
       params: [{ name: "path", required: true, hint: null }] },
     { name: "et.listSheets", kind: "et", agent: true, undo: false,
       summary: "Danh sách sheet + sheet đang active",
-      params: [] },
+      params: [{ name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }] },
     { name: "et.sheetInfo", kind: "et", agent: true, undo: false,
       summary: "Kích thước dùng thật của TỪNG sheet trong một lời gọi (`usedRange`/`rows`/`cols`/`empty`) — dùng để soát sheet nào thực sự có nội dung, không chỉ có tên",
-      params: [] },
+      params: [{ name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }] },
     { name: "et.addSheet", kind: "et", agent: true, undo: true,
       summary: "Thêm sheet mới (bỏ trống `name` thì đặt tên Sheet1, Sheet2...)",
       params: [
         { name: "name", required: false, hint: null },
-        { name: "index", required: false, hint: "0-based, default: append" }
+        { name: "index", required: false, hint: "0-based, default: append" },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
       ] },
     { name: "et.renameSheet", kind: "et", agent: true, undo: true,
       summary: "Đổi tên sheet",
       params: [
         { name: "sheet", required: true, hint: null },
-        { name: "name", required: true, hint: null }
+        { name: "name", required: true, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
       ] },
     { name: "et.activateSheet", kind: "et", agent: true, undo: false,
       summary: "Chuyển sheet",
-      params: [{ name: "sheet", required: true, hint: null }] },
+      params: [
+        { name: "sheet", required: true, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
+      ] },
     { name: "et.readRange", kind: "et", agent: true, undo: false,
       summary: "Đọc vùng, ví dụ `A1:C10`; `formulas=true` trả về công thức (ô không có công thức = null)",
       params: [
         { name: "range", required: true, hint: null },
         { name: "sheet", required: false, hint: null },
-        { name: "formulas", required: false, hint: "true = trả mảng `formulas` thay cho `values`" }
+        { name: "formulas", required: false, hint: "true = trả mảng `formulas` thay cho `values`" },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
       ] },
     { name: "et.writeRange", kind: "et", agent: true, undo: true,
       summary: "Ghi vùng từ ô góc trên-trái; `values` là mảng 2 chiều. Công thức viết theo cú pháp en-US (dấu phẩy); nếu máy dùng dấu chấm phẩy thì tự đổi. Công thức còn lỗi trả về ở `formulaErrors`",
       params: [
         { name: "range", required: true, hint: "top-left cell e.g. 'A1'" },
         { name: "values", required: true, hint: "2D array of rows e.g. [[\"Tên\",\"Điểm\"],[\"An\",9.5]]" },
-        { name: "sheet", required: false, hint: null }
+        { name: "sheet", required: false, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
       ] },
     { name: "et.importCsv", kind: "et", agent: true, undo: true,
       summary: "Nạp một file CSV vào sổ: không có `range` thì tạo sheet mới đặt tên theo tên file, có `range` thì ghi vào ô góc đó. Ô trông như số thì thành số, còn lại là chuỗi; ngày để nguyên chuỗi",
@@ -234,20 +276,23 @@
         { name: "range", required: false, hint: "top-left cell; bỏ trống thì tạo sheet mới" },
         { name: "sheet", required: false, hint: null },
         { name: "delimiter", required: false, hint: "một ký tự, mặc định ','" },
-        { name: "encoding", required: false, hint: "mặc định utf-8-sig" }
+        { name: "encoding", required: false, hint: "mặc định utf-8-sig" },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
       ] },
     { name: "et.writeRanges", kind: "et", agent: true, undo: true,
       summary: "Ghi NHIỀU vùng trong MỘT lời gọi: `writes` là mảng {range, values, sheet?}. Dùng khi cần viết nhiều khối trong cùng một phản hồi (bớt vòng qua bridge); công thức vẫn theo cú pháp en-US và lỗi công thức gom ở `formulaErrors`. Kiểm hết tham số trước khi ghi: một vùng sai thì không vùng nào được ghi",
       params: [
         { name: "writes", required: true, hint: "array of {range, values, sheet?}" },
-        { name: "sheet", required: false, hint: null }
+        { name: "sheet", required: false, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
       ] },
     { name: "et.fillRange", kind: "et", agent: true, undo: true,
       summary: "Viết MỘT công thức vào ô góc trên-trái của `range` rồi điền ra cả vùng, tham chiếu tương đối tự dịch (dùng cho bảng nghìn dòng: đừng gửi từng ô)",
       params: [
         { name: "range", required: true, hint: "the whole area e.g. 'B2:H1000'" },
         { name: "formula", required: false, hint: "written to the top-left cell first" },
-        { name: "sheet", required: false, hint: null }
+        { name: "sheet", required: false, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
       ] },
     { name: "et.formatRange", kind: "et", agent: true, undo: true,
       summary: "Định dạng vùng",
@@ -261,20 +306,23 @@
         { name: "numFmt", required: false, hint: null },
         { name: "horizontal", required: false, hint: null },
         { name: "wrap", required: false, hint: null },
-        { name: "sheet", required: false, hint: null }
+        { name: "sheet", required: false, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
       ] },
     { name: "et.setConditionalFormat", kind: "et", agent: true, undo: true,
       summary: "Đặt định dạng điều kiện cho vùng: `rules` là mảng rule, mỗi rule có operator (less/lessEqual/greater/greaterEqual/equal/notEqual/between/notBetween/formula), formula1, formula2 (chỉ between), và styleName có sẵn (Good/Bad/Neutral/Warning/Error/...) hoặc bold/italic/fontColor/fillColor/numFmt. Gọi lại trên cùng vùng thì THAY rule cũ của vùng đó, nên nhiều rule trên một vùng phải để trong MỘT lần gọi",
       params: [
         { name: "range", required: true, hint: null },
         { name: "rules", required: true, hint: "array of rule objects" },
-        { name: "sheet", required: false, hint: null }
+        { name: "sheet", required: false, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
       ] },
     { name: "et.listConditionalFormats", kind: "et", agent: true, undo: false,
       summary: "Liệt kê định dạng điều kiện đang có (đọc lại để tự kiểm); bỏ trống `range` thì cả sheet",
       params: [
         { name: "range", required: false, hint: "chỉ xem một vùng" },
-        { name: "sheet", required: false, hint: null }
+        { name: "sheet", required: false, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
       ] },
     { name: "et.addChart", kind: "et", agent: true, undo: true,
       summary: "Chèn biểu đồ từ vùng dữ liệu; `type` column/bar/line/pie/area/scatter, `width`/`height` tính bằng cm",
@@ -286,23 +334,36 @@
         { name: "anchor", required: false, hint: "top-left cell, default 'A1'" },
         { name: "width", required: false, hint: "cm, default 12" },
         { name: "height", required: false, hint: "cm, default 7" },
-        { name: "sheet", required: false, hint: null }
+        { name: "sheet", required: false, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
       ] },
     { name: "et.listCharts", kind: "et", agent: true, undo: false,
       summary: "Danh sách biểu đồ trên sheet",
-      params: [{ name: "sheet", required: false, hint: null }] },
+      params: [
+        { name: "sheet", required: false, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
+      ] },
     { name: "et.undo", kind: "et", agent: true, undo: false,
       summary: "Hoàn tác",
-      params: [{ name: "count", required: false, hint: null }] },
+      params: [
+        { name: "count", required: false, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
+      ] },
     { name: "et.exportPdf", kind: "et", agent: true, undo: false,
       summary: "Xuất PDF",
-      params: [{ name: "path", required: true, hint: null }] },
+      params: [
+        { name: "path", required: true, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
+      ] },
     { name: "et.save", kind: "et", agent: true, undo: false,
       summary: "Lưu",
-      params: [] },
+      params: [{ name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }] },
     { name: "et.saveAs", kind: "et", agent: true, undo: false,
       summary: "Lưu thành file mới",
-      params: [{ name: "path", required: true, hint: null }] },
+      params: [
+        { name: "path", required: true, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
+      ] },
     { name: "et.closeAll", kind: "et", agent: false, undo: false,
       summary: "**Đóng mọi sổ, không lưu**",
       params: [] },
@@ -320,7 +381,10 @@
       ] },
     { name: "wpp.addSlide", kind: "wpp", agent: true, undo: true,
       summary: "Thêm slide cuối; `layout` mặc định 12 = trống (1 = tiêu đề, 2 = tiêu đề + nội dung, 11 = chỉ tiêu đề)",
-      params: [{ name: "layout", required: false, hint: "number: 1 title, 2 title+content, 11 title only, 12 blank" }] },
+      params: [
+        { name: "layout", required: false, hint: "number: 1 title, 2 title+content, 11 title only, 12 blank" },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
+      ] },
     { name: "wpp.addText", kind: "wpp", agent: true, undo: true,
       summary: "Textbox có định dạng (`color` dạng `#RRGGBB`, `align` left/center/right)",
       params: [
@@ -344,7 +408,8 @@
         { name: "left", required: false, hint: null },
         { name: "top", required: false, hint: null },
         { name: "width", required: false, hint: null },
-        { name: "height", required: false, hint: null }
+        { name: "height", required: false, hint: null },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
       ] },
     { name: "wpp.addImage", kind: "wpp", agent: true, undo: true,
       summary: "Chèn ảnh (kích thước gốc nếu bỏ trống `width`/`height`)",
@@ -354,7 +419,8 @@
         { name: "left", required: false, hint: null },
         { name: "top", required: false, hint: null },
         { name: "width", required: false, hint: null },
-        { name: "height", required: false, hint: null }
+        { name: "height", required: false, hint: null },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
       ] },
     { name: "wpp.addTable", kind: "wpp", agent: true, undo: true,
       summary: "Bảng; `rows`/`cols` tự suy ra/nới theo `values`",
@@ -366,7 +432,8 @@
         { name: "left", required: false, hint: null },
         { name: "top", required: false, hint: null },
         { name: "width", required: false, hint: null },
-        { name: "height", required: false, hint: null }
+        { name: "height", required: false, hint: null },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
       ] },
     { name: "wpp.setNotes", kind: "wpp", agent: true, undo: true,
       summary: "Ghi chú thuyết trình",
@@ -377,16 +444,25 @@
       ] },
     { name: "wpp.deleteSlide", kind: "wpp", agent: true, undo: true,
       summary: "Xoá slide (mặc định slide cuối)",
-      params: [{ name: "slide", required: false, hint: null }] },
+      params: [
+        { name: "slide", required: false, hint: null },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
+      ] },
     { name: "wpp.exportPdf", kind: "wpp", agent: true, undo: false,
       summary: "Xuất PDF",
-      params: [{ name: "path", required: true, hint: null }] },
+      params: [
+        { name: "path", required: true, hint: null },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
+      ] },
     { name: "wpp.save", kind: "wpp", agent: true, undo: false,
       summary: "Lưu",
       params: [{ name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }] },
     { name: "wpp.saveAs", kind: "wpp", agent: true, undo: false,
       summary: "Lưu thành file mới",
-      params: [{ name: "path", required: true, hint: null }] },
+      params: [
+        { name: "path", required: true, hint: null },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
+      ] },
     { name: "wpp.newFromTemplate", kind: "wpp", agent: true, undo: false,
       summary: "Tạo bài MỚI từ tệp mẫu (.pptx/.potx): giữ khổ + master, bỏ hết slide mẫu, lưu ở `path` và mở ra",
       params: [
@@ -408,7 +484,8 @@
       params: [
         { name: "from", required: true, hint: "path of the source presentation" },
         { name: "first", required: false, hint: null },
-        { name: "last", required: false, hint: null }
+        { name: "last", required: false, hint: null },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
       ] },
     { name: "wpp.setShapeText", kind: "wpp", agent: true, undo: true,
       summary: "Thay chữ của một khung theo TÊN shape, giữ định dạng của khung (font, cỡ, màu)",
@@ -487,17 +564,56 @@
         { name: "last", required: true, hint: null },
         { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
       ] },
+    { name: "wpp.addShape", kind: "wpp", agent: false, undo: true,
+      summary: "Hình khối có chữ (chữ nhật, bo góc, tròn, mũi tên chevron) - nền, viền, cỡ chữ, màu chữ",
+      params: [
+        { name: "slide", required: false, hint: null },
+        { name: "left", required: false, hint: null },
+        { name: "top", required: false, hint: null },
+        { name: "width", required: false, hint: null },
+        { name: "height", required: false, hint: null },
+        { name: "shape", required: false, hint: "rect, rounded, oval, chevron, line (default rect)" },
+        { name: "text", required: false, hint: null },
+        { name: "fontSize", required: false, hint: null },
+        { name: "bold", required: false, hint: null },
+        { name: "boldFirst", required: false, hint: "true = only the first line bold (heading of the box)" },
+        { name: "color", required: false, hint: "#RRGGBB text" },
+        { name: "fill", required: false, hint: "#RRGGBB fill; empty = none" },
+        { name: "line", required: false, hint: "#RRGGBB outline; empty = none" },
+        { name: "font", required: false, hint: "font name" },
+        { name: "anchor", required: false, hint: "top or middle (default)" },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
+      ] },
+    { name: "wpp.renderSlide", kind: "wpp", agent: false, undo: false,
+      summary: "Ảnh PNG của một slide theo số (soát bằng mắt, benchmark) - base64, không đổi cửa sổ đang xem",
+      params: [
+        { name: "slide", required: true, hint: null },
+        { name: "maxWidth", required: false, hint: "pixels (default 1280)" },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
+      ] },
+    { name: "wpp.addConnector", kind: "wpp", agent: false, undo: true,
+      summary: "Đường nối có mũi tên giữa hai hình (bám theo hình khi kéo)",
+      params: [
+        { name: "from", required: true, hint: "shape name" },
+        { name: "to", required: true, hint: "shape name" },
+        { name: "slide", required: false, hint: null },
+        { name: "elbow", required: false, hint: "true = elbow connector (default straight)" },
+        { name: "color", required: false, hint: "#RRGGBB" },
+        { name: "weight", required: false, hint: "points" },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
+      ] },
     { name: "wpp.closeAll", kind: "wpp", agent: false, undo: false,
       summary: "**Đóng mọi bài trình bày, không lưu**",
       params: [] },
     { name: "writer.checkTables", kind: "wps", agent: true, undo: false,
       summary: "Soát các bảng (chỉ đọc): số dòng/cột, ô trống, ô tiêu đề lẫn đoạn văn. Bảng dàn trang — bảng đã gọi writer.formatTable với borders:false — được đánh dấu layout và KHÔNG báo empty-cells (ô trống ở đó là cố ý: khoảng trống ký, ô chờ điền)",
-      params: [] },
+      params: [{ name: "document", required: false, hint: "full path of the document to work on; default: the active one" }] },
     { name: "et.checkRange", kind: "et", agent: true, undo: false,
       summary: "Soát bảng dữ liệu (chỉ đọc): tiêu đề trống, kiểu lẫn lộn, số dạng chữ, number format, dữ liệu lạc ngoài bảng (chỉ khi không truyền range)",
       params: [
         { name: "range", required: false, hint: "default: the used range" },
-        { name: "sheet", required: false, hint: null }
+        { name: "sheet", required: false, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
       ] },
     { name: "wpp.checkLayout", kind: "wpp", agent: true, undo: false,
       summary: "Soát bố cục slide (chỉ đọc): chữ tràn khung, shape ra ngoài slide, shape chồng nhau, chữ quá nhỏ",

@@ -82,6 +82,11 @@ type RunContext struct {
 	// OverwriteApproved: sheet da duoc nguoi dung dong y ghi de trong luot nay - da dong y mot
 	// lan thi cac lenh sau tren cung sheet trong cung luot khong hoi lai.
 	OverwriteApproved map[string]bool
+	// TargetDocument: tai lieu cua luot - Core tu gan vao lenh writer.*/et.*/wpp.* model khong chon tai lieu (target.go).
+	// Doi theo lenh tao/mo tai lieu thanh cong trong luot.
+	TargetDocument string
+	// owned: slide/shape do chinh luot nay tao - xoa chung khong can hoi (owned.go).
+	owned *ownedObjects
 	// FocusSlide: slide nguoi dung dang mo (pane gui document.view) - ket qua doc ca bai giu nguyen slide nay.
 	FocusSlide int
 	// Todos: danh sach viec model ghi gan nhat (write_todos).

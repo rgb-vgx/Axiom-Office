@@ -66,6 +66,21 @@ func TestDirectoryFiltersByLivenessAndAge(t *testing.T) {
 	if !strings.Contains(fresh[0].Describe(), "et/office port 47840") {
 		t.Fatalf("Describe = %q", fresh[0].Describe())
 	}
+
+	// Session cu: chi dung lai khi bridge tren cong tra loi dung pid (may vua thuc day).
+	asked := 0
+	if found := directory.FindWoken(47841, func() int { asked++; return alive }); found == nil || found.Port != 47841 {
+		t.Fatalf("FindWoken dung pid = %+v", found)
+	}
+	if directory.FindWoken(47841, func() int { return alive + 1 }) != nil {
+		t.Fatal("bridge cua tien trinh khac tren cong: khong dung lai session cu")
+	}
+	if directory.FindWoken(47840, func() int { asked++; return alive }) != nil {
+		t.Fatal("session con moi khong phai viec cua FindWoken")
+	}
+	if asked != 1 {
+		t.Fatalf("healthPid chi goi khi co ung vien qua han, goi %d lan", asked)
+	}
 }
 
 func TestDocumentKey(t *testing.T) {

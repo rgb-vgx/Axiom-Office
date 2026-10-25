@@ -1049,7 +1049,7 @@ namespace AxiomOffice.Ai
         }
 
         // --- BEGIN SINH TU DONG (scripts/generate_mcp_commands.py) - KHONG SUA TAY ---
-        // Lenh writer.* co `undo` trong registry = dung mot buoc Undo (UndoRecordScope).
+        // Lenh writer.* co `undo` trong catalog = dung mot buoc Undo (UndoRecordScope).
         private static readonly HashSet<string> WordEditActions = new HashSet<string>(StringComparer.Ordinal)
         {
             "writer.appendText",

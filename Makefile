@@ -1,4 +1,4 @@
-.PHONY: help test test-go test-lo test-wps test-wps-e2e test-core test-mcp test-oracle test-install test-live-format core-build check-gen package clean fmt lint lint-go lint-py lint-js
+.PHONY: help test test-go test-lo test-bench test-catalog test-wps test-wps-e2e test-core test-mcp test-oracle test-install test-live-format core-build check-gen package clean fmt lint lint-go lint-py lint-js
 
 GOBIN := $(shell go env GOPATH)/bin
 RUFF ?= $(shell command -v ruff 2>/dev/null || echo python3 -m ruff)
@@ -28,7 +28,7 @@ help:
 	@echo "  lint-py     - Kiem loi Python (ruff check)"
 	@echo "  lint-js     - Kiem loi JS (ESLint: add-in WPS ES5 + tests modern)"
 
-test: test-go test-lo test-wps test-wps-e2e test-core test-mcp test-oracle test-install test-package
+test: test-go test-lo test-bench test-catalog test-wps test-wps-e2e test-core test-mcp test-oracle test-install test-package
 
 # -race: Execute ghi trang thai luot tren goroutine rieng trong khi API doc (agent.Run co khoa rieng).
 test-go:
@@ -36,6 +36,14 @@ test-go:
 
 test-lo:
 	python3 -m unittest discover -s tests/lo -v
+
+# Bo cham benchmark slide (docs/plans/18): thuan, khong can PowerPoint. Chay bo brief that: tests/bench/slides/run.py.
+test-bench:
+	python3 -m unittest discover -s tests/bench/slides -v
+
+# Catalog lenh bridge (catalog/live-commands.json - nguon chuan): dinh dang, tham so chon tai lieu, khop ban C# (khi da build).
+test-catalog:
+	python3 -m unittest discover -s tests/catalog -v
 
 test-wps:
 	python3 tests/wps/test_install_jsaddon.py

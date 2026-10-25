@@ -18,6 +18,50 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 - `LlmClient` chỉ còn `Chat` (nút Test, `llm-test`). Log `CoreClient: fallback to in-process -` đổi thành
   `CoreClient: run not started -`. Pane báo hết giờ bằng câu chung (Core không có trần 5 phút như agent cũ).
 
+### Changed — Chỉ còn hỗ trợ Microsoft Office; catalog lệnh lấy JSON làm nguồn (25/10/2026)
+
+- **LibreOffice dừng hỗ trợ.** Code và CI còn nguyên; ba test so catalog trong `tests/lo` bỏ qua kèm lý do. WPS chuyển
+  thành to-do khi sang host Linux (`docs/plans/19-h0`, mục "To-do WPS").
+- **`catalog/live-commands.json` là nguồn chuẩn** (sửa tay) thay cho registry Python của LibreOffice;
+  `scripts/generate_mcp_commands.py` sinh bản Go và WPS từ đó. `tests/catalog` (CI): định dạng, tham số chọn tài
+  liệu, khớp `AxiomOffice.Host.exe commands --json`.
+
+### Added — Slide từ brief, hình khối, nền tảng bền (25/10/2026)
+
+- **Tool `slides_from_brief`** (PowerPoint): model chọn layout và viết chữ (`cover`, `section`, `content`, `cards`,
+  `table`, `figures`, `process`, `timeline`, `diagram`); Core tính vị trí theo lưới của skill và `_design/tokens.json`,
+  kiểm hết trước khi dựng (`TOO_LONG` kèm gợi ý), không co chữ. Hình học nằm ở gói mới `core-go/internal/slidelayout`;
+  chế độ dựng theo mẫu cũng đi qua `slidelayout.Solve` (golden chuỗi lệnh bridge giữ nguyên từng byte).
+- **Lệnh C# mới (chỉ tool dùng):** `wpp.addShape`, `wpp.addConnector` (hình khối, mũi tên bám hình),
+  `wpp.renderSlide` (PNG một slide theo số). `look_at_document` nhận `slide`.
+- **Lệnh nhắm tài liệu tường minh:** mọi lệnh `writer.*`/`et.*`/`wpp.*` (trừ tạo/mở/đóng) nhận
+  `document`/`workbook`/`presentation`; bridge kích hoạt đúng tài liệu, tài liệu đã đóng thì báo `DOCUMENT_CLOSED`;
+  Core tự gắn tài liệu của lượt (benchmark: một lượt đã ghi slide vào nhầm bài).
+- **Bridge không treo vì hộp thoại:** lệnh `/cmd` chạy trên thread STA riêng, quá 120 s trả `HOST_BUSY` kèm nội dung
+  hộp thoại; lệnh còn xếp hàng bị bỏ chứ không chạy muộn. Core dùng lại session quá hạn khi bridge trả đúng `pid`
+  (máy vừa thức), model client thử lại request bị mất khi máy ngủ.
+- **`wpp.listSlides` đọc bảng, nhóm, tiêu đề biểu đồ** (trước đây agent không thấy bảng của chính mình).
+- **Không hỏi khi xoá thứ do chính lượt tạo** (sổ đối tượng của lượt); đối tượng có sẵn vẫn hỏi như cũ.
+- Skill `trinh-bay-chuyen-nghiep`: đúng số slide người dùng xin, không tự thêm bìa/mục lục/"Cảm ơn".
+- Bộ chấm benchmark: `readGap` (chữ trên slide mà `listSlides` không thấy), `unsourced` (số không có trong đề).
+- Đo lại cả bộ 24 brief × 3 bằng model yếu (`docs/plans/18-s0` mục 9.3): trên 18 brief có baseline đạt 51/54
+  (baseline 48/51); `readGap` từ 11 lượt về 0; vòng giảm 15,4 → 10,9; token giảm 76k → 55k. Còn lỗi: đường nối
+  của layout `diagram` cắt hộp (`s17`), thừa slide ở `s23`, thiếu biểu đồ gốc (`s10`).
+
+### Added — Slide: bộ đo chất lượng và thiết kế spec dùng chung (25/10/2026)
+
+- `docs/plans/18-s0-slide-do-va-spec.md`: hiện trạng hai đường tạo slide (tự do: model tự tính toạ độ; theo mẫu:
+  Go tính), bảng khoảng trống, thiết kế `SlideSpec` → `Layout` → lệnh bridge, kế hoạch tách solver có kiểm hồi quy.
+- `tests/bench/slides/`: 24 brief có sẵn số liệu, bộ chấm bằng lệnh đọc (`score.py`, không dùng LLM), bộ chạy
+  qua Core (`run.py`). `make test-bench` chạy trong CI. Baseline đầu tiên (deepseek-v4.1-flash, smoke × 3,
+  PowerPoint 2019): đạt 18/21, lỗi chung là tự thêm slide không được yêu cầu.
+- `docs/plans/19-h0-nen-tang-ben-vung.md`: plan sửa các điểm yếu lộ ra khi chạy benchmark (lệnh nhắm tài liệu
+  tường minh, bridge treo vì hộp thoại hoặc máy ngủ, `wpp.listSlides` không đọc bảng, xác nhận khi không có người).
+- `core-go/internal/tools/template_layout_test.go`: test characterization ghim số đo của `contentRegions`,
+  `cardBoxes`, `fitCards`, `pictureBoxes` và mã lỗi `checkCompose` trước khi tách solver.
+- `scripts/build.ps1`: biến `AXIOM_CSC` trỏ tới `csc.exe` khi máy không có Visual Studio (dùng `tasks\net472\csc.exe`
+  của gói NuGet `Microsoft.Net.Compilers.Toolset`).
+
 ### Fixed — Word: bảng dàn trang và `writer.restyle` cho văn bản hành chính (24/10/2026)
 
 - **`writer.formatTable {borders:false}`** (C#) nay đặt tem `AxiomLayout` vào `Table.Title` (lưu theo `.docx`,

@@ -980,6 +980,26 @@ Vẫn **.NET 4.8, C# 7.3, không NuGet**.
    memory qua Core API.
 5. Không đổi: registry lệnh, `ComGate`, `/cmd`, SSE `/events`, MCP của Host.exe.
 
+### 9.1 Quy tắc cho lệnh bridge mới (từ 25/10/2026, `docs/plans/19-h0` H6)
+
+- **Nguồn chuẩn của catalog là `catalog/live-commands.json`** (sửa tay). `scripts/generate_mcp_commands.py` sinh bản
+  Go (`livecommands_gen.go`) và bản WPS (`commands.js`) từ đó; `tests/catalog` so file này với
+  `AxiomOffice.Host.exe commands --json`. Registry Python của LibreOffice không còn là nguồn (LibreOffice dừng hỗ trợ).
+- **Backend chỉ làm primitive**: tạo hoặc sửa một đối tượng, đọc lại đúng thứ đã tạo. Bố cục, phương án dự phòng, cỡ
+  chữ, lưới, màu nằm ở Core (`core-go/internal/slidelayout`, đọc `_design/tokens.json`), viết một lần.
+- Một lệnh mới phải có cùng lúc:
+  1. Mục catalog, cùng tên và thứ tự tham số với bản C#.
+  2. Tham số chọn tài liệu (`presentation` / `workbook` / `document`). Dispatcher tự thêm cho lệnh chưa khai báo và kích
+     hoạt đúng tài liệu (`CommandDispatcher.Target.cs`); Core tự gắn tài liệu của lượt (`tools/target.go`).
+  3. Kết quả có định danh của đối tượng vừa tạo (`slide`, `shape`), để Core ghi sổ đối tượng của lượt (`tools/owned.go`).
+  4. Lệnh đọc thấy được thứ lệnh này tạo ra (vd `wpp.listSlides` đọc bảng, nhóm, biểu đồ).
+  5. Live test trên Office thấp nhất được hỗ trợ (Office 2019 x64). Lệnh đổi vòng đời tài liệu (đóng, mở, đóng hàng
+     loạt) không đóng nhiều tài liệu trong một lời gọi COM: `wpp.closeAll` thử ngày 25/10/2026 làm PowerPoint 2019
+     crash `0xc0000409`.
+- **Lệnh `/cmd` chạy trên thread STA riêng** (`Bridge/CommandWorker.cs`), quá `CommandWorker.TimeoutMs` (120 s) thì
+  trả `HOST_BUSY` kèm nội dung hộp thoại đang mở (`Bridge/HostDialogs.cs`), không bao giờ tự bấm hộp thoại. Lệnh còn
+  xếp hàng khi đã báo `HOST_BUSY` thì bị bỏ, không chạy muộn.
+
 ## 10. Build, cài đặt, đóng gói
 
 - `scripts\build.ps1`:

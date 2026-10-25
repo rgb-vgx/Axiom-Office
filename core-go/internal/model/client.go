@@ -274,6 +274,9 @@ func (c *Client) postOnce(ctx, userCtx context.Context, payload []byte, live *li
 	// Ket noi treo bi chan bang watchdog "khong nhan duoc byte nao" ben duoi.
 	requestCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	// Ca luc cho header lan luc doc than: may ngu roi thuc thi huy va thu lai (resume.go).
+	resume := watchResume(cancel)
+	defer resume.stop()
 	request, err := http.NewRequestWithContext(requestCtx, http.MethodPost, BuildURL(c.endpoint, c.Codec.Path()), bytes.NewReader(payload))
 	if err != nil {
 		return nil, "HttpRequestException: " + err.Error(), 0, 0
@@ -282,6 +285,9 @@ func (c *Client) postOnce(ctx, userCtx context.Context, payload []byte, live *li
 	ApplyAuth(request, c.Codec.Name(), c.apiKey)
 	response, err := c.http.Do(request)
 	if err != nil {
+		if resume.Resumed() && ctx.Err() == nil {
+			return nil, resumedError, 0, 0
+		}
 		return nil, transportError(err, ctx, userCtx, c.IdleTimeout), 0, 0
 	}
 	defer response.Body.Close()
@@ -292,6 +298,9 @@ func (c *Client) postOnce(ctx, userCtx context.Context, payload []byte, live *li
 	}
 	text, err := io.ReadAll(source)
 	if err != nil {
+		if resume.Resumed() && ctx.Err() == nil {
+			return nil, resumedError, 0, 0
+		}
 		if reader.Stalled() {
 			return nil, fmt.Sprintf("provider sent nothing for %ds", int(c.IdleTimeout.Seconds())), 0, 0
 		}

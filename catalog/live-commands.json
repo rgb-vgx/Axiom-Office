@@ -84,6 +84,11 @@
         "name": "maxChars",
         "required": false,
         "hint": null
+      },
+      {
+        "name": "document",
+        "required": false,
+        "hint": "full path of the document to work on; default: the active one"
       }
     ]
   },
@@ -93,7 +98,13 @@
     "agent": true,
     "undo": false,
     "summary": "Text + vị trí đang chọn",
-    "params": []
+    "params": [
+      {
+        "name": "document",
+        "required": false,
+        "hint": "full path of the document to work on; default: the active one"
+      }
+    ]
   },
   {
     "name": "writer.typeText",
@@ -106,6 +117,11 @@
         "name": "text",
         "required": true,
         "hint": null
+      },
+      {
+        "name": "document",
+        "required": false,
+        "hint": "full path of the document to work on; default: the active one"
       }
     ]
   },
@@ -155,6 +171,11 @@
         "name": "alignment",
         "required": false,
         "hint": "left/center/right/justify; mặc định left"
+      },
+      {
+        "name": "document",
+        "required": false,
+        "hint": "full path of the document to work on; default: the active one"
       }
     ]
   },
@@ -209,6 +230,11 @@
         "name": "break",
         "required": false,
         "hint": "ngắt đoạn sau khối; mặc định true khi có `alignment`"
+      },
+      {
+        "name": "document",
+        "required": false,
+        "hint": "full path of the document to work on; default: the active one"
       }
     ]
   },
@@ -233,6 +259,11 @@
         "name": "break",
         "required": false,
         "hint": null
+      },
+      {
+        "name": "document",
+        "required": false,
+        "hint": "full path of the document to work on; default: the active one"
       }
     ]
   },
@@ -277,6 +308,11 @@
         "name": "alignment",
         "required": false,
         "hint": null
+      },
+      {
+        "name": "document",
+        "required": false,
+        "hint": "full path of the document to work on; default: the active one"
       }
     ]
   },
@@ -291,6 +327,11 @@
         "name": "alignment",
         "required": true,
         "hint": null
+      },
+      {
+        "name": "document",
+        "required": false,
+        "hint": "full path of the document to work on; default: the active one"
       }
     ]
   },
@@ -320,6 +361,11 @@
         "name": "style",
         "required": false,
         "hint": null
+      },
+      {
+        "name": "document",
+        "required": false,
+        "hint": "full path of the document to work on; default: the active one"
       }
     ]
   },
@@ -394,6 +440,11 @@
         "name": "autoFit",
         "required": false,
         "hint": "content/window"
+      },
+      {
+        "name": "document",
+        "required": false,
+        "hint": "full path of the document to work on; default: the active one"
       }
     ]
   },
@@ -403,7 +454,13 @@
     "agent": true,
     "undo": true,
     "summary": "Ngắt trang",
-    "params": []
+    "params": [
+      {
+        "name": "document",
+        "required": false,
+        "hint": "full path of the document to work on; default: the active one"
+      }
+    ]
   },
   {
     "name": "writer.insertImage",
@@ -426,6 +483,11 @@
         "name": "height",
         "required": false,
         "hint": null
+      },
+      {
+        "name": "document",
+        "required": false,
+        "hint": "full path of the document to work on; default: the active one"
       }
     ]
   },
@@ -445,6 +507,11 @@
         "name": "text",
         "required": false,
         "hint": null
+      },
+      {
+        "name": "document",
+        "required": false,
+        "hint": "full path of the document to work on; default: the active one"
       }
     ]
   },
@@ -464,6 +531,11 @@
         "name": "replace",
         "required": false,
         "hint": null
+      },
+      {
+        "name": "document",
+        "required": false,
+        "hint": "full path of the document to work on; default: the active one"
       }
     ]
   },
@@ -478,6 +550,11 @@
         "name": "edits",
         "required": true,
         "hint": "array of {find, replace}; up to 200"
+      },
+      {
+        "name": "document",
+        "required": false,
+        "hint": "full path of the document to work on; default: the active one"
       }
     ]
   },
@@ -487,7 +564,13 @@
     "agent": false,
     "undo": false,
     "summary": "Khoá vùng đang bôi đen: tới khi mở khoá, lệnh writer.* chỉ được đổi chữ trong vùng đó (chars = 0: không bôi đen, không khoá)",
-    "params": []
+    "params": [
+      {
+        "name": "document",
+        "required": false,
+        "hint": "full path of the document to work on; default: the active one"
+      }
+    ]
   },
   {
     "name": "writer.unlockSelection",
@@ -495,7 +578,13 @@
     "agent": false,
     "undo": false,
     "summary": "Mở khoá vùng bôi đen",
-    "params": []
+    "params": [
+      {
+        "name": "document",
+        "required": false,
+        "hint": "full path of the document to work on; default: the active one"
+      }
+    ]
   },
   {
     "name": "writer.outline",
@@ -508,6 +597,11 @@
         "name": "maxChars",
         "required": false,
         "hint": "characters per paragraph (default 160)"
+      },
+      {
+        "name": "document",
+        "required": false,
+        "hint": "full path of the document to work on; default: the active one"
       }
     ]
   },
@@ -532,6 +626,11 @@
         "name": "size",
         "required": false,
         "hint": "body size (default 13)"
+      },
+      {
+        "name": "document",
+        "required": false,
+        "hint": "full path of the document to work on; default: the active one"
       }
     ]
   },
@@ -556,6 +655,11 @@
         "name": "font",
         "required": false,
         "hint": null
+      },
+      {
+        "name": "document",
+        "required": false,
+        "hint": "full path of the document to work on; default: the active one"
       }
     ]
   },
@@ -570,6 +674,11 @@
         "name": "count",
         "required": false,
         "hint": null
+      },
+      {
+        "name": "document",
+        "required": false,
+        "hint": "full path of the document to work on; default: the active one"
       }
     ]
   },
@@ -584,6 +693,11 @@
         "name": "path",
         "required": true,
         "hint": null
+      },
+      {
+        "name": "document",
+        "required": false,
+        "hint": "full path of the document to work on; default: the active one"
       }
     ]
   },
@@ -593,7 +707,13 @@
     "agent": true,
     "undo": false,
     "summary": "Lưu",
-    "params": []
+    "params": [
+      {
+        "name": "document",
+        "required": false,
+        "hint": "full path of the document to work on; default: the active one"
+      }
+    ]
   },
   {
     "name": "writer.saveAs",
@@ -606,6 +726,11 @@
         "name": "path",
         "required": true,
         "hint": null
+      },
+      {
+        "name": "document",
+        "required": false,
+        "hint": "full path of the document to work on; default: the active one"
       }
     ]
   },
@@ -645,7 +770,13 @@
     "agent": true,
     "undo": false,
     "summary": "Danh sách sheet + sheet đang active",
-    "params": []
+    "params": [
+      {
+        "name": "workbook",
+        "required": false,
+        "hint": "full path of the workbook to work on; default: the active one"
+      }
+    ]
   },
   {
     "name": "et.sheetInfo",
@@ -653,7 +784,13 @@
     "agent": true,
     "undo": false,
     "summary": "Kích thước dùng thật của TỪNG sheet trong một lời gọi (`usedRange`/`rows`/`cols`/`empty`) — dùng để soát sheet nào thực sự có nội dung, không chỉ có tên",
-    "params": []
+    "params": [
+      {
+        "name": "workbook",
+        "required": false,
+        "hint": "full path of the workbook to work on; default: the active one"
+      }
+    ]
   },
   {
     "name": "et.addSheet",
@@ -671,6 +808,11 @@
         "name": "index",
         "required": false,
         "hint": "0-based, default: append"
+      },
+      {
+        "name": "workbook",
+        "required": false,
+        "hint": "full path of the workbook to work on; default: the active one"
       }
     ]
   },
@@ -690,6 +832,11 @@
         "name": "name",
         "required": true,
         "hint": null
+      },
+      {
+        "name": "workbook",
+        "required": false,
+        "hint": "full path of the workbook to work on; default: the active one"
       }
     ]
   },
@@ -704,6 +851,11 @@
         "name": "sheet",
         "required": true,
         "hint": null
+      },
+      {
+        "name": "workbook",
+        "required": false,
+        "hint": "full path of the workbook to work on; default: the active one"
       }
     ]
   },
@@ -728,6 +880,11 @@
         "name": "formulas",
         "required": false,
         "hint": "true = trả mảng `formulas` thay cho `values`"
+      },
+      {
+        "name": "workbook",
+        "required": false,
+        "hint": "full path of the workbook to work on; default: the active one"
       }
     ]
   },
@@ -752,6 +909,11 @@
         "name": "sheet",
         "required": false,
         "hint": null
+      },
+      {
+        "name": "workbook",
+        "required": false,
+        "hint": "full path of the workbook to work on; default: the active one"
       }
     ]
   },
@@ -786,6 +948,11 @@
         "name": "encoding",
         "required": false,
         "hint": "mặc định utf-8-sig"
+      },
+      {
+        "name": "workbook",
+        "required": false,
+        "hint": "full path of the workbook to work on; default: the active one"
       }
     ]
   },
@@ -805,6 +972,11 @@
         "name": "sheet",
         "required": false,
         "hint": null
+      },
+      {
+        "name": "workbook",
+        "required": false,
+        "hint": "full path of the workbook to work on; default: the active one"
       }
     ]
   },
@@ -829,6 +1001,11 @@
         "name": "sheet",
         "required": false,
         "hint": null
+      },
+      {
+        "name": "workbook",
+        "required": false,
+        "hint": "full path of the workbook to work on; default: the active one"
       }
     ]
   },
@@ -888,6 +1065,11 @@
         "name": "sheet",
         "required": false,
         "hint": null
+      },
+      {
+        "name": "workbook",
+        "required": false,
+        "hint": "full path of the workbook to work on; default: the active one"
       }
     ]
   },
@@ -912,6 +1094,11 @@
         "name": "sheet",
         "required": false,
         "hint": null
+      },
+      {
+        "name": "workbook",
+        "required": false,
+        "hint": "full path of the workbook to work on; default: the active one"
       }
     ]
   },
@@ -931,6 +1118,11 @@
         "name": "sheet",
         "required": false,
         "hint": null
+      },
+      {
+        "name": "workbook",
+        "required": false,
+        "hint": "full path of the workbook to work on; default: the active one"
       }
     ]
   },
@@ -980,6 +1172,11 @@
         "name": "sheet",
         "required": false,
         "hint": null
+      },
+      {
+        "name": "workbook",
+        "required": false,
+        "hint": "full path of the workbook to work on; default: the active one"
       }
     ]
   },
@@ -994,6 +1191,11 @@
         "name": "sheet",
         "required": false,
         "hint": null
+      },
+      {
+        "name": "workbook",
+        "required": false,
+        "hint": "full path of the workbook to work on; default: the active one"
       }
     ]
   },
@@ -1008,6 +1210,11 @@
         "name": "count",
         "required": false,
         "hint": null
+      },
+      {
+        "name": "workbook",
+        "required": false,
+        "hint": "full path of the workbook to work on; default: the active one"
       }
     ]
   },
@@ -1022,6 +1229,11 @@
         "name": "path",
         "required": true,
         "hint": null
+      },
+      {
+        "name": "workbook",
+        "required": false,
+        "hint": "full path of the workbook to work on; default: the active one"
       }
     ]
   },
@@ -1031,7 +1243,13 @@
     "agent": true,
     "undo": false,
     "summary": "Lưu",
-    "params": []
+    "params": [
+      {
+        "name": "workbook",
+        "required": false,
+        "hint": "full path of the workbook to work on; default: the active one"
+      }
+    ]
   },
   {
     "name": "et.saveAs",
@@ -1044,6 +1262,11 @@
         "name": "path",
         "required": true,
         "hint": null
+      },
+      {
+        "name": "workbook",
+        "required": false,
+        "hint": "full path of the workbook to work on; default: the active one"
       }
     ]
   },
@@ -1107,6 +1330,11 @@
         "name": "layout",
         "required": false,
         "hint": "number: 1 title, 2 title+content, 11 title only, 12 blank"
+      },
+      {
+        "name": "presentation",
+        "required": false,
+        "hint": "full path of the presentation to work on; default: the active one"
       }
     ]
   },
@@ -1210,6 +1438,11 @@
         "name": "height",
         "required": false,
         "hint": null
+      },
+      {
+        "name": "presentation",
+        "required": false,
+        "hint": "full path of the presentation to work on; default: the active one"
       }
     ]
   },
@@ -1249,6 +1482,11 @@
         "name": "height",
         "required": false,
         "hint": null
+      },
+      {
+        "name": "presentation",
+        "required": false,
+        "hint": "full path of the presentation to work on; default: the active one"
       }
     ]
   },
@@ -1298,6 +1536,11 @@
         "name": "height",
         "required": false,
         "hint": null
+      },
+      {
+        "name": "presentation",
+        "required": false,
+        "hint": "full path of the presentation to work on; default: the active one"
       }
     ]
   },
@@ -1336,6 +1579,11 @@
         "name": "slide",
         "required": false,
         "hint": null
+      },
+      {
+        "name": "presentation",
+        "required": false,
+        "hint": "full path of the presentation to work on; default: the active one"
       }
     ]
   },
@@ -1350,6 +1598,11 @@
         "name": "path",
         "required": true,
         "hint": null
+      },
+      {
+        "name": "presentation",
+        "required": false,
+        "hint": "full path of the presentation to work on; default: the active one"
       }
     ]
   },
@@ -1378,6 +1631,11 @@
         "name": "path",
         "required": true,
         "hint": null
+      },
+      {
+        "name": "presentation",
+        "required": false,
+        "hint": "full path of the presentation to work on; default: the active one"
       }
     ]
   },
@@ -1460,6 +1718,11 @@
         "name": "last",
         "required": false,
         "hint": null
+      },
+      {
+        "name": "presentation",
+        "required": false,
+        "hint": "full path of the presentation to work on; default: the active one"
       }
     ]
   },
@@ -1783,6 +2046,163 @@
     ]
   },
   {
+    "name": "wpp.addShape",
+    "kind": "wpp",
+    "agent": false,
+    "undo": true,
+    "summary": "Hình khối có chữ (chữ nhật, bo góc, tròn, mũi tên chevron) - nền, viền, cỡ chữ, màu chữ",
+    "params": [
+      {
+        "name": "slide",
+        "required": false,
+        "hint": null
+      },
+      {
+        "name": "left",
+        "required": false,
+        "hint": null
+      },
+      {
+        "name": "top",
+        "required": false,
+        "hint": null
+      },
+      {
+        "name": "width",
+        "required": false,
+        "hint": null
+      },
+      {
+        "name": "height",
+        "required": false,
+        "hint": null
+      },
+      {
+        "name": "shape",
+        "required": false,
+        "hint": "rect, rounded, oval, chevron, line (default rect)"
+      },
+      {
+        "name": "text",
+        "required": false,
+        "hint": null
+      },
+      {
+        "name": "fontSize",
+        "required": false,
+        "hint": null
+      },
+      {
+        "name": "bold",
+        "required": false,
+        "hint": null
+      },
+      {
+        "name": "boldFirst",
+        "required": false,
+        "hint": "true = only the first line bold (heading of the box)"
+      },
+      {
+        "name": "color",
+        "required": false,
+        "hint": "#RRGGBB text"
+      },
+      {
+        "name": "fill",
+        "required": false,
+        "hint": "#RRGGBB fill; empty = none"
+      },
+      {
+        "name": "line",
+        "required": false,
+        "hint": "#RRGGBB outline; empty = none"
+      },
+      {
+        "name": "font",
+        "required": false,
+        "hint": "font name"
+      },
+      {
+        "name": "anchor",
+        "required": false,
+        "hint": "top or middle (default)"
+      },
+      {
+        "name": "presentation",
+        "required": false,
+        "hint": "full path of the presentation to work on; default: the active one"
+      }
+    ]
+  },
+  {
+    "name": "wpp.renderSlide",
+    "kind": "wpp",
+    "agent": false,
+    "undo": false,
+    "summary": "Ảnh PNG của một slide theo số (soát bằng mắt, benchmark) - base64, không đổi cửa sổ đang xem",
+    "params": [
+      {
+        "name": "slide",
+        "required": true,
+        "hint": null
+      },
+      {
+        "name": "maxWidth",
+        "required": false,
+        "hint": "pixels (default 1280)"
+      },
+      {
+        "name": "presentation",
+        "required": false,
+        "hint": "full path of the presentation to work on; default: the active one"
+      }
+    ]
+  },
+  {
+    "name": "wpp.addConnector",
+    "kind": "wpp",
+    "agent": false,
+    "undo": true,
+    "summary": "Đường nối có mũi tên giữa hai hình (bám theo hình khi kéo)",
+    "params": [
+      {
+        "name": "from",
+        "required": true,
+        "hint": "shape name"
+      },
+      {
+        "name": "to",
+        "required": true,
+        "hint": "shape name"
+      },
+      {
+        "name": "slide",
+        "required": false,
+        "hint": null
+      },
+      {
+        "name": "elbow",
+        "required": false,
+        "hint": "true = elbow connector (default straight)"
+      },
+      {
+        "name": "color",
+        "required": false,
+        "hint": "#RRGGBB"
+      },
+      {
+        "name": "weight",
+        "required": false,
+        "hint": "points"
+      },
+      {
+        "name": "presentation",
+        "required": false,
+        "hint": "full path of the presentation to work on; default: the active one"
+      }
+    ]
+  },
+  {
     "name": "wpp.closeAll",
     "kind": "wpp",
     "agent": false,
@@ -1796,7 +2216,13 @@
     "agent": true,
     "undo": false,
     "summary": "Soát các bảng (chỉ đọc): số dòng/cột, ô trống, ô tiêu đề lẫn đoạn văn. Bảng dàn trang — bảng đã gọi writer.formatTable với borders:false — được đánh dấu layout và KHÔNG báo empty-cells (ô trống ở đó là cố ý: khoảng trống ký, ô chờ điền)",
-    "params": []
+    "params": [
+      {
+        "name": "document",
+        "required": false,
+        "hint": "full path of the document to work on; default: the active one"
+      }
+    ]
   },
   {
     "name": "et.checkRange",
@@ -1814,6 +2240,11 @@
         "name": "sheet",
         "required": false,
         "hint": null
+      },
+      {
+        "name": "workbook",
+        "required": false,
+        "hint": "full path of the workbook to work on; default: the active one"
       }
     ]
   },
