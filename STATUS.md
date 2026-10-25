@@ -15,7 +15,7 @@ hướng dẫn dùng ở [README.md](README.md); lịch sử thay đổi ở [CH
 | **Add-in COM** (`src/AxiomOffice`, net48) | Word/Excel/PowerPoint + WPS, Windows | Chạy trên **Office 2019 x64** (24/10: Word đủ lifecycle, Excel e2e 6/6, LLM thật — §2.9). **Không hỗ trợ Office 32-bit**: mọi add-in .NET làm Office 32-bit crash (§2.9) |
 | **Agent Core** (`core-go/`, Go) | Windows + Linux | **Đã thay bản .NET làm bản phát hành** (G1–G10), qua toàn bộ e2e của bản .NET |
 | **MCP server** (`core-go/internal/mcpserver`, Go) | Windows + Linux | **Một bản duy nhất**, chạy bằng `AxiomOffice.Core.exe mcp`; 61/61 trên cả hai nền tảng (và 103/103 ở bộ parity sâu). Bản C# đã xoá; `AxiomOffice.Host.exe mcp` còn 232 dòng **chuyển tiếp byte** sang Core nên cấu hình cũ không phải đổi |
-| **Extension LibreOffice** (Python UNO) | Windows + Linux (LibreOffice) | Chạy được; 281/281 trên LibreOffice thật + wizard 20/20 với Core Go (01/10) |
+| **Extension LibreOffice** (Python UNO) | Windows + Linux (LibreOffice) | **Dừng hỗ trợ từ 25/10/2026**: không phát triển tiếp, không đưa vào plan mới. Lần đo cuối: 281/281 trên LibreOffice thật + wizard 20/20 với Core Go (01/10). Code và CI còn nguyên, gỡ là quyết định riêng |
 | **Add-in WPS Linux** (`src/AxiomOffice.WPS`, JS ES5; Core phục vụ + bridge cổng 47861) | Linux (WPS 12) | Chạy trên WPS thật: 58/80 lệnh có handler (22 chưa — `docs/architecture/wps-bridge.md` §6); ribbon 4 nhóm có icon; khung chat với menu ⋯ và 8 màn hình phụ; menu chuột phải *Sửa bằng AI* + khung chat mini (§2.6) |
 | **Wizard thiết lập** | Windows (WinForms) + Linux (awt) | Bản Linux đã chạy thật (20/20); **bản Windows đã dùng thật trong Word** (24/10: lưu cấu hình + `Thử ngay` OK — §2.9) |
 

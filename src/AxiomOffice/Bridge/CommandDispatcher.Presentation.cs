@@ -50,11 +50,7 @@ namespace AxiomOffice.Bridge
                 {
                     try
                     {
-                        dynamic shape = slide.Shapes[s];
-                        if (Convert.ToInt32(shape.HasTextFrame) == -1 && Convert.ToInt32(shape.TextFrame.HasText) == -1)
-                        {
-                            texts.Add(Convert.ToString(shape.TextFrame.TextRange.Text));
-                        }
+                        AddShapeTexts(slide.Shapes[s], texts);
                     }
                     catch
                     {
@@ -95,6 +91,82 @@ namespace AxiomOffice.Bridge
                 { "slideCount", count },
                 { "slides", slides }
             };
+        }
+
+        // Chữ của một shape cho wpp.listSlides: bảng (mỗi hàng một dòng, ô cách " | "), nhóm (đệ quy), tiêu đề biểu
+        // đồ, còn lại là TextFrame. Trước 25/10/2026 chỉ đọc TextFrame nên agent không thấy bảng của chính mình và
+        // chèn lại lần hai (docs/plans/19-h0 H3). Cùng định dạng với impress.py và commands.js.
+        internal static void AddShapeTexts(dynamic shape, List<string> texts)
+        {
+            if (ComFlag(() => shape.HasTable))
+            {
+                dynamic table = shape.Table;
+                int rows = Convert.ToInt32(table.Rows.Count);
+                int cols = Convert.ToInt32(table.Columns.Count);
+                var lines = new List<string> { "[table " + rows + "x" + cols + "]" };
+                for (int r = 1; r <= rows; r++)
+                {
+                    var cells = new List<string>();
+                    for (int c = 1; c <= cols; c++)
+                    {
+                        string cell = "";
+                        try
+                        {
+                            cell = Convert.ToString(table.Cell(r, c).Shape.TextFrame.TextRange.Text);
+                        }
+                        catch
+                        {
+                        }
+                        cells.Add(cell.Replace("\r", " ").Replace("\n", " ").Trim());
+                    }
+                    lines.Add(string.Join(" | ", cells));
+                }
+                texts.Add(string.Join("\n", lines));
+                return;
+            }
+            if (ComFlag(() => Convert.ToInt32(shape.Type) == 6))
+            {
+                dynamic items = shape.GroupItems;
+                int count = Convert.ToInt32(items.Count);
+                for (int i = 1; i <= count; i++)
+                {
+                    try
+                    {
+                        AddShapeTexts(items.Item(i), texts);
+                    }
+                    catch
+                    {
+                    }
+                }
+                return;
+            }
+            if (ComFlag(() => shape.HasChart))
+            {
+                dynamic chart = shape.Chart;
+                if (Convert.ToBoolean(chart.HasTitle))
+                {
+                    texts.Add("[chart] " + Convert.ToString(chart.ChartTitle.Text));
+                }
+                return;
+            }
+            if (Convert.ToInt32(shape.HasTextFrame) == -1 && Convert.ToInt32(shape.TextFrame.HasText) == -1)
+            {
+                texts.Add(Convert.ToString(shape.TextFrame.TextRange.Text));
+            }
+        }
+
+        // Cờ COM (MsoTriState -1 / bool) đọc an toàn: shape nào không có thuộc tính thì coi là false, không bỏ cả shape.
+        private static bool ComFlag(Func<object> read)
+        {
+            try
+            {
+                object value = read();
+                return value is bool flag ? flag : Convert.ToInt32(value) == -1;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private static Dictionary<string, object> WppNewPresentation(IAppHost host, Dictionary<string, object> p)
@@ -298,7 +370,9 @@ namespace AxiomOffice.Bridge
                 { "slide", Convert.ToInt32(slide.SlideIndex) },
                 { "rows", rows },
                 { "cols", cols },
-                { "filled", filled }
+                { "filled", filled },
+                // Tên shape: Core ghi sổ đối tượng của lượt để xoá lại không phải hỏi (docs/plans/19-h0 H4).
+                { "shape", Convert.ToString(tableShape.Name) }
             };
         }
 

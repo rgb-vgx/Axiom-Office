@@ -7,6 +7,7 @@ import (
 	"strings"
 	"unicode"
 
+	"axiomoffice/core/internal/corelog"
 	"axiomoffice/core/internal/model"
 	"axiomoffice/core/internal/office"
 	"axiomoffice/core/internal/policy"
@@ -77,7 +78,11 @@ func NewReadOnlyOfficeActionTool(catalog *office.CommandCatalog, appKind string)
 
 func signature(command office.Command) string {
 	params := make([]string, 0, len(command.Params))
+	hidden := targetParam(command.Name)
 	for _, param := range command.Params {
+		if param.Name == hidden {
+			continue // Core tu gan tai lieu cua luot (target.go): model khong can doc tham so nay
+		}
 		if param.Hint == "" {
 			params = append(params, param.Name)
 			continue
@@ -172,6 +177,7 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 		return Result{JSON: ErrorJSON(problem), Action: action}
 	}
 	params = aliasParams(t.allowed[action], params)
+	params = withTarget(t.allowed[action], action, params, run.TargetDocument)
 	if problem := loneSymbolFind(action, params); problem != "" {
 		return Result{JSON: ErrorJSON(problem), Action: action}
 	}
@@ -194,7 +200,11 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 	decision := policy.Evaluate(ctx, action, params, run.Prompt, func(inner context.Context) *int {
 		return policy.WordLength(inner, run.Bridge, run.Office.Port)
 	})
-	if decision.NeedsConfirmation {
+	if decision.NeedsConfirmation && run.ownedObjects().covers(action, params) {
+		// Agent sua lai chinh thu no vua dung trong luot: khong hoi (owned.go). Ghi log de soat lai duoc.
+		corelog.Info("run %s: %s khong can xac nhan - chi dung toi doi tuong do luot tao (%s)", run.RunID, action,
+			model.Truncate(model.MarshalRelaxed(params), 200))
+	} else if decision.NeedsConfirmation {
 		preview := model.Truncate(model.MarshalRelaxed(params), 200)
 		if preview == "null" {
 			preview = "{}"
@@ -209,6 +219,14 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 	// Sheet vua tao thanh cong trong luot nay thi lenh ghi sau len do khong can hoi ghi de.
 	if result.OK && action == "et.addSheet" {
 		rememberCreatedSheet(run, params)
+	}
+	if result.OK {
+		run.ownedObjects().record(action, params, result.Result)
+		if opensDocument(action) {
+			if opened := openedDocument(params, result.Result); opened != "" {
+				run.TargetDocument = opened
+			}
+		}
 	}
 	// Buoc 2 roadmap: cat response doc lon TRUOC khi vao turns (chi thanh cong moi cat;
 	// loi van tra nguyen van de model doc thong diep loi day du) - xem truncate.go.

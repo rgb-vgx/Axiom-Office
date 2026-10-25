@@ -14,7 +14,7 @@ Rà soát code ngày **25/10/2026**. Mục 1 phân biệt rõ **đã chạy và 
 | Bộ 24 brief: `tests/bench/slides/briefs.json` | Đã viết; cấu trúc và việc "số liệu chấm được" được test kiểm |
 | Bộ chấm: `tests/bench/slides/score.py` + `test_score.py` | **Đã chạy, 5/5 xanh** (dữ liệu giả, không cần PowerPoint) |
 | Bộ chạy: `tests/bench/slides/run.py` | **Đã chạy thật** trên PowerPoint 2019 x64 (25/10/2026): smoke × 3 = 21 lượt, 21 lượt chạy hết |
-| Baseline | **Có, cho một model yếu** (`ocg/deepseek-v4.1-flash`): mục 9. Còn thiếu model mạnh làm mốc (mục 8) |
+| Baseline | **Có**, model yếu `ocg/deepseek-v4.1-flash` (mục 9). Chỉ đo bằng model yếu, không dùng model mạnh làm mốc |
 | Thiết kế spec, solver, migration (mục 5–7) | Đề xuất, chưa triển khai |
 
 ## 2. Đã có (đối chiếu code)
@@ -28,13 +28,16 @@ Rà soát code ngày **25/10/2026**. Mục 1 phân biệt rõ **đã chạy và 
 | Kiểm trước khi dựng | Không có; chỉ soát sau bằng `wpp.checkLayout` | `checkCompose` trả mã lỗi cho model (`NEED_2_TO_4_CARDS`, `TOO_LONG`, `TABLE_SIZE`…) |
 | Lệnh dựng | `wpp.addText` (không chọn phông, không tô nền), `wpp.addTable` (luôn 18pt) | `wpp.addParagraphs` (có phông, nền, viền, hộp bo góc, tự co chữ), `wpp.addGrid`, `wpp.copyPicture` |
 | Cỡ chữ | `_design/tokens.json`: body 20, title 28; skill cấm hạ cỡ | Hằng số trong Go: 24/22/16/15/14/12, **cho tự co** đến `minFontSize` 12–14; không đọc `tokens.json` |
-| Nền tảng | Windows, LibreOffice, WPS Linux | **Chỉ Windows**: LibreOffice trả `_template_unsupported` cho 9 lệnh |
+| Nền tảng | Windows (Office/WPS), WPS Linux | **Chỉ Windows** |
+
+**Phạm vi (quyết định 25/10/2026):** S0 chỉ làm cho **Microsoft Office** (add-in C#). LibreOffice dừng hỗ trợ. Phần
+WPS Linux là to-do khi chuyển sang host Linux (`19-h0`, mục "To-do WPS").
 
 Các lệnh dựng tốt nhất (`addParagraphs`, `addGrid`) đều có `agent: false` trong `catalog/live-commands.json`. Model
 không gọi được chúng; chỉ tool Go gọi.
 
 **Soát:**
-- `wpp.checkLayout` (C# và LibreOffice) báo `overflow`, `offslide`, `overlap`, `dense`, `small-font`, kèm
+- `wpp.checkLayout` (C#) báo `overflow`, `offslide`, `overlap`, `dense`, `small-font`, kèm
   toạ độ từng shape.
 - `look_at_document`: tuỳ chọn bật thêm, **chỉ chụp slide đang hiện**, khuyên gọi 1–2 lần mỗi lượt. Phía C# đã có
   `Slide.Export`, nhưng chưa có lệnh "render slide số n".
@@ -113,7 +116,7 @@ Không đưa vào CI: cần PowerPoint thật và model thật. CI chạy `test_
 2. Mở PowerPoint (bridge PowerPoint ở cổng 47833). Lấy `pid` từ `GET http://127.0.0.1:47833/health`. Core ở cổng
    47840; nếu Core chưa chạy thì chạy `AxiomOffice.Core.exe` cạnh DLL. Token runner tự đọc từ HKCU.
 3. `python tests/bench/slides/run.py --core-port 47840 --bridge-port 47833 --pid <pid> --label baseline-<model>-<ngày> --only smoke --repeat 3`. Chạy với ít nhất
-   một model yếu (mimo hoặc deepseek flash) và một model mạnh làm mốc. Xong smoke thì chạy cả bộ.
+   model yếu đã cấu hình (mimo hoặc deepseek flash); **không dùng model mạnh**. Xong smoke thì chạy cả bộ.
 4. `python tests/bench/slides/score.py tests/bench/slides/results/<label>` → chép bảng vào mục 9.
 
 ## 5. Thiết kế spec dùng chung
@@ -197,7 +200,7 @@ func Solve(spec SlideSpec, frame Frame, measure TextMeasurer) Result
 
 Renderer biến `Box` thành lệnh bridge **đã có**:
 
-| Box | Windows (PowerPoint/WPS) | LibreOffice / WPS Linux |
+| Box | Microsoft Office (C#) | WPS Linux (to-do) |
 |---|---|---|
 | title, points, card, callout, figure | `wpp.addParagraphs` | `wpp.addText` (mất nền và viền thẻ; có báo giảm cấp) |
 | cell-grid | `wpp.addGrid` | `wpp.addTable` |
@@ -226,11 +229,13 @@ Tóm lại: phần hình học đã thuần (chỉ đọc `Kind` và hằng số
 | Bước | Việc | Không được đổi | Test giữ |
 |---|---|---|---|
 | **M0** (xong) | Test characterization: vùng, thẻ, ảnh, mã lỗi | - | `template_layout_test.go` |
-| M1 | Bridge giả ghi lệnh; golden **chuỗi lệnh + tham số** của `buildComposed` cho 6 kiểu (cover, content có ảnh và lưu ý, cards 3 và 4, table, compare) | Mọi thứ | Golden mới + M0 |
-| M2 | Chuyển hàm thuần sang `internal/slidelayout` nguyên văn; `tools` gọi qua | Số đo, mã lỗi, chuỗi lệnh | M0 + M1 chuyển theo, không sửa số |
-| M3 | Thêm `Frame`/`Theme`/`Box`/`Solve`; `buildComposed` = `Solve` + renderer | Như M2 | M1 golden giống từng byte |
-| M4 | Tool chế độ brief (mục 5): spec → `Frame` từ `tokens.json` → dựng; cập nhật skill: slide mới đi qua tool, `wpp.addText` chỉ để sửa lẻ | Chế độ mẫu | Test Go với bridge giả; benchmark smoke |
-| M5 | Fallback chế độ brief; `figures`, `quote` | Chế độ mẫu | Test fallback; benchmark cả bộ |
+| **M1** (xong) | Golden **chuỗi lệnh + tham số** của `buildComposed`: cover, content chữ, content có ảnh + chú thích + lưu ý, cards 3, cards 4, table (`testdata/compose_bridge_golden.json`). Thiếu compare/section/agenda: mẫu giả trong test chưa có kiểu slide đó | Mọi thứ | `template_compose_golden_test.go` + M0 |
+| **M2** (xong) | Hàm thuần sang `internal/slidelayout` nguyên văn; `tools` giữ tên cũ, gọi qua | Số đo, mã lỗi, chuỗi lệnh | M0 + M1 không đổi số nào |
+| **M3** (xong) | `Spec`/`Theme`/`Box`/`Solve`; `buildComposed` = `Solve` + renderer. `Frame` thành `Grid` (chế độ brief) và `contentArea(kind)` (chế độ mẫu) | Như M2 | M1 golden giống từng byte |
+| **M4** (xong, chưa đo) | Tool `slides_from_brief`: spec → lưới từ `tokens.json` + cỡ slide → dựng bằng `wpp.addParagraphs`/`wpp.addGrid`; kiểm hết trước khi dựng; không co chữ; skill trỏ slide mới sang tool | Chế độ mẫu | `slides_brief_test.go`; benchmark smoke sau khi build |
+| **M5** (xong theo hướng khác) | `figures` có; `quote` chưa. **Không tự tách slide hay đổi kiểu**: baseline cho thấy lỗi hay gặp nhất là thêm slide không được xin, nên tool chỉ gợi ý phương án trong lỗi `TOO_LONG` (cards → table; content → rút gọn, tách chỉ khi người dùng không chốt số slide) | Chế độ mẫu | Test lỗi + gợi ý |
+| **P2** (xong, chưa đo) | `wpp.addShape`, `wpp.addConnector` (C#, chỉ tool dùng); `slidelayout.Process`/`Timeline`/`Diagram`; layout `process`, `timeline`, `diagram` trong `slides_from_brief`. Biểu đồ gốc chưa làm | Chế độ mẫu | `slidelayout_test.go`, `slides_brief_test.go` |
+| **P3** (một phần) | `wpp.renderSlide {slide}` (C#); `look_at_document {slide}`; runner lưu `slide-NN.png`. **Vòng sửa tự động bằng model thị giác chưa làm**: model đang dùng là model yếu, không có thị giác, và `17-r0` không chấm bằng LLM | - | `visual_test.go` |
 
 **Rủi ro hồi quy chính:**
 1. Đổi thứ tự lệnh bridge làm `deleteShapes` xoá nhầm hộp vừa thêm. M1 golden chặn rủi ro này.
@@ -240,13 +245,13 @@ Tóm lại: phần hình học đã thuần (chỉ đọc `Kind` và hằng số
 **Tệp dự kiến sửa (P1):** `core-go/internal/slidelayout/` (mới: `layout.go`, `fallback.go`, `measure.go` + test),
 `core-go/internal/tools/template_compose.go`, `template_design.go`, `template_build.go` (gọi qua solver), một tool
 mới cho chế độ brief trong `core-go/internal/tools/` và chỗ đăng ký tool, `skills/trinh-bay-chuyen-nghiep/SKILL.md`
-và `references/bo-cuc-slide.md` (bỏ bảng toạ độ cho model), `docs/architecture/core.md` mục 8.4.6. C# và LibreOffice
-**không đổi** ở P1.
+và `references/bo-cuc-slide.md` (bỏ bảng toạ độ cho model), `docs/architecture/core.md` mục 8.4.6. Lệnh
+C# **không đổi** ở P1.
 
 ## 8. Điều kiện bắt đầu P1 và tiêu chí xong P1
 
 Bắt đầu P1 khi:
-- Có **baseline thật**: smoke × 3 lần × (một model yếu + một model mạnh), bảng ghi ở mục 9.
+- Có **baseline thật** với model yếu: smoke × 3 và cả bộ 24 brief × 3, bảng ghi ở mục 9.
 - M0 và `test_score.py` xanh trong CI (đã xanh trên máy; CI chạy `go test ./...` và đã thêm `tests/bench/slides`).
 - Thiết kế mục 5–7 được duyệt.
 
@@ -301,11 +306,44 @@ lần 3: **hai bảng giống hệt nhau chồng lên nhau** (`overlap`). Agent 
 `wpp.listSlides` nên chèn lại (`19-h0` H3). Lượt thử `s01` đầu tiên trượt vì slide trống thừa mà agent không được
 phép xoá. `s13` hỏng do máy ngủ, không tính.
 
-### 9.3 Việc tiếp theo cho bộ đo
+### 9.3 Sau S0/H0 25/10/2026: cả bộ 24 brief × 3, `ocg/deepseek-v4.1-flash`
 
-1. Chạy một **model mạnh** làm mốc (smoke × 3).
-2. Chạy **cả bộ** 24 brief × 3 với model yếu.
-3. Thêm chỉ số **nội dung thừa**: chữ trên slide không truy được về brief (vd tỷ lệ số liệu hoặc cụm danh từ không có
+Thư mục `tests/bench/slides/results/sau-s0-deepseek-v4.1-flash-2026-10-25`. Bản có `slides_from_brief`, nhắm tài liệu
+tường minh (H1), `CommandWorker` (H2), `listSlides` đọc bảng (H3), sổ đối tượng của lượt (H4). 72/72 lượt hợp lệ,
+PowerPoint mở lại sau mỗi 6 lượt. Agent gọi `slides_from_brief` ở 67/72 lượt.
+
+So trên 18 brief có baseline (`s01`–`s18`; baseline có 51 lượt hợp lệ):
+
+| | Baseline | Sau S0/H0 |
+|---|---|---|
+| Đạt | 48/51 | 51/54 |
+| Lượt có `readGap` | 11 | **0** |
+| Vòng trung bình | 15,4 | **10,9** |
+| Token phải trả trung bình | 76,2k | **54,8k** |
+| `unsourced` trung bình | 0,65 | 0,61 |
+
+Cả bộ: đạt 66/72, 11,4 vòng, 56,7k token. Biểu đồ: `s10`/`s11` từ 24,7/33,3 vòng còn 18/15,3. `s18` (tách slide)
+từ 1/3 lên 3/3 và 22,3 → 8,3 vòng.
+
+Sáu lượt trượt, ba nguyên nhân:
+
+- **`s23` 0/3, thừa slide** (xin 1, làm 4–5). Đề "làm slide tóm tắt cho lãnh đạo": tiếng Việt "slide" cũng hiểu là
+  cả bài, nên đề còn mơ hồ. Cần sửa đề ("một slide") hoặc siết skill, chưa quyết.
+- **`s17` 1/3, lỗi của tool:** layout `diagram` gọi `wpp.addConnector`, `RerouteConnections` chọn điểm nối khiến một
+  đường gấp khúc cắt ngang hai hộp tầng 2 (`overlap`). Lỗi tất định, lượt 1 và 3 giống hệt. Lượt 2 đạt nhưng tốn
+  44 vòng và 186k token để agent tự sửa. Cần nối theo hướng (đáy hộp cha → đỉnh hộp con), không reroute.
+- **`s10` lượt 3 hết giờ (900 s):** chưa có biểu đồ gốc, agent thử vẽ cột bằng ký tự khối rồi bỏ dở. Đây là việc
+  "biểu đồ gốc" còn treo.
+
+Lưu ý độ tin: bộ nhớ của agent (`AXIOM_MEMORY_ENABLED`) bật ở cả hai lần đo. Agent nhắc "memory" ở 18 lượt lần này,
+12 lượt ở baseline, nên các lần lặp không độc lập hẳn. Lần đo sau nên tắt bộ nhớ trong runner.
+
+### 9.4 Việc tiếp theo cho bộ đo
+
+1. (Bỏ: chỉ đo bằng model yếu, theo yêu cầu người dùng 25/10/2026.)
+2. (Xong, mục 9.3.) Chạy **cả bộ** 24 brief × 3 với model yếu.
+3. Runner tắt bộ nhớ agent (`AXIOM_MEMORY_ENABLED=false`) để các lần lặp độc lập.
+4. Thêm chỉ số **nội dung thừa**: chữ trên slide không truy được về brief (vd tỷ lệ số liệu hoặc cụm danh từ không có
    trong đề), để bắt kiểu `s13` lần 2.
 
 ## 10. Không làm trong S0

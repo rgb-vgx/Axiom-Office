@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"axiomoffice/core/internal/pptx"
+	"axiomoffice/core/internal/slidelayout"
 )
 
 // SlidesFromTemplateTool: dung lai ca bai trinh chieu theo tep mau, tung lo (docs/architecture/template-design.md muc 6.6).
@@ -587,22 +588,13 @@ const (
 	bodyFont       = 18.0
 	sideFont       = 16.0
 	sideTextShare  = 0.38
-	pictureGap     = 12.0
+	pictureGap     = slidelayout.PictureGap
 	minTitleLength = 2
 )
 
-// textFits: doan van vua khung (cong thuc do cua skill: dong cao 1,21 x co, ky tu/dong = rong / (0,53 x co)).
+// textFits: doan van vua khung (slidelayout.TextFits - cong thuc do cua skill).
 func textFits(text string, width, height, size float64) bool {
-	perLine := int(width / (0.53 * size))
-	maxLines := int((height - 7.2) / (1.21 * size))
-	if perLine < 1 || maxLines < 1 {
-		return false
-	}
-	lines := 0
-	for _, paragraph := range strings.Split(text, "\n") {
-		lines += max(1, (len([]rune(paragraph))+perLine-1)/perLine)
-	}
-	return lines <= maxLines
+	return slidelayout.TextFits(text, width, height, size)
 }
 
 // textArea / pictureArea: vung chu va vung anh trong pictureBox cua kieu (co chu: chu ben trai 38%).
@@ -1230,87 +1222,12 @@ func isCaption(paras []sourcePara) bool {
 	return len([]rune(parasText(paras))) <= captionChars
 }
 
-// maxUpscale: anh khong phong qua 2 lan co tren slide nguon (anh chup/scan cu do phan giai thap se vo hat).
-const maxUpscale = 2.0
-
-// pictureBoxes: xep anh theo HANG, anh cung hang cao bang nhau va lap day be ngang (giu ti le, cach nhau 12 pt);
-// thu moi cach chia hang lien tiep theo thu tu doc, lay cach co TONG dien tich anh lon nhat; ca khoi can giua vung.
-// Luot that 13/10/2026: chia o bang nhau thi anh khac ti le lech hang, chua khoang trang lon giua cac anh.
+// pictureBoxes: xep anh theo hang, giu ti le, lap day be ngang (slidelayout.PictureBoxes).
 func pictureBoxes(area []float64, sizes [][2]float64) [][4]float64 {
-	count := len(sizes)
-	if count == 0 || len(area) != 4 {
-		return nil
-	}
-	const gap = pictureGap
-	ratios := make([]float64, count)
-	limits := make([]float64, count)
-	for i, size := range sizes {
-		width, height := size[0], size[1]
-		limits[i] = math.Inf(1)
-		if width <= 0 || height <= 0 {
-			width, height = 4, 3
-		} else {
-			limits[i] = maxUpscale * height
-		}
-		ratios[i] = width / height
-	}
-	var best [][4]float64
-	bestArea := -1.0
-	for mask := 0; mask < 1<<(count-1); mask++ {
-		rows := [][]int{{0}}
-		for i := 1; i < count; i++ {
-			if mask&(1<<(i-1)) != 0 {
-				rows = append(rows, []int{})
-			}
-			rows[len(rows)-1] = append(rows[len(rows)-1], i)
-		}
-		heights := make([]float64, len(rows))
-		sum := 0.0
-		for r, row := range rows {
-			ratio, limit := 0.0, math.Inf(1)
-			for _, i := range row {
-				ratio += ratios[i]
-				limit = math.Min(limit, limits[i])
-			}
-			heights[r] = math.Min((area[2]-gap*float64(len(row)-1))/ratio, limit)
-			sum += heights[r]
-		}
-		free := area[3] - gap*float64(len(rows)-1)
-		if free <= 0 {
-			continue
-		}
-		if sum > free {
-			for r := range heights {
-				heights[r] *= free / sum
-			}
-			sum = free
-		}
-		boxes := make([][4]float64, count)
-		total := 0.0
-		top := area[1] + (area[3]-sum-gap*float64(len(rows)-1))/2
-		for r, row := range rows {
-			width := gap * float64(len(row)-1)
-			for _, i := range row {
-				width += ratios[i] * heights[r]
-			}
-			left := area[0] + (area[2]-width)/2
-			for _, i := range row {
-				w := ratios[i] * heights[r]
-				boxes[i] = [4]float64{round1(left), round1(top), round1(w), round1(heights[r])}
-				total += w * heights[r]
-				left += w + gap
-			}
-			top += heights[r] + gap
-		}
-		// Bang dien tich (sai so lam tron) thi giu cach it hang hon - da duyet truoc.
-		if total > bestArea*1.001 {
-			best, bestArea = boxes, total
-		}
-	}
-	return best
+	return slidelayout.PictureBoxes(area, sizes)
 }
 
-func round1(value float64) float64 { return math.Round(value*10) / 10 }
+func round1(value float64) float64 { return slidelayout.Round1(value) }
 
 type buildSummary struct {
 	built     []int

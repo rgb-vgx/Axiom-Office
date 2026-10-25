@@ -3,11 +3,11 @@ package tools
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"strconv"
 	"strings"
 
 	"axiomoffice/core/internal/pptx"
+	"axiomoffice/core/internal/slidelayout"
 )
 
 // Che do bien soan (mode "compose", mac dinh tu 14/10/2026). Nguoi dung so ban thiet ke nguyen van voi mot bo slide
@@ -58,7 +58,7 @@ const (
 	maxPointChars = 220
 	composeFont   = 16.0
 	cardFont      = 14.0
-	calloutFont   = 15.0
+	calloutFont   = slidelayout.CalloutFont
 	captionFont   = 12.0
 )
 
@@ -483,92 +483,37 @@ func contentArea(kind *pptx.Kind) [4]float64 {
 	return [4]float64{box[0], box[1], box[2], box[3]}
 }
 
-// contentRegions: chia vung noi dung thanh chu / anh / o luu y. Co anh: chu cot trai 42% (hoac dai tren khi chi la mot
-// cau ngan), anh ben phai voi dai chu thich duoi anh; o luu y la dai cuoi vung.
+// contentRegions: chia vung noi dung thanh chu / anh / o luu y (slidelayout.ContentRegions).
 func contentRegions(area [4]float64, row composeRow, withPictures bool) (text, pictures, callout [4]float64) {
-	if row.Callout != "" {
-		lines := float64(estimateLines(row.Callout, area[2]-24, calloutFont))
-		height := math.Min(math.Round(lines*1.21*calloutFont+20), 90)
-		callout = [4]float64{area[0], area[1] + area[3] - height, area[2], height}
-		area[3] -= height + pictureGap
-	}
-	if !withPictures {
-		return area, area, callout
-	}
-	if len(row.Points) == 0 {
-		return [4]float64{}, area, callout
-	}
-	width := math.Round(area[2] * 0.42)
-	text = [4]float64{area[0], area[1], width, area[3]}
-	pictures = [4]float64{area[0] + width + 16, area[1], area[2] - width - 16, area[3]}
-	return text, pictures, callout
+	return slidelayout.ContentRegions(area, row.Callout, calloutFont, len(row.Points) > 0, withPictures)
 }
 
 func estimateLines(text string, width, size float64) int {
-	perLine := max(int(width/(0.53*size)), 1)
-	return max(1, (len([]rune(text))+perLine-1)/perLine)
+	return slidelayout.EstimateLines(text, width, size)
 }
 
-// cardBoxes: 2-3 the mot hang; 4 the luoi 2x2.
+// cardBoxes: 2-3 the mot hang; 4 the luoi 2x2 (slidelayout.CardBoxes).
 func cardBoxes(area [4]float64, count int) [][4]float64 {
-	const gap = 14.0
-	boxes := [][4]float64{}
-	columns, rows := count, 1
-	if count == 4 {
-		columns, rows = 2, 2
-	}
-	width := (area[2] - gap*float64(columns-1)) / float64(columns)
-	height := (area[3] - gap*float64(rows-1)) / float64(rows)
-	for i := 0; i < count; i++ {
-		column, row := i%columns, i/columns
-		boxes = append(boxes, [4]float64{round1(area[0] + float64(column)*(width+gap)), round1(area[1] + float64(row)*(height+gap)),
-			round1(width), round1(height)})
-	}
-	return boxes
+	return slidelayout.CardBoxes(area, count)
 }
 
-// cardMaxFont: co chu toi da trong the (luot that 14/10/2026: the cao het vung noi dung, chu 18 pt chiem mot goc).
-const cardMaxFont = 22.0
+// cardMaxFont: co chu toi da trong the (slidelayout.CardMaxFont).
+const cardMaxFont = slidelayout.CardMaxFont
 
-// fitCards: the cao vua noi dung (uoc theo co cardMaxFont, them le), khong cao het vung; ca cum can giua theo chieu doc.
+// fitCards: the cao vua noi dung, ca cum can giua theo chieu doc (slidelayout.FitCards; bo dau nhan "**" khi do).
 func fitCards(area [4]float64, cards []composeCard) [][4]float64 {
-	boxes := cardBoxes(area, len(cards))
-	if len(boxes) == 0 {
-		return boxes
-	}
-	rows := 1
-	if len(cards) == 4 {
-		rows = 2
-	}
-	need := 0.0
+	plain := make([]slidelayout.Card, len(cards))
 	for c, card := range cards {
-		lines := estimateLines(card.Title, boxes[c][2]-20, cardMaxFont)
+		plain[c].Title = card.Title
 		for _, point := range card.Points {
-			lines += estimateLines(strings.ReplaceAll(point.T, "**", ""), boxes[c][2]-40, cardMaxFont)
+			plain[c].Points = append(plain[c].Points, strings.ReplaceAll(point.T, "**", ""))
 		}
-		need = math.Max(need, float64(lines)*1.21*cardMaxFont+float64(len(card.Points))*0.35*cardMaxFont+28)
 	}
-	const gap = 14.0
-	height := math.Min(boxes[0][3], math.Max(need, 120))
-	total := height*float64(rows) + gap*float64(rows-1)
-	top := area[1] + math.Max(0, (area[3]-total)/2)
-	columns := max(1, len(boxes)/rows)
-	for i := range boxes {
-		boxes[i][1] = round1(top + float64(i/columns)*(height+gap))
-		boxes[i][3] = round1(height)
-	}
-	return boxes
+	return slidelayout.FitCards(area, plain)
 }
 
 // tint: mau nhat cua mau nhan (tron voi trang) cho nen the / o luu y.
-func tint(hex string, share float64) string {
-	value, err := strconv.ParseUint(strings.TrimPrefix(hex, "#"), 16, 32)
-	if err != nil || len(strings.TrimPrefix(hex, "#")) != 6 {
-		return "#F2F2F2"
-	}
-	mix := func(channel uint64) uint64 { return uint64(math.Round(float64(channel)*(1-share) + 255*share)) }
-	return fmt.Sprintf("#%02X%02X%02X", mix(value>>16&0xFF), mix(value>>8&0xFF), mix(value&0xFF))
-}
+func tint(hex string, share float64) string { return slidelayout.Tint(hex, share) }
 
 // accentOf: mau nhan va phong cua mau (theo tieu de cua kieu noi dung).
 func accentOf(kind *pptx.Kind) (string, string) {
@@ -582,6 +527,23 @@ func accentOf(kind *pptx.Kind) (string, string) {
 		}
 	}
 	return accent, font
+}
+
+// composeSpec: phan hinh hoc cua mot slide bien soan cho slidelayout.Solve.
+func composeSpec(row composeRow, plan composePlan) slidelayout.Spec {
+	spec := slidelayout.Spec{Layout: row.Layout, HasPoints: len(row.Points) > 0, ShowPoints: len(plan.points) > 0,
+		Callout: row.Callout, Caption: row.Caption}
+	for _, card := range row.Cards {
+		plain := slidelayout.Card{Title: card.Title}
+		for _, point := range card.Points {
+			plain.Points = append(plain.Points, strings.ReplaceAll(point.T, "**", ""))
+		}
+		spec.Cards = append(spec.Cards, plain)
+	}
+	for _, picture := range plan.pictures {
+		spec.Pictures = append(spec.Pictures, [2]float64{picture.W, picture.H})
+	}
+	return spec
 }
 
 // buildComposed: dung mot slide bien soan.
@@ -646,60 +608,31 @@ func buildComposed(bridge func(string, map[string]any) (map[string]any, string),
 		_, problem := bridge("wpp.addParagraphs", params)
 		return problem
 	}
-	area := contentArea(kind)
-	text, pictureArea, callout := contentRegions(area, row, len(plan.pictures) > 0)
-	switch row.Layout {
-	case "cards":
-		for c, box := range fitCards(text, row.Cards) {
-			card := row.Cards[c]
+	// Hinh hoc do slidelayout.Solve giai (docs/plans/18-s0 M3); o day chi ghep noi dung vao tung hop va phat lenh.
+	for _, box := range slidelayout.Solve(composeSpec(row, plan), contentArea(kind), slidelayout.TemplateTheme) {
+		var problem string
+		switch box.Role {
+		case "card":
+			card := row.Cards[box.Index]
 			paras := append([]sourcePara{{T: card.Title, B: true, A: "center"}}, card.Points...)
-			if problem := paragraphs(paras, box, cardMaxFont, 12, map[string]any{"box": "rounded", "fill": tint(accent, 0.9),
-				"line": tint(accent, 0.55), "anchor": "middle"}); problem != "" {
-				return index, nil, problem
-			}
+			problem = paragraphs(paras, box.Rect, box.Size, box.Min, map[string]any{"box": "rounded", "fill": tint(accent, 0.9),
+				"line": tint(accent, 0.55), "anchor": box.Anchor})
+		case "grid":
+			_, problem = bridge("wpp.addGrid", map[string]any{"slide": index, "values": row.Table, "left": box.Rect[0], "top": box.Rect[1],
+				"width": box.Rect[2], "height": box.Rect[3], "header": accent, "band": tint(accent, 0.9), "font": font})
+		case "points":
+			problem = paragraphs(plan.points, box.Rect, box.Size, box.Min, map[string]any{"anchor": box.Anchor})
+		case "caption":
+			problem = paragraphs([]sourcePara{{T: row.Caption, I: true, A: "center"}}, box.Rect, box.Size, box.Min,
+				map[string]any{"color": "#595959", "anchor": box.Anchor})
+		case "picture":
+			picture := plan.pictures[box.Index]
+			_, problem = bridge("wpp.copyPicture", copyParams(sourcePath, picture.Slide, picture, index, box.Rect))
+		case "callout":
+			problem = paragraphs([]sourcePara{{T: row.Callout}}, box.Rect, box.Size, box.Min, map[string]any{"box": "rounded",
+				"fill": tint(accent, 0.88), "line": accent, "anchor": box.Anchor})
 		}
-	case "table":
-		if _, problem := bridge("wpp.addGrid", map[string]any{"slide": index, "values": row.Table, "left": text[0], "top": text[1],
-			"width": text[2], "height": text[3], "header": accent, "band": tint(accent, 0.9), "font": font}); problem != "" {
-			return index, nil, problem
-		}
-	default:
-		if len(plan.points) > 0 {
-			anchor := "middle"
-			if len(plan.pictures) > 0 {
-				anchor = "top"
-			}
-			if problem := paragraphs(plan.points, text, 24, 14, map[string]any{"anchor": anchor}); problem != "" {
-				return index, nil, problem
-			}
-		}
-		if len(plan.pictures) > 0 {
-			box := pictureArea
-			if row.Caption != "" {
-				captionHeight := math.Round(float64(estimateLines(row.Caption, box[2], captionFont))*1.21*captionFont + 10)
-				box[3] -= captionHeight + 6
-				if problem := paragraphs([]sourcePara{{T: row.Caption, I: true, A: "center"}},
-					[4]float64{box[0], box[1] + box[3] + 6, box[2], captionHeight}, captionFont, 10,
-					map[string]any{"color": "#595959"}); problem != "" {
-					return index, nil, problem
-				}
-			}
-			sizes := [][2]float64{}
-			for _, picture := range plan.pictures {
-				sizes = append(sizes, [2]float64{picture.W, picture.H})
-			}
-			for i, rect := range pictureBoxes([]float64{box[0], box[1], box[2], box[3]}, sizes) {
-				picture := plan.pictures[i]
-				if _, problem := bridge("wpp.copyPicture", copyParams(sourcePath, picture.Slide, picture, index, rect)); problem != "" {
-					return index, nil, problem
-				}
-			}
-		}
-	}
-	if row.Callout != "" {
-		paras := []sourcePara{{T: row.Callout}}
-		if problem := paragraphs(paras, callout, calloutFont, 12, map[string]any{"box": "rounded", "fill": tint(accent, 0.88),
-			"line": accent, "anchor": "middle"}); problem != "" {
+		if problem != "" {
 			return index, nil, problem
 		}
 	}

@@ -71,3 +71,23 @@ func TestLookAtDocumentReportsBridgeError(t *testing.T) {
 		t.Fatalf("bridge error must reach the model without an image: ok=%v json=%s", result.OK, result.JSON)
 	}
 }
+
+// Slide theo so: wpp.renderSlide (khong doi cua so nguoi dung); bridge khong co lenh do thi chup slide dang hien.
+func TestLookAtDocumentRendersTheRequestedSlide(t *testing.T) {
+	run, actions := visualRun(t, `{"ok":true,"result":{"width":1280,"height":720,"mime":"image/png",`+
+		`"base64":"iVBORw0KGgo=","slide":4,"slideCount":6}}`)
+	run.TargetDocument = "Presentation2"
+	result := NewVisualTool().Invoke(context.Background(), map[string]any{"slide": 4.0}, run)
+	if !result.OK || !strings.Contains(result.JSON, "slide 4 of 6") {
+		t.Fatalf("anh slide 4: %s", result.JSON)
+	}
+	if len(*actions) != 1 || !strings.Contains((*actions)[0], `"wpp.renderSlide"`) || !strings.Contains((*actions)[0], `"presentation":"Presentation2"`) {
+		t.Fatalf("phai goi wpp.renderSlide cho bai cua luot: %v", *actions)
+	}
+
+	old, oldActions := visualRun(t, `{"ok":false,"error":"unknown action: wpp.renderSlide"}`)
+	_ = NewVisualTool().Invoke(context.Background(), map[string]any{"slide": 4.0}, old)
+	if len(*oldActions) != 2 || !strings.Contains((*oldActions)[1], "app.screenshot") {
+		t.Fatalf("bridge cu phai quay ve app.screenshot: %v", *oldActions)
+	}
+}

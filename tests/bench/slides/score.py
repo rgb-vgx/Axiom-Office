@@ -47,6 +47,22 @@ def slide_texts(slides: dict) -> list[str]:
     return ["\n".join(entry.get("shapeTexts") or []) for entry in (slides or {}).get("slides") or []]
 
 
+NUMBER = re.compile(r"\d+(?:[.,]\d+)*")
+
+
+def numbers(text: str) -> set[str]:
+    """Cac con so trong chu, bo dau phan cach hang nghin/thap phan de "1.240" khop "1240" va "98,5" khop "98.5"."""
+    return {re.sub(r"[.,]", "", n) for n in NUMBER.findall(text or "")}
+
+
+def unsourced_numbers(prompt: str, texts: list[str]) -> list[str]:
+    """So tren slide khong co trong de (bat noi dung tu bia, kieu s13 lan 2 ngay 25/10/2026). Chi so MEM: so tinh ra
+    tu de (ty le, tong) cung bi dem; bo so 1 chu so (danh so muc, "3 ly do")."""
+    source = numbers(prompt)
+    found = numbers("\n".join(texts)) - source
+    return sorted(n for n in found if len(n) > 1)
+
+
 def deck_texts(path: str) -> list[str]:
     """Chu tung slide doc thang tu .pptx (moi <a:t>, ca o bang). wpp.listSlides chi doc shape co TextFrame nen
     BO SOT chu trong bang (luot 25/10/2026: bang so lieu dung du ma bi cham thieu so)."""
@@ -123,6 +139,10 @@ def score_run(brief: dict, check: dict, slides: dict, run: dict | None = None, t
         max_chars = max(max_chars, sum(s.get("chars", 0) for s in entry.get("shapes") or []))
     deck = normalize("\n".join(texts if texts is not None else slide_texts(slides)))
     missing = [phrase for phrase in brief.get("mustContain") or [] if normalize(phrase) not in deck]
+    # readGap: cum co tren slide (.pptx) ma wpp.listSlides - lenh doc agent dung de tu soat - khong thay (19-h0 H3).
+    listed = normalize("\n".join(slide_texts(slides)))
+    read_gap = [phrase for phrase in brief.get("mustContain") or []
+                if normalize(phrase) in deck and normalize(phrase) not in listed] if texts is not None else []
     checked = len(check.get("slides") or [])
     outcome = run.get("outcome") or "unknown"
     result = {
@@ -134,9 +154,11 @@ def score_run(brief: dict, check: dict, slides: dict, run: dict | None = None, t
         "issuesByType": dict(sorted(issues.items())),
         "cleanSlideRatio": round(clean / checked, 3) if checked else 0.0,
         "missing": missing,
+        "readGap": read_gap,
         "titleDrift": title_drift(check),
         "marginViolations": len(margin_violations(check)),
         "maxChars": max_chars,
+        "unsourced": unsourced_numbers(brief.get("prompt", ""), texts if texts is not None else slide_texts(slides)),
         "rounds": run.get("rounds"),
         "toolCalls": run.get("toolCalls"),
         "failures": run.get("failures"),
@@ -204,6 +226,8 @@ def summary(results: list[dict]) -> list[dict]:
             "missing": mean(len(r["missing"]) for r in runs),
             "titleDrift": mean(r["titleDrift"] for r in runs),
             "margin": mean(r["marginViolations"] for r in runs),
+            "unsourced": mean(len(r["unsourced"]) for r in runs),
+            "readGap": mean(len(r["readGap"]) for r in runs),
             "rounds": mean(r["rounds"] for r in runs),
             "billable": mean(r["billable"] for r in runs),
         })

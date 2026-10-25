@@ -64,6 +64,15 @@ namespace AxiomOffice.Bridge
             return this;
         }
 
+        // Bản sao có thêm một tham số cuối danh sách, giữ nguyên cờ Agent/Gated.
+        public CommandInfo WithParam(CommandParam extra)
+        {
+            var copy = new CommandInfo(Name, Kind, Handler, Summary, Params.Concat(new[] { extra }).ToArray());
+            copy.Agent = Agent;
+            copy.Gated = Gated;
+            return copy;
+        }
+
         // "et.readRange {range,sheet}"; tham số có hint: "values (2D array of rows)".
         public string Signature
         {

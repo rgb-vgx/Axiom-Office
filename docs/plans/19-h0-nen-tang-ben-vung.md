@@ -6,18 +6,33 @@
 
 Rà soát code ngày 25/10/2026. Trước khi làm một mục, đọc lại mục "Đã có" rồi kiểm tra lại trong code: trạng thái có thể đã đổi.
 
+**Phạm vi (quyết định 25/10/2026):** chỉ làm cho **Microsoft Office** (add-in C#) trên host Windows. **LibreOffice
+chính thức dừng hỗ trợ**: không sửa, không đưa vào tiêu chí. Phần **WPS** gom vào mục "To-do WPS (host Linux)" ở
+cuối, làm khi chuyển sang host Linux.
+
 ## Tổng quan và thứ tự
 
 | # | Mục | Bằng chứng (25/10/2026) | Cỡ việc |
 |---|---|---|---|
-| H1 | Lệnh nhắm tài liệu tường minh | 50/75 lệnh không có tham số chọn tài liệu; một lượt benchmark đã ghi vào nhầm bài | Lớn (3 backend + Core) |
+| H1 | Lệnh nhắm tài liệu tường minh | 50/75 lệnh không có tham số chọn tài liệu; một lượt benchmark đã ghi vào nhầm bài | Lớn (C# + Core) |
 | H2 | Bridge không treo vì hộp thoại hay máy ngủ | Một hộp thoại modal chặn cả bộ chạy; máy ngủ làm 21 lượt thất bại | Vừa |
 | H3 | Lệnh đọc phủ mọi thứ lệnh ghi tạo ra | `wpp.listSlides` không đọc bảng, agent chèn bảng hai lần | Nhỏ–vừa |
 | H4 | Duyệt trước thao tác trên đối tượng do chính lượt tạo | `interactive=false` từ chối mọi lệnh xoá, agent không sửa được lỗi của mình | Vừa |
-| H5 | Năng lực từng backend đi vào mô tả tool | LibreOffice báo "không hỗ trợ" lúc gọi cho 9 lệnh slide | Vừa |
+| H5 | Năng lực từng backend đi vào mô tả tool | Lệnh chỉ báo "không hỗ trợ" lúc gọi | **Hoãn**: chỉ còn một backend (C#); làm cùng WPS |
 | H6 | Lệnh mới: primitive ở backend, ghép ở Core | Hai bộ typography (xem `18-s0`) | Quy tắc, áp dần |
 
-Thứ tự làm: **H3 → H2 → H4 → H1 → H5**. H3 nhỏ và sửa ngay một lỗi chất lượng đã thấy. H2 và H4 gỡ những chỗ làm
+Thứ tự làm: **H3 → H2 → H4 → H1** (H5 hoãn).
+
+### Trạng thái (25/10/2026)
+
+| # | Đã làm (code + test tự động) | Còn lại |
+|---|---|---|
+| H1 | Catalog chuyển nguồn chuẩn sang `catalog/live-commands.json`; 53 lệnh C# có thêm `presentation`/`workbook`/`document` (`CommandDispatcher.Target.cs`: kích hoạt đúng tài liệu, báo `DOCUMENT_CLOSED`); Core tự gắn tài liệu của lượt và đổi theo khi tạo/mở tài liệu (`tools/target.go`), ẩn tham số khỏi mô tả tool; `tests/catalog` | Live test hai tài liệu cùng mở trên Word/Excel/PowerPoint; benchmark chạy song song |
+| H2 | `CommandWorker` (lệnh trên thread STA riêng, `HOST_BUSY` sau 120 s, lệnh xếp hàng bị bỏ không chạy muộn); `HostDialogs` báo nội dung hộp thoại; Core dùng lại session quá hạn khi bridge trả đúng `pid` (`FindWoken`); model client phát hiện máy vừa thức (đồng hồ thực nhảy) và thử lại (`model/resume.go`) | Live test hộp thoại modal thật; benchmark có cho máy ngủ giữa chừng |
+| H3 | `wpp.listSlides` (C#) đọc bảng `[table RxC]`, nhóm, tiêu đề biểu đồ; bộ chấm có `readGap` (baseline: khác 0 ở `s05`, `s09`, `s13`) | Live test khứ hồi ghi → đọc; đo lại `readGap` sau khi build |
+| H4 | Sổ đối tượng của lượt (`tools/owned.go`): xoá slide/shape do lượt tạo không phải hỏi, số slide dịch theo khi xoá; `wpp.addTable` trả tên shape; `slides_from_brief` cũng ghi sổ | Benchmark `interactive=false` không còn slide trống thừa |
+| H5 | Hoãn (một backend) | Làm cùng WPS |
+| H6 | Quy tắc ghi ở `docs/architecture/core.md` mục 9.1 | — | H3 nhỏ và sửa ngay một lỗi chất lượng đã thấy. H2 và H4 gỡ những chỗ làm
 hỏng phép đo. H1 lớn nhất nên làm sau, khi bộ đo đã đáng tin. H6 là quy tắc áp cho mọi lệnh mới, kể cả lệnh của S0.
 
 Mọi mục đo bằng bộ đo slide của `18-s0` (`tests/bench/slides/`) và khung đo của `17-r0`.
@@ -61,7 +76,7 @@ Các lệnh này làm trên **tài liệu đang active**. Hệ quả:
    minh: `*.newPresentation`, `*.open`, `app.*`).
 2. **C#**: hàm `TargetWorkbook` và `TargetDocument` theo đúng mẫu `TargetPresentation`; mọi lệnh gọi qua chúng.
    Không đổi hành vi khi không truyền tham số.
-3. **LibreOffice** (`impress.py`, `calc.py`, `writer.py`) và **WPS Linux** (`commands.js`): như trên.
+3. WPS Linux (`commands.js`): xem "To-do WPS". LibreOffice: không làm (dừng hỗ trợ).
 4. **Core tự gắn tài liệu**: khi lượt bắt đầu, Core chốt tài liệu đích (`request.Document.FullName`, nếu không có
    thì tên tài liệu đang active lúc bắt đầu) và **tự thêm** tham số chọn tài liệu vào mọi `office_action` mà model
    không truyền. Model không phải nhớ tham số này: mô tả tool không dài thêm, nên không làm khó model yếu.
@@ -148,7 +163,7 @@ Các lệnh này làm trên **tài liệu đang active**. Hệ quả:
 ### Việc cần làm
 
 1. `wpp.listSlides`: đọc bảng (chữ từng ô theo hàng, đánh dấu `[bảng r×c]`), nhóm shape (đệ quy `GroupItems`),
-   tiêu đề biểu đồ. Làm ở C#, LibreOffice và WPS Linux.
+   tiêu đề biểu đồ. Làm ở C#; WPS Linux xem "To-do WPS".
 2. Kiểm tra tương tự cho `writer.getText` (bảng, hộp văn bản, header/footer) và `et.readRange` (ô gộp, công thức
    lỗi). Mỗi chỗ thiếu thành một việc riêng, có ca live test.
 3. Live test khứ hồi: với mỗi lệnh ghi trong `test_live_commands.py`, đọc lại bằng lệnh đọc mà agent dùng và kiểm tra
@@ -185,8 +200,8 @@ Các lệnh này làm trên **tài liệu đang active**. Hệ quả:
 ### Việc cần làm
 
 1. **Sổ đối tượng của lượt**: Core ghi lại mọi slide và shape do lệnh thêm của lượt này tạo ra (từ kết quả bridge).
-   Bổ sung định danh vào kết quả ở lệnh thêm nào chưa trả (`wpp.addSlide`, `wpp.addTable`, `wpp.addImage`, …), ở cả
-   ba backend.
+   Bổ sung định danh vào kết quả ở lệnh thêm nào chưa trả (`wpp.addSlide`, `wpp.addTable`, `wpp.addImage`, …) trong
+   bản C#; WPS xem "To-do WPS".
 2. **Policy**: xoá hoặc sửa đối tượng **chỉ** nằm trong sổ của lượt thì không cần xác nhận, ở cả hai chế độ. Đối
    tượng có sẵn trong tài liệu thì giữ nguyên quy tắc hiện tại.
 3. Ghi vào audit mỗi lần được miễn xác nhận theo sổ, để soát lại được.
@@ -200,34 +215,13 @@ Các lệnh này làm trên **tài liệu đang active**. Hệ quả:
 
 ---
 
-## H5 - Năng lực từng backend đi vào mô tả tool
+## H5 - Năng lực từng backend đi vào mô tả tool (hoãn)
 
-### Bằng chứng
+Với phạm vi mới, chỉ còn một backend được hỗ trợ (C#, Microsoft Office), nên chưa có gì để lọc. Mục này chuyển vào
+"To-do WPS (host Linux)" bên dưới: làm khi WPS Linux thành backend thứ hai.
 
-- LibreOffice trả `_template_unsupported` cho 9 lệnh `wpp.*` **lúc gọi**. Agent chỉ biết khi đã lên kế hoạch và gọi
-  xong, mất vòng và token, mà model yếu thì hay thử lại.
-- Catalog bảo đảm **tên** lệnh giống nhau giữa các backend, chưa bảo đảm **hành vi** giống nhau.
-
-### Đã có
-
-- `catalog/live-commands.json` là nguồn chung, có sinh code (`check-gen`) và test đối chiếu registry
-  (`test_catalog_matches_csharp`).
-- Bridge trả danh sách lệnh qua `/commands`.
-
-### Việc cần làm
-
-1. Catalog thêm trường `backends` cho mỗi lệnh (`office`, `wps-windows`, `libreoffice`, `wps-linux`): sinh từ registry
-   thật của từng backend, không ghi tay.
-2. Core lọc tool và mô tả `office_action` theo backend của phiên: lệnh backend không có thì không đưa cho model. Skill
-   nhắc tới lệnh đó thì kèm ghi chú thay thế (ví dụ "LibreOffice: dùng `wpp.addText`").
-3. Bộ kịch bản hành vi chung: cùng một kịch bản chạy trên mỗi backend có thật (C# live, LibreOffice live, WPS
-   fake), so kết quả đọc lại. Mở rộng từ `tests/lo` và `tests/oracle`, không viết khung mới.
-
-### Tiêu chí xong
-
-- Phiên LibreOffice: mô tả tool không chứa lệnh nào trả `_template_unsupported`. Test Go với danh sách lệnh giả.
-- Bộ kịch bản hành vi chung chạy được trên ít nhất C# và LibreOffice cho `wpp.addText`, `wpp.addTable`,
-  `wpp.listSlides`, `wpp.checkLayout`.
+Bằng chứng gốc (giữ để tham khảo): LibreOffice trả `_template_unsupported` cho 9 lệnh `wpp.*` **lúc gọi**, nên agent
+chỉ biết sau khi đã lên kế hoạch và gọi xong.
 
 ---
 
@@ -236,7 +230,7 @@ Các lệnh này làm trên **tài liệu đang active**. Hệ quả:
 Không phải một việc riêng mà là **quy tắc** cho mọi lệnh thêm sau ngày 25/10/2026, ghi vào
 `docs/architecture/core.md`:
 
-- Backend (C#, Python UNO, JS) chỉ làm **primitive**: tạo hoặc sửa một đối tượng, đọc lại đúng thứ đã tạo. Không có bố
+- Backend (C#; sau này JS của WPS) chỉ làm **primitive**: tạo hoặc sửa một đối tượng, đọc lại đúng thứ đã tạo. Không có bố
   cục, không có ngưỡng thiết kế, không có hằng số typography.
 - Bố cục, fallback, quy tắc thiết kế (cỡ chữ, lưới, màu) nằm ở **Core (Go)**, viết một lần và đọc từ
   `_design/tokens.json`. `18-s0` áp quy tắc này cho slide.
@@ -247,9 +241,28 @@ Tiêu chí: checklist PR trong `docs/architecture/core.md`; test quét catalog c
 
 ---
 
+## To-do WPS (host Linux)
+
+Làm khi chuyển sang host Linux (WPS Office for Linux, add-in `src/AxiomOffice.WPS/commands.js`). Mỗi mục bám đúng phần
+C# đã làm ở trên:
+
+- [ ] **H1**: tham số `presentation`/`workbook`/`document` cho mọi lệnh `wpp.*`/`et.*`/`writer.*` trong `commands.js`
+      (hàm chọn tài liệu theo mẫu `wppPres`); live test hai tài liệu mở cùng lúc trên WPS thật.
+- [ ] **H2**: thời hạn cho lệnh và phát hiện hộp thoại trong bridge WPS (cổng 47861, `core-go/internal/wpsbridge`);
+      session sau khi máy ngủ.
+- [ ] **H3**: `wpp.listSlides` đọc bảng (`Type` 19, `Table.Cell(r,c)`), nhóm (`Type` 6, `GroupItems`), tiêu đề biểu
+      đồ, cùng định dạng `[table RxC]` với bản C#; test trong `tests/wps/test_addin_wpp.mjs` (fake đã có bảng:
+      `addin_fake.mjs` `makeTable`).
+- [ ] **H4**: lệnh thêm trả định danh (`slide`, `shape`) để Core ghi sổ đối tượng của lượt.
+- [ ] **H5**: catalog thêm trường `backends` (`office`, `wps-linux`) sinh từ registry thật; Core lọc tool theo backend
+      của phiên; kịch bản hành vi chung chạy trên C# live và WPS.
+- [ ] **18-s0**: renderer của chế độ brief cho WPS (bảng Box → lệnh ở mục 5.3 của `18-s0`), benchmark slide chạy trên WPS.
+
 ## Không làm
 
-- Không đổi tên `wpp`/`et`/`writer`: tốn công (catalog, ba backend, cấu hình MCP của người dùng) mà không thêm năng lực.
+- **LibreOffice**: dừng hỗ trợ từ 25/10/2026. Không sửa `src/AxiomOffice.LibreOffice`, không thêm test `tests/lo`. Gỡ
+  hẳn code và CI LibreOffice là quyết định riêng, chưa làm.
+- Không đổi tên `wpp`/`et`/`writer`: tốn công (catalog, các backend, cấu hình MCP của người dùng) mà không thêm năng lực.
 - Không tự bấm hộp thoại của Office (H2): không phân biệt được hộp thoại lỗi với câu hỏi cần người dùng trả lời.
 - Không chuyển add-in ra ngoài process trong đợt này: H2 giảm rủi ro treo trước, rồi đo xem có còn cần không.
 - Không cho chạy song song nhiều lượt trên cùng app khi H1 chưa xong.

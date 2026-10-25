@@ -19,14 +19,15 @@ namespace AxiomOffice.Bridge
         private static int _firstCommandLogged;
 
         // Mọi lệnh, theo thứ tự hiển thị trong README và mô tả tool.
-        internal static readonly CommandInfo[] Commands = GeneralCommands()
+        internal static readonly CommandInfo[] Commands = WithTargetParams(GeneralCommands()
             .Concat(WriterCommands())
             .Concat(WriterDesignCommands())
             .Concat(WriterScopeCommands())
             .Concat(SpreadsheetCommands())
             .Concat(PresentationCommands())
             .Concat(TemplateCommands())
-            .Concat(CheckCommands())
+            .Concat(ShapeCommands())
+            .Concat(CheckCommands()))
             .ToArray();
 
         private static readonly Dictionary<string, CommandInfo> CommandsByName =
@@ -90,6 +91,7 @@ namespace AxiomOffice.Bridge
             {
                 return Err("unknown action: " + action);
             }
+            ActivateTarget(host, command, p);
             if (command.Kind != null)
             {
                 RequireKind(host, command.Kind);
@@ -341,6 +343,12 @@ namespace AxiomOffice.Bridge
             {
                 index = 1;
             }
+            return ExportSlide(pres, index, count, maxWidth);
+        }
+
+        // Xuất một slide ra PNG rộng maxWidth (giữ tỉ lệ slide) - dùng chung cho app.screenshot và wpp.renderSlide.
+        internal static Dictionary<string, object> ExportSlide(dynamic pres, int index, int count, int maxWidth)
+        {
             double slideWidth = Convert.ToDouble(pres.PageSetup.SlideWidth);
             double slideHeight = Convert.ToDouble(pres.PageSetup.SlideHeight);
             int width = maxWidth;

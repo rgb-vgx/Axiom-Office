@@ -70,7 +70,7 @@
   var REASONING_PREVIEW_LIMIT = 200;
 
   // --- BEGIN SINH TU DONG (scripts/generate_mcp_commands.py) - KHONG SUA TAY ---
-  // Lenh SUA tai lieu: co `undo` trong registry = dung mot buoc Undo; pane dem de "Hoan tac luot nay".
+  // Lenh SUA tai lieu: co `undo` trong catalog = dung mot buoc Undo; pane dem de "Hoan tac luot nay".
   var EDIT_ACTIONS = {
     "et.addChart": true,
     "et.addSheet": true,
@@ -81,9 +81,11 @@
     "et.setConditionalFormat": true,
     "et.writeRange": true,
     "et.writeRanges": true,
+    "wpp.addConnector": true,
     "wpp.addGrid": true,
     "wpp.addImage": true,
     "wpp.addParagraphs": true,
+    "wpp.addShape": true,
     "wpp.addSlide": true,
     "wpp.addSlideFromTemplate": true,
     "wpp.addTable": true,

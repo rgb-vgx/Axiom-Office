@@ -114,10 +114,17 @@ class ScoreTest(unittest.TestCase):
             result = score.score_run(BRIEF, clean, listing("", ""), {"outcome": "run.completed"}, texts)
             self.assertEqual(result["missing"], [])
             self.assertTrue(result["pass"], result)
+            # listSlides khong thay chu trong bang: readGap.
+            self.assertEqual(result["readGap"], ["98,5%", "Nguyễn Thị Lan"])
             # .pptx co so slide khac bai listSlides doc: luot bi lan bai, khong hop le.
             result = score.score_run(BRIEF, clean, listing("98,5%", "Nguyễn Thị Lan", "x"), {"outcome": "run.completed"}, texts)
             self.assertFalse(result["valid"])
             self.assertFalse(result["pass"])
+
+    def test_unsourced_numbers(self):
+        prompt = "tiếp nhận 1.240 hồ sơ, đúng hạn 98,5%, ngày 15/10/2026"
+        texts = ["1240 hồ sơ, 98.5% đúng hạn", "Ngày 15/10/2026", "Thêm 5 việc, tăng 37% so với 2025"]
+        self.assertEqual(score.unsourced_numbers(prompt, texts), ["2025", "37"])
 
     def test_briefs_file_is_well_formed(self):
         with open(os.path.join(HERE, "briefs.json"), encoding="utf-8") as handle:

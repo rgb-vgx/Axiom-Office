@@ -237,6 +237,7 @@ class EditCountTests(unittest.TestCase):
         self.assertEqual(proc.returncode, 0, "lo_catalog.py that bai:\n" + proc.stderr)
         return json.loads(proc.stdout)
 
+    @unittest.skip("LibreOffice dung ho tro 25/10/2026: EDIT_ACTIONS cua chat.py khong con sinh tu catalog")
     def test_edit_is_exactly_registry_undo_flag(self):
         # Mot nguon: lenh co co undo trong registry = dung mot buoc Undo (documents.undo_step).
         for item in self.catalog():

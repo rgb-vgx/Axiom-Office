@@ -44,6 +44,9 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 
 	session := o.Sessions.Find(request.Port)
 	if session == nil {
+		session = o.Sessions.FindWoken(request.Port, func() int { return intOf(o.Bridge.Health(ctx, request.Port)["pid"]) })
+	}
+	if session == nil {
 		o.fail(run, "office session not found for port "+strconv.Itoa(request.Port)+" (is the app still open?)", "office")
 		o.finish(run)
 		return nil
@@ -147,6 +150,10 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 	if appKind == "wpp" && !readOnly && catalog.Has("wpp.sourceManifest") {
 		list = append(list, tools.NewSlidesFromTemplateTool())
 	}
+	// Dung slide moi tu brief (docs/plans/18-s0 M4): Core tinh vi tri theo luoi + tokens, model chi viet chu.
+	if appKind == "wpp" && !readOnly && catalog.Has("wpp.addParagraphs") {
+		list = append(list, tools.NewSlidesFromBriefTool(o.Skills))
+	}
 	// Trinh bay lai tai lieu Word theo mau (khoi bo tron nen nhat): chi khi sua duoc va bridge co lenh dung khoi.
 	// Dang khoa vung boi den thi khong mo (doc_design trinh bay lai ca tai lieu, bridge se tu choi).
 	locked := request.Document != nil && request.Document.SelectionLocked
@@ -225,8 +232,9 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 		Event: func(eventType string, data map[string]any) {
 			run.Events.Publish(eventType, data)
 		},
-		Confirm: confirm,
-		Choose:  choose,
+		Confirm:        confirm,
+		Choose:         choose,
+		TargetDocument: targetDocument(request.Document, session),
 	}
 	if request.Document != nil {
 		runContext.FocusSlide = request.Document.Slide
@@ -436,4 +444,24 @@ func (o *Orchestrator) applyResult(ctx context.Context, ex *execution, result mo
 	} else if result.OK {
 		o.maybeSummarize(ctx, ex.client, conversation, ex.userSeq)
 	}
+}
+
+// targetDocument: tai lieu cua luot (docs/plans/19-h0 H1) - pane gui document (duong dan day du, hoac ten khi chua
+// luu); khong co thi lay tai lieu active cua phien luc bat dau luot. Core gan no vao moi lenh model khong chon tai lieu.
+func targetDocument(document *DocumentContext, session *office.Session) string {
+	if document != nil {
+		if strings.TrimSpace(document.FullName) != "" {
+			return strings.TrimSpace(document.FullName)
+		}
+		if strings.TrimSpace(document.Name) != "" {
+			return strings.TrimSpace(document.Name)
+		}
+	}
+	if session != nil {
+		if strings.TrimSpace(session.DocumentPath) != "" {
+			return strings.TrimSpace(session.DocumentPath)
+		}
+		return strings.TrimSpace(session.Document)
+	}
+	return ""
 }

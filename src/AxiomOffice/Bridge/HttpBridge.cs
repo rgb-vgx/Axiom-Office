@@ -16,6 +16,7 @@ namespace AxiomOffice.Bridge
         private Thread _thread;
         private SessionRegistry _session;
         private EventStream _events;
+        private CommandWorker _commands;
         private volatile bool _running;
         private int _port;
 
@@ -39,6 +40,7 @@ namespace AxiomOffice.Bridge
             _listener.Start();
 
             _running = true;
+            _commands = new CommandWorker();
             _thread = new Thread(Pump);
             _thread.IsBackground = true;
             _thread.Name = "AxiomOffice.Http";
@@ -64,6 +66,11 @@ namespace AxiomOffice.Bridge
             {
                 _events.Stop();
                 _events = null;
+            }
+            if (_commands != null)
+            {
+                _commands.Dispose();
+                _commands = null;
             }
             try
             {
@@ -257,7 +264,9 @@ namespace AxiomOffice.Bridge
                     return;
                 }
 
-                object result = CommandDispatcher.Execute(_host, action, parameters);
+                // Lệnh chạy trên thread lệnh riêng (CommandWorker): host kẹt hộp thoại thì Pump vẫn trả lời được.
+                object result = _commands.Run(action, delegate { return CommandDispatcher.Execute(_host, action, parameters); },
+                    CommandWorker.TimeoutMs, delegate (string message) { return Error(message); });
                 WriteJson(context, 200, result);
                 return;
             }

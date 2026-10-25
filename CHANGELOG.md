@@ -5,6 +5,36 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed — Chỉ còn hỗ trợ Microsoft Office; catalog lệnh lấy JSON làm nguồn (25/10/2026)
+
+- **LibreOffice dừng hỗ trợ.** Code và CI còn nguyên; ba test so catalog trong `tests/lo` bỏ qua kèm lý do. WPS chuyển
+  thành to-do khi sang host Linux (`docs/plans/19-h0`, mục "To-do WPS").
+- **`catalog/live-commands.json` là nguồn chuẩn** (sửa tay) thay cho registry Python của LibreOffice;
+  `scripts/generate_mcp_commands.py` sinh bản Go và WPS từ đó. `tests/catalog` (CI): định dạng, tham số chọn tài
+  liệu, khớp `AxiomOffice.Host.exe commands --json`.
+
+### Added — Slide từ brief, hình khối, nền tảng bền (25/10/2026)
+
+- **Tool `slides_from_brief`** (PowerPoint): model chọn layout và viết chữ (`cover`, `section`, `content`, `cards`,
+  `table`, `figures`, `process`, `timeline`, `diagram`); Core tính vị trí theo lưới của skill và `_design/tokens.json`,
+  kiểm hết trước khi dựng (`TOO_LONG` kèm gợi ý), không co chữ. Hình học nằm ở gói mới `core-go/internal/slidelayout`;
+  chế độ dựng theo mẫu cũng đi qua `slidelayout.Solve` (golden chuỗi lệnh bridge giữ nguyên từng byte).
+- **Lệnh C# mới (chỉ tool dùng):** `wpp.addShape`, `wpp.addConnector` (hình khối, mũi tên bám hình),
+  `wpp.renderSlide` (PNG một slide theo số). `look_at_document` nhận `slide`.
+- **Lệnh nhắm tài liệu tường minh:** mọi lệnh `writer.*`/`et.*`/`wpp.*` (trừ tạo/mở/đóng) nhận
+  `document`/`workbook`/`presentation`; bridge kích hoạt đúng tài liệu, tài liệu đã đóng thì báo `DOCUMENT_CLOSED`;
+  Core tự gắn tài liệu của lượt (benchmark: một lượt đã ghi slide vào nhầm bài).
+- **Bridge không treo vì hộp thoại:** lệnh `/cmd` chạy trên thread STA riêng, quá 120 s trả `HOST_BUSY` kèm nội dung
+  hộp thoại; lệnh còn xếp hàng bị bỏ chứ không chạy muộn. Core dùng lại session quá hạn khi bridge trả đúng `pid`
+  (máy vừa thức), model client thử lại request bị mất khi máy ngủ.
+- **`wpp.listSlides` đọc bảng, nhóm, tiêu đề biểu đồ** (trước đây agent không thấy bảng của chính mình).
+- **Không hỏi khi xoá thứ do chính lượt tạo** (sổ đối tượng của lượt); đối tượng có sẵn vẫn hỏi như cũ.
+- Skill `trinh-bay-chuyen-nghiep`: đúng số slide người dùng xin, không tự thêm bìa/mục lục/"Cảm ơn".
+- Bộ chấm benchmark: `readGap` (chữ trên slide mà `listSlides` không thấy), `unsourced` (số không có trong đề).
+- Đo lại cả bộ 24 brief × 3 bằng model yếu (`docs/plans/18-s0` mục 9.3): trên 18 brief có baseline đạt 51/54
+  (baseline 48/51); `readGap` từ 11 lượt về 0; vòng giảm 15,4 → 10,9; token giảm 76k → 55k. Còn lỗi: đường nối
+  của layout `diagram` cắt hộp (`s17`), thừa slide ở `s23`, thiếu biểu đồ gốc (`s10`).
+
 ### Added — Slide: bộ đo chất lượng và thiết kế spec dùng chung (25/10/2026)
 
 - `docs/plans/18-s0-slide-do-va-spec.md`: hiện trạng hai đường tạo slide (tự do: model tự tính toạ độ; theo mẫu:

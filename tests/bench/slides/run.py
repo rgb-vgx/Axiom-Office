@@ -1,25 +1,28 @@
 """Chay bo brief slide qua Axiom Core tren PowerPoint THAT va ghi du lieu de score.py cham.
 
-    python tests/bench/slides/run.py --core-port 47900 --bridge-port 47853 --pid <POWERPNT pid> \
-        --label baseline-mimo [--only smoke|s01-bia,s05-...] [--repeat 3] [--out tests/bench/slides/results]
+    python tests/bench/slides/run.py --core-port 47840 --bridge-port 47833 \
+        --label baseline-mimo [--only smoke|s01-bia,s05-...] [--repeat 3] [--skip-done] [--restart-every 6]
 
 Can san: PowerPoint dang mo voi add-in Axiom (bridge len, lay port/pid tu GET /health cua bridge), Core chay va
 da cau hinh model. Moi lan chay: tao bai moi (wpp.newPresentation) -> POST /v1/runs (interactive, runner tu bam dong y moi xac nhan) -> doc
-SSE den khi ket thuc -> wpp.checkLayout + wpp.listSlides + luu .pptx va .pdf de xem lai bang mat. Bai da luu van mo
-(khong dong tu dong: luot 25/10/2026 dong hai bai cung luc qua COM lam PowerPoint 2019 crash 0xc0000409).
+SSE den khi ket thuc -> wpp.checkLayout + wpp.listSlides + luu .pptx, .pdf, slide-NN.png de xem lai bang mat. Bai da
+luu van mo (dong hai bai cung luc qua COM lam PowerPoint 2019 crash 0xc0000409); thay vao do cu --restart-every lan
+chay thi thoat PowerPoint (bo thay doi chua luu) va mo lai - 25/10/2026 ~50 bai mo lam may 4 GB het RAM.
 Trong luc chay giu may khong ngu (SetThreadExecutionState): may ngu giua luot lam mat request model va
 session cua bridge qua han - ca bo chay hong ma khong phai loi cua san pham.
 
-Ghi vao <out>/<label>/<brief>/<lan>/: brief.json, run.json, check.json, slides.json, events.log, deck.pptx, deck.pdf.
-CHUA CHAY THAT lan nao (25/10/2026: may phat trien chua cai add-in) - lan dau chay se phai sua o day.
+Ghi vao <out>/<label>/<brief>/<lan>/: brief.json, run.json, check.json, slides.json, events.log, deck.pptx, deck.pdf,
+slide-NN.png. --skip-done bo qua lan chay da co run.json (chay tiep bo do bi ngat).
 """
 from __future__ import annotations
 
 import argparse
+import base64
 import ctypes
 import json
 import os
 import struct
+import subprocess
 import sys
 import time
 import urllib.request
@@ -49,6 +52,37 @@ def bridge(port: int, token: str, action: str, params: dict | None = None) -> di
     if not payload.get("ok"):
         raise RuntimeError("%s: %s" % (action, payload.get("error")))
     return payload.get("result") or {}
+
+
+def bridge_pid(port: int) -> int:
+    with urllib.request.urlopen("http://127.0.0.1:%d/health" % port, timeout=10) as response:
+        return int(json.loads(response.read().decode("utf-8"))["result"]["pid"])
+
+
+# Thoat PowerPoint (moi bai da luu; bai do dang thi bo) roi mo lai. Chi dung tren may do rieng.
+# COM khong lay duoc (GetActiveObject: MK_E_UNAVAILABLE, gap 25/10/2026) thi dong process: moi bai benchmark da luu.
+RESTART_PS = r"""
+$id = (Get-Process POWERPNT -ErrorAction SilentlyContinue | Select-Object -First 1).Id
+try {
+  $pp = [Runtime.InteropServices.Marshal]::GetActiveObject('PowerPoint.Application')
+  foreach ($p in @($pp.Presentations)) { $p.Saved = -1 }
+  $pp.Quit(); [Runtime.InteropServices.Marshal]::ReleaseComObject($pp) | Out-Null
+} catch {}
+if ($id) { Wait-Process -Id $id -Timeout 60 -ErrorAction SilentlyContinue; Stop-Process -Id $id -Force -ErrorAction SilentlyContinue }
+Start-Sleep 2
+Start-Process 'C:\Program Files\Microsoft Office\Root\Office16\POWERPNT.EXE'
+"""
+
+
+def restart_powerpoint(port: int) -> int:
+    subprocess.run(["powershell", "-NoProfile", "-Command", RESTART_PS], check=False, timeout=180)
+    for _ in range(60):
+        time.sleep(2)
+        try:
+            return bridge_pid(port)
+        except OSError:
+            continue
+    raise RuntimeError("bridge khong len lai sau khi mo lai PowerPoint")
 
 
 def placeholder_png(path: str, width: int = 640, height: int = 400) -> str:
@@ -132,7 +166,7 @@ def run_once(args, brief: dict, folder: str) -> dict:
     core = "http://127.0.0.1:%d" % args.core_port
     started = post(core + "/v1/runs", {
         "prompt": prompt,
-        "office": {"port": args.bridge_port, "pid": args.pid, "app": "wpp", "family": "office"},
+        "office": {"port": args.bridge_port, "pid": bridge_pid(args.bridge_port), "app": "wpp", "family": "office"},
         "document": {"name": name},
         "options": {"interactive": True, "maxRounds": args.max_rounds, "maxTokens": args.max_tokens,
                     "maxSeconds": args.max_seconds},
@@ -153,7 +187,17 @@ def run_once(args, brief: dict, folder: str) -> dict:
             json.dump(data, handle, ensure_ascii=False, indent=2)
     # Bai 0 slide: PowerPoint hien hop thoai loi khi luu/xuat - hop thoai modal chan moi lenh COM sau do
     # (luot 25/10/2026: ca bo chay treo cho den khi bam OK).
-    if outputs["slides.json"].get("slideCount"):
+    count = int(outputs["slides.json"].get("slideCount") or 0)
+    if count:
+        # Anh tung slide de nguoi xem lai (khong cham bang LLM - docs/plans/17 muc 5). Bridge cu khong co
+        # wpp.renderSlide thi bo qua, PDF van du.
+        for index in range(1, count + 1):
+            try:
+                shot = bridge(args.bridge_port, args.token, "wpp.renderSlide", dict(target, slide=index))
+            except RuntimeError:
+                break
+            with open(os.path.join(folder, "slide-%02d.png" % index), "wb") as handle:
+                handle.write(base64.b64decode(shot.get("base64") or ""))
         bridge(args.bridge_port, args.token, "wpp.exportPdf", dict(target, path=os.path.join(folder, "deck.pdf")))
         bridge(args.bridge_port, args.token, "wpp.saveAs", dict(target, path=os.path.join(folder, "deck.pptx")))
     return metrics
@@ -163,7 +207,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--core-port", type=int, required=True)
     parser.add_argument("--bridge-port", type=int, required=True)
-    parser.add_argument("--pid", type=int, required=True)
+    parser.add_argument("--skip-done", action="store_true", help="bo qua lan chay da co run.json")
+    parser.add_argument("--restart-every", type=int, default=6, help="thoat va mo lai PowerPoint sau moi N lan chay (0 = khong)")
     parser.add_argument("--token", default="", help="mac dinh: token trong HKCU Software/AxiomOffice")
     parser.add_argument("--label", required=True, help="ten lan do, vd baseline-mimo-2026-10-25")
     parser.add_argument("--only", default="", help="'smoke' hoac danh sach id cach nhau dau phay")
@@ -184,9 +229,15 @@ def main() -> int:
         wanted = set(args.only.split(","))
         briefs = [b for b in briefs if b["id"] in wanted]
     keep_awake(True)
+    done = 0
     for brief in briefs:
         for n in range(1, args.repeat + 1):
             folder = os.path.join(args.out, args.label, brief["id"], str(n))
+            if args.skip_done and os.path.exists(os.path.join(folder, "run.json")):
+                continue
+            if args.restart_every and done and done % args.restart_every == 0:
+                print("-- mo lai PowerPoint (pid moi %d)" % restart_powerpoint(args.bridge_port), flush=True)
+            done += 1
             print("== %s lan %d" % (brief["id"], n), flush=True)
             try:
                 metrics = run_once(args, brief, folder)
