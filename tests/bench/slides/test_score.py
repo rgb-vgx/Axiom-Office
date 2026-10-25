@@ -147,6 +147,33 @@ class ScoreTest(unittest.TestCase):
         texts = ["1240 hồ sơ, 98.5% đúng hạn", "Ngày 15/10/2026", "Thêm 5 việc, tăng 37% so với 2025"]
         self.assertEqual(score.unsourced_numbers(prompt, texts), ["2025", "37"])
 
+    def test_must_remove_counts_leftover_over_the_run_folder(self):
+        # Loi cai san ("205") con nam tren slide phai BI SUA - hai lan chay: xong va khong xong viec sua.
+        with tempfile.TemporaryDirectory() as root:
+            outputs = {
+                "1": {"run.json": {"outcome": "run.completed", "rounds": 4},
+                      "slides.json": listing("Kết quả tuyển sinh 2026: Chỉ tiêu 600, nhập học 612, tỷ lệ 102%.")},
+                "2": {"run.json": {"outcome": "run.completed", "rounds": 2},
+                      "slides.json": listing("Kết quả tuyển sinh 2026: Chỉ tiêu 600, nhập học 205.")},
+            }
+            for n, files in outputs.items():
+                folder = os.path.join(root, "s25-loi-cai-san", n)
+                os.makedirs(folder)
+                for name, data in files.items():
+                    with open(os.path.join(folder, name), "w", encoding="utf-8") as handle:
+                        json.dump(data, handle, ensure_ascii=False)
+                with open(os.path.join(folder, "brief.json"), "w", encoding="utf-8") as handle:
+                    json.dump({"id": "s25-loi-cai-san", "slides": [1, 2], "mustContain": ["612", "102%"],
+                               "mustRemove": ["205"]}, handle, ensure_ascii=False)
+            results = score.collect(root)
+            self.assertTrue(results[0]["pass"], results[0])
+            self.assertEqual(results[0]["leftover"], [])
+            self.assertFalse(results[1]["pass"])
+            # Luot chay xong nhung so "205" cai san van nam tren bai: chua sua duoc loi.
+            self.assertEqual(results[1]["leftover"], ["205"])
+            rows = score.summary(results)
+            self.assertEqual(rows[0]["leftover"], 0.5)
+
     def test_briefs_file_is_well_formed(self):
         with open(os.path.join(HERE, "briefs.json"), encoding="utf-8") as handle:
             briefs = json.load(handle)["briefs"]
@@ -159,6 +186,17 @@ class ScoreTest(unittest.TestCase):
             self.assertTrue(1 <= low <= high, brief["id"])
             self.assertTrue(brief["mustContain"], brief["id"])
             self.assertTrue(set(brief["needs"]) <= {"chart", "shape", "connector"}, brief["id"])
+            # Bai co loi cai san: lenh seed chi cho phep bridge wpp doc/ghi bai; so sai cai san khong duoc
+            # trung voi so dung cua de bai (dung lai duoc bang moi "sua ... cho dung").
+            for item in (brief.get("seed") or []):
+                self.assertEqual(set(item), {"action", "params"}, brief["id"])
+                self.assertTrue(str(item["action"]).startswith("wpp."), brief["id"])
+            for phrase in brief.get("mustRemove") or []:
+                self.assertNotIn(score.normalize(phrase), score.normalize(brief["prompt"]),
+                                 brief["id"] + ": " + phrase)
+                self.assertTrue(any(score.normalize(phrase) in score.normalize(c.get("params", {}).get("text", ""))
+                                    for c in (brief.get("seed") or []) if c.get("action") == "wpp.addText"),
+                                brief["id"] + ": " + phrase)
             # So lieu phai cham duoc: moi cum mustContain co trong chinh de bai.
             for phrase in brief["mustContain"]:
                 self.assertIn(score.normalize(phrase), score.normalize(brief["prompt"]), brief["id"] + ": " + phrase)

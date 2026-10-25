@@ -107,7 +107,7 @@ Các quy tắc này do người dùng đặt ra từ trước, **không được
 
 > **Cập nhật 01/10/2026**: Agent Core đã được viết lại bằng Go (`core-go/`, binary một file không cần runtime)
 > và **bản .NET (`src/AxiomOffice.Core`) đã bỏ khỏi repo**. Hợp đồng bên ngoài giữ nguyên: Core API v1,
-> `core.json`, `core.db` schema 3, nguồn cấu hình `AXIOM_*`/HKCU/`config.json`, tên mutex một-phiên-bản — nên
+> `core.json`, `core.db` schema 4, nguồn cấu hình `AXIOM_*`/HKCU/`config.json`, tên mutex một-phiên-bản — nên
 > add-in, extension LibreOffice và MCP không phải đổi. Các chi tiết về .NET trong tài liệu này là **thiết kế
 > ban đầu**; phần cài đặt hiện tại xem `core-go/README.md`.
 

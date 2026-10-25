@@ -23,7 +23,7 @@ hướng dẫn dùng ở [README.md](README.md); lịch sử thay đổi ở [CH
 
 ### 2.1 Agent Core viết lại bằng Go (`core-go/`) — G1 → G10
 
-Bản Go dùng **chung hợp đồng** với bản .NET: cùng Core API v1, cùng `core.json`, cùng `core.db` (schema 3),
+Bản Go dùng **chung hợp đồng** với bản .NET: cùng Core API v1, cùng `core.json`, cùng `core.db` (schema 4,
 cùng nguồn cấu hình (`AXIOM_*` → HKCU/DPAPI hoặc `~/.config/axiom-office/config.json` + libsecret), cùng tên
 mutex một-phiên-bản. Nhờ vậy add-in/extension/MCP không phải đổi gì.
 
@@ -207,6 +207,28 @@ staticcheck vẫn chỉ ở job `linux` (không phụ thuộc nền tảng).
   nội dung và định dạng đúng, chỉ là khoảng cách. Live suite còn check *"mọi lệnh trong registry đều có
   test"* fail **từ trước**: 24 lệnh (`et.addChart`, `wpp.addGrid`, `writer.restyle`…) chưa có ca live.
 
+### 2.10 Đợt 25/10/2026: trả token cho agent — bớt vòng thừa, bớt tool không dùng, đánh dấu cache
+
+Nguồn: báo cáo đo 26 lượt thật (24–25/10, PowerPoint, `ocg/beam-free`, 212 vòng, 1.541.217 token đầu vào) —
+~71% đầu vào là tiền tố cố định (tools + system prompt), ~25% là các vòng sau lần sửa tài liệu cuối; chỉ dẫn
+đầy đủ ở `reports/Giảm ngữ cảnh gửi lại agent.md`. Chi tiết kỹ thuật từng mục: `CHANGELOG.md` (Unreleased).
+
+| Việc | Nội dung |
+|---|---|
+| `docStateGuard` | Lệnh đọc y hệt khi tài liệu chưa đổi → Core không chạy lại tool, trả `"unchanged": true` ("kết quả ở trên vẫn đúng"); revision tăng mỗi khi ghi thành công, kết quả đọc gắn với revision lúc đọc |
+| `verifyGuard` | Đã có bằng chứng sau lần sửa cuối (lệnh đọc/kiểm ở phiên bản hiện tại, hoặc lệnh ghi tự báo `Verifies`) → lượt tính `Verified` ngay, không thêm vòng nhắc; ghi mới sau đó thì được nhắc như thường |
+| `AppMCP` | Server built-in `office` lọc theo app: `doc_*` cho Word, `excel_*` cho Sheets, `ppt_*` cho Slides + 8 lệnh đọc của app khác; lệnh ghi của app khác bị bỏ (~8k ký tự tiền tố/vòng — mục 3 báo cáo); server `mcp.json` của người dùng giữ nguyên, thứ tự tool giữ nguyên |
+| Anthropic cache | `cache_control: ephemeral` ở khối system cuối (tools + system thành một tiền tố cố định) và cấp request (`automatic` — tự đánh dấu phần đuôi mới nhất mỗi vòng); các nhà kiểu OpenAI tự cache nên phần đó không đổi |
+| `reasoning_content` | Non-stream (`Parse`) tách `turn.Reasoning` rồi cắt khỏi `Raw` (DeepSeek trả 400 nếu gửi lại; đường streaming vốn không kèm) |
+| `StopRule` | System prompt thêm quy tắc dừng: đọc lại đã đúng thì trả lời và kết thúc; không quét lại cả bài khi tài liệu không đổi, không lặp phép kiểm đã qua; chỉ kiểm lại khi sắp ghi thêm, một phép kiểm vừa thất bại, hoặc phần đó chưa từng kiểm (công thức tư vấn ChatGPT 25/10/2026) |
+| Đo từng vòng | `RoundStat` + `AgentCallbacks.RoundFinished`; core.db **schema 4** (`tool_calls.result_chars`, `runs.cached_tokens`, bảng `run_rounds`); dòng finish thêm `no-tool rounds: ...` |
+| Bench "cài sẵn lỗi" | `s25-loi-cai-san` (`tests/bench/slides/briefs.json` version 2): `seed` chạy lệnh bridge cài số sai trên bài mới trước lượt, `mustRemove` chấm khoá cụm lỗi phải biến mất — đo việc model đọc tài liệu có sẵn để sửa |
+
+**Kiểm** (25/10/2026): `go test ./...` 24 gói xanh; **e2e Core 170 passed, 0 failed** (đợt §2.9 là 169 — tăng
+1 phép kiểm `cache_control`; cập nhật 2 phép characterization: system Anthropic thành block có `cache_control`
+và ca MCP chạy phiên Word vì `doc_` giờ là tool của Word); bench slides **9/9**; `make check-gen` khớp;
+`gofmt` + `go vet` + `ruff` sạch.
+
 ## 3. Chưa làm / chưa kiểm chứng
 
 | Việc | Tình trạng | Ghi chú |
@@ -216,7 +238,7 @@ staticcheck vẫn chỉ ở job `linux` (không phụ thuộc nền tảng).
 | Trích xuất memory với **LLM thật** | **Đã (24/10/2026)** | Lượt thật trích 1 fact (`core.log`: `1 added`) |
 | **Office 32-bit** | **Không hỗ trợ** | Add-in .NET làm Office 32-bit crash `mso98win32client.dll`; kiểm bằng add-in tối giản (§2.9) |
 | Đọc/ghi **HKCU** bằng test tự động trên Windows | Một phần | Đối chiếu tay: Core Go đọc đúng endpoint/model/token/DPAPI của bạn; test tự động hiện dùng `AXIOM_*`. Từ 24/10 test cũng **không còn ghi vào HKCU thật** (nguồn cấu hình inject file tạm — §2.8) |
-| **Push remote** | Đã push 24/10/2026 | Đợt 18–22/10 (11 commit) + đợt sửa CI Windows 24/10; xem §2.7 và §2.8 |
+| **Push remote** | Đã push 24/10/2026 | Đợt 18–22/10 (11 commit) + đợt sửa CI Windows 24/10; xem §2.7 và §2.8. Đợt 25/10 "trả token cho agent" (§2.10) đã commit nhưng **chưa push** |
 | CI job **windows** | **Xanh (24/10/2026)** | Trước đó đỏ ở bước `go test` (`TestWPSConfigWrite` giả định nguồn cấu hình là `config.json`, nhưng trên Windows `DefaultSource()` là HKCU) và ở bước build net48 (`}` thừa trong `AskAiPane.cs`). Đã sửa cả hai — xem §2.8 |
 | Merge `feat/setup-wizard` + `feat/core-go` vào `main` | **Đã xong** | Fast-forward, lịch sử thẳng |
 | Nền tảng khác | Chưa | Chỉ build được Windows (amd64) và Linux (amd64/arm64); chưa có macOS hay Windows ARM |

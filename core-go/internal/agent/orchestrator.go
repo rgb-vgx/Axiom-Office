@@ -266,6 +266,9 @@ func (o *Orchestrator) finish(run *Run) {
 	if run.Verified {
 		message += ", self-verified"
 	}
+	if run.RoundKinds != "" {
+		message += ", no-tool rounds: " + run.RoundKinds
+	}
 	if run.Error != "" {
 		message += " - " + run.Error
 	}
@@ -367,7 +370,7 @@ func executeTool(ctx context.Context, registry *tools.Registry, call model.ToolC
 	output := tool.Invoke(ctx, arguments, run)
 	return model.ToolResult{
 		CallID: call.ID, Name: call.Name, ResultJSON: output.JSON, OK: output.OK,
-		ImageDataURL: output.ImageDataURL, Mutating: output.Mutating,
+		ImageDataURL: output.ImageDataURL, Mutating: output.Mutating, Verifies: output.Verifies,
 		Final: output.Final, FinalText: output.FinalText, Abort: output.Abort,
 	}
 }

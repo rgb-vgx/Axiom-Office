@@ -67,6 +67,27 @@ func TestAnthropicRoundTrip(t *testing.T) {
 	}
 }
 
+// Prompt caching cua codec Anthropic (bao cao "Giam ngu canh gui lai agent", muc 5): khoi system cuoi
+// mang ephemeral gom tools + system thanh mot muc cache co dinh; cap request "automatic" danh dau khoi
+// tui cuoi. Khong co system thi khong gui truong "system".
+func TestAnthropicPromptCachingControls(t *testing.T) {
+	codec := anthropicCodec{}
+	tools := []Tool{{Name: "n", Description: "d", Parameters: json.RawMessage(`{"type":"object"}`)}}
+	data, _ := json.Marshal(codec.BuildRequest("m", "sys", nil, tools, true, 0))
+	for _, want := range []string{
+		`"cache_control":{"type":"ephemeral"}`,
+		`"system":[{"cache_control":{"type":"ephemeral"},"text":"sys","type":"text"}]`,
+	} {
+		if !strings.Contains(string(data), want) {
+			t.Fatalf("request missing %s:\n%s", want, data)
+		}
+	}
+	plain, _ := json.Marshal(codec.BuildRequest("m", "", nil, nil, false, 0))
+	if strings.Contains(string(plain), `"system"`) {
+		t.Fatalf("system rong khong ghi truong: %s", plain)
+	}
+}
+
 func TestParseModels(t *testing.T) {
 	got := ParseModels([]byte(`{"data":[{"id":"b"},{"id":"a"},{"id":"b"},{"id":" "},{"id":3}]}`))
 	if strings.Join(got, ",") != "a,b" {

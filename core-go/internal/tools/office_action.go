@@ -268,7 +268,8 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 		raw = TruncateBridgeResult(action, result.Result, raw, run.FocusSlide)
 	}
 	// Lenh that bai thi tai lieu khong doi -> khong tinh la da sua.
-	output := Result{JSON: raw, OK: result.OK, Action: action, Mutating: result.OK && ChangesDocument(action)}
+	output := Result{JSON: raw, OK: result.OK, Action: action, Mutating: result.OK && ChangesDocument(action),
+		Verifies: result.OK && Verifies(action)}
 	if !result.OK && AppGone(result.Error) {
 		output.Abort = appGoneMessage
 	}

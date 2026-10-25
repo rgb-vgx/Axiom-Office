@@ -469,7 +469,7 @@ core-go/                                 → AxiomOffice.Core.exe (Go, không cg
   internal/office                        BridgeClient (/cmd, /commands, /session), SessionDirectory
   internal/api                           Core API v1 (runs, SSE, confirm, conversations, skills, memory, audit,
                                          setup, mcp, admin) + kênh /wps cho WPS Linux
-  internal/store                         SQLite core.db (schema 3): hội thoại, lượt chạy, audit
+  internal/store                         SQLite core.db (schema 4): hội thoại, lượt chạy, audit
   internal/setup                         /v1/setup, /v1/llm/*, catalog sinh từ catalog/setup.json
 
 src/AxiomOffice.LibreOffice/             → axiom-office.oxt (Python UNO; thiết kế docs/architecture/libreoffice.md)
@@ -1137,7 +1137,7 @@ flowchart LR
 | `%LOCALAPPDATA%\AxiomOffice\sessions\{pid}.json` | Session registry (mục 16); LibreOffice: `{pid}-{kind}.json`; WPS Linux: `<pid Core>-wps.json` |
 | `%LOCALAPPDATA%\AxiomOffice\core.json` | Core đang chạy: `pid`, `port`, `version`, `protocol` (xoá khi Core thoát) |
 | `%LOCALAPPDATA%\AxiomOffice\core.log` | Log của Core |
-| `%LOCALAPPDATA%\AxiomOffice\core\core.db` | SQLite (WAL, schema 3): hội thoại, lượt chạy, audit, memory (mục 22.7) |
+| `%LOCALAPPDATA%\AxiomOffice\core\core.db` | SQLite (WAL, schema 4): hội thoại, lượt chạy, audit, memory (mục 22.7) |
 | `%LOCALAPPDATA%\AxiomOffice\skills\`, `mcp.json` | Skill của người dùng; cấu hình MCP server ngoài |
 
 Trên Linux theo XDG: cấu hình `~/.config/axiom-office/config.json` (0600), dữ liệu
@@ -1204,7 +1204,7 @@ flowchart TD
 ## 22. Agent Core (bản Go: `core-go/`)
 
 Đặc tả đầy đủ và lý do từng lựa chọn: [docs/architecture/core.md](core.md) (thiết kế ban đầu cho bản .NET);
-bản Go giữ nguyên hợp đồng ngoài (Core API v1, `core.json`, `core.db` schema 3, nguồn cấu hình,
+bản Go giữ nguyên hợp đồng ngoài (Core API v1, `core.json`, `core.db` schema 4, nguồn cấu hình,
 tên mutex) nên add-in/extension/MCP không phải đổi gì. Chi tiết cài đặt Go:
 [core-go/README.md](../../core-go/README.md). Mục này mô tả bản Go đang chạy.
 

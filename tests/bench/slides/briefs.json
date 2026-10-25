@@ -1,6 +1,6 @@
 {
-  "about": "Bộ brief đo chất lượng slide (docs/plans/18-s0-slide-do-va-spec.md). Mỗi brief mang sẵn số liệu để chấm được bằng lệnh đọc (mustContain), không để model tự bịa. slides = [ít nhất, nhiều nhất]. needs = khả năng bản hiện tại CHƯA có (biểu đồ, hình khối, đường nối): baseline ghi nhận cách agent xử lý, không tính là lỗi của brief. smoke = tập con chạy trước mỗi thay đổi lớn.",
-  "version": 1,
+  "about": "Bộ brief đo chất lượng slide (docs/plans/18-s0-slide-do-va-spec.md). Mỗi brief mang sẵn số liệu để chấm được bằng lệnh đọc (mustContain), không để model tự bịa. slides = [ít nhất, nhiều nhất]. needs = khả năng bản hiện tại CHƯA có (biểu đồ, hình khối, đường nối): baseline ghi nhận cách agent xử lý, không tính là lỗi của brief. smoke = tập con chạy trước mỗi thay đổi lớn. seed = lệnh bridge chạy trên bài vừa tạo TRƯỚC khi chạy lượt (2): cài sẵn lỗi nhìn thấy bằng lệnh đọc; mustRemove = cụm lỗi cài sẵn PHẢI biến mất (chấm khóa: không sửa được là thất bại).",
+  "version": 2,
   "briefs": [
     {
       "id": "s01-bia",
@@ -218,6 +218,21 @@
       "slides": [5, 8],
       "mustContain": ["Văn phòng xanh 2027", "20%", "30%", "phân loại rác", "Phòng Hành chính"],
       "needs": ["shape"]
+    },
+    {
+      "id": "s25-loi-cai-san",
+      "category": "fix",
+      "smoke": true,
+      "prompt": "Bài đang mở có slide kết quả tuyển sinh 2026 ghi sai số nhập học. Sửa lại cho đúng: nhập học 612 trên chỉ tiêu 600, kèm tỷ lệ đạt 102%.",
+      "slides": [1, 2],
+      "mustContain": ["600", "612", "102%"],
+      "mustRemove": ["205"],
+      "needs": [],
+      "seed": [
+        {"action": "wpp.addSlide", "params": {"layout": 2}},
+        {"action": "wpp.addText", "params": {"text": "Kết quả tuyển sinh 2026", "top": 30, "left": 40, "width": 880, "height": 70, "fontSize": 24, "bold": true}},
+        {"action": "wpp.addText", "params": {"text": "Chỉ tiêu 600, nhập học 205.", "top": 120, "left": 40, "width": 880, "height": 120, "fontSize": 18}}
+      ]
     }
   ]
 }

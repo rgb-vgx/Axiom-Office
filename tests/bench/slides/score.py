@@ -189,6 +189,8 @@ def score_run(brief: dict, check: dict, slides: dict, run: dict | None = None, t
         max_chars = max(max_chars, sum(s.get("chars", 0) for s in entry.get("shapes") or []))
     deck = normalize("\n".join(texts if texts is not None else slide_texts(slides)))
     missing = [phrase for phrase in brief.get("mustContain") or [] if normalize(phrase) not in deck]
+    # mustRemove: chu cai san trong bai (brief.seed) phai BI MAT sau khi sua (ket luan 04-)
+    leftover = [phrase for phrase in brief.get("mustRemove") or [] if normalize(phrase) in deck]
     # readGap: cum co tren slide (.pptx) ma wpp.listSlides - lenh doc agent dung de tu soat - khong thay (19-h0 H3).
     listed = normalize("\n".join(slide_texts(slides)))
     read_gap = [phrase for phrase in brief.get("mustContain") or []
@@ -204,6 +206,7 @@ def score_run(brief: dict, check: dict, slides: dict, run: dict | None = None, t
         "issuesByType": dict(sorted(issues.items())),
         "cleanSlideRatio": round(clean / checked, 3) if checked else 0.0,
         "missing": missing,
+        "leftover": leftover,
         "readGap": read_gap,
         "titleDrift": title_drift(check),
         "marginViolations": len(margin_violations(check)),
@@ -219,9 +222,10 @@ def score_run(brief: dict, check: dict, slides: dict, run: dict | None = None, t
     # luot 25/10/2026 s09 lan 1: bai moi khong thanh active, slide ghi noi vao bai cua luot truoc va file luu la bai do
     # (2 slide) trong khi listSlides doc bai dich (1 slide) - phai loai, khong cham (docs/plans/19-h0 H1).
     result["valid"] = texts is None or len(texts) == count
-    # Dat (hard): luot xong, so slide trong khoang, checkLayout sach, khong mat so lieu nao cua brief.
+    # Dat (hard): luot xong, so slide trong khoang, checkLayout sach, khong mat so lieu nao cua brief, va LOI CAI
+    # SAN (mustRemove) khong con tren slide - day la thu do hum kiem tra doc lai sau khi sua cua luot that.
     result["pass"] = (result["valid"] and outcome == "run.completed" and result["slidesOk"] and result["issues"] == 0
-                      and not missing and count > 0)
+                      and not missing and not leftover and count > 0)
     return result
 
 
@@ -274,6 +278,7 @@ def summary(results: list[dict]) -> list[dict]:
             "pass": "%d/%d" % (sum(1 for r in runs if r["pass"]), len(runs)),
             "issues": mean(r["issues"] for r in runs),
             "missing": mean(len(r["missing"]) for r in runs),
+            "leftover": mean(len(r.get("leftover") or []) for r in runs),
             "titleDrift": mean(r["titleDrift"] for r in runs),
             "margin": mean(r["marginViolations"] for r in runs),
             "unsourced": mean(len(r["unsourced"]) for r in runs),

@@ -203,6 +203,19 @@ func (openAICodec) Parse(body []byte) (*Turn, string) {
 	turn := &Turn{InputTokens: root.Usage.Prompt, OutputTokens: root.Usage.Completion, Raw: raw,
 		CachedTokens: cachedFrom(root.Usage.PromptCacheHit, root.Usage.PromptDetails.Cached),
 		FinishReason: root.Choices[0].FinishReason, Reasoning: message.ReasoningContent}
+	// Raw quay lai lich su o vong sau qua AppendAssistant. thinking (reasoning_content) cua model reasoning duoc
+	// trich ra cho turn.Reasoning tren; cat no KHOI Raw giong duong streaming (khong bao gi kep vao): gui lai
+	// chi ton token va dang la "thu vo ich" luc model do quyet, DeepSeek doi 400 khi thay no trong request
+	// (bao cao "Giam ngu canh gui lai agent" - phan con lai).
+	if strings.Contains(string(raw), "reasoning_content") {
+		var cleaned map[string]json.RawMessage
+		if json.Unmarshal(raw, &cleaned) == nil {
+			delete(cleaned, "reasoning_content")
+			if rebuilt, err := json.Marshal(cleaned); err == nil {
+				turn.Raw = rebuilt
+			}
+		}
+	}
 	var text string
 	if json.Unmarshal(message.Content, &text) == nil && len(message.Content) > 0 && string(message.Content) != "null" {
 		turn.Text, turn.HasText = text, true

@@ -22,7 +22,8 @@ func TestRunAgentEndsWhenToolReportsFinal(t *testing.T) {
 	}
 }
 
-// Lan goi y het thu 5 bi chan (khong chay tool), model nhan loi va doi cach.
+// Lan goi y het thu 5 bi chan (khong chay tool), model nhan loi va doi cach. Lenh doc (khong sua tai lieu) lap lai khi
+// tai lieu chua doi thi tu lan 2 da khong chay ma tra "khong doi" (docStateGuard) - nhung van duoc dem.
 func TestRunAgentBlocksIdenticalCalls(t *testing.T) {
 	server, _ := verifyServer(t, []string{replyToolCall})
 	client := NewClient(server.Client(), "openai", server.URL, "", "m")
@@ -40,8 +41,110 @@ func TestRunAgentBlocksIdenticalCalls(t *testing.T) {
 				blocked = result.ResultJSON
 			}
 		}})
-	if executed != DefaultMaxIdenticalCalls || blocked == "" {
-		t.Fatalf("chay %d lan (muon %d), loi chan: %q", executed, DefaultMaxIdenticalCalls, blocked)
+	if executed != 1 || blocked == "" {
+		t.Fatalf("chay %d lan (muon 1 - cac lan sau la 'khong doi'), loi chan: %q", executed, blocked)
+	}
+}
+
+// replyToolCallArgs: tool call voi id va doi so tuy bien (doc roi doc lai, hay roi ghi roi doc).
+const replyToolCallArgs = `{"choices":[{"message":{"role":"assistant","content":null,` +
+	`"tool_calls":[{"id":"%s","function":{"name":"t","arguments":%q}}]}}],` +
+	`"usage":{"prompt_tokens":10,"completion_tokens":1}}`
+
+// Lenh doc Y HET lap lai khi tai lieu khong doi (khong co lenh ghi o giua): lan sau khong chay lai tool, thay
+// bang ket qua "unchanged"; ket qua dau van nam lai trong ngu canh cho model (docStateGuard khong tao ra lich
+// su dang ra lai khac), nhung van duoc dem de chong trung lap hang loat.
+func TestRunAgentDocStateGuardSkipsIdenticalRead(t *testing.T) {
+	server, bodies := verifyServer(t, []string{
+		fmt.Sprintf(replyToolCallArgs, "r1", `{"doc":"list"}`),
+		fmt.Sprintf(replyToolCallArgs, "r2", `{"doc":"list"}`),
+		fmt.Sprintf(replyText, "khong co gi moi"),
+	})
+	client := NewClient(server.Client(), "openai", server.URL, "", "m")
+	executed := 0
+	results := []string{}
+	result := client.RunAgent(context.Background(), "s", nil, "u", mutatingTools(),
+		func(ctx context.Context, call ToolCall) ToolResult {
+			executed++
+			return ToolResult{CallID: call.ID, Name: call.Name, OK: true,
+				ResultJSON: `{"ok":true,"result":"3 slide, 0 loi bo cuc"}`}
+		}, DefaultAgentOptions(), AgentCallbacks{ToolFinished: func(call ToolResult) {
+			results = append(results, call.ResultJSON)
+		}})
+	if !result.OK || result.Text != "khong co gi moi" || result.Rounds != 3 || len(bodies()) != 3 {
+		t.Fatalf("luot phai di 3 vong (doc, doc lai, tra loi): %+v (%d request)", result, len(bodies()))
+	}
+	if executed != 1 {
+		t.Fatalf("lan doc lap lai phai KHONG chay lai tool: thuc chay %d lan", executed)
+	}
+	if len(results) != 2 || !strings.Contains(results[1], "unchanged") {
+		t.Fatalf("lan hai phai nhan ket qua thay the 'khong doi': %v", results)
+	}
+	// Ket qua thay the di vao hoi thoai lan goi thu 3 (tin `tool` cho r2), thay cho ban ket qua tang dai kha.
+	// Lan goi thu 2 VAN giu ket qua dau (no la bang chung cho doi chieu).
+	sent := bodies()
+	if !strings.Contains(sent[1], `3 slide, 0 loi bo cuc`) || strings.Contains(sent[1], "unchanged") {
+		t.Fatalf("request vong 2 phai giu ket qua doc dau: %.500s", sent[1])
+	}
+	if !strings.Contains(sent[2], "unchanged") {
+		t.Fatalf("request vong 3 phai chua ket qua 'unchanged' thay cho doc lap lai: %.500s", sent[2])
+	}
+}
+
+// Doc lai sau khi SUA ma ket qua doc la suon chung kiem tra (Verifies): verifyGuard khong bat them mot vong
+// doc lai nua - luot tra loi o vong thu 3 thay vi thu 4.
+func TestRunAgentEvidenceReadAfterWriteSkipsVerifyNudge(t *testing.T) {
+	server, bodies := verifyServer(t, []string{
+		fmt.Sprintf(replyToolCallArgs, "w1", `{"step":"write"}`),
+		fmt.Sprintf(replyToolCallArgs, "r1", `{"step":"read"}`),
+		fmt.Sprintf(replyText, "da kiem tra, dung"),
+	})
+	client := NewClient(server.Client(), "openai", server.URL, "", "m")
+	result := client.RunAgent(context.Background(), "s", nil, "u", mutatingTools(),
+		func(ctx context.Context, call ToolCall) ToolResult {
+			if strings.Contains(call.Arguments, `"step":"write"`) {
+				return ToolResult{CallID: call.ID, Name: call.Name, OK: true, Mutating: true, ResultJSON: `{"ok":true}`}
+			}
+			// Lenh doc kiem tra: bang chung kiem tra tai lieu o phien ban hien tai.
+			return ToolResult{CallID: call.ID, Name: call.Name, OK: true, Verifies: true,
+				ResultJSON: `{"ok":true,"checked":"doc moi giong gi da ghi"}`}
+		}, DefaultAgentOptions(), AgentCallbacks{})
+	if !result.OK || result.Text != "da kiem tra, dung" || result.Rounds != 3 {
+		t.Fatalf("phai ket thuc o vong 3 (doc la ban chung, khong can nhac): %+v", result)
+	}
+	if !result.Verified {
+		t.Fatal("da doc lai sau khi sua phai tinh la luot da tu kiem chung (Verified)")
+	}
+	sent := bodies()
+	if len(sent) != 3 || strings.Contains(sent[2], "check the work you just did") {
+		t.Fatalf("vong dung phai khong mang loi nhac kiem chung: %d request, %.200s", len(sent), sent[2])
+	}
+}
+
+// Doc lai TRUOC khi sua thi khong tinh la bang chung o phien ban moi: sau lan sua cuoi khong co doc lai thi
+// verifyGuard van bat doc lai mot lan truoc khi tra loi (ket thuc o vong 4 thay vi vong 3).
+func TestRunAgentReadBeforeWriteIsNotEvidence(t *testing.T) {
+	server, bodies := verifyServer(t, []string{
+		fmt.Sprintf(replyToolCallArgs, "r1", `{"step":"read"}`),
+		fmt.Sprintf(replyToolCallArgs, "w1", `{"step":"write"}`),
+		fmt.Sprintf(replyText, "ban nhap"),
+		fmt.Sprintf(replyText, "ket qua cuoi"),
+	})
+	client := NewClient(server.Client(), "openai", server.URL, "", "m")
+	result := client.RunAgent(context.Background(), "s", nil, "u", mutatingTools(),
+		func(ctx context.Context, call ToolCall) ToolResult {
+			if strings.Contains(call.Arguments, `"step":"write"`) {
+				return ToolResult{CallID: call.ID, Name: call.Name, OK: true, Mutating: true, ResultJSON: `{"ok":true}`}
+			}
+			return ToolResult{CallID: call.ID, Name: call.Name, OK: true, Verifies: true,
+				ResultJSON: `{"ok":true,"checked":"tai lieu truoc khi sua"}`}
+		}, DefaultAgentOptions(), AgentCallbacks{})
+	if !result.OK || result.Text != "ket qua cuoi" || result.Rounds != 4 || !result.Verified {
+		t.Fatalf("doc truoc sua khong tinh bang chung, phai co vong nhac: %+v", result)
+	}
+	sent := bodies()
+	if !strings.Contains(sent[3], "check the work you just did") {
+		t.Fatalf("request cuoi phai mang loi nhac kiem chung: %.200s", sent[3])
 	}
 }
 

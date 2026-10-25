@@ -21,6 +21,9 @@ type Result struct {
 	// kiem chung truoc khi tra loi (model.AgentOptions.Verify) - luot chi doc ma bat doc lai thi chi
 	// ton them mot vong vo ich.
 	Mutating bool
+	// Verifies: ket qua la bang chung kiem tra tai lieu (lenh doc/kiem, hoac tool ghi tu kiem sau khi ghi) -
+	// model.ToolResult.Verifies.
+	Verifies bool
 	// Final / FinalText: tool da xong CA viec nguoi dung yeu cau (va tu kiem chung) - luot ket thuc voi FinalText,
 	// khong goi model them (model.ToolResult.Final).
 	Final     bool
@@ -60,6 +63,10 @@ var readOnly = map[string]bool{
 
 // ReadOnly: lenh nay chi doc tai lieu, khong sua va khong ghi file.
 func ReadOnly(action string) bool { return readOnly[action] }
+
+// Verifies: lenh doc noi dung / kiem tai lieu - ket qua thanh cong la bang chung kiem tra o phien ban hien tai
+// (app.info chi la thong tin ung dung, khong tinh).
+func Verifies(action string) bool { return readOnly[action] && action != "app.info" }
 
 // RunContext: trang thai cua mot luot chay ma tool can (muc 8.3).
 type RunContext struct {

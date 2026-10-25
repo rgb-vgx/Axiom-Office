@@ -129,6 +129,15 @@ type AgentCallbacks struct {
 	// AskContinue: hoi nguoi dung co cho luot chay tiep khi vuot nguong (17-R0).
 	// Tra true = chay tiep, false/nil = dung luot. Nhan (vong, billableTokens, lyDo).
 	AskContinue func(round, billable int, reason string) bool
+	// RoundFinished: so lieu mot vong goi model (token, so tool call, loai vong) - de do truc tiep ngu canh gui lai.
+	RoundFinished func(stat RoundStat)
+}
+
+// RoundStat: mot vong goi model. Kind: "tools" (co tool call), "final" (cau tra loi cuoi), "nudge:<guard>" (guard nhac
+// lam tiep, vd nudge:verify), "end:<guard>" (guard ket thuc luot), "error" (goi model hong).
+type RoundStat struct {
+	Round, InputTokens, CachedTokens, OutputTokens, ToolCalls int
+	Kind                                                      string
 }
 
 type AgentResult struct {
@@ -148,6 +157,8 @@ type AgentResult struct {
 	ToolsDisabled bool
 	// Verified: luot nay co sua tai lieu nen da duoc yeu cau tu kiem chung truoc khi tra loi.
 	Verified bool
+	// RoundStats: tung vong goi model (cung noi dung RoundFinished).
+	RoundStats []RoundStat
 	// Model: model tra loi cuoi cung (khac Client.Model khi da chuyen sang model du phong).
 	Model string
 	// RepairedToolCalls: so tool call da duoc AgentOptions.RepairToolCall sua. Cao = tin hieu chinh prompt/schema.
@@ -220,7 +231,7 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 
 	options = options.FitWindow()
 	loop := &agentLoop{client: c, options: options, callbacks: callbacks, result: &result, systemPrompt: systemPrompt,
-		toolsEnabled: len(tools) > 0, model: c.Model, addLine: addLine}
+		toolsEnabled: len(tools) > 0, model: c.Model, addLine: addLine, verifiedAt: -1, reads: map[string]int{}}
 	loop.turns = make([]Message, 0, len(prior)+1)
 	for _, turn := range prior {
 		loop.turns = append(loop.turns, map[string]any{"role": turn.Role, "content": turn.Content})
@@ -242,10 +253,20 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 		}
 
 		turn, failure := loop.ask(runCtx, ctx, tools)
+		stat := RoundStat{Round: result.Rounds, Kind: "error"}
+		report := func(kind string) {
+			stat.Kind = kind
+			result.RoundStats = append(result.RoundStats, stat)
+			if callbacks.RoundFinished != nil {
+				callbacks.RoundFinished(stat)
+			}
+		}
 		if failure == nil {
 			result.InputTokens += turn.InputTokens
 			result.OutputTokens += turn.OutputTokens
 			result.CachedTokens += turn.CachedTokens
+			stat.InputTokens, stat.CachedTokens, stat.OutputTokens = turn.InputTokens, turn.CachedTokens, turn.OutputTokens
+			stat.ToolCalls = len(turn.ToolCalls)
 			if turn.Reasoning != "" && callbacks.Reasoning != nil {
 				callbacks.Reasoning(result.Rounds, turn.Reasoning)
 			}
@@ -253,18 +274,22 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 				reply := StripThoughts(turn.Text)
 				decision := guards.onReply(loop, turn, reply)
 				if decision == nil {
+					report("final")
 					return done(true, reply, "", "")
 				}
 				if decision.next {
+					report("nudge:" + decision.by)
 					continue
 				}
 				if decision.failure == nil {
+					report("end:" + decision.by)
 					return finish(decision)
 				}
 				failure = decision.failure
 			}
 		}
 		if failure != nil {
+			report("error")
 			if runCtx.Err() != nil {
 				return stopped()
 			}
@@ -277,6 +302,7 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 		if options.RepairToolCall != nil {
 			result.RepairedToolCalls += repairTurnToolCalls(turn, options.RepairToolCall)
 		}
+		report("tools")
 		loop.turns = c.Codec.AppendAssistant(loop.turns, turn)
 		results := make([]ToolResult, 0, len(turn.ToolCalls))
 		for _, call := range turn.ToolCalls {

@@ -47,6 +47,8 @@ type Run struct {
 	// CachedTokens: phan InputTokens doc tu cache cua nha cung cap - do cache co trung khong, khong
 	// phai tham so. 0 khi nha cung cap khong cache hoac khong bao.
 	CachedTokens int
+	// RoundKinds: vong khong goi tool theo ly do ("final 1, nudge:verify 1") - chi de log.
+	RoundKinds string
 	// Verified: luot nay co sua tai lieu nen da duoc yeu cau doc lai truoc khi tra loi.
 	Verified bool
 	// SelectionLock: luot nay da khoa vung boi den cua tai lieu dang mo (chi WPS). finish() mo khoa -

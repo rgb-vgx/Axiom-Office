@@ -80,6 +80,18 @@ const CheckRule = "When you have changed the document, read the result back and 
 	"formulas really depend on existing data, read the formulas back (et.readRange with formulas:true) " +
 	"instead of changing values. "
 
+// StopRule: nua sau cua buoc doc lai sau khi sua; doc lai da cho thay dung thi DUNG. Do duoc tren 26 luot
+// that 24-25/10/2026: khoang 25% token dau vao la cac vong xac minh sau lan sua cuoi (listSlides/checkLayout
+// lap lai ca bai, moi lan 0 loi moi - bao cao "Giam ngu canh gui lai agent", muc 6). Cong thu tu ChatGPT
+// (25/10/2026): kiem lai chi khi sap ghi them, khi mot kiem tra that bai, hoac khi con phan chua kiem; viec
+// kiem lai "de dam bao" khi khong co gi sua doi khong cho ra tin nao moi, chi tieu token - phia harness da
+// chong lai bang docStateGuard (lenh doc lap lai khi tai lieu khong doi) va verifyGuard (bang chung sau lan
+// sua). Cau cuoi khuyen goi doc doc lap song song trong cung mot phan hoi.
+const StopRule = "Once a read-back of what you changed confirms it is correct, finish and reply - do not run " +
+	"any further whole-document sweeps or repeat a check that already passed on an unchanged document; " +
+	"only verify again if you are about to change something, a check failed, or you have not checked " +
+	"that part yet. Independent checks may read different places in one reply. "
+
 // PlanModeRule: che do lap ke hoach (Request.Plan). Ghi de cau "reply with a very short summary" cua Base cho
 // luot nay. Tool cua luot chi con lenh doc (NewReadOnlyOfficeActionTool, ReadOnlyMCP) nen model khong sua duoc
 // tai lieu du co muon; quy tac van noi ro de model khong mo ta nhu da lam xong.
@@ -131,7 +143,7 @@ func Base(appName string) string {
 		"and also for reading the document when needed (for example read the open file before answering questions about it). " +
 		"Document commands such as writer.getText or et.writeRange are values of office_action's `action` argument, never tool names. " +
 		"Prefer a few well-chosen actions over many tiny ones. Write all generated content (letters, reports, slide contents, tables) in the user's language. " +
-		ReconRule + PlanRule + CheckRule +
+		ReconRule + PlanRule + CheckRule + StopRule +
 		"Do not save the file (save, saveAs) or export it (exportPdf) unless the user explicitly asks for it: your changes are already visible in the open document and the user decides when and where to save. " +
 		InjectionRule +
 		"After finishing, reply with a very short summary (1-2 sentences). Never invent tool results."

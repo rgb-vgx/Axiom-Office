@@ -15,7 +15,7 @@ import (
 	"axiomoffice/core/internal/corelog"
 )
 
-const SchemaVersion = 3
+const SchemaVersion = 4
 
 type DB struct {
 	Path string
@@ -102,6 +102,11 @@ func (d *DB) Migrate() error {
 	if version < 3 {
 		if _, err := tx.Exec(schemaV3); err != nil {
 			return fmt.Errorf("schema v3: %w", err)
+		}
+	}
+	if version < 4 {
+		if _, err := tx.Exec(schemaV4); err != nil {
+			return fmt.Errorf("schema v4: %w", err)
 		}
 	}
 	if _, err := tx.Exec(fmt.Sprintf("PRAGMA user_version = %d", SchemaVersion)); err != nil {
@@ -263,3 +268,15 @@ func (s *Stores) Status(memoryEnabled bool) string {
 	}
 	return "unavailable"
 }
+
+// schema v4 (25/10/2026): do truc tiep ngu canh gui lai moi vong (bao cao "Giam ngu canh gui lai agent", muc 0) -
+// kich thuoc ket qua tool da vao ngu canh, token doc tu cache cua luot, va so lieu tung vong (token, so tool call,
+// loai vong: tools / final / nudge:<guard> / error).
+const schemaV4 = `
+ALTER TABLE tool_calls ADD COLUMN result_chars INTEGER;
+ALTER TABLE runs ADD COLUMN cached_tokens INTEGER;
+CREATE TABLE run_rounds (
+  id INTEGER PRIMARY KEY, run_id TEXT, round INTEGER, input_tokens INTEGER, cached_tokens INTEGER,
+  output_tokens INTEGER, tool_calls INTEGER, kind TEXT, created_at TEXT);
+CREATE INDEX ix_run_rounds_run ON run_rounds(run_id, round);
+`

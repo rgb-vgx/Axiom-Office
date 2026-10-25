@@ -383,6 +383,22 @@ var OfficeReadOnlyTools = setOf(
 	"ppt_profile", "ppt_get_text",
 )
 
+// FileToolApp: ten tool file cua server built-in thuoc app nao: doc_* = Word/WPS Writer ("wps"), excel_* =
+// Excel ("et"), ppt_* = PowerPoint ("wpp"). Ten khac (server nguoi dung, echo...) -> "". Dung de CHI GUI tool
+// cua app dang lam + tool DOC cua app khac - 20 tool file gan vao moi app ton khoang 8k ky tu tien to moi vong
+// (bao cao "Giam ngu canh gui lai agent", muc 3), trong do lenh ghi cua app khac thi khong bao gio dung.
+func FileToolApp(name string) string {
+	switch {
+	case strings.HasPrefix(name, "doc_"):
+		return "wps"
+	case strings.HasPrefix(name, "excel_"):
+		return "et"
+	case strings.HasPrefix(name, "ppt_"):
+		return "wpp"
+	}
+	return ""
+}
+
 // stringList: mang chuoi trong mcp.json (phan tu khong phai chuoi -> bo).
 func stringList(value any) []string {
 	items, ok := value.([]any)

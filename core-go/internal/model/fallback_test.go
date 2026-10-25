@@ -239,7 +239,8 @@ func TestOncePerReplyBlocksSecondCall(t *testing.T) {
 	client.RunAgent(context.Background(), "s", nil, "u", mutatingTools(),
 		func(ctx context.Context, call ToolCall) ToolResult {
 			executed++
-			return ToolResult{CallID: call.ID, Name: call.Name, OK: true, ResultJSON: `{"ok":true}`}
+			// Mutating: tool ghi (write_todos) - lan goi y het o phan hoi sau khong bi docStateGuard thay bang "khong doi".
+			return ToolResult{CallID: call.ID, Name: call.Name, OK: true, Mutating: true, ResultJSON: `{"ok":true}`}
 		}, options, AgentCallbacks{})
 	if executed != 2 {
 		t.Fatalf("moi phan hoi chi chay mot lan: chay %d lan qua 2 phan hoi", executed)

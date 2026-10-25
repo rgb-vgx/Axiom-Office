@@ -46,18 +46,51 @@ func (r *Runs) SetMemoryStatus(runID, memoryStatus string) {
 	_, _ = r.db.sql.Exec("UPDATE runs SET memory_status = ? WHERE id = ?", memoryStatus, runID)
 }
 
-func (r *Runs) Finish(runID, status string, rounds, inputTokens, outputTokens int, errText *string, memoryStatus *string) {
+func (r *Runs) Finish(runID, status string, rounds, inputTokens, outputTokens, cachedTokens int, errText *string, memoryStatus *string) {
 	_, _ = r.db.sql.Exec(`UPDATE runs
-		SET status = ?, finished_at = ?, rounds = ?, input_tokens = ?, output_tokens = ?, error = ?,
+		SET status = ?, finished_at = ?, rounds = ?, input_tokens = ?, output_tokens = ?, cached_tokens = ?, error = ?,
 		    memory_status = COALESCE(?, memory_status)
-		WHERE id = ?`, status, Now(), rounds, inputTokens, outputTokens, errText, memoryStatus, runID)
+		WHERE id = ?`, status, Now(), rounds, inputTokens, outputTokens, cachedTokens, errText, memoryStatus, runID)
 }
 
-// AddToolCall: params rut gon <= 2KB, khong ghi noi dung file (muc 8.6).
-func (r *Runs) AddToolCall(runID string, seq int, tool string, action, paramsJSON *string, ok bool, errText *string, ms int64) {
-	_, _ = r.db.sql.Exec(`INSERT INTO tool_calls (run_id, seq, tool, action, params_json, ok, error, ms, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, runID, seq, tool, action, truncatePtr(paramsJSON, 2048),
-		boolToInt(ok), truncatePtr(errText, 500), ms, Now())
+// AddToolCall: params rut gon <= 2KB, khong ghi noi dung file (muc 8.6). resultChars: kich thuoc ket qua DA VAO ngu
+// canh model (sau khi cat) - khong ghi noi dung, chi do.
+func (r *Runs) AddToolCall(runID string, seq int, tool string, action, paramsJSON *string, ok bool, errText *string, ms int64,
+	resultChars int) {
+	_, _ = r.db.sql.Exec(`INSERT INTO tool_calls (run_id, seq, tool, action, params_json, ok, error, ms, created_at, result_chars)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, runID, seq, tool, action, truncatePtr(paramsJSON, 2048),
+		boolToInt(ok), truncatePtr(errText, 500), ms, Now(), resultChars)
+}
+
+// RoundRow: so lieu mot vong goi model (schema v4).
+type RoundRow struct {
+	Round, InputTokens, CachedTokens, OutputTokens, ToolCalls int
+	Kind                                                      string
+}
+
+// AddRound: mot vong goi model - de do vong nao gui bao nhieu, vong nao khong goi tool va vi sao.
+func (r *Runs) AddRound(runID string, row RoundRow) {
+	_, _ = r.db.sql.Exec(`INSERT INTO run_rounds (run_id, round, input_tokens, cached_tokens, output_tokens, tool_calls, kind, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, runID, row.Round, row.InputTokens, row.CachedTokens, row.OutputTokens, row.ToolCalls,
+		row.Kind, Now())
+}
+
+// Rounds: cac vong cua mot luot theo thu tu.
+func (r *Runs) Rounds(runID string) []RoundRow {
+	rows := []RoundRow{}
+	result, err := r.db.sql.Query(`SELECT round, input_tokens, cached_tokens, output_tokens, tool_calls, kind FROM run_rounds
+		WHERE run_id = ? ORDER BY round`, runID)
+	if err != nil {
+		return rows
+	}
+	defer result.Close()
+	for result.Next() {
+		var row RoundRow
+		if result.Scan(&row.Round, &row.InputTokens, &row.CachedTokens, &row.OutputTokens, &row.ToolCalls, &row.Kind) == nil {
+			rows = append(rows, row)
+		}
+	}
+	return rows
 }
 
 func (r *Runs) Get(runID string) *RunRow {

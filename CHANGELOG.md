@@ -5,6 +5,49 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed — Trả token cho agent: bớt vòng thừa, bớt tool không dùng, đánh dấu cache (25/10/2026)
+
+Báo cáo "Giam ngu canh gui lai agent" (26 lượt thật 24–25/10, PowerPoint, `ocg/beam-free`, 212 vòng,
+1.541.217 token đầu vào): ~25% token là các vòng nằm sau lần sửa tài liệu cuối, ~71% là tiền tố cố định
+(tools + system prompt) gửi lại mỗi vòng. Đợt này sửa bằng harness, giữ nguyên hợp đồng API v1.
+
+- **Không chạy lại lệnh đọc y hệt khi tài liệu chưa đổi** (`docStateGuard`): Core giữ `revision` (tăng mỗi khi
+  lệnh ghi thành công) và ghi nhớ lệnh đọc chạy ở revision nào. Lệnh đọc trùng (chu kỳ + tham số) mà chưa có
+  lệnh ghi nào ở giữa → không chạm tool, thay kết quả bằng `"unchanged": true` ("kết quả ở trên vẫn đúng").
+  Ca cũ `TestRunAgentBlocksIdenticalCalls` nay dừng ở lần 1; thêm `TestRunAgentDocStateGuardSkipsIdenticalRead`.
+- **Không vất thêm vòng nhắc kiểm tra khi đã có bằng chứng** (`verifyGuard`): lượt có sửa tài liệu vẫn phải
+  tự kiểm trước khi trả lời, nhưng đã có lệnh đọc/kiểm ở phiên bản hiện tại sau lần sửa cuối, hoặc lệnh ghi
+  tự báo đã kiểm (`Verifies`) thì lượt tính là `Verified` ngay — không thêm vòng nhắc; sau đó có ghi mới thì
+  được nhắc như thường. Thêm `TestRunAgentEvidenceReadAfterWriteSkipsVerifyNudge`,
+  `TestRunAgentReadBeforeWriteIsNotEvidence`.
+- **Công cụ MCP được lọc theo app đang làm** (`mcp.FileToolApp` + `tools.AppMCP`): server built-in `office`
+  (20 tool `doc_*`/`excel_*`/`ppt_*`, trước đây rải đủ cho mỗi app — ~8k ký tự tiền tố mỗi vòng, mục 3 của
+  báo cáo) nay giữ tool của app phiên (Word → `doc_*`, Sheets → `excel_*`, Slides → `ppt_*`) cộng 8 lệnh đọc
+  của app còn lại; lệnh ghi của app khác bị bỏ. Server người dùng trong `mcp.json` giữ nguyên, thứ tự tool
+  giữ nguyên (không phá cache). `TestAppMCPFilterByApp`.
+- **Anthropic prompt caching** (`anthropicCodec.BuildRequest`): gắn `cache_control: ephemeral` cho khối
+  system cuối (tools + system thành một tiền tố cố định) và cấp request (`automatic` — tự đánh dấu phần đuôi
+  mới nhất mỗi vòng, xác minh dạng API 25/10/2026). Nhà cung cấp kiểu OpenAI tự cache nên phần đó không đổi.
+  `TestAnthropicPromptCachingControls`.
+- **`reasoning_content`**: đường non-stream của codec OpenAI (`Parse`) tách suy nghĩ ra `turn.Reasoning` rồi
+  cắt khỏi `Raw` — gửi lại lịch sử thì DeepSeek từ chối 400, còn nhà khác nhận thì cũng chỉ tốn token. Đường
+  streaming vốn không kèm. `TestParseDropsReasoningContentFromRaw`.
+- **Quy tắc dừng trong system prompt** (`StopRule`, nối sau `CheckRule`): đọc lại đã đúng thì trả lời và kết
+  thúc — không quét lại cả bài khi tài liệu không đổi, không lặp phép kiểm đã qua; chỉ kiểm lại khi sắp ghi
+  thêm, một phép kiểm vừa thất bại, hoặc phần đó chưa từng kiểm. Câu chữ theo tư vấn ChatGPT ngày
+  25/10/2026; phần "đọc lệnh trùng / chưa có kiểm lại" chặn bằng guard ở trên (chống giả kiểm và kiểm nông).
+- **Đo trực tiếp mỗi vòng** (schema 4): `RoundStat` (đầu vào, cached, output, số tool, loại vòng
+  `tools`/`final`/`nudge:*`/`end:*`/`error`) qua `AgentCallbacks.RoundFinished`, ghi SQLite
+  (`tool_calls.result_chars`, `runs.cached_tokens`, bảng `run_rounds`); dòng finish thêm `no-tool rounds: ...`.
+- **Bench slide "cài sẵn lỗi"** (`tests/bench/slides/briefs.json` version 2): brief mới `s25-loi-cai-san` —
+  `seed` chạy lệnh bridge cài sẵn số sai ("nhập học 205") trên bài mới trước lượt, `mustRemove` chấm khoá cụm
+  lỗi phải biến mất; đo được lượt có đọc tài liệu có sẵn để sửa (mô hình "sửa lỗi trên bài đang mở", ca khắp
+  nhất của 17-R0). `score.py` thêm cột `leftover`.
+- **Kiểm:** `go test ./...` (24 gói) xanh; e2e Core **170 passed, 0 failed** (`make test-core`, cập nhật 2
+  chỗ characterization: system Anthropic thành block + `cache_control`; ca MCP chạy phiên Word vì `doc_`
+  giờ là tool của Word — `TestAppMCPFilterByApp` riêng); bench slides 9/9; `check-gen`, `gofmt`, `go vet`,
+  `ruff` sạch.
+
 ### Fixed — Sơ đồ slide: dây không cắt hộp, checkLayout thấy đường nối, nhóm màu (25/10/2026)
 
 Lượt thật (PowerPoint, `ocg/beam-free`, đề 10 slide kiến trúc AI Agent ngân hàng): sơ đồ kiến trúc có dây xuyên qua

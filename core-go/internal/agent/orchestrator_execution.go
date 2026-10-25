@@ -182,11 +182,14 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 		list = append(list, tools.NewVisualTool())
 	}
 
-	// MCP (muc 8.7): lan file office + server nguoi dung cau hinh; loi server khong hong run.
+	// MCP (muc 8.7): lan file office loc theo app (lenh ghi cua app khac bi bo - muc 3 bao cao "Giam ngu
+	// canh gui lai agent") + server nguoi dung cau hinh giu nguyen; loi server khong hong run.
 	if o.MCP != nil {
 		bound := o.MCP.Tools(ctx)
 		if readOnly {
 			bound = tools.ReadOnlyMCP(bound)
+		} else {
+			bound = tools.AppMCP(bound, appKind)
 		}
 		if len(bound) > 0 {
 			list = append(list, tools.WrapMCPTools(bound)...)
@@ -326,6 +329,10 @@ func (o *Orchestrator) buildCallbacks(ex *execution) model.AgentCallbacks {
 			return choice == "continue"
 		},
 
+		RoundFinished: func(stat model.RoundStat) {
+			o.Runs.AddRound(run.ID, store.RoundRow{Round: stat.Round, InputTokens: stat.InputTokens, CachedTokens: stat.CachedTokens,
+				OutputTokens: stat.OutputTokens, ToolCalls: stat.ToolCalls, Kind: stat.Kind})
+		},
 		ToolStarted: func(call model.ToolCall) {
 			run.update(func() { run.ToolCalls++ })
 			action, params := readCall(call)
@@ -353,7 +360,7 @@ func (o *Orchestrator) buildCallbacks(ex *execution) model.AgentCallbacks {
 				"resultBytes": len(result.ResultJSON),
 			})
 			o.Runs.AddToolCall(run.ID, run.transcriptLen(), result.Name, optional(info.action), optional(info.params),
-				result.OK, optional(errorText), result.Ms)
+				result.OK, optional(errorText), result.Ms, len(result.ResultJSON))
 			label := info.action
 			if label == "" {
 				label = result.Name
@@ -377,6 +384,7 @@ func (o *Orchestrator) applyResult(ctx context.Context, ex *execution, result mo
 		run.CachedTokens = result.CachedTokens
 		run.Verified = result.Verified
 		run.Seconds = result.Seconds
+		run.RoundKinds = roundKinds(result.RoundStats)
 	})
 
 	switch {
@@ -418,7 +426,7 @@ func (o *Orchestrator) applyResult(ctx context.Context, ex *execution, result mo
 		run.appendTranscript("(provider khong ho tro tools - chay che do thuong)")
 	}
 
-	o.Runs.Finish(run.ID, run.Status, run.Rounds, run.InputTokens, run.OutputTokens, o.errorPtr(run), nil)
+	o.Runs.Finish(run.ID, run.Status, run.Rounds, run.InputTokens, run.OutputTokens, run.CachedTokens, o.errorPtr(run), nil)
 	if o.Memory != nil {
 		o.Memory.TouchHits(ex.memoryContext.IDs)
 		if result.OK && !request.Plan {
@@ -483,4 +491,23 @@ func (o *Orchestrator) actTools(appKind string, catalog *office.CommandCatalog, 
 	// Danh sach viec (write_todos): chi khi lam that - lap ke hoach da tra ve ke hoach bang chu.
 	list = append(list, tools.NewTodoTool())
 	return list
+}
+
+// roundKinds: dem vong KHONG goi tool theo ly do ("final 1, nudge:verify 1") - log de biet vong nao la thua.
+func roundKinds(stats []model.RoundStat) string {
+	counts, order := map[string]int{}, []string{}
+	for _, stat := range stats {
+		if stat.Kind == "tools" {
+			continue
+		}
+		if counts[stat.Kind] == 0 {
+			order = append(order, stat.Kind)
+		}
+		counts[stat.Kind]++
+	}
+	parts := []string{}
+	for _, kind := range order {
+		parts = append(parts, kind+" "+strconv.Itoa(counts[kind]))
+	}
+	return strings.Join(parts, ", ")
 }

@@ -753,8 +753,12 @@ def test_anthropic(work: str, token: str, bridge: FakeBridge, document_path: str
               and first["headers"].get("anthropic-version") == "2023-06-01",
               "Anthropic: gui x-api-key + anthropic-version", {k: v for k, v in first["headers"].items() if "key" in k or "anthropic" in k})
         body = first["body"]
-        check(isinstance(body.get("system"), str) and "AI assistant embedded inside" in body["system"],
-              "Anthropic: system la truong rieng (khong nam trong messages)", str(body.get("system"))[:80])
+        system = body.get("system")
+        check(isinstance(system, list) and system and "AI assistant embedded inside" in str(system[0].get("text", "")),
+              "Anthropic: system la truong rieng dang block (khong nam trong messages)", str(body.get("system"))[:160])
+        check(system[-1].get("cache_control") == {"type": "ephemeral"} and body.get("cache_control") == {"type": "ephemeral"},
+              "Anthropic: khoi system cuoi + request deu gan ephemeral de cache tien to tro lai moi vong",
+              {"system": system[-1].get("cache_control"), "request": body.get("cache_control")})
         check(all(message.get("role") != "system" for message in body["messages"]),
               "Anthropic: messages khong co role system")
         tools = body.get("tools") or []
@@ -1138,7 +1142,12 @@ def test_mcp(work: str, token: str, bridge: FakeBridge, document_path: str, sess
         {"text": "Da dung cong cu MCP"},
     ])
     core = Core(data_dir, session_dir, llm, token, {"AXIOM_MEMORY_AUTO_EXTRACT": "0", "AXIOM_CONFIRM_TIMEOUT": "20"})
-    office = {"port": bridge.port, "pid": bridge.pid, "app": "et", "family": "office"}
+    # appKind lay tu session ghi trong session_dir (file sessions/{pid}.json), khong pha tu POST /v1/runs. Tu thay doi
+    # "loc cong cu MCP theo app" (25/10/2026), lenh ghi doc_ (tao/ghi de docx) chi con den phien Word - nen ca nay ghi
+    # lai session thanh "wps" de giu nguyen ba so: tao file moi khong hoi, ghi de file co roi thi hoi, tu choi thi bao
+    # "user declined". Cuoi cung tra lai "et" cho cac ca sau.
+    write_session(session_dir, bridge.pid, bridge.port, "wps", document_path)
+    office = {"port": bridge.port, "pid": bridge.pid, "app": "wps", "family": "office"}
     try:
         status, listing = http_json(core.base + "/v1/mcp", token=core.token)
         servers = {s["name"]: s for s in listing["result"]["servers"]}
@@ -1190,6 +1199,7 @@ def test_mcp(work: str, token: str, bridge: FakeBridge, document_path: str, sess
               and '"a":2' in (calls[0]["params"] or "") and calls[4]["ok"] is False,
               "audit day du cho tool MCP (ten, tham so, ok)", [(c["tool"], c["ok"]) for c in calls])
     finally:
+        write_session(session_dir, bridge.pid, bridge.port, "et", document_path)
         core.stop()
         llm.stop()
 

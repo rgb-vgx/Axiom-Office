@@ -4,7 +4,8 @@
         --label baseline-mimo [--only smoke|s01-bia,s05-...] [--repeat 3] [--skip-done] [--restart-every 6]
 
 Can san: PowerPoint dang mo voi add-in Axiom (bridge len, lay port/pid tu GET /health cua bridge), Core chay va
-da cau hinh model. Moi lan chay: tao bai moi (wpp.newPresentation) -> POST /v1/runs (interactive, runner tu bam dong y moi xac nhan) -> doc
+da cau hinh model. Moi lan chay: tao bai moi (wpp.newPresentation) -> chay lenh bridge cua brief.seed neu co
+(slide loi cai san, de do luot sua) -> POST /v1/runs (interactive, runner tu bam dong y moi xac nhan) -> doc
 SSE den khi ket thuc -> wpp.checkLayout + wpp.listSlides + luu .pptx, .pdf, slide-NN.png de xem lai bang mat. Bai da
 luu van mo (dong hai bai cung luc qua COM lam PowerPoint 2019 crash 0xc0000409); thay vao do cu --restart-every lan
 chay thi thoat PowerPoint (bo thay doi chua luu) va mo lai - 25/10/2026 ~50 bai mo lam may 4 GB het RAM.
@@ -163,6 +164,12 @@ def run_once(args, brief: dict, folder: str) -> dict:
         prompt = prompt.replace("{%s}" % key, placeholder_png(os.path.join(folder, os.path.basename(name))))
     created = bridge(args.bridge_port, args.token, "wpp.newPresentation")
     name = created.get("presentation") or created.get("name") or ""
+    # Bai co loi cai san (brief.seed): chay cac lenh bridge tren bai vua tao TRUOC khi chay luot. De do luot sua
+    # loi CO SAN trong tai lieu - model phai doc de thay so sai (khong co trong prompt) roi sua dung cho.
+    for item in brief.get("seed") or []:
+        params = dict(item.get("params") or {})
+        params.setdefault("presentation", name)
+        bridge(args.bridge_port, args.token, item["action"], params)
     core = "http://127.0.0.1:%d" % args.core_port
     started = post(core + "/v1/runs", {
         "prompt": prompt,

@@ -588,7 +588,13 @@ func (t *SlidesFromBriefTool) Invoke(ctx context.Context, arguments map[string]a
 		issueCount += len(issues)
 		built = append(built, map[string]any{"slide": index, "layout": slide.Layout, "title": slide.Title, "issues": issues})
 	}
-	return Result{JSON: OKJSON(map[string]any{"built": len(built), "slides": built, "issueCount": issueCount}), OK: true, Mutating: true}
+	// Tool tu kiem sau khi ghi (wpp.checkLayout tung slide): bao ro DA kiem gi va CHUA kiem gi (tu van ChatGPT
+	// 25/10/2026: "0 loi bo cuc" khong phai "dung yeu cau") - Verifies cho verifyGuard biet khong can them vong doc lai.
+	verified := map[string]any{"checked": "layout of every new slide (wpp.checkLayout: overflow, overlap, off-slide, " +
+		"small font, connectors crossing boxes)", "issueCount": issueCount,
+		"notChecked": "wording, facts and whether the slides cover everything the user asked - compare with the request yourself"}
+	return Result{JSON: OKJSON(map[string]any{"built": len(built), "slides": built, "issueCount": issueCount, "verified": verified}),
+		OK: true, Mutating: true, Verifies: true}
 }
 
 // buildBriefSlide: dung mot slide - slide trong (layout 12), tieu de, cac hop cua kieu, dong nguon, ghi chu, roi soat.
