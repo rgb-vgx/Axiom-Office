@@ -48,18 +48,10 @@ namespace AxiomOffice.Bridge
             get { return ReadInt("Enabled", 1) != 0; }
         }
 
-        // 0 = pane luon dung agent in-process, khong khoi dong Agent Core (docs/architecture/core.md muc 7.6).
+        // 0 = khong khoi dong Agent Core, nen pane va ai.ask khong chay duoc AI (docs/architecture/core.md muc 7.6).
         public static bool CoreEnabled
         {
             get { return ReadInt("CoreEnabled", 1) != 0; }
-        }
-
-        // Agent in-process chi la duong du phong: MAC DINH TAT (0) de moi luot di qua Core, giu policy/audit/
-        // memory. Bat bang HKCU\Software\AxiomOffice\LegacyAgent=1 khi Core hong va nguoi dung chap nhan
-        // mat audit (docs/architecture/core.md muc 4.2).
-        public static bool LegacyAgent
-        {
-            get { return ReadInt("LegacyAgent", 0) != 0; }
         }
 
         public static string LlmProvider

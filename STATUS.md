@@ -240,8 +240,9 @@ Ghi ở [core-go/README.md](core-go/README.md); tóm tắt:
 4. `conversationId` gửi kèm khoảng trắng được cắt bỏ (bản .NET coi là hội thoại mới).
 5. `Normalize` của memory dùng bảng bỏ dấu tiếng Việt tường minh (giống bản .NET); chữ Latin có dấu khác chỉ
    được bỏ dấu nếu văn bản đã ở dạng phân rã sẵn.
-6. **Agent in-process là opt-in**: `HKCU\Software\AxiomOffice\LegacyAgent=1` (mặc định 0). Lý do: đường này
-   bỏ qua policy/xác nhận/audit/memory của Core; mặc định Core lỗi thì pane báo lỗi thay vì chạy agent thứ hai.
+6. **Không còn agent in-process** (bỏ 25/10/2026, trước đó là opt-in `LegacyAgent=1`): đường này bỏ qua
+   policy/xác nhận/audit/memory của Core. Core lỗi thì pane báo lỗi; `ai.ask` ở chế độ companion
+   (`Host.exe word|excel|...`) trả `ok:false` vì Core chỉ chạy lượt từ add-in.
 
 ## 5. Lệnh hay dùng
 

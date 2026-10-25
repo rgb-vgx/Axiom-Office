@@ -66,7 +66,7 @@ không nhớ hội thoại (mỗi lần Ask là phiên mới).
 | N4 | **Memory dài hạn**: theo tài liệu và theo người dùng, xem/xoá được | Thông tin ghi ở phiên trước được dùng ở phiên sau |
 | N5 | **Mở rộng bằng MCP**: Core là MCP client, cắm tool ngoài (ngôn ngữ nào cũng được) | Tool MCP ngoài xuất hiện cho agent qua cấu hình |
 | N6 | **An toàn**: allowlist, không tự lưu, xác nhận thao tác nguy hiểm, nhật ký audit | Test chứng minh |
-| N7 | **Không phá tương thích**: HTTP API, lệnh, 50 tool MCP, `ai.ask` giữ hợp đồng; Core không chạy thì pane vẫn dùng được (agent in-process) | Test cũ vẫn pass |
+| N7 | **Không phá tương thích**: HTTP API, lệnh, 50 tool MCP, `ai.ask` giữ hợp đồng (Core không chạy thì pane báo lỗi rõ — agent in-process dự phòng đã bỏ 25/10/2026) | Test cũ vẫn pass |
 
 **Ngoài phạm vi của đợt này** (chỉ để chỗ trong thiết kế, không làm): RAG/vector trên kho tài liệu,
 nhiều agent phối hợp, chạy script trong skill, đồng bộ đám mây, đa người dùng, macOS/web Office,
@@ -125,7 +125,6 @@ flowchart LR
             pane["Ask AI pane<br/>+ CoreClient"]
             bridge["HTTP bridge<br/>/cmd /events /commands"]
             cmds["Registry 47 lệnh<br/>+ ComGate"]
-            fallback["Agent in-process<br/>(dự phòng)"]
         end
         om["Object model"]
     end
@@ -164,7 +163,7 @@ flowchart LR
 
 | Thành phần | Giữ / thêm | Không làm |
 |---|---|---|
-| **Add-in** | UI pane, bridge, registry lệnh, ComGate, Undo, SSE; khởi động Core; client của Core; agent dự phòng **chỉ khi `LegacyAgent=1`** | Không thêm memory, skill, MCP client vào add-in |
+| **Add-in** | UI pane, bridge, registry lệnh, ComGate, Undo, SSE; khởi động Core; client của Core (không có agent dự phòng) | Không thêm memory, skill, MCP client vào add-in |
 | **Agent Core** | Vòng agent, gọi LLM, tool registry, skills, memory, policy, audit, MCP client, lưu hội thoại | Không gọi COM trực tiếp; mọi thao tác tài liệu đi qua `POST /cmd` của bridge |
 | **Host.exe** | Giữ nguyên trên Windows (MCP server 50 tool, companion, `commands`, `llm-test`) | Không gộp vào Core. **Cập nhật 01/10/2026**: bản Linux không dùng Host.exe — MCP server là subcommand `mcp` của Core Go, cùng hợp đồng tool |
 
@@ -176,9 +175,8 @@ flowchart LR
   route qua Core), không khởi động theo Windows.
 - Core **tự thoát** khi không còn run nào và không còn session bridge nào sống (dựa trên thư mục
   `sessions`) trong 10 phút.
-- Core crash hoặc không khởi động được → pane báo lỗi rõ. Agent in-process chỉ chạy khi
-  `LegacyAgent=1` (mặc định 0): nó bỏ qua policy/xác nhận/audit/memory của Core, nên chỉ dành cho
-  trường hợp khẩn cấp có người dùng chấp nhận mất audit. Mọi lượt bình thường đi qua Core.
+- Core crash hoặc không khởi động được → pane báo lỗi rõ. Mọi lượt đi qua Core: agent in-process
+  (trước là opt-in `LegacyAgent=1`) đã bỏ ngày 25/10/2026 vì nó bỏ qua policy/xác nhận/audit/memory.
 
 ## 5. Quyết định công nghệ
 
@@ -269,7 +267,7 @@ tests/
   2. Không có/không sống → `Process.Start` `AxiomOffice.Core.exe` nằm **cùng thư mục với
      `AxiomOffice.dll`** (tham số `--parent-pid <pid host>` chỉ để log), chờ `core.json` + `/health`
      tối đa 10s.
-  3. Thất bại → dùng agent in-process, log lý do, thử lại Core ở lần Ask sau (không quá 1 lần/phút).
+  3. Thất bại → pane báo lỗi, log lý do, thử lại Core ở lần Ask sau (không quá 1 lần/phút).
 - Mutex `Local\AxiomOffice.Core`: process thứ hai thấy mutex bị giữ thì thoát ngay với mã 0.
 
 ```mermaid
@@ -288,7 +286,7 @@ sequenceDiagram
         P->>C: GET /health
     end
     alt vẫn lỗi
-        P->>P: agent in-process (dự phòng)
+        P->>P: báo lỗi "Agent Core không chạy được"
     end
 ```
 
@@ -406,8 +404,7 @@ bằng `BeginInvoke` (như `PostToUi` hiện có). **Không** chặn UI thread.
 | Giá trị | Mặc định | Ý nghĩa |
 |---|---|---|
 | `CorePort` | 47840 | Port Core |
-| `CoreEnabled` | 1 | 0 = không khởi động Core; chỉ dùng được AI nếu `LegacyAgent=1` |
-| `LegacyAgent` | 0 | 1 = cho phép agent in-process khi Core lỗi (bỏ qua policy/audit/memory — chỉ dùng khẩn cấp) |
+| `CoreEnabled` | 1 | 0 = không khởi động Core, nên pane và `ai.ask` không chạy được AI |
 | `MemoryEnabled` | 1 | 0 = không đọc/ghi memory dài hạn (hội thoại vẫn lưu) |
 | `MemoryAutoExtract` | 1 | 0 = không tự trích xuất sau run (chỉ `remember` và người dùng ghi) |
 | `MemoryModel` | rỗng | Model cho trích xuất/gộp memory (rỗng = `LlmModel`) |
@@ -424,7 +421,9 @@ DB và log nằm trong thư mục đó (test không làm bẩn `%LOCALAPPDATA%`)
 
 Lệnh bridge `ai.ask` giữ **nguyên hình dạng response** (`ok`, `reply`/`error`, `transcript`,
 `seconds`, `rounds`). Giai đoạn 1: vẫn chạy agent in-process. Giai đoạn 4 (tuỳ chọn, hỏi người
-dùng): chuyển sang Core khi Core sẵn sàng, dịch kết quả về cùng hình dạng.
+dùng): chuyển sang Core khi Core sẵn sàng, dịch kết quả về cùng hình dạng. Từ 25/10/2026 chỉ còn Core:
+Core không nhận lượt (hoặc chế độ companion `Host.exe word|excel|...`, không có add-in) thì `ai.ask`
+trả `ok:false` kèm lý do.
 
 ## 8. Thiết kế các module của Agent Core
 

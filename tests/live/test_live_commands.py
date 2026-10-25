@@ -497,27 +497,19 @@ $out = @{}
 foreach ($action in 'writer.closeAll', 'ai.ask', 'nosuch.action', 'et.newWorkbook') {
     $out[$action] = $tool.GetMethod('Execute', $flags).Invoke($null, @($null, 'office_action', ('{"action":"' + $action + '"}')))
 }
-foreach ($kind in 'wps', 'et', 'wpp') {
-    $def = $tool.GetMethod('Definition', $flags).Invoke($null, @($kind))
-    $out['definition:' + $kind] = $def.GetType().GetField('Description').GetValue($def)
-}
 $out | ConvertTo-Json -Compress
 """
 
 
 def test_agent_tool():
-    """Tool office_action của agent (không cần Office): chỉ nhận lệnh có trong mô tả tool."""
+    """Lệnh office_action của pane (không cần Office): chỉ nhận lệnh agent (ForAgent). Mô tả tool cho model
+    giờ chỉ còn ở Core (core-go/internal/tools/office_action.go)."""
     output = subprocess.run(["powershell", "-NoProfile", "-Command", AGENT_TOOL_PS % ADDIN_DLL],
                             capture_output=True, text=True, encoding="utf-8", timeout=60).stdout
     data = json.loads(output)
     for action in ("writer.closeAll", "ai.ask", "nosuch.action", "et.newWorkbook"):
         reply = json.loads(data[action])
         check(reply["ok"] is False and "not an available action" in reply["error"], "office_action từ chối " + action, reply)
-    writer = data["definition:wps"]
-    # appendText co them tham so dinh dang/can le (24/10/2026): chi kiem lenh co mat va `text` dung dau.
-    check("writer.typeText {text}" in writer and "writer.appendText {text," in writer, "office_action (Writer) có typeText/appendText", writer)
-    listed = " ".join(data["definition:" + kind] for kind in ("wps", "et", "wpp"))
-    check("writer.closeAll" not in listed and "ai.ask {" not in listed, "office_action không liệt kê writer.closeAll / ai.ask", listed)
 
 
 def core_health():

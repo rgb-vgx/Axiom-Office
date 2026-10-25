@@ -427,8 +427,9 @@ namespace AxiomOffice.Bridge
             {
                 throw new InvalidOperationException("'prompt' is required");
             }
-            // Giai đoạn 4 (docs/architecture/core.md 7.7): chạy qua Agent Core khi có (skill, memory, policy, MCP), dịch kết quả về
-            // đúng hình dạng cũ; Core không dùng được (chưa nhận lượt chạy) thì chạy agent in-process như trước.
+            // docs/architecture/core.md 7.7: chạy qua Agent Core (skill, memory, policy, MCP), dịch kết quả về đúng hình dạng cũ.
+            // Core không dùng được (chưa nhận lượt chạy, hoặc chế độ companion không có add-in) thì báo lỗi: không còn agent
+            // in-process bỏ qua policy/xác nhận/audit.
             Ai.LlmResult agentResult = null;
             var connect = host as Connect;
             if (connect != null && Ai.CoreClient.Instance.Enabled)
@@ -443,10 +444,10 @@ namespace AxiomOffice.Bridge
             }
             if (agentResult == null)
             {
-                agentResult = Ai.AiAgent.Run(host, prompt, delegate(string line)
-                {
-                    Logger.Info("ai.ask progress: " + line);
-                });
+                agentResult = new Ai.LlmResult();
+                agentResult.Error = connect == null
+                    ? "ai.ask needs Agent Core, which runs only inside the add-in (not in companion mode)"
+                    : "Agent Core is not running (" + (Ai.CoreClient.Instance.LastError ?? "unknown reason") + ")";
             }
             var reply = new Dictionary<string, object>();
             reply["ok"] = agentResult.Ok;

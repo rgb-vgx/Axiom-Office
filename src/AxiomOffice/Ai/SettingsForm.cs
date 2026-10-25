@@ -9,7 +9,7 @@ namespace AxiomOffice.Ai
     {
         private const string DefaultOpenAiEndpoint = "https://api.openai.com/v1";
         private const string DefaultAnthropicEndpoint = "https://api.anthropic.com/v1";
-        // Gemini dung endpoint OpenAI-compatible cua Google: luu provider "openai" nen Core, agent in-process
+        // Gemini dung endpoint OpenAI-compatible cua Google: luu provider "openai" nen Core, llm-test
         // va ban cai cu deu chay duoc, khong can SDK rieng.
         private const string DefaultGeminiEndpoint = "https://generativelanguage.googleapis.com/v1beta/openai";
         private const string DefaultGeminiModel = "gemini-2.5-flash";

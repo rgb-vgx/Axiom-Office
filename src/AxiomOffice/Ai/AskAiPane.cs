@@ -57,7 +57,7 @@ namespace AxiomOffice.Ai
         private EmptyState _empty;
         private string _conversationId;              // hoi thoai ben Agent Core, theo tai lieu dang mo
         private bool _freshConversation;             // nguoi dung vua bam "Cuoc tro chuyen moi"
-        private bool _lastRunViaCore;                // luot vua roi chay qua Core hay in-process
+        private bool _lastRunViaCore;                // luot vua roi da chay qua Core
         private string _lastReply = "";
         private string _lastPrompt = "";
         private string _blockedReason;
@@ -636,38 +636,14 @@ namespace AxiomOffice.Ai
                 LlmResult result;
                 try
                 {
-                    // Uu tien Agent Core (docs/architecture/core.md muc 9); Core khong dung duoc thi chay trong add-in
-                    // nhu cu de pane khong bao gio bi khoa vi Core.
+                    // Moi luot chay qua Agent Core (docs/architecture/core.md muc 9); Core khong dung duoc thi bao loi ro.
+                    // Khong co agent thu hai trong add-in: moi luot phai qua policy/xac nhan/audit/memory cua Core.
                     result = RunViaCore(host, corePrompt, run, progress, plan);
-                    if (result == null && files.Count > 0)
+                    if (result == null)
                     {
-                        // Agent trong add-in không đọc được tệp ngoài: báo rõ thay vì trả lời như không có tệp.
                         result = new LlmResult();
-                        result.Error = Ui.T("Đọc tệp đính kèm cần Agent Core, mà Core đang không chạy được (")
+                        result.Error = Ui.T("Agent Core không chạy được (")
                             + (CoreClient.Instance.LastError ?? Ui.T("không rõ lý do")) + ").";
-                    }
-                    else if (result == null && plan)
-                    {
-                        // Agent trong add-in không có chế độ chỉ đọc: không được chạy thay (nó sẽ sửa tài liệu).
-                        result = new LlmResult();
-                        result.Error = Ui.T("Lập kế hoạch cần Agent Core, mà Core đang không chạy được (")
-                            + (CoreClient.Instance.LastError ?? Ui.T("không rõ lý do")) + Ui.T("). Tắt \"Lập kế hoạch trước\" để AI làm ngay.");
-                    }
-                    else if (result == null)
-                    {
-                        // Mặc định KHÔNG chạy agent thứ hai: nó bỏ qua policy/confirm/audit/memory của Core
-                        // (docs/architecture/core.md §4.2). Chỉ dùng khi người dùng bật rõ LegacyAgent.
-                        if (!Config.LegacyAgent)
-                        {
-                            result = new LlmResult();
-                            result.Error = Ui.T("Agent Core không chạy được (")
-                                + (CoreClient.Instance.LastError ?? Ui.T("không rõ lý do"))
-                                + Ui.T("). Để dùng agent cũ trong add-in, đặt HKCU\\Software\\AxiomOffice\\LegacyAgent=1 rồi thử lại.");
-                        }
-                        else
-                        {
-                            result = AiAgent.Run(host, promptText, progress, run.Token);
-                        }
                     }
                 }
                 catch (Exception ex)
@@ -696,7 +672,7 @@ namespace AxiomOffice.Ai
             });
         }
 
-        // Chay mot luot qua Agent Core. Tra null khi Core khong dung duoc (pane se chay in-process).
+        // Chay mot luot qua Agent Core. Tra null khi Core khong dung duoc (pane bao loi).
         private LlmResult RunViaCore(Connect host, string promptText, CancellationTokenSource run, Action<string> progress, bool plan)
         {
             CoreClient core = CoreClient.Instance;
@@ -822,8 +798,8 @@ namespace AxiomOffice.Ai
                     string message = !string.IsNullOrEmpty(item.Error) ? item.Error : ErrorText(outcome);
                     outcome = "{\"ok\":false,\"error\":" + new System.Web.Script.Serialization.JavaScriptSerializer().Serialize(message) + "}";
                 }
-                // Cung dinh dang dong tien trinh cua che do in-process ({"action": ..., "params": ...}) de
-                // PaneControls hien nhan tieng Viet theo action (truoc day chi co "{}").
+                // Dong tien trinh dang office_action {"action": ..., "params": ...} de PaneControls hien nhan
+                // tieng Viet theo action (truoc day chi co "{}").
                 string call = "{\"action\": \"" + (officeAction ? item.Action ?? "" : item.Tool) + "\""
                     + (string.IsNullOrEmpty(item.ParamsPreview) ? "" : ", \"params\": " + item.ParamsPreview)
                     + "}";
@@ -1273,15 +1249,11 @@ namespace AxiomOffice.Ai
             string message;
             if (result.TimedOut)
             {
-                message = Ui.T("AI chưa xong sau ") + (LlmClient.AgentTimeoutMs / 60000) + Ui.T(" phút nên đã dừng.");
+                message = Ui.T("AI không phản hồi kịp nên lượt chạy đã dừng.");
             }
             else if (result.Stopped)
             {
                 message = Ui.T("AI đã dùng hết ngân sách token cho lượt này nên dừng lại.");
-            }
-            else if (result.StepLimitReached)
-            {
-                message = Ui.T("AI chưa xong sau ") + result.Rounds + Ui.T(" vòng nên đã dừng.");
             }
             else if (lower.Contains("timed out"))
             {

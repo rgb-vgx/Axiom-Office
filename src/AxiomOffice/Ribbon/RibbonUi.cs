@@ -245,7 +245,7 @@ namespace AxiomOffice.Ribbon
 
         public static bool GetEnabled(string tag)
         {
-            // Agent in-process không có QA thị giác lẫn nguồn tìm web: tắt Core thì hai nút này không tác dụng.
+            // QA thị giác và nguồn tìm web là của Agent Core: tắt Core thì hai nút này không tác dụng.
             return (tag != "visualQa" && tag != "searchSource") || Config.CoreEnabled;
         }
 

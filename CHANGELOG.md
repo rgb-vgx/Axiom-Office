@@ -5,6 +5,19 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Removed — Agent in-process của add-in (25/10/2026)
+
+- Bỏ `Ai/AiAgent.cs`, vòng tool-calling `LlmClient.RunAgent`, khoá `LegacyAgent`, `OfficeActionTool.Definition`
+  và `CommandCatalog.AgentActions`. Agent này bỏ qua policy/xác nhận/audit/memory của Core và có prompt riêng
+  phải sửa song song (vd quy tắc "lệnh là giá trị của `action`" vừa thêm cho Core).
+- Mọi lượt AI của pane đi qua Agent Core; Core lỗi thì pane báo lỗi (một thông báo chung, thay cho ba thông báo
+  riêng cho tệp đính kèm / lập kế hoạch / LegacyAgent).
+- **`ai.ask`**: trước đây Core không nhận lượt — và **luôn luôn** ở chế độ companion (`Host.exe word|excel|...`)
+  — thì chạy agent cũ mà **không kiểm tra `LegacyAgent`**. Nay trả `ok:false` kèm lý do; lệnh bridge từng
+  bước vẫn dùng bình thường.
+- `LlmClient` chỉ còn `Chat` (nút Test, `llm-test`). Log `CoreClient: fallback to in-process -` đổi thành
+  `CoreClient: run not started -`. Pane báo hết giờ bằng câu chung (Core không có trần 5 phút như agent cũ).
+
 ### Fixed — Word: bảng dàn trang và `writer.restyle` cho văn bản hành chính (24/10/2026)
 
 - **`writer.formatTable {borders:false}`** (C#) nay đặt tem `AxiomLayout` vào `Table.Title` (lưu theo `.docx`,

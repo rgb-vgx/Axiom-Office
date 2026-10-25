@@ -42,8 +42,8 @@ namespace AxiomOffice.Ai
     }
 
     // Client HTTP + SSE toi AxiomOffice.Core.exe: tim Core qua core.json, khoi dong khi can (muc 7.1),
-    // chay luot agent qua Core API (7.3/7.4). Moi loi ket noi -> Run tra null de pane dung agent
-    // in-process nhu cu (du phong). Khong bao gio nem ra ngoai.
+    // chay luot agent qua Core API (7.3/7.4). Moi loi ket noi -> Run tra null de pane bao loi ro.
+    // Khong bao gio nem ra ngoai.
     // partial: phan cho wizard thiet lap nam o CoreSetup.cs (SetupWizardForm dung).
     internal sealed partial class CoreClient
     {
@@ -123,7 +123,7 @@ namespace AxiomOffice.Ai
                 {
                     _lastFailureUtc = DateTime.UtcNow;
                     _baseUrl = null;
-                    Logger.Info("CoreClient: Agent Core khong san sang (" + LastError + "); dung agent in-process");
+                    Logger.Info("CoreClient: Agent Core khong san sang (" + LastError + ")");
                     return null;
                 }
 
@@ -134,7 +134,7 @@ namespace AxiomOffice.Ai
             }
         }
 
-        // Chay mot luot qua Core. Tra null khi KHONG ket noi duoc (pane nen thu lai bang in-process);
+        // Chay mot luot qua Core. Tra null khi KHONG ket noi duoc (pane bao loi);
         // loi nghiep vu cua luot chay van tra LlmResult voi Ok=false (khong chay lai de tranh ton token).
         public LlmResult Run(Connect host, string prompt, string conversationId, Action<CoreEvent> onEvent, CancellationToken cancel)
         {
@@ -167,7 +167,7 @@ namespace AxiomOffice.Ai
             if (port <= 0)
             {
                 LastError = "khong tim thay port cua bridge trong session registry";
-                Logger.Info("CoreClient: fallback to in-process - " + LastError);
+                Logger.Info("CoreClient: run not started - " + LastError);
                 return null;
             }
 
@@ -202,19 +202,19 @@ namespace AxiomOffice.Ai
             if (responseText == null)
             {
                 LastError = error;
-                Logger.Info("CoreClient: fallback to in-process - POST /v1/runs failed: " + error);
+                Logger.Info("CoreClient: run not started - POST /v1/runs failed: " + error);
                 return null;
             }
 
             // Core boc ket qua trong {"ok":true,"result":{runId, conversationId}} (giong bridge). Truoc day doc
-            // runId o cap ngoai nen luon "khong tra runId" -> pane chay lai in-process trong khi Core van chay:
-            // moi yeu cau bi lam HAI lan.
+            // runId o cap ngoai nen luon "khong tra runId" -> pane (hoi do con agent in-process) chay lai trong khi
+            // Core van chay: moi yeu cau bi lam HAI lan.
             Dictionary<string, object> reply = RunReply(responseText);
             string runId = reply != null ? Convert.ToString(reply.ContainsKey("runId") ? reply["runId"] : null) : null;
             if (string.IsNullOrEmpty(runId))
             {
                 LastError = "Core khong tra runId: " + Truncate(responseText, 200);
-                Logger.Info("CoreClient: fallback to in-process - " + LastError);
+                Logger.Info("CoreClient: run not started - " + LastError);
                 return null;
             }
 
@@ -236,8 +236,8 @@ namespace AxiomOffice.Ai
 
             if (!result.Ok && !result.Cancelled && !result.TimedOut && !result.Stopped)
             {
-                // Da co runId thi Core co the da sua tai lieu: KHONG tra null (pane chay lai in-process se
-                // lam hai lan). Bao loi cua Core cho nguoi dung.
+                // Da co runId thi Core co the da sua tai lieu: KHONG tra null (ben goi se coi nhu Core chua
+                // nhan luot). Bao loi cua Core cho nguoi dung.
                 if (string.IsNullOrEmpty(result.Error))
                 {
                     result.Error = "khong doc duoc ket qua tu Agent Core (run " + runId + ")";
@@ -754,7 +754,7 @@ namespace AxiomOffice.Ai
                 || type == "run.timedout" || type == "run.stopped";
         }
 
-        // Chuyen su kien ket thuc thanh ket qua cho pane (giong LlmResult cua che do in-process).
+        // Chuyen su kien ket thuc thanh ket qua cho pane (LlmResult - cung hinh dang ai.ask tra ve).
         private static void ApplyEvent(LlmResult result, CoreEvent item)
         {
             if (item.Seconds > 0)

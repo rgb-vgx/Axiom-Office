@@ -93,12 +93,6 @@ namespace AxiomOffice.Bridge
             return string.Join("; ", commands.Select(c => c.Signature).ToArray());
         }
 
-        // Lệnh cho tool office_action của Ask AI pane theo loại app đang mở.
-        public static string AgentActions(string kind)
-        {
-            return Signatures(ForKind(kind).Where(c => c.Agent));
-        }
-
         // Bảng lệnh cho README (AxiomOffice.Host.exe commands --markdown).
         public static string ToMarkdown()
         {

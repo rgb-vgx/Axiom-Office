@@ -120,7 +120,7 @@ flowchart TB
     dev(["Script"])
 
     subgraph proc["Process Word / Excel / PowerPoint / WPS (mỗi instance một bộ)"]
-        addin["Add-in AxiomOffice.dll<br/>.NET 4.8, COM in-process<br/>Ask AI pane · HTTP bridge · hệ lệnh<br/>agent in-process (dự phòng)"]
+        addin["Add-in AxiomOffice.dll<br/>.NET 4.8, COM in-process<br/>Ask AI pane · HTTP bridge · hệ lệnh"]
         om["Object model của app"]
         addin -->|"COM late-bound"| om
     end
@@ -153,7 +153,7 @@ flowchart TB
 
 | Container | Công nghệ | Trách nhiệm | Giao tiếp |
 |---|---|---|---|
-| **Add-in `AxiomOffice.dll`** | .NET 4.8, C# 7.3, COM in-process, WinForms | UI trong app (pane, cài đặt, quản lý ghi nhớ), HTTP bridge, thực thi lệnh trên tài liệu; agent in-process khi Core không dùng được | COM với app; HTTP server loopback; HTTP client tới Core; HTTPS tới LLM (dự phòng) |
+| **Add-in `AxiomOffice.dll`** | .NET 4.8, C# 7.3, COM in-process, WinForms | UI trong app (pane, cài đặt, quản lý ghi nhớ), HTTP bridge, thực thi lệnh trên tài liệu | COM với app; HTTP server loopback; HTTP client tới Core; HTTPS tới LLM (chỉ nút Test) |
 | **`AxiomOffice.Core.exe`** | **Go (thuần Go, không cgo; SQLite `modernc.org/sqlite`), một file ~12MB**, một bản / người dùng | Agent cho mọi app: prompt, vòng tool-calling + chuỗi guard, hội thoại, skill, memory dài hạn, policy xác nhận, audit, MCP client, QA | HTTP loopback `127.0.0.1:47840` (+SSE); HTTP client tới bridge; HTTPS tới LLM; stdio/HTTP tới MCP server |
 | **`AxiomOffice.Host.exe`** | .NET 4.8 console (biên dịch cùng source add-in) | **Shim chuyển tiếp byte** `mcp` sang Core Go; companion không cần add-in, công cụ dev | stdio với MCP client (và với Core: làn file); HTTP client tới bridge; COM (companion) |
 | **Extension LibreOffice** | Python UNO (`.oxt`), chạy trong `soffice` | Bridge HTTP + sidebar Ask AI cho Writer/Calc/Impress (cùng tên lệnh, cùng giao thức) | UNO với tài liệu; HTTP loopback `:47851–47853` |
@@ -211,7 +211,7 @@ flowchart TB
 |---|---|---|
 | Giao diện | Ribbon, task pane chat (tiến trình, thẻ xác nhận, dòng "Đã ghi nhớ"), cài đặt, form quản lý ghi nhớ | Add-in |
 | Orchestrator | Dựng prompt (quy tắc, chỉ mục skill, memory, ngữ cảnh tài liệu, hội thoại), chạy vòng tool-calling, phát sự kiện SSE, lưu hội thoại + audit | Core |
-| Model gateway | Codec OpenAI-compatible / Anthropic, thử lại lỗi tạm thời, timeout, trần token, lọc `<thought>` | Core (bản in-process: `LlmClient`) |
+| Model gateway | Codec OpenAI-compatible / Anthropic, thử lại lỗi tạm thời, timeout, trần token, lọc `<thought>` | Core |
 | Tool registry | `office_action` (allowlist từ `/commands`), `load_skill`/`read_skill_file`, `remember`/`recall`, `mcp__*`, `look_at_document` | Core |
 | Policy + xác nhận | Hỏi người dùng trước thao tác rủi ro; audit mọi tool call | Core (thẻ xác nhận ở pane) |
 | Memory | Ghi nhớ dài hạn học từ mem0 2.2.1: chỉ-ADD, chống trùng, chấm điểm cộng dồn | Core |
@@ -256,7 +256,7 @@ sequenceDiagram
     end
     CO-->>UI: run.completed (câu trả lời)
     CO->>CO: nền: trích xuất ghi nhớ, tóm tắt hội thoại
-    Note over UI,CO: Core không nhận được lượt chạy (chưa có runId) → pane chạy agent in-process như cũ.<br/>Đã có runId thì không bao giờ chạy lại in-process (tránh sửa hai lần).
+    Note over UI,CO: Core không nhận được lượt chạy (chưa có runId) → pane báo lỗi (không có agent dự phòng).
 ```
 
 ### K6: Ghi nhớ qua các phiên
@@ -385,7 +385,7 @@ flowchart LR
 | AD-10 | Mọi đăng ký trong HKCU | Không cần admin | Chỉ cài cho từng người dùng |
 | AD-11 | Agent Core là process riêng viết bằng Go (một file ~12MB, không runtime, không cgo) | Dùng được SQLite thuần Go, một agent cho mọi app, không làm nặng process Office; build chéo Windows/Linux từ một máy | Thêm một process và giao thức HTTP nội bộ |
 | AD-12 | Core chỉ thao tác tài liệu qua bridge (`/cmd`), không gọi COM | Một đường thực thi lệnh duy nhất (allowlist, ComGate, Undo); Core không phụ thuộc Office | Mỗi lệnh thêm một vòng HTTP loopback |
-| AD-13 | Pane thử Core trước, dự phòng agent in-process; đã có runId thì không chạy lại | Pane không bao giờ bị khoá vì Core; không sửa tài liệu hai lần | Hai bản agent (C# 7.3 và .NET 10) phải giữ hành vi gần nhau |
+| AD-13 | Mọi lượt AI chạy qua Core; Core lỗi thì pane báo lỗi (agent in-process dự phòng đã bỏ 25/10/2026) | Không có đường nào bỏ qua policy/xác nhận/audit; chỉ một bản agent để bảo trì | Core hỏng là không dùng được AI trong pane |
 | AD-14 | Skill theo chuẩn Agent Skills (thư mục + `SKILL.md`), nạp 3 tầng | Hệ sinh thái sẵn có; prompt gọn (chỉ mục ~100 token/skill) | Không chạy script trong skill |
 | AD-15 | Memory tự làm (ban đầu bằng C#, nay bằng Go — `core-go/internal/memory`) theo ý tưởng mem0 2.2.1 (chỉ-ADD) | Dữ liệu ở lại máy, không Python/Docker, model không tự sửa/xoá memory | Tự bảo trì thuật toán chấm điểm; embedding tuỳ chọn |
 | AD-16 | Policy xác nhận trong Core, trả lời qua pane | Người dùng quyết định thao tác rủi ro; audit đầy đủ | Lượt chạy có thể dừng chờ tới 120s |
@@ -422,9 +422,8 @@ src/AxiomOffice/                         → AxiomOffice.dll
     AskAiPane.cs               ~1300     Pane chat: CoreClient + plan mode + đính kèm tệp, hủy, lỗi, chèn trả lời
     PaneControls.cs            ~1300     Control vẽ bằng GDI+, design token PaneTheme
     MarkdownView.cs                      Hiển thị markdown trong bubble trả lời (đậm/nghiêng/mã/link/list/code)
-    AiAgent.cs                            System prompt + tool office_action (in-process, dự phòng)
-    LlmClient.cs                          OpenAI-compatible / Anthropic, vòng tool-calling, timeout, hủy
-    OfficeActionTool.cs                   Định nghĩa tool (từ registry), allowlist, gọi dispatcher
+    LlmClient.cs                          Chat một lượt OpenAI-compatible / Anthropic (nút Test, llm-test)
+    OfficeActionTool.cs                   Allowlist lệnh agent, gọi dispatcher (thao tác nhanh của pane)
     CoreClient.cs + CoreAdmin.cs          Tìm/khởi động Core, POST /v1/runs + SSE, hủy, confirm, API memory/audit
     SettingsForm.cs + SetupWizardForm.cs  Cài đặt LLM, wizard 5 bước (câu chữ từ catalog/setup.json)
     MemoryForm.cs + AdminForms.cs         Quản lý ghi nhớ, hội thoại trước, nhật ký hoạt động
@@ -830,9 +829,8 @@ Chiều ra, `ToPlain` / `ToMatrix` chuyển giá trị COM sang JSON: `object[,]
 |---|---|
 | `AskAiPane` | UI chat: gửi prompt, hiện từng thao tác, Dừng, Thử lại, Chèn trả lời (`writer.insertStyledText`) |
 | `PaneControls` | `PaneTheme` (design token, scale DPI), `ChatBubble`, `ToolLine`, `TypingBubble`, `PromptBox`, `ComposerPanel`, `ErrorCard`, `ChatList`... |
-| `AiAgent` | Dựng system prompt theo loại app, gắn tool `office_action`, gọi `LlmClient.RunAgent` (đường dự phòng) |
-| `LlmClient` | Vòng tool-calling in-process; `Chat` cho nút Test và `llm-test` |
-| `OfficeActionTool` | Định nghĩa tool (mô tả sinh từ registry), allowlist, thực thi → `CommandDispatcher` |
+| `LlmClient` | `Chat` một lượt cho nút Test và `llm-test`; `LlmResult` (kết quả lượt chạy, cũng dùng cho Core) |
+| `OfficeActionTool` | Allowlist lệnh agent (`ForAgent`), thực thi → `CommandDispatcher` (thao tác nhanh của pane) |
 | `MarkdownView` | Hiển thị markdown trong bubble trả lời (đậm/nghiêng/mã/link/list/khối mã) |
 | `SettingsForm` | Provider, endpoint, model, API key (lưu DPAPI), Tavily key, nút Test; bật/tắt Core, ghi nhớ, tự ghi nhớ, QA thị giác, model dự phòng, cửa sổ ngữ cảnh; mở Quản lý ghi nhớ |
 | `SetupWizardForm` + `SetupWizardControls` | Wizard 5 bước (câu chữ từ `catalog/setup.json`), tự mở một lần khi chưa cấu hình, bước 5 **Thử ngay** qua Core |
@@ -840,10 +838,9 @@ Chiều ra, `ToPlain` / `ToMatrix` chuyển giá trị COM sang JSON: `object[,]
 | `MemoryForm` + `AdminForms` | Xem, thêm, sửa, ghim, hạn dùng, xoá/khôi phục, lịch sử, xoá toàn bộ ghi nhớ; hội thoại trước; nhật ký hoạt động; kỹ năng; trạng thái |
 | `McpForm` (+`McpServerEditForm`, `McpFile`) | Nút ribbon Công cụ ngoài…: gộp mcp.json + `GET /v1/mcp`, bật/tắt, tin cậy, thêm/sửa/xoá server; ghi UTF-8 không BOM |
 
-Pane chạy qua **Agent Core** (mục 22) là đường chính; `AiAgent`/`LlmClient` là **dự phòng in-process**
-khi Core không nhận được lượt chạy (đã có runId thì không bao giờ chạy lại in-process, tránh sửa
-tài liệu hai lần), và là đường chạy của companion (`Host.exe word|excel|ppt`). Core không chạy
-trong plan mode thì pane **báo lỗi** thay vì rơi về in-process (agent đó không có chế độ chỉ đọc).
+Pane chạy **mọi lượt qua Agent Core** (mục 22). Core không nhận được lượt chạy thì pane **báo lỗi**;
+agent in-process dự phòng (`AiAgent` + `LlmClient.RunAgent`) đã bỏ ngày 25/10/2026 vì nó bỏ qua
+policy/xác nhận/audit/memory. `ai.ask` ở companion (`Host.exe word|excel|ppt`) vì thế trả `ok:false`.
 
 ### 15.2 Một lượt chạy (đường chính: qua Core; xem mục 22.3)
 
@@ -872,32 +869,6 @@ sequenceDiagram
     P-->>U: bubble trả lời (markdown), link Chèn trả lời
 ```
 
-Đường dự phòng in-process (Core không nhận lượt chạy) đi như cũ qua `AiAgent`/`LlmClient` trên
-ThreadPool worker, mỗi tool qua `ComGate.Run`:
-
-```
-    U->>P: nhập yêu cầu, bấm Ask
-    P->>W: QueueUserWorkItem (CancellationTokenSource)
-    W->>AG: AiAgent.Run(host, prompt, progress, token)
-    loop tới khi model trả lời không kèm tool call
-        AG->>L: messages + tool office_action (timeout 120s/request)
-        L-->>AG: tool_calls
-        AG->>T: Execute(office_action, {action, params})
-        alt action không có ForAgent
-            T-->>AG: ok:false "not an available action"
-        else
-            T->>D: Execute(host, action, params)
-            D-->>T: ok / error
-            T-->>AG: JSON kết quả
-        end
-        AG-->>P: progress (BeginInvoke) → một dòng ToolLine
-    end
-    L-->>AG: câu trả lời cuối
-    AG-->>W: LlmResult (Ok, Text, Transcript, Rounds, Seconds)
-    W-->>P: FinishRun (BeginInvoke)
-    P-->>U: bubble trả lời, link Chèn trả lời
-```
-
 ```mermaid
 stateDiagram-v2
     [*] --> Idle
@@ -905,7 +876,7 @@ stateDiagram-v2
     Running --> Running: tool call + progress
     Running --> Done: model trả lời xong
     Running --> Cancelled: bấm Dừng (hủy request đang chờ / POST /cancel với Core)
-    Running --> TimedOut: quá trần (in-process: 5 phút; Core: hết ngân sách token → run.stopped)
+    Running --> TimedOut: model im lặng quá lâu / quá maxSeconds của bên gọi (run.timedout)
     Running --> Failed: lỗi provider / cấu hình
     Done --> Idle
     Cancelled --> Idle
@@ -921,11 +892,10 @@ stateDiagram-v2
 | `anthropic` | `{endpoint}/messages` | `x-api-key`, `anthropic-version: 2023-06-01` | `tools` + `tool_use` / `tool_result` |
 
 - `LlmResult`: `Ok`, `Text`, `Error`, `Seconds`, `Rounds`, `Transcript`, `Cancelled`, `TimedOut`,
-  `StepLimitReached`, `ViaCore`, `ConversationId`, `RunId`.
-- **Thời gian (in-process)**: `TimeoutMs` = 120s mỗi request; `AgentTimeoutMs` = 300s cả lượt (linked
-  `CancellationTokenSource`); hủy gọi `HttpWebRequest.Abort()` nên dừng ngay. **Core không đặt trần
-  thời gian mặc định** (kiểm soát bằng số vòng + nút Dừng; bên gọi vẫn đặt `maxSeconds` được, vd `ai.ask`).
-- **Số vòng**: in-process không giới hạn (`maxIterations` = 0); Core mặc định 100 vòng
+  `Stopped`, `ViaCore`, `ConversationId`, `RunId`.
+- **Thời gian**: **Core không đặt trần thời gian mặc định** (kiểm soát bằng số vòng + nút Dừng; bên gọi vẫn
+  đặt `maxSeconds` được, vd `ai.ask`). `LlmClient.Chat` (nút Test) giữ `TimeoutMs` = 120s mỗi request.
+- **Số vòng**: Core mặc định 100 vòng
   (`options.maxRounds`, tối đa 1000) và ngân sách token (mặc định không trần; bên gọi đặt `maxTokens` được).
 - **Provider không hỗ trợ tools**: lỗi có chữ "tool" → tắt tools, chạy tiếp như chat thường.
 
@@ -947,7 +917,7 @@ stateDiagram-v2
   quả), `AskAiPane: ok ... N tool calls, M rounds`; ghi ngay trên worker kể cả khi pane đã đóng.
 - **`ai.ask`** (lệnh bridge) chạy qua Core ở chế độ không tương tác (`interactive=false`) trên thread
   riêng của bridge, trả `reply`, `transcript`, `seconds`, `rounds`, thêm `viaCore`, và log
-  `ai.ask progress:`. Core không dùng được thì chạy agent in-process như trước.
+  `ai.ask progress:`. Core không dùng được (hoặc chế độ companion, không có add-in) thì trả `ok:false`.
 
 ## 16. Session registry
 
@@ -1111,7 +1081,7 @@ giữ port) → idle. Ctrl+C dừng bridge và `Quit` app.
 | `LlmFallbackModels` | String | rỗng | Model dự phòng cùng provider, phân cách `,`/`;`/xuống dòng |
 | `LlmContextWindow` | DWORD | 0 | Cửa sổ ngữ cảnh khi provider không khai (Ollama/LM Studio); 0 = theo provider |
 | `CorePort` | DWORD | 47840 | Port Agent Core (bận thì thử 47840–47849; Core Go giữ luôn listener đã bind được) |
-| `CoreEnabled` | DWORD | 1 | 0 = pane luôn chạy agent in-process |
+| `CoreEnabled` | DWORD | 1 | 0 = không khởi động Core, nên pane và `ai.ask` không chạy được AI |
 | `MemoryEnabled` / `MemoryAutoExtract` | DWORD | 1 / 1 | Ghi nhớ dài hạn / tự trích xuất sau lượt |
 | `MemoryModel` | String | = `LlmModel` | Model cho trích xuất memory |
 | `EmbeddingModel` / `EmbeddingEndpoint` | String | rỗng | Tìm memory theo ngữ nghĩa (tuỳ chọn) |
@@ -1205,7 +1175,7 @@ flowchart TD
 - **Agent Core (Go)**: `build.ps1` tắt Core đang chạy (`/v1/admin/shutdown`), `go build`
   (cần Go 1.26+, không cgo nhờ `modernc.org/sqlite` nên build chéo được) thành
   `AxiomOffice.Core.exe` (~12MB sau `-s -w`) với version từ `VERSION`, chép `skills\` cạnh exe;
-  thiếu Go thì bỏ qua Core (pane chạy in-process). Linux: `scripts/linux/package.sh` đóng tarball
+  thiếu Go thì bỏ qua Core (pane không chạy được AI tới khi có Core). Linux: `scripts/linux/package.sh` đóng tarball
   (`core/AxiomOffice.Core` ELF + `.oxt` + `wps-addin/`).
 - Script `.ps1` giữ ASCII không BOM (PowerShell 5.1 đọc sai UTF-8 không BOM).
 
@@ -1308,7 +1278,7 @@ flowchart TD
 - Codec `openai.go` (`/chat/completions`, tool `function`, kết quả `role=tool`, ảnh gửi bằng
   tin `user` `image_url`) và `anthropic.go` (`/messages`, `tool_use`/`tool_result`, ảnh là khối `image`,
   prompt caching cho phần system ổn định). Tin assistant gửi lại nguyên văn. Quy tắc nối endpoint
-  giống bản in-process (không nối lặp hậu tố).
+  giống `LlmClient.BuildUrl` của add-in (không nối lặp hậu tố).
 - `max_tokens` mặc định 65536 mỗi phản hồi (model reasoning đốt vào phần suy nghĩ trước khi viết tool
   call nên 4096 hay chết `finish_reason=length`); `FitWindow()` hạ ngưỡng theo cửa sổ ngữ cảnh khi
   provider khai (`GET /models`) hoặc `LlmContextWindow` (Ollama/LM Studio) — không nâng ngưỡng cho
@@ -1405,8 +1375,8 @@ từ chối; lượt `interactive=false` từ chối ngay. Mọi tool call vào 
 
 - `CoreClient.Run`: `EnsureBaseUrl` (đọc `core.json`, `/health`, khởi động exe nếu cần) → `POST /v1/runs`
   (gửi pid của bridge theo session file, kèm `document.view` + tệp đính kèm) → đọc SSE tới sự kiện
-  kết thúc. **Chỉ trả null (dự phòng in-process) khi Core chưa nhận lượt chạy**; mọi lý do dự phòng
-  ghi `bridge.log`.
+  kết thúc. **Chỉ trả null (pane báo lỗi) khi Core chưa nhận lượt chạy**; mọi lý do ghi `bridge.log`
+  (`CoreClient: run not started - ...`).
 - Pane hiện dòng tiến trình (`look_at_document`/`recall`/tool MCP đều có dòng riêng; `load_skill`/
   `remember` đã có dòng riêng nên ẩn), "Dùng kỹ năng", thẻ xác nhận (đồng ý/từ chối, 120s), thẻ kế
   hoạch (plan mode), dòng "Đã ghi nhớ" + Xoá (kể cả memory trích xuất nền: hỏi lại
