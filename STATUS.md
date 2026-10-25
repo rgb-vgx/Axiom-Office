@@ -1,9 +1,8 @@
 ﻿# Tình trạng dự án Axiom Office
 
-Cập nhật: **25/10/2026** · nhánh `main` · đã push đến §2.11 (đợt bớt ngữ cảnh + slide sơ đồ 25/10); đợt tự đi lại dây
-§2.12 mới commit tại máy, chưa push. Số liệu kiểm chứng ở §2.4 là lượt đo **01/10/2026**; số mới của đợt WPS ở §2.6,
-lượt đo lại toàn bộ ở §2.7, lượt đo lại job Windows ở §2.8, đợt Office x64 + sửa định dạng văn bản ở §2.9 và ba
-đợt 25/10 ở §2.10–2.12.
+Cập nhật: **26/10/2026** · nhánh `main` · đã push đến §2.12 (ba đợt 25/10: bớt ngữ cảnh, slide sơ đồ, tự đi lại dây).
+Số liệu kiểm chứng ở §2.4 là lượt đo **01/10/2026**; số mới của đợt WPS ở §2.6, lượt đo lại toàn bộ ở §2.7, lượt đo
+lại job Windows ở §2.8, đợt Office x64 + sửa định dạng văn bản ở §2.9 và ba đợt 25/10 ở §2.10–2.12.
 
 Tài liệu này là ảnh chụp nhanh "đã làm được gì / chưa làm được gì". Chi tiết thiết kế nằm ở
 [docs/architecture/core.md](docs/architecture/core.md) (Core + add-in) và [docs/architecture/libreoffice.md](docs/architecture/libreoffice.md) (LibreOffice);
@@ -247,8 +246,10 @@ trúc không dây cắt hộp. Sửa: sơ đồ lồng trong khoá `diagram`, `r
 - **Đoạn nguồn là vật cản** của dây vòng (trước đây dây dưới hàng cuối có thể cắt qua dòng nguồn).
 - **Kiểm:** `TestDiagramAlternativesSkipCurrentAndTried`, `TestSlidesFromBriefReroutesConnectorPowerPointDrawsAcrossBox`,
   `TestSlidesFromBriefStopsReroutingAfterTwoAttempts`; `go test ./...` 24 gói xanh; `go vet ./...` sạch.
-- **Còn:** chưa chạy đề ngân hàng 3 lần trên PowerPoint thật để đạt tiêu chí của plan 20 §5.1 (phiên này không có
-  cấu hình LLM/Office để chạy lượt thật).
+- **Tài liệu:** mô tả `wpp.checkLayout` thêm `connector-*` (catalog, README, kiến trúc); WPS ghi rõ không có hai
+  loại này; skill `trinh-bay-chuyen-nghiep` nhắc tool tự vẽ lại dây.
+- **Còn:** chưa chạy đề ngân hàng 3 lần trên PowerPoint thật để đạt tiêu chí của plan 20 §5.1 (máy đã cài PowerPoint
+  nhưng chưa cấu hình LLM/Core để chạy lượt thật).
 
 ## 3. Chưa làm / chưa kiểm chứng
 
@@ -259,7 +260,7 @@ trúc không dây cắt hộp. Sửa: sơ đồ lồng trong khoá `diagram`, `r
 | Trích xuất memory với **LLM thật** | **Đã (24/10/2026)** | Lượt thật trích 1 fact (`core.log`: `1 added`) |
 | **Office 32-bit** | **Không hỗ trợ** | Add-in .NET làm Office 32-bit crash `mso98win32client.dll`; kiểm bằng add-in tối giản (§2.9) |
 | Đọc/ghi **HKCU** bằng test tự động trên Windows | Một phần | Đối chiếu tay: Core Go đọc đúng endpoint/model/token/DPAPI của bạn; test tự động hiện dùng `AXIOM_*`. Từ 24/10 test cũng **không còn ghi vào HKCU thật** (nguồn cấu hình inject file tạm — §2.8) |
-| **Push remote** | Một phần | Đợt 18–22/10 (11 commit), sửa CI Windows 24/10 (§2.7–2.8) và hai đợt 25/10 — "trả token cho agent" (§2.10) + slide sơ đồ (§2.11) — đã lên `origin/main`. Đợt tự đi lại dây (§2.12) mới commit tại máy, **chưa push** |
+| **Push remote** | Đã push 26/10/2026 | Đợt 18–22/10 (11 commit), sửa CI Windows 24/10 (§2.7–2.8) và ba đợt 25/10 — "trả token cho agent" (§2.10), slide sơ đồ (§2.11), tự đi lại dây (§2.12) — đều đã lên `origin/main` |
 | CI job **windows** | **Xanh (24/10/2026)** | Trước đó đỏ ở bước `go test` (`TestWPSConfigWrite` giả định nguồn cấu hình là `config.json`, nhưng trên Windows `DefaultSource()` là HKCU) và ở bước build net48 (`}` thừa trong `AskAiPane.cs`). Đã sửa cả hai — xem §2.8 |
 | Nghiệm thu plan 20 §5.1 trên đề thật | Chưa | Code + test tự đi lại dây đã xong (§2.12); cần chạy đề ngân hàng 3 lần trên PowerPoint thật, lần dựng đầu không còn `connector-*` |
 | Merge `feat/setup-wizard` + `feat/core-go` vào `main` | **Đã xong** | Fast-forward, lịch sử thẳng |

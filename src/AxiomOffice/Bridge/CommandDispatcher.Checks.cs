@@ -24,7 +24,8 @@ namespace AxiomOffice.Bridge
                     "Soát bảng dữ liệu (chỉ đọc): tiêu đề trống, kiểu lẫn lộn, số dạng chữ, number format, dữ liệu lạc ngoài bảng",
                     Opt("range", "default: the used range"), Opt("sheet")).ForAgent(),
                 Command("wpp.checkLayout", "wpp", WppCheckLayout,
-                    "Soát bố cục slide (chỉ đọc): chữ tràn khung, shape ra ngoài slide, shape chồng nhau, chữ quá nhỏ",
+                    "Soát bố cục slide (chỉ đọc): chữ tràn khung, shape ra ngoài slide, shape chồng nhau, chữ quá nhỏ, "
+                    + "đường nối cắt qua hộp khác hoặc chồng lên đường nối khác",
                     Opt("slide", "slide number; default: every slide"), Opt("presentation", "full path of the presentation to work on; default: the active one")).ForAgent()
             };
         }

@@ -1365,7 +1365,8 @@ từ chối; lượt `interactive=false` từ chối ngay. Mọi tool call vào 
 ### 22.10 QA hai mức
 
 - **Cấu trúc** (luôn có, lệnh bridge chỉ đọc): `wpp.checkLayout` (tràn khung, ra ngoài slide, chồng
-  shape, chữ < 12pt, slide quá nhiều chữ), `et.checkRange` (tiêu đề trống, kiểu lẫn lộn, số dạng chữ,
+  shape, chữ < 12pt, slide quá nhiều chữ, đường nối cắt qua hộp khác hoặc chồng lên đường nối khác),
+  `et.checkRange` (tiêu đề trống, kiểu lẫn lộn, số dạng chữ,
   thiếu number format, ô lỗi, dữ liệu lạc ngoài bảng; response lớn được cắt gọn giữ `issueCount`),
   `writer.checkTables` (ô trống, ô tiêu đề lẫn đoạn văn; bảng dàn trang gắn tem thì miễn `empty-cells`).
 - **Thị giác** (tuỳ chọn): PowerPoint xuất thẳng slide đang mở (`Slide.Export`), Word/Excel chụp cửa

@@ -102,7 +102,7 @@ SELECT seq, tool, action, ok, result_chars, error, params_json FROM tool_calls W
 - **Mã:** `core-go/internal/tools/slides_brief.go` (`diagramPlan`, `repair`), `core-go/internal/slidelayout/route.go`
   (`DiagramAlternatives`). Test: 1 ca SL + 2 ca tools (đi lại thành công, dừng sau 2 lần).
 - **Xong khi:** đề ngân hàng chạy 3 lần liền, lần dựng đầu không còn `connector-*` trong `core.log`.
-  **Chưa đo** — phiên 25/10 làm trên máy không cấu hình LLM/Office để chạy lượt thật.
+  **Chưa đo** — phiên 25/10 làm trên máy đã cài PowerPoint nhưng chưa cấu hình LLM/Core để chạy lượt thật.
 
 ### 5.2 Thành phần xuyên suốt trong sơ đồ (Observability, audit…)
 

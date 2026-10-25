@@ -207,7 +207,7 @@ sẵn trong prompt; model tự gọi `load_skill` khi yêu cầu khớp (pane hi
 
 `skills/_design/tokens.json` là **token thiết kế dùng chung** (màu theo ngữ nghĩa, thang chữ, number
 format); skill dùng đúng giá trị trong đó. Sau khi tạo, agent tự **soát cấu trúc** bằng
-`wpp.checkLayout` / `et.checkRange` / `writer.checkTables` (tràn chữ, shape chồng, dữ liệu lạc ô…).
+`wpp.checkLayout` / `et.checkRange` / `writer.checkTables` (tràn chữ, shape chồng, đường nối cắt hộp, dữ liệu lạc ô…).
 
 Nguồn skill (trùng tên thì nguồn sau thắng): `skills\` cạnh `AxiomOffice.Core.exe` → thư mục trong
 `SkillDirs` (HKCU, phân cách `;`) → `%LOCALAPPDATA%\AxiomOffice\skills`. Thêm/sửa skill có hiệu lực sau
@@ -487,7 +487,7 @@ công cụ); lệnh khai báo cạnh handler trong `src/AxiomOffice/Bridge/Comma
 | `wpp.deleteTagged` | `first`, `last`, `presentation?` | Xoá các slide do công cụ dựng (có tag nguồn) mà tag bắt đầu trong [first, last] - dựng lại một lô theo bố cục mới |  |
 | `writer.checkTables` | — | Soát các bảng (chỉ đọc): số dòng/cột, ô trống, ô tiêu đề lẫn đoạn văn | ✓ |
 | `et.checkRange` | `range?`, `sheet?` | Soát bảng dữ liệu (chỉ đọc): tiêu đề trống, kiểu lẫn lộn, số dạng chữ, number format, dữ liệu lạc ngoài bảng | ✓ |
-| `wpp.checkLayout` | `slide?`, `presentation?` | Soát bố cục slide (chỉ đọc): chữ tràn khung, shape ra ngoài slide, shape chồng nhau, chữ quá nhỏ | ✓ |
+| `wpp.checkLayout` | `slide?`, `presentation?` | Soát bố cục slide (chỉ đọc): chữ tràn khung, shape ra ngoài slide, shape chồng nhau, chữ quá nhỏ, đường nối cắt qua hộp khác hoặc chồng lên đường nối khác | ✓ |
 
 Lệnh `writer.*` tự kích hoạt tài liệu có cửa sổ hiển thị nếu `ActiveDocument` là tài liệu ẩn.
 App đang bận (dialog mở, đang gõ trong ô Excel) thì bridge tự thử lại lỗi COM "busy" tối đa 10 lần

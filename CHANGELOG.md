@@ -21,8 +21,11 @@ PowerPoint vẽ ra 1 `connector-crossing` + 3 `connector-overlap`; model không 
   hàng cuối có thể cắt qua dòng nguồn mà mô hình không biết (checkLayout bên C# tính mọi textbox là hộp).
 - **Test**: `TestDiagramAlternativesSkipCurrentAndTried` (SL), `TestSlidesFromBriefReroutesConnectorPowerPointDrawsAcrossBox`
   và `TestSlidesFromBriefStopsReroutingAfterTwoAttempts` (tools). `go test ./...` 24 gói xanh, `go vet ./...` sạch.
+- **Tài liệu + catalog**: `wpp.checkLayout` mô tả thêm `connector-crossing`/`connector-overlap` (catalog, README,
+  kiến trúc); `docs/architecture/wps-bridge.md` ghi rõ WPS không có hai loại này; skill `trinh-bay-chuyen-nghiep`
+  nhắc tool tự vẽ lại dây.
 - **Chưa đạt tiêu chí "xong" của plan 20 §5.1**: cần chạy đề ngân hàng 3 lần trên PowerPoint thật, lần dựng đầu không
-  còn `connector-*` trong `core.log` (máy kiểm chứng hiện chưa cấu hình LLM/Office để chạy lượt thật).
+  còn `connector-*` trong `core.log` (máy kiểm chứng đã cài PowerPoint nhưng chưa cấu hình LLM/Core để chạy lượt thật).
 
 ### Fixed — Slide sơ đồ trên đề thật: sửa đúng slide lỗi, dây tránh chú thích, xoá slide trống không hỏi (25/10/2026)
 

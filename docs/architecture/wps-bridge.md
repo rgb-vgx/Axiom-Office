@@ -131,7 +131,8 @@ Cùng giao thức và cùng guard với bridge LibreOffice (`Origin` → 403, to
 - WPP: `Font.Bold` nhận `msoTrue` = **-1** (không phải `true` như ET); `wpp.setNotes` ghi vào placeholder
   **cuối** của `NotesPage` (trang ghi chú đo được có 2 placeholder: 1 = số trang, 2 = ghi chú).
 - `wpp.checkLayout` **không** báo `overflow` (cần chiều cao chữ thật, object model WPS không đo được); bốn loại
-  còn lại (`offslide`, `small-font`, `overlap`, `dense`) giữ nguyên ngưỡng của LibreOffice.
+  còn lại (`offslide`, `small-font`, `overlap`, `dense`) giữ nguyên ngưỡng của LibreOffice. WPS cũng **không** báo
+  `connector-crossing`/`connector-overlap` — hai loại này chỉ có ở bản Microsoft Office.
 - **Lệnh đang chạy không bị coi là mất kết nối** (vá 11/10/2026): add-in chạy **đơn luồng**, nên trong lúc thực thi
   một lệnh dài (`et.importCsv` file lớn, `et.formatRange` cả bảng, `exportPdf`) nó **không poll**. Nếu vẫn áp dụng
   luật `AXIOM_WPS_DISCONNECT_SECONDS` (45 giây) thì lệnh bị cắt giữa chừng: kết quả bị bỏ, file session bị xoá,

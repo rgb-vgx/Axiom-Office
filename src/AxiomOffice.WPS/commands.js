@@ -639,7 +639,7 @@
         { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
       ] },
     { name: "wpp.checkLayout", kind: "wpp", agent: true, undo: false,
-      summary: "Soát bố cục slide (chỉ đọc): chữ tràn khung, shape ra ngoài slide, shape chồng nhau, chữ quá nhỏ",
+      summary: "Soát bố cục slide (chỉ đọc): chữ tràn khung, shape ra ngoài slide, shape chồng nhau, chữ quá nhỏ, đường nối cắt qua hộp khác hoặc chồng lên đường nối khác",
       params: [
         { name: "slide", required: false, hint: "slide number; default: every slide" },
         { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
