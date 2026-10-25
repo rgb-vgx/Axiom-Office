@@ -543,7 +543,7 @@ namespace AxiomOffice.Ai
                         ApplyEvent(result, item);
                         if (item.Type == "tool.finished")
                         {
-                            result.Transcript.Add((item.Action ?? "?") + (item.Ok ? " ok" : " loi"));
+                            result.Transcript.Add(ToolLine(item));
                         }
 
                         if (IsTerminal(item.Type))
@@ -746,6 +746,51 @@ namespace AxiomOffice.Ai
             }
 
             return Convert.ToString(value);
+        }
+
+        // Dong tien trinh cua mot tool.finished: dung chung cho pane (PaneControls ve tick/x + nhan theo action) va
+        // LlmResult.Transcript (ai.ask tra ve) - cung dang voi agent in-process truoc day nen ben goi doc duoc action
+        // va loi (vd "is not an available action").
+        internal static string ToolLine(CoreEvent item)
+        {
+            bool officeAction = string.IsNullOrEmpty(item.Tool) || item.Tool == "office_action";
+            string outcome = !string.IsNullOrEmpty(item.ResultPreview)
+                ? item.ResultPreview
+                : (item.Ok
+                    ? "{\"ok\":true}"
+                    : "{\"ok\":false,\"error\":\"" + (item.Error ?? "loi") + "\"}");
+            // Core báo thất bại mà preview không có "ok":false (vd {"error":"'wpp.listShapes' is not an available
+            // action…"}, lỗi MCP dạng chữ) thì ToolLine sẽ vẽ tích xanh: ép thành dòng lỗi.
+            if (!item.Ok && !outcome.Contains("\"ok\":false"))
+            {
+                string message = !string.IsNullOrEmpty(item.Error) ? item.Error : ErrorText(outcome);
+                outcome = "{\"ok\":false,\"error\":" + new System.Web.Script.Serialization.JavaScriptSerializer().Serialize(message) + "}";
+            }
+            // Dong tien trinh dang office_action {"action": ..., "params": ...} de PaneControls hien nhan
+            // tieng Viet theo action (truoc day chi co "{}").
+            string call = "{\"action\": \"" + (officeAction ? item.Action ?? "" : item.Tool) + "\""
+                + (string.IsNullOrEmpty(item.ParamsPreview) ? "" : ", \"params\": " + item.ParamsPreview)
+                + "}";
+            return "office_action " + call + " -> " + outcome;
+        }
+
+        // Câu lỗi trong preview kết quả ({"error":"…"} có thể bị cắt ở 150 ký tự); không có thì trả nguyên preview.
+        private static string ErrorText(string preview)
+        {
+            System.Text.RegularExpressions.Match match = System.Text.RegularExpressions.Regex.Match(
+                preview ?? "", "\"error\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)");
+            if (!match.Success)
+            {
+                return string.IsNullOrEmpty(preview) ? Ui.T("lỗi") : preview;
+            }
+            try
+            {
+                return System.Text.RegularExpressions.Regex.Unescape(match.Groups[1].Value);
+            }
+            catch (ArgumentException)
+            {
+                return match.Groups[1].Value;
+            }
         }
 
         private static bool IsTerminal(string type)
