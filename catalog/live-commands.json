@@ -1332,6 +1332,11 @@
         "hint": "number: 1 title, 2 title+content, 11 title only, 12 blank"
       },
       {
+        "name": "index",
+        "required": false,
+        "hint": "position of the new slide (1 = first); default: after the last slide"
+      },
+      {
         "name": "presentation",
         "required": false,
         "hint": "full path of the presentation to work on; default: the active one"

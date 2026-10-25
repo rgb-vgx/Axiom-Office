@@ -94,6 +94,8 @@ type RunContext struct {
 	TargetDocument string
 	// owned: slide/shape do chinh luot nay tao - xoa chung khong can hoi (owned.go).
 	owned *ownedObjects
+	// briefSpecs: mo ta slide (JSON) da dung qua slides_from_brief trong luot -> so loi bo cuc cua lan dung do.
+	briefSpecs map[string]int
 	// FocusSlide: slide nguoi dung dang mo (pane gui document.view) - ket qua doc ca bai giu nguyen slide nay.
 	FocusSlide int
 	// Todos: danh sach viec model ghi gan nhat (write_todos).

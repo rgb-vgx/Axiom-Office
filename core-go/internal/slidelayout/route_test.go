@@ -69,3 +69,19 @@ func TestConnectorPathLoopAndCrossing(t *testing.T) {
 		t.Fatal("chong / khong chong")
 	}
 }
+
+// Vat can ngoai so do (dong chu thich, tieu de): duong vong phia tren khong duoc chay qua no (luot that 25/10/2026).
+func TestRouteDiagramAvoidsObstacles(t *testing.T) {
+	rows := Diagram(Rect{40, 180, 880, 320}, []int{3})
+	// Ba hop mot hang, noi hop 1 -> hop 3 (nhay qua hop giua): vong duoi la lua chon dau. Chan duoi bang vat can -> vong tren.
+	below := Rect{40, rows[0][0][1] + rows[0][0][3] + 4, 880, 30}
+	routes := RouteDiagram(rows, []Edge{{0, 0, 0, 2}}, below)
+	if !routes[0].Clear || routes[0].FromSide != SideTop || PathCrosses(routes[0].Path, below) {
+		t.Fatalf("phai vong tren de tranh vat can: %+v", routes[0])
+	}
+	// Chan ca tren: khong con duong sach -> Clear = false (checkLayout se bao, khong im lang ve sai).
+	above := Rect{40, rows[0][0][1] - 34, 880, 30}
+	if routes := RouteDiagram(rows, []Edge{{0, 0, 0, 2}}, below, above); routes[0].Clear {
+		t.Fatalf("khong co duong sach thi Clear phai false: %+v", routes[0])
+	}
+}

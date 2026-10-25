@@ -82,6 +82,12 @@ def main() -> int:
     closed = b.call("wpp.addSlide", {"presentation": "Khong-ton-tai.pptx"})
     check(not closed.get("ok") and "DOCUMENT_CLOSED" in str(closed.get("error")), "H1 bai khong mo -> DOCUMENT_CLOSED", closed)
 
+    # addSlide index: chen vao giua (slides_from_brief "replace" dung lai slide tai cho).
+    b.ok("wpp.addSlide", {"layout": 12, "presentation": a, "index": 1})
+    count = b.ok("wpp.listSlides", {"presentation": a})["slideCount"]
+    check(count == 2, "addSlide index chen slide vao vi tri 1", count)
+    b.ok("wpp.deleteSlide", {"presentation": a, "slide": 1})
+
     # H3 + H4: bang doc lai duoc, addTable tra ten shape.
     table = b.ok("wpp.addTable", {"presentation": a, "slide": 1, "values": [["Năm", "Nhập học"], ["2024", "470"]],
                                   "left": 40, "top": 130, "width": 400, "height": 80})

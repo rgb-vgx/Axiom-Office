@@ -32,6 +32,10 @@ func (o *ownedObjects) record(action string, params, result map[string]any) {
 	slide := asInt(result["slide"])
 	switch {
 	case action == "wpp.addSlide":
+		// Chen vao giua (index): slide tu vi tri do tro di lui xuong mot so.
+		if slide > 0 && asInt(params["index"]) > 0 {
+			o.insertSlide(deck, slide)
+		}
 		if slide > 0 {
 			if o.slides[deck] == nil {
 				o.slides[deck] = map[int]bool{}
@@ -55,6 +59,26 @@ func (o *ownedObjects) record(action string, params, result map[string]any) {
 			o.shapes[deck][slide][shape] = true
 		}
 	}
+}
+
+// insertSlide: slide moi chen o vi tri k - slide tu k tro di (truoc khi chen) lui xuong mot so.
+func (o *ownedObjects) insertSlide(deck string, inserted int) {
+	slides := map[int]bool{}
+	for index := range o.slides[deck] {
+		if index >= inserted {
+			index++
+		}
+		slides[index] = true
+	}
+	o.slides[deck] = slides
+	shapes := map[int]map[string]bool{}
+	for index, names := range o.shapes[deck] {
+		if index >= inserted {
+			index++
+		}
+		shapes[index] = names
+	}
+	o.shapes[deck] = shapes
 }
 
 // removeSlide: slide k bi xoa - slide sau no lui len mot so.
@@ -110,4 +134,12 @@ func (o *ownedObjects) covers(action string, params map[string]any) bool {
 		return true
 	}
 	return false
+}
+
+// rememberBriefSpec: ghi mo ta slide vua dung va so loi bo cuc cua no (checkSameSpec).
+func (run *RunContext) rememberBriefSpec(spec string, issues int) {
+	if run.briefSpecs == nil {
+		run.briefSpecs = map[string]int{}
+	}
+	run.briefSpecs[spec] = issues
 }

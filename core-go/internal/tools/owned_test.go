@@ -122,3 +122,19 @@ func TestOwnedSlidesShiftAfterDelete(t *testing.T) {
 		t.Fatal("slide cua bai khac khong duoc tinh")
 	}
 }
+
+// Chen slide vao giua (wpp.addSlide index - slides_from_brief replace): slide tu vi tri do lui xuong mot so.
+func TestOwnedSlidesShiftAfterInsert(t *testing.T) {
+	o := (&RunContext{}).ownedObjects()
+	o.record("wpp.addSlide", map[string]any{}, map[string]any{"slide": 2.0})
+	o.record("wpp.addText", map[string]any{}, map[string]any{"slide": 2.0, "shape": "TextBox 1"})
+	// Chen slide moi o vi tri 1: slide 2 cua luot thanh 3, slide moi (1) cung cua luot.
+	o.record("wpp.addSlide", map[string]any{"index": 1.0}, map[string]any{"slide": 1.0})
+	if !o.covers("wpp.deleteSlide", map[string]any{"slide": 1.0}) || !o.covers("wpp.deleteSlide", map[string]any{"slide": 3.0}) ||
+		o.covers("wpp.deleteSlide", map[string]any{"slide": 2.0}) {
+		t.Fatalf("so slide phai lui xuong khi chen: %+v", o.slides)
+	}
+	if !o.covers("wpp.deleteShapes", map[string]any{"slide": 3.0, "shapes": []any{"TextBox 1"}}) {
+		t.Fatalf("shape lui theo slide: %+v", o.shapes)
+	}
+}

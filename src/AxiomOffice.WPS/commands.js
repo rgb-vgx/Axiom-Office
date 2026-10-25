@@ -383,6 +383,7 @@
       summary: "Thêm slide cuối; `layout` mặc định 12 = trống (1 = tiêu đề, 2 = tiêu đề + nội dung, 11 = chỉ tiêu đề)",
       params: [
         { name: "layout", required: false, hint: "number: 1 title, 2 title+content, 11 title only, 12 blank" },
+        { name: "index", required: false, hint: "position of the new slide (1 = first); default: after the last slide" },
         { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
       ] },
     { name: "wpp.addText", kind: "wpp", agent: true, undo: true,

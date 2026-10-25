@@ -17,7 +17,8 @@ namespace AxiomOffice.Bridge
                 Command("wpp.open", "wpp", WppOpen, "Mở .pptx", Req("path")),
                 Command("wpp.listSlides", "wpp", WppListSlides, "Số slide + text từng slide", Opt("presentation", "full path of the presentation to work on; default: the active one"), Opt("detail", "true = kem layout/master/notes")).ForAgent(),
                 Command("wpp.addSlide", "wpp", WppAddSlide, "Thêm slide cuối; `layout` mặc định 12 = trống (1 = tiêu đề, 2 = tiêu đề + nội dung, 11 = chỉ tiêu đề)",
-                    Opt("layout", "number: 1 title, 2 title+content, 11 title only, 12 blank")).ForAgent(),
+                    Opt("layout", "number: 1 title, 2 title+content, 11 title only, 12 blank"),
+                    Opt("index", "position of the new slide (1 = first); default: after the last slide")).ForAgent(),
                 Command("wpp.addText", "wpp", WppAddText, "Textbox có định dạng (`color` dạng `#RRGGBB`, `align` left/center/right)",
                     Req("text"), Opt("slide"), Opt("left"), Opt("top"), Opt("width"), Opt("height"), Opt("fontSize"), Opt("bold"), Opt("color"), Opt("align"),
                     Opt("presentation", "full path of the presentation to work on; default: the active one")).ForAgent(),
@@ -235,7 +236,13 @@ namespace AxiomOffice.Bridge
             int layout = ParamInt(p, "layout", 12);
             dynamic app = host.Application;
             dynamic pres = app.ActivePresentation;
-            int index = Convert.ToInt32(pres.Slides.Count) + 1;
+            int count = Convert.ToInt32(pres.Slides.Count);
+            // index: chen vao vi tri (thay dung cho mot slide da xoa - slides_from_brief "replace"); ngoai 1..count+1 thi cuoi bai.
+            int index = ParamInt(p, "index", 0);
+            if (index < 1 || index > count + 1)
+            {
+                index = count + 1;
+            }
             pres.Slides.Add(index, layout);
             return new Dictionary<string, object> { { "slide", index }, { "layout", layout } };
         }

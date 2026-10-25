@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 
+	"axiomoffice/core/internal/corelog"
+	"axiomoffice/core/internal/model"
 	"axiomoffice/core/internal/skills"
 	"axiomoffice/core/internal/slidelayout"
 )
@@ -28,7 +30,9 @@ func (t *SlidesFromBriefTool) Name() string { return "slides_from_brief" }
 
 func (t *SlidesFromBriefTool) Description() string {
 	return "Add NEW slides at the end of the open presentation from a short spec, without a template file (it adds the slides " +
-		"itself - do not call wpp.addSlide first): you choose " +
+		"itself - do not call wpp.addSlide first). To FIX slides this tool already built in this request (layout issues, " +
+		"wording), send only those slides again with replace: <slide number> - each is rebuilt in place; do not rebuild or " +
+		"delete the other slides. You choose " +
 		"each slide's layout and write the words; the tool places everything on the grid (positions, font sizes, " +
 		"colours) and checks the layout. Use it instead of wpp.addText / wpp.addTable for new slides. Layouts: " +
 		"cover {title, subtitle}; section {title}; content {title, points, callout}; cards {title, cards: [{title, " +
@@ -94,6 +98,9 @@ type briefSlide struct {
 	Edges      []briefEdge
 	Chart      *briefChart
 	Source     string
+	// Replace: so slide (do CHINH luot nay dung) duoc thay tai cho bang slide nay - sua dung slide loi thay vi dung lai
+	// ca bai (luot that 25/10/2026: checkLayout bao 3 loi, model dung lai 10 slide roi xoa 10 slide cu, ~10 vong).
+	Replace int
 }
 
 // briefItems: danh sach object {titleKey, textKey} (hoac chuoi: chi co title).
@@ -198,6 +205,7 @@ func parseBrief(value any) ([]briefSlide, []rowError) {
 		slide := briefSlide{composeRow: row}
 		if entry, ok := list[i].(map[string]any); ok {
 			slide.Source = strings.TrimSpace(textOf(entry["source"]))
+			slide.Replace = asInt(entry["replace"])
 			slide.Steps = briefItems(entry["steps"], "title", "text")
 			slide.Milestones = briefItems(entry["milestones"], "date", "text")
 			if nodes, ok := entry["nodes"].([]any); ok {
@@ -606,20 +614,41 @@ func (t *SlidesFromBriefTool) Invoke(ctx context.Context, arguments map[string]a
 	}
 	tokens := t.tokens()
 	grid := slidelayout.Grid{Width: floatOf(layout["slideWidth"], 960), Height: floatOf(layout["slideHeight"], 540), Margin: tokens.Slide.Margin}
-	if errors := checkBrief(slides, grid, tokens); len(errors) > 0 {
+	errors = checkBrief(slides, grid, tokens)
+	errors = append(errors, checkReplace(slides, run, target)...)
+	specs := briefSpecs(arguments["slides"])
+	errors = append(errors, checkSameSpec(specs, run)...)
+	if len(errors) > 0 {
 		return Result{JSON: OKJSON(map[string]any{"built": 0, "errors": errors,
 			"how": "nothing was built: fix every error (shorten the text named in field) and call again with ALL slides"})}
 	}
 
 	built := []map[string]any{}
 	issueCount := 0
-	for _, slide := range slides {
-		index, issues, problem := buildBriefSlide(bridge, grid, tokens, slide)
+	for s, slide := range slides {
+		if slide.Replace > 0 {
+			if _, problem := bridge("wpp.deleteSlide", map[string]any{"slide": slide.Replace}); problem != "" {
+				return Result{JSON: OKJSON(map[string]any{"built": len(built), "slides": built, "error": problem}), Mutating: len(built) > 0}
+			}
+		}
+		index, issues, problem := buildBriefSlide(bridge, grid, tokens, slide, slide.Replace)
 		if problem != "" {
-			return Result{JSON: OKJSON(map[string]any{"built": len(built), "slides": built, "error": problem}), Mutating: len(built) > 0}
+			return Result{JSON: OKJSON(map[string]any{"built": len(built), "slides": built, "error": problem}), Mutating: true}
 		}
 		issueCount += len(issues)
-		built = append(built, map[string]any{"slide": index, "layout": slide.Layout, "title": slide.Title, "issues": issues})
+		entry := map[string]any{"slide": index, "layout": slide.Layout, "title": slide.Title, "issues": issues}
+		if slide.Replace > 0 {
+			entry["replaced"] = slide.Replace
+		}
+		// Bao ro ghi chu da dat: luot that 25/10/2026 model dat notes qua brief roi van goi wpp.setNotes tung slide (10 vong).
+		if strings.TrimSpace(slide.Notes) != "" {
+			entry["notes"] = "set"
+		}
+		built = append(built, entry)
+		logIssues(run.RunID, "slides_from_brief", index, issues)
+		if s < len(specs) {
+			run.rememberBriefSpec(specs[s], len(issues))
+		}
 	}
 	// Tool tu kiem sau khi ghi (wpp.checkLayout tung slide): bao ro DA kiem gi va CHUA kiem gi (tu van ChatGPT
 	// 25/10/2026: "0 loi bo cuc" khong phai "dung yeu cau") - Verifies cho verifyGuard biet khong can them vong doc lai.
@@ -632,8 +661,12 @@ func (t *SlidesFromBriefTool) Invoke(ctx context.Context, arguments map[string]a
 
 // buildBriefSlide: dung mot slide - slide trong (layout 12), tieu de, cac hop cua kieu, dong nguon, ghi chu, roi soat.
 func buildBriefSlide(bridge func(string, map[string]any) (map[string]any, string), grid slidelayout.Grid, tokens briefTokens,
-	slide briefSlide) (int, []any, string) {
-	added, problem := bridge("wpp.addSlide", map[string]any{"layout": 12})
+	slide briefSlide, at int) (int, []any, string) {
+	addParams := map[string]any{"layout": 12}
+	if at > 0 {
+		addParams["index"] = at
+	}
+	added, problem := bridge("wpp.addSlide", addParams)
 	if problem != "" {
 		return 0, nil, problem
 	}
@@ -900,7 +933,9 @@ func briefShapes(bridge func(string, map[string]any) (map[string]any, string), i
 			edges = append(edges, slidelayout.Edge{FromLayer: layerOf[edge.From], FromPlace: place[edge.From],
 				ToLayer: layerOf[edge.To], ToPlace: place[edge.To]})
 		}
-		for e, route := range slidelayout.RouteDiagram(rows, edges) {
+		// Tieu de va dong chu thich cung la vat can cua duong noi.
+		obstacles := append([]slidelayout.Rect{grid.Title()}, legendRects(groups, grid.Content())...)
+		for e, route := range slidelayout.RouteDiagram(rows, edges, obstacles...) {
 			steps = append(steps, connectRoute(names[slide.Edges[e].From], names[slide.Edges[e].To], route))
 		}
 	}
@@ -912,8 +947,9 @@ func briefShapes(bridge func(string, map[string]any) (map[string]any, string), i
 
 type groupSwatch struct{ Fill, Line string }
 
-// legendHeight: dong chu thich (o mau 14 pt + nhan) va khe phia tren no.
-const legendHeight = 34.0
+// legendHeight: dong chu thich (o mau 14 pt + nhan, cao 24) cong mot lan trong cho duong vong phia tren tang 1 (vong
+// cach dinh hop 16 pt) - 34 thi duong vong do chay xuyen qua nhan chu thich (luot that 25/10/2026).
+const legendHeight = 50.0
 
 func groupPalette(colors struct{ Primary, Accent, Text, Muted string }) []groupSwatch {
 	// Nhom 3 dam hon han (Tint 0,55): Tint(Accent, 0,82) gan nhu trung mau nhom 1 (luot that 25/10/2026: chu thich "Kenh"
@@ -939,6 +975,10 @@ func groupsOf(slide briefSlide) []string {
 		for _, node := range slide.Nodes {
 			add(node.Group)
 		}
+	}
+	// Mot nhom thi khong co gi de phan biet: khong to mau, khong chu thich (luot that 25/10/2026: chu thich chi co "Ops").
+	if len(names) < 2 {
+		return nil
 	}
 	return names
 }
@@ -976,6 +1016,21 @@ func checkGroups(slot int, slide briefSlide) []rowError {
 	return errors
 }
 
+// legendRects: o mau va nhan cua dong chu thich (cung hinh hoc voi legendSteps) - vat can cho duong noi.
+func legendRects(groups []string, content slidelayout.Rect) []slidelayout.Rect {
+	rects := []slidelayout.Rect{}
+	const square, labelWidth = 14.0, 200.0
+	for g := range groups {
+		if g >= maxGroups {
+			break
+		}
+		left := content[0] + float64(g)*(square+8+labelWidth+16)
+		rects = append(rects, slidelayout.Rect{left, content[1] + 5, square, square},
+			slidelayout.Rect{left + square + 8, content[1], labelWidth, 24})
+	}
+	return rects
+}
+
 // legendSteps: o mau + nhan cua tung nhom, mot hang can trai o dau vung noi dung.
 func legendSteps(groups []string, palette []groupSwatch, content slidelayout.Rect, swatch func(slidelayout.Rect, groupSwatch) string,
 	label func(string, slidelayout.Rect) string) []func() string {
@@ -1000,4 +1055,73 @@ func floatOf(value any, fallback float64) float64 {
 		return number
 	}
 	return fallback
+}
+
+// checkReplace: replace chi cho slide do CHINH luot nay dung (so doi tuong cua luot, owned.go) - khong thay slide cua
+// nguoi dung; moi so slide chi thay mot lan trong mot lan goi.
+func checkReplace(slides []briefSlide, run *RunContext, target string) []rowError {
+	errors := []rowError{}
+	seen := map[int]bool{}
+	for i, slide := range slides {
+		if slide.Replace == 0 {
+			continue
+		}
+		params := map[string]any{"slide": float64(slide.Replace)}
+		if target != "" {
+			params["presentation"] = target
+		}
+		switch {
+		case slide.Replace < 0 || seen[slide.Replace]:
+			errors = append(errors, rowError{Src: i + 1, Field: "replace", Error: "BAD_REPLACE", Actual: slide.Replace,
+				Allowed: "the number of one slide built in this request, each at most once"})
+		case !run.ownedObjects().covers("wpp.deleteSlide", params):
+			errors = append(errors, rowError{Src: i + 1, Field: "replace", Error: "NOT_BUILT_IN_THIS_REQUEST", Actual: slide.Replace,
+				Allowed: "replace only slides this tool built in this request; slides that were already in the deck are not replaced"})
+		}
+		seen[slide.Replace] = true
+	}
+	return errors
+}
+
+// logIssues: loi bo cuc cua slide vua dung (loai + chi tiet, chi co ten hinh va kich thuoc - khong co chu cua tai lieu)
+// vao core.log - core.db chi luu kich thuoc ket qua nen truoc day khong soat lai duoc model da thay loi gi.
+func logIssues(runID, source string, slide int, issues []any) {
+	for _, item := range issues {
+		issue, _ := item.(map[string]any)
+		corelog.Info("run %s: %s slide %d: %s - %s", runID, source, slide, textOf(issue["type"]),
+			model.Truncate(textOf(issue["detail"]), 200))
+	}
+}
+
+// briefSpecs: mo ta cua tung slide (JSON, bo replace) - de nhan ra model gui lai dung mot mo ta da dung.
+func briefSpecs(value any) []string {
+	specs := []string{}
+	list, _ := value.([]any)
+	for _, item := range list {
+		entry, _ := item.(map[string]any)
+		copied := map[string]any{}
+		for key, field := range entry {
+			if key != "replace" {
+				copied[key] = field
+			}
+		}
+		raw, _ := json.Marshal(copied)
+		specs = append(specs, string(raw))
+	}
+	return specs
+}
+
+// checkSameSpec: cung mot mo ta thi dung ra dung slide cu voi dung loi cu - luot that 25/10/2026: model gui lai slide
+// so do gan y het ~17 lan qua replace, lan nao cung cung loi duong noi, toi khi bi chan (42 vong).
+func checkSameSpec(specs []string, run *RunContext) []rowError {
+	errors := []rowError{}
+	for i, spec := range specs {
+		if issues, seen := run.briefSpecs[spec]; seen && issues > 0 {
+			errors = append(errors, rowError{Src: i + 1, Field: "slide", Error: "SAME_SPEC_SAME_ISSUES", Actual: issues,
+				Allowed: "this exact slide was already built in this request and had layout issues - the same spec builds the " +
+					"same slide again. Change it (shorter text, fewer nodes or edges, another layer for a node, another layout) " +
+					"or keep the slide as it is and tell the user"})
+		}
+	}
+	return errors
 }

@@ -159,7 +159,10 @@ type Placed struct {
 // tang ke duoi/tren -> day xuong dinh (gap khuc, re o giua khe); cung tang ke nhau -> thang ngang; cung tang khong ke
 // nhau -> vong duoi hang, roi vong tren; vuot tang hoac quay nguoc -> vong ben phai/trai (phia gan hon truoc), roi
 // duong doc. Khong ung vien nao sach thi lay ung vien dau, Clear = false (checkLayout se bao).
-func RouteDiagram(rows [][]Rect, edges []Edge) []Route {
+//
+// obstacles: hop khac tren slide ma duong noi cung phai tranh (tieu de, dong chu thich nhom mau). Luot that 25/10/2026:
+// duong vong phia tren tang 1 chay xuyen qua nhan chu thich vi bo di day chi biet hop cua so do.
+func RouteDiagram(rows [][]Rect, edges []Edge, obstacles ...Rect) []Route {
 	routes := []Route{}
 	placed := []Placed{}
 	loops := map[[2]int]int{} // (tang, phia) -> so duong vong da xep
@@ -174,7 +177,7 @@ func RouteDiagram(rows [][]Rect, edges []Edge) []Route {
 					clearance(rows, edge, from, to, candidate.FromSide)
 			}
 			candidate.Path = ConnectorPath(from, to, candidate.FromSide, candidate.ToSide, candidate.Elbow, candidate.Offset)
-			if chosen < 0 && routeClear(rows, edge, candidate.Path, placed) {
+			if chosen < 0 && routeClear(rows, edge, candidate.Path, placed, obstacles) {
 				chosen = c
 			}
 		}
@@ -241,7 +244,12 @@ func diagramCandidates(rows [][]Rect, edge Edge, from, to Rect) []Route {
 	return []Route{{FromSide: near, ToSide: near, Elbow: true}, {FromSide: far, ToSide: far, Elbow: true}, vertical}
 }
 
-func routeClear(rows [][]Rect, edge Edge, path []Point, placed []Placed) bool {
+func routeClear(rows [][]Rect, edge Edge, path []Point, placed []Placed, obstacles []Rect) bool {
+	for _, box := range obstacles {
+		if PathCrosses(path, box) {
+			return false
+		}
+	}
 	for l, row := range rows {
 		for p, box := range row {
 			if (l == edge.FromLayer && p == edge.FromPlace) || (l == edge.ToLayer && p == edge.ToPlace) {

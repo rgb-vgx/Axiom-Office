@@ -34,7 +34,15 @@ func briefBridge(t *testing.T) (*RunContext, *[]briefCall) {
 		switch request.Action {
 		case "wpp.addSlide":
 			slides++
-			_, _ = w.Write([]byte(`{"ok":true,"result":{"slide":` + strconv.Itoa(slides) + `}}`))
+			at := slides
+			if index, ok := request.Params["index"].(float64); ok && int(index) >= 1 && int(index) <= slides {
+				at = int(index)
+			}
+			_, _ = w.Write([]byte(`{"ok":true,"result":{"slide":` + strconv.Itoa(at) + `}}`))
+		case "wpp.deleteSlide":
+			slides--
+			deleted, _ := request.Params["slide"].(float64)
+			_, _ = w.Write([]byte(`{"ok":true,"result":{"deleted":` + strconv.Itoa(int(deleted)) + `,"slideCount":` + strconv.Itoa(slides) + `}}`))
 		case "wpp.addShape", "wpp.addConnector":
 			shapes++
 			_, _ = w.Write([]byte(`{"ok":true,"result":{"slide":1,"shape":"Shape ` + strconv.Itoa(shapes) + `"}}`))
@@ -334,5 +342,63 @@ func TestSlidesFromBriefAcceptsNestedLayoutFields(t *testing.T) {
 	bad := NewSlidesFromBriefTool(nil).Invoke(context.Background(), brief(t, `[{"layout":"diagram","title":"Trống","nodes":[]}]`), run)
 	if !strings.Contains(bad.JSON, "NEED_2_TO_10_NODES") || !strings.Contains(bad.JSON, "directly on the slide") {
 		t.Fatalf("loi phai chi cach viet dung: %s", bad.JSON)
+	}
+}
+
+// Sua dung slide loi (luot that 25/10/2026: checkLayout bao 3 loi, model dung lai 10 slide roi xoa 10 slide cu): gui lai
+// chi slide do voi replace - xoa slide cu cua luot, dung slide moi DUNG cho do. Slide khong do luot dung thi tu choi.
+func TestSlidesFromBriefReplacesOwnSlideInPlace(t *testing.T) {
+	run, calls := briefBridge(t)
+	tool := NewSlidesFromBriefTool(nil)
+	first := tool.Invoke(context.Background(), brief(t, `[
+		{"layout":"section","title":"Phần một"},{"layout":"section","title":"Phần hai"},{"layout":"section","title":"Phần ba"}
+	]`), run)
+	if !strings.Contains(first.JSON, `"built":3`) {
+		t.Fatalf("dung 3 slide: %s", first.JSON)
+	}
+	*calls = nil
+	fixed := tool.Invoke(context.Background(), brief(t, `[{"layout":"section","title":"Phần hai (sửa)","replace":2}]`), run)
+	if !fixed.OK || !strings.Contains(fixed.JSON, `"replaced":2`) || !strings.Contains(fixed.JSON, `"slide":2`) {
+		t.Fatalf("phai thay slide 2 tai cho: %s", fixed.JSON)
+	}
+	var deleted, inserted bool
+	for _, call := range *calls {
+		if call.Action == "wpp.deleteSlide" && call.Params["slide"] == 2.0 {
+			deleted = true
+		}
+		if call.Action == "wpp.addSlide" && call.Params["index"] == 2.0 {
+			inserted = deleted // chen SAU khi da xoa slide cu
+		}
+	}
+	if !deleted || !inserted {
+		t.Fatalf("xoa slide 2 roi chen vao vi tri 2: %+v", *calls)
+	}
+	// Slide moi o vi tri 2 van la cua luot (thay lai lan nua duoc); slide 9 khong ton tai / khong cua luot -> tu choi.
+	if !run.ownedObjects().covers("wpp.deleteSlide", map[string]any{"slide": 2.0, "presentation": "Presentation3"}) {
+		t.Fatal("slide thay tai cho van la cua luot")
+	}
+	*calls = nil
+	refused := tool.Invoke(context.Background(), brief(t, `[{"layout":"section","title":"Không phải của lượt","replace":9}]`), run)
+	if !strings.Contains(refused.JSON, "NOT_BUILT_IN_THIS_REQUEST") {
+		t.Fatalf("phai tu choi: %s", refused.JSON)
+	}
+	for _, call := range *calls {
+		if call.Action != "wpp.checkLayout" {
+			t.Fatalf("tu choi thi khong duoc dung/xoa gi, da goi %s", call.Action)
+		}
+	}
+}
+
+// Cung mot mo ta slide da dung ra loi bo cuc thi tu choi (luot that 25/10/2026: ~17 lan gui lai slide so do y het qua
+// replace, 42 vong); mo ta da dung SACH thi gui lai van duoc (vd thay tai cho sau khi sua slide khac).
+func TestSlidesFromBriefRefusesSameSpecWithIssues(t *testing.T) {
+	run := &RunContext{}
+	specs := briefSpecs([]any{map[string]any{"layout": "section", "title": "A", "replace": 2.0},
+		map[string]any{"layout": "section", "title": "B"}})
+	run.rememberBriefSpec(briefSpecs([]any{map[string]any{"layout": "section", "title": "A"}})[0], 2)
+	run.rememberBriefSpec(specs[1], 0)
+	errors := checkSameSpec(specs, run)
+	if len(errors) != 1 || errors[0].Src != 1 || errors[0].Error != "SAME_SPEC_SAME_ISSUES" {
+		t.Fatalf("chi slide 1 (cung mo ta, co loi; replace khong tinh) bi tu choi: %+v", errors)
 	}
 }

@@ -257,6 +257,15 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 	if result.OK && action == "et.addSheet" {
 		rememberCreatedSheet(run, params)
 	}
+	if result.OK && action == "wpp.checkLayout" {
+		// Loi bo cuc vao core.log (chi loai + ten hinh): soat lai duoc model da thay gi truoc khi sua.
+		slides, _ := result.Result["slides"].([]any)
+		for _, item := range slides {
+			entry, _ := item.(map[string]any)
+			issues, _ := entry["issues"].([]any)
+			logIssues(run.RunID, action, asInt(entry["index"]), issues)
+		}
+	}
 	if result.OK {
 		run.ownedObjects().record(action, params, result.Result)
 		if opensDocument(action) {
