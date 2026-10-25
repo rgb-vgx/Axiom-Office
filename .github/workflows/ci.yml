@@ -55,6 +55,9 @@ jobs:
       - name: Agent Core ban Go (go test + build + e2e day du)
         run: make test-go test-core
 
+      - name: Bo cham benchmark slide (thuan, khong can PowerPoint)
+        run: make test-bench
+
       - name: Cai dependencies cho bo test oracle
         run: |
           python3 -m pip install -r tests/oracle/word-mcp/requirements.txt \

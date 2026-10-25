@@ -5,6 +5,20 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Slide: bộ đo chất lượng và thiết kế spec dùng chung (25/10/2026)
+
+- `docs/plans/18-s0-slide-do-va-spec.md`: hiện trạng hai đường tạo slide (tự do: model tự tính toạ độ; theo mẫu:
+  Go tính), bảng khoảng trống, thiết kế `SlideSpec` → `Layout` → lệnh bridge, kế hoạch tách solver có kiểm hồi quy.
+- `tests/bench/slides/`: 24 brief có sẵn số liệu, bộ chấm bằng lệnh đọc (`score.py`, không dùng LLM), bộ chạy
+  qua Core (`run.py`). `make test-bench` chạy trong CI. Baseline đầu tiên (deepseek-v4.1-flash, smoke × 3,
+  PowerPoint 2019): đạt 18/21, lỗi chung là tự thêm slide không được yêu cầu.
+- `docs/plans/19-h0-nen-tang-ben-vung.md`: plan sửa các điểm yếu lộ ra khi chạy benchmark (lệnh nhắm tài liệu
+  tường minh, bridge treo vì hộp thoại hoặc máy ngủ, `wpp.listSlides` không đọc bảng, xác nhận khi không có người).
+- `core-go/internal/tools/template_layout_test.go`: test characterization ghim số đo của `contentRegions`,
+  `cardBoxes`, `fitCards`, `pictureBoxes` và mã lỗi `checkCompose` trước khi tách solver.
+- `scripts/build.ps1`: biến `AXIOM_CSC` trỏ tới `csc.exe` khi máy không có Visual Studio (dùng `tasks\net472\csc.exe`
+  của gói NuGet `Microsoft.Net.Compilers.Toolset`).
+
 ### Fixed — Word: bảng dàn trang và `writer.restyle` cho văn bản hành chính (24/10/2026)
 
 - **`writer.formatTable {borders:false}`** (C#) nay đặt tem `AxiomLayout` vào `Table.Title` (lưu theo `.docx`,

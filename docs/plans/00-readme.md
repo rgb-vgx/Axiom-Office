@@ -19,6 +19,8 @@ trong code: trạng thái có thể đã đổi.
 | 7 | `07-p6-audit-va-an-toan-du-lieu.md` | Ẩn thông tin nhạy cảm trong audit, bản chụp để khôi phục | Audit đã có |
 | 8 | `08-p7-ux-trong-app.md` | Dịch nốt giao diện, lỗi tiếng Việt dễ hiểu | Phần lớn đã có |
 | 9 | `09-p8-libreoffice-parity.md` | Các lệnh còn để trống phía LibreOffice | LibreOffice đã chạy 281/281 |
+| 10 | `18-s0-slide-do-va-spec.md` | Slide: bộ đo chất lượng (24 brief) và thiết kế spec + layout solver dùng chung cho slide từ brief và theo mẫu | **Mới.** Bộ đo xong phần chấm, chưa có baseline thật |
+| 11 | `19-h0-nen-tang-ben-vung.md` | Nền tảng bền: lệnh nhắm tài liệu tường minh, bridge không treo vì hộp thoại/máy ngủ, đọc đủ những gì đã ghi, miễn xác nhận cho đối tượng do lượt tạo, năng lực từng backend | **Mới.** Bằng chứng từ benchmark slide 25/10/2026 |
 | — | `06-p5-bao-cao-dinh-ky-toi-gian.md` | Báo cáo định kỳ | **Cần thiết kế lại**: Core không chạy khi Office đóng |
 | — | `15-p0-tasks-chitiet.md`, `16-p1-tasks-chitiet.md` | Task chi tiết P0, P1 | Đã cập nhật theo hướng mới |
 
