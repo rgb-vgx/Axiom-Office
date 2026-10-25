@@ -1,8 +1,9 @@
 ﻿# Tình trạng dự án Axiom Office
 
-Cập nhật: **24/10/2026** · nhánh `main` · đã push (đợt sửa CI Windows 24/10 — xem §2.8). Số liệu kiểm
-chứng ở §2.4 là lượt đo **01/10/2026**; số mới của đợt WPS ở §2.6, lượt đo lại toàn bộ ở §2.7, lượt đo
-lại job Windows ở §2.8 và đợt Office x64 + sửa định dạng văn bản ở §2.9.
+Cập nhật: **25/10/2026** · nhánh `main` · đã push đến §2.11 (đợt bớt ngữ cảnh + slide sơ đồ 25/10); đợt tự đi lại dây
+§2.12 mới commit tại máy, chưa push. Số liệu kiểm chứng ở §2.4 là lượt đo **01/10/2026**; số mới của đợt WPS ở §2.6,
+lượt đo lại toàn bộ ở §2.7, lượt đo lại job Windows ở §2.8, đợt Office x64 + sửa định dạng văn bản ở §2.9 và ba
+đợt 25/10 ở §2.10–2.12.
 
 Tài liệu này là ảnh chụp nhanh "đã làm được gì / chưa làm được gì". Chi tiết thiết kế nằm ở
 [docs/architecture/core.md](docs/architecture/core.md) (Core + add-in) và [docs/architecture/libreoffice.md](docs/architecture/libreoffice.md) (LibreOffice);
@@ -237,6 +238,18 @@ trúc không dây cắt hộp. Sửa: sơ đồ lồng trong khoá `diagram`, `r
 đề/chú thích, `SAME_SPEC_SAME_ISSUES`, lỗi bố cục vào `core.log`, xoá slide trống không hỏi, nhãn lỗi của khung chat.
 **Bàn giao chi tiết + việc tiếp: `docs/plans/20-c0-ngu-canh-va-slide.md`.**
 
+### 2.12 Đợt 25/10/2026 (tiếp): sơ đồ tự đi lại dây
+
+- **`slides_from_brief` tự sửa lỗi đi dây**: giữ tên từng đường nối theo cạnh; sau `wpp.checkLayout` của slide, lỗi
+  `connector-crossing`/`connector-overlap` thuộc đường do tool vẽ → vẽ đường mới bằng ứng viên kế tiếp
+  (`slidelayout.DiagramAlternatives`, tăng `offset` với đường vòng, bỏ qua đường đã thử), xoá đường cũ, kiểm lại;
+  tối đa **2 lần mỗi đường**. Kết quả trả `connectorsRerouted` để model không dựng lại slide.
+- **Đoạn nguồn là vật cản** của dây vòng (trước đây dây dưới hàng cuối có thể cắt qua dòng nguồn).
+- **Kiểm:** `TestDiagramAlternativesSkipCurrentAndTried`, `TestSlidesFromBriefReroutesConnectorPowerPointDrawsAcrossBox`,
+  `TestSlidesFromBriefStopsReroutingAfterTwoAttempts`; `go test ./...` 24 gói xanh; `go vet ./...` sạch.
+- **Còn:** chưa chạy đề ngân hàng 3 lần trên PowerPoint thật để đạt tiêu chí của plan 20 §5.1 (phiên này không có
+  cấu hình LLM/Office để chạy lượt thật).
+
 ## 3. Chưa làm / chưa kiểm chứng
 
 | Việc | Tình trạng | Ghi chú |
@@ -246,8 +259,9 @@ trúc không dây cắt hộp. Sửa: sơ đồ lồng trong khoá `diagram`, `r
 | Trích xuất memory với **LLM thật** | **Đã (24/10/2026)** | Lượt thật trích 1 fact (`core.log`: `1 added`) |
 | **Office 32-bit** | **Không hỗ trợ** | Add-in .NET làm Office 32-bit crash `mso98win32client.dll`; kiểm bằng add-in tối giản (§2.9) |
 | Đọc/ghi **HKCU** bằng test tự động trên Windows | Một phần | Đối chiếu tay: Core Go đọc đúng endpoint/model/token/DPAPI của bạn; test tự động hiện dùng `AXIOM_*`. Từ 24/10 test cũng **không còn ghi vào HKCU thật** (nguồn cấu hình inject file tạm — §2.8) |
-| **Push remote** | Đã push 24/10/2026 | Đợt 18–22/10 (11 commit) + đợt sửa CI Windows 24/10; xem §2.7 và §2.8. Đợt 25/10 "trả token cho agent" (§2.10) đã commit nhưng **chưa push** |
+| **Push remote** | Một phần | Đợt 18–22/10 (11 commit), sửa CI Windows 24/10 (§2.7–2.8) và hai đợt 25/10 — "trả token cho agent" (§2.10) + slide sơ đồ (§2.11) — đã lên `origin/main`. Đợt tự đi lại dây (§2.12) mới commit tại máy, **chưa push** |
 | CI job **windows** | **Xanh (24/10/2026)** | Trước đó đỏ ở bước `go test` (`TestWPSConfigWrite` giả định nguồn cấu hình là `config.json`, nhưng trên Windows `DefaultSource()` là HKCU) và ở bước build net48 (`}` thừa trong `AskAiPane.cs`). Đã sửa cả hai — xem §2.8 |
+| Nghiệm thu plan 20 §5.1 trên đề thật | Chưa | Code + test tự đi lại dây đã xong (§2.12); cần chạy đề ngân hàng 3 lần trên PowerPoint thật, lần dựng đầu không còn `connector-*` |
 | Merge `feat/setup-wizard` + `feat/core-go` vào `main` | **Đã xong** | Fast-forward, lịch sử thẳng |
 | Nền tảng khác | Chưa | Chỉ build được Windows (amd64) và Linux (amd64/arm64); chưa có macOS hay Windows ARM |
 | Embedding với máy chủ thật | Chưa | Chỉ kiểm bằng máy chủ giả trả vector điều khiển được |
@@ -306,8 +320,8 @@ Các phần e2e chạy riêng được: `fake_bridge`, `guards`, `skills`, `memo
    Quản lý / Hệ thống), chọn ngôn ngữ hiển thị, khoá vùng chọn trong Word, dialog *Công cụ ngoài…*, màu Fluent. `Host.exe mcp` vẫn chỉ là
    shim chuyển tiếp byte sang Core Go (`src/AxiomOffice.Host/Mcp/McpHost.cs`).
 5. Phát hành gói Linux mới để người dùng có `install.sh` đã sửa (§3).
-6. Làm tiếp slide sơ đồ và bớt ngữ cảnh theo `docs/plans/20-c0-ngu-canh-va-slide.md` §5 (trước hết: tool tự đi lại
-   dây khi PowerPoint vẽ lệch mô hình).
+6. Chạy đề ngân hàng **3 lần trên PowerPoint thật** để nghiệm thu 5.1 (tool tự đi lại dây — code + test đã xong, xem
+   §2.12); sau đó làm 5.2–5.3 trong `docs/plans/20-c0-ngu-canh-va-slide.md` §5.
 
 ## 7. Đối chiếu benchmark & lộ trình hiệu năng (02–03/10/2026)
 

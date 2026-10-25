@@ -90,17 +90,19 @@ SELECT seq, tool, action, ok, result_chars, error, params_json FROM tool_calls W
 
 ## 5. Việc tiếp (theo thứ tự đề xuất)
 
-### 5.1 Công cụ tự đi lại dây khi PowerPoint vẽ lệch mô hình — **nên làm trước**
+### 5.1 Công cụ tự đi lại dây khi PowerPoint vẽ lệch mô hình — **ĐÃ LÀM 25/10/2026, còn đo lượt thật**
 
 - **Bằng chứng:** lượt `r_894e42ac…`, lần dựng đầu slide 4: 1 `connector-crossing` (đường cắt qua một nút) + 3
   `connector-overlap`, dù `RouteDiagram` đã chọn đường "sạch" theo mô hình. Model không sửa được lỗi đi dây (đó là
   việc của tool) nên chỉ tốn vòng gửi lại.
-- **Hướng làm:** trong `buildBriefSlide`/`briefShapes` (`core-go/internal/tools/slides_brief.go`), sau `wpp.checkLayout`
-  của slide, với mỗi `connector-*` thuộc đường do tool vẽ: xoá đường đó (`wpp.deleteShapes`), vẽ lại bằng ứng viên kế
-  tiếp của `diagramCandidates` (`core-go/internal/slidelayout/route.go`) hoặc tăng `offset`, kiểm lại; tối đa 2 lần mỗi
-  đường. Cần map tên shape đường nối ↔ cạnh (kết quả `wpp.addConnector` trả `shape`). `checkLayout` đã trả `path` của
-  từng đường nối (toạ độ thật) để so với mô hình — dùng nó để sửa mô hình nếu lệch có quy luật.
+- **Đã làm:** `slides_from_brief` giữ tên đường nối (`wpp.addConnector` trả `shape`) theo cạnh; sau `wpp.checkLayout`
+  của slide, mỗi lỗi `connector-*` thuộc sơ đồ do tool vẽ → vẽ đường mới bằng `slidelayout.DiagramAlternatives`
+  (ứng viên kế tiếp / tăng `offset`, bỏ qua đường đã thử), xoá đường cũ, `checkLayout` lại, tối đa **2 lần mỗi đường**.
+  Kết quả có `connectorsRerouted`. Đoạn nguồn cũng thành vật cản để dây vòng dưới hàng cuối không cắt qua.
+- **Mã:** `core-go/internal/tools/slides_brief.go` (`diagramPlan`, `repair`), `core-go/internal/slidelayout/route.go`
+  (`DiagramAlternatives`). Test: 1 ca SL + 2 ca tools (đi lại thành công, dừng sau 2 lần).
 - **Xong khi:** đề ngân hàng chạy 3 lần liền, lần dựng đầu không còn `connector-*` trong `core.log`.
+  **Chưa đo** — phiên 25/10 làm trên máy không cấu hình LLM/Office để chạy lượt thật.
 
 ### 5.2 Thành phần xuyên suốt trong sơ đồ (Observability, audit…)
 

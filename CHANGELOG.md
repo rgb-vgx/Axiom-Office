@@ -5,6 +5,25 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — Sơ đồ tự đi lại dây khi PowerPoint vẽ lệch mô hình (25/10/2026)
+
+Lượt thật `r_894e42ac…` (đề ngân hàng, lần dựng đầu slide 4): `RouteDiagram` chọn đường "sạch" theo mô hình nhưng
+PowerPoint vẽ ra 1 `connector-crossing` + 3 `connector-overlap`; model không sửa được lỗi đi dây nên chỉ tốn vòng gửi lại.
+
+- **`slides_from_brief` tự sửa**: sau `wpp.checkLayout` của từng slide, mỗi lỗi `connector-*` thuộc đường do tool vẽ →
+  vẽ đường mới bằng ứng viên kế tiếp, xoá đường cũ (vẽ mới trước để add lỗi còn đường cũ), `checkLayout` lại; tối đa
+  **2 lần mỗi đường**. Kết quả slide có `connectorsRerouted` (tổng ở kết quả tool) để model biết tool đã sửa, không
+  dựng lại slide.
+- **`slidelayout.DiagramAlternatives`**: trả ứng viên khác cho một cạnh, bỏ qua đường hiện tại và các đường đã thử;
+  đường vòng thử `offset` lớn dần trước khi đổi phía; lọc bằng `routeClear` (không cắt hộp/không chồng dây) như
+  `RouteDiagram`.
+- **Đoạn nguồn là vật cản**: `grid.Source()` được đưa vào `obstacles` khi slide có `source` — trước đây dây vòng dưới
+  hàng cuối có thể cắt qua dòng nguồn mà mô hình không biết (checkLayout bên C# tính mọi textbox là hộp).
+- **Test**: `TestDiagramAlternativesSkipCurrentAndTried` (SL), `TestSlidesFromBriefReroutesConnectorPowerPointDrawsAcrossBox`
+  và `TestSlidesFromBriefStopsReroutingAfterTwoAttempts` (tools). `go test ./...` 24 gói xanh, `go vet ./...` sạch.
+- **Chưa đạt tiêu chí "xong" của plan 20 §5.1**: cần chạy đề ngân hàng 3 lần trên PowerPoint thật, lần dựng đầu không
+  còn `connector-*` trong `core.log` (máy kiểm chứng hiện chưa cấu hình LLM/Office để chạy lượt thật).
+
 ### Fixed — Slide sơ đồ trên đề thật: sửa đúng slide lỗi, dây tránh chú thích, xoá slide trống không hỏi (25/10/2026)
 
 Đề "Thiết kế hệ thống AI Agent cho ngân hàng" (10 slide, `tests/live/tasks/ngan-hang-ai-agent.md`, chạy bằng

@@ -40,7 +40,8 @@ func (t *SlidesFromBriefTool) Description() string {
 		"figures: [{value, label}] 2-3 big numbers}; process {title, steps: [{title, text, group}] 3-5 steps joined by arrows}; " +
 		"timeline {title, milestones: [{date, text}] 3-6}; diagram {title, nodes: [{id, text, layer, group}] up to 10 (layer 1 = " +
 		"top row, up to 4 nodes per layer), edges: [{from, to}] arrows between node ids - arrows are routed around the " +
-		"other boxes, so back arrows and arrows that skip a node are fine}; optional group on steps/nodes (2-3 short names, " +
+		"other boxes, so back arrows and arrows that skip a node are fine, and the tool re-routes one itself if PowerPoint " +
+		"draws it across a box}; optional group on steps/nodes (2-3 short names, " +
 		"e.g. \"AI\" / \"Business system\"): each group gets its own colour and a legend, to show who does which step; " +
 		"chart {title, chart: {type column|bar|line|pie, " +
 		"categories: [...] 2-12, series: [{name, values: [numbers]}] 1-4 (pie: 1), unit e.g. \"%\" or \" tỷ\"}} - a real, " +
@@ -624,21 +625,30 @@ func (t *SlidesFromBriefTool) Invoke(ctx context.Context, arguments map[string]a
 	}
 
 	built := []map[string]any{}
-	issueCount := 0
+	issueCount, rerouted := 0, 0
 	for s, slide := range slides {
 		if slide.Replace > 0 {
 			if _, problem := bridge("wpp.deleteSlide", map[string]any{"slide": slide.Replace}); problem != "" {
 				return Result{JSON: OKJSON(map[string]any{"built": len(built), "slides": built, "error": problem}), Mutating: len(built) > 0}
 			}
 		}
-		index, issues, problem := buildBriefSlide(bridge, grid, tokens, slide, slide.Replace)
+		index, issues, reroutedHere, problem := buildBriefSlide(bridge, grid, tokens, slide, slide.Replace)
 		if problem != "" {
 			return Result{JSON: OKJSON(map[string]any{"built": len(built), "slides": built, "error": problem}), Mutating: true}
 		}
 		issueCount += len(issues)
+		rerouted += reroutedHere
+		if reroutedHere > 0 {
+			corelog.Info("run %s: slides_from_brief slide %d: rerouted %d connector(s) after checkLayout",
+				run.RunID, index, reroutedHere)
+		}
 		entry := map[string]any{"slide": index, "layout": slide.Layout, "title": slide.Title, "issues": issues}
 		if slide.Replace > 0 {
 			entry["replaced"] = slide.Replace
+		}
+		// Tool tự đi lại dây khi PowerPoint vẽ lệch mô hình: báo để model không tưởng còn lỗi (và không dựng lại slide).
+		if reroutedHere > 0 {
+			entry["connectorsRerouted"] = reroutedHere
 		}
 		// Bao ro ghi chu da dat: luot that 25/10/2026 model dat notes qua brief roi van goi wpp.setNotes tung slide (10 vong).
 		if strings.TrimSpace(slide.Notes) != "" {
@@ -655,20 +665,24 @@ func (t *SlidesFromBriefTool) Invoke(ctx context.Context, arguments map[string]a
 	verified := map[string]any{"checked": "layout of every new slide (wpp.checkLayout: overflow, overlap, off-slide, " +
 		"small font, connectors crossing boxes)", "issueCount": issueCount,
 		"notChecked": "wording, facts and whether the slides cover everything the user asked - compare with the request yourself"}
-	return Result{JSON: OKJSON(map[string]any{"built": len(built), "slides": built, "issueCount": issueCount, "verified": verified}),
-		OK: true, Mutating: true, Verifies: true}
+	summary := map[string]any{"built": len(built), "slides": built, "issueCount": issueCount, "verified": verified}
+	if rerouted > 0 {
+		summary["connectorsRerouted"] = rerouted
+	}
+	return Result{JSON: OKJSON(summary), OK: true, Mutating: true, Verifies: true}
 }
 
 // buildBriefSlide: dung mot slide - slide trong (layout 12), tieu de, cac hop cua kieu, dong nguon, ghi chu, roi soat.
+// Tra them so duong noi da tu di lai (checkLayout bao connector-*) de bao cho model.
 func buildBriefSlide(bridge func(string, map[string]any) (map[string]any, string), grid slidelayout.Grid, tokens briefTokens,
-	slide briefSlide, at int) (int, []any, string) {
+	slide briefSlide, at int) (int, []any, int, string) {
 	addParams := map[string]any{"layout": 12}
 	if at > 0 {
 		addParams["index"] = at
 	}
 	added, problem := bridge("wpp.addSlide", addParams)
 	if problem != "" {
-		return 0, nil, problem
+		return 0, nil, 0, problem
 	}
 	index := asInt(added["slide"])
 	colors := tokens.Colors
@@ -684,6 +698,7 @@ func buildBriefSlide(bridge func(string, map[string]any) (map[string]any, string
 	}
 	heading := []sourcePara{{T: slide.Title, B: true}}
 	steps := []func() string{}
+	var plan *diagramPlan
 	switch slide.Layout {
 	case "cover":
 		title, subtitle := grid.Cover()
@@ -710,7 +725,9 @@ func buildBriefSlide(bridge func(string, map[string]any) (map[string]any, string
 		steps = append(steps, func() string {
 			return text(heading, grid.Title(), tokens.Slide.Type.Title, colors.Primary, map[string]any{"anchor": "middle"})
 		})
-		steps = append(steps, briefBody(bridge, index, grid, tokens, slide, text)...)
+		body, drawn := briefBody(bridge, index, grid, tokens, slide, text)
+		plan = drawn
+		steps = append(steps, body...)
 	}
 	if slide.Source != "" {
 		steps = append(steps, func() string {
@@ -725,23 +742,36 @@ func buildBriefSlide(bridge func(string, map[string]any) (map[string]any, string
 	}
 	for _, step := range steps {
 		if problem := step(); problem != "" {
-			return index, nil, problem
+			return index, nil, 0, problem
 		}
 	}
-	var issues []any
-	if checked, problem := bridge("wpp.checkLayout", map[string]any{"slide": index}); problem == "" {
-		if list, ok := checked["slides"].([]any); ok && len(list) > 0 {
-			if entry, ok := list[0].(map[string]any); ok {
-				issues, _ = entry["issues"].([]any)
-			}
-		}
+	issues := layoutIssues(bridge, index)
+	rerouted := 0
+	if plan != nil {
+		issues, rerouted = plan.repair(bridge, issues)
 	}
-	return index, issues, ""
+	return index, issues, rerouted, ""
+}
+
+// layoutIssues: issues cua MOT slide sau khi dung (wpp.checkLayout). Loi goi bridge thi coi nhu khong doc duoc - khong
+// che mat loi dung slide (ket qua cuoi van duoc tra trong "issues").
+func layoutIssues(bridge func(string, map[string]any) (map[string]any, string), index int) []any {
+	checked, problem := bridge("wpp.checkLayout", map[string]any{"slide": index})
+	if problem != "" {
+		return nil
+	}
+	list, _ := checked["slides"].([]any)
+	if len(list) == 0 {
+		return nil
+	}
+	entry, _ := list[0].(map[string]any)
+	issues, _ := entry["issues"].([]any)
+	return issues
 }
 
 // briefBody: cac hop noi dung cua content / cards / table / figures (hinh hoc tu slidelayout).
 func briefBody(bridge func(string, map[string]any) (map[string]any, string), index int, grid slidelayout.Grid, tokens briefTokens,
-	slide briefSlide, text func([]sourcePara, slidelayout.Rect, float64, string, map[string]any) string) []func() string {
+	slide briefSlide, text func([]sourcePara, slidelayout.Rect, float64, string, map[string]any) string) ([]func() string, *diagramPlan) {
 	colors := tokens.Colors
 	steps := []func() string{}
 	switch slide.Layout {
@@ -758,7 +788,7 @@ func briefBody(bridge func(string, map[string]any) (map[string]any, string), ind
 				"height": area[3], "type": chart.Type, "categories": chart.Categories, "series": series, "unit": chart.Unit,
 				"colors": chartColors(colors), "font": briefFont, "fontSize": tokens.Slide.Type.Caption + 2, "color": colors.Text})
 			return problem
-		})
+		}), nil
 	}
 	if slide.Layout == "figures" {
 		values, labels := grid.Figures(len(slide.Figures), tokens.Slide.Gutter)
@@ -771,7 +801,7 @@ func briefBody(bridge func(string, map[string]any) (map[string]any, string), ind
 				return text([]sourcePara{{T: label, A: "center"}}, labelBox, tokens.Slide.Type.Body, colors.Text, nil)
 			})
 		}
-		return steps
+		return steps, nil
 	}
 	spec := slidelayout.Spec{Layout: slide.Layout, HasPoints: len(slide.Points) > 0, ShowPoints: len(slide.Points) > 0,
 		Callout: slide.Callout}
@@ -811,15 +841,16 @@ func briefBody(bridge func(string, map[string]any) (map[string]any, string), ind
 			})
 		}
 	}
-	return steps
+	return steps, nil
 }
 
 // briefShapes: quy trinh, dong thoi gian, so do - ve bang hinh khoi va duong noi goc (wpp.addShape, wpp.addConnector),
 // nguoi dung keo sua duoc; duong noi bam theo hinh. Ten hinh chi biet khi da ve, nen buoc noi doc ten qua con tro.
 func briefShapes(bridge func(string, map[string]any) (map[string]any, string), index int, grid slidelayout.Grid, tokens briefTokens,
-	slide briefSlide, text func([]sourcePara, slidelayout.Rect, float64, string, map[string]any) string) []func() string {
+	slide briefSlide, text func([]sourcePara, slidelayout.Rect, float64, string, map[string]any) string) ([]func() string, *diagramPlan) {
 	colors := tokens.Colors
 	steps := []func() string{}
+	var plan *diagramPlan
 	shape := func(box slidelayout.Rect, kind, label string, extra map[string]any) (string, string) {
 		params := map[string]any{"slide": index, "left": box[0], "top": box[1], "width": box[2], "height": box[3], "shape": kind,
 			"font": briefFont, "fontSize": tokens.Slide.Type.Body, "color": colors.Text}
@@ -842,15 +873,14 @@ func briefShapes(bridge func(string, map[string]any) (map[string]any, string), i
 			return problem
 		}
 	}
-	// connectRoute: so do - canh ra/vao do RouteDiagram chon (tranh hop khac, duong vong co do sau rieng).
-	connectRoute := func(from, to *string, route slidelayout.Route) func() string {
+	// drawRoute: so do - canh ra/vao do RouteDiagram chon (tranh hop khac, duong vong co do sau rieng). Ten duong noi
+	// duoc giu lai de plan.repair xoa/ve lai dung duong khi checkLayout bao loi sau khi PowerPoint ve.
+	drawRoute := func(plan *diagramPlan, e int, from, to *string, route slidelayout.Route) func() string {
 		return func() string {
-			params := map[string]any{"slide": index, "from": *from, "to": *to, "elbow": route.Elbow, "fromSide": route.FromSide,
-				"toSide": route.ToSide, "color": colors.Muted}
-			if route.Offset > 0 {
-				params["offset"] = slidelayout.Round1(route.Offset)
+			result, problem := bridge("wpp.addConnector", connectorParams(index, *from, *to, route, colors.Muted))
+			if name := textOf(result["shape"]); problem == "" && name != "" {
+				plan.connectors[e] = name
 			}
-			_, problem := bridge("wpp.addConnector", params)
 			return problem
 		}
 	}
@@ -933,13 +963,122 @@ func briefShapes(bridge func(string, map[string]any) (map[string]any, string), i
 			edges = append(edges, slidelayout.Edge{FromLayer: layerOf[edge.From], FromPlace: place[edge.From],
 				ToLayer: layerOf[edge.To], ToPlace: place[edge.To]})
 		}
-		// Tieu de va dong chu thich cung la vat can cua duong noi.
+		// Tieu de, dong chu thich va dong nguon cung la vat can cua duong noi (checkLayout tinh ca chung la "hop";
+		// luot that 25/10/2026: duong vong duoi hang cuoi cat qua dong nguon).
 		obstacles := append([]slidelayout.Rect{grid.Title()}, legendRects(groups, grid.Content())...)
-		for e, route := range slidelayout.RouteDiagram(rows, edges, obstacles...) {
-			steps = append(steps, connectRoute(names[slide.Edges[e].From], names[slide.Edges[e].To], route))
+		if slide.Source != "" {
+			obstacles = append(obstacles, grid.Source())
+		}
+		routes := slidelayout.RouteDiagram(rows, edges, obstacles...)
+		plan = &diagramPlan{slide: index, rows: rows, edges: edges, obstacles: obstacles, routes: routes,
+			connectors: make([]string, len(edges)), fromNames: make([]*string, len(edges)), toNames: make([]*string, len(edges)),
+			color: colors.Muted}
+		for e, route := range routes {
+			plan.fromNames[e], plan.toNames[e] = names[slide.Edges[e].From], names[slide.Edges[e].To]
+			steps = append(steps, drawRoute(plan, e, plan.fromNames[e], plan.toNames[e], route))
 		}
 	}
-	return steps
+	return steps, plan
+}
+
+// diagramPlan: so do vua ve cua mot slide - giu ten hai dau, ten tung duong noi va duong da chon de tu di lai.
+type diagramPlan struct {
+	slide      int
+	rows       [][]slidelayout.Rect
+	edges      []slidelayout.Edge
+	obstacles  []slidelayout.Rect
+	routes     []slidelayout.Route
+	connectors []string
+	fromNames  []*string
+	toNames    []*string
+	color      string
+	rerouted   int
+}
+
+// connectorParams: tham so wpp.addConnector cua mot Route - dung chung cho lan ve dau va lan di lai.
+func connectorParams(slide int, from, to string, route slidelayout.Route, color string) map[string]any {
+	params := map[string]any{"slide": slide, "from": from, "to": to, "elbow": route.Elbow,
+		"fromSide": route.FromSide, "toSide": route.ToSide, "color": color}
+	if route.Offset > 0 {
+		params["offset"] = slidelayout.Round1(route.Offset)
+	}
+	return params
+}
+
+// repair: checkLayout bao connector-crossing/connector-overlap tren duong do tool ve thi xoa duong do va ve lai bang
+// ung vien khac cua DiagramAlternatives (toi da 2 lan moi duong), roi kiem lai bang checkLayout. PowerPoint la nguon
+// dung cuoi cung: mo hinh chi chon ung vien, con ket qua that do checkLayout tra.
+func (p *diagramPlan) repair(bridge func(string, map[string]any) (map[string]any, string), issues []any) ([]any, int) {
+	attempts := make([]int, len(p.connectors))
+	tried := make([][]slidelayout.Route, len(p.connectors))
+	for e := range tried {
+		if e < len(p.routes) {
+			tried[e] = append(tried[e], p.routes[e])
+		}
+	}
+	for {
+		e := p.brokenEdge(issues, attempts)
+		if e < 0 {
+			return issues, p.rerouted
+		}
+		alternatives := slidelayout.DiagramAlternatives(p.rows, p.edges, p.routes, p.obstacles, e, tried[e]...)
+		if len(alternatives) == 0 {
+			attempts[e] = 2
+			continue
+		}
+		from, to := p.fromNames[e], p.toNames[e]
+		if from == nil || to == nil {
+			attempts[e] = 2
+			continue
+		}
+		route := alternatives[0]
+		result, problem := bridge("wpp.addConnector", connectorParams(p.slide, *from, *to, route, p.color))
+		if problem != "" {
+			attempts[e] = 2
+			continue
+		}
+		newName := textOf(result["shape"])
+		if newName == "" {
+			attempts[e] = 2
+			continue
+		}
+		// Ve duong moi TRUOC khi xoa duong cu: add loi thi van con duong cu, khong mat mui ten.
+		if old := p.connectors[e]; old != "" {
+			if _, problem := bridge("wpp.deleteShapes", map[string]any{"slide": p.slide, "shapes": []any{old}}); problem != "" {
+				issues = append(issues, map[string]any{"type": "connector-reroute-failed",
+					"detail": "drew a replacement for connector '" + old + "' but could not remove the old one: " + problem})
+				attempts[e] = 2
+				continue
+			}
+		}
+		p.connectors[e] = newName
+		p.routes[e] = route
+		tried[e] = append(tried[e], route)
+		p.rerouted++
+		attempts[e]++
+		issues = layoutIssues(bridge, p.slide)
+	}
+}
+
+// brokenEdge: duong noi dau tien bi checkLayout bao loi va con luot di lai (toi da 2 lan moi duong). Connector-overlap
+// tra hai ten - sua duong dau tien con thuoc so do cua tool.
+func (p *diagramPlan) brokenEdge(issues []any, attempts []int) int {
+	for _, item := range issues {
+		issue, _ := item.(map[string]any)
+		if !strings.HasPrefix(textOf(issue["type"]), "connector-") {
+			continue
+		}
+		shapes, _ := issue["shapes"].([]any)
+		for _, value := range shapes {
+			name := textOf(value)
+			for e, connector := range p.connectors {
+				if connector != "" && connector == name && e < len(attempts) && attempts[e] < 2 {
+					return e
+				}
+			}
+		}
+	}
+	return -1
 }
 
 // Nhom mau cua quy trinh / so do (vd buoc cua AI va buoc xac minh cua he thong nghiep vu): moi nhom mot mau theo

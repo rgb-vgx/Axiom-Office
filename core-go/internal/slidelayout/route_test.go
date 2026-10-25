@@ -70,6 +70,37 @@ func TestConnectorPathLoopAndCrossing(t *testing.T) {
 	}
 }
 
+// Khi PowerPoint ve lech mo hinh (checkLayout bao connector-*): ung vien ke tiep phai khac hinh hoc vua hong, va lan
+// thu lai khong quay ve ung vien da thu (luot that 25/10/2026: 1 crossing + 3 overlap o lan dung dau slide 4).
+func TestDiagramAlternativesSkipCurrentAndTried(t *testing.T) {
+	rows := Diagram(Rect{40, 130, 880, 370}, []int{1, 1})
+	edges := []Edge{{0, 0, 1, 0}}
+	routes := RouteDiagram(rows, edges)
+	if len(routes) != 1 || routes[0].FromSide != SideBottom || routes[0].ToSide != SideTop {
+		t.Fatalf("duong dau = %+v", routes)
+	}
+	alternatives := DiagramAlternatives(rows, edges, routes, nil, 0, routes[0])
+	if len(alternatives) == 0 {
+		t.Fatal("phai co ung vien khac")
+	}
+	for _, route := range alternatives {
+		if route.FromSide == routes[0].FromSide && route.ToSide == routes[0].ToSide && route.Elbow == routes[0].Elbow {
+			t.Fatalf("khong duoc tra lai dung duong vua hong: %+v", route)
+		}
+		if !route.Clear {
+			t.Fatalf("ung vien phai sach theo mo hinh: %+v", route)
+		}
+	}
+	// Da thu ung vien dau: lan sau khong tra lai no.
+	tried := append([]Route{routes[0]}, alternatives[0])
+	next := DiagramAlternatives(rows, edges, []Route{alternatives[0]}, nil, 0, tried...)
+	for _, route := range next {
+		if sameRoute(route, alternatives[0]) {
+			t.Fatalf("ung vien da thu bi tra lai: %+v", route)
+		}
+	}
+}
+
 // Vat can ngoai so do (dong chu thich, tieu de): duong vong phia tren khong duoc chay qua no (luot that 25/10/2026).
 func TestRouteDiagramAvoidsObstacles(t *testing.T) {
 	rows := Diagram(Rect{40, 180, 880, 320}, []int{3})

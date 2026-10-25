@@ -197,6 +197,83 @@ func RouteDiagram(rows [][]Rect, edges []Edge, obstacles ...Rect) []Route {
 	return routes
 }
 
+// DiagramAlternatives: các đường khác cho một cạnh sau khi PowerPoint vẽ lệch mô hình (checkLayout báo
+// connector-crossing / connector-overlap). Đường hiện tại và các đường đã thử (skip) bị bỏ qua; đường vòng thử độ sâu
+// lớn dần (tăng offset) trước khi đổi phía. Trả danh sách đã lọc "không cắt hộp / không chồng đường khác" nếu có, không
+// thì trả các ứng viên còn lại để caller thử và đo lại bằng checkLayout (nguồn đúng cuối cùng).
+func DiagramAlternatives(rows [][]Rect, edges []Edge, routes []Route, obstacles []Rect, edgeIndex int, skip ...Route) []Route {
+	if edgeIndex < 0 || edgeIndex >= len(edges) || edgeIndex >= len(routes) || len(rows) == 0 {
+		return nil
+	}
+	edge := edges[edgeIndex]
+	if edge.FromLayer < 0 || edge.FromLayer >= len(rows) || edge.ToLayer < 0 || edge.ToLayer >= len(rows) ||
+		edge.FromPlace < 0 || edge.FromPlace >= len(rows[edge.FromLayer]) ||
+		edge.ToPlace < 0 || edge.ToPlace >= len(rows[edge.ToLayer]) {
+		return nil
+	}
+	from, to := rows[edge.FromLayer][edge.FromPlace], rows[edge.ToLayer][edge.ToPlace]
+	current := routes[edgeIndex]
+	used := map[[2]int]float64{}
+	placed := []Placed{}
+	for i, route := range routes {
+		if i == edgeIndex || i >= len(edges) {
+			continue
+		}
+		if route.FromSide == route.ToSide && route.Elbow {
+			key := loopKey(edges[i], route.FromSide)
+			if route.Offset > used[key] {
+				used[key] = route.Offset
+			}
+		}
+		placed = append(placed, Placed{From: [2]int{edges[i].FromLayer, edges[i].FromPlace},
+			To: [2]int{edges[i].ToLayer, edges[i].ToPlace}, Path: route.Path})
+	}
+	clear, fallback := []Route{}, []Route{}
+	for _, candidate := range diagramCandidates(rows, edge, from, to) {
+		offsets := []float64{candidate.Offset}
+		if candidate.FromSide == candidate.ToSide && candidate.Elbow {
+			key := loopKey(edge, candidate.FromSide)
+			start := LoopOffset + clearance(rows, edge, from, to, candidate.FromSide)
+			if last, ok := used[key]; ok && last+LoopStep > start {
+				start = last + LoopStep
+			}
+			offsets = []float64{start, start + LoopStep, start + 2*LoopStep}
+		}
+		for _, offset := range offsets {
+			route := candidate
+			route.Offset = offset
+			route.Path = ConnectorPath(from, to, route.FromSide, route.ToSide, route.Elbow, route.Offset)
+			if sameRoute(route, current) || sameAnyRoute(route, skip) {
+				continue
+			}
+			if routeClear(rows, edge, route.Path, placed, obstacles) {
+				route.Clear = true
+				clear = append(clear, route)
+			} else {
+				fallback = append(fallback, route)
+			}
+		}
+	}
+	if len(clear) > 0 {
+		return clear
+	}
+	return fallback
+}
+
+// sameRoute: cùng cạnh ra/vào và cùng độ sâu - thử lại y hệt đường vừa hỏng thì không có ích.
+func sameRoute(a, b Route) bool {
+	return a.FromSide == b.FromSide && a.ToSide == b.ToSide && a.Elbow == b.Elbow && math.Abs(a.Offset-b.Offset) < 0.5
+}
+
+func sameAnyRoute(route Route, skip []Route) bool {
+	for _, used := range skip {
+		if sameRoute(route, used) {
+			return true
+		}
+	}
+	return false
+}
+
 // loopKey: duong vong cung phia cua cung mot tang (vong duoi/tren) hoac cung mot phia slide (vong trai/phai) xep lan.
 func loopKey(edge Edge, side string) [2]int {
 	sideIndex := map[string]int{SideTop: 0, SideBottom: 1, SideLeft: 2, SideRight: 3}[side]

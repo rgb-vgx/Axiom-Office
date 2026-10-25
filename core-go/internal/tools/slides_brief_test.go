@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -50,6 +51,69 @@ func briefBridge(t *testing.T) (*RunContext, *[]briefCall) {
 			_, _ = w.Write([]byte(`{"ok":true,"result":{"slideWidth":960,"slideHeight":540,"slides":[{"issues":[]}]}}`))
 		default:
 			_, _ = w.Write([]byte(`{"ok":true,"result":{}}`))
+		}
+	}))
+	t.Cleanup(server.Close)
+	port, err := strconv.Atoi(strings.TrimPrefix(server.URL, "http://127.0.0.1:"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	run := &RunContext{Office: &office.Session{App: "wpp", Port: port}, Bridge: office.NewBridgeClient(server.Client(), "t"),
+		TargetDocument: "Presentation3"}
+	return run, &calls
+}
+
+// briefBridgeBrokenConnectors: bridge gia biet checkLayout bao connector-crossing cho nhung duong noi ma `broken` chon.
+// addConnector tra ten "Shape N" nhu briefBridge; deleteShapes go ten khoi slide de lan checkLayout sau khong con loi.
+func briefBridgeBrokenConnectors(t *testing.T, broken func(params map[string]any) bool) (*RunContext, *[]briefCall) {
+	t.Helper()
+	calls := []briefCall{}
+	slides, shapes := 0, 0
+	connectors := map[string]map[string]any{}
+	order := []string{}
+	reply := func(w http.ResponseWriter, result map[string]any) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "result": result})
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		var request struct {
+			Action string         `json:"action"`
+			Params map[string]any `json:"params"`
+		}
+		_ = json.Unmarshal(body, &request)
+		calls = append(calls, briefCall{request.Action, request.Params})
+		switch request.Action {
+		case "wpp.addSlide":
+			slides++
+			reply(w, map[string]any{"slide": slides})
+		case "wpp.addShape", "wpp.addConnector":
+			shapes++
+			name := fmt.Sprintf("Shape %d", shapes)
+			if request.Action == "wpp.addConnector" {
+				connectors[name] = request.Params
+				order = append(order, name)
+			}
+			reply(w, map[string]any{"slide": 1, "shape": name})
+		case "wpp.deleteShapes":
+			names, _ := request.Params["shapes"].([]any)
+			for _, value := range names {
+				delete(connectors, textOf(value))
+			}
+			reply(w, map[string]any{"deleted": names})
+		case "wpp.checkLayout":
+			issues := []any{}
+			for _, name := range order {
+				params, ok := connectors[name]
+				if !ok || !broken(params) {
+					continue
+				}
+				issues = append(issues, map[string]any{"type": "connector-crossing", "detail": "crossing",
+					"shapes": []any{name, "Shape 1"}})
+			}
+			reply(w, map[string]any{"slideWidth": 960, "slideHeight": 540,
+				"slides": []any{map[string]any{"issues": issues}}})
+		default:
+			reply(w, map[string]any{})
 		}
 	}))
 	t.Cleanup(server.Close)
@@ -188,6 +252,61 @@ func TestSlidesFromBriefDrawsProcessAndDiagramWithConnectors(t *testing.T) {
 	// Slide va hinh do tool dung la cua luot: xoa slide 2 khong phai hoi.
 	if !run.ownedObjects().covers("wpp.deleteSlide", map[string]any{"slide": 2.0, "presentation": "Presentation3"}) {
 		t.Fatal("slide do tool dung phai ghi vao so cua luot")
+	}
+}
+
+// PowerPoint ve lech mo hinh (checkLayout bao connector-crossing du RouteDiagram da chon duong "sach"): tool tu xoa
+// duong hong, ve lai bang ung vien ke tiep va kiem lai - model khong phai ton vong de sua loi di day.
+func TestSlidesFromBriefReroutesConnectorPowerPointDrawsAcrossBox(t *testing.T) {
+	run, calls := briefBridgeBrokenConnectors(t, func(params map[string]any) bool {
+		return params["fromSide"] == "bottom" && params["toSide"] == "top"
+	})
+	result := NewSlidesFromBriefTool(nil).Invoke(context.Background(), brief(t, `[
+		{"layout":"diagram","title":"Hai tầng xử lý","nodes":[{"id":"a","text":"Gateway","layer":1},
+		 {"id":"b","text":"Orchestrator","layer":2}],"edges":[{"from":"a","to":"b"}]}
+	]`), run)
+	if !result.OK || !strings.Contains(result.JSON, `"connectorsRerouted":1`) || !strings.Contains(result.JSON, `"issueCount":0`) {
+		t.Fatalf("phai tu di lai va het loi: %s", result.JSON)
+	}
+	var deleted, redrawn bool
+	for _, call := range *calls {
+		switch call.Action {
+		case "wpp.addConnector":
+			if call.Params["fromSide"] == "right" && call.Params["toSide"] == "right" {
+				redrawn = true
+			}
+		case "wpp.deleteShapes":
+			names, _ := call.Params["shapes"].([]any)
+			for _, name := range names {
+				if textOf(name) == "Shape 3" {
+					deleted = true
+				}
+			}
+		}
+	}
+	if !deleted || !redrawn {
+		t.Fatalf("phai xoa duong hong Shape 3 va ve lai canh phai: %+v", *calls)
+	}
+}
+
+// Khong ung vien nao sach (PowerPoint van bao loi): toi da 2 lan moi duong, tra loi that de model biet ma sua mo hinh.
+func TestSlidesFromBriefStopsReroutingAfterTwoAttempts(t *testing.T) {
+	run, calls := briefBridgeBrokenConnectors(t, func(map[string]any) bool { return true })
+	result := NewSlidesFromBriefTool(nil).Invoke(context.Background(), brief(t, `[
+		{"layout":"diagram","title":"Hai tầng xử lý","nodes":[{"id":"a","text":"Gateway","layer":1},
+		 {"id":"b","text":"Orchestrator","layer":2}],"edges":[{"from":"a","to":"b"}]}
+	]`), run)
+	adds := 0
+	for _, call := range *calls {
+		if call.Action == "wpp.addConnector" {
+			adds++
+		}
+	}
+	if adds != 3 {
+		t.Fatalf("1 lan ve dau + toi da 2 lan di lai, co %d lan addConnector", adds)
+	}
+	if !strings.Contains(result.JSON, `"connectorsRerouted":2`) || !strings.Contains(result.JSON, `"issueCount":1`) {
+		t.Fatalf("phai dung sau 2 lan va giu loi that: %s", result.JSON)
 	}
 }
 
