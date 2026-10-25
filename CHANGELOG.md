@@ -5,6 +5,22 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — Lỗi tìm ra khi phủ test live cho mọi lệnh (25/10/2026)
+
+- **`wpp.newFromTemplate` khi tệp mẫu đang mở**: `Presentations.Open` trả về chính bài đang mở, nên lệnh xoá hết
+  slide của bài đó rồi đổi tên sang tệp mới (mất thay đổi chưa lưu). Nay mở một bản chép tạm của mẫu, và đưa
+  cửa sổ bài mới lên làm cửa sổ hoạt động.
+- **`wpp.addSlideFromTemplate`**: mẫu đang mở thì `InsertFromFile` đẩy cửa sổ của mẫu lên, các lệnh sau (không
+  truyền `presentation`) sửa nhầm bài mẫu. Nay trả quyền cho bài đích.
+- **`writer.lockSelection`**: bôi đen cả tài liệu (Ctrl+A) thì lỗi COM "Value out of range" (Word không nhận
+  `Range(n, n)` ở cuối tài liệu); kiểm tra sau mỗi lệnh khi đang khoá cũng dính cùng lỗi.
+- **`et.setConditionalFormat` / `et.listConditionalFormats`** (Excel): kết quả bị bọc hai lớp `{ok, result}`; trả
+  toán tử viết thường; danh sách rule phẳng. Nay cùng hình dạng LibreOffice/WPS (`formats: [{range, rules}]`,
+  ngưỡng không kèm `=`, điều kiện công thức có `operator: "formula"`).
+- `tests/live/test_live_commands.py`: test cho 24 lệnh chưa có test trên Office; `et.undo` kiểm theo ô thật
+  (Excel không hoàn tác được thay đổi qua COM); dọn A5 trước `ai.ask` của Excel; `ai.ask` của PowerPoint kiểm
+  bài đích theo đường dẫn.
+
 ### Removed — Agent in-process của add-in (25/10/2026)
 
 - Bỏ `Ai/AiAgent.cs`, vòng tool-calling `LlmClient.RunAgent`, khoá `LegacyAgent`, `OfficeActionTool.Definition`

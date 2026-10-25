@@ -112,14 +112,54 @@ namespace AxiomOffice.Bridge
                 throw new ArgumentException("'path' already exists: " + path + " - choose another file name (never overwrite)");
             }
             dynamic app = host.Application;
-            // Untitled: mở BẢN SAO của mẫu, tệp mẫu không bị sửa; .potx cũng mở được như vậy.
-            dynamic pres = app.Presentations.Open(template, 0, -1, -1);
-            int templateSlides = Convert.ToInt32(pres.Slides.Count);
-            for (int i = templateSlides; i >= 1; i--)
+            // Mẫu ĐANG MỞ thì Presentations.Open (kể cả Untitled) trả về chính bài đang mở: trước đây lệnh này xoá hết
+            // slide của bài đó rồi SaveAs sang `path` - cửa sổ của người dùng thành bài mới rỗng, thay đổi chưa lưu mất
+            // (đo 25/10/2026, PowerPoint x64). Khi đó mở một bản chép tạm của tệp mẫu.
+            string source = template;
+            string copy = null;
+            if (FindPresentation(app, template) != null)
             {
-                pres.Slides[i].Delete();
+                copy = Path.Combine(Path.GetTempPath(), "axiom-template-" + Guid.NewGuid().ToString("N") + Path.GetExtension(template));
+                File.Copy(template, copy);
+                source = copy;
             }
-            pres.SaveAs(path, 24);
+            dynamic pres;
+            int templateSlides;
+            try
+            {
+                // Untitled: mở BẢN SAO của mẫu, tệp mẫu không bị sửa; .potx cũng mở được như vậy.
+                pres = app.Presentations.Open(source, 0, -1, -1);
+                templateSlides = Convert.ToInt32(pres.Slides.Count);
+                for (int i = templateSlides; i >= 1; i--)
+                {
+                    pres.Slides[i].Delete();
+                }
+                pres.SaveAs(path, 24);
+                // Mở qua COM thì cửa sổ mới KHÔNG tự thành cửa sổ hoạt động: không kích hoạt thì các lệnh sau (không
+                // truyền `presentation`) rơi vào bài cũ của người dùng (đo 25/10/2026).
+                try
+                {
+                    pres.Windows[1].Activate();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Info("wpp.newFromTemplate: could not activate the new window (" + ex.Message + ")");
+                }
+            }
+            finally
+            {
+                if (copy != null)
+                {
+                    try
+                    {
+                        File.Delete(copy);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Info("wpp.newFromTemplate: temp copy not deleted (" + ex.Message + ")");
+                    }
+                }
+            }
             return new Dictionary<string, object>
             {
                 { "path", Convert.ToString(pres.FullName) },
@@ -354,6 +394,19 @@ namespace AxiomOffice.Bridge
             catch (Exception ex)
             {
                 throw new ArgumentException("cannot insert slide " + kind + " of the template (does it have that many slides? see kinds of ppt_profile): " + ex.Message);
+            }
+            finally
+            {
+                // Mẫu ĐANG MỞ thì InsertFromFile đẩy cửa sổ của mẫu lên làm cửa sổ hoạt động: các lệnh sau (không truyền
+                // `presentation`) sửa nhầm bài mẫu của người dùng (đo 25/10/2026, PowerPoint x64). Trả quyền cho bài đích.
+                try
+                {
+                    pres.Windows[1].Activate();
+                }
+                catch (Exception activateError)
+                {
+                    Logger.Info("wpp.addSlideFromTemplate: could not re-activate the target window (" + activateError.Message + ")");
+                }
             }
             dynamic inserted = null;
             foreach (dynamic candidate in pres.Slides)

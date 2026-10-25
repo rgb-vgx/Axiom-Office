@@ -914,7 +914,8 @@ namespace AxiomOffice.Bridge
                 }
                 plan.Add(new Dictionary<string, object>
                 {
-                    { "key", key }, { "formula1", formula1 }, { "formula2", formula2 }, { "rule", rules[i] }
+                    { "key", key }, { "input", ParamString(rules[i], "operator", "less") }, { "formula1", formula1 },
+                    { "formula2", formula2 }, { "rule", rules[i] }
                 });
             }
 
@@ -959,17 +960,20 @@ namespace AxiomOffice.Bridge
                 {
                     condition.Interior.Color = fillColor.Value;
                 }
+                // Trả đúng tên toán tử bên gọi đã viết ("greaterEqual"), như bản LibreOffice/WPS - không phải khoá
+                // so khớp viết thường.
                 written.Add(new Dictionary<string, object>
                 {
-                    { "operator", key }, { "formula1", formula1 },
+                    { "operator", item["input"] }, { "formula1", formula1 },
                     { "formula2", string.IsNullOrEmpty(formula2) ? null : formula2 }
                 });
             }
 
-            return Ok(new Dictionary<string, object>
+            // Handler trả kết quả trần: dispatcher tự bọc {ok, result} (trước đây Ok(...) ở đây làm kết quả bị bọc hai lớp).
+            return new Dictionary<string, object>
             {
-                { "sheet", Convert.ToString(sheet.Name) }, { "range", Convert.ToString(range.Address) }, { "rules", written }
-            });
+                { "sheet", Convert.ToString(sheet.Name) }, { "range", Convert.ToString(range.Address(false, false)) }, { "rules", written }
+            };
         }
 
         private static Dictionary<string, object> EtListConditionalFormats(IAppHost host, Dictionary<string, object> p)
@@ -983,14 +987,16 @@ namespace AxiomOffice.Bridge
             // đọc được từ một Range. Bỏ trống `range` thì soi vùng đang dùng thật.
             dynamic scope = string.IsNullOrEmpty(address) ? sheet.UsedRange : sheet.Range[address];
 
-            var items = new List<object>();
+            // Cùng hình dạng với LibreOffice/WPS: {sheet, formats: [{range, rules: [...]}]}, nhóm theo vùng áp dụng
+            // (AppliesTo). Trước đây Excel trả danh sách rule phẳng, không biết rule thuộc vùng nào.
+            var formats = new List<object>();
+            var byRange = new Dictionary<string, List<object>>();
             dynamic conditions = scope.FormatConditions;
             int count = Convert.ToInt32(conditions.Count);
             for (int i = 1; i <= count; i++)
             {
                 dynamic condition = conditions[i];
-                object operatorName = null;
-                object type = null;
+                int type = 0;
                 try
                 {
                     type = Convert.ToInt32(condition.Type);
@@ -998,30 +1004,59 @@ namespace AxiomOffice.Bridge
                 catch (Exception)
                 {
                 }
+                string operatorName = null;
+                if (type == XlExpression)
+                {
+                    // Điều kiện công thức không có Operator (đọc thuộc tính đó ném lỗi): trước đây trả null.
+                    operatorName = "formula";
+                }
+                else
+                {
+                    try
+                    {
+                        int code = Convert.ToInt32(condition.Operator);
+                        operatorName = ConditionalOperatorNames.ContainsKey(code) ? ConditionalOperatorNames[code] : "unknown(" + code + ")";
+                    }
+                    catch (Exception)
+                    {
+                    }
+                }
+                string applies = Convert.ToString(scope.Address(false, false));
                 try
                 {
-                    int code = Convert.ToInt32(condition.Operator);
-                    operatorName = Convert.ToInt32(type) == XlExpression
-                        ? "formula"
-                        : (ConditionalOperatorNames.ContainsKey(code) ? ConditionalOperatorNames[code] : "unknown(" + code + ")");
+                    applies = Convert.ToString(condition.AppliesTo.Address(false, false));
                 }
                 catch (Exception)
                 {
                 }
-                items.Add(new Dictionary<string, object>
+                List<object> rules;
+                if (!byRange.TryGetValue(applies, out rules))
+                {
+                    rules = new List<object>();
+                    byRange[applies] = rules;
+                    formats.Add(new Dictionary<string, object> { { "range", applies }, { "rules", rules } });
+                }
+                // Excel lưu formula kèm "=" ("=50"); bỏ đi cho khớp giá trị đã ghi và bản LibreOffice. formula2 chỉ
+                // có nghĩa với between/notBetween (giống LibreOffice/WPS).
+                bool usesFormula2 = operatorName == "between" || operatorName == "notBetween";
+                rules.Add(new Dictionary<string, object>
                 {
                     { "operator", operatorName },
-                    { "formula1", SafeFormula(condition, "Formula1") },
-                    { "formula2", SafeFormula(condition, "Formula2") },
+                    { "formula1", StripEquals(SafeFormula(condition, "Formula1")) },
+                    { "formula2", usesFormula2 ? StripEquals(SafeFormula(condition, "Formula2")) : null },
                     { "type", type }
                 });
             }
-            return Ok(new Dictionary<string, object>
+            return new Dictionary<string, object>
             {
                 { "sheet", Convert.ToString(sheet.Name) },
-                { "range", Convert.ToString(scope.Address) },
-                { "formats", items }
-            });
+                { "formats", formats }
+            };
+        }
+
+        private static string StripEquals(string formula)
+        {
+            return formula != null && formula.StartsWith("=") ? formula.Substring(1) : formula;
         }
 
         // Công thức của FormatCondition có thể ném COMException (vùng gộp, điều kiện kiểu thanh/màu) -

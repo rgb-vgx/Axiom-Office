@@ -87,7 +87,7 @@ class Bridge:
             RECORD["%s|%s" % (self.label, key or action)] = normalize(reply, self.out)
         return (reply or {}).get("result") if expect_ok else (reply or {}).get("error")
 
-    def ask(self, prompt, document_key):
+    def ask(self, prompt, document_key, target=None):
         """ai.ask thật (không ghi golden): xong việc, không tự lưu/xuất file, tài liệu còn ở trạng thái chưa lưu."""
         result = self.cmd("ai.ask", {"prompt": prompt}, timeout=330, record=False) or {}
         transcript = result.get("transcript") or []
@@ -100,6 +100,14 @@ class Bridge:
         if refused:
             print("     office_action từ chối:", refused)
         info = self.cmd("app.info", record=False) or {}
+        if target:
+            # Core ghim tài liệu của lượt (H1) nên AI sửa đúng bài kể cả khi cửa sổ hoạt động đổi giữa chừng; đã gặp
+            # (25/10/2026, không tái hiện được) cửa sổ hoạt động nhảy sang bài khác sau ai.ask - ghi lại, rồi kiểm bài đích.
+            active = (info.get(document_key) or {}).get("fullName", "")
+            if active.lower() != target.lower():
+                print("     LƯU Ý: sau ai.ask cửa sổ hoạt động là %s, không phải bài đích" % active)
+            self.cmd("wpp.open", {"path": target}, record=False)
+            info = self.cmd("app.info", record=False) or {}
         check((info.get(document_key) or {}).get("saved") is False, self.label + " tài liệu vẫn chưa lưu sau ai.ask", info.get(document_key))
         return actions
 
@@ -271,6 +279,33 @@ def test_writer(b, out, png, run_ai):
     b.cmd("writer.undo", {"count": 1})
     after = b.cmd("writer.getText", {"maxChars": 40}, key="writer.getText after undo")
     check(after and "Axiom" in after["text"], "Word undo hoàn tác replaceAll", {"replace": replaced, "text": after})
+    # Lệnh soát/dựng tài liệu: trước đây chỉ có test riêng (test_writer_format.py) hoặc chưa có test trên Word.
+    many = b.cmd("writer.replaceMany", {"edits": [{"find": "Tiêu đề một", "replace": "Tiêu đề 1"},
+                                                  {"find": "KHÔNG_CÓ_CHỖ_NÀY", "replace": "x"}]}) or {}
+    check(many.get("counts") == [1, 0] and many.get("replaced") == 1, "Word replaceMany đếm số chỗ thay của từng cặp", many)
+    b.cmd("writer.replaceMany", {"edits": []}, expect_ok=False, key="writer.replaceMany edits rỗng")
+    outline = b.cmd("writer.outline", {"maxChars": 40}) or {}
+    items = outline.get("items") or []
+    check(outline.get("paragraphs", 0) > 0 and any(i.get("kind") == "table" for i in items)
+          and any("Tiêu đề 1" in (i.get("t") or "") for i in items), "Word outline liệt kê đoạn và bảng", outline)
+    blocks = b.cmd("writer.insertBlocks", {"blocks": [{"before": 1, "kind": "box", "cells": [
+        {"tone": "info", "lines": [{"k": "title", "t": "Ghi chú khối"}, {"k": "text", "t": "Nội dung trong khối"}]}]}]}) or {}
+    check(blocks.get("inserted") == 1, "Word insertBlocks chèn 1 khối", blocks)
+    check("Ghi chú khối" in ((b.cmd("writer.getText", record=False) or {}).get("text") or ""),
+          "Word insertBlocks: chữ của khối có trong tài liệu", "")
+    restyled = b.cmd("writer.restyle", {}) or {}
+    check(restyled.get("mode") in ("design", "administrative"), "Word restyle trả chế độ trình bày", restyled)
+    # Khoá vùng bôi đen: có vùng chọn (>= 2 ký tự chữ) thì khoá, khi khoá lệnh chạm ra ngoài vùng bị từ chối;
+    # không bôi đen thì chars = 0 và không khoá gì. Lệnh trước để lại vùng chọn nào thì kiểm theo vùng đó.
+    selection = b.cmd("writer.selection", record=False) or {}
+    has_selection = len((selection.get("text") or "").strip()) >= 2
+    locked = b.cmd("writer.lockSelection", record=False) or {}
+    check((locked.get("chars", 0) > 0) == has_selection, "Word lockSelection khoá đúng khi (và chỉ khi) có vùng bôi đen",
+          {"lock": locked, "selection": (selection.get("text") or "")[:40]})
+    if has_selection:
+        refused = b.cmd("writer.appendText", {"text": "ngoài vùng"}, expect_ok=False, key="writer.appendText khi khoá vùng")
+        check("Refused: the user selected part" in (refused or ""), "Word khoá vùng từ chối lệnh ghi ra ngoài vùng chọn", refused)
+    b.cmd("writer.unlockSelection")
     pdf = os.path.join(out, "writer.pdf")
     b.cmd("writer.exportPdf", {"path": pdf})
     check(os.path.getsize(pdf) > 1000, "Word exportPdf tạo file", pdf)
@@ -360,7 +395,14 @@ def test_spreadsheet(b, out, run_ai):
           "app.screenshot trả PNG thật, rộng <= maxWidth", {k: shot.get(k) for k in ("width", "height", "mime")})
     b.cmd("et.activateSheet", {"sheet": "Sheet1"})
     b.cmd("et.writeRange", {"range": "A5", "values": [["hoàn tác tôi"]]}, key="et.writeRange before undo")
-    b.cmd("et.undo", {"count": 1})
+    undo = b.cmd("et.undo", {"count": 1}) or {}
+    # Excel không hoàn tác được thay đổi qua COM (docs/architecture/README.md, giới hạn đã biết): et.undo phải nói
+    # thật (undone = 0) thay vì báo đã hoàn tác; WPS thì hoàn tác được. Kiểm theo ô A5 thật.
+    a5 = ((b.cmd("et.readRange", {"range": "A5"}, record=False) or {}).get("values") or [[None]])[0][0]
+    check((a5 is None) == (undo.get("undone", 0) > 0), "et.undo báo đúng số bước đã hoàn tác", {"undo": undo, "A5": a5})
+    # Dọn A5 để bước ai.ask sau ghi vào ô TRỐNG (ghi đè ô có chữ thì Core hỏi xác nhận - ai.ask không ai bấm nên từ chối).
+    b.cmd("et.writeRange", {"range": "A5", "values": [[None]]}, key="et.writeRange clear A5")
+    test_spreadsheet_more(b, out)
     pdf = os.path.join(out, "et.pdf")
     b.cmd("et.exportPdf", {"path": pdf})
     check(os.path.getsize(pdf) > 500, "Excel exportPdf tạo file", pdf)
@@ -375,6 +417,56 @@ def test_spreadsheet(b, out, run_ai):
         row = (total.get("values") or [[None, None]])[0]
         check("tổng" in str(row[0]).lower() and row[1] == 17.5, "Excel ai.ask ghi Tổng = 17.5 vào A5:B5", row)
         b.cmd("et.save", record=False)
+
+
+def test_spreadsheet_more(b, out):
+    """Sheet, biểu đồ, điền công thức, ghi nhiều vùng, CSV, định dạng điều kiện (cùng kịch bản test LibreOffice)."""
+    added = b.cmd("et.addSheet", {"name": "Raw_Data"}) or {}
+    check(added.get("sheet") == "Raw_Data" and "Raw_Data" in (added.get("sheets") or []), "Excel addSheet thêm sheet có tên", added)
+    auto = b.cmd("et.addSheet", {}) or {}
+    renamed = b.cmd("et.renameSheet", {"sheet": auto.get("sheet"), "name": "Data_Cleaning"}) or {}
+    check("Data_Cleaning" in (renamed.get("sheets") or []), "Excel renameSheet đổi tên được", renamed)
+    b.cmd("et.addSheet", {"name": "Raw_Data"}, expect_ok=False, key="et.addSheet trùng tên")
+    b.cmd("et.renameSheet", {"sheet": "Không có", "name": "X"}, expect_ok=False, key="et.renameSheet sheet lạ")
+    b.cmd("et.activateSheet", {"sheet": "Sheet1"}, record=False)
+    chart = b.cmd("et.addChart", {"sheet": "Sheet1", "range": "A1:B3", "type": "line", "title": "Điểm", "anchor": "E30"}) or {}
+    check(chart.get("chart") and chart.get("type") == "line", "Excel addChart tạo biểu đồ", chart)
+    charts = b.cmd("et.listCharts", {"sheet": "Sheet1"}) or {}
+    check(chart.get("chart") in [c.get("name") for c in (charts.get("charts") or [])], "Excel listCharts thấy biểu đồ vừa tạo", charts)
+    b.cmd("et.addChart", {"sheet": "Sheet1", "range": "A1:B3", "type": "donut"}, expect_ok=False, key="et.addChart kiểu lạ")
+    filled = b.cmd("et.fillRange", {"sheet": "Raw_Data", "range": "A1:A20", "formula": "=ROW()*2"}) or {}
+    column = (b.cmd("et.readRange", {"range": "A1:A20", "sheet": "Raw_Data"}, record=False) or {}).get("values") or []
+    check(filled.get("filled") == 20 and len(column) == 20 and column[0][0] == 2 and column[19][0] == 40,
+          "Excel fillRange điền đủ ô, tham chiếu tương đối tự dịch", {"fill": filled, "first": column[:1], "last": column[-1:]})
+    batch = b.cmd("et.writeRanges", {"sheet": "Raw_Data", "writes": [
+        {"range": "C1", "values": [["gộp", 1], ["một", 2]]},
+        {"range": "A1", "sheet": "Data_Cleaning", "values": [["khác sheet"]]}]}) or {}
+    check(batch.get("ranges") == 2 and batch.get("written") == 5, "Excel writeRanges ghi 2 vùng bằng MỘT lời gọi", batch)
+    b.cmd("et.writeRanges", {"sheet": "Raw_Data", "writes": [{"range": "F1", "values": [["không được ghi"]]}, {"range": "G1"}]},
+          expect_ok=False, key="et.writeRanges vùng sau thiếu values")
+    check(((b.cmd("et.readRange", {"range": "F1", "sheet": "Raw_Data"}, record=False) or {}).get("values") or [[None]])[0][0] is None,
+          "Excel writeRanges kiểm hết trước khi ghi (vùng đầu không bị ghi khi vùng sau sai)", "")
+    raw = os.path.join(out, "raw-data.csv")
+    with open(raw, "w", encoding="utf-8-sig", newline="") as handle:
+        handle.write("Vùng,Mã,Số lượng,Giá,Ghi chú\nBắc,SP-001,12,1500.5,có dấu\nNam,SP-002,0,-2,\n")
+    loaded = b.cmd("et.importCsv", {"path": raw}) or {}
+    grid = (b.cmd("et.readRange", {"range": "A1:D3", "sheet": loaded.get("sheet") or "raw-data"}, record=False) or {}).get("values") or []
+    check(loaded.get("rows") == 3 and loaded.get("columns") == 5 and grid and grid[0][0] == "Vùng" and grid[1][1] == "SP-001"
+          and grid[1][3] == 1500.5, "Excel importCsv nạp file vào sheet mới, giữ chữ có dấu và số", {"load": loaded, "grid": grid})
+    b.cmd("et.importCsv", {"path": os.path.join(out, "khong-co.csv")}, expect_ok=False, key="et.importCsv file thiếu")
+    b.cmd("et.writeRange", {"range": "H1:H10", "sheet": "Raw_Data",
+                            "values": [[10], [20], [30], [40], [50], [60], [70], [80], [90], [100]]}, record=False)
+    applied = b.cmd("et.setConditionalFormat", {"sheet": "Raw_Data", "range": "H1:H10", "rules": [
+        {"operator": "less", "formula1": "50", "fillColor": "#FFCCCC"},
+        {"operator": "greaterEqual", "formula1": "90", "bold": True}]}) or {}
+    check([r.get("operator") for r in applied.get("rules") or []] == ["less", "greaterEqual"],
+          "Excel setConditionalFormat nhận 2 rule, trả đúng tên toán tử đã viết", applied)
+    listed = b.cmd("et.listConditionalFormats", {"sheet": "Raw_Data"}) or {}
+    mine = [f for f in (listed.get("formats") or []) if f.get("range", "").replace("$", "").endswith("H1:H10")]
+    check(len(mine) == 1 and [(r.get("operator"), r.get("formula1"), r.get("formula2")) for r in mine[0].get("rules") or []]
+          == [("less", "50", None), ("greaterEqual", "90", None)],
+          "Excel listConditionalFormats nhóm theo vùng, đọc lại đúng toán tử và ngưỡng", listed)
+    b.cmd("et.activateSheet", {"sheet": "Sheet1"}, record=False)
 
 
 # ---------------------------------------------------------------- PowerPoint / WPP
@@ -435,14 +527,66 @@ def test_presentation(b, out, png, run_ai):
     pptx = os.path.join(out, "wpp.pptx")
     b.cmd("wpp.saveAs", {"path": pptx})
     b.cmd("wpp.save")
-    b.cmd("wpp.open", {"path": pptx})
+    test_presentation_template(b, out, pptx)
+    reopened = b.cmd("wpp.open", {"path": pptx}) or {}
+    back = b.cmd("wpp.listSlides", record=False) or {}
+    check(back.get("presentation") == "wpp.pptx", "PowerPoint wpp.open bài đã mở đưa nó lên làm bài đang hoạt động",
+          {"open": reopened, "active": back.get("presentation")})
     b.cmd("wpp.listSlides", key="wpp.listSlides reopened")
     if run_ai:
-        b.ask("Thêm một slide mới ở cuối với tiêu đề 'Kết luận'", "activePresentation")
-        slides = b.cmd("wpp.listSlides", record=False) or {}
+        b.ask("Thêm một slide mới ở cuối với tiêu đề 'Kết luận'", "activePresentation", target=pptx)
+        slides = b.cmd("wpp.listSlides", {"presentation": pptx}, record=False) or {}
         last = (slides.get("slides") or [{}])[-1].get("shapeTexts", [])
         check(slides.get("slideCount") == 3 and any("Kết luận" in t for t in last), "PowerPoint ai.ask thêm slide 'Kết luận'", slides)
         b.cmd("wpp.save", record=False)
+
+
+def test_presentation_template(b, out, pptx):
+    """Làm bài theo mẫu (docs/architecture/template-design.md): bài mới từ wpp.pptx, chép slide/ảnh, sắp xếp chữ/bảng."""
+    manifest = b.cmd("wpp.sourceManifest", {"from": pptx}) or {}
+    check(manifest.get("slideCount") == 2 and len(manifest.get("slides") or []) == 2,
+          "PowerPoint sourceManifest đọc 2 slide của bài nguồn", manifest)
+    made = os.path.join(out, "from-template.pptx")
+    created = b.cmd("wpp.newFromTemplate", {"template": pptx, "path": made}) or {}
+    check(created.get("slideCount") == 0 and created.get("templateSlides") == 2 and os.path.exists(made),
+          "PowerPoint newFromTemplate tạo bài mới rỗng, giữ khổ của mẫu", created)
+    # Mẫu đang mở (wpp.pptx): trước 25/10/2026 lệnh này lấy chính bài đang mở, xoá hết slide rồi đổi tên sang `made`.
+    still = b.cmd("wpp.sourceManifest", {"from": pptx}, record=False) or {}
+    check(still.get("slideCount") == 2 and created.get("path", "").lower() == made.lower(),
+          "PowerPoint newFromTemplate KHÔNG đụng tới bài mẫu đang mở (vẫn đủ 2 slide)", still.get("slideCount"))
+    b.cmd("wpp.newFromTemplate", {"template": pptx, "path": made}, expect_ok=False, key="wpp.newFromTemplate path đã có")
+    active = b.cmd("wpp.listSlides", record=False) or {}
+    check(active.get("presentation") == os.path.basename(made), "PowerPoint newFromTemplate đưa bài mới lên làm bài đang hoạt động",
+          active.get("presentation"))
+    copied = b.cmd("wpp.addSlideFromTemplate", {"template": pptx, "kind": 1, "tag": 1}) or {}
+    names = [s.get("shape") for s in (copied.get("textShapes") or [])]
+    check(copied.get("slideCount") == 1 and names, "PowerPoint addSlideFromTemplate chép slide 1 của mẫu (có khung chữ)", copied)
+    # Mẫu đang mở thì InsertFromFile đẩy cửa sổ mẫu lên: bài đang hoạt động phải vẫn là bài mới.
+    active = b.cmd("wpp.listSlides", record=False) or {}
+    check(active.get("presentation") == os.path.basename(made), "PowerPoint addSlideFromTemplate giữ bài mới là bài đang hoạt động",
+          active.get("presentation"))
+    if names:
+        text = b.cmd("wpp.setShapeText", {"shape": names[0], "text": "Tiêu đề theo mẫu", "slide": 1}) or {}
+        check(text.get("shape") == names[0] and text.get("chars") == len("Tiêu đề theo mẫu"),
+              "PowerPoint setShapeText thay chữ theo tên shape", text)
+    b.cmd("wpp.setShapeText", {"shape": "Không có shape này", "text": "x", "slide": 1}, expect_ok=False, key="wpp.setShapeText shape lạ")
+    b.cmd("wpp.addSlide", {"layout": 12}, record=False)
+    picture = b.cmd("wpp.copyPicture", {"from": pptx, "fromSlide": 2, "slide": 2, "left": 40, "top": 40, "width": 200, "height": 200}) or {}
+    check(picture.get("slide") == 2 and picture.get("shape"), "PowerPoint copyPicture chép ảnh từ bài khác", picture)
+    paras = b.cmd("wpp.addParagraphs", {"slide": 2, "left": 300, "top": 40, "width": 500, "height": 300, "paragraphs": [
+        {"t": "Mục chính", "l": 1, "b": True}, {"t": "Ý phụ một", "l": 2, "u": True}, {"t": "Ý phụ hai", "l": 2, "u": True}]}) or {}
+    check(paras.get("shape") and paras.get("overflow") is False, "PowerPoint addParagraphs chữ nhiều cấp vừa khung", paras)
+    grid = b.cmd("wpp.addGrid", {"slide": 2, "left": 40, "top": 300, "width": 700, "height": 150,
+                                 "values": [["Quý", "Doanh thu"], ["Q1", "100"], ["Q2", "120"]]}) or {}
+    check(grid.get("shape") and grid.get("overflow") is False, "PowerPoint addGrid bảng định dạng vừa khung", grid)
+    deleted = b.cmd("wpp.deleteShapes", {"slide": 2, "shapes": [picture.get("shape"), "Không có"]}) or {}
+    check(deleted.get("deleted") == [picture.get("shape")] and deleted.get("notFound") == ["Không có"],
+          "PowerPoint deleteShapes xoá theo tên, báo tên không thấy", deleted)
+    tagged = b.cmd("wpp.deleteTagged", {"first": 1, "last": 1}) or {}
+    slides = b.cmd("wpp.listSlides", record=False) or {}
+    check(tagged.get("deleted") == 1 and slides.get("slideCount") == 1, "PowerPoint deleteTagged xoá slide dựng từ mẫu (tag 1)",
+          {"tagged": tagged, "slides": slides.get("slideCount")})
+    b.cmd("wpp.save", record=False)
 
 
 def test_http(port, label):
@@ -484,7 +628,8 @@ def test_commands(port, label):
 
     sample = next((c for c in commands if c.get("name") == "et.readRange"), None)
     check(sample is not None and sample.get("kind") == "et" and sample.get("agent") is True
-          and [p.get("name") for p in sample.get("params") or []] == ["range", "sheet", "formulas"]
+          # Tham số chọn tài liệu (`workbook`, H1 - nhắm đúng tài liệu) đứng sau ba tham số của lệnh.
+          and [p.get("name") for p in sample.get("params") or []][:3] == ["range", "sheet", "formulas"]
           and all("required" in p and "hint" in p for p in sample["params"]),
           label + " /commands đủ trường name/kind/agent/summary/params", sample)
 
@@ -537,6 +682,17 @@ def test_core_version():
           "Agent Core /health (version khớp bridge, protocol 1)", core)
 
 
+def other_live_tests():
+    """Lệnh đã có test live trên Office ở file khác (slide, định dạng Word) - không lặp lại ở đây."""
+    names = set()
+    for name in ("test_live_slides.py", "test_writer_format.py"):
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
+        if os.path.exists(path):
+            with open(path, encoding="utf-8") as handle:
+                names.update(re.findall(r'"((?:writer|et|wpp|app)\.[A-Za-z]+)"', handle.read()))
+    return names
+
+
 def registered_actions():
     """Danh sách lệnh bridge từ registry (AxiomOffice.Host.exe commands --json); None nếu bản cũ chưa có."""
     try:
@@ -586,7 +742,7 @@ def main():
 
     registry = registered_actions()
     if registry is not None and args.apps == "word,excel,ppt":
-        missing = sorted(registry - TESTED - ({"ai.ask"} if not args.ai else set()))
+        missing = sorted(registry - TESTED - other_live_tests() - ({"ai.ask"} if not args.ai else set()))
         check(not missing, "mọi lệnh trong registry đều có test", missing)
 
     if args.record:
