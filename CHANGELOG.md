@@ -5,6 +5,25 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — Slide sơ đồ trên đề thật: sửa đúng slide lỗi, dây tránh chú thích, xoá slide trống không hỏi (25/10/2026)
+
+Đề "Thiết kế hệ thống AI Agent cho ngân hàng" (10 slide, `tests/live/tasks/ngan-hang-ai-agent.md`, chạy bằng
+`tests/live/run_ai_task.py`, `ocg/beam-free`): 20 → 42 → 30 vòng qua các lần sửa; bản cuối 10 slide, `checkLayout` 0
+lỗi. Bàn giao chi tiết: `docs/plans/20-c0-ngu-canh-va-slide.md`.
+
+- **`slides_from_brief`**: nhận trường lồng trong khoá cùng tên layout (`{"layout":"diagram","diagram":{"nodes":…}}` —
+  lượt khung chat hỏng vì model viết kiểu này); lỗi thiếu nút/bước/mốc chỉ cách viết đúng; mô tả "không gọi
+  `wpp.addSlide` trước".
+- **`replace: N`**: gửi lại chỉ slide lỗi để dựng lại tại chỗ (chỉ slide do lượt dựng; `NOT_BUILT_IN_THIS_REQUEST`);
+  `wpp.addSlide` có `index`. Trước đó model dựng lại cả 10 slide rồi xoá bộ cũ.
+- **`SAME_SPEC_SAME_ISSUES`**: gửi lại đúng mô tả một slide đã dựng ra lỗi thì bị từ chối kèm gợi ý đổi gì (một lượt đã
+  gửi lại slide sơ đồ ~17 lần).
+- **Đường nối** tránh tiêu đề và dòng chú thích nhóm màu (`RouteDiagram` nhận vật cản; khoảng chú thích 34 → 50 pt).
+- **Lỗi bố cục vào `core.log`** (`slides_from_brief` và `wpp.checkLayout`: loại + chi tiết, không có chữ tài liệu).
+- Kết quả slide có `notes: "set"`; một nhóm màu thì không tô/không chú thích; nhóm 3 màu đậm hơn hẳn nhóm 1.
+- **Xoá slide trống không hỏi xác nhận** (`policy.BlankSlide`: không có hình nào ngoài placeholder rỗng).
+- **Khung chat** không gọi mọi lỗi là "Máy chủ AI báo lỗi": đọc `ErrorKind` của Core; lặp lệnh hỏng có câu riêng.
+
 ### Changed — Trả token cho agent: bớt vòng thừa, bớt tool không dùng, đánh dấu cache (25/10/2026)
 
 Báo cáo "Giam ngu canh gui lai agent" (26 lượt thật 24–25/10, PowerPoint, `ocg/beam-free`, 212 vòng,

@@ -211,7 +211,7 @@ staticcheck vẫn chỉ ở job `linux` (không phụ thuộc nền tảng).
 
 Nguồn: báo cáo đo 26 lượt thật (24–25/10, PowerPoint, `ocg/beam-free`, 212 vòng, 1.541.217 token đầu vào) —
 ~71% đầu vào là tiền tố cố định (tools + system prompt), ~25% là các vòng sau lần sửa tài liệu cuối; chỉ dẫn
-đầy đủ ở `reports/Giảm ngữ cảnh gửi lại agent.md`. Chi tiết kỹ thuật từng mục: `CHANGELOG.md` (Unreleased).
+đầy đủ ở `docs/research/giam-ngu-canh-gui-lai-agent.md`. Chi tiết kỹ thuật từng mục: `CHANGELOG.md` (Unreleased).
 
 | Việc | Nội dung |
 |---|---|
@@ -228,6 +228,14 @@ Nguồn: báo cáo đo 26 lượt thật (24–25/10, PowerPoint, `ocg/beam-free
 1 phép kiểm `cache_control`; cập nhật 2 phép characterization: system Anthropic thành block có `cache_control`
 và ca MCP chạy phiên Word vì `doc_` giờ là tool của Word); bench slides **9/9**; `make check-gen` khớp;
 `gofmt` + `go vet` + `ruff` sạch.
+
+### 2.11 Đợt 25/10/2026 (tiếp): slide sơ đồ trên đề thật
+
+Đề "Thiết kế hệ thống AI Agent cho ngân hàng" (10 slide, `tests/live/tasks/ngan-hang-ai-agent.md`) chạy bằng
+`tests/live/run_ai_task.py`: 20 → 42 → **30 vòng** qua các lần sửa; bản cuối 10 slide, `checkLayout` 0 lỗi, sơ đồ kiến
+trúc không dây cắt hộp. Sửa: sơ đồ lồng trong khoá `diagram`, `replace: N` sửa đúng slide lỗi, đường nối tránh tiêu
+đề/chú thích, `SAME_SPEC_SAME_ISSUES`, lỗi bố cục vào `core.log`, xoá slide trống không hỏi, nhãn lỗi của khung chat.
+**Bàn giao chi tiết + việc tiếp: `docs/plans/20-c0-ngu-canh-va-slide.md`.**
 
 ## 3. Chưa làm / chưa kiểm chứng
 
@@ -298,7 +306,8 @@ Các phần e2e chạy riêng được: `fake_bridge`, `guards`, `skills`, `memo
    Quản lý / Hệ thống), chọn ngôn ngữ hiển thị, khoá vùng chọn trong Word, dialog *Công cụ ngoài…*, màu Fluent. `Host.exe mcp` vẫn chỉ là
    shim chuyển tiếp byte sang Core Go (`src/AxiomOffice.Host/Mcp/McpHost.cs`).
 5. Phát hành gói Linux mới để người dùng có `install.sh` đã sửa (§3).
-6. Push các commit đang chờ.
+6. Làm tiếp slide sơ đồ và bớt ngữ cảnh theo `docs/plans/20-c0-ngu-canh-va-slide.md` §5 (trước hết: tool tự đi lại
+   dây khi PowerPoint vẽ lệch mô hình).
 
 ## 7. Đối chiếu benchmark & lộ trình hiệu năng (02–03/10/2026)
 

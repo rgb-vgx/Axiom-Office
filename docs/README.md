@@ -38,6 +38,7 @@ Gói cài Windows còn kèm `scripts/dist/HUONG-DAN-CAI-DAT.txt` (hướng dẫn
 |---|---|
 | [research/wps-spike.md](research/wps-spike.md) | Spike: add-in JS trên WPS Office for Linux có làm được không (cơ sở của `architecture/wps-bridge.md`) |
 | [research/skills-review.md](research/skills-review.md) | Review 8 skill dựng sẵn và khoảng trống so với công việc văn phòng |
+| [research/giam-ngu-canh-gui-lai-agent.md](research/giam-ngu-canh-gui-lai-agent.md) | Giảm ngữ cảnh agent gửi lại mỗi vòng: kỹ thuật trên thế giới (đến 10/2026), số đo trên Axiom, lộ trình ưu tiên |
 | [../tests/wps/REFERENCE.md](../tests/wps/REFERENCE.md) | Các phép đo trên WPS thật (object model, bridge, ribbon, menu chuột phải, hộp thoại) — đặt cạnh test của add-in WPS |
 
 ## Lộ trình
