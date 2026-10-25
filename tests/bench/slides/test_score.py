@@ -121,6 +121,27 @@ class ScoreTest(unittest.TestCase):
             self.assertFalse(result["valid"])
             self.assertFalse(result["pass"])
 
+    def test_chart_values_are_read_from_the_pptx(self):
+        # Bieu do goc: so lieu nam o ppt/charts/chartN.xml (lien ket qua rels cua slide), nhan co don vi.
+        chart = ('<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" '
+                 'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><c:chart><c:plotArea><c:pieChart><c:ser>'
+                 '<c:tx><c:strRef><c:strCache><c:pt idx="0"><c:v>Chi phí</c:v></c:pt></c:strCache></c:strRef></c:tx>'
+                 '<c:dLbls><c:numFmt formatCode="General&quot;%&quot;" sourceLinked="0"/></c:dLbls>'
+                 '<c:cat><c:strRef><c:strCache><c:pt idx="0"><c:v>Nhân sự</c:v></c:pt><c:pt idx="1"><c:v>Khác</c:v></c:pt>'
+                 '</c:strCache></c:strRef></c:cat><c:val><c:numRef><c:numCache><c:formatCode>General</c:formatCode>'
+                 '<c:pt idx="0"><c:v>55</c:v></c:pt><c:pt idx="1"><c:v>12.5</c:v></c:pt></c:numCache></c:numRef></c:val>'
+                 '</c:ser></c:pieChart></c:plotArea></c:chart></c:chartSpace>')
+        with tempfile.TemporaryDirectory() as root:
+            path = os.path.join(root, "deck.pptx")
+            with zipfile.ZipFile(path, "w") as package:
+                package.writestr("ppt/slides/slide1.xml", "<p:sld><a:t>Cơ cấu chi phí</a:t></p:sld>")
+                package.writestr("ppt/slides/_rels/slide1.xml.rels",
+                                 '<Relationships><Relationship Id="rId2" Target="../charts/chart3.xml"/></Relationships>')
+                package.writestr("ppt/charts/chart3.xml", chart)
+            self.assertEqual(score.deck_texts(path), ["Cơ cấu chi phí\nChi phí: Nhân sự 55%, Khác 12.5%"])
+        self.assertEqual(score.chart_value("0.55", "0%"), "55%")
+        self.assertEqual(score.chart_value("28", 'General" tỷ"'), "28 tỷ")
+
     def test_unsourced_numbers(self):
         prompt = "tiếp nhận 1.240 hồ sơ, đúng hạn 98,5%, ngày 15/10/2026"
         texts = ["1240 hồ sơ, 98.5% đúng hạn", "Ngày 15/10/2026", "Thêm 5 việc, tăng 37% so với 2025"]

@@ -64,6 +64,9 @@ namespace AxiomOffice.Bridge
             // MsoShapeType (1 hình vẽ, 13 ảnh, 17 textbox...); 0 = không rõ.
             public int Type;
             public double MinFont;
+            // Đường nối (Shape.Connector): là đường, không có diện tích - khung bao của đường gấp khúc trùm lên các hộp
+            // nó nối, không phải chồng.
+            public bool Connector;
         }
 
         private static Dictionary<string, object> WppCheckLayout(IAppHost host, Dictionary<string, object> p)
@@ -128,6 +131,8 @@ namespace AxiomOffice.Bridge
                         Height = Convert.ToDouble(shape.Height),
                         MinFont = 0
                     };
+                    RotateBox(box, ComDouble(() => shape.Rotation));
+                    box.Connector = ComFlag(() => shape.Connector);
                     try
                     {
                         if (Convert.ToInt32(shape.HasTextFrame) == -1 && Convert.ToInt32(shape.TextFrame.HasText) == -1)
@@ -229,7 +234,7 @@ namespace AxiomOffice.Bridge
             }
             // Shape nền phủ gần cả slide là chủ ý thiết kế: không tính là chồng.
             double slideArea = slideWidth * slideHeight;
-            List<ShapeBox> content = boxes.Where(b => b.Width * b.Height < slideArea * 0.9).ToList();
+            List<ShapeBox> content = boxes.Where(b => b.Width * b.Height < slideArea * 0.9 && !b.Connector).ToList();
             var spilled = new HashSet<string>();
             for (int a = 0; a < content.Count; a++)
             {
@@ -268,6 +273,23 @@ namespace AxiomOffice.Bridge
                 issues.Add(Issue("dense", "the slide has " + totalChars + " characters; keep one message per slide and move details to notes (wpp.setNotes)"));
             }
             return issues;
+        }
+
+        // Left/Top/Width/Height của PowerPoint là khung TRƯỚC khi xoay: xoay 90/270 độ (đường nối gấp khúc đi xuống hay
+        // dùng) thì khung thật đổi rộng-cao quanh tâm. Góc khác: giữ nguyên (gần đúng).
+        internal static void RotateBox(ShapeBox box, double rotation)
+        {
+            double turn = ((rotation % 180) + 180) % 180;
+            if (Math.Abs(turn - 90) > 1)
+            {
+                return;
+            }
+            double centerX = box.Left + box.Width / 2, centerY = box.Top + box.Height / 2;
+            double width = box.Width;
+            box.Width = box.Height;
+            box.Height = width;
+            box.Left = centerX - box.Width / 2;
+            box.Top = centerY - box.Height / 2;
         }
 
         // Ảnh nền của mẫu (logo, dải màu) phủ gần cả slide, có thể lệch vài pt ra ngoài mép: không phải lỗi.

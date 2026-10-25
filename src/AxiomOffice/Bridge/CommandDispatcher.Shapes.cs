@@ -26,8 +26,11 @@ namespace AxiomOffice.Bridge
                 Command("wpp.addConnector", "wpp", WppAddConnector,
                     "Đường nối có mũi tên giữa hai hình (bám theo hình khi kéo)",
                     Req("from", "shape name"), Req("to", "shape name"), Opt("slide"),
-                    Opt("elbow", "true = elbow connector (default straight)"), Opt("color", "#RRGGBB"), Opt("weight", "points"),
-                    Opt("presentation", "full path of the presentation to work on; default: the active one"))
+                    Opt("elbow", "true = elbow connector (default straight)"),
+                    Opt("direction", "down, up, right or left: leave 'from' on that side and enter 'to' on the opposite side; default: nearest sides"),
+                    Opt("color", "#RRGGBB"), Opt("weight", "points"),
+                    Opt("presentation", "full path of the presentation to work on; default: the active one")),
+                ChartCommand()
             };
         }
 
@@ -130,11 +133,18 @@ namespace AxiomOffice.Bridge
             dynamic slide = WppGetSlide(pres, ParamInt(p, "slide", 0));
             dynamic from = ConnectEnd(slide, ParamString(p, "from", null));
             dynamic to = ConnectEnd(slide, ParamString(p, "to", null));
-            // MsoConnectorType: 1 thẳng, 2 gấp khúc. Nối vào điểm 1 rồi RerouteConnections chọn điểm gần nhất.
+            // MsoConnectorType: 1 thẳng, 2 gấp khúc. Có hướng thì nối đúng cạnh (đáy cha -> đỉnh con): RerouteConnections
+            // chọn "điểm gần nhất" có thể cho đường gấp khúc cắt ngang hộp bên cạnh (benchmark s17, docs/plans/18-s0 9.3).
+            string direction = ParamString(p, "direction", null);
+            int begin = ConnectSite(from, direction, false);
+            int end = ConnectSite(to, direction, true);
             dynamic connector = slide.Shapes.AddConnector(ParamBool(p, "elbow", false) ? 2 : 1, 0, 0, 10, 10);
-            connector.ConnectorFormat.BeginConnect(from, 1);
-            connector.ConnectorFormat.EndConnect(to, 1);
-            connector.RerouteConnections();
+            connector.ConnectorFormat.BeginConnect(from, begin > 0 ? begin : 1);
+            connector.ConnectorFormat.EndConnect(to, end > 0 ? end : 1);
+            if (begin == 0 || end == 0)
+            {
+                connector.RerouteConnections();
+            }
             connector.Line.EndArrowheadStyle = 2; // msoArrowheadTriangle
             connector.Line.Weight = (float)ParamDouble(p, "weight", 1.75);
             int? color = ParseBgrColor(ParamString(p, "color", "#595959"));
@@ -147,6 +157,27 @@ namespace AxiomOffice.Bridge
                 { "slide", Convert.ToInt32(slide.SlideIndex) },
                 { "shape", Convert.ToString(connector.Name) }
             };
+        }
+
+        // Điểm nối của hình theo cạnh. Hình chữ nhật, bo góc, elip có 4k điểm đều nhau, đánh số ngược chiều kim đồng hồ
+        // từ đỉnh: đỉnh 1, trái 1+k, đáy 1+2k, phải 1+3k. Hình khác hoặc không có hướng: 0 (để PowerPoint tự chọn).
+        private static int ConnectSite(dynamic shape, string direction, bool entering)
+        {
+            if (string.IsNullOrWhiteSpace(direction))
+            {
+                return 0;
+            }
+            int side;
+            switch (direction.Trim().ToLowerInvariant())
+            {
+                case "down": side = entering ? 0 : 2; break;
+                case "up": side = entering ? 2 : 0; break;
+                case "right": side = entering ? 1 : 3; break;
+                case "left": side = entering ? 3 : 1; break;
+                default: throw new ArgumentException("'direction' must be down, up, right or left, got " + direction);
+            }
+            int count = Convert.ToInt32(shape.ConnectionSiteCount);
+            return count > 0 && count % 4 == 0 ? 1 + side * count / 4 : 0;
         }
 
         private static dynamic ConnectEnd(dynamic slide, string name)

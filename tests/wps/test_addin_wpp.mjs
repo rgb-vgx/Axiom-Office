@@ -73,7 +73,7 @@ function slideOf(app, index) {
 // Hinh khoi + duong noi (slides_from_brief, docs/plans/18-s0 P2): cung chi co tren PowerPoint, WPS la to-do.
 const TEMPLATE_COMMANDS = ["wpp.newFromTemplate", "wpp.addSlideFromTemplate", "wpp.sourceManifest", "wpp.setShapeText",
   "wpp.deleteShapes", "wpp.copyPicture", "wpp.addParagraphs", "wpp.addGrid", "wpp.deleteTagged", "wpp.addShape",
-  "wpp.addConnector", "wpp.renderSlide"];
+  "wpp.addConnector", "wpp.renderSlide", "wpp.addChart"];
 
 test("registry: du 15 lenh wpp.*, metadata giong het registry LibreOffice", () => {
   const ctx = loadAddin();

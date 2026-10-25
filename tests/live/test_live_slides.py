@@ -8,7 +8,9 @@ Kiem:
   - H1: lenh khong tu chon bai (wpp.addSlide) + tham so presentation -> ghi dung bai du bai khac dang active;
         bai da dong -> DOCUMENT_CLOSED.
   - H4: wpp.addTable tra ten shape.
-  - P2: wpp.addShape + wpp.addConnector (duong noi bam hai hinh), checkLayout khong bao chong.
+  - P2: wpp.addShape + wpp.addConnector (duong noi bam hai hinh), checkLayout khong bao chong; so do 3 tang noi
+        theo huong "down" khong co duong cat hop.
+  - Bieu do goc: wpp.addChart (cot co don vi, tron), listSlides doc lai gia tri, checkLayout sach.
   - P3: wpp.renderSlide tra PNG cua slide theo so.
 """
 from __future__ import annotations
@@ -98,6 +100,47 @@ def main() -> int:
     check("Phê duyệt" in texts and any(t.startswith("Tiếp nhận") for t in texts), "P2 chu trong hinh doc lai duoc", texts)
     layout = b.ok("wpp.checkLayout", {"presentation": a, "slide": 2})
     check(layout.get("issueCount") == 0, "P2 checkLayout sach (duong noi khong tinh la chong)", layout)
+
+    # P2: so do 3 tang kieu s17 (docs/plans/18-s0 9.3) - noi theo huong (day cha -> dinh con), khong duong nao cat hop.
+    b.ok("wpp.addSlide", {"layout": 12, "presentation": a})
+    boxes = {"g": (360, 136, 240), "p1": (222, 270, 240), "p2": (498, 270, 240)}
+    for n, x in enumerate((40, 269, 498, 727)):
+        boxes["c%d" % n] = (x, 404, 193)
+    names = {}
+    for key, (left, top, width) in boxes.items():
+        names[key] = b.ok("wpp.addShape", {"presentation": a, "slide": 3, "shape": "rounded", "left": left, "top": top,
+                                           "width": width, "height": 90, "text": key, "line": "#1F4E79"})["shape"]
+    for parent, child in (("g", "p1"), ("g", "p2"), ("p1", "c0"), ("p1", "c1"), ("p2", "c2"), ("p2", "c3")):
+        b.ok("wpp.addConnector", {"presentation": a, "slide": 3, "from": names[parent], "to": names[child], "elbow": True,
+                                  "direction": "down"})
+    layout = b.ok("wpp.checkLayout", {"presentation": a, "slide": 3})
+    check(layout.get("issueCount") == 0, "P2 so do 3 tang: duong noi theo huong khong cat hop", layout.get("slides"))
+    bad = b.call("wpp.addConnector", {"presentation": a, "slide": 3, "from": names["g"], "to": names["p1"], "direction": "cheo"})
+    count = len(b.ok("wpp.checkLayout", {"presentation": a, "slide": 3})["slides"][0]["shapes"])
+    check(not bad.get("ok") and count == len(layout["slides"][0]["shapes"]), "P2 direction sai -> loi, khong de lai duong noi", bad)
+    # Bo qua duong noi khong duoc lam mat loi that: hai hop chong nhau van bao.
+    b.ok("wpp.addShape", {"presentation": a, "slide": 3, "shape": "rect", "left": 380, "top": 150, "width": 200, "height": 60,
+                          "text": "chong", "fill": "#FFFFFF"})
+    layout = b.ok("wpp.checkLayout", {"presentation": a, "slide": 3})
+    check(any(i.get("type") == "overlap" for i in layout["slides"][0]["issues"]), "P2 hai hop chong that van bao overlap",
+          layout["slides"][0]["issues"])
+
+    # Bieu do goc: so lieu nam trong bang tinh nhung, listSlides doc lai duoc gia tri kem don vi.
+    b.ok("wpp.addSlide", {"layout": 12, "presentation": a})
+    column = b.ok("wpp.addChart", {"presentation": a, "slide": 4, "type": "column", "categories": ["Q1", "Q2", "Q3", "Q4"],
+                                   "series": [{"name": "Doanh thu", "values": [28, 31, 33, 36]}], "unit": " tỷ",
+                                   "colors": ["#1F4E79"], "font": "Arial", "left": 40, "top": 130, "width": 420, "height": 330})
+    pie = b.ok("wpp.addChart", {"presentation": a, "slide": 4, "type": "pie", "categories": ["Nhân sự", "Văn phòng", "Khác"],
+                                "series": [{"name": "Chi phí", "values": [55, 25, 20]}], "unit": "%",
+                                "colors": ["#1F4E79", "#2E75B6", "#849EB5"], "left": 500, "top": 130, "width": 420, "height": 330})
+    texts = "\n".join(b.ok("wpp.listSlides", {"presentation": a})["slides"][3]["shapeTexts"])
+    check(bool(column.get("shape")) and bool(pie.get("shape")), "Chart addChart tra ten", (column, pie))
+    check("Q4 36 tỷ" in texts and "Nhân sự 55%" in texts, "Chart listSlides doc gia tri kem don vi", texts)
+    layout = b.ok("wpp.checkLayout", {"presentation": a, "slide": 4})
+    check(layout.get("issueCount") == 0, "Chart checkLayout sach", layout.get("slides"))
+    bad = b.call("wpp.addChart", {"presentation": a, "slide": 4, "type": "pie", "categories": ["a", "b"],
+                                  "series": [{"name": "x", "values": [1, 2]}, {"name": "y", "values": [1, 2]}]})
+    check(not bad.get("ok"), "Chart pie hai chuoi -> loi", bad)
 
     # P3: render slide theo so.
     shot = b.ok("wpp.renderSlide", {"presentation": a, "slide": 2, "maxWidth": 640})

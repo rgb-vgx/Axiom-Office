@@ -205,7 +205,7 @@
       "id": "s23-tom-tat-quyet-dinh",
       "category": "comparison",
       "smoke": false,
-      "prompt": "Làm slide tóm tắt cho lãnh đạo ra quyết định: Đề xuất mua 40 máy tính mới thay máy đã dùng trên 7 năm. Chi phí 720 triệu. Lợi ích: giảm 60% thời gian chờ khởi động, giảm chi sửa chữa 90 triệu/năm. Rủi ro: chậm giao hàng 3–4 tuần. Cần quyết định trước 30/11/2026.",
+      "prompt": "Làm một slide tóm tắt cho lãnh đạo ra quyết định: Đề xuất mua 40 máy tính mới thay máy đã dùng trên 7 năm. Chi phí 720 triệu. Lợi ích: giảm 60% thời gian chờ khởi động, giảm chi sửa chữa 90 triệu/năm. Rủi ro: chậm giao hàng 3–4 tuần. Cần quyết định trước 30/11/2026.",
       "slides": [1, 1],
       "mustContain": ["40 máy tính", "720 triệu", "90 triệu", "30/11/2026"],
       "needs": []
