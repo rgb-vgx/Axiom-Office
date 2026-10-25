@@ -81,6 +81,7 @@
     "et.setConditionalFormat": true,
     "et.writeRange": true,
     "et.writeRanges": true,
+    "wpp.addChart": true,
     "wpp.addConnector": true,
     "wpp.addGrid": true,
     "wpp.addImage": true,

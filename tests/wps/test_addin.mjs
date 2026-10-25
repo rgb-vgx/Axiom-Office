@@ -309,6 +309,7 @@ const CHUA_CO_HANDLER = {
   // host Linux (docs/plans/19-h0 muc "To-do WPS").
   "wpp.addShape": "hinh khoi (slides_from_brief) - chi PowerPoint; WPS JS chua viet handler",
   "wpp.addConnector": "duong noi (slides_from_brief) - chi PowerPoint; WPS JS chua viet handler",
+  "wpp.addChart": "bieu do goc (slides_from_brief) - chi PowerPoint; WPS JS chua viet handler",
   "wpp.renderSlide": "anh mot slide theo so (look_at_document, benchmark) - chi PowerPoint; WPS JS chua viet handler",
 };
 

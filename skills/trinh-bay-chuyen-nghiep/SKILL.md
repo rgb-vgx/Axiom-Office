@@ -17,7 +17,8 @@ dưới đây không áp dụng. Không tự vẽ lại mẫu bằng `wpp.addTex
 
 **Có tool `slides_from_brief`** (PowerPoint): slide **mới** làm bằng tool này — chọn layout (`cover`,
 `section`, `content`, `cards`, `table`, `figures`; quy trình `process`, dòng thời gian `timeline`, sơ đồ khối
-`diagram` vẽ bằng hình khối và mũi tên sửa được) và viết chữ; tool tự đặt vị trí, cỡ chữ, màu theo lưới mục 1–2
+`diagram` vẽ bằng hình khối và mũi tên sửa được; biểu đồ `chart` cột/thanh/đường/tròn là biểu đồ thật của
+PowerPoint: số trong `values` là số trần, đơn vị để ở `unit`) và viết chữ; tool tự đặt vị trí, cỡ chữ, màu theo lưới mục 1–2
 và tự soát. Gặp lỗi `TOO_LONG` thì rút chữ theo gợi ý rồi gọi lại với **cả** danh sách slide. Bảng toạ độ mục 1,
 mục 3 và `wpp.addText` chỉ dùng khi không có tool này hoặc để sửa lẻ một hộp chữ có sẵn. Mục 4 vẫn áp dụng.
 
@@ -112,9 +113,10 @@ Hộp của `wpp.addText` **giữ đúng chiều cao đã đặt**: chữ dài h
 - `wpp.addText` chỉ nhận `text, slide, left, top, width, height, fontSize, bold, color, align`. **Không
   có** phông chữ (luôn là Arial), chữ nghiêng, gạch đầu dòng, giãn dòng. Cỡ, đậm, màu áp cho **cả hộp** —
   muốn nhấn một con số thì tách nó thành hộp riêng.
-- **Không có** biểu đồ, tô nền. Người dùng xin biểu đồ → làm bảng hoặc ba con số lớn và **nói thẳng** là
-  không vẽ được biểu đồ. Hình khối, mũi tên, sơ đồ chỉ làm được qua `slides_from_brief` (`process`,
-  `timeline`, `diagram`); không có tool đó thì cũng không có hình khối.
+- Biểu đồ, hình khối, mũi tên, sơ đồ chỉ làm được qua `slides_from_brief` (`chart`, `process`,
+  `timeline`, `diagram`). Không có tool đó thì **không có** biểu đồ và hình khối: người dùng xin biểu đồ →
+  làm bảng hoặc ba con số lớn và **nói thẳng** là không vẽ được biểu đồ. Không vẽ cột bằng hình chữ nhật
+  hay ký tự. Không có tô nền.
 - `wpp.addTable` không nhận cỡ chữ, style hay màu ô: ô luôn Arial 18pt. Chữ dài trong ô làm **hàng giãn
   ra** và cả bảng dài xuống — giữ chữ mỗi ô theo bảng ở `references/bo-cuc-slide.md` mục 4.
 - `wpp.addImage`: chỉ truyền `width` (ảnh tự giữ tỉ lệ). Truyền cả `width` lẫn `height` là kéo méo ảnh.
@@ -148,7 +150,7 @@ tên lệnh (`wpp.*`), số kind, toạ độ. Gọi slide bằng số trang và
 - Một câu: bao nhiêu slide (so với bản gốc nếu làm lại), đã soát lỗi.
 - **Khác bản gốc**: slide nào gộp, tách ("(tiếp theo)"), đổi thứ tự; phần nào chuyển vào ghi chú.
 - **Chỗ tự thêm hoặc sửa** để người dùng duyệt: nhãn ngắn, chữ đã rút gọn, lỗi chính tả, chữ viết tắt.
-- **Cần lưu ý**: việc không làm được (biểu đồ → đã làm bảng), slide còn lỗi `checkLayout`, nhắc lưu
+- **Cần lưu ý**: việc không làm được (vd không có `slides_from_brief`: biểu đồ → đã làm bảng), slide còn lỗi `checkLayout`, nhắc lưu
   (Ctrl+S).
 
 ## Đọc thêm

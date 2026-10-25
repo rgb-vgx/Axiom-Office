@@ -142,11 +142,7 @@ namespace AxiomOffice.Bridge
             }
             if (ComFlag(() => shape.HasChart))
             {
-                dynamic chart = shape.Chart;
-                if (Convert.ToBoolean(chart.HasTitle))
-                {
-                    texts.Add("[chart] " + Convert.ToString(chart.ChartTitle.Text));
-                }
+                texts.Add(ChartText(shape.Chart));
                 return;
             }
             if (Convert.ToInt32(shape.HasTextFrame) == -1 && Convert.ToInt32(shape.TextFrame.HasText) == -1)
@@ -166,6 +162,19 @@ namespace AxiomOffice.Bridge
             catch
             {
                 return false;
+            }
+        }
+
+        // Số COM đọc an toàn: không có thuộc tính thì 0.
+        private static double ComDouble(Func<object> read)
+        {
+            try
+            {
+                return Convert.ToDouble(read());
+            }
+            catch
+            {
+                return 0;
             }
         }
 

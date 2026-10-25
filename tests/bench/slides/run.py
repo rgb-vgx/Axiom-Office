@@ -218,8 +218,17 @@ def main() -> int:
     parser.add_argument("--max-seconds", type=int, default=900,
                         help="tran thoi gian moi luot (cat ca request model dang treo)")
     parser.add_argument("--out", default=os.path.join(HERE, "results"))
+    parser.add_argument("--allow-memory", action="store_true",
+                        help="cho chay khi Core bat bo nho agent (cac lan lap khong con doc lap)")
     args = parser.parse_args()
     args.token = args.token or registry_token()
+
+    # Bo nho agent bat thi lan 2, 3 nho lan 1 ("I have memory of this exact task"): tat truoc khi do (docs/plans/18-s0 9.3).
+    with urllib.request.urlopen("http://127.0.0.1:%d/health" % args.core_port, timeout=10) as response:
+        memory = json.loads(response.read().decode("utf-8")).get("result", {}).get("memory")
+    if memory == "on" and not args.allow_memory:
+        print("Core dang bat bo nho agent: khoi dong Core voi AXIOM_MEMORY_ENABLED=false (hoac --allow-memory)", file=sys.stderr)
+        return 2
 
     with open(os.path.join(HERE, "briefs.json"), encoding="utf-8") as handle:
         briefs = json.load(handle)["briefs"]

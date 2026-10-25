@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"axiomoffice/core/internal/skills"
@@ -33,7 +34,9 @@ func (t *SlidesFromBriefTool) Description() string {
 		"points}] 2-4}; table {title, table: [[header...], [row...]...] up to 7 rows x 5 columns}; figures {title, " +
 		"figures: [{value, label}] 2-3 big numbers}; process {title, steps: [{title, text}] 3-5 steps joined by arrows}; " +
 		"timeline {title, milestones: [{date, text}] 3-6}; diagram {title, nodes: [{id, text, layer}] up to 10 (layer 1 = " +
-		"top row, up to 4 nodes per layer), edges: [{from, to}] arrows between node ids}. Any slide may add notes (speaker notes) and source (one line). " +
+		"top row, up to 4 nodes per layer), edges: [{from, to}] arrows between node ids}; chart {title, chart: {type column|bar|line|pie, " +
+		"categories: [...] 2-12, series: [{name, values: [numbers]}] 1-4 (pie: 1), unit e.g. \"%\" or \" tỷ\"}} - a real, " +
+		"editable PowerPoint chart with value labels. Any slide may add notes (speaker notes) and source (one line). " +
 		"title: a short conclusion sentence. points: short phrases, \"**word**\" to stress, \"- \" for level 2. Make " +
 		"exactly the number of slides the user asked for. Nothing is built until every slide passes the checks: if a " +
 		"text is too long you get errors {slide, field, error, max}; shorten it and call again with all slides."
@@ -46,7 +49,7 @@ func (t *SlidesFromBriefTool) Parameters() json.RawMessage {
 }
 
 // briefLayouts: kieu dung duoc tu brief.
-var briefLayouts = []string{"cover", "section", "content", "cards", "table", "figures", "process", "timeline", "diagram"}
+var briefLayouts = []string{"cover", "section", "content", "cards", "table", "figures", "process", "timeline", "diagram", "chart"}
 
 type briefFigure struct{ Value, Label string }
 
@@ -60,6 +63,21 @@ type briefNode struct {
 
 type briefEdge struct{ From, To string }
 
+// briefChart: bieu do goc cua PowerPoint (wpp.addChart) - so lieu nam trong bang tinh nhung, nguoi dung "Edit Data" duoc.
+// Values giu chuoi goc de bao loi dung cho; Numbers la gia tri da doc.
+type briefChart struct {
+	Type       string
+	Categories []string
+	Series     []briefSeries
+	Unit       string
+}
+
+type briefSeries struct {
+	Name    string
+	Values  []any
+	Numbers []float64
+}
+
 type briefSlide struct {
 	composeRow
 	Figures    []briefFigure
@@ -67,6 +85,7 @@ type briefSlide struct {
 	Milestones []briefItem
 	Nodes      []briefNode
 	Edges      []briefEdge
+	Chart      *briefChart
 	Source     string
 }
 
@@ -160,6 +179,9 @@ func parseBrief(value any) ([]briefSlide, []rowError) {
 					}
 				}
 			}
+			if chart, ok := entry["chart"].(map[string]any); ok {
+				slide.Chart = parseChart(chart)
+			}
 			if figures, ok := entry["figures"].([]any); ok {
 				for _, item := range figures {
 					if figure, ok := item.(map[string]any); ok {
@@ -172,6 +194,101 @@ func parseBrief(value any) ([]briefSlide, []rowError) {
 		slides = append(slides, slide)
 	}
 	return slides, errors
+}
+
+func parseChart(entry map[string]any) *briefChart {
+	// unit giu nguyen dau cach: " tỷ" -> "28 tỷ", "%" -> "55%".
+	unit, _ := entry["unit"].(string)
+	chart := &briefChart{Type: strings.ToLower(strings.TrimSpace(textOf(entry["type"]))), Unit: unit}
+	if chart.Type == "" {
+		chart.Type = "column"
+	}
+	categories, _ := entry["categories"].([]any)
+	for _, category := range categories {
+		chart.Categories = append(chart.Categories, strings.TrimSpace(textOf(category)))
+	}
+	series, _ := entry["series"].([]any)
+	for _, raw := range series {
+		if item, ok := raw.(map[string]any); ok {
+			values, _ := item["values"].([]any)
+			chart.Series = append(chart.Series, briefSeries{Name: strings.TrimSpace(textOf(item["name"])), Values: values})
+		}
+	}
+	return chart
+}
+
+// chartNumber: so tu brief - so JSON, hoac chuoi so ("28", "28,5"). Chuoi kem don vi ("28 tỷ") la loi: don vi de o unit.
+func chartNumber(value any) (float64, bool) {
+	switch v := value.(type) {
+	case float64:
+		return v, true
+	case string:
+		number, err := strconv.ParseFloat(strings.ReplaceAll(strings.TrimSpace(v), ",", "."), 64)
+		return number, err == nil
+	}
+	return 0, false
+}
+
+// checkChart: kiem bieu do va dien Numbers. Bieu do khong co chu dai (nhan danh muc do PowerPoint tu xuong dong), nen
+// chi gioi han so luong va do dai nhan.
+func checkChart(slot int, chart *briefChart) []rowError {
+	if chart == nil {
+		return []rowError{{Src: slot, Field: "chart", Error: "MISSING", Allowed: "{type, categories, series: [{name, values}], unit}"}}
+	}
+	errors := []rowError{}
+	switch chart.Type {
+	case "column", "bar", "line", "pie":
+	default:
+		errors = append(errors, rowError{Src: slot, Field: "chart.type", Error: "UNKNOWN_CHART_TYPE", Allowed: "column, bar, line, pie"})
+	}
+	if n := len(chart.Categories); n < 2 || n > 12 {
+		errors = append(errors, rowError{Src: slot, Field: "chart.categories", Error: "NEED_2_TO_12_CATEGORIES", Actual: n})
+	}
+	for c, category := range chart.Categories {
+		if category == "" || len([]rune(category)) > 30 {
+			errors = append(errors, rowError{Src: slot, Field: fmt.Sprintf("chart.categories[%d]", c), Error: "LABEL_1_TO_30_CHARS",
+				Actual: len([]rune(category))})
+		}
+	}
+	if len([]rune(chart.Unit)) > 8 || strings.ContainsAny(chart.Unit, "\"\\") {
+		errors = append(errors, rowError{Src: slot, Field: "chart.unit", Error: "BAD_UNIT", Allowed: "short suffix, e.g. \"%\" or \" tỷ\""})
+	}
+	maxSeries := 4
+	if chart.Type == "pie" {
+		maxSeries = 1
+	}
+	if n := len(chart.Series); n < 1 || n > maxSeries {
+		errors = append(errors, rowError{Src: slot, Field: "chart.series", Error: fmt.Sprintf("NEED_1_TO_%d_SERIES", maxSeries), Actual: n})
+	}
+	for i := range chart.Series {
+		series := &chart.Series[i]
+		field := fmt.Sprintf("chart.series[%d]", i)
+		if series.Name == "" || len([]rune(series.Name)) > 40 {
+			errors = append(errors, rowError{Src: slot, Field: field + ".name", Error: "NAME_1_TO_40_CHARS"})
+		}
+		if len(series.Values) != len(chart.Categories) {
+			errors = append(errors, rowError{Src: slot, Field: field + ".values", Error: "ONE_VALUE_PER_CATEGORY",
+				Actual: len(series.Values), Max: len(chart.Categories)})
+			continue
+		}
+		series.Numbers = series.Numbers[:0]
+		for v, value := range series.Values {
+			number, ok := chartNumber(value)
+			if !ok || (chart.Type == "pie" && number < 0) {
+				errors = append(errors, rowError{Src: slot, Field: fmt.Sprintf("%s.values[%d]", field, v), Error: "NOT_A_NUMBER",
+					Allowed: "plain numbers (pie: 0 or more); put the unit in chart.unit"})
+				continue
+			}
+			series.Numbers = append(series.Numbers, number)
+		}
+	}
+	return errors
+}
+
+// chartColors: mau chuoi/lat banh theo token - dam truoc, nhat sau.
+func chartColors(colors struct{ Primary, Accent, Text, Muted string }) []string {
+	return []string{colors.Primary, colors.Accent, slidelayout.Tint(colors.Primary, 0.45), slidelayout.Tint(colors.Accent, 0.55),
+		colors.Muted, slidelayout.Tint(colors.Muted, 0.55)}
 }
 
 func briefTheme(tokens briefTokens) slidelayout.Theme {
@@ -350,6 +467,8 @@ func checkBrief(slides []briefSlide, grid slidelayout.Grid, tokens briefTokens) 
 					fits(slot, "nodes["+node.ID+"]", node.Text, shapeText(rows[l][n]), body)
 				}
 			}
+		case "chart":
+			errors = append(errors, checkChart(slot, slide.Chart)...)
 		default:
 			errors = append(errors, rowError{Src: slot, Field: "layout", Error: "UNKNOWN_LAYOUT", Allowed: allowed})
 		}
@@ -541,6 +660,18 @@ func briefBody(bridge func(string, map[string]any) (map[string]any, string), ind
 	switch slide.Layout {
 	case "process", "timeline", "diagram":
 		return briefShapes(bridge, index, grid, tokens, slide, text)
+	case "chart":
+		return append(steps, func() string {
+			area, chart := grid.Content(), slide.Chart
+			series := []map[string]any{}
+			for _, item := range chart.Series {
+				series = append(series, map[string]any{"name": item.Name, "values": item.Numbers})
+			}
+			_, problem := bridge("wpp.addChart", map[string]any{"slide": index, "left": area[0], "top": area[1], "width": area[2],
+				"height": area[3], "type": chart.Type, "categories": chart.Categories, "series": series, "unit": chart.Unit,
+				"colors": chartColors(colors), "font": briefFont, "fontSize": tokens.Slide.Type.Caption + 2, "color": colors.Text})
+			return problem
+		})
 	}
 	if slide.Layout == "figures" {
 		values, labels := grid.Figures(len(slide.Figures), tokens.Slide.Gutter)
@@ -615,10 +746,12 @@ func briefShapes(bridge func(string, map[string]any) (map[string]any, string), i
 		name, _ := result["shape"].(string)
 		return name, problem
 	}
-	connect := func(from, to *string, elbow bool) func() string {
+	// direction: di ra canh nao cua hinh dau, vao canh doi dien cua hinh sau (wpp.addConnector) - khong de PowerPoint tu
+	// chon diem noi, duong gap khuc co the cat ngang hop ben canh (benchmark s17, docs/plans/18-s0 9.3).
+	connect := func(from, to *string, elbow bool, direction string) func() string {
 		return func() string {
 			_, problem := bridge("wpp.addConnector", map[string]any{"slide": index, "from": *from, "to": *to, "elbow": elbow,
-				"color": colors.Muted})
+				"direction": direction, "color": colors.Muted})
 			return problem
 		}
 	}
@@ -642,7 +775,7 @@ func briefShapes(bridge func(string, map[string]any) (map[string]any, string), i
 			})
 		}
 		for s := 1; s < len(slide.Steps); s++ {
-			steps = append(steps, connect(&names[s-1], &names[s], false))
+			steps = append(steps, connect(&names[s-1], &names[s], false, "right"))
 		}
 	case "timeline":
 		axis, dots, dates, texts := slidelayout.Timeline(area, len(slide.Milestones))
@@ -669,11 +802,11 @@ func briefShapes(bridge func(string, map[string]any) (map[string]any, string), i
 		layers, _ := diagramLayers(slide)
 		rows := slidelayout.Diagram(area, layerCounts(layers))
 		names := map[string]*string{}
-		layerOf := map[string]int{}
+		layerOf, place := map[string]int{}, map[string]int{}
 		for l, layer := range layers {
 			for n, node := range layer {
 				rect, node, name, first := rows[l][n], node, new(string), l == 0
-				names[node.ID], layerOf[node.ID] = name, l
+				names[node.ID], layerOf[node.ID], place[node.ID] = name, l, n
 				steps = append(steps, func() string {
 					var problem string
 					*name, problem = shape(rect, "rounded", node.Text, style(first))
@@ -682,10 +815,26 @@ func briefShapes(bridge func(string, map[string]any) (map[string]any, string), i
 			}
 		}
 		for _, edge := range slide.Edges {
-			steps = append(steps, connect(names[edge.From], names[edge.To], layerOf[edge.From] != layerOf[edge.To]))
+			steps = append(steps, connect(names[edge.From], names[edge.To], layerOf[edge.From] != layerOf[edge.To],
+				diagramDirection(layerOf[edge.From], place[edge.From], layerOf[edge.To], place[edge.To])))
 		}
 	}
 	return steps
+}
+
+// diagramDirection: tang tren xuong tang duoi thi "down" (day cha -> dinh con, kieu so do to chuc); cung tang thi
+// sang ngang theo thu tu trong tang.
+func diagramDirection(fromLayer, fromPlace, toLayer, toPlace int) string {
+	switch {
+	case toLayer > fromLayer:
+		return "down"
+	case toLayer < fromLayer:
+		return "up"
+	case toPlace > fromPlace:
+		return "right"
+	default:
+		return "left"
+	}
 }
 
 func floatOf(value any, fallback float64) float64 {

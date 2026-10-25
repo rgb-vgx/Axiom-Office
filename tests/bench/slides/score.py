@@ -24,6 +24,7 @@ import sys
 import unicodedata
 import zipfile
 from collections import Counter
+from xml.etree import ElementTree
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -63,15 +64,64 @@ def unsourced_numbers(prompt: str, texts: list[str]) -> list[str]:
     return sorted(n for n in found if len(n) > 1)
 
 
+CHART_NS = {"c": "http://schemas.openxmlformats.org/drawingml/2006/chart",
+            "a": "http://schemas.openxmlformats.org/drawingml/2006/main"}
+
+
+def chart_value(value: str, code: str) -> str:
+    """Gia tri nhu nhan hien thi: chuoi hang trong ngoac kep la don vi, % ngoai ngoac thi nhan 100 (khop
+    FormatChartValue cua bridge)."""
+    try:
+        number = float(value)
+    except ValueError:
+        return value
+    suffix, quoted, percent = "", False, False
+    for ch in code or "":
+        if ch == '"':
+            quoted = not quoted
+        elif quoted:
+            suffix += ch
+        elif ch == "%":
+            percent = True
+    if percent:
+        number, suffix = number * 100, suffix + "%"
+    return ("%.2f" % round(number, 2)).rstrip("0").rstrip(".") + suffix
+
+
+def chart_text(xml: bytes) -> str:
+    """Chu cua mot bieu do goc: tieu de, roi moi chuoi "ten: danh muc gia tri+don vi". So lieu nam o
+    ppt/charts/chartN.xml, khong co trong slide (docs/plans/18-s0 muc 9.3)."""
+    root = ElementTree.fromstring(xml)
+    lines = [" ".join(t.text or "" for t in root.iterfind(".//c:title//a:t", CHART_NS)).strip()]
+    for series in root.iterfind(".//c:ser", CHART_NS):
+        name = " ".join(v.text or "" for v in series.iterfind("c:tx//c:v", CHART_NS))
+        categories = [v.text or "" for v in series.iterfind("c:cat//c:pt/c:v", CHART_NS)]
+        cache = series.find("c:val//c:numCache", CHART_NS)
+        code = cache.findtext("c:formatCode", "", CHART_NS) if cache is not None else ""
+        label = series.find("c:dLbls/c:numFmt", CHART_NS)
+        if label is not None and label.get("sourceLinked") == "0":
+            code = label.get("formatCode", code)
+        values = [chart_value(v.text or "", code) for v in series.iterfind("c:val//c:pt/c:v", CHART_NS)]
+        lines.append(name + ": " + ", ".join("%s %s" % pair for pair in zip(categories, values)))
+    return "\n".join(line for line in lines if line)
+
+
 def deck_texts(path: str) -> list[str]:
-    """Chu tung slide doc thang tu .pptx (moi <a:t>, ca o bang). wpp.listSlides chi doc shape co TextFrame nen
-    BO SOT chu trong bang (luot 25/10/2026: bang so lieu dung du ma bi cham thieu so)."""
+    """Chu tung slide doc thang tu .pptx (moi <a:t>, ca o bang, va so lieu bieu do goc). wpp.listSlides chi doc
+    shape co TextFrame nen BO SOT chu trong bang (luot 25/10/2026: bang so lieu dung du ma bi cham thieu so)."""
     texts = []
     with zipfile.ZipFile(path) as package:
-        names = [n for n in package.namelist() if re.fullmatch(r"ppt/slides/slide\d+\.xml", n)]
+        members = set(package.namelist())
+        names = [n for n in members if re.fullmatch(r"ppt/slides/slide\d+\.xml", n)]
         for name in sorted(names, key=lambda n: int(re.search(r"(\d+)\.xml$", n).group(1))):
             xml = package.read(name).decode("utf-8")
-            texts.append("\n".join(html.unescape(t) for t in re.findall(r"<a:t>([^<]*)</a:t>", xml)))
+            parts = [html.unescape(t) for t in re.findall(r"<a:t>([^<]*)</a:t>", xml)]
+            rels = name.replace("ppt/slides/", "ppt/slides/_rels/") + ".rels"
+            if rels in members:
+                for target in re.findall(r'Target="\.\./charts/(chart\d+\.xml)"', package.read(rels).decode("utf-8")):
+                    if "ppt/charts/" + target in members:
+                        parts.append(chart_text(package.read("ppt/charts/" + target)))
+            texts.append("\n".join(parts))
     return texts
 
 
