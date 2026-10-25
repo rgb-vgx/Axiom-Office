@@ -237,6 +237,10 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 		// Agent sua lai chinh thu no vua dung trong luot: khong hoi (owned.go). Ghi log de soat lai duoc.
 		corelog.Info("run %s: %s khong can xac nhan - chi dung toi doi tuong do luot tao (%s)", run.RunID, action,
 			model.Truncate(model.MarshalRelaxed(params), 200))
+	} else if decision.NeedsConfirmation && action == "wpp.deleteSlide" &&
+		policy.BlankSlide(ctx, run.Bridge, run.Office.Port, params) {
+		corelog.Info("run %s: wpp.deleteSlide khong can xac nhan - slide trong (%s)", run.RunID,
+			model.Truncate(model.MarshalRelaxed(params), 200))
 	} else if decision.NeedsConfirmation {
 		preview := model.Truncate(model.MarshalRelaxed(params), 200)
 		if preview == "null" {

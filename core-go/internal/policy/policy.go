@@ -156,6 +156,38 @@ func Evaluate(ctx context.Context, action string, params map[string]any, prompt 
 }
 
 // WordLength: do dai tai lieu Word qua bridge (writer.getText maxChars=1 tra totalChars).
+// BlankSlide: slide `params.slide` (so ro rang) khong co hinh nao ngoai placeholder rong - xoa no khong mat gi cua
+// nguoi dung nen khong hoi (nguoi dung 25/10/2026: "cu mac dinh dong y xoa slide rong dau tien"; bai moi cua
+// PowerPoint luon co mot slide bia trong). Doc bang wpp.checkLayout: no bo placeholder rong, giu moi hinh khac ke ca
+// anh khong chu - slide chi co mot anh van bi coi la CO noi dung va van hoi. Loi doc / khong ro slide -> false (hoi).
+func BlankSlide(ctx context.Context, bridge *office.BridgeClient, port int, params map[string]any) bool {
+	var slide float64
+	switch value := params["slide"].(type) {
+	case float64:
+		slide = value
+	case string: // model yeu gui "1" / "1.0"
+		slide, _ = strconv.ParseFloat(strings.TrimSpace(value), 64)
+	}
+	if slide < 1 || slide != float64(int(slide)) {
+		return false
+	}
+	query := map[string]any{"slide": int(slide)}
+	if deck, ok := params["presentation"].(string); ok && strings.TrimSpace(deck) != "" {
+		query["presentation"] = deck
+	}
+	result := bridge.Command(ctx, port, "wpp.checkLayout", query)
+	if !result.OK {
+		return false
+	}
+	slides, _ := result.Result["slides"].([]any)
+	if len(slides) != 1 {
+		return false
+	}
+	entry, _ := slides[0].(map[string]any)
+	shapes, ok := entry["shapes"].([]any)
+	return ok && len(shapes) == 0
+}
+
 func WordLength(ctx context.Context, bridge *office.BridgeClient, port int) *int {
 	result := bridge.Command(ctx, port, "writer.getText", map[string]any{"maxChars": 1})
 	if !result.OK {

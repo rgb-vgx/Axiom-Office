@@ -916,8 +916,10 @@ type groupSwatch struct{ Fill, Line string }
 const legendHeight = 34.0
 
 func groupPalette(colors struct{ Primary, Accent, Text, Muted string }) []groupSwatch {
-	return []groupSwatch{{slidelayout.Tint(colors.Primary, 0.9), colors.Primary}, {slidelayout.Tint(colors.Muted, 0.88), colors.Muted},
-		{slidelayout.Tint(colors.Accent, 0.82), colors.Accent}}
+	// Nhom 3 dam hon han (Tint 0,55): Tint(Accent, 0,82) gan nhu trung mau nhom 1 (luot that 25/10/2026: chu thich "Kenh"
+	// va "Du lieu" cung mot mau xanh nhat, khong phan biet duoc).
+	return []groupSwatch{{slidelayout.Tint(colors.Primary, 0.9), colors.Primary}, {slidelayout.Tint(colors.Muted, 0.85), colors.Muted},
+		{slidelayout.Tint(colors.Accent, 0.55), colors.Accent}}
 }
 
 // groupsOf: ten nhom theo thu tu xuat hien (bo trong = khong nhom).

@@ -6,6 +6,12 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"axiomoffice/core/internal/office"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
 )
 
 // Cung bang ca voi PolicyTests.cs cua ban .NET (muc 8.6): lenh rui ro nao phai hoi nguoi dung.
@@ -192,5 +198,42 @@ func TestNewFromTemplateOverwriteAsks(t *testing.T) {
 		map[string]any{"template": "mau.potx", "path": filepath.Join(t.TempDir(), "moi.pptx")}, "dung slide theo mau", nil)
 	if fresh.NeedsConfirmation {
 		t.Fatalf("tao file moi khong can hoi: %+v", fresh)
+	}
+}
+
+// Slide trong (chi placeholder rong) xoa khong hoi; slide co hinh (ke ca anh khong chu), khong ro so slide, hay doc
+// loi thi van hoi (nguoi dung 25/10/2026: "cu mac dinh dong y xoa slide rong dau tien").
+func TestBlankSlide(t *testing.T) {
+	shapes := map[float64]string{1: `[]`, 2: `[{"name":"Picture 1"}]`}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var request struct {
+			Params map[string]any `json:"params"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&request)
+		slide, _ := request.Params["slide"].(float64)
+		list, ok := shapes[slide]
+		if !ok {
+			_, _ = w.Write([]byte(`{"ok":false,"error":"'slide' must be between 1 and 2"}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"ok":true,"result":{"slides":[{"index":1,"shapes":` + list + `,"issues":[]}]}}`))
+	}))
+	defer server.Close()
+	port, _ := strconv.Atoi(strings.TrimPrefix(server.URL, "http://127.0.0.1:"))
+	bridge := office.NewBridgeClient(server.Client(), "t")
+	for _, c := range []struct {
+		params map[string]any
+		want   bool
+	}{
+		{map[string]any{"slide": 1.0}, true},
+		{map[string]any{"slide": "1.0"}, true},
+		{map[string]any{"slide": 2.0}, false},
+		{map[string]any{"slide": 9.0}, false},
+		{map[string]any{}, false},
+		{map[string]any{"slide": 1.5}, false},
+	} {
+		if got := BlankSlide(context.Background(), bridge, port, c.params); got != c.want {
+			t.Fatalf("BlankSlide(%v) = %v", c.params, got)
+		}
 	}
 }
