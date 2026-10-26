@@ -272,7 +272,12 @@ func (g *docStateGuard) afterTools(loop *agentLoop, _ *Turn, results []ToolResul
 		loop.reads = map[string]int{}
 	}
 	for _, result := range results {
+		// Lan goi hong nhung DA ghi mot phan (slides_from_brief/template_design dung do roi loi: ok:false + Mutating)
+		// van lam tai lieu doi - khong tang revision thi lenh doc lap lai bi coi la "chua doi" (26/10/2026).
 		if !result.OK {
+			if result.Mutating {
+				loop.revision++
+			}
 			continue
 		}
 		if result.Mutating {

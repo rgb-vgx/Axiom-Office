@@ -114,6 +114,10 @@ func TestDesignModeChecksCoverageThenBuilds(t *testing.T) {
 		!strings.Contains(bad.JSON, "3:i2") || countActions("wpp.addSlideFromTemplate") != 0 {
 		t.Fatalf("bo cuc thieu phai bao loi va khong dung: %s", bad.JSON)
 	}
+	// Bo cuc sai la lan goi hong: ok:false + cau loi gon, chi tiet van trong errors.
+	if bad.OK || !strings.Contains(bad.JSON, `"ok":false`) || !strings.Contains(bad.JSON, `"error":"slide `) {
+		t.Fatalf("tu choi phai la ok:false: %s", bad.JSON)
+	}
 
 	good := invoke([]any{
 		map[string]any{"layout": "cover", "title": "CĐHA GAN", "use": []any{"1"}},

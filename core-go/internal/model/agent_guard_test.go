@@ -78,6 +78,33 @@ func TestRunAgentIdenticalReadAfterWriteNotBlocked(t *testing.T) {
 	}
 }
 
+// Lan goi hong nhung DA ghi mot phan (slides_from_brief dung 3 slide roi loi: ok:false + Mutating) van lam tai lieu
+// doi: lenh doc y het sau do phai chay that, khong duoc tra "unchanged" (26/10/2026).
+func TestRunAgentFailedPartialWriteCountsAsChange(t *testing.T) {
+	server, _ := verifyServer(t, []string{
+		fmt.Sprintf(replyToolCallArgs, "r1", `{"doc":"list"}`),
+		fmt.Sprintf(replyToolCallArgs, "w1", `{"write":1}`),
+		fmt.Sprintf(replyToolCallArgs, "r2", `{"doc":"list"}`),
+		fmt.Sprintf(replyText, "xong"),
+	})
+	client := NewClient(server.Client(), "openai", server.URL, "", "m")
+	reads := 0
+	options := DefaultAgentOptions()
+	options.Verify = false
+	result := client.RunAgent(context.Background(), "s", nil, "u", mutatingTools(),
+		func(ctx context.Context, call ToolCall) ToolResult {
+			if strings.Contains(call.Arguments, "write") {
+				return ToolResult{CallID: call.ID, Name: call.Name, OK: false, Mutating: true,
+					ResultJSON: `{"ok":false,"error":"slide 4 failed","built":3}`}
+			}
+			reads++
+			return ToolResult{CallID: call.ID, Name: call.Name, OK: true, ResultJSON: `{"ok":true}`}
+		}, options, AgentCallbacks{})
+	if !result.OK || reads != 2 {
+		t.Fatalf("lenh doc sau lan ghi hong mot phan phai chay lai: doc %d, %+v", reads, result)
+	}
+}
+
 // replyToolCallArgs: tool call voi id va doi so tuy bien (doc roi doc lai, hay roi ghi roi doc).
 const replyToolCallArgs = `{"choices":[{"message":{"role":"assistant","content":null,` +
 	`"tool_calls":[{"id":"%s","function":{"name":"t","arguments":%q}}]}}],` +

@@ -814,7 +814,8 @@ func (t *SlidesFromTemplateTool) design(ctx context.Context, arguments map[strin
 		report["errors"] = errors
 		report["source"] = designView(views)
 		report["next"] = fmt.Sprintf("fix the slides listed in errors (src = slide position in your list) and call again with first=%d, last=%d and the whole list", first, last)
-		result.JSON = OKJSON(report)
+		// Bo cuc sai la lan goi hong: ok:false kem errors (truoc 26/10/2026 tra "ok":true).
+		result.OK, result.JSON = false, FailJSON(rowErrorsLine(errors), report)
 		return result
 	}
 
@@ -901,6 +902,10 @@ func (t *SlidesFromTemplateTool) design(ctx context.Context, arguments map[strin
 		report["next"] = "FINISHED: every source slide is designed, checked and saved. Answer the user now; do not re-check slide by slide."
 	}
 	result.JSON = OKJSON(report)
+	if len(errors) > 0 {
+		// Co slide dung hong (loi PowerPoint): phan con lai da dung va luu (built), nhung lan goi la that bai.
+		result.OK, result.JSON = false, FailJSON(rowErrorsLine(errors), report)
+	}
 	if all && len(errors) == 0 && (saved || built == 0) {
 		result.Final = true
 		var text strings.Builder

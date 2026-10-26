@@ -13,6 +13,10 @@ Từ log khung chat (plan 20-c0 §5.5, lượt `r_d820f088` lập kế hoạch �
 - **`slides_from_brief` từ chối / dựng dở trả `{"ok":false,"error":...}`** kèm `errors` (từng trường) và `how`, thay vì
   `{"ok":true,"result":{"built":0,"errors":...}}` — model và khung chat từng thấy "ok":true trong một lần gọi hỏng.
   `error` là một dòng gọn (`slide 4: TOO_LONG nodes[policy] (12/11)`), khung chat hiện thẳng (`FailJSON`).
+- **`slides_from_template` (mode design/compose) cũng vậy**: bố cục sai hoặc có slide dựng hỏng trả `ok:false` +
+  `errors` (trước là `"ok":true` kèm `errors`); phần đã dựng vẫn được lưu và báo trong `built`.
+- **Lần gọi hỏng nhưng đã ghi một phần** (`ok:false` + `Mutating`) nay tăng revision tài liệu: trước đó `docStateGuard`
+  bỏ qua mọi kết quả hỏng nên lệnh đọc y hệt sau đó bị trả "unchanged" dù bài đã đổi.
 - **Kết quả `slides_from_brief` có `titleShape`** từng slide: model đoán tên `Title` để sửa tiêu đề → lỗi + 2 vòng đọc lại.
 - **Tool đọc của server MCP built-in** (`ppt_profile`, `doc_get_text`…) không còn bị tính là lệnh ghi (tra theo tên
   đầy đủ `mcp__office__…` nên không khớp danh sách chỉ đọc) - trước đó tăng revision của tài liệu dù chỉ đọc.
