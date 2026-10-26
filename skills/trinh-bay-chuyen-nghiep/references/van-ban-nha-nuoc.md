@@ -3,12 +3,12 @@
 Dùng khi nguồn là nghị quyết, kế hoạch, chương trình hành động, báo cáo sơ kết/tổng kết, chuyên đề bồi
 dưỡng của cơ quan Đảng, chính quyền, Mặt trận, đoàn thể (đầu văn bản có "ĐẢNG CỘNG SẢN VIỆT NAM", "CỘNG
 HOÀ XÃ HỘI CHỦ NGHĨA VIỆT NAM", "ỦY BAN NHÂN DÂN…", "ĐẢNG ỦY…", số ký hiệu kiểu `-NQ/TW`, `/KH-UBND`).
-Rút từ bộ skill slide cho cán bộ, công chức đã dùng thật; lưới, cỡ chữ, sức chứa vẫn theo `SKILL.md`.
+Rút từ bộ skill slide cho cán bộ, công chức đã dùng thật; lưới, cỡ chữ, sức chứa vẫn theo `slides_from_brief` (tự vẽ: `tu-ve-bang-wpp.md`).
 
 Người xem là cán bộ trong hội nghị hoặc lớp bồi dưỡng: họ cần **đúng nguyên văn** và sự trang trọng. Hai
 ưu tiên trên hết là **giữ trọn nội dung** và **giữ đúng lưới**.
 
-## 1. Khác với `SKILL.md` mục 4
+## 1. Khác với `SKILL.md` mục 1
 
 - **Không viết lại thành "tiêu đề kết luận".** Tiêu đề là **tên mục của văn bản**, chép đúng chữ
   ("Mục đích, yêu cầu", "Nhiệm vụ 3: Phát triển kinh tế số"). Viết hoa chữ đầu câu, giữ hoa tên riêng và
@@ -18,7 +18,7 @@ Người xem là cán bộ trong hội nghị hoặc lớp bồi dưỡng: họ 
   - mở chữ viết tắt rõ ràng ("TP" → "Thành phố");
   - sửa lỗi chính tả hiển nhiên ("TRIẺN", "gía");
   - thêm dấu chấm cuối câu.
-- **Không rút gọn câu để vừa hộp.** Thứ tự xử lý chữ dài ở `SKILL.md` mục 3 đổi thành: (1) tách sang
+- **Không rút gọn câu để vừa hộp.** Thứ tự xử lý chữ dài ở `tu-ve-bang-wpp.md` mục 3 đổi thành: (1) tách sang
   slide sau; (2) đưa phần giải thích, ví dụ sang `wpp.setNotes`. Không cắt chữ của câu nguyên văn.
 - Ngoặc kép cong “ ” và gạch ngang – trong văn bản là đúng chuẩn, giữ nguyên.
 
@@ -29,7 +29,7 @@ Người xem là cán bộ trong hội nghị hoặc lớp bồi dưỡng: họ 
   đoạn — chép cả đoạn là tràn hộp (đã gặp: tóm tắt 130–150 ký tự trong ô chỉ chứa ≈ 80).
 - Chữ viết tắt đã mở, lỗi chính tả đã sửa, ý đã tách.
 
-Mọi thứ ở mục này là phần **tự thêm**: liệt kê trong báo cáo cuối (`SKILL.md` mục 7) để người dùng duyệt.
+Mọi thứ ở mục này là phần **tự thêm**: liệt kê trong báo cáo cuối (`SKILL.md` mục 3) để người dùng duyệt.
 
 ## 3. Bìa — lấy từ đầu văn bản
 

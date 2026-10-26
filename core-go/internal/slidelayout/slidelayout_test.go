@@ -77,3 +77,25 @@ func TestSolveOrder(t *testing.T) {
 		t.Fatalf("thu tu = %v", roles)
 	}
 }
+
+// Trang tri bia nam ngoai vung chu (ten, dong phu) va trong slide.
+func TestCoverDecorStaysOffText(t *testing.T) {
+	for _, grid := range []Grid{{960, 540, 40}, {720, 540, 40}} {
+		title, subtitle := grid.Cover()
+		decor := grid.CoverDecor()
+		if len(decor) != 3 {
+			t.Fatalf("3 khoi trang tri: %v", decor)
+		}
+		for _, item := range decor {
+			box := item.Box
+			if box[0] < 0 || box[1] < 0 || box[0]+box[2] > grid.Width+0.1 || box[1]+box[3] > grid.Height+0.1 || box[3] <= 0 {
+				t.Fatalf("%s ra ngoai slide: %v", item.Kind, box)
+			}
+			for _, text := range []Rect{title, subtitle} {
+				if box[0] < text[0]+text[2] && text[0] < box[0]+box[2] && box[1] < text[1]+text[3] && text[1] < box[1]+box[3] {
+					t.Fatalf("%s %v de len vung chu %v", item.Kind, box, text)
+				}
+			}
+		}
+	}
+}

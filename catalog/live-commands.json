@@ -2123,6 +2123,11 @@
         "hint": "#RRGGBB outline; empty = none"
       },
       {
+        "name": "dash",
+        "required": false,
+        "hint": "true = dashed outline"
+      },
+      {
         "name": "font",
         "required": false,
         "hint": "font name"

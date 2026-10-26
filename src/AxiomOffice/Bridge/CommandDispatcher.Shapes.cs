@@ -17,7 +17,7 @@ namespace AxiomOffice.Bridge
                     Opt("slide"), Opt("left"), Opt("top"), Opt("width"), Opt("height"),
                     Opt("shape", "rect, rounded, oval, chevron, line (default rect)"), Opt("text"),
                     Opt("fontSize"), Opt("bold"), Opt("boldFirst", "true = only the first line bold (heading of the box)"), Opt("color", "#RRGGBB text"), Opt("fill", "#RRGGBB fill; empty = none"),
-                    Opt("line", "#RRGGBB outline; empty = none"), Opt("font", "font name"), Opt("anchor", "top or middle (default)"),
+                    Opt("line", "#RRGGBB outline; empty = none"), Opt("dash", "true = dashed outline"), Opt("font", "font name"), Opt("anchor", "top or middle (default)"),
                     Opt("presentation", "full path of the presentation to work on; default: the active one")),
                 Command("wpp.renderSlide", "wpp", WppRenderSlide,
                     "Ảnh PNG của một slide theo số (soát bằng mắt, benchmark) - base64, không đổi cửa sổ đang xem",
@@ -87,6 +87,10 @@ namespace AxiomOffice.Bridge
                 shape.Line.Visible = -1;
                 shape.Line.ForeColor.RGB = line.Value;
                 shape.Line.Weight = 1.25f;
+                if (ParamBool(p, "dash", false))
+                {
+                    shape.Line.DashStyle = 4; // msoLineDash: dai "xuyen suot" canh so do (Core slides_from_brief span)
+                }
             }
             else
             {

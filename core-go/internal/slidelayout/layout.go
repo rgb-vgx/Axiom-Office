@@ -55,6 +55,14 @@ func TextFits(text string, width, height, size float64) bool {
 	return lines <= maxLines
 }
 
+// MaxChars: so ky tu toi da cua MOT doan vua khung (cung cong thuc TextFits) - bao cho model trong loi TOO_LONG de rut
+// mot lan la vua (luot that 26/10/2026: chi bao "shorter text", model rut dan qua 2-3 vong).
+func MaxChars(width, height, size float64) int {
+	perLine := int(width / (0.53 * size))
+	maxLines := int((height - 7.2) / (1.21 * size))
+	return max(0, perLine*maxLines)
+}
+
 // ContentRegions: chia vung noi dung thanh chu / anh / o luu y. Co anh: chu cot trai 42% (hoac khong co vung chu khi
 // khong co y nao), anh ben phai; o luu y la dai cuoi vung (cao toi da 90), uoc theo co chu calloutSize.
 func ContentRegions(area Rect, callout string, calloutSize float64, hasPoints, withPictures bool) (text, pictures, calloutBox Rect) {

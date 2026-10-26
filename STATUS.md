@@ -1,6 +1,6 @@
 ﻿# Tình trạng dự án Axiom Office
 
-Cập nhật: **26/10/2026** · nhánh `main` · đã push đến §2.12 (ba đợt 25/10: bớt ngữ cảnh, slide sơ đồ, tự đi lại dây).
+Cập nhật: **26/10/2026** · nhánh `main` · đã push đến §2.13 (đợt 26/10: debug trace, slide sơ đồ trên đề thật).
 Số liệu kiểm chứng ở §2.4 là lượt đo **01/10/2026**; số mới của đợt WPS ở §2.6, lượt đo lại toàn bộ ở §2.7, lượt đo
 lại job Windows ở §2.8, đợt Office x64 + sửa định dạng văn bản ở §2.9 và ba đợt 25/10 ở §2.10–2.12.
 
@@ -251,6 +251,28 @@ trúc không dây cắt hộp. Sửa: sơ đồ lồng trong khoá `diagram`, `r
 - **Còn:** chưa chạy đề ngân hàng 3 lần trên PowerPoint thật để đạt tiêu chí của plan 20 §5.1 (máy đã cài PowerPoint
   nhưng chưa cấu hình LLM/Core để chạy lượt thật).
 
+### 2.13 Đợt 26/10/2026: debug trace, slide sơ đồ trên đề thật bằng `ocg/beam-free`
+
+- **DebugTrace** (`AXIOM_DEBUG_TRACE=1` hoặc HKCU): mỗi lượt ghi `traces/<run id>.jsonl` — prompt, từng vòng, tham số
+  và kết quả tool nguyên văn, guard, đi lại dây. Mọi sửa đổi dưới đây đều tìm ra từ trace lượt thật.
+- **Slide**: đi lại dây làm tệ hơn thì trả về tuyến cũ; kết quả có `next` (chỉ sửa slide lỗi); dải `span` cho thành
+  phần xuyên suốt (Observability), viền nét đứt; bìa có điểm nhấn; `timeline` có `points`; `SAME_SPEC_SAME_ISSUES` bắt
+  sơ đồ gửi lại chỉ đổi tiêu đề; dựng lại slide đã sạch quá 2 lần thì từ chối; lỗi đầu lượt có `max`/cách gộp tầng.
+- **Core**: chặn lệnh lặp y hệt không chặn lệnh đọc khi tài liệu đã đổi; `wpp.setShapeText` chữ y hệt → `changed:false`
+  (không tính là sửa); kiểm kết nối LLM với model suy luận không còn "Không rõ lỗi".
+- **Skill** `trinh-bay-chuyen-nghiep` tách phần tự vẽ ra `references/tu-ve-bang-wpp.md` (13,9k → 8,4k ký tự).
+- **Đo đề ngân hàng 10 slide** (`tests/live/run_ai_task.py`, `ocg/beam-free`):
+
+  | Lượt | Vòng | Token vào | Thời gian | Ghi chú |
+  |---|---|---|---|---|
+  | `r_f78df99d` (đầu ngày) | 45 | 1,30M | 478 s | sơ đồ mất Observability; "kiểm Scotch" |
+  | `r_e6766361` | 12 | 191k | 583 s | dải `span`, lần dựng đầu 0 lỗi |
+  | `r_9a7512ac` | 41 | 1,18M | 973 s | **hỏng**: model không gõ được "kiểm soát" ("Sudan"), sửa ~20 lần → nay bị chặn |
+  | `r_fb096418` | 17 | 413k | 203 s | đạt mốc §5.1 (3 lượt liền không `connector-*`) |
+  | `r_e0c9405c` (cuối ngày) | **11** | **156k** | **128 s** | skill ngắn, bìa + timeline mới |
+- **Còn:** model `beam-free` đôi khi viết sai "kiểm soát" (lỗi sinh chữ, tool không kiểm chính tả); chặn dựng lại slide
+  sạch chưa bật ở lượt thật nào; `s26` chưa chạy; kiểm qua khung chat (plan 20 §5.5) cần người bấm.
+
 ## 3. Chưa làm / chưa kiểm chứng
 
 | Việc | Tình trạng | Ghi chú |
@@ -260,9 +282,9 @@ trúc không dây cắt hộp. Sửa: sơ đồ lồng trong khoá `diagram`, `r
 | Trích xuất memory với **LLM thật** | **Đã (24/10/2026)** | Lượt thật trích 1 fact (`core.log`: `1 added`) |
 | **Office 32-bit** | **Không hỗ trợ** | Add-in .NET làm Office 32-bit crash `mso98win32client.dll`; kiểm bằng add-in tối giản (§2.9) |
 | Đọc/ghi **HKCU** bằng test tự động trên Windows | Một phần | Đối chiếu tay: Core Go đọc đúng endpoint/model/token/DPAPI của bạn; test tự động hiện dùng `AXIOM_*`. Từ 24/10 test cũng **không còn ghi vào HKCU thật** (nguồn cấu hình inject file tạm — §2.8) |
-| **Push remote** | Đã push 26/10/2026 | Đợt 18–22/10 (11 commit), sửa CI Windows 24/10 (§2.7–2.8) và ba đợt 25/10 — "trả token cho agent" (§2.10), slide sơ đồ (§2.11), tự đi lại dây (§2.12) — đều đã lên `origin/main` |
+| **Push remote** | Đã push 26/10/2026 | Đợt 18–22/10 (11 commit), sửa CI Windows 24/10 (§2.7–2.8) ba đợt 25/10 — "trả token cho agent" (§2.10), slide sơ đồ (§2.11), tự đi lại dây (§2.12) — và đợt 26/10 đến `4f1b3a9` (§2.13) đều đã lên `origin/main` |
 | CI job **windows** | **Xanh (24/10/2026)** | Trước đó đỏ ở bước `go test` (`TestWPSConfigWrite` giả định nguồn cấu hình là `config.json`, nhưng trên Windows `DefaultSource()` là HKCU) và ở bước build net48 (`}` thừa trong `AskAiPane.cs`). Đã sửa cả hai — xem §2.8 |
-| Nghiệm thu plan 20 §5.1 trên đề thật | Chưa | Code + test tự đi lại dây đã xong (§2.12); cần chạy đề ngân hàng 3 lần trên PowerPoint thật, lần dựng đầu không còn `connector-*` |
+| Nghiệm thu plan 20 §5.1 trên đề thật | **Đạt 26/10/2026** | 3 lượt liền (`r_e6766361`, `r_9a7512ac`, `r_fb096418`, `ocg/beam-free`) lần dựng đầu không còn `connector-*` (§2.13) |
 | Merge `feat/setup-wizard` + `feat/core-go` vào `main` | **Đã xong** | Fast-forward, lịch sử thẳng |
 | Nền tảng khác | Chưa | Chỉ build được Windows (amd64) và Linux (amd64/arm64); chưa có macOS hay Windows ARM |
 | Embedding với máy chủ thật | Chưa | Chỉ kiểm bằng máy chủ giả trả vector điều khiển được |

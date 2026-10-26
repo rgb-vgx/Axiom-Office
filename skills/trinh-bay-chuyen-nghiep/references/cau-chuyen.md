@@ -58,7 +58,7 @@ tư thời gian nhất — người quyết định thường không đọc quá
   cỡ chữ ở `tokens.json` đã đủ rộng; đừng thêm cỡ thứ tư để "phân cấp" thêm.
 - Hướng dẫn trợ năng của Microsoft cho PowerPoint nói slide nên dùng "a larger font size (18pt or larger),
   sans serif fonts, and sufficient white space" — tức **chữ thường ≥ 18pt** và **chừa khoảng trắng**. Cỡ
-  chữ theo đó ở mục 8; khoảng trắng chính là lưới ở `SKILL.md`.
+  chữ theo đó ở mục 8; khoảng trắng chính là lưới ở `tu-ve-bang-wpp.md` mục 1.
 
 ## 5. Dài bao nhiêu slide
 

@@ -689,3 +689,81 @@ func TestSlidesFromBriefStopsRebuildingCleanSlides(t *testing.T) {
 		t.Fatalf("lan thu 3 phai bi tu choi va bao tra loi nguoi dung: %s", stop.JSON)
 	}
 }
+
+// Loi dau luot (luot that 26/10/2026, ca 4 luot): nut o tang 5+ khong keo theo UNKNOWN_NODE cho canh noi toi no, va
+// loi tang chi cach gop tang; TOO_LONG cua chu mot doan bao max de model rut mot lan la vua.
+func TestSlidesFromBriefEarlyErrorsAreActionable(t *testing.T) {
+	run, _ := briefBridge(t)
+	result := NewSlidesFromBriefTool(nil).Invoke(context.Background(), brief(t, `[
+		{"layout":"diagram","title":"Năm tầng","nodes":[{"id":"a","text":"Gateway","layer":1},{"id":"b","text":"Orchestrator","layer":2},
+		 {"id":"c","text":"Policy","layer":3},{"id":"d","text":"Banking","layer":4},{"id":"e","text":"Validation","layer":5}],
+		 "edges":[{"from":"a","to":"b"},{"from":"d","to":"e"}],"span":["Observability"]},
+		{"layout":"diagram","title":"Hai tầng","nodes":[{"id":"a","text":"Knowledge Retrieval Augmented Generation Service with citations, ranking, caching and freshness checks","layer":1},
+		 {"id":"b","text":"Orchestrator","layer":2}],"edges":[{"from":"a","to":"b"}]}
+	]`), run)
+	var parsed struct {
+		Result struct {
+			Errors []rowError `json:"errors"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal([]byte(result.JSON), &parsed); err != nil {
+		t.Fatal(err)
+	}
+	var layer, long *rowError
+	for i, problem := range parsed.Result.Errors {
+		switch problem.Error {
+		case "UNKNOWN_NODE":
+			t.Fatalf("canh toi nut sai tang khong duoc bao UNKNOWN_NODE: %+v", problem)
+		case "LAYER_1_TO_4":
+			layer = &parsed.Result.Errors[i]
+		case "TOO_LONG":
+			long = &parsed.Result.Errors[i]
+		}
+	}
+	if layer == nil || !strings.Contains(layer.Allowed, "side by side") {
+		t.Fatalf("loi tang phai chi cach gop: %s", result.JSON)
+	}
+	if long == nil || long.Max <= 0 || long.Max >= long.Actual {
+		t.Fatalf("TOO_LONG phai co max < actual: %s", result.JSON)
+	}
+}
+
+// Bia co diem nhan (3 khoi trang tri, ve truoc chu); moc lo trinh kem points thanh nhieu dong (plan 20-c0 5.4).
+func TestSlidesFromBriefCoverDecorAndTimelinePoints(t *testing.T) {
+	run, calls := briefBridge(t)
+	result := NewSlidesFromBriefTool(nil).Invoke(context.Background(), brief(t, `[
+		{"layout":"cover","title":"AI Agent Platform","subtitle":"Secure and governed"},
+		{"layout":"timeline","title":"Ba giai đoạn triển khai","milestones":[
+		 {"date":"Phase 1","text":"FAQ read-only","points":["Mục tiêu: trả lời có trích dẫn","Rủi ro: tri thức cũ"]},
+		 {"date":"Phase 2","text":"Tích hợp API"},{"date":"Phase 3","text":"Workflow","points":"Điều kiện: audit đầy đủ"}]}
+	]`), run)
+	if !result.OK || !strings.Contains(result.JSON, `"built":2`) {
+		t.Fatalf("phai dung duoc: %s", result.JSON)
+	}
+	decor, firstText, lines := 0, -1, 0
+	for i, call := range *calls {
+		if call.Params["slide"] != 1.0 && call.Params["slide"] != 1 {
+			if call.Action == "wpp.addParagraphs" {
+				raw, _ := json.Marshal(call.Params["paragraphs"])
+				if strings.Contains(string(raw), "FAQ read-only") {
+					lines = strings.Count(string(raw), "{")
+				}
+			}
+			continue
+		}
+		switch call.Action {
+		case "wpp.addShape":
+			if firstText >= 0 {
+				t.Fatalf("trang tri phai ve truoc chu (lenh %d)", i)
+			}
+			decor++
+		case "wpp.addParagraphs":
+			if firstText < 0 {
+				firstText = i
+			}
+		}
+	}
+	if decor != 3 || lines != 3 {
+		t.Fatalf("bia 3 khoi trang tri (co %d), moc 1 ba dong (co %d)", decor, lines)
+	}
+}

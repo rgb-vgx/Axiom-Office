@@ -39,8 +39,9 @@ func (t *SlidesFromBriefTool) Description() string {
 		"cover {title, subtitle}; section {title}; content {title, points, callout}; cards {title, cards: [{title, " +
 		"points}] 2-4}; table {title, table: [[header...], [row...]...] up to 7 rows x 5 columns}; figures {title, " +
 		"figures: [{value, label}] 2-3 big numbers}; process {title, steps: [{title, text, group}] 3-5 steps joined by arrows}; " +
-		"timeline {title, milestones: [{date, text}] 3-6}; diagram {title, nodes: [{id, text, layer, group}] up to 10 (layer 1 = " +
-		"top row, up to 4 nodes per layer), edges: [{from, to}] arrows between node ids - arrows are routed around the " +
+		"timeline {title, milestones: [{date, text, points: [2-3 short lines, e.g. goal / condition / risk]}] 3-6} - use it for a roadmap or phases; diagram {title, nodes: [{id, text, layer, group}] up to 10 (layer 1 = " +
+		"top row, layers 1-4 only - put nodes side by side to fit, up to 4 nodes per layer; node text one short line, about 16 " +
+		"characters when a layer has 3-4 nodes), edges: [{from, to}] arrows between node ids - arrows are routed around the " +
 		"other boxes, so back arrows and arrows that skip a node are fine, and the tool re-routes one itself if PowerPoint " +
 		"draws it across a box; span: [{text}] up to 2 parts that run through every layer (e.g. Observability, audit log) - drawn as a strip beside the whole diagram, not a node, no arrows to it}; optional group on steps/nodes (2-3 short names, " +
 		"e.g. \"AI\" / \"Business system\"): each group gets its own colour and a legend, to show who does which step; " +
@@ -132,6 +133,27 @@ func briefItems(value any, titleKey, textKey string) []briefItem {
 	return items
 }
 
+// joinLines: text roi tung dong cua points (chuoi hoac danh sach chuoi), moi dong mot doan.
+func joinLines(text string, points any) string {
+	lines := []string{}
+	if text = strings.TrimSpace(text); text != "" {
+		lines = append(lines, text)
+	}
+	switch value := points.(type) {
+	case string:
+		if value = strings.TrimSpace(value); value != "" {
+			lines = append(lines, value)
+		}
+	case []any:
+		for _, item := range value {
+			if line := strings.TrimSpace(textOf(item)); line != "" {
+				lines = append(lines, line)
+			}
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
 // briefTokens: phan slide/colors cua _design/tokens.json can cho viec dung.
 type briefTokens struct {
 	Slide struct {
@@ -221,6 +243,15 @@ func parseBrief(value any) ([]briefSlide, []rowError) {
 			slide.Replace = asInt(entry["replace"])
 			slide.Steps = briefItems(entry["steps"], "title", "text")
 			slide.Milestones = briefItems(entry["milestones"], "date", "text")
+			// Moc lo trinh co the kem 2-3 dong ngan (muc tieu / dieu kien / rui ro) - truoc day chi mot dong nen model
+			// lam lo trinh thanh cards (luot that 25-26/10/2026, plan 20-c0 5.4).
+			if list, ok := entry["milestones"].([]any); ok {
+				for m, item := range list {
+					if milestone, ok := item.(map[string]any); ok && m < len(slide.Milestones) {
+						slide.Milestones[m].Text = joinLines(slide.Milestones[m].Text, milestone["points"])
+					}
+				}
+			}
 			if nodes, ok := entry["nodes"].([]any); ok {
 				for _, item := range nodes {
 					if node, ok := item.(map[string]any); ok {
@@ -380,7 +411,11 @@ func checkBrief(slides []briefSlide, grid slidelayout.Grid, tokens briefTokens) 
 			if hint == "" || strings.HasPrefix(field, "title") || strings.HasPrefix(field, "source") {
 				hint = "shorter text (move details to notes)"
 			}
-			errors = append(errors, rowError{Src: slot, Field: field, Error: "TOO_LONG", Actual: len([]rune(text)), Allowed: hint})
+			problem := rowError{Src: slot, Field: field, Error: "TOO_LONG", Actual: len([]rune(text)), Allowed: hint}
+			if !strings.Contains(text, "\n") {
+				problem.Max = slidelayout.MaxChars(box[2], box[3], size)
+			}
+			errors = append(errors, problem)
 		}
 	}
 	for i, slide := range slides {
@@ -604,7 +639,12 @@ func diagramLayers(slide briefSlide) ([][]briefNode, []rowError) {
 			errors = append(errors, rowError{Field: "nodes[" + node.ID + "]", Error: "DUPLICATE_ID"})
 			continue
 		case node.Layer < 1 || node.Layer > 4:
-			errors = append(errors, rowError{Field: "nodes[" + node.ID + "].layer", Error: "LAYER_1_TO_4", Actual: node.Layer})
+			// Van ghi id: canh noi toi nut nay khong bao them UNKNOWN_NODE (luot that 26/10/2026: 4 nut tang 5-7 keo theo
+			// 5 loi canh kem goi y "span khong nhan mui ten" sai, model mat them mot vong).
+			ids[node.ID] = true
+			errors = append(errors, rowError{Field: "nodes[" + node.ID + "].layer", Error: "LAYER_1_TO_4", Actual: node.Layer,
+				Allowed: "at most 4 layers: put nodes that work in parallel or one after another side by side in the same " +
+					"layer (up to 4 per layer, arrows between them are routed), e.g. a 7-step chain as layers 1,2,2,3,3,4,4"})
 			continue
 		}
 		ids[node.ID] = true
@@ -623,13 +663,27 @@ func diagramLayers(slide briefSlide) ([][]briefNode, []rowError) {
 	for _, edge := range slide.Edges {
 		if !ids[edge.From] || !ids[edge.To] || edge.From == edge.To {
 			allowed := edge.From + " -> " + edge.To
-			if len(slide.Spans) > 0 {
+			if spanLike(edge.From, spanTexts) || spanLike(edge.To, spanTexts) {
 				allowed += " (a span runs beside every layer and takes no arrows - drop arrows to it)"
 			}
 			errors = append(errors, rowError{Field: "edges", Error: "UNKNOWN_NODE", Allowed: allowed})
 		}
 	}
 	return layers, errors
+}
+
+// spanLike: id cua dau canh khong phai nut nhung trung (mot phan) ten mot dai - vd "obs" voi "Observability: trace...".
+func spanLike(id string, spanTexts map[string]bool) bool {
+	id = strings.ToLower(strings.TrimSpace(id))
+	if len(id) < 3 {
+		return false
+	}
+	for text := range spanTexts {
+		if strings.Contains(text, id) {
+			return true
+		}
+	}
+	return false
 }
 
 func layerCounts(layers [][]briefNode) []int {
@@ -777,6 +831,23 @@ func buildBriefSlide(bridge func(string, map[string]any) (map[string]any, string
 	switch slide.Layout {
 	case "cover":
 		title, subtitle := grid.Cover()
+		// Diem nhan thi giac (de bai 26/10/2026: "khong dung trang bia chi gom tieu de va vai dong chu"): dai mau chinh ben
+		// trai, khoi nhat o day, vach mau nhan giua ten va dong phu. Ve truoc chu (nam duoi); checkLayout coi trang tri
+		// chong nhau / trang tri chong chu la chu y.
+		for _, decor := range grid.CoverDecor() {
+			decor, fill := decor, colors.Primary
+			switch decor.Kind {
+			case "base":
+				fill = slidelayout.Tint(colors.Primary, 0.9)
+			case "rule":
+				fill = colors.Accent
+			}
+			steps = append(steps, func() string {
+				_, problem := bridge("wpp.addShape", map[string]any{"slide": index, "left": decor.Box[0], "top": decor.Box[1],
+					"width": decor.Box[2], "height": decor.Box[3], "shape": "rect", "fill": fill, "line": fill})
+				return problem
+			})
+		}
 		steps = append(steps, func() string {
 			return text([]sourcePara{{T: slide.Title, B: true, A: "center"}}, title, tokens.Slide.Type.Hero, colors.Primary,
 				map[string]any{"anchor": "middle"})
@@ -1014,7 +1085,12 @@ func briefShapes(bridge func(string, map[string]any) (map[string]any, string), i
 			})
 			if milestone.Text != "" {
 				steps = append(steps, func() string {
-					return text([]sourcePara{{T: milestone.Text, A: "center"}}, label, tokens.Slide.Type.Body, colors.Text, nil)
+					paras := parasFromText(milestone.Text)
+					for p := range paras {
+						// Moc co points: dong dau (noi dung moc) dam, cac dong muc tieu / rui ro thuong.
+						paras[p].A, paras[p].B, paras[p].L = "center", p == 0 && len(paras) > 1, 0
+					}
+					return text(paras, label, tokens.Slide.Type.Body, colors.Text, nil)
 				})
 			}
 		}
@@ -1025,7 +1101,7 @@ func briefShapes(bridge func(string, map[string]any) (map[string]any, string), i
 			rect, label := rect, slide.Spans[s].Title
 			steps = append(steps, func() string {
 				_, problem := shape(rect, "rounded", label, map[string]any{"fill": slidelayout.Tint(colors.Muted, 0.85),
-					"line": colors.Muted, "boldFirst": true})
+					"line": colors.Muted, "dash": true, "boldFirst": true})
 				return problem
 			})
 		}

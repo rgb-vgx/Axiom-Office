@@ -5,6 +5,27 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added / Changed — Skill slide ngắn lại; lỗi đầu lượt chỉ rõ cách sửa; bìa và lộ trình đỡ đơn điệu (26/10/2026)
+
+- **Skill `trinh-bay-chuyen-nghiep` tách đôi** (plan 20-c0 §5.3): lưới, cỡ chữ, sức chứa, giới hạn wpp và checklist tự
+  vẽ chuyển sang `references/tu-ve-bang-wpp.md` (chỉ đọc khi không có `slides_from_brief`). `SKILL.md` 13,9k → 8,4k
+  ký tự; skill và `thiet-ke-van-phong` nói rõ không cần đọc `_design/tokens.json` / `bo-cuc-slide.md` khi có tool.
+- **Lỗi đầu lượt chỉ rõ cách sửa** (cả 4 lượt trước đều mất 2–4 vòng đầu): `TOO_LONG` của chữ một đoạn có `max` (số
+  ký tự vừa, `slidelayout.MaxChars`); nút ở tầng 5+ không còn kéo theo `UNKNOWN_NODE` cho cạnh nối tới nó, và
+  `LAYER_1_TO_4` chỉ cách gộp tầng; câu "span không nhận mũi tên" chỉ hiện khi id giống tên dải; mô tả tool nói trước
+  giới hạn 4 tầng và ~16 ký tự/nút.
+- **Bìa có điểm nhấn**: dải màu chính bên trái, khối nhạt ở đáy, vạch màu nhấn giữa tên và dòng phụ
+  (`Grid.CoverDecor`, không đè vùng chữ). **`timeline`** nhận `points` mỗi mốc (mục tiêu / điều kiện / rủi ro), dòng đầu
+  đậm; skill gợi ý lộ trình → `timeline`, các bước → `process`, số → `figures`/`chart`.
+- **`wpp.addShape` nhận `dash`** (C#, catalog): dải `span` có viền nét đứt.
+- **Benchmark `s26-loi-khong-noi-cho`**: slide cài sẵn tổng sai (1.240 + 310 ≠ 1.450) và hộp chữ đè tiêu đề, đề chỉ
+  nói "soát và sửa mọi lỗi" (đo khả năng tự phát hiện); brief nhận trường `derived` cho số suy ra.
+- **Đo lại** (`r_e0c9405c…`, `ocg/beam-free`): **11 vòng, 156k token vào** (138k cache), 128 s — 1 lần bị từ chối
+  (có `max`, rút một lần là vừa), lần dựng đầu 10 slide 0 lỗi; skill nạp đầu lượt 11,8k ký tự (trước ~23k + đọc
+  `tokens.json`).
+- Kiểm: `go test ./...` xanh (+3 test tools, +1 test slidelayout); `tests/catalog` OK (Host đã build lại);
+  `tests/bench/slides` OK.
+
 ### Added / Fixed — Dải "xuyên suốt" cho sơ đồ; chặn lệnh lặp không chặn nhầm lệnh đọc; bắt sơ đồ lỗi gửi lại (26/10/2026)
 
 Lượt thật đề ngân hàng bằng `ocg/beam-free` (`r_f78df99d…`, trace bật): 45 vòng, 1,30M token vào; bài cuối 0 lỗi bố

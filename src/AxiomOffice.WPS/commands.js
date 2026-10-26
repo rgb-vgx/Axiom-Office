@@ -581,6 +581,7 @@
         { name: "color", required: false, hint: "#RRGGBB text" },
         { name: "fill", required: false, hint: "#RRGGBB fill; empty = none" },
         { name: "line", required: false, hint: "#RRGGBB outline; empty = none" },
+        { name: "dash", required: false, hint: "true = dashed outline" },
         { name: "font", required: false, hint: "font name" },
         { name: "anchor", required: false, hint: "top or middle (default)" },
         { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }

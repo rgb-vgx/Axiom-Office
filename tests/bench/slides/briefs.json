@@ -233,6 +233,22 @@
         {"action": "wpp.addText", "params": {"text": "Kết quả tuyển sinh 2026", "top": 30, "left": 40, "width": 880, "height": 70, "fontSize": 24, "bold": true}},
         {"action": "wpp.addText", "params": {"text": "Chỉ tiêu 600, nhập học 205.", "top": 120, "left": 40, "width": 880, "height": 120, "fontSize": 18}}
       ]
+    },
+    {
+      "id": "s26-loi-khong-noi-cho",
+      "category": "fix",
+      "smoke": true,
+      "prompt": "Soát lại slide đang mở trước khi gửi lãnh đạo và sửa mọi lỗi bạn thấy (số liệu, bố cục).",
+      "slides": [1, 1],
+      "mustContain": ["1.240", "310", "1.550"],
+      "mustRemove": ["1.450"],
+      "derived": ["1.550"],
+      "needs": [],
+      "seed": [
+        {"action": "wpp.addSlide", "params": {"layout": 12}},
+        {"action": "wpp.addText", "params": {"text": "Thu ngân sách quý III/2026 vượt dự toán nhờ thu nội địa", "top": 30, "left": 40, "width": 880, "height": 80, "fontSize": 28, "bold": true}},
+        {"action": "wpp.addText", "params": {"text": "• Thu nội địa: 1.240 tỷ đồng\n• Thu xuất nhập khẩu: 310 tỷ đồng\n• Tổng thu: 1.450 tỷ đồng", "top": 90, "left": 40, "width": 880, "height": 150, "fontSize": 20}}
+      ]
     }
   ]
 }

@@ -22,6 +22,26 @@ func (g Grid) Cover() (title, subtitle Rect) {
 	return Rect{g.Margin, top, g.Width - 2*g.Margin, 110}, Rect{g.Margin, top + 122, g.Width - 2*g.Margin, 70}
 }
 
+// Decor: mot khoi trang tri khong chu. Kind: "band" (mau chinh), "base" (mau chinh nhat), "rule" (mau nhan).
+type Decor struct {
+	Kind string
+	Box  Rect
+}
+
+// CoverDecor: trang tri bia - dai doc ben trai (trong le), khoi nhat o day (duoi dong phu), vach ngan giua ten va dong
+// phu. Khong khoi nao de len vung chu cua Cover().
+func (g Grid) CoverDecor() []Decor {
+	title, subtitle := g.Cover()
+	band := Round1(g.Margin * 0.45)
+	baseTop := subtitle[1] + subtitle[3] + 24
+	gap := subtitle[1] - (title[1] + title[3])
+	return []Decor{
+		{"band", Rect{0, 0, band, g.Height}},
+		{"base", Rect{0, Round1(baseTop), g.Width, Round1(g.Height - baseTop)}},
+		{"rule", Rect{Round1(g.Width/2 - 40), Round1(title[1] + title[3] + gap/2 - 2), 80, 4}},
+	}
+}
+
 // Section: mot dong chu lon giua slide.
 func (g Grid) Section() Rect { return Rect{g.Margin, (g.Height - 110) / 2, g.Width - 2*g.Margin, 110} }
 

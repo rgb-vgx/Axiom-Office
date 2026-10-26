@@ -107,11 +107,12 @@ SELECT seq, tool, action, ok, result_chars, error, params_json FROM tool_calls W
   phải đi lại lần nào; `r_9a7512ac…` và `r_fb096418…` lần dựng đầu cũng 0 lỗi dây → **đạt mốc: 3 lượt liền**
   (`r_e6766361`, `r_9a7512ac`, `r_fb096418`) không còn `connector-*` ở lần dựng đầu.
 
-### 5.2 Thành phần xuyên suốt trong sơ đồ (Observability, audit…) — **ĐÃ LÀM 26/10/2026** (chưa có nét đứt)
+### 5.2 Thành phần xuyên suốt trong sơ đồ (Observability, audit…) — **ĐÃ LÀM 26/10/2026**
 
 - **Đã làm:** `diagram` nhận `span: [{text}]` (tối đa 2) → dải dọc bên phải, cao bằng cả sơ đồ, là vật cản khi đi dây,
   không nhận mũi tên; `WORD_TOO_LONG` khi một từ không vừa bề rộng dải (190). `slidelayout.DiagramWithSpans`; mô tả tool
-  + skill. Lượt `r_e6766361…`: model dùng `span` cho Observability ngay lần đầu. Còn: nét đứt (`dash` ở C#), `side: bottom`.
+  + skill. Lượt `r_e6766361…`: model dùng `span` cho Observability ngay lần đầu. Viền nét đứt (`wpp.addShape dash`) đã có. Còn:
+  `side: bottom`.
 
 - Hiện nút như vậy nằm lẻ một ô, không nối với ai (ảnh slide 4 các lượt). Đề bài yêu cầu "Observability thu thập
   trace, log và metric **xuyên suốt** hệ thống".
@@ -119,7 +120,11 @@ SELECT seq, tool, action, ok, result_chars, error, params_json FROM tool_calls W
   cạnh các tầng, có đường nét đứt (hoặc chú thích) — không phải một nút trong lưới. Ghi vào mô tả tool + skill
   `trinh-bay-chuyen-nghiep`. Cần thêm `dash` cho `wpp.addConnector`/`wpp.addShape` (C#) nếu dùng nét đứt.
 
-### 5.3 Bớt vòng đầu lượt nạp skill
+### 5.3 Bớt vòng đầu lượt nạp skill — **ĐÃ LÀM 26/10/2026**
+
+- **Đã làm:** phần tự vẽ của skill sang `references/tu-ve-bang-wpp.md`; `SKILL.md` 8,4k ký tự; skill nói không cần
+  đọc `tokens.json`/`bo-cuc-slide.md` khi có tool. Lượt `r_e0c9405c…`: đầu lượt nạp 11,8k ký tự (trước ~23k), 11 vòng.
+  Thêm: lỗi `TOO_LONG` có `max`, lỗi tầng không kéo theo lỗi cạnh (cả 4 lượt trước mất 2–4 vòng đầu vì hai lỗi này).
 
 - 4 lệnh đầu mọi lượt slide nạp ~28k ký tự (`load_skill trinh-bay-chuyen-nghiep` ~13k, `thiet-ke-van-phong` ~3k,
   `_design/tokens.json` ~3k, `references/bo-cuc-slide.md` ~8k) — gửi lại ở **mọi** vòng sau đó.
@@ -127,7 +132,10 @@ SELECT seq, tool, action, ok, result_chars, error, params_json FROM tool_calls W
   `tokens.json`/`bo-cuc-slide.md` (chỉ cần khi tự vẽ bằng `wpp.addText`); cân nhắc tách phần "dùng slides_from_brief"
   thành file ngắn riêng. Đo lại `result_chars` của 4 lệnh đầu.
 
-### 5.4 Thiết kế còn đơn điệu
+### 5.4 Thiết kế còn đơn điệu — **ĐÃ LÀM 26/10/2026** (bìa, timeline, gợi ý skill)
+
+- **Đã làm:** bìa có dải màu, khối đáy, vạch nhấn (`Grid.CoverDecor`); `timeline` nhận `points` mỗi mốc; skill gợi ý
+  layout theo loại nội dung. Lượt `r_e0c9405c…`: slide lộ trình là `timeline` 3 mốc kèm mục tiêu / hoàn thành / rủi ro.
 
 - Bìa chỉ có chữ (đề đòi "điểm nhấn thị giác"); nhiều slide dạng thẻ giống nhau; slide lộ trình thường thành `cards`
   thay vì `timeline` (timeline hiện chỉ có `{date, text}`, không có mục tiêu/điều kiện/rủi ro).
@@ -141,7 +149,7 @@ SELECT seq, tool, action, ok, result_chars, error, params_json FROM tool_calls W
 
 ### 5.6 Còn từ báo cáo nghiên cứu / tư vấn ChatGPT
 
-- **Benchmark có lỗi cài sẵn mà đề KHÔNG nói chỗ lỗi** (đo khả năng tự phát hiện, không chỉ sửa) — `s25` hiện nói rõ
+- **ĐÃ THÊM 26/10/2026: `s26-loi-khong-noi-cho`** (chưa chạy). **Benchmark có lỗi cài sẵn mà đề KHÔNG nói chỗ lỗi** (đo khả năng tự phát hiện, không chỉ sửa) — `s25` hiện nói rõ
   lỗi. Thêm brief vào `tests/bench/slides/briefs.json`.
 - **Phân loại vòng không gọi tool** — giờ có `run_rounds.kind`; tổng hợp trên nhiều lượt rồi quyết định.
 - **Phiên bản tài liệu cho lệnh ghi** (từ chối ghi khi tài liệu đã đổi so với lần đọc) — hiện `docStateGuard` chỉ biết

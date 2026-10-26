@@ -13,7 +13,8 @@ Mục tiêu: người đọc hiểu nội dung nhanh. Đẹp = rõ ràng + nhấ
 ## Lấy giá trị cụ thể từ token
 
 Gọi `read_skill_file {name: "_design", path: "tokens.json"}` rồi dùng **đúng giá trị** trong đó cho
-lệnh (màu `#RRGGBB`, cỡ chữ, number format). Không tự chế màu mới.
+lệnh (màu `#RRGGBB`, cỡ chữ, number format). Không tự chế màu mới. PowerPoint có tool `slides_from_brief`/`slides_from_template`
+thì **không cần** đọc `tokens.json`: tool tự dùng token.
 
 ## Quy tắc
 

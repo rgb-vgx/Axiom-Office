@@ -197,8 +197,12 @@ class ScoreTest(unittest.TestCase):
                 self.assertTrue(any(score.normalize(phrase) in score.normalize(c.get("params", {}).get("text", ""))
                                     for c in (brief.get("seed") or []) if c.get("action") == "wpp.addText"),
                                 brief["id"] + ": " + phrase)
-            # So lieu phai cham duoc: moi cum mustContain co trong chinh de bai.
+            # So lieu phai cham duoc: moi cum mustContain co trong chinh de bai - hoac, voi bai loi cai san ma de KHONG noi
+            # cho loi (s26), trong chu cua bai cai san hoac la so suy ra ("derived", vd tong = cong cac dong).
+            seeded = " ".join(score.normalize(c.get("params", {}).get("text", "")) for c in (brief.get("seed") or []))
             for phrase in brief["mustContain"]:
+                if brief.get("mustRemove") and (score.normalize(phrase) in seeded or phrase in (brief.get("derived") or [])):
+                    continue
                 self.assertIn(score.normalize(phrase), score.normalize(brief["prompt"]), brief["id"] + ": " + phrase)
 
 
