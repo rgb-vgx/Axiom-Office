@@ -5,6 +5,13 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — Wizard báo "Không rõ lỗi" với model suy luận (26/10/2026)
+
+`POST /v1/llm/test` chỉ cho `max_tokens = 24`: model suy luận (`ocg/beam-free`) tiêu hết token cho phần suy nghĩ,
+`content` rỗng, `finish_reason = "length"`; `Client.Chat` lại trả lỗi rỗng nên wizard chỉ hiện "Không rõ lỗi".
+Sửa: trần phép thử nâng lên **512**; `Chat` trả `provider returned no answer text (finish_reason=…, reasoning N chars)`;
+`setup.Describe` dịch lỗi này sang kind `reply` với câu tiếng Việt rõ ràng. Kiểm: `ocg/beam-free` qua phép thử (2,3 s).
+
 ### Docs — WPS còn thiếu gì so với bản Windows (26/10/2026)
 
 Đối chiếu `catalog/live-commands.json` (**84** lệnh), bảng `HANDLERS` trong `src/AxiomOffice.WPS/commands.js` và

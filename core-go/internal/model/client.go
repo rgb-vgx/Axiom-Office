@@ -180,7 +180,10 @@ func (c *Client) Chat(ctx context.Context, systemPrompt, userPrompt string, maxT
 		return "", parseError, false
 	}
 	if !turn.HasText {
-		return "", "", false
+		// Model reasoning het ngan sach giua phan suy nghi: content rong, finish_reason = "length".
+		// Truoc day tra loi rong -> wizard chi bao "Khong ro loi" (ocg/beam-free, 26/10/2026).
+		return "", fmt.Sprintf("provider returned no answer text (finish_reason=%q, reasoning %d chars)",
+			turn.FinishReason, len(turn.Reasoning)), false
 	}
 	return StripThoughts(turn.Text), "", true
 }

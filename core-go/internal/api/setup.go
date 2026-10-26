@@ -24,7 +24,9 @@ const (
 	testSystemPrompt = "Bạn là trợ lý kiểm tra kết nối. Trả lời cực ngắn."
 	testUserPrompt   = "Trả lời đúng một từ: OK"
 	testTimeout      = 30 * time.Second
-	testMaxTokens    = 24
+	// Model reasoning (ocg/beam-free...) tieu token suy nghi truoc khi tra loi: 24 token thi het giua
+	// phan suy nghi, content rong. Tran nay chi la mai: model tra "OK" la dung, so token thuc dung van nho.
+	testMaxTokens = 512
 )
 
 func mapSetup(mux *http.ServeMux, deps *Deps) {
