@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"axiomoffice/core/internal/office"
+	"axiomoffice/core/internal/slidelayout"
 )
 
 type briefCall struct {
@@ -598,5 +599,93 @@ func TestSlidesFromBriefRefusesSameSpecWithIssues(t *testing.T) {
 	errors := checkSameSpec(specs, run)
 	if len(errors) != 1 || errors[0].Src != 1 || errors[0].Error != "SAME_SPEC_SAME_ISSUES" {
 		t.Fatalf("chi slide 1 (cung mo ta, co loi; replace khong tinh) bi tu choi: %+v", errors)
+	}
+}
+
+// So do loi gui lai voi nodes/edges y het nhung doi tieu de/ghi chu van bi tu choi (luot that 26/10/2026: 3 lan, moi lan
+// chi sua chinh ta tieu de); doi nodes thi duoc dung. Slide khac: doi ghi chu khong tinh la doi.
+func TestSlidesFromBriefSameDiagramNewTitleRefused(t *testing.T) {
+	run := &RunContext{}
+	nodes := []any{map[string]any{"id": "a", "text": "A", "layer": 1.0}, map[string]any{"id": "b", "text": "B", "layer": 2.0}}
+	edges := []any{map[string]any{"from": "a", "to": "b"}}
+	run.rememberBriefSpec(briefSpecs([]any{map[string]any{"layout": "diagram", "title": "kiểm Scotch", "notes": "x",
+		"nodes": nodes, "edges": edges}})[0], 3)
+	run.rememberBriefSpec(briefSpecs([]any{map[string]any{"layout": "cards", "title": "C", "notes": "x"}})[0], 1)
+	specs := briefSpecs([]any{
+		map[string]any{"layout": "diagram", "title": "kiểm soát", "notes": "y", "nodes": nodes, "edges": edges, "replace": 4.0},
+		map[string]any{"layout": "diagram", "title": "kiểm soát", "nodes": nodes[:1], "edges": []any{}},
+		map[string]any{"layout": "cards", "title": "C", "notes": "khac"},
+	})
+	errors := checkSameSpec(specs, run)
+	if len(errors) != 2 || errors[0].Src != 1 || errors[1].Src != 3 {
+		t.Fatalf("slide 1 (so do cu, doi tieu de) va 3 (chi doi ghi chu) phai bi tu choi: %+v", errors)
+	}
+}
+
+// Thanh phan xuyen suot (Observability) ve thanh dai ben phai, khong phai nut le (luot that 26/10/2026: model bo nut
+// Observability de het loi duong noi, de bai lai bat buoc no "xuyen suot"). Mui ten toi dai bi tu choi kem cach sua.
+func TestSlidesFromBriefDrawsDiagramSpan(t *testing.T) {
+	run, calls := briefBridge(t)
+	result := NewSlidesFromBriefTool(nil).Invoke(context.Background(), brief(t, `[
+		{"layout":"diagram","title":"Kiến trúc ba tầng có quan sát xuyên suốt","nodes":[{"id":"a","text":"Gateway","layer":1},
+		 {"id":"b","text":"Orchestrator","layer":2},{"id":"c","text":"Banking APIs","layer":3}],
+		 "edges":[{"from":"a","to":"b"},{"from":"b","to":"c"},{"from":"c","to":"a"}],
+		 "span":[{"text":"Observability: trace, log, metric"}]}
+	]`), run)
+	if !result.OK || !strings.Contains(result.JSON, `"built":1`) {
+		t.Fatalf("phai dung duoc: %s", result.JSON)
+	}
+	var span map[string]any
+	nodeRight := 0.0
+	for _, call := range *calls {
+		if call.Action != "wpp.addShape" {
+			continue
+		}
+		if call.Params["text"] == "Observability: trace, log, metric" {
+			span = call.Params
+		} else if call.Params["text"] != nil {
+			nodeRight = max(nodeRight, call.Params["left"].(float64)+call.Params["width"].(float64))
+		}
+	}
+	if span == nil || span["left"].(float64) < nodeRight+slidelayout.SpanGap-0.1 || span["width"] != slidelayout.SpanWidth {
+		t.Fatalf("dai phai ben phai cac nut (nut toi %v): %+v", nodeRight, span)
+	}
+	bad := NewSlidesFromBriefTool(nil).Invoke(context.Background(), brief(t, `[
+		{"layout":"diagram","title":"Hai tầng","nodes":[{"id":"a","text":"Gateway","layer":1},{"id":"b","text":"Orchestrator","layer":2}],
+		 "edges":[{"from":"a","to":"b"},{"from":"b","to":"obs"}],"span":["Observability"]}
+	]`), run)
+	if !strings.Contains(bad.JSON, "UNKNOWN_NODE") || !strings.Contains(bad.JSON, "takes no arrows") {
+		t.Fatalf("mui ten toi dai phai bi tu choi kem cach sua: %s", bad.JSON)
+	}
+	long := NewSlidesFromBriefTool(nil).Invoke(context.Background(), brief(t, `[
+		{"layout":"diagram","title":"Hai tầng","nodes":[{"id":"a","text":"Gateway","layer":1},{"id":"b","text":"Orchestrator","layer":2}],
+		 "edges":[{"from":"a","to":"b"}],"span":["Observability"]},
+		{"layout":"diagram","title":"Hai tầng","nodes":[{"id":"a","text":"Gateway","layer":1},{"id":"b","text":"Orchestrator","layer":2}],
+		 "edges":[{"from":"a","to":"b"}],"span":["Observabilityplatform"]}
+	]`), run)
+	if strings.Count(long.JSON, "WORD_TOO_LONG") != 1 || !strings.Contains(long.JSON, `"src":2`) {
+		t.Fatalf("chi tu qua dai cho dai moi bi tu choi (Observability phai vua): %s", long.JSON)
+	}
+}
+
+// Slide da sach (0 loi bo cuc) bi dung lai qua 2 lan goi thi tu choi va bao bai da xong (luot that 26/10/2026: model khong
+// go duoc "kiem soat", dung lai slide sach ~20 lan roi het token).
+func TestSlidesFromBriefStopsRebuildingCleanSlides(t *testing.T) {
+	run, _ := briefBridge(t)
+	tool := NewSlidesFromBriefTool(nil)
+	first := tool.Invoke(context.Background(), brief(t, `[{"layout":"section","title":"Phần một"},{"layout":"section","title":"Phần hai"}]`), run)
+	if !strings.Contains(first.JSON, `"built":2`) {
+		t.Fatalf("dung 2 slide: %s", first.JSON)
+	}
+	for i, title := range []string{"Kiểm Sudan", "Kiểm Scotch"} {
+		again := tool.Invoke(context.Background(), brief(t, `[{"layout":"section","title":"`+title+`","replace":2}]`), run)
+		if !strings.Contains(again.JSON, `"replaced":2`) {
+			t.Fatalf("lan sua chu %d van duoc: %s", i+1, again.JSON)
+		}
+	}
+	stop := tool.Invoke(context.Background(), brief(t, `[{"layout":"section","title":"Kiểm soát","replace":2}]`), run)
+	if !strings.Contains(stop.JSON, `"built":0`) || !strings.Contains(stop.JSON, "CLEAN_SLIDE_REBUILT_TOO_OFTEN") ||
+		!strings.Contains(stop.JSON, "answer the user now") {
+		t.Fatalf("lan thu 3 phai bi tu choi va bao tra loi nguoi dung: %s", stop.JSON)
 	}
 }

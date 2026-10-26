@@ -46,6 +46,38 @@ func TestRunAgentBlocksIdenticalCalls(t *testing.T) {
 	}
 }
 
+// Lenh doc y het xen giua cac lan ghi (tai lieu da doi) khong bi chan du vuot han muc: luot that 26/10/2026 -
+// wpp.checkLayout ca bai sau moi lan dung lai bi chan o lan thu 5, model phai kiem tung slide mot.
+func TestRunAgentIdenticalReadAfterWriteNotBlocked(t *testing.T) {
+	replies := []string{}
+	for i := 1; i <= 6; i++ {
+		replies = append(replies, fmt.Sprintf(replyToolCallArgs, fmt.Sprintf("r%d", i), `{"doc":"check"}`))
+		if i < 6 {
+			replies = append(replies, fmt.Sprintf(replyToolCallArgs, fmt.Sprintf("w%d", i), fmt.Sprintf(`{"write":%d}`, i)))
+		}
+	}
+	server, _ := verifyServer(t, append(replies, fmt.Sprintf(replyText, "xong")))
+	client := NewClient(server.Client(), "openai", server.URL, "", "m")
+	reads, blocked := 0, 0
+	options := DefaultAgentOptions()
+	options.Verify = false
+	result := client.RunAgent(context.Background(), "s", nil, "u", mutatingTools(),
+		func(ctx context.Context, call ToolCall) ToolResult {
+			write := strings.Contains(call.Arguments, "write")
+			if !write {
+				reads++
+			}
+			return ToolResult{CallID: call.ID, Name: call.Name, OK: true, Mutating: write, ResultJSON: `{"ok":true}`}
+		}, options, AgentCallbacks{ToolFinished: func(result ToolResult) {
+			if strings.Contains(result.ResultJSON, "blocked") {
+				blocked++
+			}
+		}})
+	if !result.OK || reads != 6 || blocked != 0 {
+		t.Fatalf("6 lan doc xen 5 lan ghi phai chay het: doc %d, chan %d, %+v", reads, blocked, result)
+	}
+}
+
 // replyToolCallArgs: tool call voi id va doi so tuy bien (doc roi doc lai, hay roi ghi roi doc).
 const replyToolCallArgs = `{"choices":[{"message":{"role":"assistant","content":null,` +
 	`"tool_calls":[{"id":"%s","function":{"name":"t","arguments":%q}}]}}],` +

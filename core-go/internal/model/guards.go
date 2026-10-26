@@ -290,13 +290,28 @@ func (g *docStateGuard) afterTools(loop *agentLoop, _ *Turn, results []ToolResul
 
 // identicalCallGuard (MaxIdenticalCalls): lan goi thu (n+1) Y HET (cung tool, cung doi so) trong luot bi chan -
 // tai lieu khong doi tu lan truoc thi ket qua cung khong doi.
+//
+// Lenh DOC (khong sua tai lieu) duoc dem lai tu dau khi tai lieu da doi tu lan doc truoc: luot that 26/10/2026
+// (r_f78df99d, beam-free) - wpp.checkLayout ca bai sau moi lan dung lai bi chan o lan thu 5 du bai da khac, model
+// phai kiem tung slide mot, mat 12 vong. Lenh GHI lap y het van bi dem suot luot (moi lan ghi lam revision tang nen
+// khong the dung revision de mien).
 type identicalCallGuard struct {
-	limit  int
-	counts map[string]int
+	limit   int
+	counts  map[string]int
+	readAt  map[string]int    // chu ky lenh doc -> revision luc goi gan nhat
+	pending map[string]string // CallID -> chu ky cua vong dang chay
+	at      map[string]int    // CallID -> revision luc goi
 }
 
-func (g *identicalCallGuard) beforeCall(_ *agentLoop, call ToolCall) *ToolResult {
+func (g *identicalCallGuard) beforeCall(loop *agentLoop, call ToolCall) *ToolResult {
 	signature := call.Name + " " + call.Arguments
+	if g.pending == nil {
+		g.readAt, g.pending, g.at = map[string]int{}, map[string]string{}, map[string]int{}
+	}
+	if at, read := g.readAt[signature]; read && at != loop.revision {
+		g.counts[signature] = 0
+	}
+	g.pending[call.ID], g.at[call.ID] = signature, loop.revision
 	g.counts[signature]++
 	if g.counts[signature] <= g.limit {
 		return nil
@@ -304,6 +319,21 @@ func (g *identicalCallGuard) beforeCall(_ *agentLoop, call ToolCall) *ToolResult
 	return &ToolResult{CallID: call.ID, Name: call.Name, ResultJSON: ErrorJSON(fmt.Sprintf(
 		"blocked: this exact call (same tool, same arguments) already ran %d times in this request; "+
 			"use the earlier result, change the arguments, or answer the user", g.limit))}
+}
+
+// afterTools: ghi nhan lenh doc (chay thanh cong, khong sua tai lieu) cung revision luc goi. Chay truoc
+// docStateGuard.afterTools nen loop.revision chua tang o day - dung revision luc goi da luu.
+func (g *identicalCallGuard) afterTools(_ *agentLoop, _ *Turn, results []ToolResult) *verdict {
+	for _, result := range results {
+		signature, ok := g.pending[result.CallID]
+		if ok && result.OK && !result.Mutating {
+			g.readAt[signature] = g.at[result.CallID]
+		} else if ok && result.Mutating {
+			delete(g.readAt, signature)
+		}
+	}
+	g.pending, g.at = map[string]string{}, map[string]int{}
+	return nil
 }
 
 // sameTaskGuard (MaxSameTaskCalls): chan vong lap "lam cung mot viec, khac tham so" (17-R0 muc 3.3).

@@ -96,6 +96,10 @@ type RunContext struct {
 	owned *ownedObjects
 	// briefSpecs: mo ta slide (JSON) da dung qua slides_from_brief trong luot -> so loi bo cuc cua lan dung do.
 	briefSpecs map[string]int
+	// slideIssues: slide do slides_from_brief dung trong luot -> so loi bo cuc lan dung gan nhat; cleanRebuilds: so lan
+	// goi da dung lai slide sach (checkCleanRebuilds).
+	slideIssues   map[int]int
+	cleanRebuilds int
 	// FocusSlide: slide nguoi dung dang mo (pane gui document.view) - ket qua doc ca bai giu nguyen slide nay.
 	FocusSlide int
 	// Trace: su kien DebugTrace tu ben trong tool (vd slides_from_brief di lai day) - nil khi tat; goi qua run.trace.

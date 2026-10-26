@@ -42,7 +42,7 @@ func (t *SlidesFromBriefTool) Description() string {
 		"timeline {title, milestones: [{date, text}] 3-6}; diagram {title, nodes: [{id, text, layer, group}] up to 10 (layer 1 = " +
 		"top row, up to 4 nodes per layer), edges: [{from, to}] arrows between node ids - arrows are routed around the " +
 		"other boxes, so back arrows and arrows that skip a node are fine, and the tool re-routes one itself if PowerPoint " +
-		"draws it across a box}; optional group on steps/nodes (2-3 short names, " +
+		"draws it across a box; span: [{text}] up to 2 parts that run through every layer (e.g. Observability, audit log) - drawn as a strip beside the whole diagram, not a node, no arrows to it}; optional group on steps/nodes (2-3 short names, " +
 		"e.g. \"AI\" / \"Business system\"): each group gets its own colour and a legend, to show who does which step; " +
 		"chart {title, chart: {type column|bar|line|pie, " +
 		"categories: [...] 2-12, series: [{name, values: [numbers]}] 1-4 (pie: 1), unit e.g. \"%\" or \" tỷ\"}} - a real, " +
@@ -77,6 +77,12 @@ type briefNode struct {
 // maxGroups: so nhom mau toi da tren mot slide quy trinh / so do (mau: primary, muted, accent).
 const maxGroups = 3
 
+// boldCharWidth: be rong trung binh mot ky tu dam / co chu (Arial dam rong hon 0,53 cua chu thuong).
+const boldCharWidth = 0.62
+
+// maxSpans: so dai "xuyen suot" toi da cua mot so do (slidelayout.DiagramWithSpans).
+const maxSpans = 2
+
 type briefEdge struct{ From, To string }
 
 // briefChart: bieu do goc cua PowerPoint (wpp.addChart) - so lieu nam trong bang tinh nhung, nguoi dung "Edit Data" duoc.
@@ -101,8 +107,10 @@ type briefSlide struct {
 	Milestones []briefItem
 	Nodes      []briefNode
 	Edges      []briefEdge
-	Chart      *briefChart
-	Source     string
+	// Spans: thanh phan chay xuyen moi tang cua so do (Observability, audit) - dai doc ben phai, khong phai nut.
+	Spans  []briefItem
+	Chart  *briefChart
+	Source string
 	// Replace: so slide (do CHINH luot nay dung) duoc thay tai cho bang slide nay - sua dung slide loi thay vi dung lai
 	// ca bai (luot that 25/10/2026: checkLayout bao 3 loi, model dung lai 10 slide roi xoa 10 slide cu, ~10 vong).
 	Replace int
@@ -230,6 +238,11 @@ func parseBrief(value any) ([]briefSlide, []rowError) {
 					}
 				}
 			}
+			spans := entry["span"]
+			if spans == nil {
+				spans = entry["spans"]
+			}
+			slide.Spans = briefItems(spans, "text", "")
 			if chart, ok := entry["chart"].(map[string]any); ok {
 				slide.Chart = parseChart(chart)
 			}
@@ -523,10 +536,21 @@ func checkBrief(slides []briefSlide, grid slidelayout.Grid, tokens briefTokens) 
 				break
 			}
 			errors = append(errors, checkGroups(slot, slide)...)
-			rows := slidelayout.Diagram(shapesArea(area, slide), layerCounts(layers))
+			rows, spans := slidelayout.DiagramWithSpans(shapesArea(area, slide), layerCounts(layers), len(slide.Spans))
 			for l, layer := range layers {
 				for n, node := range layer {
 					fits(slot, "nodes["+node.ID+"]", node.Text, shapeText(rows[l][n]), body)
+				}
+			}
+			for s, span := range slide.Spans {
+				field := fmt.Sprintf("span[%d]", s)
+				fits(slot, field, span.Title, shapeText(spans[s]), body)
+				// Dai hep: mot tu dai hon dong thi PowerPoint ngat giua tu ("Observabil|ity") - TextFits chi dem dong.
+				for _, word := range strings.Fields(span.Title) {
+					if float64(len([]rune(word)))*boldCharWidth*body > shapeText(spans[s])[2] {
+						errors = append(errors, rowError{Src: slot, Field: field, Error: "WORD_TOO_LONG", Actual: len([]rune(word)),
+							Allowed: "words that fit the narrow strip (" + word + " is split mid-word) - use a shorter name"})
+					}
 				}
 			}
 		case "chart":
@@ -558,6 +582,16 @@ func diagramLayers(slide briefSlide) ([][]briefNode, []rowError) {
 			Allowed: `nodes and edges directly on the slide: {"layout":"diagram","title":"...","nodes":[{"id":"a","text":"...","layer":1}],"edges":[{"from":"a","to":"b"}]}`}}
 	}
 	errors := []rowError{}
+	if len(slide.Spans) > maxSpans {
+		errors = append(errors, rowError{Field: "span", Error: "MAX_2_SPANS", Actual: len(slide.Spans)})
+	}
+	spanTexts := map[string]bool{}
+	for s, span := range slide.Spans {
+		if span.Title == "" {
+			errors = append(errors, rowError{Field: fmt.Sprintf("span[%d]", s), Error: "NEEDS_TEXT"})
+		}
+		spanTexts[strings.ToLower(span.Title)] = true
+	}
 	byLayer := map[int][]briefNode{}
 	ids := map[string]bool{}
 	top := 0
@@ -588,7 +622,11 @@ func diagramLayers(slide briefSlide) ([][]briefNode, []rowError) {
 	}
 	for _, edge := range slide.Edges {
 		if !ids[edge.From] || !ids[edge.To] || edge.From == edge.To {
-			errors = append(errors, rowError{Field: "edges", Error: "UNKNOWN_NODE", Allowed: edge.From + " -> " + edge.To})
+			allowed := edge.From + " -> " + edge.To
+			if len(slide.Spans) > 0 {
+				allowed += " (a span runs beside every layer and takes no arrows - drop arrows to it)"
+			}
+			errors = append(errors, rowError{Field: "edges", Error: "UNKNOWN_NODE", Allowed: allowed})
 		}
 	}
 	return layers, errors
@@ -632,9 +670,19 @@ func (t *SlidesFromBriefTool) Invoke(ctx context.Context, arguments map[string]a
 	errors = append(errors, checkReplace(slides, run, target)...)
 	specs := briefSpecs(arguments["slides"])
 	errors = append(errors, checkSameSpec(specs, run)...)
+	rebuilds := checkCleanRebuilds(slides, run)
+	if len(errors) == 0 && len(rebuilds) > 0 {
+		return Result{JSON: OKJSON(map[string]any{"built": 0, "errors": rebuilds,
+			"how": "nothing was built: the deck is done - answer the user now; if some wording is still wrong, say which " +
+				"words on which slide so the user can fix them in PowerPoint"})}
+	}
+	errors = append(errors, rebuilds...)
 	if len(errors) > 0 {
 		return Result{JSON: OKJSON(map[string]any{"built": 0, "errors": errors,
 			"how": "nothing was built: fix every error (shorten the text named in field) and call again with ALL slides"})}
+	}
+	if replacesCleanSlide(slides, run) {
+		run.cleanRebuilds++
 	}
 
 	built := []map[string]any{}
@@ -668,6 +716,7 @@ func (t *SlidesFromBriefTool) Invoke(ctx context.Context, arguments map[string]a
 			entry["notes"] = "set"
 		}
 		built = append(built, entry)
+		run.rememberSlideIssues(index, len(issues))
 		logIssues(run.RunID, "slides_from_brief", index, issues)
 		if s < len(specs) {
 			run.rememberBriefSpec(specs[s], len(issues))
@@ -971,7 +1020,15 @@ func briefShapes(bridge func(string, map[string]any) (map[string]any, string), i
 		}
 	case "diagram":
 		layers, _ := diagramLayers(slide)
-		rows := slidelayout.Diagram(area, layerCounts(layers))
+		rows, spans := slidelayout.DiagramWithSpans(area, layerCounts(layers), len(slide.Spans))
+		for s, rect := range spans {
+			rect, label := rect, slide.Spans[s].Title
+			steps = append(steps, func() string {
+				_, problem := shape(rect, "rounded", label, map[string]any{"fill": slidelayout.Tint(colors.Muted, 0.85),
+					"line": colors.Muted, "boldFirst": true})
+				return problem
+			})
+		}
 		names := map[string]*string{}
 		layerOf, place := map[string]int{}, map[string]int{}
 		for l, layer := range layers {
@@ -993,6 +1050,7 @@ func briefShapes(bridge func(string, map[string]any) (map[string]any, string), i
 		// Tieu de, dong chu thich va dong nguon cung la vat can cua duong noi (checkLayout tinh ca chung la "hop";
 		// luot that 25/10/2026: duong vong duoi hang cuoi cat qua dong nguon).
 		obstacles := append([]slidelayout.Rect{grid.Title()}, legendRects(groups, grid.Content())...)
+		obstacles = append(obstacles, spans...)
 		if slide.Source != "" {
 			obstacles = append(obstacles, grid.Source())
 		}
@@ -1306,6 +1364,38 @@ func checkReplace(slides []briefSlide, run *RunContext, target string) []rowErro
 	return errors
 }
 
+// maxCleanRebuilds: so lan goi dung lai slide DA SACH (0 loi bo cuc) qua replace trong mot luot.
+const maxCleanRebuilds = 2
+
+// replacesCleanSlide: lan goi co thay slide ma lan dung truoc cua no khong co loi bo cuc.
+func replacesCleanSlide(slides []briefSlide, run *RunContext) bool {
+	for _, slide := range slides {
+		if issues, seen := run.slideIssues[slide.Replace]; slide.Replace > 0 && seen && issues == 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// checkCleanRebuilds: dung lai slide da sach qua maxCleanRebuilds lan thi tu choi - bo cuc khong con gi de sua, chi con
+// sua chu. Luot that 26/10/2026 (r_9a7512ac, beam-free): model khong go duoc "kiem soat" (ra "Kiem Sudan"), dung lai cac
+// slide sach ~20 lan de sua, suy luan lap toi het token - luot hong du bai da xong tu vong 10.
+func checkCleanRebuilds(slides []briefSlide, run *RunContext) []rowError {
+	if run.cleanRebuilds < maxCleanRebuilds {
+		return nil
+	}
+	errors := []rowError{}
+	for i, slide := range slides {
+		if issues, seen := run.slideIssues[slide.Replace]; slide.Replace > 0 && seen && issues == 0 {
+			errors = append(errors, rowError{Src: i + 1, Field: "replace", Error: "CLEAN_SLIDE_REBUILT_TOO_OFTEN",
+				Actual: slide.Replace, Allowed: fmt.Sprintf("slide %d already has 0 layout issues and clean slides were "+
+					"rebuilt %d times in this request - stop rebuilding; answer the user and name any wording that is still "+
+					"wrong", slide.Replace, run.cleanRebuilds)})
+		}
+	}
+	return errors
+}
+
 // logIssues: loi bo cuc cua slide vua dung (loai + chi tiet, chi co ten hinh va kich thuoc - khong co chu cua tai lieu)
 // vao core.log - core.db chi luu kich thuoc ket qua nen truoc day khong soat lai duoc model da thay loi gi.
 func logIssues(runID, source string, slide int, issues []any) {
@@ -1316,15 +1406,21 @@ func logIssues(runID, source string, slide int, issues []any) {
 	}
 }
 
-// briefSpecs: mo ta cua tung slide (JSON, bo replace) - de nhan ra model gui lai dung mot mo ta da dung.
+// briefSpecs: mo ta cua tung slide (JSON, bo replace va notes - khong doi bo cuc) - de nhan ra model gui lai dung mot
+// mo ta da dung. So do chi xet layout + nodes + edges: luot that 26/10/2026 (r_f78df99d) gui lai so do loi y het 3 lan,
+// moi lan chi doi tieu de (sua chinh ta) hoac ghi chu nen khong bi bat, lan nao cung 3 loi duong noi.
 func briefSpecs(value any) []string {
 	specs := []string{}
 	list, _ := value.([]any)
 	for _, item := range list {
 		entry, _ := item.(map[string]any)
 		copied := map[string]any{}
+		diagram := textOf(entry["layout"]) == "diagram"
 		for key, field := range entry {
-			if key != "replace" {
+			if key == "replace" || key == "notes" {
+				continue
+			}
+			if !diagram || key == "layout" || key == "nodes" || key == "edges" || key == "span" || key == "spans" {
 				copied[key] = field
 			}
 		}
@@ -1342,7 +1438,8 @@ func checkSameSpec(specs []string, run *RunContext) []rowError {
 		if issues, seen := run.briefSpecs[spec]; seen && issues > 0 {
 			errors = append(errors, rowError{Src: i + 1, Field: "slide", Error: "SAME_SPEC_SAME_ISSUES", Actual: issues,
 				Allowed: "this exact slide was already built in this request and had layout issues - the same spec builds the " +
-					"same slide again. Change it (shorter text, fewer nodes or edges, another layer for a node, another layout) " +
+					"same slide again (for a diagram only nodes and edges count - a new title or notes does not change it). Change it " +
+					"(shorter text, fewer nodes or edges, another layer for a node, another layout) " +
 					"or keep the slide as it is and tell the user"})
 		}
 	}

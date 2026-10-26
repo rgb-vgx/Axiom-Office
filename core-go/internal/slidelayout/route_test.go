@@ -116,3 +116,32 @@ func TestRouteDiagramAvoidsObstacles(t *testing.T) {
 		t.Fatalf("khong co duong sach thi Clear phai false: %+v", routes[0])
 	}
 }
+
+// Dai xuyen suot nam ben phai, cao bang ca so do, khong de len nut nao; duong vong ben phai (quay nguoc tu tang duoi len
+// tang tren) khong cat qua dai khi dai la vat can.
+func TestDiagramWithSpansReservesRightStrip(t *testing.T) {
+	area := Rect{40, 130, 880, 370}
+	rows, spans := DiagramWithSpans(area, []int{1, 2, 2}, 1)
+	if len(spans) != 1 {
+		t.Fatalf("phai co 1 dai: %v", spans)
+	}
+	span := spans[0]
+	if right := span[0] + span[2]; right > area[0]+area[2]+0.1 || span[1] != rows[0][0][1] ||
+		span[1]+span[3] != rows[2][0][1]+rows[2][0][3] {
+		t.Fatalf("dai phai nam trong vung, cao tu tang dau toi tang cuoi: %v rows %v", span, rows)
+	}
+	for _, row := range rows {
+		for _, box := range row {
+			if box[0]+box[2]+SpanGap > span[0]+0.1 {
+				t.Fatalf("nut %v lan vao khe/dai %v", box, span)
+			}
+		}
+	}
+	routes := RouteDiagram(rows, []Edge{{2, 1, 0, 0}}, span)
+	if !routes[0].Clear {
+		t.Fatalf("duong quay nguoc phai tim duoc duong khong cat dai: %+v", routes[0])
+	}
+	if rows, spans := DiagramWithSpans(area, []int{1, 2}, 0); spans != nil || len(rows) != 2 {
+		t.Fatalf("khong co dai thi nhu Diagram: %v %v", rows, spans)
+	}
+}

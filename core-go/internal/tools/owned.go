@@ -136,6 +136,14 @@ func (o *ownedObjects) covers(action string, params map[string]any) bool {
 	return false
 }
 
+// rememberSlideIssues: so loi bo cuc cua lan dung gan nhat cua slide (checkCleanRebuilds).
+func (run *RunContext) rememberSlideIssues(slide, issues int) {
+	if run.slideIssues == nil {
+		run.slideIssues = map[int]int{}
+	}
+	run.slideIssues[slide] = issues
+}
+
 // rememberBriefSpec: ghi mo ta slide vua dung va so loi bo cuc cua no (checkSameSpec).
 func (run *RunContext) rememberBriefSpec(spec string, issues int) {
 	if run.briefSpecs == nil {

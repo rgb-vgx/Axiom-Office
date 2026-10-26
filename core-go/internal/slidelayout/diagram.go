@@ -73,3 +73,36 @@ func Diagram(area Rect, layers []int) [][]Rect {
 	}
 	return result
 }
+
+const (
+	// SpanWidth: be rong mot dai "xuyen suot" ben phai so do (Observability, audit...). 130 thi "Observability" dam co
+	// 20 bi PowerPoint ngat giua tu (luot that 26/10/2026) - 190 chua duoc "Observability:" (14 ky tu dam co 20).
+	SpanWidth = 190.0
+	// SpanGap: khe giua so do va dai dau tien - du cho vai duong vong ben phai (LoopOffset + LoopStep...).
+	SpanGap = 56.0
+)
+
+// DiagramWithSpans: so do nhu Diagram, chua cho `spans` dai doc ben phai, moi dai cao tu dinh tang dau toi day tang
+// cuoi - thanh phan chay xuyen moi tang (docs/plans/20-c0 5.2), ve thanh dai thay vi mot nut le khong noi voi ai.
+func DiagramWithSpans(area Rect, layers []int, spans int) ([][]Rect, []Rect) {
+	if spans <= 0 {
+		return Diagram(area, layers), nil
+	}
+	reserved := SpanGap + SpanWidth*float64(spans) + FlowGap/2*float64(spans-1)
+	rows := Diagram(Rect{area[0], area[1], area[2] - reserved, area[3]}, layers)
+	if len(rows) == 0 {
+		return rows, nil
+	}
+	top, bottom := area[1]+area[3], area[1]
+	for _, row := range rows {
+		for _, box := range row {
+			top, bottom = math.Min(top, box[1]), math.Max(bottom, box[1]+box[3])
+		}
+	}
+	rects := []Rect{}
+	left := area[0] + area[2] - reserved + SpanGap
+	for i := 0; i < spans; i++ {
+		rects = append(rects, Rect{Round1(left + float64(i)*(SpanWidth+FlowGap/2)), Round1(top), SpanWidth, Round1(bottom - top)})
+	}
+	return rows, rects
+}

@@ -90,7 +90,7 @@ SELECT seq, tool, action, ok, result_chars, error, params_json FROM tool_calls W
 
 ## 5. Việc tiếp (theo thứ tự đề xuất)
 
-### 5.1 Công cụ tự đi lại dây khi PowerPoint vẽ lệch mô hình — **ĐÃ LÀM 25/10/2026, còn đo lượt thật**
+### 5.1 Công cụ tự đi lại dây khi PowerPoint vẽ lệch mô hình — **ĐÃ LÀM 25/10/2026, đo 2/3 lượt (26/10)**
 
 - **Bằng chứng:** lượt `r_894e42ac…`, lần dựng đầu slide 4: 1 `connector-crossing` (đường cắt qua một nút) + 3
   `connector-overlap`, dù `RouteDiagram` đã chọn đường "sạch" theo mô hình. Model không sửa được lỗi đi dây (đó là
@@ -102,9 +102,16 @@ SELECT seq, tool, action, ok, result_chars, error, params_json FROM tool_calls W
 - **Mã:** `core-go/internal/tools/slides_brief.go` (`diagramPlan`, `repair`), `core-go/internal/slidelayout/route.go`
   (`DiagramAlternatives`). Test: 1 ca SL + 2 ca tools (đi lại thành công, dừng sau 2 lần).
 - **Xong khi:** đề ngân hàng chạy 3 lần liền, lần dựng đầu không còn `connector-*` trong `core.log`.
-  **Chưa đo** — phiên 25/10 làm trên máy đã cài PowerPoint nhưng chưa cấu hình LLM/Core để chạy lượt thật.
+  **Đo 26/10/2026** (`ocg/beam-free`): `r_f78df99d…` lần dựng đầu slide 4 còn 3 `connector-*` sau 4 lần đi lại (6 lần
+  đi lại làm tệ hơn đã được trả về tuyến cũ - `reroute.reverted`); `r_e6766361…` (sau 5.2) lần dựng đầu 0 lỗi, không
+  phải đi lại lần nào; `r_9a7512ac…` lần dựng đầu 0 lỗi. Hai lượt sau liền nhau sạch - **còn 1 lượt** nữa mới đủ
+  "3 lần liền" (lượt đầu chưa có `span`).
 
-### 5.2 Thành phần xuyên suốt trong sơ đồ (Observability, audit…)
+### 5.2 Thành phần xuyên suốt trong sơ đồ (Observability, audit…) — **ĐÃ LÀM 26/10/2026** (chưa có nét đứt)
+
+- **Đã làm:** `diagram` nhận `span: [{text}]` (tối đa 2) → dải dọc bên phải, cao bằng cả sơ đồ, là vật cản khi đi dây,
+  không nhận mũi tên; `WORD_TOO_LONG` khi một từ không vừa bề rộng dải (190). `slidelayout.DiagramWithSpans`; mô tả tool
+  + skill. Lượt `r_e6766361…`: model dùng `span` cho Observability ngay lần đầu. Còn: nét đứt (`dash` ở C#), `side: bottom`.
 
 - Hiện nút như vậy nằm lẻ một ô, không nối với ai (ảnh slide 4 các lượt). Đề bài yêu cầu "Observability thu thập
   trace, log và metric **xuyên suốt** hệ thống".

@@ -5,6 +5,34 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added / Fixed — Dải "xuyên suốt" cho sơ đồ; chặn lệnh lặp không chặn nhầm lệnh đọc; bắt sơ đồ lỗi gửi lại (26/10/2026)
+
+Lượt thật đề ngân hàng bằng `ocg/beam-free` (`r_f78df99d…`, trace bật): 45 vòng, 1,30M token vào; bài cuối 0 lỗi bố
+cục nhưng sơ đồ **mất nút Observability** (model bỏ nút để hết lỗi dây) và 13 vòng cuối chỉ để kiểm từng slide.
+
+- **`identicalCallGuard`**: lệnh đọc (không sửa tài liệu) được đếm lại từ đầu khi tài liệu đã đổi kể từ lần đọc trước.
+  Trước đây `wpp.checkLayout` cả bài sau mỗi lần dựng lại bị chặn ở lần thứ 5 dù bài đã khác → model kiểm từng slide
+  một (12 vòng). Lệnh ghi lặp y hệt vẫn bị đếm suốt lượt.
+- **`SAME_SPEC_SAME_ISSUES` bắt cả sơ đồ đổi tiêu đề**: khoá so sánh bỏ `notes`; với `diagram` chỉ xét layout + `nodes` +
+  `edges` (+ `span`). Lượt trên gửi lại sơ đồ lỗi y hệt 3 lần, mỗi lần chỉ sửa chính tả tiêu đề, không bị bắt.
+- **`diagram` nhận `span: [{text}]`** (tối đa 2; nhận cả `spans` / chuỗi trần): thành phần chạy xuyên mọi tầng
+  (Observability, audit) vẽ thành dải dọc bên phải, cao bằng cả sơ đồ, không phải nút, không nhận mũi tên (mũi tên tới
+  nó → `UNKNOWN_NODE` kèm cách sửa). Dải là vật cản khi đi dây. Từ dài hơn bề rộng dải → `WORD_TOO_LONG` (PowerPoint
+  ngắt giữa từ "Observabil|ity" ở bản rộng 130 đầu tiên; nay 190). `slidelayout.DiagramWithSpans`; mô tả tool + skill
+  `trinh-bay-chuyen-nghiep` hướng dẫn dùng. Chưa có nét đứt (`wpp.addShape` chưa có `dash`).
+- **Đo lại** (cùng đề, `ocg/beam-free`): `r_e6766361…` **12 vòng, 191k token vào** (157k cache), 583 s; lần dựng đầu
+  10 slide **0 lỗi**, không phải đi lại dây; sơ đồ giữ Observability thành dải.
+  `r_9a7512ac…` (dải 190): lần dựng đầu 10 slide **0 lỗi**, chữ "Observability:" trong dải không còn bị ngắt — nhưng
+  lượt **hỏng** sau 41 vòng, 1,18M token (`finish_reason=length`, bài vẫn đủ 10 slide, 0 lỗi bố cục).
+- Chưa sửa: `beam-free` **không gõ được "kiểm soát"** — ra "kiểm Scotch" (`r_f78df99d`, 5 slide) hoặc "Kiểm Sudan"
+  (`r_9a7512ac`, 6 chỗ). Model tự thấy lỗi, dựng lại slide ~20 lần để sửa, suy luận rơi vào vòng lặp ("Kiểm Sudan →
+  Kiểm Sudan → …") tới khi hết token. Đây là phần tốn nhất của hai lượt 45 và 41 vòng.
+- **Chặn vòng sửa chữ vô ích**: `slides_from_brief` đếm số lần gọi dựng lại (qua `replace`) slide mà lần dựng trước
+  **0 lỗi bố cục**; quá 2 lần thì từ chối (`CLEAN_SLIDE_REBUILT_TOO_OFTEN`) và bảo model trả lời người dùng, nêu chữ nào
+  còn sai ở slide nào để họ sửa trong PowerPoint. Lượt `r_9a7512ac` sẽ dừng ở vòng ~15 thay vì 41 (chưa đo lượt thật);
+  lượt `r_e6766361` chỉ dựng lại slide sạch 1 lần nên không bị ảnh hưởng.
+- Kiểm: `go test ./...` xanh (+1 test model, +4 test tools, +1 test slidelayout).
+
 ### Added / Fixed — Log debug từng lượt; đi lại dây không làm sơ đồ tệ hơn; chỉ sửa slide lỗi (26/10/2026)
 
 - **`DebugTrace`** (HKCU DWORD hoặc `AXIOM_DEBUG_TRACE=1`, mặc định tắt): mỗi lượt ghi `traces/<run id>.jsonl` cạnh
