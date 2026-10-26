@@ -1091,6 +1091,7 @@ giữ port) → idle. Ctrl+C dừng bridge và `Quit` app.
 | `VisualQaEnabled` | DWORD | 0 | Cho model xem ảnh trang/slide (tốn token) |
 | `VerifyWorkEnabled` | DWORD | 1 | Agent tự đọc lại sau khi sửa trước khi trả lời |
 | `LlmShowReasoning` | DWORD | 0 | Hiện phần suy nghĩ của model (tốn token) |
+| `DebugTrace` | DWORD | 0 | Ghi mỗi lượt ra `traces\<run id>.jsonl` cạnh `core.log`: system prompt, tool, từng vòng (token, câu trả lời, tool call nguyên văn), kết quả tool nguyên văn, quyết định guard, lệnh bridge bên trong `slides_from_brief`, từng lần đi lại dây. **Chỉ để soi lỗi** — file lớn và chứa nội dung tài liệu (`AXIOM_DEBUG_TRACE`) |
 
 Core đọc lại cấu hình mỗi lượt chạy (đổi model/bật tắt trong Cài đặt có hiệu lực ngay). Biến môi
 trường `AXIOM_*` ghi đè cho test (`AXIOM_CORE_DATA_DIR`, `AXIOM_CORE_PORT`, `AXIOM_SESSION_DIR`,

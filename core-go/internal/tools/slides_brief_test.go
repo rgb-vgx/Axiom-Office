@@ -67,6 +67,17 @@ func briefBridge(t *testing.T) (*RunContext, *[]briefCall) {
 // addConnector tra ten "Shape N" nhu briefBridge; deleteShapes go ten khoi slide de lan checkLayout sau khong con loi.
 func briefBridgeBrokenConnectors(t *testing.T, broken func(params map[string]any) bool) (*RunContext, *[]briefCall) {
 	t.Helper()
+	return briefBridgeConnectorIssues(t, func(params map[string]any) int {
+		if broken(params) {
+			return 1
+		}
+		return 0
+	})
+}
+
+// briefBridgeConnectorIssues: nhu briefBridgeBrokenConnectors nhung moi duong noi gay `count(params)` loi connector-crossing.
+func briefBridgeConnectorIssues(t *testing.T, count func(params map[string]any) int) (*RunContext, *[]briefCall) {
+	t.Helper()
 	calls := []briefCall{}
 	slides, shapes := 0, 0
 	connectors := map[string]map[string]any{}
@@ -104,11 +115,13 @@ func briefBridgeBrokenConnectors(t *testing.T, broken func(params map[string]any
 			issues := []any{}
 			for _, name := range order {
 				params, ok := connectors[name]
-				if !ok || !broken(params) {
+				if !ok {
 					continue
 				}
-				issues = append(issues, map[string]any{"type": "connector-crossing", "detail": "crossing",
-					"shapes": []any{name, "Shape 1"}})
+				for i := 0; i < count(params); i++ {
+					issues = append(issues, map[string]any{"type": "connector-crossing", "detail": "crossing",
+						"shapes": []any{name, "Shape 1"}})
+				}
 			}
 			reply(w, map[string]any{"slideWidth": 960, "slideHeight": 540,
 				"slides": []any{map[string]any{"issues": issues}}})
@@ -336,6 +349,43 @@ func TestSlidesFromBriefStopsReroutingAfterTwoAttempts(t *testing.T) {
 	}
 	if !strings.Contains(result.JSON, `"connectorsRerouted":2`) || !strings.Contains(result.JSON, `"issueCount":1`) {
 		t.Fatalf("phai dung sau 2 lan va giu loi that: %s", result.JSON)
+	}
+	// Con loi: chi ro chi sua slide loi bang replace, khong dung lai ca bai (trace r_22ae8aca 26/10/2026).
+	if !strings.Contains(result.JSON, `"next":"the other slides are done - do NOT rebuild the deck. Fix only slide(s) 1:`) ||
+		!strings.Contains(result.JSON, `\"replace\"`) {
+		t.Fatalf("thieu huong dan sua slide loi: %s", result.JSON)
+	}
+}
+
+// Duong di lai lam so do te hon (them loi): ve lai duong cu, thu ung vien ke tiep (trace r_22ae8aca 26/10/2026: khong
+// so sanh thi 3 loi thanh 9-12 loi).
+func TestSlidesFromBriefRevertsRerouteThatAddsIssues(t *testing.T) {
+	run, calls := briefBridgeConnectorIssues(t, func(params map[string]any) int {
+		switch {
+		case params["fromSide"] == "bottom" && params["toSide"] == "top":
+			return 1
+		case params["fromSide"] == "right" && params["toSide"] == "right":
+			return 3
+		}
+		return 0
+	})
+	result := NewSlidesFromBriefTool(nil).Invoke(context.Background(), brief(t, `[
+		{"layout":"diagram","title":"Hai tầng xử lý","nodes":[{"id":"a","text":"Gateway","layer":1},
+		 {"id":"b","text":"Orchestrator","layer":2}],"edges":[{"from":"a","to":"b"}]}
+	]`), run)
+	routes := []string{}
+	for _, call := range *calls {
+		if call.Action == "wpp.addConnector" {
+			routes = append(routes, textOf(call.Params["fromSide"])+"-"+textOf(call.Params["toSide"]))
+		}
+	}
+	// Moi tuyen right-right (ke ca duong vong offset khac) deu te hon: thu 2 lan, lan nao cung ve lai bottom-top.
+	want := []string{"bottom-top", "right-right", "bottom-top", "right-right", "bottom-top"}
+	if strings.Join(routes, ",") != strings.Join(want, ",") {
+		t.Fatalf("phai ve lai duong cu sau moi lan thu te hon: %v", routes)
+	}
+	if !strings.Contains(result.JSON, `"issueCount":1`) || strings.Contains(result.JSON, `"connectorsRerouted"`) {
+		t.Fatalf("phai giu duong goc (1 loi, khong 3) va khong tinh lan bi hoan la da di lai: %s", result.JSON)
 	}
 }
 

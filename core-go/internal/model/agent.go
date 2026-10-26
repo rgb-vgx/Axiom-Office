@@ -2,6 +2,7 @@ package model
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -131,6 +132,8 @@ type AgentCallbacks struct {
 	AskContinue func(round, billable int, reason string) bool
 	// RoundFinished: so lieu mot vong goi model (token, so tool call, loai vong) - de do truc tiep ngu canh gui lai.
 	RoundFinished func(stat RoundStat)
+	// Trace: su kien chi tiet de soi loi (round, tool, guard, state) voi DAY DU noi dung - chi gan khi bat DebugTrace.
+	Trace func(event string, fields map[string]any)
 }
 
 // RoundStat: mot vong goi model. Kind: "tools" (co tool call), "final" (cau tra loi cuoi), "nudge:<guard>" (guard nhac
@@ -267,6 +270,7 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 			result.CachedTokens += turn.CachedTokens
 			stat.InputTokens, stat.CachedTokens, stat.OutputTokens = turn.InputTokens, turn.CachedTokens, turn.OutputTokens
 			stat.ToolCalls = len(turn.ToolCalls)
+			loop.traceRound(turn)
 			if turn.Reasoning != "" && callbacks.Reasoning != nil {
 				callbacks.Reasoning(result.Rounds, turn.Reasoning)
 			}
@@ -277,6 +281,8 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 					report("final")
 					return done(true, reply, "", "")
 				}
+				loop.trace("guard", map[string]any{"round": result.Rounds, "by": decision.by, "next": decision.next,
+					"end": decision.end, "error": decision.err})
 				if decision.next {
 					report("nudge:" + decision.by)
 					continue
@@ -290,6 +296,7 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 		}
 		if failure != nil {
 			report("error")
+			loop.trace("round.error", map[string]any{"round": result.Rounds, "detail": failure.detail})
 			if runCtx.Err() != nil {
 				return stopped()
 			}
@@ -314,8 +321,9 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 			}
 			toolStarted := time.Now()
 			var toolResult ToolResult
-			if replaced := guards.beforeCall(loop, call); replaced != nil {
-				toolResult = *replaced
+			replacedBy := ""
+			if replaced, by := guards.beforeCall(loop, call); replaced != nil {
+				toolResult, replacedBy = *replaced, by
 			} else {
 				toolResult = safeExecute(runCtx, execute, call)
 			}
@@ -325,9 +333,20 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 				callbacks.ToolFinished(toolResult)
 			}
 			addLine(call.Name + " " + Truncate(call.Arguments, 150) + " -> " + Truncate(toolResult.ResultJSON, 150))
+			loop.trace("tool", map[string]any{"round": result.Rounds, "id": call.ID, "name": call.Name, "args": call.Arguments,
+				"ok": toolResult.OK, "ms": toolResult.Ms, "mutating": toolResult.Mutating, "verifies": toolResult.Verifies,
+				"final": toolResult.Final, "replacedBy": replacedBy, "resultChars": len(toolResult.ResultJSON),
+				"result": toolResult.ResultJSON})
 		}
 		loop.turns = c.Codec.AppendToolResults(loop.turns, results)
-		if decision := guards.afterTools(loop, turn, results); decision != nil && decision.end {
+		decision := guards.afterTools(loop, turn, results)
+		loop.trace("state", map[string]any{"round": result.Rounds, "revision": loop.revision, "verifiedAt": loop.verifiedAt,
+			"reads": len(loop.reads), "turns": len(loop.turns)})
+		if decision != nil {
+			loop.trace("guard", map[string]any{"round": result.Rounds, "by": decision.by, "next": decision.next,
+				"end": decision.end, "error": decision.err})
+		}
+		if decision != nil && decision.end {
 			return finish(decision)
 		}
 	}
@@ -449,4 +468,32 @@ func clearOldToolResults(turns []Message, keep, minChars int) int {
 		item.holder["content"] = clearedToolResult
 	}
 	return reclaim
+}
+
+// trace: su kien DebugTrace (AgentCallbacks.Trace) - khong lam gi khi khong bat.
+func (l *agentLoop) trace(event string, fields map[string]any) {
+	if l.callbacks.Trace != nil {
+		l.callbacks.Trace(event, fields)
+	}
+}
+
+// traceRound: mot vong goi model - kich thuoc ngu canh vua gui, cau tra loi va tool call nguyen van.
+func (l *agentLoop) traceRound(turn *Turn) {
+	if l.callbacks.Trace == nil {
+		return
+	}
+	calls := make([]map[string]any, 0, len(turn.ToolCalls))
+	for _, call := range turn.ToolCalls {
+		calls = append(calls, map[string]any{"id": call.ID, "name": call.Name, "args": call.Arguments})
+	}
+	contextChars := len(l.systemPrompt)
+	for _, message := range l.turns {
+		if raw, err := json.Marshal(message); err == nil {
+			contextChars += len(raw)
+		}
+	}
+	l.trace("round", map[string]any{"round": l.result.Rounds, "model": l.model, "input": turn.InputTokens,
+		"cached": turn.CachedTokens, "output": turn.OutputTokens, "finish": turn.FinishReason, "text": turn.Text,
+		"reasoningChars": len(turn.Reasoning), "reasoning": turn.Reasoning, "toolCalls": calls,
+		"sentMessages": len(l.turns), "sentChars": contextChars})
 }

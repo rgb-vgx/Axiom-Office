@@ -98,6 +98,8 @@ type RunContext struct {
 	briefSpecs map[string]int
 	// FocusSlide: slide nguoi dung dang mo (pane gui document.view) - ket qua doc ca bai giu nguyen slide nay.
 	FocusSlide int
+	// Trace: su kien DebugTrace tu ben trong tool (vd slides_from_brief di lai day) - nil khi tat; goi qua run.trace.
+	Trace func(event string, fields map[string]any)
 	// Todos: danh sach viec model ghi gan nhat (write_todos).
 	Todos []Todo
 	// lastTemplate, lastSource, lastTarget: tham so slides_from_template lan truoc trong luot (model hay bo o lan sau).
@@ -226,4 +228,11 @@ func normalizeURL(url string) string {
 	url = strings.TrimPrefix(strings.TrimPrefix(url, "https://"), "http://")
 	url = strings.TrimPrefix(url, "www.")
 	return strings.TrimRight(url, "/")
+}
+
+// trace: su kien DebugTrace cua tool (khong lam gi khi tat).
+func (r *RunContext) trace(event string, fields map[string]any) {
+	if r != nil && r.Trace != nil {
+		r.Trace(event, fields)
+	}
 }

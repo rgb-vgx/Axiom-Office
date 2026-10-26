@@ -181,10 +181,18 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 	if ex == nil {
 		return
 	}
+	ex.trace = openTrace(o.Config(), run.ID)
+	defer ex.trace.close()
+	ex.runContext.Trace = ex.trace.callback()
+	ex.traceStart()
 	result := ex.client.RunAgent(ctx, ex.systemPrompt, ex.assembled.PriorTurns, request.Prompt, ex.registry.ModelTools(),
 		func(inner context.Context, call model.ToolCall) model.ToolResult {
 			return executeTool(inner, ex.registry, call, ex.runContext)
 		}, ex.options, o.buildCallbacks(ex))
+	ex.trace.write("result", map[string]any{"ok": result.OK, "text": result.Text, "error": result.Error,
+		"kind": result.ErrorKind, "rounds": result.Rounds, "input": result.InputTokens, "cached": result.CachedTokens,
+		"output": result.OutputTokens, "seconds": result.Seconds, "verified": result.Verified,
+		"repairedToolCalls": result.RepairedToolCalls, "model": result.Model})
 	o.applyResult(ctx, ex, result)
 	o.finish(run)
 }

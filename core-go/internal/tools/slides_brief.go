@@ -613,6 +613,8 @@ func (t *SlidesFromBriefTool) Invoke(ctx context.Context, arguments map[string]a
 			params["presentation"] = target
 		}
 		result := run.Bridge.Command(ctx, run.Office.Port, action, params)
+		run.trace("tool.bridge", map[string]any{"tool": "slides_from_brief", "action": action, "params": params,
+			"ok": result.OK, "error": result.Error, "result": result.Result})
 		if !result.OK {
 			return nil, action + ": " + result.Error
 		}
@@ -643,7 +645,7 @@ func (t *SlidesFromBriefTool) Invoke(ctx context.Context, arguments map[string]a
 				return Result{JSON: OKJSON(map[string]any{"built": len(built), "slides": built, "error": problem}), Mutating: len(built) > 0}
 			}
 		}
-		index, issues, reroutedHere, problem := buildBriefSlide(bridge, grid, tokens, slide, slide.Replace)
+		index, issues, reroutedHere, problem := buildBriefSlide(bridge, grid, tokens, slide, slide.Replace, run.Trace)
 		if problem != "" {
 			return Result{JSON: OKJSON(map[string]any{"built": len(built), "slides": built, "error": problem}), Mutating: true}
 		}
@@ -680,13 +682,26 @@ func (t *SlidesFromBriefTool) Invoke(ctx context.Context, arguments map[string]a
 	if rerouted > 0 {
 		summary["connectorsRerouted"] = rerouted
 	}
+	// Con loi thi noi ro cach sua: luot that 26/10/2026 (trace r_22ae8aca) chi bao issueCount, model dung lai CA 10 slide
+	// (bai thanh 20 slide) roi mat 7 vong xoa tung slide cu.
+	if broken := slidesWithIssues(built); len(broken) > 0 {
+		numbers := make([]string, len(broken))
+		for i, slide := range broken {
+			numbers[i] = strconv.Itoa(slide)
+		}
+		summary["next"] = "the other slides are done - do NOT rebuild the deck. Fix only slide(s) " +
+			strings.Join(numbers, ", ") + ": call slides_from_brief again with ONLY those slides, each with " +
+			"\"replace\": <its slide number> and a CHANGED spec (shorter text, fewer items; diagrams: fewer nodes per " +
+			"layer or fewer edges); " +
+			"the same spec gives the same issues"
+	}
 	return Result{JSON: OKJSON(summary), OK: true, Mutating: true, Verifies: true}
 }
 
 // buildBriefSlide: dung mot slide - slide trong (layout 12), tieu de, cac hop cua kieu, dong nguon, ghi chu, roi soat.
 // Tra them so duong noi da tu di lai (checkLayout bao connector-*) de bao cho model.
 func buildBriefSlide(bridge func(string, map[string]any) (map[string]any, string), grid slidelayout.Grid, tokens briefTokens,
-	slide briefSlide, at int) (int, []any, int, string) {
+	slide briefSlide, at int, trace func(string, map[string]any)) (int, []any, int, string) {
 	addParams := map[string]any{"layout": 12}
 	if at > 0 {
 		addParams["index"] = at
@@ -759,6 +774,7 @@ func buildBriefSlide(bridge func(string, map[string]any) (map[string]any, string
 	issues := layoutIssues(bridge, index)
 	rerouted := 0
 	if plan != nil {
+		plan.trace = trace
 		issues, rerouted = plan.repair(bridge, issues)
 	}
 	return index, issues, rerouted, ""
@@ -994,6 +1010,8 @@ func briefShapes(bridge func(string, map[string]any) (map[string]any, string), i
 
 // diagramPlan: so do vua ve cua mot slide - giu ten hai dau, ten tung duong noi va duong da chon de tu di lai.
 type diagramPlan struct {
+	// trace: DebugTrace (RunContext.Trace) - nil khi tat.
+	trace      func(string, map[string]any)
 	slide      int
 	rows       [][]slidelayout.Rect
 	edges      []slidelayout.Edge
@@ -1033,6 +1051,10 @@ func (p *diagramPlan) repair(bridge func(string, map[string]any) (map[string]any
 			return issues, p.rerouted
 		}
 		alternatives := slidelayout.DiagramAlternatives(p.rows, p.edges, p.routes, p.obstacles, e, tried[e]...)
+		if p.trace != nil {
+			p.trace("reroute", map[string]any{"slide": p.slide, "edge": e, "connector": p.connectors[e], "attempt": attempts[e],
+				"current": p.routes[e], "tried": len(tried[e]), "alternatives": alternatives, "issues": issues})
+		}
 		if len(alternatives) == 0 {
 			attempts[e] = 2
 			continue
@@ -1062,13 +1084,64 @@ func (p *diagramPlan) repair(bridge func(string, map[string]any) (map[string]any
 				continue
 			}
 		}
+		previous := p.routes[e]
 		p.connectors[e] = newName
 		p.routes[e] = route
 		tried[e] = append(tried[e], route)
 		p.rerouted++
 		attempts[e]++
-		issues = layoutIssues(bridge, p.slide)
+		next := layoutIssues(bridge, p.slide)
+		// Duong moi lam so do TE HON (them loi duong noi): ve lai duong cu. Luot that 26/10/2026 (trace r_22ae8aca):
+		// khong so sanh thi 11 lan di lai dua slide tu 3 len 9-12 loi, model phai dung lai slide 9 lan.
+		if before, after := connectorIssueCount(issues), connectorIssueCount(next); after > before {
+			if restored := p.restore(bridge, e, previous, *from, *to); restored {
+				if p.trace != nil {
+					p.trace("reroute.reverted", map[string]any{"slide": p.slide, "edge": e, "before": before, "after": after})
+				}
+				next = layoutIssues(bridge, p.slide)
+			}
+		}
+		issues = next
 	}
+}
+
+// slidesWithIssues: so slide (theo thu tu dung) con loi bo cuc sau khi dung.
+func slidesWithIssues(built []map[string]any) []int {
+	broken := []int{}
+	for _, entry := range built {
+		if issues, _ := entry["issues"].([]any); len(issues) > 0 {
+			broken = append(broken, asInt(entry["slide"]))
+		}
+	}
+	return broken
+}
+
+// restore: ve lai duong noi e theo tuyen cu roi xoa duong vua thu; loi giua chung thi giu nguyen duong vua thu.
+func (p *diagramPlan) restore(bridge func(string, map[string]any) (map[string]any, string), e int, route slidelayout.Route,
+	from, to string) bool {
+	result, problem := bridge("wpp.addConnector", connectorParams(p.slide, from, to, route, p.color))
+	name := textOf(result["shape"])
+	if problem != "" || name == "" {
+		return false
+	}
+	if _, problem := bridge("wpp.deleteShapes", map[string]any{"slide": p.slide, "shapes": []any{p.connectors[e]}}); problem != "" {
+		_, _ = bridge("wpp.deleteShapes", map[string]any{"slide": p.slide, "shapes": []any{name}})
+		return false
+	}
+	p.connectors[e], p.routes[e] = name, route
+	p.rerouted--
+	return true
+}
+
+// connectorIssueCount: so loi duong noi (connector-*) trong ket qua checkLayout cua mot slide.
+func connectorIssueCount(issues []any) int {
+	count := 0
+	for _, item := range issues {
+		if issue, _ := item.(map[string]any); strings.HasPrefix(textOf(issue["type"]), "connector-") {
+			count++
+		}
+	}
+	return count
 }
 
 // brokenEdge: duong noi dau tien bi checkLayout bao loi va con luot di lai (toi da 2 lan moi duong). Connector-overlap

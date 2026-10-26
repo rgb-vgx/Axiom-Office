@@ -142,15 +142,16 @@ func guardName(item any) string {
 	return strings.TrimSuffix(name, "Guard")
 }
 
-func (c guardChain) beforeCall(loop *agentLoop, call ToolCall) *ToolResult {
+// beforeCall: ket qua thay the (nil = chay tool that) va ten guard da thay.
+func (c guardChain) beforeCall(loop *agentLoop, call ToolCall) (*ToolResult, string) {
 	for _, item := range c {
 		if guard, ok := item.(callGuard); ok {
 			if replaced := guard.beforeCall(loop, call); replaced != nil {
-				return replaced
+				return replaced, guardName(item)
 			}
 		}
 	}
-	return nil
+	return nil, ""
 }
 
 func (c guardChain) afterTools(loop *agentLoop, turn *Turn, results []ToolResult) *verdict {
@@ -223,6 +224,8 @@ func (g *verifyGuard) onReply(loop *agentLoop, turn *Turn, _ string) *verdict {
 	if loop.revision == 0 || g.asked || !loop.toolsEnabled {
 		return nil
 	}
+	loop.trace("verify", map[string]any{"round": loop.result.Rounds, "revision": loop.revision,
+		"verifiedAt": loop.verifiedAt, "nudge": loop.verifiedAt != loop.revision})
 	if loop.verifiedAt == loop.revision {
 		// Co bang chung o phien ban hien tai (lenh doc/kiem sau lan sua cuoi, hoac tool ghi tu kiem): luot da
 		// tu kiem truoc khi tra loi - danh dau Verified nhu khi duoc nhac, nhung KHONG vat them mot vong doc

@@ -56,7 +56,10 @@ type Config struct {
 	// nguoi nhac moi chay tiep, con bo khung tu kiem chung thi xong viec mot minh.
 	VerifyWorkEnabled bool
 	VisualQaEnabled   bool
-	LlmApiKey         string
+	// DebugTrace: ghi moi luot ra traces/<run id>.jsonl - day du prompt, tool call, ket qua, quyet dinh guard (agent/trace.go).
+	// Chi de soi loi: file lon va co ca noi dung tai lieu. Mac dinh tat.
+	DebugTrace bool
+	LlmApiKey  string
 	// TavilyApiKey: khoa tim kiem web (tool tavily_search); rong = khong co tool. Windows luu "dpapi:" nhu LlmApiKey.
 	TavilyApiKey string
 	// TavilyEnabled: cho AI tim kiem web (toggle tren ribbon). Tat thi khong dang ky tool du co khoa.
@@ -117,6 +120,7 @@ func From(env Env, source Source) Config {
 		LlmContextWindow:         clamp(intValue(env, "AXIOM_LLM_CONTEXT_WINDOW", source, "LlmContextWindow", 0), 0, 10_000_000),
 		VerifyWorkEnabled:        flag(env, "AXIOM_VERIFY_WORK", source, "VerifyWorkEnabled", true),
 		VisualQaEnabled:          flag(env, "AXIOM_VISUAL_QA", source, "VisualQaEnabled", false),
+		DebugTrace:               flag(env, "AXIOM_DEBUG_TRACE", source, "DebugTrace", false),
 		LlmApiKey:                Unprotect(text(env, "AXIOM_LLM_API_KEY", source, "LlmApiKey")),
 		TavilyApiKey:             Unprotect(text(env, "AXIOM_TAVILY_API_KEY", source, "TavilyApiKey")),
 		TavilyEnabled:            flag(env, "AXIOM_TAVILY_ENABLED", source, "TavilyEnabled", true),

@@ -34,6 +34,8 @@ type execution struct {
 	systemPrompt      string
 	options           model.AgentOptions
 	choose            func(string, string, []tools.Choice) (string, string, error)
+	// trace: DebugTrace cua luot (nil = tat) - trace.go.
+	trace *runTrace
 }
 
 // prepareExecution lam phan "truoc khi goi model": tim phien Office, khoa vung boi den, tao hoi thoai,
@@ -329,6 +331,7 @@ func (o *Orchestrator) buildCallbacks(ex *execution) model.AgentCallbacks {
 			return choice == "continue"
 		},
 
+		Trace: ex.trace.callback(),
 		RoundFinished: func(stat model.RoundStat) {
 			o.Runs.AddRound(run.ID, store.RoundRow{Round: stat.Round, InputTokens: stat.InputTokens, CachedTokens: stat.CachedTokens,
 				OutputTokens: stat.OutputTokens, ToolCalls: stat.ToolCalls, Kind: stat.Kind})

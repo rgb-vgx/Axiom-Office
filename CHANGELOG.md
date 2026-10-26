@@ -5,6 +5,21 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added / Fixed — Log debug từng lượt; đi lại dây không làm sơ đồ tệ hơn; chỉ sửa slide lỗi (26/10/2026)
+
+- **`DebugTrace`** (HKCU DWORD hoặc `AXIOM_DEBUG_TRACE=1`, mặc định tắt): mỗi lượt ghi `traces/<run id>.jsonl` cạnh
+  `core.log` — sự kiện `run` (prompt, system prompt, tool), `round` (token, `finish_reason`, câu trả lời, suy luận, tool
+  call nguyên văn, cỡ ngữ cảnh đã gửi), `tool` (tham số + kết quả nguyên văn, `mutating`/`verifies`, guard nào thay kết
+  quả), `state` (revision/verifiedAt), `guard`/`verify`, `tool.bridge` (lệnh PowerPoint bên trong `slides_from_brief`),
+  `reroute`/`reroute.reverted`, `result`. core.db chỉ giữ 200 ký tự lỗi và ~2.000 ký tự tham số nên trước đây không soi lại được.
+- Lượt thật có trace (`r_22ae8aca`, đề ngân hàng, 31 vòng, 918k token vào) chỉ ra hai lỗi:
+  - **`slides_from_brief` đi lại dây làm sơ đồ tệ hơn mà vẫn giữ**: không so số lỗi trước/sau — 11 lần đi lại đưa slide 4
+    từ 3 lên 9–12 lỗi. Nay dây mới làm tăng số lỗi `connector-*` thì vẽ lại tuyến cũ, xoá tuyến thử (không tính vào
+    `connectorsRerouted`).
+  - **Dựng xong còn lỗi mà không chỉ cách sửa**: chỉ có `issueCount`, model dựng lại cả 10 slide (bài thành 20 slide)
+    rồi mất 7 vòng xoá từng slide cũ. Nay kết quả có `next`: chỉ gửi lại slide lỗi, mỗi slide kèm `replace` và spec đã đổi.
+- Kiểm: `go test ./...` xanh (+2 test tools, +1 test trace).
+
 ### Fixed — Slide bìa hiện "Slide 1 — Cover"; ghi lại chữ cũ làm đọc lại cả bài (26/10/2026)
 
 Lượt thật đề ngân hàng (`r_ab57df5f…`, 25 vòng, 469k token): model ghi `"source":"Slide 1 — Cover"` → bìa hiện dòng đó;
