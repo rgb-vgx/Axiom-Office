@@ -90,7 +90,7 @@ SELECT seq, tool, action, ok, result_chars, error, params_json FROM tool_calls W
 
 ## 5. Việc tiếp (theo thứ tự đề xuất)
 
-### 5.1 Công cụ tự đi lại dây khi PowerPoint vẽ lệch mô hình — **ĐÃ LÀM 25/10/2026, đo 2/3 lượt (26/10)**
+### 5.1 Công cụ tự đi lại dây khi PowerPoint vẽ lệch mô hình — **XONG 26/10/2026** (đạt mốc 3 lượt liền)
 
 - **Bằng chứng:** lượt `r_894e42ac…`, lần dựng đầu slide 4: 1 `connector-crossing` (đường cắt qua một nút) + 3
   `connector-overlap`, dù `RouteDiagram` đã chọn đường "sạch" theo mô hình. Model không sửa được lỗi đi dây (đó là
@@ -104,8 +104,8 @@ SELECT seq, tool, action, ok, result_chars, error, params_json FROM tool_calls W
 - **Xong khi:** đề ngân hàng chạy 3 lần liền, lần dựng đầu không còn `connector-*` trong `core.log`.
   **Đo 26/10/2026** (`ocg/beam-free`): `r_f78df99d…` lần dựng đầu slide 4 còn 3 `connector-*` sau 4 lần đi lại (6 lần
   đi lại làm tệ hơn đã được trả về tuyến cũ - `reroute.reverted`); `r_e6766361…` (sau 5.2) lần dựng đầu 0 lỗi, không
-  phải đi lại lần nào; `r_9a7512ac…` lần dựng đầu 0 lỗi. Hai lượt sau liền nhau sạch - **còn 1 lượt** nữa mới đủ
-  "3 lần liền" (lượt đầu chưa có `span`).
+  phải đi lại lần nào; `r_9a7512ac…` và `r_fb096418…` lần dựng đầu cũng 0 lỗi dây → **đạt mốc: 3 lượt liền**
+  (`r_e6766361`, `r_9a7512ac`, `r_fb096418`) không còn `connector-*` ở lần dựng đầu.
 
 ### 5.2 Thành phần xuyên suốt trong sơ đồ (Observability, audit…) — **ĐÃ LÀM 26/10/2026** (chưa có nét đứt)
 

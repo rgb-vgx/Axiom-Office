@@ -31,6 +31,10 @@ cục nhưng sơ đồ **mất nút Observability** (model bỏ nút để hết
   **0 lỗi bố cục**; quá 2 lần thì từ chối (`CLEAN_SLIDE_REBUILT_TOO_OFTEN`) và bảo model trả lời người dùng, nêu chữ nào
   còn sai ở slide nào để họ sửa trong PowerPoint. Lượt `r_9a7512ac` sẽ dừng ở vòng ~15 thay vì 41 (chưa đo lượt thật);
   lượt `r_e6766361` chỉ dựng lại slide sạch 1 lần nên không bị ảnh hưởng.
+- **Đo lại sau cả đợt** (`r_fb096418…`, `ocg/beam-free`): **17 vòng, 413k token vào** (357k cache), 203 s, xong bình
+  thường; lần dựng đầu sơ đồ 0 lỗi dây, chỉ slide 10 (thẻ) 1 lỗi → model sửa đúng slide đó bằng `replace` một lần;
+  dải Observability đúng một dòng; không còn "Sudan"/"Scotch". Ba lượt liền (`r_e6766361`, `r_9a7512ac`, `r_fb096418`)
+  lần dựng đầu không còn `connector-*` → đạt mốc plan 20-c0 §5.1. Chặn dựng lại slide sạch chưa bật ở lượt thật nào.
 - Kiểm: `go test ./...` xanh (+1 test model, +4 test tools, +1 test slidelayout).
 
 ### Added / Fixed — Log debug từng lượt; đi lại dây không làm sơ đồ tệ hơn; chỉ sửa slide lỗi (26/10/2026)
