@@ -256,3 +256,31 @@ func TestLoneSymbolFindRejected(t *testing.T) {
 		t.Fatal("chi ap dung cho lenh thay chu")
 	}
 }
+
+// Lenh ghi tu bao "changed": false (wpp.setShapeText y het chu dang co) thi khong tinh la sua tai lieu: revision
+// giu nguyen nen lenh doc truoc do khong phai chay lai (luot that 26/10/2026).
+func TestOfficeActionUnchangedWriteIsNotMutating(t *testing.T) {
+	reply := `{"ok":true,"result":{"slide":1,"shape":"TextBox 3","changed":false}}`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(reply))
+	}))
+	defer server.Close()
+	port, err := strconv.Atoi(strings.TrimPrefix(server.URL, "http://127.0.0.1:"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalog := &office.CommandCatalog{Version: "1.0.0", Commands: []office.Command{
+		{Name: "wpp.setShapeText", Kind: "wpp", Agent: true, Summary: "thay chu"},
+	}}
+	tool := NewOfficeActionTool(catalog, "wpp")
+	run := &RunContext{Office: &office.Session{App: "wpp", Port: port}, Bridge: office.NewBridgeClient(server.Client(), "t")}
+	args := map[string]any{"action": "wpp.setShapeText", "params": map[string]any{"shape": "TextBox 3", "text": "A"}}
+
+	if result := tool.Invoke(context.Background(), args, run); !result.OK || result.Mutating {
+		t.Fatalf("changed=false: OK=%v Mutating=%v, muon OK va khong Mutating", result.OK, result.Mutating)
+	}
+	reply = `{"ok":true,"result":{"slide":1,"shape":"TextBox 3","changed":true}}`
+	if result := tool.Invoke(context.Background(), args, run); !result.Mutating {
+		t.Fatal("changed=true phai tinh la sua tai lieu")
+	}
+}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -45,7 +46,7 @@ func (t *SlidesFromBriefTool) Description() string {
 		"e.g. \"AI\" / \"Business system\"): each group gets its own colour and a legend, to show who does which step; " +
 		"chart {title, chart: {type column|bar|line|pie, " +
 		"categories: [...] 2-12, series: [{name, values: [numbers]}] 1-4 (pie: 1), unit e.g. \"%\" or \" tỷ\"}} - a real, " +
-		"editable PowerPoint chart with value labels. Any slide may add notes (speaker notes) and source (one line). " +
+		"editable PowerPoint chart with value labels. Any slide may add notes (speaker notes); content slides may add source (one line PRINTED on the slide: the data source only, never a slide label). " +
 		"title: a short conclusion sentence. points: short phrases, \"**word**\" to stress, \"- \" for level 2. Make " +
 		"exactly the number of slides the user asked for. Nothing is built until every slide passes the checks: if a " +
 		"text is too long you get errors {slide, field, error, max}; shorten it and call again with all slides."
@@ -58,6 +59,9 @@ func (t *SlidesFromBriefTool) Parameters() json.RawMessage {
 }
 
 // briefLayouts: kieu dung duoc tu brief.
+// slideLabel: "Slide 1", "Slide 1 — Cover", "Trang 3", "Cover" - nhan dan y cua model, khong phai nguon du lieu.
+var slideLabel = regexp.MustCompile(`(?i)^\s*((slide|trang)\s*\d+\b|(cover|bìa|title slide)\s*$)`)
+
 var briefLayouts = []string{"cover", "section", "content", "cards", "table", "figures", "process", "timeline", "diagram", "chart"}
 
 type briefFigure struct{ Value, Label string }
@@ -383,8 +387,15 @@ func checkBrief(slides []briefSlide, grid slidelayout.Grid, tokens briefTokens) 
 		} else {
 			fits(slot, "title", slide.Title, title, titleSize)
 		}
-		// Dong nguon: hop 24 pt chi cho dung MOT dong (cong thuc do can 24,1 pt cho mot dong 14 pt) - dem ky tu.
-		if source := grid.Source(); slide.Source != "" && slidelayout.EstimateLines(slide.Source, source[2], tokens.Slide.Type.Caption) > 1 {
+		// Dong nguon HIEN tren slide. Luot that 26/10/2026: model ghi "source":"Slide 1 — Cover" (nhan dan y) -> bia
+		// hien dong do, model sua qua lai 3 lan roi tra lai nhu cu. Bia/section khong co dong nguon; nhan slide thi tu choi.
+		if slide.Source != "" && (slide.Layout == "cover" || slide.Layout == "section") {
+			errors = append(errors, rowError{Src: slot, Field: "source", Error: "NO_SOURCE_ON_" + strings.ToUpper(slide.Layout),
+				Allowed: "omit source on this slide (it is printed on the slide); put remarks in notes"})
+		} else if slideLabel.MatchString(slide.Source) {
+			errors = append(errors, rowError{Src: slot, Field: "source", Error: "SOURCE_IS_SLIDE_LABEL",
+				Allowed: "source is printed on the slide: only the data source, e.g. \"Nguồn: báo cáo nội bộ 2025\"; omit it if there is none"})
+		} else if source := grid.Source(); slide.Source != "" && slidelayout.EstimateLines(slide.Source, source[2], tokens.Slide.Type.Caption) > 1 {
 			errors = append(errors, rowError{Src: slot, Field: "source", Error: "TOO_LONG", Actual: len([]rune(slide.Source)),
 				Allowed: "one line"})
 		}

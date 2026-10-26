@@ -1468,12 +1468,20 @@ namespace AxiomOffice.Bridge
                 throw new ArgumentException("shape '" + name + "' cannot hold text; text shapes: " + ShapeNames(slide, true));
             }
             dynamic range = shape.TextFrame.TextRange;
-            range.Text = text.Replace("\r\n", "\n").Replace("\n", "\r");
+            string wanted = text.Replace("\r\n", "\n").Replace("\n", "\r");
+            // Chu y het chu dang co: khong ghi, bao changed=false de Core khong coi tai lieu da doi (luot that 26/10/2026:
+            // model ghi lai dung chu cu roi phai doc lai ca bai vi revision tang).
+            bool changed = !string.Equals(Convert.ToString(range.Text), wanted, StringComparison.Ordinal);
+            if (changed)
+            {
+                range.Text = wanted;
+            }
             var result = new Dictionary<string, object>
             {
                 { "slide", index },
                 { "shape", Convert.ToString(shape.Name) },
-                { "chars", text.Length }
+                { "chars", text.Length },
+                { "changed", changed }
             };
             bool grew = false;
             try

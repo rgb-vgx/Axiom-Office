@@ -5,6 +5,19 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — Slide bìa hiện "Slide 1 — Cover"; ghi lại chữ cũ làm đọc lại cả bài (26/10/2026)
+
+Lượt thật đề ngân hàng (`r_ab57df5f…`, 25 vòng, 469k token): model ghi `"source":"Slide 1 — Cover"` → bìa hiện dòng đó;
+model sửa `TextBox 3` qua lại 3 lần (lần cuối ghi y hệt chữ đang có), mỗi lần ghi làm revision tăng nên lại đọc cả bài.
+13 vòng sau lần dựng cuối tốn 327k token (70% lượt).
+
+- `slides_from_brief`: bìa/section không nhận `source` (`NO_SOURCE_ON_COVER`/`NO_SOURCE_ON_SECTION`); `source` dạng
+  nhãn slide (`Slide N…`, `Trang N`, `Cover`) bị từ chối (`SOURCE_IS_SLIDE_LABEL`); mô tả tool nói rõ `source` in trên slide.
+- `wpp.setShapeText` (C#): chữ y hệt thì không ghi, trả `changed: false`; `office_action` coi lệnh ghi có
+  `changed: false` là không sửa tài liệu → revision giữ nguyên, `docStateGuard` vẫn trả `unchanged` cho lệnh đọc lặp.
+- Kiểm: `go test ./...` xanh (+2 test); PowerPoint thật: ghi chữ cũ → `changed:false`, chữ mới → `true`.
+  Bản WPS (`commands.js`) chưa trả `changed` (Core coi như có đổi, như trước).
+
 ### Fixed — Wizard báo "Không rõ lỗi" với model suy luận (26/10/2026)
 
 `POST /v1/llm/test` chỉ cho `max_tokens = 24`: model suy luận (`ocg/beam-free`) tiêu hết token cho phần suy nghĩ,

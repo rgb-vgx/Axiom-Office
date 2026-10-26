@@ -280,8 +280,13 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 	if result.OK {
 		raw = TruncateBridgeResult(action, result.Result, raw, run.FocusSlide)
 	}
-	// Lenh that bai thi tai lieu khong doi -> khong tinh la da sua.
-	output := Result{JSON: raw, OK: result.OK, Action: action, Mutating: result.OK && ChangesDocument(action),
+	// Lenh that bai thi tai lieu khong doi -> khong tinh la da sua. Lenh ghi tu bao "changed": false (vd wpp.setShapeText
+	// y het chu dang co) cung vay: revision giu nguyen nen lenh doc truoc do van dung (docStateGuard).
+	unchanged := false
+	if flag, ok := result.Result["changed"].(bool); ok && !flag {
+		unchanged = true
+	}
+	output := Result{JSON: raw, OK: result.OK, Action: action, Mutating: result.OK && ChangesDocument(action) && !unchanged,
 		Verifies: result.OK && Verifies(action)}
 	if !result.OK && AppGone(result.Error) {
 		output.Abort = appGoneMessage

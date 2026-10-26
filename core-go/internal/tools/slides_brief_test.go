@@ -204,6 +204,35 @@ func TestSlidesFromBriefRejectsBeforeBuilding(t *testing.T) {
 	}
 }
 
+// Luot that 26/10/2026: "source":"Slide 1 — Cover" hien tren bia, model sua qua lai 3 lan.
+func TestSlidesFromBriefRejectsSlideLabelAsSource(t *testing.T) {
+	run, _ := briefBridge(t)
+	result := NewSlidesFromBriefTool(nil).Invoke(context.Background(), brief(t, `[
+		{"layout":"cover","title":"Nền tảng AI Agent","source":"Slide 1 — Cover"},
+		{"layout":"content","title":"Vấn đề","points":["a","b"],"source":"Slide 2 — Problem"},
+		{"layout":"content","title":"Số liệu","points":["a","b"],"source":"Nguồn: báo cáo nội bộ 2025"}
+	]`), run)
+	for _, want := range []string{`"src":1,"field":"source","error":"NO_SOURCE_ON_COVER"`,
+		`"src":2,"field":"source","error":"SOURCE_IS_SLIDE_LABEL"`} {
+		if !strings.Contains(result.JSON, want) {
+			t.Fatalf("thieu %s trong %s", want, result.JSON)
+		}
+	}
+	if strings.Contains(result.JSON, `"src":3,"field":"source"`) {
+		t.Fatalf("nguon du lieu that khong duoc bi tu choi: %s", result.JSON)
+	}
+	for _, label := range []string{"Slide 10", "slide 3: Roadmap", "Trang 4", "Cover"} {
+		if !slideLabel.MatchString(label) {
+			t.Errorf("%q phai la nhan slide", label)
+		}
+	}
+	for _, source := range []string{"Nguồn: Slideshare 2024", "Slides.com", "Cover letter dataset"} {
+		if slideLabel.MatchString(source) {
+			t.Errorf("%q khong phai nhan slide", source)
+		}
+	}
+}
+
 func TestSlidesFromBriefDrawsProcessAndDiagramWithConnectors(t *testing.T) {
 	run, calls := briefBridge(t)
 	result := NewSlidesFromBriefTool(nil).Invoke(context.Background(), brief(t, `[
