@@ -697,7 +697,7 @@ func layerCounts(layers [][]briefNode) []int {
 func (t *SlidesFromBriefTool) Invoke(ctx context.Context, arguments map[string]any, run *RunContext) Result {
 	slides, errors := parseBrief(arguments["slides"])
 	if len(errors) > 0 {
-		return Result{JSON: OKJSON(map[string]any{"built": 0, "errors": errors})}
+		return Result{JSON: FailJSON(rowErrorsLine(errors), map[string]any{"built": 0, "errors": errors, "how": briefFixHow})}
 	}
 	target := strings.TrimSpace(run.TargetDocument)
 	bridge := func(action string, params map[string]any) (map[string]any, string) {
@@ -726,14 +726,13 @@ func (t *SlidesFromBriefTool) Invoke(ctx context.Context, arguments map[string]a
 	errors = append(errors, checkSameSpec(specs, run)...)
 	rebuilds := checkCleanRebuilds(slides, run)
 	if len(errors) == 0 && len(rebuilds) > 0 {
-		return Result{JSON: OKJSON(map[string]any{"built": 0, "errors": rebuilds,
+		return Result{JSON: FailJSON(rowErrorsLine(rebuilds), map[string]any{"built": 0, "errors": rebuilds,
 			"how": "nothing was built: the deck is done - answer the user now; if some wording is still wrong, say which " +
 				"words on which slide so the user can fix them in PowerPoint"})}
 	}
 	errors = append(errors, rebuilds...)
 	if len(errors) > 0 {
-		return Result{JSON: OKJSON(map[string]any{"built": 0, "errors": errors,
-			"how": "nothing was built: fix every error (shorten the text named in field) and call again with ALL slides"})}
+		return Result{JSON: FailJSON(rowErrorsLine(errors), map[string]any{"built": 0, "errors": errors, "how": briefFixHow})}
 	}
 	if replacesCleanSlide(slides, run) {
 		run.cleanRebuilds++
@@ -744,12 +743,12 @@ func (t *SlidesFromBriefTool) Invoke(ctx context.Context, arguments map[string]a
 	for s, slide := range slides {
 		if slide.Replace > 0 {
 			if _, problem := bridge("wpp.deleteSlide", map[string]any{"slide": slide.Replace}); problem != "" {
-				return Result{JSON: OKJSON(map[string]any{"built": len(built), "slides": built, "error": problem}), Mutating: len(built) > 0}
+				return Result{JSON: FailJSON(problem, map[string]any{"built": len(built), "slides": built}), Mutating: len(built) > 0}
 			}
 		}
-		index, issues, reroutedHere, problem := buildBriefSlide(bridge, grid, tokens, slide, slide.Replace, run.Trace)
+		index, titleShape, issues, reroutedHere, problem := buildBriefSlide(bridge, grid, tokens, slide, slide.Replace, run.Trace)
 		if problem != "" {
-			return Result{JSON: OKJSON(map[string]any{"built": len(built), "slides": built, "error": problem}), Mutating: true}
+			return Result{JSON: FailJSON(problem, map[string]any{"built": len(built), "slides": built}), Mutating: true}
 		}
 		issueCount += len(issues)
 		rerouted += reroutedHere
@@ -758,6 +757,10 @@ func (t *SlidesFromBriefTool) Invoke(ctx context.Context, arguments map[string]a
 				run.RunID, index, reroutedHere)
 		}
 		entry := map[string]any{"slide": index, "layout": slide.Layout, "title": slide.Title, "issues": issues}
+		// Ten hinh tieu de de sua chu bang wpp.setShapeText: luot that 26/10/2026 (r_9b55dd99) model doan "Title" -> loi.
+		if titleShape != "" {
+			entry["titleShape"] = titleShape
+		}
 		if slide.Replace > 0 {
 			entry["replaced"] = slide.Replace
 		}
@@ -801,20 +804,36 @@ func (t *SlidesFromBriefTool) Invoke(ctx context.Context, arguments map[string]a
 	return Result{JSON: OKJSON(summary), OK: true, Mutating: true, Verifies: true}
 }
 
+const briefFixHow = "nothing was built: fix every error (shorten the text named in field) and call again with ALL slides"
+
+// rowErrorsLine: cau "error" cua lan tu choi - gon mot dong (khung chat hien no), chi tiet nam trong "errors".
+func rowErrorsLine(errors []rowError) string {
+	parts := make([]string, 0, len(errors))
+	for _, row := range errors {
+		part := fmt.Sprintf("slide %d: %s %s", row.Src, row.Error, row.Field)
+		if row.Max > 0 && row.Actual > 0 {
+			part += fmt.Sprintf(" (%d/%d)", row.Actual, row.Max)
+		}
+		parts = append(parts, part)
+	}
+	return model.Truncate(strings.Join(parts, "; "), 300)
+}
+
 // buildBriefSlide: dung mot slide - slide trong (layout 12), tieu de, cac hop cua kieu, dong nguon, ghi chu, roi soat.
-// Tra them so duong noi da tu di lai (checkLayout bao connector-*) de bao cho model.
+// Tra them ten hinh tieu de va so duong noi da tu di lai (checkLayout bao connector-*) de bao cho model.
 func buildBriefSlide(bridge func(string, map[string]any) (map[string]any, string), grid slidelayout.Grid, tokens briefTokens,
-	slide briefSlide, at int, trace func(string, map[string]any)) (int, []any, int, string) {
+	slide briefSlide, at int, trace func(string, map[string]any)) (int, string, []any, int, string) {
 	addParams := map[string]any{"layout": 12}
 	if at > 0 {
 		addParams["index"] = at
 	}
 	added, problem := bridge("wpp.addSlide", addParams)
 	if problem != "" {
-		return 0, nil, 0, problem
+		return 0, "", nil, 0, problem
 	}
 	index := asInt(added["slide"])
 	colors := tokens.Colors
+	lastShape := ""
 	text := func(paras []sourcePara, box slidelayout.Rect, size float64, color string, extra map[string]any) string {
 		params := map[string]any{"slide": index, "paragraphs": paras, "left": box[0], "top": box[1], "width": box[2],
 			"height": box[3], "fontSize": size, "minFontSize": size, "color": color, "accent": colors.Primary, "font": briefFont,
@@ -822,7 +841,15 @@ func buildBriefSlide(bridge func(string, map[string]any) (map[string]any, string
 		for key, value := range extra {
 			params[key] = value
 		}
-		_, problem := bridge("wpp.addParagraphs", params)
+		drawn, problem := bridge("wpp.addParagraphs", params)
+		lastShape, _ = drawn["shape"].(string)
+		return problem
+	}
+	// title: ve tieu de va nho ten hinh.
+	titleShape := ""
+	title := func(paras []sourcePara, box slidelayout.Rect, size float64) string {
+		problem := text(paras, box, size, colors.Primary, map[string]any{"anchor": "middle"})
+		titleShape = lastShape
 		return problem
 	}
 	heading := []sourcePara{{T: slide.Title, B: true}}
@@ -830,7 +857,7 @@ func buildBriefSlide(bridge func(string, map[string]any) (map[string]any, string
 	var plan *diagramPlan
 	switch slide.Layout {
 	case "cover":
-		title, subtitle := grid.Cover()
+		titleBox, subtitle := grid.Cover()
 		// Diem nhan thi giac (de bai 26/10/2026: "khong dung trang bia chi gom tieu de va vai dong chu"): dai mau chinh ben
 		// trai, khoi nhat o day, vach mau nhan giua ten va dong phu. Ve truoc chu (nam duoi); checkLayout coi trang tri
 		// chong nhau / trang tri chong chu la chu y.
@@ -849,8 +876,7 @@ func buildBriefSlide(bridge func(string, map[string]any) (map[string]any, string
 			})
 		}
 		steps = append(steps, func() string {
-			return text([]sourcePara{{T: slide.Title, B: true, A: "center"}}, title, tokens.Slide.Type.Hero, colors.Primary,
-				map[string]any{"anchor": "middle"})
+			return title([]sourcePara{{T: slide.Title, B: true, A: "center"}}, titleBox, tokens.Slide.Type.Hero)
 		})
 		if slide.Subtitle != "" {
 			steps = append(steps, func() string {
@@ -864,12 +890,11 @@ func buildBriefSlide(bridge func(string, map[string]any) (map[string]any, string
 		}
 	case "section":
 		steps = append(steps, func() string {
-			return text([]sourcePara{{T: slide.Title, B: true, A: "center"}}, grid.Section(), tokens.Slide.Type.Hero, colors.Primary,
-				map[string]any{"anchor": "middle"})
+			return title([]sourcePara{{T: slide.Title, B: true, A: "center"}}, grid.Section(), tokens.Slide.Type.Hero)
 		})
 	default:
 		steps = append(steps, func() string {
-			return text(heading, grid.Title(), tokens.Slide.Type.Title, colors.Primary, map[string]any{"anchor": "middle"})
+			return title(heading, grid.Title(), tokens.Slide.Type.Title)
 		})
 		body, drawn := briefBody(bridge, index, grid, tokens, slide, text)
 		plan = drawn
@@ -888,7 +913,7 @@ func buildBriefSlide(bridge func(string, map[string]any) (map[string]any, string
 	}
 	for _, step := range steps {
 		if problem := step(); problem != "" {
-			return index, nil, 0, problem
+			return index, titleShape, nil, 0, problem
 		}
 	}
 	issues := layoutIssues(bridge, index)
@@ -897,7 +922,7 @@ func buildBriefSlide(bridge func(string, map[string]any) (map[string]any, string
 		plan.trace = trace
 		issues, rerouted = plan.repair(bridge, issues)
 	}
-	return index, issues, rerouted, ""
+	return index, titleShape, issues, rerouted, ""
 }
 
 // layoutIssues: issues cua MOT slide sau khi dung (wpp.checkLayout). Loi goi bridge thi coi nhu khong doc duoc - khong

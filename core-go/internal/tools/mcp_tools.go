@@ -84,7 +84,17 @@ func (t *MCPTool) Invoke(ctx context.Context, arguments map[string]any, run *Run
 		}
 	}
 	return Result{JSON: mcp.ResultJSON(text, ok), OK: ok, Action: name,
-		Mutating: ok && MCPChangesState(name)}
+		Mutating: ok && mcpToolChangesState(t.bound)}
+}
+
+// mcpToolChangesState: name() la ten day du "mcp__office__ppt_profile" - danh sach chi doc ghi ten tool tran cua
+// server built-in, tra theo ten day du thi khong bao gio khop (26/10/2026: ppt_profile luc lap ke hoach bi tinh la
+// lenh ghi, tang revision).
+func mcpToolChangesState(bound mcp.ServerTool) bool {
+	if bound.Server != nil && bound.Server.Config.BuiltIn {
+		return MCPChangesState(bound.Tool.Name)
+	}
+	return MCPChangesState(bound.Name())
 }
 
 // mcpReadOnly: cac tool MCP chi doc trang thai, khong ghi file nao. Danh sach nay gom dung cac tool

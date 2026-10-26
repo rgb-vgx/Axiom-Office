@@ -24,7 +24,7 @@ type briefCall struct {
 func briefBridge(t *testing.T) (*RunContext, *[]briefCall) {
 	t.Helper()
 	calls := []briefCall{}
-	slides, shapes := 0, 0
+	slides, shapes, texts := 0, 0, 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 		var request struct {
@@ -48,6 +48,9 @@ func briefBridge(t *testing.T) (*RunContext, *[]briefCall) {
 		case "wpp.addShape", "wpp.addConnector":
 			shapes++
 			_, _ = w.Write([]byte(`{"ok":true,"result":{"slide":1,"shape":"Shape ` + strconv.Itoa(shapes) + `"}}`))
+		case "wpp.addParagraphs":
+			texts++
+			_, _ = w.Write([]byte(`{"ok":true,"result":{"slide":` + strconv.Itoa(slides) + `,"shape":"TextBox ` + strconv.Itoa(texts) + `"}}`))
 		case "wpp.checkLayout":
 			_, _ = w.Write([]byte(`{"ok":true,"result":{"slideWidth":960,"slideHeight":540,"slides":[{"issues":[]}]}}`))
 		default:
@@ -159,6 +162,10 @@ func TestSlidesFromBriefBuildsOnTheGrid(t *testing.T) {
 	]`), run)
 	if !result.OK || !result.Mutating || !strings.Contains(result.JSON, `"built":2`) {
 		t.Fatalf("phai dung 2 slide: %s", result.JSON)
+	}
+	// Ten hinh tieu de (hinh chu dau tien moi slide) de model sua chu khong phai doan "Title".
+	if !strings.Contains(result.JSON, `"titleShape":"TextBox 1"`) || !strings.Contains(result.JSON, `"titleShape":"TextBox 4"`) {
+		t.Fatalf("phai bao ten hinh tieu de: %s", result.JSON)
 	}
 	var title, points, source, values []map[string]any
 	for _, call := range *calls {
@@ -663,7 +670,7 @@ func TestSlidesFromBriefDrawsDiagramSpan(t *testing.T) {
 		{"layout":"diagram","title":"Hai tầng","nodes":[{"id":"a","text":"Gateway","layer":1},{"id":"b","text":"Orchestrator","layer":2}],
 		 "edges":[{"from":"a","to":"b"}],"span":["Observabilityplatform"]}
 	]`), run)
-	if strings.Count(long.JSON, "WORD_TOO_LONG") != 1 || !strings.Contains(long.JSON, `"src":2`) {
+	if long.OK || !strings.Contains(long.JSON, `"ok":false`) || strings.Count(long.JSON, `"error":"WORD_TOO_LONG"`) != 1 || !strings.Contains(long.JSON, `"src":2`) {
 		t.Fatalf("chi tu qua dai cho dai moi bi tu choi (Observability phai vua): %s", long.JSON)
 	}
 }
@@ -701,23 +708,27 @@ func TestSlidesFromBriefEarlyErrorsAreActionable(t *testing.T) {
 		{"layout":"diagram","title":"Hai tầng","nodes":[{"id":"a","text":"Knowledge Retrieval Augmented Generation Service with citations, ranking, caching and freshness checks","layer":1},
 		 {"id":"b","text":"Orchestrator","layer":2}],"edges":[{"from":"a","to":"b"}]}
 	]`), run)
+	// Tu choi la that bai: {"ok":false,"error":"<mot dong>","errors":[...]} - khong phai "ok":true kem loi.
 	var parsed struct {
-		Result struct {
-			Errors []rowError `json:"errors"`
-		} `json:"result"`
+		OK     bool       `json:"ok"`
+		Error  string     `json:"error"`
+		Errors []rowError `json:"errors"`
 	}
 	if err := json.Unmarshal([]byte(result.JSON), &parsed); err != nil {
 		t.Fatal(err)
 	}
+	if result.OK || parsed.OK || !strings.Contains(parsed.Error, "slide 1: LAYER_1_TO_4 nodes[e].layer") {
+		t.Fatalf("tu choi phai la ok:false kem cau loi gon: %s", result.JSON)
+	}
 	var layer, long *rowError
-	for i, problem := range parsed.Result.Errors {
+	for i, problem := range parsed.Errors {
 		switch problem.Error {
 		case "UNKNOWN_NODE":
 			t.Fatalf("canh toi nut sai tang khong duoc bao UNKNOWN_NODE: %+v", problem)
 		case "LAYER_1_TO_4":
-			layer = &parsed.Result.Errors[i]
+			layer = &parsed.Errors[i]
 		case "TOO_LONG":
-			long = &parsed.Result.Errors[i]
+			long = &parsed.Errors[i]
 		}
 	}
 	if layer == nil || !strings.Contains(layer.Allowed, "side by side") {

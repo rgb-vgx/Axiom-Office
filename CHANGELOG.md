@@ -5,6 +5,19 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — Tool lỗi trả `ok:false`; tên hình tiêu đề; lệnh đọc MCP không tính là ghi (26/10/2026)
+
+Từ log khung chat (plan 20-c0 §5.5, lượt `r_d820f088` lập kế hoạch → `r_9b55dd99` thực hiện, `ocg/beam-free`: 10 slide,
+10 vòng, 118k token vào, 0 lỗi bố cục):
+
+- **`slides_from_brief` từ chối / dựng dở trả `{"ok":false,"error":...}`** kèm `errors` (từng trường) và `how`, thay vì
+  `{"ok":true,"result":{"built":0,"errors":...}}` — model và khung chat từng thấy "ok":true trong một lần gọi hỏng.
+  `error` là một dòng gọn (`slide 4: TOO_LONG nodes[policy] (12/11)`), khung chat hiện thẳng (`FailJSON`).
+- **Kết quả `slides_from_brief` có `titleShape`** từng slide: model đoán tên `Title` để sửa tiêu đề → lỗi + 2 vòng đọc lại.
+- **Tool đọc của server MCP built-in** (`ppt_profile`, `doc_get_text`…) không còn bị tính là lệnh ghi (tra theo tên
+  đầy đủ `mcp__office__…` nên không khớp danh sách chỉ đọc) - trước đó tăng revision của tài liệu dù chỉ đọc.
+- **`score.py`**: nguồn số của brief gồm cả `seed` + `derived` (bài sửa lỗi `s26` từng bị đếm nhầm `unsourced`).
+
 ### Added / Changed — Skill slide ngắn lại; lỗi đầu lượt chỉ rõ cách sửa; bìa và lộ trình đỡ đơn điệu (26/10/2026)
 
 - **Skill `trinh-bay-chuyen-nghiep` tách đôi** (plan 20-c0 §5.3): lưới, cỡ chữ, sức chứa, giới hạn wpp và checklist tự

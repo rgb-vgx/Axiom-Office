@@ -180,6 +180,19 @@ func (r *Registry) ModelTools() []model.Tool {
 // ErrorJSON: {"ok":false,"error":"..."} khong escape ky tu (thong bao doc duoc nguyen van).
 func ErrorJSON(message string) string { return model.ErrorJSON(message) }
 
+// FailJSON: {"ok":false,"error":"...", ...chi tiet} - tool that bai nhung co them du lieu de model sua (vd danh sach loi
+// tung truong). Truoc 26/10/2026 slides_from_brief tu choi bang {"ok":true,"result":{"built":0,"errors":...}}: model
+// va khung chat thay "ok":true trong mot lan goi hong.
+func FailJSON(message string, details map[string]any) string {
+	body := map[string]any{"ok": false, "error": message}
+	for key, value := range details {
+		if key != "ok" && key != "error" {
+			body[key] = value
+		}
+	}
+	return model.MarshalRelaxed(body)
+}
+
 // OKJSON: {"ok":true,"result":...}; tra nguyen van neu phan result khong marshal duoc.
 func OKJSON(result any) string {
 	return model.MarshalRelaxed(map[string]any{"ok": true, "result": result})

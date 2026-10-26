@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"axiomoffice/core/internal/mcp"
 	"axiomoffice/core/internal/office"
 	"axiomoffice/core/internal/skills"
 )
@@ -213,6 +214,19 @@ func TestChangesDocumentClassification(t *testing.T) {
 		if !MCPChangesState(name) {
 			t.Errorf("%s phai tinh la co ghi", name)
 		}
+	}
+
+	// Tool goi that mang ten day du (mcp__office__ppt_profile): van phai tra theo ten tran cua server built-in.
+	builtIn := &mcp.Server{Config: mcp.ServerConfig{Name: "office", BuiltIn: true}}
+	if mcpToolChangesState(mcp.ServerTool{Server: builtIn, Tool: mcp.ToolInfo{Name: "ppt_profile"}}) {
+		t.Error("mcp__office__ppt_profile chi doc")
+	}
+	if !mcpToolChangesState(mcp.ServerTool{Server: builtIn, Tool: mcp.ToolInfo{Name: "ppt_add_slide_file"}}) {
+		t.Error("mcp__office__ppt_add_slide_file phai tinh la co ghi")
+	}
+	user := &mcp.Server{Config: mcp.ServerConfig{Name: "nguoi-dung"}}
+	if !mcpToolChangesState(mcp.ServerTool{Server: user, Tool: mcp.ToolInfo{Name: "ppt_profile"}}) {
+		t.Error("tool cua server nguoi dung trung ten van tinh la co ghi")
 	}
 }
 
