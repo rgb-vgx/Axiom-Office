@@ -149,7 +149,7 @@ SELECT seq, tool, action, ok, result_chars, error, params_json FROM tool_calls W
 
 ### 5.6 Còn từ báo cáo nghiên cứu / tư vấn ChatGPT
 
-- **ĐÃ THÊM 26/10/2026: `s26-loi-khong-noi-cho`** (chưa chạy). **Benchmark có lỗi cài sẵn mà đề KHÔNG nói chỗ lỗi** (đo khả năng tự phát hiện, không chỉ sửa) — `s25` hiện nói rõ
+- **ĐÃ THÊM 26/10/2026: `s26-loi-khong-noi-cho`** (chạy 26/10: 3/3 đạt với `ocg/beam-free`, cả 3 tự thấy tổng sai). **Benchmark có lỗi cài sẵn mà đề KHÔNG nói chỗ lỗi** (đo khả năng tự phát hiện, không chỉ sửa) — `s25` hiện nói rõ
   lỗi. Thêm brief vào `tests/bench/slides/briefs.json`.
 - **Phân loại vòng không gọi tool** — giờ có `run_rounds.kind`; tổng hợp trên nhiều lượt rồi quyết định.
 - **Phiên bản tài liệu cho lệnh ghi** (từ chối ghi khi tài liệu đã đổi so với lần đọc) — hiện `docStateGuard` chỉ biết

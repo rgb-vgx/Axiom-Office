@@ -56,6 +56,15 @@ def numbers(text: str) -> set[str]:
     return {re.sub(r"[.,]", "", n) for n in NUMBER.findall(text or "")}
 
 
+def brief_source(brief: dict) -> str:
+    """Nguon so lieu cua de: prompt + chu bai cai san (seed) + so suy ra ("derived"). Bai sua loi (s26) lay so tu
+    slide cai san chu khong tu prompt - chi doc prompt thi moi so cua bai deu bi dem la bia (26/10/2026)."""
+    parts = [brief.get("prompt", "")]
+    parts += [str((item.get("params") or {}).get("text", "")) for item in brief.get("seed") or []]
+    parts += [str(value) for value in brief.get("derived") or []]
+    return "\n".join(parts)
+
+
 def unsourced_numbers(prompt: str, texts: list[str]) -> list[str]:
     """So tren slide khong co trong de (bat noi dung tu bia, kieu s13 lan 2 ngay 25/10/2026). Chi so MEM: so tinh ra
     tu de (ty le, tong) cung bi dem; bo so 1 chu so (danh so muc, "3 ly do")."""
@@ -211,7 +220,7 @@ def score_run(brief: dict, check: dict, slides: dict, run: dict | None = None, t
         "titleDrift": title_drift(check),
         "marginViolations": len(margin_violations(check)),
         "maxChars": max_chars,
-        "unsourced": unsourced_numbers(brief.get("prompt", ""), texts if texts is not None else slide_texts(slides)),
+        "unsourced": unsourced_numbers(brief_source(brief), texts if texts is not None else slide_texts(slides)),
         "rounds": run.get("rounds"),
         "toolCalls": run.get("toolCalls"),
         "failures": run.get("failures"),

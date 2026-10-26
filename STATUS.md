@@ -271,7 +271,10 @@ trúc không dây cắt hộp. Sửa: sơ đồ lồng trong khoá `diagram`, `r
   | `r_fb096418` | 17 | 413k | 203 s | đạt mốc §5.1 (3 lượt liền không `connector-*`) |
   | `r_e0c9405c` (cuối ngày) | **11** | **156k** | **128 s** | skill ngắn, bìa + timeline mới |
 - **Còn:** model `beam-free` đôi khi viết sai "kiểm soát" (lỗi sinh chữ, tool không kiểm chính tả); chặn dựng lại slide
-  sạch chưa bật ở lượt thật nào; `s26` chưa chạy; kiểm qua khung chat (plan 20 §5.5) cần người bấm.
+  sạch chưa bật ở lượt thật nào; kiểm qua khung chat (plan 20 §5.5) cần người bấm.
+- **`s26` (lỗi cài sẵn, đề không nói chỗ):** 3/3 đạt (`s26-beam-free-2026-10-26`) — cả 3 lượt tự thấy tổng 1.450 sai,
+  sửa thành 1.550 (1.240 + 310) và gỡ chồng chữ; 6–10 vòng, ~17 s, 0 lỗi lệnh. `score.py` nay lấy nguồn số từ cả
+  `seed` + `derived` (trước chỉ prompt nên báo nhầm `unsourced` = 4).
 
 ## 3. Chưa làm / chưa kiểm chứng
 
