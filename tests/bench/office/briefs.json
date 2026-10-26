@@ -1,0 +1,194 @@
+{
+  "version": 1,
+  "note": "Bo do Word/Excel (de xuat 26/10/2026). app: word|excel. prompts: mot hoac nhieu luot lien tiep tren cung tai lieu. seed: lenh bridge chay tren tai lieu moi TRUOC luot (tai lieu co san). expect: tieu chi do bang check_docx/check_xlsx (score.py). mustContain/mustKeep: chu phai co sau luot; mustRemove: chu phai mat. Gia tri '@gen:<ten>' trong seed do run.py sinh.",
+  "briefs": [
+    {
+      "id": "w01-to-trinh-ngan", "app": "word", "kind": "create-short",
+      "prompts": ["Soạn tờ trình ngắn (khoảng nửa trang) gửi Giám đốc đề nghị mua 5 máy tính xách tay cho phòng Kế toán, tổng kinh phí dự kiến 125 triệu đồng, lý do: máy cũ đã dùng 7 năm, thường xuyên hỏng. Có tiêu đề, phần kính gửi, nội dung, đề nghị và chỗ ký."],
+      "mustContain": ["5 máy tính", ["125 triệu", "125.000.000"], "7 năm"],
+      "expect": {"maxFakeHeadings": 0}
+    },
+    {
+      "id": "w02-bao-cao-dai", "app": "word", "kind": "create-long",
+      "prompts": ["Soạn báo cáo tổng kết công tác chuyển đổi số năm 2026 của một trường THPT, khoảng 4 trang: mục lục tự động; 4 mục lớn (Kết quả đạt được, Hạn chế, Nguyên nhân, Phương hướng 2027), mỗi mục 2–3 mục con; số trang ở chân trang. Không bịa số liệu: chỗ cần số thì ghi [cần bổ sung]."],
+      "mustContain": ["Phương hướng"],
+      "expect": {"toc": true, "pageNumber": true, "minHeadings": {"1": 4, "2": 6}, "maxFakeHeadings": 0, "noBlankPage": true}
+    },
+    {
+      "id": "w03-bang-nho", "app": "word", "kind": "table-small",
+      "prompts": ["Chèn bảng kết quả tuyển sinh có tiêu đề bảng (caption) 'Bảng 1. Kết quả tuyển sinh 2024–2026': năm 2024 chỉ tiêu 500, nhập học 480; năm 2025 chỉ tiêu 550, nhập học 541; năm 2026 chỉ tiêu 600, nhập học 612. Thêm cột tỷ lệ nhập học (%) tính đúng, một câu nhận xét dưới bảng."],
+      "mustContain": ["480", "541", "612", "96", "98,4", "102"],
+      "expect": {"minTables": 1, "captions": 1}
+    },
+    {
+      "id": "w04-bang-lon", "app": "word", "kind": "table-large",
+      "seed": [{"action": "writer.appendText", "params": {"text": "Danh sách học sinh đạt giải năm học 2025–2026"}}],
+      "prompts": ["Dưới dòng tiêu đề có sẵn, chèn bảng danh sách 30 học sinh đạt giải (cột: STT, Họ tên, Lớp, Môn, Giải) với dữ liệu mẫu ghi rõ là dữ liệu minh họa. Bảng dài qua trang thì hàng tiêu đề phải lặp lại ở đầu trang sau."],
+      "mustContain": ["Danh sách học sinh đạt giải năm học 2025–2026", "minh họa"],
+      "expect": {"minTables": 1, "repeatHeader": true, "minTableRows": 31}
+    },
+    {
+      "id": "w05-sua-mot-muc", "app": "word", "kind": "edit-preserve",
+      "seed": [
+        {"action": "writer.heading", "params": {"text": "1. Mục tiêu", "level": 1}},
+        {"action": "writer.appendText", "params": {"text": "Nâng tỷ lệ hồ sơ giải quyết đúng hạn lên 98% trong năm 2026."}},
+        {"action": "writer.heading", "params": {"text": "2. Giải pháp", "level": 1}},
+        {"action": "writer.appendText", "params": {"text": "Tăng cường nhân lực cho bộ phận một cửa. Rà soát quy trình nội bộ hằng tháng."}},
+        {"action": "writer.heading", "params": {"text": "3. Tổ chức thực hiện", "level": 1}},
+        {"action": "writer.appendText", "params": {"text": "Văn phòng chủ trì, các phòng phối hợp; báo cáo kết quả trước ngày 15/12/2026."}}
+      ],
+      "prompts": ["Chỉ viết lại mục 2 cho cụ thể hơn thành 3 giải pháp có gạch đầu dòng (thêm giải pháp số hóa hồ sơ). Giữ nguyên mục 1 và mục 3."],
+      "mustKeep": ["1. Mục tiêu", "Nâng tỷ lệ hồ sơ giải quyết đúng hạn lên 98% trong năm 2026.", "3. Tổ chức thực hiện", "Văn phòng chủ trì, các phòng phối hợp; báo cáo kết quả trước ngày 15/12/2026."],
+      "mustContain": ["số hóa"],
+      "expect": {"minHeadings": {"1": 3}}
+    },
+    {
+      "id": "w06-chen-muc", "app": "word", "kind": "edit-insert",
+      "seed": [
+        {"action": "writer.heading", "params": {"text": "1. Bối cảnh", "level": 1}},
+        {"action": "writer.appendText", "params": {"text": "Đơn vị đang vận hành 3 hệ thống phần mềm rời rạc."}},
+        {"action": "writer.heading", "params": {"text": "2. Giải pháp", "level": 1}},
+        {"action": "writer.appendText", "params": {"text": "Hợp nhất về một nền tảng dùng chung."}},
+        {"action": "writer.heading", "params": {"text": "3. Kinh phí", "level": 1}},
+        {"action": "writer.appendText", "params": {"text": "Dự kiến 2,4 tỷ đồng trong 2 năm."}}
+      ],
+      "prompts": ["Thêm mục 'Rủi ro' nằm giữa mục 2 và mục 3 (cùng cấp tiêu đề với các mục khác), nêu 3 rủi ro chính; đánh số lại các mục cho đúng thứ tự."],
+      "mustKeep": ["Đơn vị đang vận hành 3 hệ thống phần mềm rời rạc.", "Hợp nhất về một nền tảng dùng chung.", "Dự kiến 2,4 tỷ đồng trong 2 năm."],
+      "mustContain": ["Rủi ro"],
+      "expect": {"minHeadings": {"1": 4}, "headingOrder": ["Bối cảnh", "Giải pháp", "Rủi ro", "Kinh phí"]}
+    },
+    {
+      "id": "w07-thieu-so-lieu", "app": "word", "kind": "missing-data",
+      "prompts": ["Soạn báo cáo nhanh doanh thu 4 quý năm 2026 của chi nhánh: quý 1 là 12,5 tỷ, quý 2 là 13,1 tỷ, quý 3 là 14,0 tỷ; quý 4 chưa có số liệu. Có bảng số liệu và một đoạn nhận xét xu hướng. Không được tự điền số cho quý 4."],
+      "mustContain": ["12,5", "13,1", "14,0"],
+      "expect": {"minTables": 1, "noInventedQ4": true}
+    },
+    {
+      "id": "w08-chuan-hoa-tieu-de", "app": "word", "kind": "restructure",
+      "seed": [
+        {"action": "writer.appendText", "params": {"text": "QUY TRÌNH TIẾP NHẬN HỒ SƠ", "bold": true, "size": 16}},
+        {"action": "writer.appendText", "params": {"text": "Bước 1. Tiếp nhận", "bold": true}},
+        {"action": "writer.appendText", "params": {"text": "Cán bộ một cửa kiểm tra thành phần hồ sơ và ghi phiếu hẹn."}},
+        {"action": "writer.appendText", "params": {"text": "Bước 2. Xử lý", "bold": true}},
+        {"action": "writer.appendText", "params": {"text": "Phòng chuyên môn thẩm định trong 5 ngày làm việc."}},
+        {"action": "writer.appendText", "params": {"text": "Bước 3. Trả kết quả", "bold": true}},
+        {"action": "writer.appendText", "params": {"text": "Bộ phận một cửa trả kết quả và lưu sổ theo dõi."}}
+      ],
+      "prompts": ["Các dòng tiêu đề trong tài liệu đang chỉ in đậm. Chuyển chúng sang style tiêu đề thật của Word (tiêu đề chính Heading 1, các bước Heading 2) để có thể làm mục lục; không đổi chữ nào."],
+      "mustKeep": ["QUY TRÌNH TIẾP NHẬN HỒ SƠ", "Bước 1. Tiếp nhận", "Cán bộ một cửa kiểm tra thành phần hồ sơ và ghi phiếu hẹn.", "Phòng chuyên môn thẩm định trong 5 ngày làm việc.", "Bộ phận một cửa trả kết quả và lưu sổ theo dõi."],
+      "expect": {"minHeadings": {"1": 1, "2": 3}, "maxFakeHeadings": 0}
+    },
+    {
+      "id": "w09-nhieu-buoc", "app": "word", "kind": "multi-step",
+      "prompts": [
+        "Soạn biên bản họp giao ban tuần 43 của phòng Hành chính: thời gian 8h00 ngày 20/10/2026, chủ trì ông Trần Văn Nam, 3 nội dung đã thống nhất, phân công 3 việc trong bảng (việc, người phụ trách, hạn).",
+        "Thêm một việc vào bảng phân công: 'Rà soát hợp đồng bảo vệ', người phụ trách bà Lê Thu Hà, hạn 31/10/2026. Không đổi phần khác.",
+        "Đổi tên người chủ trì thành ông Trần Văn Nghĩa ở mọi chỗ."
+      ],
+      "mustContain": ["Rà soát hợp đồng bảo vệ", "Lê Thu Hà", "Trần Văn Nghĩa", ["20/10/2026", "20 tháng 10 năm 2026"]],
+      "mustRemove": ["Trần Văn Nam"],
+      "expect": {"minTables": 1, "minTableRows": 5}
+    },
+    {
+      "id": "w10-dau-chan-trang", "app": "word", "kind": "page-setup",
+      "seed": [
+        {"action": "writer.heading", "params": {"text": "Nội quy phòng máy", "level": 1}},
+        {"action": "writer.appendText", "params": {"text": "1. Giữ trật tự, không ăn uống trong phòng.\n2. Tắt máy và màn hình khi ra về.\n3. Báo ngay cho giáo viên khi máy có sự cố."}}
+      ],
+      "prompts": ["Thêm đầu trang ghi 'Trường THPT Nguyễn Du – Tổ Tin học' và số trang ở chân trang, căn giữa. Không đổi nội dung."],
+      "mustKeep": ["Nội quy phòng máy", "Báo ngay cho giáo viên khi máy có sự cố."],
+      "expect": {"pageNumber": true, "headerText": "Nguyễn Du"}
+    },
+    {
+      "id": "x01-bang-moi-tong", "app": "excel", "kind": "create-short",
+      "prompts": ["Tạo bảng doanh số 5 nhân viên (Họ tên, Tháng 1, Tháng 2, Tháng 3, Tổng quý) với dữ liệu mẫu ghi rõ là minh họa; cột Tổng quý và dòng Tổng cộng cuối bảng phải là công thức; số tiền định dạng có phân cách hàng nghìn."],
+      "expect": {"minFormulas": 9, "noErrors": true, "groupedNumbers": true}
+    },
+    {
+      "id": "x02-tong-hop-cheo-sheet", "app": "excel", "kind": "cross-sheet",
+      "seed": [
+        {"action": "et.renameSheet", "params": {"sheet": "Sheet1", "name": "Data"}},
+        {"action": "et.writeRange", "params": {"sheet": "Data", "range": "A1", "values": "@gen:sales40"}}
+      ],
+      "prompts": ["Sheet Data có 40 dòng bán hàng (Ngày, Khu vực, Sản phẩm, Số lượng, Doanh thu). Tạo sheet Summary tổng doanh thu và số lượng theo từng khu vực bằng công thức tham chiếu Data (không gõ số), kèm dòng tổng."],
+      "expect": {"sheets": ["Data", "Summary"], "minFormulas": 6, "noErrors": true, "recalc": {"source": "Data", "target": "Summary"}}
+    },
+    {
+      "id": "x03-sua-cong-thuc-loi", "app": "excel", "kind": "fix-formulas",
+      "seed": [
+        {"action": "et.writeRange", "params": {"range": "A1", "values": [["Sản phẩm", "Số lượng", "Đơn giá", "Thành tiền", "Tỷ trọng"], ["Bút bi", 120, 5000, "=B2*C2", "=D2/D7"], ["Vở", 80, 12000, "=B3*C3", "=D3/D7"], ["Thước", 45, 8000, "=B4*C4", "=D4/D8"], ["Tẩy", 60, 3000, "=B5*C5", "=D5/D8"], ["Hộp bút", 25, 45000, "=B6*C6", "=D6/D8"], ["Tổng", "=SUM(B2:B5)", "", "=SUM(D2:D5)", ""]]}}
+      ],
+      "prompts": ["Soát và sửa mọi lỗi công thức trong bảng đang mở (ô lỗi, tổng thiếu dòng, tham chiếu sai). Không đổi dữ liệu nhập."],
+      "mustKeepCells": {"B2": 120, "C6": 45000},
+      "expect": {"noErrors": true, "formulaContains": {"B7": "B6", "D7": "D6", "E4": "D7"}}
+    },
+    {
+      "id": "x04-them-cot-giu-du-lieu", "app": "excel", "kind": "edit-preserve",
+      "seed": [
+        {"action": "et.writeRange", "params": {"range": "A1", "values": [["Mã", "Tên hàng", "Số lượng", "Đơn giá"], ["H01", "Giấy A4", 50, 72000], ["H02", "Mực in", 12, 350000], ["H03", "Ghim bấm", 30, 15000], ["H04", "Bìa hồ sơ", 200, 4500]]}}
+      ],
+      "prompts": ["Thêm cột Thành tiền = Số lượng × Đơn giá (công thức) bên phải bảng và dòng Tổng cộng. Không sửa dữ liệu cũ."],
+      "mustKeepCells": {"A2": "H01", "C3": 12, "D5": 4500},
+      "expect": {"minFormulas": 5, "noErrors": true}
+    },
+    {
+      "id": "x05-bang-lon", "app": "excel", "kind": "table-large",
+      "seed": [{"action": "et.writeRange", "params": {"range": "A1", "values": "@gen:staff200"}}],
+      "prompts": ["Bảng nhân sự 200 dòng đang mở: cố định hàng tiêu đề khi cuộn, bật bộ lọc, định dạng cột Lương có phân cách hàng nghìn và cột Ngày vào làm dạng dd/mm/yyyy. Không đổi dữ liệu."],
+      "mustKeepCells": {"B2": "@gen:staff200!B2", "E201": "@gen:staff200!E201"},
+      "expect": {"frozen": true, "autoFilter": true, "groupedNumbers": true, "dates": true}
+    },
+    {
+      "id": "x06-danh-sach-chon", "app": "excel", "kind": "validation",
+      "seed": [
+        {"action": "et.writeRange", "params": {"range": "A1", "values": [["Mã HS", "Họ tên", "Trạng thái"], ["HS01", "Nguyễn An", ""], ["HS02", "Lê Bình", ""], ["HS03", "Trần Chi", ""]]}}
+      ],
+      "prompts": ["Tạo sheet Lists chứa danh sách trạng thái hợp lệ (Đã nộp, Chưa nộp, Miễn) và cho cột Trạng thái chỉ được chọn từ danh sách đó (data validation)."],
+      "expect": {"sheets": ["Lists"], "listValidation": true}
+    },
+    {
+      "id": "x07-canh-bao-nguong", "app": "excel", "kind": "conditional",
+      "seed": [
+        {"action": "et.writeRange", "params": {"range": "A1", "values": [["Khoản mục", "Dự toán", "Đã chi", "Tỷ lệ"], ["Văn phòng phẩm", 50000000, 46000000, "=C2/B2"], ["Đi lại", 80000000, 52000000, "=C3/B3"], ["Hội nghị", 120000000, 118000000, "=C4/B4"], ["Đào tạo", 60000000, 21000000, "=C5/B5"], ["", "", "", ""], ["Ngưỡng cảnh báo", 0.9, "", ""]]}}
+      ],
+      "prompts": ["Tô đỏ các dòng có Tỷ lệ chi vượt ngưỡng cảnh báo ở ô B7 (định dạng có điều kiện đọc thẳng ô B7, không gõ cứng 90%), định dạng cột Tỷ lệ là phần trăm."],
+      "expect": {"cfReferences": "B$7", "percent": true, "noErrors": true}
+    },
+    {
+      "id": "x08-du-lieu-thieu", "app": "excel", "kind": "missing-data",
+      "seed": [
+        {"action": "et.writeRange", "params": {"range": "A1", "values": [["Lớp", "Sĩ số", "Số HS giỏi"], ["10A1", 42, 15], ["10A2", 40, ""], ["10A3", "", 9], ["10A4", 38, 11]]}}
+      ],
+      "prompts": ["Thêm cột Tỷ lệ HS giỏi (%) bằng công thức không bị lỗi khi thiếu dữ liệu (để trống hoặc ghi 'Thiếu số liệu'), và tô vàng các ô dữ liệu đang trống."],
+      "expect": {"noErrors": true, "minFormulas": 4}
+    },
+    {
+      "id": "x09-bieu-do-sheet-khac", "app": "excel", "kind": "chart",
+      "seed": [
+        {"action": "et.renameSheet", "params": {"sheet": "Sheet1", "name": "Data"}},
+        {"action": "et.writeRange", "params": {"sheet": "Data", "range": "A1", "values": [["Tháng", "Kế hoạch", "Thực hiện"], ["T1", 100, 92], ["T2", 110, 115], ["T3", 120, 118], ["T4", 125, 131], ["T5", 130, 127], ["T6", 140, 146]]}}
+      ],
+      "prompts": ["Tạo sheet Dashboard có biểu đồ cột so sánh Kế hoạch và Thực hiện theo tháng, lấy dữ liệu trực tiếp từ sheet Data (đổi Data thì biểu đồ tự đổi)."],
+      "expect": {"sheets": ["Data", "Dashboard"], "chartOn": "Dashboard", "chartSource": "Data"}
+    },
+    {
+      "id": "x10-nhieu-buoc", "app": "excel", "kind": "multi-step",
+      "prompts": [
+        "Tạo bảng tính lương 4 nhân viên: Họ tên, Lương cơ bản, Phụ cấp, Tổng thu nhập (công thức), BHXH 8% (công thức đọc tỷ lệ từ một ô tham số riêng), Thực lĩnh (công thức). Dữ liệu mẫu ghi rõ là minh họa.",
+        "Đổi tỷ lệ BHXH thành 10.5% và kiểm tra các cột tính lại đúng.",
+        "Thêm dòng tổng cộng cho các cột tiền."
+      ],
+      "expect": {"minFormulas": 12, "noErrors": true, "parameterCell": 0.105}
+    },
+    {
+      "id": "a-word-bao-cao-ai-agent", "app": "word", "kind": "flagship", "timeout": 1800,
+      "promptFile": "tests/live/tasks/word-bao-cao-ai-agent.md",
+      "expect": {"toc": true, "pageNumber": true, "minHeadings": {"1": 6, "2": 6}, "maxFakeHeadings": 0, "minTables": 2, "captions": 2, "noBlankPage": true, "pagesBetween": [6, 9]}
+    },
+    {
+      "id": "b-excel-ngan-sach-du-an", "app": "excel", "kind": "flagship", "timeout": 1800,
+      "promptFile": "tests/live/tasks/excel-ngan-sach-du-an.md",
+      "expect": {"sheets": ["Dashboard", "Project_Data", "Monthly_Budget", "Config"], "noErrors": true, "frozen": true, "autoFilter": true, "listValidation": true, "conditional": true, "chartOn": "Dashboard", "recalc": {"source": "Monthly_Budget", "target": "Dashboard"}}
+    }
+  ]
+}

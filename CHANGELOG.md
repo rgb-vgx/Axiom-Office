@@ -5,6 +5,13 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Bộ đo Word/Excel và baseline (26/10/2026)
+
+- **`tests/bench/office`**: 22 ca (10 Word, 10 Excel, đề A báo cáo, đề B workbook 4 sheet), chạy trên Office thật
+  qua `POST /v1/runs` (tự bấm đồng ý, tài liệu dựng sẵn, nhiều lượt liên tiếp); chấm `.docx`/`.xlsx` bằng XML + Word/Excel
+  COM (phân trang; đổi đầu vào xem tổng hợp đổi theo). Baseline `ocg/beam-free` **13/22**; capability matrix, lỗi
+  theo mức độ và kế hoạch P0–P3: `docs/plans/21-v0-word-excel-chat-luong.md`.
+
 ### Fixed — Tool lỗi trả `ok:false`; tên hình tiêu đề; lệnh đọc MCP không tính là ghi (26/10/2026)
 
 Từ log khung chat (plan 20-c0 §5.5, lượt `r_d820f088` lập kế hoạch → `r_9b55dd99` thực hiện, `ocg/beam-free`: 10 slide,

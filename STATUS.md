@@ -276,6 +276,16 @@ trúc không dây cắt hộp. Sửa: sơ đồ lồng trong khoá `diagram`, `r
   sửa thành 1.550 (1.240 + 310) và gỡ chồng chữ; 6–10 vòng, ~17 s, 0 lỗi lệnh. `score.py` nay lấy nguồn số từ cả
   `seed` + `derived` (trước chỉ prompt nên báo nhầm `unsourced` = 4).
 
+### 2.14 Đợt 26/10/2026: bộ đo Word/Excel và baseline
+
+- Bộ đo `tests/bench/office` (22 ca: 10 Word, 10 Excel, đề A báo cáo 6–8 trang, đề B workbook 4 sheet), chấm bằng XML
+  + Word/Excel COM (phân trang, đổi đầu vào xem tổng hợp đổi theo). Chi tiết, capability matrix và kế hoạch:
+  `docs/plans/21-v0-word-excel-chat-luong.md`.
+- **Baseline `ocg/beam-free`: đạt 13/22** (Word 6/11, Excel 7/11). Critical: `writer.undo` lùi quá phần việc của lượt
+  (mất toàn bộ nội dung ca `w08`); `et.save` sổ mới đổi tên làm Core mất tài liệu đích (`x06`). Thiếu lệnh: mục lục,
+  header/footer/số trang, caption, gán style cho đoạn có sẵn; Table/bộ lọc, freeze, validation, biểu đồ lấy sheet khác.
+  Chặn lệnh lặp chặn nhầm `insertPageBreak`; Word mỗi đoạn một lệnh (tờ trình nửa trang 33 vòng).
+
 ## 3. Chưa làm / chưa kiểm chứng
 
 | Việc | Tình trạng | Ghi chú |

@@ -22,6 +22,7 @@ trong code: trạng thái có thể đã đổi.
 | 10 | `18-s0-slide-do-va-spec.md` | Slide: bộ đo chất lượng (24 brief) và thiết kế spec + layout solver dùng chung cho slide từ brief và theo mẫu | **Mới.** Bộ đo xong phần chấm, chưa có baseline thật |
 | 11 | `19-h0-nen-tang-ben-vung.md` | Nền tảng bền: lệnh nhắm tài liệu tường minh, bridge không treo vì hộp thoại/máy ngủ, đọc đủ những gì đã ghi, miễn xác nhận cho đối tượng do lượt tạo, năng lực từng backend | **Mới.** Bằng chứng từ benchmark slide 25/10/2026 |
 | 12 | `20-c0-ngu-canh-va-slide.md` | Bàn giao đợt 25/10/2026: bớt ngữ cảnh gửi lại (đo từng vòng, docStateGuard, AppMCP, cache), slide sơ đồ (đi dây, `replace`, nhóm màu), số đo đề thật, cách đo, việc tiếp | **Mới.** Đọc trước khi làm tiếp slide/ngữ cảnh |
+| 13 | `21-v0-word-excel-chat-luong.md` | Word/Excel: bộ đo 22 ca (`tests/bench/office`), capability matrix, baseline `beam-free` 13/22, kế hoạch P0–P3 | **Mới 26/10/2026.** P0: undo trong phạm vi lượt, theo dõi tài liệu khi lưu đổi tên, chặn lặp nhầm lệnh ghi, miễn xác nhận ô do lượt ghi |
 | — | `06-p5-bao-cao-dinh-ky-toi-gian.md` | Báo cáo định kỳ | **Cần thiết kế lại**: Core không chạy khi Office đóng |
 | — | `15-p0-tasks-chitiet.md`, `16-p1-tasks-chitiet.md` | Task chi tiết P0, P1 | Đã cập nhật theo hướng mới |
 
