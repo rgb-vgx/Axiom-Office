@@ -105,6 +105,45 @@ func TestRunAgentFailedPartialWriteCountsAsChange(t *testing.T) {
 	}
 }
 
+// Lenh ghi y het XEN lenh ghi khac (ngat trang sau moi chuong) khong bi chan; lap LIEN thi van bi chan (bo do Word
+// 26/10/2026: writer.insertPageBreak bi chan tu lan 5 khi viet bao cao nhieu chuong).
+func TestRunAgentIdenticalWriteBetweenOtherWritesNotBlocked(t *testing.T) {
+	run := func(replies []string) (int, int) {
+		server, _ := verifyServer(t, append(replies, fmt.Sprintf(replyText, "xong")))
+		client := NewClient(server.Client(), "openai", server.URL, "", "m")
+		breaks, blocked := 0, 0
+		options := DefaultAgentOptions()
+		options.Verify = false
+		client.RunAgent(context.Background(), "s", nil, "u", mutatingTools(),
+			func(ctx context.Context, call ToolCall) ToolResult {
+				if strings.Contains(call.Arguments, "break") {
+					breaks++
+				}
+				return ToolResult{CallID: call.ID, Name: call.Name, OK: true, Mutating: true, ResultJSON: `{"ok":true}`}
+			}, options, AgentCallbacks{ToolFinished: func(result ToolResult) {
+				if strings.Contains(result.ResultJSON, "blocked") {
+					blocked++
+				}
+			}})
+		return breaks, blocked
+	}
+	interleaved := []string{}
+	for i := 1; i <= 6; i++ {
+		interleaved = append(interleaved, fmt.Sprintf(replyToolCallArgs, fmt.Sprintf("t%d", i), fmt.Sprintf(`{"text":"chuong %d"}`, i)),
+			fmt.Sprintf(replyToolCallArgs, fmt.Sprintf("b%d", i), `{"break":true}`))
+	}
+	if breaks, blocked := run(interleaved); breaks != 6 || blocked != 0 {
+		t.Fatalf("6 lan ngat trang xen 6 doan chu phai chay het: chay %d, chan %d", breaks, blocked)
+	}
+	repeated := []string{}
+	for i := 1; i <= 6; i++ {
+		repeated = append(repeated, fmt.Sprintf(replyToolCallArgs, fmt.Sprintf("b%d", i), `{"break":true}`))
+	}
+	if breaks, blocked := run(repeated); breaks != 4 || blocked == 0 {
+		t.Fatalf("ngat trang lap lien phai bi chan sau 4 lan: chay %d, chan %d", breaks, blocked)
+	}
+}
+
 // replyToolCallArgs: tool call voi id va doi so tuy bien (doc roi doc lai, hay roi ghi roi doc).
 const replyToolCallArgs = `{"choices":[{"message":{"role":"assistant","content":null,` +
 	`"tool_calls":[{"id":"%s","function":{"name":"t","arguments":%q}}]}}],` +

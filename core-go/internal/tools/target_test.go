@@ -61,3 +61,51 @@ func TestOfficeActionTargetsTheRunDocument(t *testing.T) {
 		t.Fatalf("sau newPresentation phai nham bai moi: target=%q params=%+v", run.TargetDocument, sent[3])
 	}
 }
+
+// Luu so moi lam no doi ten ("Book1" -> duong dan .xlsx): cac lenh sau phai nham ten moi. Bo do Excel 26/10/2026 (x06):
+// sau et.save moi lenh bao DOCUMENT_CLOSED vi Core van gui workbook "Book1".
+func TestOfficeActionFollowsDocumentRenamedBySave(t *testing.T) {
+	sent := []map[string]any{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		var request struct {
+			Action string         `json:"action"`
+			Params map[string]any `json:"params"`
+		}
+		_ = json.Unmarshal(body, &request)
+		sent = append(sent, request.Params)
+		switch request.Action {
+		case "et.save":
+			_, _ = w.Write([]byte(`{"ok":true,"result":{"saved":true,"fullName":"C:\\Users\\u\\Documents\\Book1.xlsx"}}`))
+		case "et.saveAs":
+			_, _ = w.Write([]byte(`{"ok":true,"result":{"saved":true,"fullName":"D:\\khac.xlsx"}}`))
+		default:
+			_, _ = w.Write([]byte(`{"ok":true,"result":{}}`))
+		}
+	}))
+	defer server.Close()
+	port, err := strconv.Atoi(strings.TrimPrefix(server.URL, "http://127.0.0.1:"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := office.CommandParam{Name: "workbook", Hint: "full path of the workbook to work on; default: the active one"}
+	catalog := &office.CommandCatalog{Version: "1.0.0", Commands: []office.Command{
+		{Name: "et.save", Kind: "et", Agent: true, Params: []office.CommandParam{target}},
+		{Name: "et.saveAs", Kind: "et", Agent: true, Params: []office.CommandParam{{Name: "path"}, target}},
+		{Name: "et.listSheets", Kind: "et", Agent: true, Params: []office.CommandParam{target}},
+	}}
+	tool := NewOfficeActionTool(catalog, "et")
+	run := &RunContext{Office: &office.Session{App: "et", Port: port}, Bridge: office.NewBridgeClient(server.Client(), "t"),
+		TargetDocument: "Book1", Prompt: "luu so", Confirm: func(string, string, string) (bool, error) { return true, nil }}
+	saved := `C:\Users\u\Documents\Book1.xlsx`
+	call(tool, run, "et.save", nil)
+	call(tool, run, "et.listSheets", nil)
+	if run.TargetDocument != saved || sent[len(sent)-1]["workbook"] != saved {
+		t.Fatalf("sau save phai nham ten moi: target=%q params=%+v", run.TargetDocument, sent[len(sent)-1])
+	}
+	// Luu mot so KHAC (model chi ro workbook khac dich): dich giu nguyen.
+	call(tool, run, "et.saveAs", map[string]any{"path": `D:\khac.xlsx`, "workbook": "So khac"})
+	if run.TargetDocument != saved {
+		t.Fatalf("luu so khac khong doi dich: %q", run.TargetDocument)
+	}
+}

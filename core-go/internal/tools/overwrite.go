@@ -305,12 +305,80 @@ func effectiveOverwriteSheet(paramSheet, resolved string) string {
 	return resolved
 }
 
-// filterOverwriteCells: bo o thuoc sheet do luot tao hoac da duoc dong y trong luot nay.
+// maxWrittenCells: tran so o nho cho mot luot (vung qua lon thi khong nho phan vuot - van hoi nhu cu, an toan).
+const maxWrittenCells = 50000
+
+// rememberWrittenCells: sau lenh ghi o thanh cong, nho cac o vua ghi (ten sheet lay tu ket qua bridge - trung voi ten
+// ma checkOverwriteGuard dung khi doc lai vung dich).
+func rememberWrittenCells(run *RunContext, action string, params, result map[string]any) {
+	mark := func(sheet, area string, rows, cols int) {
+		c1, r1, c2, r2, ok := parseOverwriteRange(area)
+		if !ok || sheet == "" {
+			return
+		}
+		if rows > 0 && cols > 0 {
+			c2, r2 = c1+cols-1, r1+rows-1
+		}
+		if run.WrittenCells == nil {
+			run.WrittenCells = map[string]map[string]bool{}
+		}
+		cells := run.WrittenCells[sheet]
+		if cells == nil {
+			cells = map[string]bool{}
+			run.WrittenCells[sheet] = cells
+		}
+		for row := r1; row <= r2; row++ {
+			for col := c1; col <= c2; col++ {
+				if len(cells) >= maxWrittenCells {
+					return
+				}
+				cells[overwriteCellAddr(col, row)] = true
+			}
+		}
+	}
+	size := func(values any) (int, int) {
+		matrix := asOverwriteMatrix(values)
+		cols := 0
+		for _, line := range matrix {
+			cols = max(cols, len(line))
+		}
+		return len(matrix), cols
+	}
+	sheetOf := func(entry map[string]any, fallback string) string {
+		if sheet := overwriteStringParam(entry, "sheet"); sheet != "" {
+			return sheet
+		}
+		return fallback
+	}
+	resultSheet := overwriteStringParam(result, "sheet")
+	switch action {
+	case "et.writeRange":
+		rows, cols := size(params["values"])
+		mark(sheetOf(params, resultSheet), overwriteStringParam(params, "range"), rows, cols)
+	case "et.fillRange":
+		mark(sheetOf(params, resultSheet), overwriteStringParam(params, "range"), 0, 0)
+	case "et.writeRanges":
+		// Lenh khong ghi sheet thi ghi vao sheet active: bridge tra danh sach sheet da ghi; chi mot sheet thi chac chan.
+		fallback := overwriteStringParam(params, "sheet")
+		if names, _ := result["sheets"].([]any); fallback == "" && len(names) == 1 {
+			fallback, _ = names[0].(string)
+		}
+		writes, _ := params["writes"].([]any)
+		for _, item := range writes {
+			if entry, ok := item.(map[string]any); ok {
+				rows, cols := size(entry["values"])
+				mark(sheetOf(entry, fallback), overwriteStringParam(entry, "range"), rows, cols)
+			}
+		}
+	}
+}
+
+// filterOverwriteCells: bo o thuoc sheet do luot tao, da duoc dong y, hoac o do chinh luot nay vua ghi.
 func filterOverwriteCells(run *RunContext, cells []overwriteCell) []overwriteCell {
 	kept := cells[:0]
 	for _, cell := range cells {
 		if cell.sheet != "" {
-			if run.CreatedSheets[cell.sheet] || run.OverwriteApproved[cell.sheet] {
+			if run.CreatedSheets[cell.sheet] || run.OverwriteApproved[cell.sheet] || run.WrittenCells[cell.sheet][cell.cell] {
 				continue
 			}
 		}

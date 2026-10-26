@@ -3,8 +3,13 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
+
+	"axiomoffice/core/internal/office"
 )
 
 func designOutline() []outlineItem {
@@ -191,5 +196,33 @@ func TestDocDesignCustomStyle(t *testing.T) {
 	}
 	if _, _, problem := customStyle(map[string]any{"size": float64(40)}); problem == "" {
 		t.Fatal("co chu 40 phai bao loi")
+	}
+}
+
+// Tai lieu gan nhu trong: doc_design tu choi truoc khi hoi kieu (bo do Word 26/10/2026, de A: goi sau mot bang, kieu
+// "basic" ket thuc luot bang cau tra loi san - bao cao dung o 1 trang).
+func TestDocDesignRefusesNearlyEmptyDocument(t *testing.T) {
+	actions := []string{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var request struct {
+			Action string `json:"action"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&request)
+		actions = append(actions, request.Action)
+		_, _ = w.Write([]byte(`{"ok":true,"result":{"totalChars":120,"text":"B"}}`))
+	}))
+	defer server.Close()
+	port, _ := strconv.Atoi(strings.TrimPrefix(server.URL, "http://127.0.0.1:"))
+	run := &RunContext{Office: &office.Session{App: "wps", Port: port}, Bridge: office.NewBridgeClient(server.Client(), "t"),
+		Choose: func(string, string, []Choice) (string, string, error) {
+			t.Fatal("tai lieu trong thi khong duoc hoi chon kieu")
+			return "", "", nil
+		}}
+	result := NewDocDesignTool().Invoke(context.Background(), map[string]any{}, run)
+	if result.OK || result.Final || result.Mutating || !strings.Contains(result.JSON, "Write the content first") {
+		t.Fatalf("tai lieu 120 ky tu phai bi tu choi: %+v", result)
+	}
+	if len(actions) != 1 || actions[0] != "writer.getText" {
+		t.Fatalf("chi duoc doc tai lieu, khong restyle: %v", actions)
 	}
 }

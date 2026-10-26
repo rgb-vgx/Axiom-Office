@@ -5,6 +5,18 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — Word/Excel P0: không mất dữ liệu, lượt không tự hỏng (26/10/2026)
+
+- **Undo chỉ lùi việc của lượt**: Core đếm bước hoàn tác do lượt tạo (theo trường `undo` của catalog), `writer.undo`/
+  `et.undo`/`wpp.undo` không lùi quá; lượt chưa sửa gì thì từ chối (ca `w08` từng xóa sạch nội dung có sẵn; Excel
+  `Undo()` còn lùi thao tác của người dùng).
+- **Lưu đổi tên tài liệu**: `save`/`saveAs` trả `fullName` mới thì tài liệu đích của lượt đổi theo (ca `x06`: sau
+  `et.save` sổ mới mọi lệnh báo `DOCUMENT_CLOSED`).
+- **Chặn lệnh lặp**: lệnh ghi y hệt chỉ bị đếm dồn khi lặp liền; xen lệnh ghi khác thì đếm lại (`insertPageBreak` sau
+  mỗi chương từng bị chặn từ lần 5).
+- **Ghi đè ô do chính lượt vừa ghi không cần xác nhận** (số tạm → công thức); ô có từ trước vẫn hỏi.
+- **`doc_design` từ chối tài liệu gần như trống** (< 400 ký tự) thay vì kết thúc lượt soạn mới bằng câu trả lời sẵn.
+
 ### Added — Bộ đo Word/Excel và baseline (26/10/2026)
 
 - **`tests/bench/office`**: 22 ca (10 Word, 10 Excel, đề A báo cáo, đề B workbook 4 sheet), chạy trên Office thật

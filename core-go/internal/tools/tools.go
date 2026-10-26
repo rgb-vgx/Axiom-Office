@@ -89,6 +89,11 @@ type RunContext struct {
 	// OverwriteApproved: sheet da duoc nguoi dung dong y ghi de trong luot nay - da dong y mot
 	// lan thi cac lenh sau tren cung sheet trong cung luot khong hoi lai.
 	OverwriteApproved map[string]bool
+	// WrittenCells: o do chinh luot nay vua ghi (sheet -> dia chi): ghi de len chung khong hoi - bo do Excel 26/10/2026,
+	// model ghi so tam roi thay bang cong thuc bi hoi tung lan (khung chat) hoac bi tu choi het (ai.ask, luot hong).
+	WrittenCells map[string]map[string]bool
+	// undoable: so buoc hoan tac do CHINH luot nay tao, theo app ("writer", "et", "wpp") - undo.go.
+	undoable map[string]int
 	// TargetDocument: tai lieu cua luot - Core tu gan vao lenh writer.*/et.*/wpp.* model khong chon tai lieu (target.go).
 	// Doi theo lenh tao/mo tai lieu thanh cong trong luot.
 	TargetDocument string

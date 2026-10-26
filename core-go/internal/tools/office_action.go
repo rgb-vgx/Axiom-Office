@@ -214,6 +214,12 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 	if problem := loneSymbolFind(action, params); problem != "" {
 		return Result{JSON: ErrorJSON(problem), Action: action}
 	}
+	if isUndo(action) {
+		var problem string
+		if params, problem = limitUndo(run, action, params); problem != "" {
+			return Result{JSON: ErrorJSON(problem), Action: action}
+		}
+	}
 
 	// Guard chong ghi de (log 11/10/2026): lenh ghi o vao sheet co tu truoc ma dung vao o
 	// khong rong voi gia tri moi khac gia tri cu thi hoi nguoi dung truoc - xem overwrite.go.
@@ -257,6 +263,9 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 	if result.OK && action == "et.addSheet" {
 		rememberCreatedSheet(run, params)
 	}
+	if result.OK {
+		rememberWrittenCells(run, action, params, result.Result)
+	}
 	if result.OK && action == "wpp.checkLayout" {
 		// Loi bo cuc vao core.log (chi loai + ten hinh): soat lai duoc model da thay gi truoc khi sua.
 		slides, _ := result.Result["slides"].([]any)
@@ -273,6 +282,9 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 				run.TargetDocument = opened
 			}
 		}
+		if renamed := savedDocument(action, params, result.Result, run.TargetDocument); renamed != "" {
+			run.TargetDocument = renamed
+		}
 	}
 	// Buoc 2 roadmap: cat response doc lon TRUOC khi vao turns (chi thanh cong moi cat;
 	// loi van tra nguyen van de model doc thong diep loi day du) - xem truncate.go.
@@ -288,6 +300,7 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 	}
 	output := Result{JSON: raw, OK: result.OK, Action: action, Mutating: result.OK && ChangesDocument(action) && !unchanged,
 		Verifies: result.OK && Verifies(action)}
+	countUndoable(run, action, output.Mutating, result.Result)
 	if !result.OK && AppGone(result.Error) {
 		output.Abort = appGoneMessage
 	}

@@ -167,6 +167,35 @@ bằng bộ ở §1 (cùng model, cùng ca) và so với baseline §3.
 Mẫu theo loại tài liệu (báo cáo, biên bản, tờ trình), dashboard Excel dựng sẵn, định dạng có điều kiện nâng cao; WPS
 khi có máy Linux.
 
+## 5.1 Kết quả P0 (26/10/2026, đo lại 8 ca, `results/p0-beam-free-2026-10-26/`)
+
+Đã làm cả 4 việc P0 + một lỗi lộ ra khi đo (mỗi việc có test hồi quy, test hỏng khi gỡ bản sửa):
+
+- **Undo trong phạm vi lượt** (`core-go/internal/tools/undo.go`): Core đếm số bước hoàn tác do lượt tạo (lệnh có `undo`
+  trong catalog - `TestMakesUndoStepMatchesCatalog` đối chiếu), `*.undo` không lùi quá số đó, lượt chưa sửa gì thì
+  từ chối. Excel cần nhất: `app.Undo()` chỉ lùi thao tác giao diện của người dùng.
+- **Theo dõi tài liệu khi lưu đổi tên** (`savedDocument`, `target.go`): `save`/`saveAs` trả `fullName` khác → tài liệu
+  đích của lượt đổi theo (trừ khi lưu một tài liệu khác).
+- **Chặn lặp chỉ khi lặp liền** (`identicalCallGuard.writeAt`, `guards.go`): lệnh ghi y hệt được đếm lại khi giữa hai
+  lần có lệnh ghi khác.
+- **Miễn xác nhận ô do lượt ghi** (`RunContext.WrittenCells`, `overwrite.go`): ô đã ghi bằng `writeRange`/`writeRanges`/
+  `fillRange` trong lượt thì ghi đè không hỏi; ô có từ trước vẫn hỏi.
+- **`doc_design` từ chối tài liệu gần như trống** (< 400 ký tự): đo lại đề A lần đầu, model gọi nó sau một bảng, kiểu
+  "basic" kết thúc lượt bằng câu trả lời sẵn - báo cáo dừng ở 1 trang.
+
+| Ca | Baseline | Sau P0 |
+|---|---|---|
+| w08 chuẩn hóa tiêu đề | **mất toàn bộ nội dung** (critical), 60+ vòng | không mất chữ (undo bị giới hạn); vẫn trượt vì thiếu lệnh gán style (P1) |
+| w10 đầu/chân trang | dừng vì chặn lệnh lặp | chạy hết lượt (14 vòng); vẫn trượt vì thiếu lệnh header/footer (P1) |
+| a báo cáo 6–8 trang | 5 lần ngắt trang bị chặn, 60+ vòng | 7 lần ngắt trang không bị chặn, 0 lệnh lỗi; vẫn hết 60 vòng (P2: mỗi đoạn một lệnh) |
+| x01 bảng mới + tổng | ✓, 19 vòng, 1 xác nhận | ✓, **7 vòng, 0 xác nhận** |
+| x04 thêm cột | ✓, 11 vòng, 1 xác nhận | ✓, **6 vòng, 0 xác nhận** |
+| x06 danh sách chọn | `DOCUMENT_CLOSED` sau `et.save`, lượt hỏng | chạy hết (8 vòng); trượt vì thiếu validation (P1) |
+| x10 nhiều bước | ✓, 2 xác nhận | ✓, 1 xác nhận (ô tham số do **lượt trước** ghi - lượt mới vẫn hỏi, đúng thiết kế) |
+| b workbook 4 sheet | 60+ vòng | 60+ vòng; thiếu Table/freeze/validation (P1) |
+
+Không còn lỗi critical nào trong 8 ca. Ca trượt còn lại đều do thiếu lệnh (P1) hoặc số vòng (P2).
+
 ## 6. Cách đo sau mỗi thay đổi
 
 1. Chạy lại đúng ca liên quan (`--only`), 3 lần với `ocg/beam-free`; ca P0 chạy cả bộ.

@@ -124,6 +124,9 @@ func outlineView(items []outlineItem) string {
 	return view.String()
 }
 
+// minDesignChars: duoi muc nay coi tai lieu la (gan nhu) trong - chua co gi de trinh bay lai.
+const minDesignChars = 400
+
 func (t *DocDesignTool) Invoke(ctx context.Context, arguments map[string]any, run *RunContext) Result {
 	bridge := func(action string, params map[string]any) (map[string]any, string) {
 		result := run.Bridge.Command(ctx, run.Office.Port, action, params)
@@ -139,6 +142,16 @@ func (t *DocDesignTool) Invoke(ctx context.Context, arguments map[string]any, ru
 		return Result{JSON: ErrorJSON(problem), Mutating: mutating}
 	}
 	if run.docStyle == "" {
+		// Tai lieu (gan nhu) trong: tool trinh bay lai bai CO SAN, khong phai buoc dau cua viec soan moi. Bo do Word
+		// 26/10/2026 (de A): model goi doc_design sau mot bang, kieu "basic" ket thuc luot bang cau tra loi san - bao cao
+		// dung o 1 trang. Tu choi truoc khi hoi nguoi dung chon kieu.
+		if run.Bridge == nil || run.Office == nil {
+			// Khong co bridge (test chon kieu): bo qua buoc dem chu.
+		} else if text, problem := bridge("writer.getText", map[string]any{"maxChars": 1}); problem == "" && asInt(text["totalChars"]) < minDesignChars {
+			return Result{JSON: ErrorJSON(fmt.Sprintf("the document has only %d characters - doc_design restyles an EXISTING "+
+				"document. Write the content first with office_action (headings with writer.heading, text, tables), then "+
+				"call doc_design only if the user asked to restyle it", asInt(text["totalChars"])))}
+		}
 		style, wish, problem := chooseDocStyle(arguments, run)
 		if problem != "" {
 			return Result{JSON: ErrorJSON(problem)}

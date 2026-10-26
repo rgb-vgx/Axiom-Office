@@ -298,12 +298,17 @@ func (g *docStateGuard) afterTools(loop *agentLoop, _ *Turn, results []ToolResul
 //
 // Lenh DOC (khong sua tai lieu) duoc dem lai tu dau khi tai lieu da doi tu lan doc truoc: luot that 26/10/2026
 // (r_f78df99d, beam-free) - wpp.checkLayout ca bai sau moi lan dung lai bi chan o lan thu 5 du bai da khac, model
-// phai kiem tung slide mot, mat 12 vong. Lenh GHI lap y het van bi dem suot luot (moi lan ghi lam revision tang nen
-// khong the dung revision de mien).
+// phai kiem tung slide mot, mat 12 vong.
+//
+// Lenh GHI y het chi bi dem don khi cac lan goi NOI LIEN (giua hai lan khong co lenh ghi nao khac): bo do Word/Excel
+// 26/10/2026 - writer.insertPageBreak (khong tham so) bi chan tu lan 5 khi viet bao cao nhieu chuong, du giua cac lan
+// la ca mot chuong moi. Moi lan ghi lam revision tang 1, nen "noi lien" = revision luc goi lai dung bang revision sau
+// lan ghi truoc.
 type identicalCallGuard struct {
 	limit   int
 	counts  map[string]int
 	readAt  map[string]int    // chu ky lenh doc -> revision luc goi gan nhat
+	writeAt map[string]int    // chu ky lenh ghi -> revision luc goi gan nhat (truoc khi ghi)
 	pending map[string]string // CallID -> chu ky cua vong dang chay
 	at      map[string]int    // CallID -> revision luc goi
 }
@@ -311,9 +316,12 @@ type identicalCallGuard struct {
 func (g *identicalCallGuard) beforeCall(loop *agentLoop, call ToolCall) *ToolResult {
 	signature := call.Name + " " + call.Arguments
 	if g.pending == nil {
-		g.readAt, g.pending, g.at = map[string]int{}, map[string]string{}, map[string]int{}
+		g.readAt, g.writeAt, g.pending, g.at = map[string]int{}, map[string]int{}, map[string]string{}, map[string]int{}
 	}
 	if at, read := g.readAt[signature]; read && at != loop.revision {
+		g.counts[signature] = 0
+	}
+	if at, wrote := g.writeAt[signature]; wrote && loop.revision > at+1 {
 		g.counts[signature] = 0
 	}
 	g.pending[call.ID], g.at[call.ID] = signature, loop.revision
@@ -335,6 +343,7 @@ func (g *identicalCallGuard) afterTools(_ *agentLoop, _ *Turn, results []ToolRes
 			g.readAt[signature] = g.at[result.CallID]
 		} else if ok && result.Mutating {
 			delete(g.readAt, signature)
+			g.writeAt[signature] = g.at[result.CallID]
 		}
 	}
 	g.pending, g.at = map[string]string{}, map[string]int{}

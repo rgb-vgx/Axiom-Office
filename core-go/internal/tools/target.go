@@ -45,6 +45,25 @@ func withTarget(command office.Command, action string, params map[string]any, ta
 	return params
 }
 
+// savedDocument: luu tai lieu DICH lam no doi ten (save lan dau cua "Book1" -> "...\Book1.xlsx"; saveAs -> duong dan moi)
+// thi tra ten moi de cac lenh sau con nham dung tai lieu. Bo do Excel 26/10/2026 (x06): et.save so moi, moi lenh sau
+// bao DOCUMENT_CLOSED "the workbook 'Book1' is not open". Luu tai lieu KHAC (tham so tai lieu khac dich) thi bo qua.
+func savedDocument(action string, params, result map[string]any, target string) string {
+	if !strings.HasSuffix(action, ".save") && !strings.HasSuffix(action, ".saveAs") {
+		return ""
+	}
+	fullName, _ := result["fullName"].(string)
+	fullName = strings.TrimSpace(fullName)
+	if fullName == "" || strings.EqualFold(fullName, target) {
+		return ""
+	}
+	if named, _ := params[targetParam(action)].(string); strings.TrimSpace(named) != "" && target != "" &&
+		!strings.EqualFold(strings.TrimSpace(named), target) {
+		return ""
+	}
+	return fullName
+}
+
 // openedDocument: tai lieu vua tao/mo (duong dan day du neu co, khong thi ten nhu "Presentation2").
 func openedDocument(params, result map[string]any) string {
 	for _, key := range []string{"fullName", "path", "name", "presentation"} {

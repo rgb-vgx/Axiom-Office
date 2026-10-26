@@ -285,6 +285,9 @@ trúc không dây cắt hộp. Sửa: sơ đồ lồng trong khoá `diagram`, `r
   (mất toàn bộ nội dung ca `w08`); `et.save` sổ mới đổi tên làm Core mất tài liệu đích (`x06`). Thiếu lệnh: mục lục,
   header/footer/số trang, caption, gán style cho đoạn có sẵn; Table/bộ lọc, freeze, validation, biểu đồ lấy sheet khác.
   Chặn lệnh lặp chặn nhầm `insertPageBreak`; Word mỗi đoạn một lệnh (tờ trình nửa trang 33 vòng).
+- **P0 xong** (plan 21 §5.1): undo không lùi quá việc của lượt, theo dõi tài liệu khi lưu đổi tên, chặn lặp chỉ khi
+  lặp liền, ghi đè ô do lượt ghi không hỏi, `doc_design` từ chối tài liệu gần trống. Đo lại 8 ca: hết lỗi critical
+  (`w08` không còn mất chữ, `x06` không còn `DOCUMENT_CLOSED`), `x01`/`x04` 0 xác nhận và số vòng giảm một nửa.
 
 ## 3. Chưa làm / chưa kiểm chứng
 
