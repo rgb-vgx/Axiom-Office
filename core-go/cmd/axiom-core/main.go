@@ -161,7 +161,7 @@ func run() int {
 		Bridge: bridge, Sessions: sessions,
 		Conversations: stores.Convs, Runs: stores.Runs,
 		Models: models, Skills: skillIndex, Memory: memoryService, MCP: mcpClient,
-		Config: config.Load, Assembler: agent.NewContextAssembler(),
+		Config: config.Load, Assembler: agent.NewContextAssembler(), BusyPort: manager.BusyPort,
 	}
 	// Kho nguon web (schema v3): nguon tai ve trong cac luot truoc - don luc khoi dong (qua han / qua tran).
 	if stores.Available {

@@ -181,6 +181,8 @@ type Orchestrator struct {
 	WebSources *store.WebSources
 	Config     func() config.Config
 	Assembler  *ContextAssembler
+	// BusyPort: cong Office dang co luot khac chay (Manager.BusyPort) - other_document khong sua tai lieu do. nil = khong kiem.
+	BusyPort func(port int) bool
 }
 
 func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) {

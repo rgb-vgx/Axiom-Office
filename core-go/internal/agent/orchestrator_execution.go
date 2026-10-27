@@ -211,6 +211,10 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 			list = append(list, tools.WrapMCPTools(bound)...)
 		}
 	}
+	// Tai lieu Office khac dang mo (other_document.go): chi gui tool khi co - luot mot tai lieu khong ton them chu.
+	if others := otherSessions(o.Sessions, session); len(others) > 0 {
+		list = append(list, tools.NewOtherDocumentTool(others, readOnly, o.BusyPort))
+	}
 	registry := tools.NewRegistry(list)
 
 	var confirm func(string, string, string) (bool, error)
@@ -496,6 +500,21 @@ func targetDocument(document *DocumentContext, session *office.Session) string {
 		return strings.TrimSpace(session.Document)
 	}
 	return ""
+}
+
+// otherSessions: phien Office song khac phien cua luot (khac cong), co tai lieu mo.
+func otherSessions(directory *office.Directory, current *office.Session) []office.Session {
+	if directory == nil || current == nil {
+		return nil
+	}
+	others := []office.Session{}
+	for _, session := range directory.List(false) {
+		if session.Port == current.Port || strings.TrimSpace(session.Document) == "" {
+			continue
+		}
+		others = append(others, session)
+	}
+	return others
 }
 
 // actTools: tool chi co khi LAM THAT - khong co o lap ke hoach / lenh nhanh chi tra loi (o lap ke hoach chi duoc

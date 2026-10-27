@@ -62,7 +62,7 @@ core-build:
 	cp -r skills dist/core/skills
 
 test-core: core-build
-	AXIOM_E2E_CORE_EXE=$(CURDIR)/dist/core/axiom-core python3 tests/core/test_core_e2e.py --only fake_bridge,guards,skills,confirm,memory,mcp,visual,setup,shutdown,anthropic,embeddings,summarize,cancel,mcp_http,verify
+	AXIOM_E2E_CORE_EXE=$(CURDIR)/dist/core/axiom-core python3 tests/core/test_core_e2e.py --only fake_bridge,guards,skills,confirm,cross_app,memory,mcp,visual,setup,shutdown,anthropic,embeddings,summarize,cancel,mcp_http,verify
 
 test-mcp: core-build
 	python3 tests/mcp-host/test_mcp_portable.py $(CURDIR)/dist/core/axiom-core

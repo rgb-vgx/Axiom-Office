@@ -1143,6 +1143,76 @@ def test_confirm(work: str, token: str, bridge: FakeBridge, document_path: str, 
         llm.stop()
 
 
+def test_cross_app(work: str, token: str, bridge: FakeBridge, document_path: str, session_dir: str) -> None:
+    """Lam viec xuyen ung dung (tools/other_document.go): co tai lieu khac dang mo thi model co tool other_document,
+    lenh di dung bridge cua tai lieu do, sua thi hoi nguoi dung truoc (khong co ai hoi thi tu choi)."""
+    other_dir = os.path.join(work, "sessions-cross")
+    write_session(other_dir, bridge.pid, bridge.port, "et", document_path)
+    second = FakeBridge(pid=os.getppid())
+    write_args = {"range": "A1", "values": [["Tong", 42]]}
+    llm = FakeLlm(work, [
+        {"text": "Mot tai lieu"},
+        {"tool": "other_document", "arguments": {"document": "nguon", "action": "commands"}},
+        {"tool": "other_document", "arguments": {"document": "nguon.xlsx", "action": "et.writeRange", "params": write_args}},
+        {"text": "Khong ai xac nhan"},
+        {"tool": "other_document", "arguments": {"document": str(second.port), "action": "et.writeRange", "params": write_args}},
+        {"text": "Da ghi sang so nguon"},
+    ])
+    data_dir = os.path.join(work, "core-cross")
+    os.makedirs(data_dir, exist_ok=True)
+    core = Core(data_dir, other_dir, llm, token, {"AXIOM_CONFIRM_TIMEOUT": "20", "AXIOM_MEMORY_AUTO_EXTRACT": "0"})
+    office = {"port": bridge.port, "pid": bridge.pid, "app": "et", "family": "office"}
+    document = {"name": "bao-cao.xlsx", "fullName": document_path}
+    try:
+        status, created = core.run("Tom tat bang", office, document=document)
+        core.events(created["result"]["runId"])
+        tools = [t["function"]["name"] for t in llm.requests()[-1]["body"].get("tools", [])]
+        check("other_document" not in tools, "mot tai lieu dang mo: khong gui tool other_document", tools)
+
+        write_session(other_dir, second.pid, second.port, "et", os.path.join(work, "nguon.xlsx"))
+        bridge.commands.clear()
+        status, created = core.run("Lay tong tu so nguon", office, document=document, options={"interactive": False})
+        events = core.events(created["result"]["runId"])
+        request = llm.requests()[-1]["body"]
+        described = next((t["function"]["description"] for t in request.get("tools", [])
+                          if t["function"]["name"] == "other_document"), "")
+        finished = [p.get("data", {}) for t, p in events if t == "tool.finished"]
+        check("nguon.xlsx (Excel, port %d)" % second.port in described and "bao-cao.xlsx" not in described,
+              "hai tai lieu: other_document liet ke tai lieu KHAC", described[:300])
+        check(len(finished) == 2 and "user declined" in (finished[1].get("error") or "") and second.actions() == []
+              and bridge.actions() == [], "khong ai xac nhan: khong sua tai lieu khac", (finished, second.actions()))
+        listed = [m for m in request.get("messages", []) if m.get("role") == "tool"]
+        check(listed and "et.writeRange {range" in (listed[0].get("content") or ""),
+              "action commands tra lenh cua app kia", listed[:1])
+
+        status, created = core.run("Ghi tong sang so nguon", office, document=document)
+        run_id = created["result"]["runId"]
+        collected: list = []
+        url = f"{core.base}/v1/runs/{run_id}/events"
+        reader = threading.Thread(target=lambda: sse_events(url, core.token, timeout=60, sink=collected), daemon=True)
+        reader.start()
+        confirmation, reason = None, ""
+        deadline = time.time() + 20
+        while confirmation is None and time.time() < deadline:
+            found = next((p.get("data", {}) for t, p in list(collected) if t == "confirm.required"), None)
+            if found:
+                confirmation, reason = found.get("confirmationId"), found.get("reason", "")
+            else:
+                time.sleep(0.1)
+        if confirmation:
+            http_json(f"{core.base}/v1/runs/{run_id}/confirm", method="POST", token=core.token,
+                      body={"confirmationId": confirmation, "approved": True})
+        reader.join(timeout=60)
+        check("nguon.xlsx" in reason, "hoi xac nhan neu ten tai lieu khac", reason)
+        check(second.actions() == ["et.writeRange"] and bridge.actions() == [],
+              "dong y: lenh ghi xuong bridge cua tai lieu khac, khong dung tai lieu cua luot",
+              (second.actions(), bridge.actions()))
+    finally:
+        core.stop()
+        llm.stop()
+        second.stop()
+
+
 def test_mcp(work: str, token: str, bridge: FakeBridge, document_path: str, session_dir: str) -> None:
     """Giai doan 4 (docs/architecture/core.md 8.7, 12): MCP server mau (Python stdlib) duoc goi qua agent; server ngoai can xac
     nhan, "trusted" thi khong; lan file office (Host.exe) doc/ghi file; ghi de file da co thi hoi; server loi
@@ -1541,7 +1611,7 @@ def test_verify(work: str, token: str, bridge: FakeBridge, document_path: str, s
 
 
 # Cac phan chay duoc rieng (--only); /health luon chay truoc.
-SECTIONS = ["fake_bridge", "guards", "skills", "memory", "confirm", "mcp", "visual", "setup", "shutdown",
+SECTIONS = ["fake_bridge", "guards", "skills", "memory", "confirm", "cross_app", "mcp", "visual", "setup", "shutdown",
             "anthropic", "embeddings", "summarize", "cancel", "mcp_http", "verify"]
 
 # Phan phu thuoc: `guards` dung chung kich ban LLM voi `fake_bridge` (kich ban tuan tu) nen chay mot minh
@@ -1644,6 +1714,8 @@ def main() -> int:
                 test_memory(work, token, bridge, document_path, session_dir)
             if wanted("confirm"):
                 test_confirm(work, token, bridge, document_path, session_dir)
+            if wanted("cross_app"):
+                test_cross_app(work, token, bridge, document_path, session_dir)
             if wanted("mcp"):
                 test_mcp(work, token, bridge, document_path, session_dir)
             if wanted("visual"):
