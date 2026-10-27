@@ -237,3 +237,18 @@ func TestBlankSlide(t *testing.T) {
 		}
 	}
 }
+
+func TestReviewRevisionsAlwaysAsksAndResolveOnlyWhenNotRequested(t *testing.T) {
+	if decision := evaluate("writer.reviewRevisions", map[string]any{"action": "reject", "all": true}, "chap nhan het", nil); !decision.NeedsConfirmation ||
+		!strings.Contains(decision.Reason, "Từ chối") {
+		t.Fatalf("tu choi revision phai hoi: %+v", decision)
+	}
+	if decision := evaluate("writer.resolveComment", map[string]any{"comment": 1.0}, "sửa theo các góp ý", nil); !decision.NeedsConfirmation {
+		t.Fatalf("nguoi dung khong yeu cau danh dau xong thi phai hoi: %+v", decision)
+	}
+	for _, prompt := range []string{"xử lý các comment rồi đánh dấu xong", "resolve all comments", "đóng các góp ý đã sửa"} {
+		if decision := evaluate("writer.resolveComment", map[string]any{"comment": 1.0}, prompt, nil); decision.NeedsConfirmation {
+			t.Fatalf("%q: nguoi dung da yeu cau, khong hoi: %+v", prompt, decision)
+		}
+	}
+}

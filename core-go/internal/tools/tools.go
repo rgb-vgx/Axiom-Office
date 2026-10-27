@@ -52,7 +52,8 @@ var noDocumentChange = map[string]bool{
 	// Nhay toi cho duoc trich dan (pane goi khi nguoi dung bam): chi chon + cuon.
 	"writer.goto": true, "et.goto": true, "wpp.goto": true,
 	// Loc chi an hang (khong doi noi dung): ket qua doc sau do van dung.
-	"et.filter": true,
+	"et.filter":           true,
+	"writer.listComments": true, "writer.listRevisions": true,
 }
 
 // ChangesDocument: lenh nay co lam doi noi dung tai lieu dang mo khong.
@@ -67,8 +68,8 @@ var readOnly = map[string]bool{
 	// et.whatIf ghi tam mot o roi tu tra lai (ket qua = bang chung kiem tra, tai lieu khong doi).
 	"et.readRanges": true, "et.whatIf": true,
 	"writer.getText": true, "writer.selection": true, "writer.checkTables": true, "writer.outline": true,
-	"writer.checkLayout": true,
-	"wpp.listSlides":     true, "wpp.checkLayout": true,
+	"writer.checkLayout": true, "writer.listComments": true, "writer.listRevisions": true,
+	"wpp.listSlides": true, "wpp.checkLayout": true,
 }
 
 // ReadOnly: lenh nay chi doc tai lieu, khong sua va khong ghi file.
