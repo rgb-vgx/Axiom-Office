@@ -97,3 +97,16 @@ func (run *RunContext) UndoSteps(app string) int {
 	}
 	return run.undoable[app]
 }
+
+// EditSteps: tong so lenh sua chac chan cua luot (moi app, da tru undo cua luot) - pane Excel/PowerPoint dung de bao
+// "thay doi nay khong hoan tac duoc bang Ctrl+Z" chi khi luot that su da sua (Claude Code /rewind: noi ro pham vi khoi phuc).
+func (run *RunContext) EditSteps() int {
+	if run == nil {
+		return 0
+	}
+	total := 0
+	for _, steps := range run.undoable {
+		total += steps
+	}
+	return total
+}

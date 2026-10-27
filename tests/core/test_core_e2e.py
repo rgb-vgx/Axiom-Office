@@ -955,6 +955,24 @@ def test_cancel(work: str, token: str, bridge: FakeBridge, document_path: str, s
         check(status == 409, "huy luot da xong -> 409", again)
         status, health = http_json(core.base + "/health")
         check(status == 200 and health["result"]["memory"] == "on", "sau khi huy, Core van khoe", health["result"]["memory"])
+
+        # Luot bi huy de lai mot dong trong hoi thoai; luot sau thay no trong "Recent turns" cua system prompt (Codex/Grok
+        # Build: luot bi ngat la trang thai co ten, model biet tai lieu co the da doi mot phan).
+        conversation_id = run.get("conversationId")
+        messages = core.conversation(conversation_id)["messages"]
+        notes = [m["content"] for m in messages if m["role"] == "tool_summary" and "ended before finishing" in m["content"]]
+        check(len(notes) == 1 and "cancelled" in notes[0], "hoi thoai ghi lai luot bi huy giua chung", notes)
+        before = len(llm.requests())
+        status, again = core.run("lam tiep", office, conversation_id=conversation_id,
+                                 document={"name": "bao-cao.xlsx", "fullName": document_path})
+        deadline = time.time() + 30
+        while len(llm.requests()) <= before and time.time() < deadline:
+            time.sleep(0.1)
+        prompt = llm.requests()[-1]["body"]["messages"][0]["content"] if len(llm.requests()) > before else ""
+        check("ended before finishing: cancelled" in prompt, "luot sau thay dong 'luot truoc bi dung' trong system prompt",
+              prompt[-400:])
+        if status == 200:
+            http_json(f"{core.base}/v1/runs/{again['result']['runId']}/cancel", method="POST", token=core.token)
     finally:
         core.stop()
         llm.stop()

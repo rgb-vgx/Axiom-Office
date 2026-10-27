@@ -1136,6 +1136,12 @@ namespace AxiomOffice.Ai
             // thi khong tru duoc va nut nay lui vao noi dung co tu truoc luot (audit agent runtime F02).
             _lastRunEdits = result.UndoSteps >= 0 ? result.UndoSteps : _runEdits;
             _undoLink.Visible = host.AppKind == "wps" && _lastRunEdits > 0;
+            // Excel/PowerPoint cua Microsoft: thay doi qua COM khong vao ngan hoan tac (khong co nut "Hoan tac luot nay") - noi
+            // ro pham vi thay vi de nguoi dung tuong Ctrl+Z se lay lai duoc (Claude Code /rewind bao ro cai gi khong khoi phuc).
+            if (host.IsOfficeHost && (host.AppKind == "et" || host.AppKind == "wpp") && result.EditSteps > 0)
+            {
+                _chat.AddInfo(Ui.T("Lưu ý: Excel/PowerPoint không hoàn tác được bằng Ctrl+Z các thay đổi AI vừa làm. Nếu cần quay lại, hãy đóng tài liệu không lưu hoặc mở bản đã lưu trước đó."));
+            }
             if (result.ViaCore && result.Ok)
             {
                 PollExtractedMemories(result.RunId);

@@ -323,7 +323,7 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 	switch {
 	case result.OK && ReadOnly(action):
 		run.forgetUncertain()
-	case !result.OK && mayChangeDocument(action) && uncertainOutcome(result.Error):
+	case !result.OK && mayChangeDocument(action) && (uncertainOutcome(result.Error) || cancelledInFlight(ctx, result.Error)):
 		// Ket qua khong ro (uncertain.go): coi nhu CO sua - docStateGuard tang revision nen lenh doc truoc do khong con
 		// duoc coi la "khong doi", va bat buoc kiem chung truoc khi tra loi. Khong dem buoc hoan tac (khong biet co hay
 		// khong) - undo.go chi lui so buoc chac chan cua luot.

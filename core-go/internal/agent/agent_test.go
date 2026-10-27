@@ -501,3 +501,15 @@ func TestConversationKeyOnlyForSavedDocuments(t *testing.T) {
 		}
 	}
 }
+
+func TestEndedEarlyNoteNamesUncertainEdits(t *testing.T) {
+	note := EndedEarlyNote(StatusCancelled, []string{"writer.appendText", "writer.insertTable"})
+	for _, part := range []string{"ended before finishing: cancelled", "writer.appendText, writer.insertTable", "read the affected part"} {
+		if !strings.Contains(note, part) {
+			t.Fatalf("thieu %q trong %q", part, note)
+		}
+	}
+	if note := EndedEarlyNote("interrupted", nil); strings.Contains(note, "partly applied") {
+		t.Fatalf("khong co lenh nao do dang thi khong ke ten lenh: %q", note)
+	}
+}

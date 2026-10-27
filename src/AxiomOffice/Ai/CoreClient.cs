@@ -40,6 +40,7 @@ namespace AxiomOffice.Ai
         public int OutputTokens;
         public int Round;       // run.reasoning: vòng chạy đã sinh ra phần suy luận này
         public int UndoSteps = -1;  // sự kiện kết thúc lượt: số bước hoàn tác Word của lượt (-1 = Core không báo)
+        public int EditSteps = -1;  // sự kiện kết thúc lượt: số lệnh sửa tài liệu của lượt, mọi app (-1 = Core không báo)
     }
 
     // Client HTTP + SSE toi AxiomOffice.Core.exe: tim Core qua core.json, khoi dong khi can (muc 7.1),
@@ -664,6 +665,11 @@ namespace AxiomOffice.Ai
                     item.UndoSteps = Convert.ToInt32(data["undoSteps"]);
                 }
 
+                if (data.ContainsKey("editSteps") && data["editSteps"] != null)
+                {
+                    item.EditSteps = Convert.ToInt32(data["editSteps"]);
+                }
+
                 if (data.ContainsKey("round"))
                 {
                     item.Round = Convert.ToInt32(data["round"]);
@@ -821,6 +827,11 @@ namespace AxiomOffice.Ai
             if (item.UndoSteps >= 0)
             {
                 result.UndoSteps = item.UndoSteps;
+            }
+
+            if (item.EditSteps >= 0)
+            {
+                result.EditSteps = item.EditSteps;
             }
 
             switch (item.Type)

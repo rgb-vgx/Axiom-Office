@@ -415,5 +415,6 @@
   "Agent Core không chạy được (": "Agent Core is not running (",
   "AI gọi lại cùng một lệnh bị lỗi nhiều lần nên Axiom đã dừng lượt này (máy chủ AI không lỗi). Chi tiết: ": "The AI kept repeating the same failing command, so Axiom stopped this run (the AI server is fine). Details: ",
   "Axiom đã dừng lượt chạy: ": "Axiom stopped the run: ",
-  "AI không phản hồi kịp nên lượt chạy đã dừng.": "The AI did not respond in time, so the run stopped."
+  "AI không phản hồi kịp nên lượt chạy đã dừng.": "The AI did not respond in time, so the run stopped.",
+  "Lưu ý: Excel/PowerPoint không hoàn tác được bằng Ctrl+Z các thay đổi AI vừa làm. Nếu cần quay lại, hãy đóng tài liệu không lưu hoặc mở bản đã lưu trước đó.": "Note: Excel/PowerPoint cannot undo the AI's changes with Ctrl+Z. To go back, close the document without saving or reopen the last saved copy."
 }

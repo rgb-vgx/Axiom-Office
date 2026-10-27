@@ -1,6 +1,8 @@
 package tools
 
 import (
+	"context"
+	"sort"
 	"strings"
 
 	"axiomoffice/core/internal/model"
@@ -67,3 +69,28 @@ func (run *RunContext) checkUncertainRetry(action string, params map[string]any)
 }
 
 func (run *RunContext) forgetUncertain() { run.uncertain = nil }
+
+// cancelledInFlight: luot bi huy (nguoi dung bam Dung, het gio, Core dung) trong khi /cmd dang cho - lenh da toi bridge
+// thi COM khong huy duoc va co the van chay xong (Codex: "aborted by user after Ns" khac "aborted before dispatch").
+func cancelledInFlight(ctx context.Context, errorText string) bool {
+	return ctx.Err() != nil && errorText == "cancelled"
+}
+
+// UncertainActions: lenh ghi con ket qua khong ro khi luot ket thuc (chua co lenh doc nao sau do) - Core ghi vao hoi
+// thoai de luot sau doc lai truoc khi sua.
+func (run *RunContext) UncertainActions() []string {
+	if run == nil {
+		return nil
+	}
+	seen := map[string]bool{}
+	actions := []string{}
+	for key := range run.uncertain {
+		action, _, _ := strings.Cut(key, " ")
+		if !seen[action] {
+			seen[action] = true
+			actions = append(actions, action)
+		}
+	}
+	sort.Strings(actions)
+	return actions
+}

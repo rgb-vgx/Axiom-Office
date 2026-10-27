@@ -91,18 +91,46 @@ func (r *Runs) AddRound(runID string, row RoundRow) {
 // khoi dong lai. Tai lieu co the da bi sua mot phan ma khong co su kien ket thuc nao.
 const StatusInterrupted = "interrupted"
 
+// InterruptedRun: mot luot vua duoc doi sang 'interrupted' - hoi thoai cua no can mot dong bao cho luot sau.
+type InterruptedRun struct {
+	ID             string
+	ConversationID *string
+}
+
 // MarkInterrupted: luot con 'running' trong core.db khi Core vua khoi dong la luot cua process truoc (moi nguoi dung chi
-// mot Core, va luot chi song trong RAM) - doi sang 'interrupted' de khong treo 'running' mai mai. Tra so luot da doi.
-func (r *Runs) MarkInterrupted() int {
-	result, err := r.db.sql.Exec(`UPDATE runs SET status = ?, finished_at = ?,
-		error = COALESCE(error, 'Agent Core stopped while this run was in progress')
-		WHERE status = 'running'`, StatusInterrupted, Now())
+// mot Core, va luot chi song trong RAM) - doi sang 'interrupted' de khong treo 'running' mai mai. Tra cac luot da doi.
+func (r *Runs) MarkInterrupted() []InterruptedRun {
+	rows, err := r.db.sql.Query("SELECT id, conversation_id FROM runs WHERE status = 'running'")
 	if err != nil {
-		corelog.Error("core.db: mark interrupted runs failed: %v", err)
-		return 0
+		corelog.Error("core.db: list running runs failed: %v", err)
+		return nil
 	}
-	count, _ := result.RowsAffected()
-	return int(count)
+	found := []InterruptedRun{}
+	for rows.Next() {
+		var (
+			item         InterruptedRun
+			conversation sql.NullString
+		)
+		if rows.Scan(&item.ID, &conversation) == nil {
+			item.ConversationID = nullString(conversation)
+			found = append(found, item)
+		}
+	}
+	_ = rows.Close()
+	marked := []InterruptedRun{}
+	for _, item := range found {
+		result, err := r.db.sql.Exec(`UPDATE runs SET status = ?, finished_at = ?,
+			error = COALESCE(error, 'Agent Core stopped while this run was in progress')
+			WHERE id = ? AND status = 'running'`, StatusInterrupted, Now(), item.ID)
+		if err != nil {
+			corelog.Error("core.db: mark run %s interrupted failed: %v", item.ID, err)
+			continue
+		}
+		if count, _ := result.RowsAffected(); count > 0 {
+			marked = append(marked, item)
+		}
+	}
+	return marked
 }
 
 // Rounds: cac vong cua mot luot theo thu tu.

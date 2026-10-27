@@ -5,6 +5,21 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — Agent Core: lượt dừng giữa chừng được ghi lại, phạm vi hoàn tác nói rõ (27/10/2026)
+
+Theo `docs/research/hoc-tu-agent-khac.md` (học từ Codex, Grok Build, Claude Code).
+
+- **Lượt dừng giữa chừng để lại dấu vết cho lượt sau**: lượt kết thúc `cancelled`/`timedout`/`stopped`/`failed` sau khi đã
+  gọi tool ghi một dòng vào hội thoại ("previous request ended before finishing: …"), kèm tên lệnh ghi còn kết quả không
+  rõ; lượt sau thấy dòng này trong "Recent turns" và đọc lại tài liệu trước khi sửa. Lượt bị Core đổi sang `interrupted`
+  lúc khởi động cũng được ghi như vậy vào hội thoại của nó.
+- **Bấm Dừng khi một lệnh ghi đang chạy trong Office** = kết quả không rõ (như `HOST_BUSY`): lệnh COM không huỷ được và
+  có thể vẫn chạy xong.
+- **`GET /v1/runs/{id}` đọc `core.db`** khi lượt không còn trong bộ nhớ (Core khởi động lại, quá 30 phút): trả trạng thái
+  đã lưu kèm `"stored": true` thay vì 404.
+- **Excel/PowerPoint (Microsoft Office)**: sau lượt có sửa tài liệu, khung chat nói rõ Ctrl+Z không lấy lại được thay đổi
+  của AI. Sự kiện kết thúc lượt có thêm `editSteps` (số lệnh sửa chắc chắn của lượt, mọi app).
+
 ### Fixed — Agent Core: kết quả mơ hồ, hoàn tác lượt, lượt bị gián đoạn (27/10/2026)
 
 Theo `docs/audits/axiom-agent-runtime-deep-audit.md` (F01, F02, F04, F07, F08).

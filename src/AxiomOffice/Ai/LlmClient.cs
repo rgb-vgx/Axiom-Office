@@ -30,6 +30,8 @@ namespace AxiomOffice.Ai
         // UndoSteps: so buoc hoan tac Word chac chan cua luot do Core tinh (da tru lan agent tu undo); -1 = Core khong bao
         // (Core cu, hoac luot in-process) -> pane tu dem nhu truoc.
         public int UndoSteps = -1;
+        // EditSteps: so lenh sua tai lieu chac chan cua luot (moi app) do Core bao; -1 = khong biet.
+        public int EditSteps = -1;
         public List<string> Transcript = new List<string>();
     }
 

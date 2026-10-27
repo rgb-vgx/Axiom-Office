@@ -58,7 +58,9 @@ type Run struct {
 	ToolCalls     int
 	// UndoSteps: so buoc hoan tac Word (writer.*) chac chan cua luot khi ket thuc - nut "Hoan tac luot nay" cua pane lui
 	// dung chung nay buoc (tools.RunContext.UndoSteps).
-	UndoSteps     int
+	UndoSteps int
+	// EditSteps: so lenh sua chac chan cua luot tren moi app (tools.RunContext.EditSteps).
+	EditSteps     int
 	Transcript    []string
 	Events        *EventStream
 	Confirmations *Confirmations
@@ -149,6 +151,7 @@ func (r *Run) JSON() map[string]any {
 		"seconds":        round2(r.Seconds),
 		"toolCalls":      r.ToolCalls,
 		"undoSteps":      r.UndoSteps,
+		"editSteps":      r.EditSteps,
 		"lastEvent":      r.Events.LastSeq(),
 		"transcript":     transcript,
 	}

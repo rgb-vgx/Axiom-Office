@@ -389,8 +389,9 @@ func (o *Orchestrator) applyResult(ctx context.Context, ex *execution, result mo
 		run.Seconds = result.Seconds
 		run.RoundKinds = roundKinds(result.RoundStats)
 		run.UndoSteps = ex.runContext.UndoSteps("writer")
+		run.EditSteps = ex.runContext.EditSteps()
 	})
-	undoSteps := run.UndoSteps
+	undoSteps, editSteps := run.UndoSteps, run.EditSteps
 
 	switch {
 	case result.OK:
@@ -400,21 +401,21 @@ func (o *Orchestrator) applyResult(ctx context.Context, ex *execution, result mo
 			"reply": result.Text, "rounds": result.Rounds, "seconds": round2(result.Seconds),
 			"inputTokens": result.InputTokens, "outputTokens": result.OutputTokens,
 			"cachedTokens": result.CachedTokens, "billableTokens": result.BillableTokens(),
-			"verified": result.Verified, "model": result.Model, "undoSteps": undoSteps,
+			"verified": result.Verified, "model": result.Model, "undoSteps": undoSteps, "editSteps": editSteps,
 		})
 	case result.Cancelled:
 		run.update(func() { run.Status = StatusCancelled })
-		run.Events.Publish("run.cancelled", map[string]any{"seconds": round2(result.Seconds), "undoSteps": undoSteps})
+		run.Events.Publish("run.cancelled", map[string]any{"seconds": round2(result.Seconds), "undoSteps": undoSteps, "editSteps": editSteps})
 	case result.TimedOut:
 		run.update(func() { run.Status, run.Error, run.ErrorKind = StatusTimedOut, result.Error, "timeout" })
 		run.Events.Publish("run.timedout", map[string]any{"seconds": round2(result.Seconds), "error": result.Error,
-			"undoSteps": undoSteps})
+			"undoSteps": undoSteps, "editSteps": editSteps})
 	case result.Stopped:
 		run.update(func() { run.Status, run.Error, run.ErrorKind = StatusStopped, result.Error, "budget" })
 		run.Events.Publish("run.stopped", map[string]any{
 			"error": result.Error, "rounds": result.Rounds,
 			"inputTokens": result.InputTokens, "outputTokens": result.OutputTokens,
-			"cachedTokens": result.CachedTokens, "billableTokens": result.BillableTokens(), "undoSteps": undoSteps,
+			"cachedTokens": result.CachedTokens, "billableTokens": result.BillableTokens(), "undoSteps": undoSteps, "editSteps": editSteps,
 		})
 	default:
 		kind := result.ErrorKind
@@ -430,6 +431,12 @@ func (o *Orchestrator) applyResult(ctx context.Context, ex *execution, result mo
 
 	if result.ToolsDisabled {
 		run.appendTranscript("(provider khong ho tro tools - chay che do thuong)")
+	}
+	// Luot dung giua chung (huy, het gio, het ngan sach, loi) sau khi da goi tool: ghi mot dong vao hoi thoai - luot sau thay
+	// no trong "Recent turns" va biet tai lieu co the da doi mot phan (Codex/Grok Build: luot bi ngat la trang thai co ten,
+	// khong phai mot cuoc tro chuyen im lang).
+	if !result.OK && run.ToolCalls > 0 {
+		o.Conversations.AppendMessage(conversation.ID, "tool_summary", EndedEarlyNote(run.Status, ex.runContext.UncertainActions()))
 	}
 
 	o.Runs.Finish(run.ID, run.Status, run.Rounds, run.InputTokens, run.OutputTokens, run.CachedTokens, o.errorPtr(run), nil)
@@ -524,4 +531,13 @@ func roundKinds(stats []model.RoundStat) string {
 		parts = append(parts, kind+" "+strconv.Itoa(counts[kind]))
 	}
 	return strings.Join(parts, ", ")
+}
+
+// EndedEarlyNote: dong "Recent turns" cho luot dung giua chung - trang thai cua luot va cac lenh ghi con ket qua khong ro.
+func EndedEarlyNote(status string, uncertain []string) string {
+	note := "(previous request ended before finishing: " + status
+	if len(uncertain) > 0 {
+		note += "; these edits may have been partly applied: " + strings.Join(uncertain, ", ")
+	}
+	return note + " - read the affected part of the document before editing it again)"
 }

@@ -152,10 +152,33 @@ func serveStartRun(w http.ResponseWriter, deps *Deps, request *agent.Request) {
 func serveGetRun(w http.ResponseWriter, deps *Deps, runID string) {
 	run := deps.Manager.Get(runID)
 	if run == nil {
+		// Khong con trong RAM (Core khoi dong lai, hoac qua RetentionMinutes): tra trang thai da luu trong core.db de pane
+		// ket noi lai thay luot da ket thuc the nao (Grok Build: su kien ket thuc luot duoc luu va phat lai), thay vi 404.
+		if stored := storedRunJSON(deps, runID); stored != nil {
+			OK(w, stored)
+			return
+		}
 		Error(w, http.StatusNotFound, "unknown run: "+runID)
 		return
 	}
 	OK(w, run.JSON())
+}
+
+// storedRunJSON: hinh dang GET /v1/runs/{id} dung tu dong runs trong core.db (khong co reply/transcript - chi luu trong RAM).
+// "stored": true de ben goi biet day la ban luu, khong phai luot dang song.
+func storedRunJSON(deps *Deps, runID string) map[string]any {
+	if deps.Stores == nil || !deps.Stores.Available || deps.Stores.Runs == nil {
+		return nil
+	}
+	row := deps.Stores.Runs.Get(runID)
+	if row == nil {
+		return nil
+	}
+	return map[string]any{
+		"runId": row.ID, "conversationId": row.ConversationID, "status": row.Status, "started": row.StartedAt,
+		"finished": row.FinishedAt, "reply": nil, "error": row.Error, "rounds": row.Rounds,
+		"inputTokens": row.InputTokens, "outputTokens": row.OutputTokens, "model": row.Model, "stored": true,
+	}
 }
 
 // serveCancelRun: huy luot dang chay (dung chung cho /v1 va /wps).

@@ -88,3 +88,13 @@ func TestUndoStepsSubtractsTheRunsOwnUndo(t *testing.T) {
 		t.Fatalf("luot chua co ngu canh tool thi 0 buoc, co %d", got)
 	}
 }
+
+func TestEditStepsCountsEveryApp(t *testing.T) {
+	run := &RunContext{}
+	countUndoable(run, "et.writeRange", true, nil)
+	countUndoable(run, "wpp.addSlide", true, nil)
+	countUndoable(run, "et.readRange", false, nil)
+	if got := run.EditSteps(); got != 2 {
+		t.Fatalf("2 lenh sua (Excel + PowerPoint) -> 2, co %d", got)
+	}
+}

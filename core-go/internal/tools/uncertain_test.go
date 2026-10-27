@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -109,5 +110,38 @@ func TestUncertainOutcomeMarkers(t *testing.T) {
 		if got := uncertainOutcome(text); got != want {
 			t.Errorf("uncertainOutcome(%q) = %v, muon %v", text, got, want)
 		}
+	}
+}
+
+// Luot bi huy khi lenh ghi dang o trong bridge (Office van co the chay xong): ket qua khong ro, khong phai "chua chay".
+func TestCancelWhileWriteIsInFlightIsUncertain(t *testing.T) {
+	started := make(chan struct{})
+	release := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(started)
+		select {
+		case <-release:
+		case <-r.Context().Done():
+		}
+	}))
+	t.Cleanup(func() { close(release); server.Close() })
+	port, _ := strconv.Atoi(strings.TrimPrefix(server.URL, "http://127.0.0.1:"))
+	catalog := &office.CommandCatalog{Version: "1.0.0", Commands: []office.Command{
+		{Name: "writer.appendText", Kind: "wps", Agent: true, Params: []office.CommandParam{{Name: "text", Required: true}}},
+	}}
+	tool := NewOfficeActionTool(catalog, "wps")
+	run := &RunContext{Office: &office.Session{App: "wps", Port: port}, Bridge: office.NewBridgeClient(server.Client(), "t")}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		<-started
+		cancel()
+	}()
+	result := tool.Invoke(ctx, map[string]any{"action": "writer.appendText", "params": map[string]any{"text": "a"}}, run)
+	if result.OK || !result.Mutating || !strings.Contains(result.JSON, "may still have been applied") {
+		t.Fatalf("huy khi lenh ghi dang chay phai coi la co the da sua: %+v", result)
+	}
+	if got := run.UncertainActions(); len(got) != 1 || got[0] != "writer.appendText" {
+		t.Fatalf("lenh ghi dang do phai nam trong danh sach ket qua khong ro: %v", got)
 	}
 }
