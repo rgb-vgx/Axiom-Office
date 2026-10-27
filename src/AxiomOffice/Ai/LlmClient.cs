@@ -32,6 +32,8 @@ namespace AxiomOffice.Ai
         public int UndoSteps = -1;
         // EditSteps: so lenh sua tai lieu chac chan cua luot (moi app) do Core bao; -1 = khong biet.
         public int EditSteps = -1;
+        // UndoMode: "revisions" = lượt sửa bằng Track Changes (hoàn tác = từ chối revision của lượt); "steps"/null = Ctrl+Z.
+        public string UndoMode;
         public List<string> Transcript = new List<string>();
     }
 

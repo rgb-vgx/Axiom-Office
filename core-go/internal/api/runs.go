@@ -52,6 +52,12 @@ func mapRuns(mux *http.ServeMux, deps *Deps) {
 		serveCancelRun(w, deps, r.PathValue("runId"))
 	})
 
+	// "Hoan tac luot nay" (agent/tracking.go UndoRun): luot co Track Changes thi tu choi revision cua luot, khong thi lui
+	// dung so buoc cua luot. Pane goi day thay vi tu dem buoc (audit F02/F03).
+	routeBoth(mux, deps, "POST /v1/runs/{runId}/undo", func(w http.ResponseWriter, r *http.Request) {
+		serveUndoRun(w, r, deps, r.PathValue("runId"))
+	})
+
 	// Tra loi yeu cau xac nhan cua policy (muc 7.3, 8.6): {"confirmationId", "approved": true|false}.
 	routeBoth(mux, deps, "POST /v1/runs/{runId}/confirm", func(w http.ResponseWriter, r *http.Request) {
 		body, parsed := readJSON(r)
@@ -193,6 +199,25 @@ func serveCancelRun(w http.ResponseWriter, deps *Deps, runID string) {
 		return
 	}
 	OK(w, map[string]any{"cancelled": true, "status": run.CurrentStatus()})
+}
+
+// serveUndoRun: hoan tac ca luot (dung chung cho /v1 va /wps). Luot khac dang chay tren cung cong thi 409.
+func serveUndoRun(w http.ResponseWriter, r *http.Request, deps *Deps, runID string) {
+	run := deps.Manager.Get(runID)
+	if run == nil {
+		Error(w, http.StatusNotFound, "unknown run: "+runID)
+		return
+	}
+	if deps.Manager.BusyPort(run.Port) {
+		Error(w, http.StatusConflict, "a run is in progress on this document: wait for it to finish")
+		return
+	}
+	result, problem := deps.Orchestrator.UndoRun(r.Context(), run)
+	if problem != "" {
+		Error(w, http.StatusConflict, problem)
+		return
+	}
+	OK(w, result)
 }
 
 // serveConfirmRun: tra loi yeu cau xac nhan cua policy (dung chung cho /v1 va /wps).

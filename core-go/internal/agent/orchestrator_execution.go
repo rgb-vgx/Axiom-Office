@@ -242,6 +242,8 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 	if request.Document != nil {
 		runContext.FocusSlide = request.Document.Slide
 	}
+	// Track Changes cho luot Word (tracking.go): bat truoc lenh sua dau tien, tra lai trong finish().
+	o.startTracking(ctx, run, request, appKind, catalog, readOnly, runContext.TargetDocument)
 	// Luu nguon web tai ve trong luot (WebSourceStore bat + kho mo duoc): tool web ghi qua RunContext.
 	if o.WebSources != nil {
 		if cfg := o.Config(); cfg.WebSourceStore {
@@ -415,21 +417,21 @@ func (o *Orchestrator) applyResult(ctx context.Context, ex *execution, result mo
 			"reply": result.Text, "rounds": result.Rounds, "seconds": round2(result.Seconds),
 			"inputTokens": result.InputTokens, "outputTokens": result.OutputTokens,
 			"cachedTokens": result.CachedTokens, "billableTokens": result.BillableTokens(),
-			"verified": result.Verified, "model": result.Model, "undoSteps": undoSteps, "editSteps": editSteps,
+			"verified": result.Verified, "model": result.Model, "undoSteps": undoSteps, "editSteps": editSteps, "undoMode": run.undoMode(),
 		})
 	case result.Cancelled:
 		run.update(func() { run.Status = StatusCancelled })
-		run.Events.Publish("run.cancelled", map[string]any{"seconds": round2(result.Seconds), "undoSteps": undoSteps, "editSteps": editSteps})
+		run.Events.Publish("run.cancelled", map[string]any{"seconds": round2(result.Seconds), "undoSteps": undoSteps, "editSteps": editSteps, "undoMode": run.undoMode()})
 	case result.TimedOut:
 		run.update(func() { run.Status, run.Error, run.ErrorKind = StatusTimedOut, result.Error, "timeout" })
 		run.Events.Publish("run.timedout", map[string]any{"seconds": round2(result.Seconds), "error": result.Error,
-			"undoSteps": undoSteps, "editSteps": editSteps})
+			"undoSteps": undoSteps, "editSteps": editSteps, "undoMode": run.undoMode()})
 	case result.Stopped:
 		run.update(func() { run.Status, run.Error, run.ErrorKind = StatusStopped, result.Error, "budget" })
 		run.Events.Publish("run.stopped", map[string]any{
 			"error": result.Error, "rounds": result.Rounds,
 			"inputTokens": result.InputTokens, "outputTokens": result.OutputTokens,
-			"cachedTokens": result.CachedTokens, "billableTokens": result.BillableTokens(), "undoSteps": undoSteps, "editSteps": editSteps,
+			"cachedTokens": result.CachedTokens, "billableTokens": result.BillableTokens(), "undoSteps": undoSteps, "editSteps": editSteps, "undoMode": run.undoMode(),
 		})
 	default:
 		kind := result.ErrorKind

@@ -44,6 +44,8 @@ type Request struct {
 	// boi den gui kem. Khong co doan nao thi dung nhu lenh nhanh, de mot cau "ngan hon nua" khong bi hieu thanh sua ca
 	// tai lieu.
 	RequireSelection bool
+	// TrackChanges (options.trackChanges): luot Word sua bang Track Changes; nil = theo cau hinh TrackChangesEnabled.
+	TrackChanges *bool
 }
 
 const (
@@ -123,6 +125,10 @@ func ParseRequest(body map[string]any) (*Request, string) {
 		interactive = value
 	}
 	requireSelection, _ := tryMap(body["options"])["requireSelection"].(bool)
+	var trackChanges *bool
+	if value, ok := tryMap(body["options"])["trackChanges"].(bool); ok {
+		trackChanges = &value
+	}
 	mode := strings.TrimSpace(textOf(tryMap(body["options"])["mode"]))
 	if mode != "" && mode != "plan" && mode != "act" {
 		return nil, "'options.mode' must be \"plan\" or \"act\""
@@ -146,6 +152,7 @@ func ParseRequest(body map[string]any) (*Request, string) {
 		ReadOnly:    quick.ID != "" && !quick.Edits,
 		// Lenh nhanh nao cung lam tren doan boi den, nen luon can doan boi den.
 		RequireSelection: quick.ID != "" || requireSelection,
+		TrackChanges:     trackChanges,
 	}, ""
 }
 
@@ -259,6 +266,7 @@ func (o *Orchestrator) unlockSelection(run *Run) {
 
 // finish: moc ket thuc + dong SSE + log (luon chay, ke ca khi loi).
 func (o *Orchestrator) finish(run *Run) {
+	o.stopTracking(run)
 	o.unlockSelection(run)
 	now := time.Now().UTC()
 	run.update(func() { run.Finished = &now })
@@ -286,7 +294,7 @@ func (o *Orchestrator) finish(run *Run) {
 func (o *Orchestrator) fail(run *Run, errorText, kind string) {
 	run.update(func() { run.Status, run.Error, run.ErrorKind = StatusFailed, errorText, kind })
 	run.Events.Publish("run.failed", map[string]any{"error": errorText, "kind": kind, "undoSteps": run.UndoSteps,
-		"editSteps": run.EditSteps})
+		"editSteps": run.EditSteps, "undoMode": run.undoMode()})
 	corelog.Error("run %s failed [%s]: %s", run.ID, kind, errorText)
 }
 

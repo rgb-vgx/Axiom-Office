@@ -58,6 +58,8 @@ namespace AxiomOffice.Ai
         private string _conversationId;              // hoi thoai ben Agent Core, theo tai lieu dang mo
         private bool _freshConversation;             // nguoi dung vua bam "Cuoc tro chuyen moi"
         private bool _lastRunViaCore;                // luot vua roi da chay qua Core
+        private string _lastRunId;                   // luot vua roi ben Core (POST /v1/runs/{id}/undo)
+        private string _lastUndoMode;                // "revisions" = luot sua bang Track Changes
         private string _lastReply = "";
         private string _lastPrompt = "";
         private string _blockedReason;
@@ -1148,6 +1150,29 @@ namespace AxiomOffice.Ai
             {
                 return;
             }
+            // Qua Core trước: Core biết lượt có sửa bằng Track Changes (từ chối đúng revision của lượt, không đụng chữ người
+            // dùng gõ xen giữa) và số bước chắc chắn của lượt. Lượt Track Changes mà Core lỗi thì KHÔNG lùi bằng Ctrl+Z.
+            if (_lastRunViaCore && !string.IsNullOrEmpty(_lastRunId))
+            {
+                string coreError;
+                if (CoreClient.Instance.UndoRun(_lastRunId, out coreError))
+                {
+                    Logger.Info("AskAiPane: undo last run via Core (" + (_lastUndoMode ?? "steps") + ")");
+                    _chat.AddInfo(_lastUndoMode == "revisions"
+                        ? Ui.T("Đã từ chối các thay đổi của AI trong lượt vừa rồi.")
+                        : Ui.T("Đã hoàn tác ") + _lastRunEdits + Ui.T(" thao tác của lượt vừa rồi."));
+                    _undoLink.Visible = false;
+                    _lastRunEdits = 0;
+                    _lastRunId = null;
+                    return;
+                }
+                Logger.Info("AskAiPane: undo via Core failed: " + coreError);
+                if (_lastUndoMode == "revisions")
+                {
+                    _chat.AddInfo(Ui.T("Không hoàn tác được: ") + Truncate(coreError ?? "", 120));
+                    return;
+                }
+            }
             try
             {
                 var serializer = new System.Web.Script.Serialization.JavaScriptSerializer();
@@ -1186,6 +1211,8 @@ namespace AxiomOffice.Ai
             _busyDot.Visible = false;
             _chat.RemoveTyping();
             _lastRunViaCore = result.ViaCore;
+            _lastRunId = result.ViaCore ? result.RunId : null;
+            _lastUndoMode = result.UndoMode;
             // Core biet chinh xac so buoc hoan tac con lai cua luot (da tru lan agent tu writer.undo); tu dem tool.finished
             // thi khong tru duoc va nut nay lui vao noi dung co tu truoc luot (audit agent runtime F02).
             _lastRunEdits = result.UndoSteps >= 0 ? result.UndoSteps : _runEdits;

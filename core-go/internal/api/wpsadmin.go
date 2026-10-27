@@ -189,6 +189,7 @@ func coreStatus(deps *Deps) map[string]any {
 // doi -> session file cu tro sai cho).
 var settableSettings = map[string]bool{
 	"VisualQaEnabled":       true,
+	"TrackChangesEnabled":   true,
 	"LlmShowReasoning":      true,
 	"MemoryEnabled":         true,
 	"MemoryAutoExtract":     true,
@@ -229,6 +230,8 @@ func liveSetting(cfg config.Config, name string) any {
 	switch name {
 	case "VisualQaEnabled":
 		return cfg.VisualQaEnabled
+	case "TrackChangesEnabled":
+		return cfg.TrackChangesEnabled
 	case "LlmShowReasoning":
 		return cfg.LlmShowReasoning
 	case "MemoryEnabled":

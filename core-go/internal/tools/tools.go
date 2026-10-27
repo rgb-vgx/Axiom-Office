@@ -54,6 +54,8 @@ var noDocumentChange = map[string]bool{
 	// Loc chi an hang (khong doi noi dung): ket qua doc sau do van dung.
 	"et.filter":           true,
 	"writer.listComments": true, "writer.listRevisions": true,
+	// Bat/tat theo doi thay doi (Core goi dau/cuoi luot): khong doi noi dung.
+	"writer.setTracking": true,
 }
 
 // ChangesDocument: lenh nay co lam doi noi dung tai lieu dang mo khong.

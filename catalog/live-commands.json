@@ -3172,6 +3172,40 @@
         "hint": "true = every revision"
       },
       {
+        "name": "since",
+        "required": false,
+        "hint": "only revisions made at or after this time (ISO 8601), with author"
+      },
+      {
+        "name": "document",
+        "required": false,
+        "hint": "full path of the document to work on; default: the active one"
+      }
+    ]
+  },
+  {
+    "name": "writer.setTracking",
+    "kind": "wps",
+    "agent": false,
+    "undo": false,
+    "summary": "Bật/tắt theo dõi thay đổi; `author` = tên tác giả của các thay đổi trong lúc bật, `restoreAuthor` trả lại tên cũ",
+    "params": [
+      {
+        "name": "on",
+        "required": true,
+        "hint": "true/false: Document.TrackRevisions"
+      },
+      {
+        "name": "author",
+        "required": false,
+        "hint": null
+      },
+      {
+        "name": "restoreAuthor",
+        "required": false,
+        "hint": "true = put back the user's name"
+      },
+      {
         "name": "document",
         "required": false,
         "hint": "full path of the document to work on; default: the active one"

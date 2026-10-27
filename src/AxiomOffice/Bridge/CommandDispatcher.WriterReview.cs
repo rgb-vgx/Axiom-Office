@@ -35,7 +35,75 @@ namespace AxiomOffice.Bridge
                     Opt("author", "only revisions by this author"), Opt("max", "default 200")).ForAgent(),
                 Command("writer.reviewRevisions", "wps", WriterReviewRevisions,
                     "Chấp nhận hoặc từ chối thay đổi được theo dõi: theo `ids` (từ writer.listRevisions), theo `author`, hoặc `all: true`",
-                    Req("action", "accept | reject"), Opt("ids", "array of revision ids"), Opt("author"), Opt("all", "true = every revision")).ForAgent(),
+                    Req("action", "accept | reject"), Opt("ids", "array of revision ids"), Opt("author"), Opt("all", "true = every revision"),
+                    Opt("since", "only revisions made at or after this time (ISO 8601), with author")).ForAgent(),
+                // Chế độ "AI sửa bằng Track Changes" (W4): Core bật ở đầu lượt, trả lại ở cuối lượt - không cho agent.
+                Command("writer.setTracking", "wps", WriterSetTracking,
+                    "Bật/tắt theo dõi thay đổi; `author` = tên tác giả của các thay đổi trong lúc bật, `restoreAuthor` trả lại tên cũ",
+                    Req("on", "true/false: Document.TrackRevisions"), Opt("author"), Opt("restoreAuthor", "true = put back the user's name")),
+            };
+        }
+
+        // Tên người dùng Office trước khi Core đổi sang tác giả "Axiom AI" (một process Word, một lượt chạy tại một thời điểm).
+        private static string _savedUserName;
+        private static string _savedUserInitials;
+        private static bool? _savedUseLocalUserInfo;
+
+        private static Dictionary<string, object> WriterSetTracking(IAppHost host, Dictionary<string, object> p)
+        {
+            bool on = ParamBool(p, "on", true);
+            string author = (ParamString(p, "author", null) ?? "").Trim();
+            dynamic app = host.Application;
+            dynamic doc = app.ActiveDocument;
+            bool previous = Convert.ToBoolean(doc.TrackRevisions);
+            if (author.Length > 0)
+            {
+                if (_savedUserName == null)
+                {
+                    _savedUserName = Convert.ToString(app.UserName) ?? "";
+                    _savedUserInitials = Convert.ToString(app.UserInitials) ?? "";
+                    try
+                    {
+                        // Microsoft 365 ghi tác giả theo tài khoản đăng nhập trừ khi bật "dùng tên này bất kể đăng nhập".
+                        _savedUseLocalUserInfo = Convert.ToBoolean(app.Options.UseLocalUserInfo);
+                        app.Options.UseLocalUserInfo = true;
+                    }
+                    catch
+                    {
+                        _savedUseLocalUserInfo = null;
+                    }
+                }
+                app.UserName = author;
+                try
+                {
+                    app.UserInitials = "AI";
+                }
+                catch
+                {
+                }
+            }
+            if (ParamBool(p, "restoreAuthor", false) && _savedUserName != null)
+            {
+                app.UserName = _savedUserName;
+                try
+                {
+                    app.UserInitials = _savedUserInitials;
+                    if (_savedUseLocalUserInfo.HasValue)
+                    {
+                        app.Options.UseLocalUserInfo = _savedUseLocalUserInfo.Value;
+                    }
+                }
+                catch
+                {
+                }
+                _savedUserName = null;
+                _savedUserInitials = null;
+                _savedUseLocalUserInfo = null;
+            }
+            doc.TrackRevisions = on;
+            return new Dictionary<string, object>
+            {
+                { "tracking", Convert.ToBoolean(doc.TrackRevisions) }, { "previous", previous }, { "author", Convert.ToString(app.UserName) ?? "" }
             };
         }
 
@@ -431,6 +499,18 @@ namespace AxiomOffice.Bridge
             List<string> ids = ParamStrings(p, "ids");
             string author = (ParamString(p, "author", null) ?? "").Trim();
             bool all = ParamBool(p, "all", false);
+            DateTime since = DateTime.MinValue;
+            string sinceText = ParamString(p, "since", null);
+            if (!string.IsNullOrWhiteSpace(sinceText))
+            {
+                if (!DateTime.TryParse(sinceText, System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out since))
+                {
+                    throw new ArgumentException("'since' must be an ISO 8601 time, e.g. 2026-10-27T08:30:00Z");
+                }
+                // Revision.Date là giờ máy, làm tròn tới phút: so theo giờ máy, lùi một phút cho chắc.
+                since = since.ToLocalTime().AddMinutes(-1);
+            }
             if ((ids == null || ids.Count == 0) && author.Length == 0 && !all)
             {
                 throw new ArgumentException("give 'ids' (from writer.listRevisions), 'author', or 'all': true");
@@ -444,8 +524,20 @@ namespace AxiomOffice.Bridge
             foreach (KeyValuePair<string, dynamic> pair in revisions)
             {
                 string who = Convert.ToString(pair.Value.Author) ?? "";
-                if (all || wanted.Contains(pair.Key)
-                    || (author.Length > 0 && string.Equals(who, author, StringComparison.CurrentCultureIgnoreCase)))
+                bool byAuthor = author.Length > 0 && string.Equals(who, author, StringComparison.CurrentCultureIgnoreCase);
+                if (byAuthor && since > DateTime.MinValue)
+                {
+                    DateTime when = DateTime.MinValue;
+                    try
+                    {
+                        when = Convert.ToDateTime(pair.Value.Date);
+                    }
+                    catch
+                    {
+                    }
+                    byAuthor = when >= since;
+                }
+                if (all || wanted.Contains(pair.Key) || byAuthor)
                 {
                     targets.Add(pair);
                 }

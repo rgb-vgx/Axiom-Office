@@ -60,7 +60,16 @@ type Run struct {
 	// dung chung nay buoc (tools.RunContext.UndoSteps).
 	UndoSteps int
 	// EditSteps: so lenh sua chac chan cua luot tren moi app (tools.RunContext.EditSteps).
-	EditSteps     int
+	EditSteps int
+	// Tracking: luot sua bang Track Changes (tracking.go) - tac gia, thoi diem bat, trang thai theo doi truoc luot, tai lieu.
+	Tracking         bool
+	TrackingPrevious bool
+	TrackingAuthor   string
+	TrackingSince    time.Time
+	TargetDocument   string
+	trackingStopped  bool
+	// undone: "Hoan tac luot nay" da chay (POST /v1/runs/{id}/undo) - khong cho lan hai.
+	undone        bool
 	Transcript    []string
 	Events        *EventStream
 	Confirmations *Confirmations
@@ -152,6 +161,8 @@ func (r *Run) JSON() map[string]any {
 		"toolCalls":      r.ToolCalls,
 		"undoSteps":      r.UndoSteps,
 		"editSteps":      r.EditSteps,
+		"undoMode":       r.undoMode(),
+		"tracking":       r.Tracking,
 		"lastEvent":      r.Events.LastSeq(),
 		"transcript":     transcript,
 	}
@@ -218,6 +229,18 @@ func (m *Manager) CancelRunning() int {
 		cancelled++
 	}
 	return cancelled
+}
+
+// BusyPort: co luot dang chay tren office port nay khong.
+func (m *Manager) BusyPort(port int) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, run := range m.runs {
+		if run.Port == port && run.CurrentStatus() == StatusRunning {
+			return true
+		}
+	}
+	return false
 }
 
 // Running: so luot con dang chay (Core cho chung dung han truoc khi thoat).

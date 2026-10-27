@@ -41,6 +41,7 @@ namespace AxiomOffice.Ai
         public int Round;       // run.reasoning: vòng chạy đã sinh ra phần suy luận này
         public int UndoSteps = -1;  // sự kiện kết thúc lượt: số bước hoàn tác Word của lượt (-1 = Core không báo)
         public int EditSteps = -1;  // sự kiện kết thúc lượt: số lệnh sửa tài liệu của lượt, mọi app (-1 = Core không báo)
+        public string UndoMode;     // sự kiện kết thúc lượt: "revisions" (lượt sửa bằng Track Changes) | "steps"
     }
 
     // Client HTTP + SSE toi AxiomOffice.Core.exe: tim Core qua core.json, khoi dong khi can (muc 7.1),
@@ -293,6 +294,29 @@ namespace AxiomOffice.Ai
 
             var first = items[0] as Dictionary<string, object>;
             return first != null && first.ContainsKey("id") ? Convert.ToString(first["id"]) : null;
+        }
+
+        // "Hoàn tác lượt này" qua Core (POST /v1/runs/{id}/undo): Core biết lượt có sửa bằng Track Changes không (từ chối
+        // đúng revision của lượt) và số bước hoàn tác chắc chắn của lượt.
+        public bool UndoRun(string runId, out string error)
+        {
+            error = null;
+            if (string.IsNullOrEmpty(runId))
+            {
+                error = "no run";
+                return false;
+            }
+            string baseUrl;
+            lock (_sync)
+            {
+                baseUrl = _baseUrl;
+            }
+            if (baseUrl == null)
+            {
+                error = "Agent Core is not running";
+                return false;
+            }
+            return PostJson(baseUrl + "/v1/runs/" + runId + "/undo", "{}", 60000, CancellationToken.None, out error) != null;
         }
 
         // Yeu cau Core dung luot chay (ngoai viec huy request SSE dang cho).
@@ -670,6 +694,11 @@ namespace AxiomOffice.Ai
                     item.EditSteps = Convert.ToInt32(data["editSteps"]);
                 }
 
+                if (data.ContainsKey("undoMode") && data["undoMode"] != null)
+                {
+                    item.UndoMode = Convert.ToString(data["undoMode"]);
+                }
+
                 if (data.ContainsKey("round"))
                 {
                     item.Round = Convert.ToInt32(data["round"]);
@@ -832,6 +861,11 @@ namespace AxiomOffice.Ai
             if (item.EditSteps >= 0)
             {
                 result.EditSteps = item.EditSteps;
+            }
+
+            if (!string.IsNullOrEmpty(item.UndoMode))
+            {
+                result.UndoMode = item.UndoMode;
             }
 
             switch (item.Type)
