@@ -1,8 +1,8 @@
 # Báo cáo kiểm thử Windows: Office thật — Track Changes, Pivot, other_document (windows-2)
 
-Ngày test: **28/10/2026** · nhánh **`windows-2`**, base `origin/main` @ `ccb8820` · HEAD khi đóng báo cáo:
-`181b988` (5 commit sửa lỗi/test) · phạm vi: bridge C# cho Microsoft Office + Agent Core Go, _kiểm thử trên
-Microsoft 365 thật trên Windows_ (không phải e2e giả lập).
+Ngày test: **28/10/2026** · nhánh **`windows-2`**, base `origin/main` @ `ccb8820` · HEAD mã nguồn khi đóng
+báo cáo: `181b988` (5 commit sửa lỗi/test) + commit báo cáo `71c9506` · phạm vi: bridge C# cho Microsoft
+Office + Agent Core Go, _kiểm thử trên Microsoft 365 thật trên Windows_ (không phải e2e giả lập).
 
 Mục tiêu phiên: (1) build + cài bản `main` mới (mã C# của đợt Track Changes/Pivot/other_document chưa từng được
 biên dịch); (2) chạy 4 suite theo yêu cầu; (3) kiểm tay các lệnh mới; (4) sửa lỗi tối thiểu, mỗi lỗi một commit;
