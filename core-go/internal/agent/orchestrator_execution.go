@@ -128,7 +128,7 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 	}
 	assembled := o.Assembler.Assemble(conversation, before, 10)
 
-	catalog := o.Bridge.GetCommands(ctx, request.Port, false)
+	catalog := o.Bridge.GetCommandsFor(ctx, request.Port, appKind, false)
 	if catalog == nil {
 		o.fail(run, "cannot read GET /commands from the bridge (uninstall/upgrade the add-in?)", "office")
 		o.finish(run)

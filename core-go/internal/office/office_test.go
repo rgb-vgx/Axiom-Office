@@ -170,6 +170,52 @@ func TestBridgeCommandAndCatalogCache(t *testing.T) {
 	}
 }
 
+func TestBridgeCatalogCacheSplitsByApp(t *testing.T) {
+	// Bridge WPS dung MOT port cho ca ba app: doi app trong TTL 5 phut ma cache chi theo port thi
+	// agent nhan catalog cua app cu (kind khac) -> danh sach lenh rong. Cache phai tach theo app.
+	commands := 0
+	current := "wps"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-Auth-Token") != "tok" {
+			w.WriteHeader(401)
+			return
+		}
+		if r.URL.Path != "/commands" {
+			w.WriteHeader(404)
+			return
+		}
+		commands++
+		_, _ = w.Write([]byte(`{"ok":true,"result":{"version":"1.0.0","commands":[
+			{"name":"` + current + `.getText","kind":"` + current + `","agent":true,"params":[]}]}}`))
+	}))
+	defer server.Close()
+	port := portOf(t, server.URL)
+	client := NewBridgeClient(server.Client(), "tok")
+	ctx := context.Background()
+
+	writerCatalog := client.GetCommandsFor(ctx, port, "wps", false)
+	if writerCatalog == nil || !writerCatalog.Has("wps.getText") {
+		t.Fatalf("catalog wps = %+v", writerCatalog)
+	}
+	// Cung app: dung cache.
+	if again := client.GetCommandsFor(ctx, port, "wps", false); again != writerCatalog || commands != 1 {
+		t.Fatalf("cung app phai dung cache: goi /commands %d lan", commands)
+	}
+	// Doi app tren cung port: phai goi lai /commands, khong tra catalog cua Writer.
+	current = "et"
+	etCatalog := client.GetCommandsFor(ctx, port, "et", false)
+	if etCatalog == nil || !etCatalog.Has("et.getText") || etCatalog.Has("wps.getText") {
+		t.Fatalf("catalog et = %+v", etCatalog)
+	}
+	if commands != 2 {
+		t.Fatalf("doi app phai goi lai /commands, goi %d lan", commands)
+	}
+	// Quay lai app cu trong TTL: cache cua no van con dung.
+	if back := client.GetCommandsFor(ctx, port, "wps", false); back != writerCatalog || commands != 2 {
+		t.Fatalf("cache cua app cu phai con: goi %d lan", commands)
+	}
+}
+
 func portOf(t *testing.T, raw string) int {
 	t.Helper()
 	parsed, err := url.Parse(raw)
