@@ -5,6 +5,24 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Word/Excel P3: mẫu văn bản theo loại, dashboard, định dạng có điều kiện nâng cao (27/10/2026)
+
+- **Tool `doc_from_brief`**: văn bản mới theo loại (tờ trình, công văn, thông báo, biên bản, báo cáo, kế hoạch) đúng thể
+  thức NĐ 30/2020 - phần đầu, tên loại + trích yếu, Kính gửi, nội dung, nơi nhận, chữ ký, số trang/mục lục; chỗ thiếu
+  ghi "…" và báo `placeholders`. Lệnh nền `writer.insertLayoutTable` (bảng không viền, định dạng từng dòng).
+- **Tool `dashboard_from_data`**: sheet Dashboard với ô KPI là công thức đọc sheet dữ liệu và 1-4 biểu đồ đọc thẳng vùng
+  dữ liệu; `replace: true` dựng lại.
+- **Excel**: `et.setConditionalFormat {type}` - colorScale, dataBar, iconSet, top/bottom, aboveAverage/belowAverage,
+  duplicate/unique; `et.deleteSheet`; `et.formatRange {columnWidth}`; `et.addChart` nhận vùng rời mỗi phần có tên sheet.
+- Bộ đo `tests/bench/office` thêm 4 ca P3 (26 ca); test live `tests/live/test_office_templates.py`.
+
+### Fixed — P3 (27/10/2026)
+
+- Core: lệnh gọi có đối số không phải JSON (model cắt giữa chừng) không chạy và không gửi lại chuỗi hỏng trong lịch sử
+  (nhà cung cấp từ chối cả request, HTTP 400).
+- `et.setConditionalFormat` gọi lại chỉ thay rule có vùng áp dụng trùng khít, không xoá rule của vùng chồng một phần.
+- `et.deleteSheet` hỏi người dùng khi sheet có dữ liệu và không do lượt tạo.
+
 ### Added — Word/Excel P2: tự soát phân trang, viết cả mục một lệnh (27/10/2026)
 
 - **`writer.writeContent`**: nhiều khối (tiêu đề, đoạn căn đều, gạch đầu dòng / danh sách số thật, bảng kèm chú thích,

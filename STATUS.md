@@ -297,11 +297,17 @@ trúc không dây cắt hộp. Sửa: sơ đồ lồng trong khoá `diagram`, `r
   `deleteParagraphs`, `addTableRows`; bảng nhỏ tự giữ trên một trang; Excel `checkRange` không range soát ô lỗi mọi
   sheet. Đo 6 ca: **6/6** - đề A đạt lần đầu (18 vòng, 8 trang; trước 60 vòng, 11 trang), `w09` 15 vòng (trước 81),
   `w02` hết trang trắng. `test_writer_format.py` 19/19 (lỗi "căn đều" là lỗi của test: style Normal đã căn đều).
+- **P3 xong** (plan 21 §5.4): tool `doc_from_brief` (tờ trình, công văn, thông báo, biên bản, báo cáo, kế hoạch đúng thể
+  thức NĐ 30; lệnh nền `writer.insertLayoutTable`), tool `dashboard_from_data` (KPI là công thức đọc sheet dữ liệu, biểu
+  đồ đọc thẳng), `et.setConditionalFormat` kiểu trực quan (thang màu, thanh dữ liệu, biểu tượng, top/bottom...),
+  `et.deleteSheet`; Core không gửi lại đối số JSON hỏng (trước đó HTTP 400 hỏng cả lượt). Bộ đo 26 ca (+4 ca P3); đo 7
+  ca: **6/7** - `w01` 2 vòng (trước 15), đề B còn hết 60 vòng (định dạng từng ô).
 
 ## 3. Chưa làm / chưa kiểm chứng
 
 | Việc | Tình trạng | Ghi chú |
 |---|---|---|
+| **Đo lại trọn bộ 26 ca Word/Excel** (plan 21 §1: 22 ca + 4 ca P3) sau P0–P3 | **Chưa (để sau)** | Mới đo từng nhóm ca, mỗi ca 1 lần (§5.1–5.4); cần một lượt đủ 26 ca, mỗi ca 3 lần, `ocg/beam-free`, so với baseline 13/22 (`results/baseline-beam-free-2026-10-26/`) |
 | **Wizard Windows bấm tay trong Word/Excel/WPS** | **Đã (24/10/2026, trong Word x64)** | Lưu cấu hình + `Thử ngay` OK (§2.9) |
 | e2e `--office` (Office thật + add-in, `test_office`) | **Đã chạy 24/10/2026** | Excel x64: 6/6 (§2.9) |
 | Trích xuất memory với **LLM thật** | **Đã (24/10/2026)** | Lượt thật trích 1 fact (`core.log`: `1 added`) |

@@ -491,6 +491,14 @@ func (o *Orchestrator) actTools(appKind string, catalog *office.CommandCatalog, 
 	if appKind == "wps" && !locked && catalog.Has("writer.insertBlocks") {
 		list = append(list, tools.NewDocDesignTool())
 	}
+	// Van ban moi theo loai, dung the thuc NĐ 30 (plan 21 P3): can bang dan trang dinh dang tung dong (Office Windows).
+	if appKind == "wps" && !locked && catalog.Has("writer.insertLayoutTable") && catalog.Has("writer.writeContent") {
+		list = append(list, tools.NewDocFromBriefTool())
+	}
+	// Dashboard tu bang du lieu co san (plan 21 P3): o KPI la cong thuc, bieu do doc thang sheet du lieu.
+	if appKind == "et" && catalog.Has("et.addChart") && catalog.Has("et.formatRange") {
+		list = append(list, tools.NewDashboardFromDataTool())
+	}
 	// Danh sach viec (write_todos): chi khi lam that - lap ke hoach da tra ve ke hoach bang chu.
 	list = append(list, tools.NewTodoTool())
 	return list

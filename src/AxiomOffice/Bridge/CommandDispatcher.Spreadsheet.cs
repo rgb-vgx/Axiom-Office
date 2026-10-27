@@ -22,6 +22,9 @@ namespace AxiomOffice.Bridge
                 Command("et.addSheet", "et", EtAddSheet, "Thêm sheet mới (bỏ trống `name` thì đặt tên Sheet1, Sheet2...)",
                     Opt("name"), Opt("index", "0-based, default: append")).ForAgent(),
                 Command("et.renameSheet", "et", EtRenameSheet, "Đổi tên sheet", Req("sheet"), Req("name")).ForAgent(),
+                Command("et.deleteSheet", "et", EtDeleteSheet,
+                    "Xoá một sheet (sheet thừa như Sheet1 của sổ mới, sheet chính lượt này dựng sai); không xoá được sheet cuối cùng",
+                    Req("sheet")).ForAgent(),
                 Command("et.activateSheet", "et", EtActivateSheet, "Chuyển sheet", Req("sheet")).ForAgent(),
                 Command("et.readRange", "et", EtReadRange,
                     "Đọc vùng, ví dụ `A1:C10`; `formulas=true` trả về công thức (ô không có công thức = null)",
@@ -39,7 +42,8 @@ namespace AxiomOffice.Bridge
                     "Viết MỘT công thức vào ô góc trên-trái của `range` rồi điền ra cả vùng, tham chiếu tương đối tự dịch (dùng cho bảng nghìn dòng: đừng gửi từng ô)",
                     Req("range", "the whole area e.g. 'B2:H1000'"), Opt("formula", "written to the top-left cell first"), Opt("sheet")).ForAgent(),
                 Command("et.formatRange", "et", EtFormatRange, "Định dạng vùng (màu dạng `#RRGGBB`, `horizontal` left/center/right)",
-                    Req("range"), Opt("bold"), Opt("italic"), Opt("fontSize"), Opt("fontColor"), Opt("fillColor"), Opt("numFmt"), Opt("horizontal"), Opt("wrap"), Opt("sheet")).ForAgent(),
+                    Req("range"), Opt("bold"), Opt("italic"), Opt("fontSize"), Opt("fontColor"), Opt("fillColor"), Opt("numFmt"), Opt("horizontal"), Opt("wrap"),
+                    Opt("columnWidth", "width of the range's columns in characters, e.g. 20"), Opt("sheet")).ForAgent(),
                 Command("et.addChart", "et", EtAddChart,
                     "Chèn biểu đồ từ vùng dữ liệu; `type` column/bar/line/pie/area/scatter, `width`/`height` tính bằng cm",
                     Req("range", "source data e.g. 'A1:B13'"), Opt("type", "column (default)/bar/line/pie/area/scatter"),
@@ -49,8 +53,11 @@ namespace AxiomOffice.Bridge
                 Command("et.setConditionalFormat", "et", EtSetConditionalFormat,
                     "Đặt định dạng điều kiện cho vùng: `rules` là mảng rule, mỗi rule có operator "
                     + "(less/lessEqual/greater/greaterEqual/equal/notEqual/between/notBetween/formula), formula1, "
-                    + "formula2 (chỉ between), và bold/italic/fontColor/fillColor. Gọi lại trên cùng vùng thì THAY "
-                    + "rule cũ của vùng đó, nên nhiều rule trên một vùng phải để trong MỘT lần gọi",
+                    + "formula2 (chỉ between), và bold/italic/fontColor/fillColor; HOẶC `type` trực quan: colorScale "
+                    + "{colors: 2-3 màu thấp→cao}, dataBar {color}, iconSet {icons: 3arrows/3traffic/3flags/3symbols/"
+                    + "4arrows/5arrows}, top/bottom {rank, percent} + màu, aboveAverage/belowAverage + màu, duplicate/"
+                    + "unique + màu. Gọi lại trên cùng vùng thì THAY rule cũ của vùng đó, nên nhiều rule trên một vùng "
+                    + "phải để trong MỘT lần gọi",
                     Req("range"), Req("rules", "array of rule objects"), Opt("sheet")).ForAgent(),
                 Command("et.listConditionalFormats", "et", EtListConditionalFormats,
                     "Liệt kê định dạng điều kiện đang có (đọc lại để tự kiểm); bỏ trống `range` thì soi vùng đang dùng",
@@ -591,6 +598,11 @@ namespace AxiomOffice.Bridge
             {
                 range.WrapText = ParamBool(p, "wrap", false);
             }
+            // Ô số lớn cỡ chữ to hiện "####" khi cột hẹp (ô KPI của dashboard).
+            if (HasParam(p, "columnWidth"))
+            {
+                range.EntireColumn.ColumnWidth = Math.Max(1.0, Math.Min(255.0, ParamDouble(p, "columnWidth", 12.0)));
+            }
             return new Dictionary<string, object>
             {
                 { "sheet", Convert.ToString(sheet.Name) },
@@ -681,6 +693,40 @@ namespace AxiomOffice.Bridge
             return new Dictionary<string, object> { { "sheet", newName }, { "sheets", SheetNames(wb) } };
         }
 
+        // Bộ đo 27/10/2026 đề B ("đúng 4 sheet"): không có lệnh xoá sheet, model đổi tên Sheet1 qua lại hàng chục lần đến khi
+        // bị chặn. Core hỏi người dùng trước khi xoá sheet có dữ liệu mà không do lượt tạo (policy.go).
+        private static Dictionary<string, object> EtDeleteSheet(IAppHost host, Dictionary<string, object> p)
+        {
+            string name = ParamString(p, "sheet", null);
+            if (string.IsNullOrEmpty(name))
+            {
+                throw new InvalidOperationException("'sheet' is required");
+            }
+            dynamic app = host.Application;
+            dynamic wb = app.ActiveWorkbook;
+            var names = SheetNames(wb);
+            if (!names.Contains(name))
+            {
+                throw new InvalidOperationException("no sheet named '" + name + "' (sheets: " + string.Join(", ", names) + ")");
+            }
+            if (names.Count <= 1)
+            {
+                throw new InvalidOperationException("'" + name + "' is the only sheet - a workbook needs at least one");
+            }
+            // Excel hỏi "xoá vĩnh viễn?" bằng hộp thoại: tắt cảnh báo trong lúc xoá.
+            bool alerts = Convert.ToBoolean(app.DisplayAlerts);
+            try
+            {
+                app.DisplayAlerts = false;
+                wb.Worksheets[name].Delete();
+            }
+            finally
+            {
+                app.DisplayAlerts = alerts;
+            }
+            return new Dictionary<string, object> { { "deleted", name }, { "sheets", SheetNames(wb) } };
+        }
+
         // Kiểu biểu đồ theo tên người dùng gõ -> hằng số XlChartType của Excel.
         private static int ChartType(string kind)
         {
@@ -759,8 +805,31 @@ namespace AxiomOffice.Bridge
             // Vùng nguồn ở sheet khác ("Data!A1:C7", "'Kế hoạch'!A1:C7"): biểu đồ đặt trên `sheet`, dữ liệu đọc thẳng từ sheet
             // nguồn để tự cập nhật (bộ đo 26/10/2026 ca x09: trước phải chép dữ liệu sang Dashboard làm bảng trung gian).
             dynamic source = sheet;
+            // Vùng rời mỗi phần có tên sheet ("Data!A1:A13,Data!D1:D13" - bộ đo 27/10/2026 ca x11): bỏ tên sheet ở các phần
+            // sau; mọi phần phải cùng một sheet.
+            string[] areas = address.Split(',');
+            string prefix = null;
+            for (int i = 0; i < areas.Length; i++)
+            {
+                int mark = areas[i].LastIndexOf('!');
+                if (mark <= 0)
+                {
+                    continue;
+                }
+                string areaSheet = areas[i].Substring(0, mark).Trim();
+                if (prefix == null)
+                {
+                    prefix = areaSheet;
+                }
+                else if (!string.Equals(prefix.Trim('\''), areaSheet.Trim('\''), StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException("all parts of 'range' must be on one sheet, got '" + address + "'");
+                }
+                areas[i] = (i == 0 ? areaSheet + "!" : "") + areas[i].Substring(mark + 1).Trim();
+            }
+            address = string.Join(",", areas);
             string local = address;
-            int bang = address.LastIndexOf('!');
+            int bang = address.IndexOf('!');
             if (bang > 0)
             {
                 string sourceName = address.Substring(0, bang).Trim().Trim('\'').Replace("''", "'");
@@ -910,6 +979,17 @@ namespace AxiomOffice.Bridge
             var plan = new List<Dictionary<string, object>>();
             for (int i = 0; i < rules.Count; i++)
             {
+                string visual = NormalizeOperator(ParamString(rules[i], "type", ""));
+                if (visual.Length > 0 && visual != "cellvalue" && visual != "expression")
+                {
+                    CheckVisualRule(rules[i], visual, i);
+                    plan.Add(new Dictionary<string, object>
+                    {
+                        { "key", visual }, { "input", ParamString(rules[i], "type", visual) }, { "formula1", null },
+                        { "formula2", null }, { "rule", rules[i] }, { "visual", true }
+                    });
+                    continue;
+                }
                 string key = NormalizeOperator(ParamString(rules[i], "operator", "less"));
                 bool isFormula = key == "formula";
                 if (!isFormula && !ConditionalOperators.ContainsKey(key))
@@ -938,7 +1018,7 @@ namespace AxiomOffice.Bridge
                 });
             }
 
-            range.FormatConditions.Delete();        // thay rule cũ của vùng: gọi lại không chồng lên nhau
+            DeleteSameRangeConditions(range);       // thay rule cũ của ĐÚNG vùng này: gọi lại không chồng lên nhau
 
             var written = new List<object>();
             foreach (Dictionary<string, object> item in plan)
@@ -948,6 +1028,16 @@ namespace AxiomOffice.Bridge
                 string formula2 = Convert.ToString(item["formula2"]);
                 Dictionary<string, object> rule = (Dictionary<string, object>)item["rule"];
                 dynamic condition;
+                if (item.ContainsKey("visual"))
+                {
+                    condition = AddVisualCondition(range, wb, key, rule);
+                    if (VisualRuleTakesStyle(key))
+                    {
+                        ApplyConditionStyle(condition, rule);
+                    }
+                    written.Add(new Dictionary<string, object> { { "type", item["input"] } });
+                    continue;
+                }
                 if (key == "formula")
                 {
                     // Công thức trần: Excel nhận kèm dấu =, và không dùng toán tử.
@@ -961,24 +1051,7 @@ namespace AxiomOffice.Bridge
                 {
                     condition = range.FormatConditions.Add(XlCellValue, ConditionalOperators[key], formula1);
                 }
-                if (ParamBool(rule, "bold", false))
-                {
-                    condition.Font.Bold = true;
-                }
-                if (ParamBool(rule, "italic", false))
-                {
-                    condition.Font.Italic = true;
-                }
-                int? fontColor = ParseBgrColor(ParamString(rule, "fontColor", null));
-                if (fontColor.HasValue)
-                {
-                    condition.Font.Color = fontColor.Value;
-                }
-                int? fillColor = ParseBgrColor(ParamString(rule, "fillColor", null));
-                if (fillColor.HasValue)
-                {
-                    condition.Interior.Color = fillColor.Value;
-                }
+                ApplyConditionStyle(condition, rule);
                 // Trả đúng tên toán tử bên gọi đã viết ("greaterEqual"), như bản LibreOffice/WPS - không phải khoá
                 // so khớp viết thường.
                 written.Add(new Dictionary<string, object>
@@ -1024,7 +1097,11 @@ namespace AxiomOffice.Bridge
                 {
                 }
                 string operatorName = null;
-                if (type == XlExpression)
+                if (VisualTypeNames.ContainsKey(type))
+                {
+                    operatorName = VisualTypeNames[type];
+                }
+                else if (type == XlExpression)
                 {
                     // Điều kiện công thức không có Operator (đọc thuộc tính đó ném lỗi): trước đây trả null.
                     operatorName = "formula";

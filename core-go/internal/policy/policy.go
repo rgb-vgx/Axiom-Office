@@ -130,6 +130,10 @@ func Evaluate(ctx context.Context, action string, params map[string]any, prompt 
 		return Ask("Xoá slide khỏi bài thuyết trình")
 	}
 
+	if action == "et.deleteSheet" {
+		return Ask("Xoá sheet khỏi sổ tính")
+	}
+
 	if action == "wpp.deleteShapes" {
 		return Ask("Xoá hình/khung khỏi slide")
 	}
@@ -186,6 +190,32 @@ func BlankSlide(ctx context.Context, bridge *office.BridgeClient, port int, para
 	entry, _ := slides[0].(map[string]any)
 	shapes, ok := entry["shapes"].([]any)
 	return ok && len(shapes) == 0
+}
+
+// EmptySheet: sheet `params.sheet` khong co o nao co du lieu (vd Sheet1 trong cua so moi) - xoa khong mat gi nen khong
+// hoi. Doc bang et.sheetInfo (co co "empty" tung sheet); loi doc / khong thay sheet -> false (hoi).
+func EmptySheet(ctx context.Context, bridge *office.BridgeClient, port int, params map[string]any) bool {
+	name, _ := params["sheet"].(string)
+	if strings.TrimSpace(name) == "" {
+		return false
+	}
+	query := map[string]any{}
+	if book, ok := params["workbook"].(string); ok && strings.TrimSpace(book) != "" {
+		query["workbook"] = book
+	}
+	result := bridge.Command(ctx, port, "et.sheetInfo", query)
+	if !result.OK {
+		return false
+	}
+	sheets, _ := result.Result["sheets"].([]any)
+	for _, item := range sheets {
+		entry, _ := item.(map[string]any)
+		if entry["name"] == name {
+			empty, _ := entry["empty"].(bool)
+			return empty
+		}
+	}
+	return false
 }
 
 func WordLength(ctx context.Context, bridge *office.BridgeClient, port int) *int {

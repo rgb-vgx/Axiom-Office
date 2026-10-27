@@ -19,6 +19,8 @@ chung. Số liệu ở `tests/bench/results/`.
    lại nằm ở cuối danh sách (`test3-gaps.md`). Đừng làm hết dữ liệu rồi mới tới phân tích; dựng một
    nhánh dọc cho xong (dữ liệu → công thức → dashboard/checks) rồi mới nhân ra. Đối chiếu bằng
    `et.listSheets` với danh sách đề bài, và đọc lại vài ô của **từng** sheet để chắc nó không rỗng.
+   Sổ mới có sẵn `Sheet1`: đổi tên nó thành sheet đầu tiên của đề (`et.renameSheet`), hoặc xoá sheet thừa bằng
+   `et.deleteSheet` — đề nói "đúng N sheet" thì không để sheet thừa.
 
 2. **Ô giả định phải có GIÁ TRỊ trước khi công thức đọc nó.** Công thức trỏ vào ô trống **không báo
    lỗi** — Calc coi ô trống là 0, nên mô hình vẫn ra số và không ai biết nó đang chạy bằng 0. Đo được:
@@ -81,6 +83,9 @@ chung. Số liệu ở `tests/bench/results/`.
     KPI vẫn là công thức; thêm ít nhất một `et.addChart` đọc từ vùng KPI/tổng hợp, và đề nói "visual"
     / "Gantt" thì dựng phần hình (biểu đồ thanh theo ngày bắt đầu–thời lượng, hoặc ô tô màu bằng
     `et.setConditionalFormat` theo ngày) — không thay bằng một bảng ngày tháng.
+    Có tool `dashboard_from_data` thì dùng nó: một lần gọi dựng sheet Dashboard với ô KPI là **công thức**
+    trỏ sheet dữ liệu (`{label, column, agg, format}`) và 1-4 biểu đồ đọc thẳng vùng dữ liệu
+    (`{type, title, x, y: [...]}`) — không chép dữ liệu sang Dashboard, không gõ số KPI.
 
 ## Checklist trước khi trả lời
 

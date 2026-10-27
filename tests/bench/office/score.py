@@ -96,6 +96,10 @@ def score_word(path: str, brief: dict, use_app: bool) -> tuple[dict, list]:
         failed.append("tables>=%d" % expect["minTables"])
     if expect.get("captions") and report.get("captions", 0) < expect["captions"]:
         failed.append("captions>=%d (co %d)" % (expect["captions"], report.get("captions", 0)))
+    if expect.get("adminHeader") and not report.get("adminHeader"):
+        failed.append("phan dau NĐ30 (quoc hieu dam trong bang dan trang)")
+    if expect.get("recipients") and not report.get("recipients"):
+        failed.append("noi nhan")
     if expect.get("repeatHeader") and not report.get("tablesRepeatHeader"):
         failed.append("repeatHeader")
     if expect.get("minTableRows") and docx_table_rows(path) < expect["minTableRows"]:
@@ -174,7 +178,7 @@ def score_excel(path: str, brief: dict, use_app: bool) -> tuple[dict, list]:
         failed.append("cf doc %s (rule: %s)" % (expect["cfReferences"], [r["formula"] for r in rules][:3]))
     if expect.get("chartOn") and not (sheets.get(expect["chartOn"]) or {}).get("charts"):
         failed.append("chart tren %s" % expect["chartOn"])
-    if expect.get("chartOn") and (sheets.get(expect["chartOn"]) or {}).get("charts", 0) > 1:
+    if expect.get("chartOn") and (sheets.get(expect["chartOn"]) or {}).get("charts", 0) > expect.get("maxCharts", 1):
         failed.append("%d bieu do tren %s (thua)" % (sheets[expect["chartOn"]]["charts"], expect["chartOn"]))
     if expect.get("chartSource"):
         # Chi bieu do cua sheet de neu (chartOn): bieu do lac o sheet khac khong tinh (x09 lan dau, 26/10/2026).
@@ -182,6 +186,24 @@ def score_excel(path: str, brief: dict, use_app: bool) -> tuple[dict, list]:
         refs = [ref for s in holder for ref in s.get("chartRefs") or []]
         if not any(expect["chartSource"] in ref for ref in refs):
             failed.append("chart lay tu %s (refs %s)" % (expect["chartSource"], refs[:3]))
+    if expect.get("cfTypes"):
+        types = {rule["type"] for rule in rules}
+        # Phan tu la danh sach = mot trong cac kieu (vd to ca hang top 3: top10 hoac cong thuc RANK).
+        missing = [kind for kind in expect["cfTypes"] if not (set(kind) & types if isinstance(kind, list) else kind in types)]
+        if missing:
+            failed.append("cf kieu %s (co %s)" % (missing, sorted(types)))
+    if expect.get("chartsOn"):
+        want = expect["chartsOn"]
+        holder = sheets.get(want["sheet"]) or {}
+        if holder.get("charts", 0) < want.get("min", 1):
+            failed.append("charts tren %s >= %d (co %d)" % (want["sheet"], want.get("min", 1), holder.get("charts", 0)))
+        if want.get("source") and not all(want["source"] in ref for ref in holder.get("chartRefs", [])):
+            failed.append("chart doc %s (refs %s)" % (want["source"], holder.get("chartRefs", [])[:3]))
+    if expect.get("readsSheet"):
+        want = expect["readsSheet"]
+        count = ((sheets.get(want["sheet"]) or {}).get("readsSheets") or {}).get(want["source"], 0)
+        if count < want.get("min", 1):
+            failed.append("%s: cong thuc doc %s >= %d (co %d)" % (want["sheet"], want["source"], want.get("min", 1), count))
     if expect.get("recalc") and use_app:
         recalc = report.get("recalc") or {}
         if not recalc.get("moved"):

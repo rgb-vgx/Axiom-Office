@@ -269,6 +269,50 @@ Lệnh mới (C# `CommandDispatcher.WriterLayout.cs`; catalog + bản sinh), ch�
 
 Sau P2 cả 6 ca đều đạt (mỗi ca 1 lần đo). Toàn bộ 22 ca chưa đo lại một lượt.
 
+## 5.4 Kết quả P3 (27/10/2026, `results/p3*-beam-free-2026-10-27/`)
+
+Chỉ Office Windows (WPS để sau). Bộ đo thêm 4 ca P3: `w11` tờ trình, `w12` công văn, `x11` dashboard, `x12` tô màu theo
+mức (26 ca). `check_docx` tách bảng dàn trang (tem `AxiomLayout`) khỏi bảng dữ liệu, nhận phần đầu NĐ 30 và "Nơi nhận";
+`check_xlsx` đếm công thức đọc sheet khác (`readsSheets`); `score.py` thêm `adminHeader`, `recipients`, `cfTypes` (cho phép
+"một trong các kiểu"), `chartsOn`, `readsSheet`, `maxCharts`.
+
+- **Mẫu văn bản theo loại** - tool Core `doc_from_brief` (`core-go/internal/tools/doc_brief.go`): tờ trình, công văn,
+  thông báo, biên bản, báo cáo, kế hoạch đúng thể thức NĐ 30/2020. Model khai báo thông tin + nội dung (khối như
+  `writeContent`); tool dựng phần đầu (cơ quan chủ quản thường, cơ quan ban hành IN HOA đậm, số ký hiệu | quốc hiệu, tiêu
+  ngữ đậm, địa danh ngày tháng nghiêng - "05/02" theo NĐ 30), tên loại + trích yếu, Kính gửi, thông tin cuộc họp (biên
+  bản), nội dung, phần ký (nơi nhận | chức vụ, họ tên; biên bản: thư ký | chủ trì), số trang + mục lục (báo cáo, kế
+  hoạch), rồi `checkLayout`. Chỗ người dùng chưa cho → "…" + `placeholders`, không bịa. Từ chối tài liệu đã có chữ;
+  hỏng giữa chừng thì chỉ số bước `writer.undo`. Lệnh nền mới `writer.insertLayoutTable` (bảng không viền, định dạng
+  từng dòng trong ô).
+- **Dashboard dựng sẵn** - tool `dashboard_from_data` (`dashboard.go`): ô KPI là **công thức** đọc sheet dữ liệu
+  (`=SUM(Data!$B$2:$B$13)`, `{label, column, agg, format}`), 1-4 biểu đồ đọc thẳng vùng dữ liệu (cột x + cột y, vùng
+  rời), xếp lưới; sheet đã có chữ thì từ chối, `replace: true` dựng lại dashboard chính lượt đã dựng.
+  `et.formatRange {columnWidth}`, `et.deleteSheet` (sheet do lượt tạo hoặc trống thì xoá thẳng, sheet có dữ liệu của
+  người dùng thì hỏi), `et.addChart` nhận vùng rời mỗi phần có tên sheet (`Data!A1:A13,Data!D1:D13`).
+- **Định dạng có điều kiện nâng cao** - `et.setConditionalFormat {type}`: `colorScale` (`colors` hoặc
+  `minColor/maxColor`), `dataBar`, `iconSet`, `top`/`bottom {rank, percent}`, `aboveAverage`/`belowAverage`,
+  `duplicate`/`unique`; gọi lại chỉ thay rule **đúng vùng đó** (trước đây xoá cả rule của vùng chỉ chồng một phần).
+- **Core**: lệnh gọi có đối số không phải JSON (model cắt giữa chừng) không chạy, model nhận lỗi rõ, lịch sử gửi lại
+  mang `{}` - trước đó nhà cung cấp từ chối CẢ request (HTTP 400, ca `x11` lần đầu hỏng lượt).
+- Skill: `van-ban-hanh-chinh` (có `doc_from_brief` thì gọi ngay - lần đầu `w11` model kẹt gọi `writer.getText` 7 lần theo
+  checklist cũ), `bao-cao-du-lieu`, `mo-hinh-nhieu-sheet`.
+- Test: Go (bridge giả) `doc_brief_test.go`, `dashboard_test.go`, `TestInvalidArgumentsNotExecutedNorResent`; live
+  `tests/live/test_office_templates.py` (chạy cả test Go `-tags live` trên Office thật) **32/32**;
+  `test_live_commands.py --apps word,excel` 211/211; `test_office_layout.py` 22/22; `test_office_structure.py` 14/14.
+
+| Ca | Trước P3 | Lần đo P3 đầu | Sau sửa |
+|---|---|---|---|
+| w01 tờ trình ngắn | ✓ 15 vòng (P2) | **✓ 2 vòng** (`doc_from_brief`) | |
+| w09 biên bản 3 lượt | ✓ 15 vòng (P2) | ✓ 30 vòng | |
+| w11 tờ trình đúng thể thức | - | ✗ kẹt `getText` theo checklist skill cũ | **✓ 3 vòng** |
+| w12 công văn | - | **✓ 11 vòng** | |
+| x11 dashboard | - | ✗ đối số JSON bị cắt → HTTP 400 | ✗ dựng tay (không xoá/dựng lại được) → **✓ 17 vòng** (`deleteSheet`, `replace`) |
+| x12 tô màu theo mức | - | ✗ `top` trên cả hàng xoá thang màu B, thanh C | **✓ 22 vòng** |
+| b workbook 4 sheet | ✓ 51 vòng (P1) | ✗ đổi tên `Sheet1` qua lại (không có lệnh xoá sheet) | đủ mọi tiêu chí nhưng hết 60 vòng (20 `readRange`, 19 `formatRange` từng ô) |
+
+**Sau P3: 6/7 ca đạt** (mỗi ca 1 lần đo). Còn lại: đề B tốn vòng vì định dạng từng ô (gợi ý tiếp: định dạng nhiều vùng
+trong một lệnh).
+
 ## 6. Cách đo sau mỗi thay đổi
 
 1. Chạy lại đúng ca liên quan (`--only`), 3 lần với `ocg/beam-free`; ca P0 chạy cả bộ.

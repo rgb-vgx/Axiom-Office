@@ -181,6 +181,35 @@
       "expect": {"minFormulas": 12, "noErrors": true, "parameterCell": 0.105}
     },
     {
+      "id": "w11-to-trinh-the-thuc", "app": "word", "kind": "template",
+      "prompts": ["Soạn tờ trình đúng thể thức văn bản hành chính: Trường THPT Nguyễn Du (trực thuộc Sở Giáo dục và Đào tạo Hà Nội) trình Giám đốc Sở đề nghị cấp bổ sung 450 triệu đồng để sửa chữa 6 phòng học xuống cấp; hạng mục: thay mái tôn, sơn lại tường, thay hệ thống điện. Người ký: Hiệu trưởng (chưa có tên). Ngày 03/11/2026."],
+      "mustContain": ["TỜ TRÌNH", ["450 triệu", "450.000.000"], "6 phòng học", "Nơi nhận"],
+      "expect": {"adminHeader": true, "recipients": true, "maxFakeHeadings": 0}
+    },
+    {
+      "id": "w12-cong-van", "app": "word", "kind": "template",
+      "prompts": ["Soạn công văn của Công ty Cổ phần An Phát (Phòng Hành chính - Nhân sự soạn) gửi các phòng, ban đề nghị nộp báo cáo kết quả công tác quý III/2026 trước ngày 15/10/2026, gửi bản mềm qua email hcns@anphat.vn. Đúng thể thức văn bản hành chính."],
+      "mustContain": ["V/v", ["15/10/2026", "15 tháng 10 năm 2026"], "hcns@anphat.vn", "Nơi nhận"],
+      "expect": {"adminHeader": true, "recipients": true}
+    },
+    {
+      "id": "x11-dashboard", "app": "excel", "kind": "dashboard",
+      "seed": [
+        {"action": "et.renameSheet", "params": {"sheet": "Sheet1", "name": "Data"}},
+        {"action": "et.writeRange", "params": {"sheet": "Data", "range": "A1", "values": [["Tháng", "Doanh thu (triệu)", "Chi phí (triệu)", "Số đơn"], ["T1", 820, 610, 412], ["T2", 760, 590, 380], ["T3", 910, 640, 455], ["T4", 880, 650, 440], ["T5", 950, 690, 470], ["T6", 1020, 720, 505], ["T7", 990, 700, 490], ["T8", 1080, 760, 532], ["T9", 1120, 780, 550], ["T10", 1050, 750, 521], ["T11", 1180, 820, 580], ["T12", 1260, 870, 610]]}}
+      ],
+      "prompts": ["Từ dữ liệu ở sheet Data, tạo sheet Dashboard gồm: tổng doanh thu, tổng chi phí, số đơn trung bình mỗi tháng (các ô này phải tự cập nhật khi Data đổi), một biểu đồ cột doanh thu và chi phí theo tháng, một biểu đồ đường số đơn theo tháng."],
+      "mustKeepCells": {"B2": 820, "D13": 610},
+      "expect": {"sheets": ["Data", "Dashboard"], "chartsOn": {"sheet": "Dashboard", "min": 2, "source": "Data"}, "readsSheet": {"sheet": "Dashboard", "source": "Data", "min": 3}}
+    },
+    {
+      "id": "x12-to-mau-theo-muc", "app": "excel", "kind": "conditional",
+      "seed": [{"action": "et.writeRange", "params": {"range": "A1", "values": [["Họ tên", "Điểm TB", "Chuyên cần (%)"], ["Nguyễn An", 6.8, 92], ["Nguyễn Bình", 8.9, 98], ["Nguyễn Chi", 7.4, 85], ["Nguyễn Dũng", 5.9, 76], ["Nguyễn Hà", 9.3, 100], ["Nguyễn Khánh", 7.8, 95], ["Nguyễn Lan", 8.1, 90], ["Nguyễn Minh", 6.2, 81], ["Nguyễn Nam", 9.0, 97], ["Nguyễn Phương", 7.1, 88], ["Nguyễn Quang", 8.6, 94], ["Nguyễn Thảo", 5.4, 70]]}}],
+      "prompts": ["Trong bảng điểm đang mở: tô thang màu cho cột Điểm TB (thấp màu đỏ, cao màu xanh), làm nổi bật 3 học sinh có Điểm TB cao nhất bằng nền xanh lá nhạt, và thêm thanh dữ liệu cho cột Chuyên cần."],
+      "mustKeepCells": {"B2": 6.8, "C13": 70},
+      "expect": {"cfTypes": ["colorScale", ["top10", "expression"], "dataBar"]}
+    },
+    {
       "id": "a-word-bao-cao-ai-agent", "app": "word", "kind": "flagship", "timeout": 1800,
       "promptFile": "tests/live/tasks/word-bao-cao-ai-agent.md",
       "expect": {"toc": true, "pageNumber": true, "minHeadings": {"1": 6, "2": 6}, "maxFakeHeadings": 0, "minTables": 2, "captions": 2, "noBlankPage": true, "pagesBetween": [6, 9]}
@@ -188,7 +217,7 @@
     {
       "id": "b-excel-ngan-sach-du-an", "app": "excel", "kind": "flagship", "timeout": 1800,
       "promptFile": "tests/live/tasks/excel-ngan-sach-du-an.md",
-      "expect": {"sheets": ["Dashboard", "Project_Data", "Monthly_Budget", "Config"], "noErrors": true, "frozen": true, "autoFilter": true, "listValidation": true, "conditional": true, "chartOn": "Dashboard", "recalc": {"source": "Monthly_Budget", "target": "Dashboard"}}
+      "expect": {"sheets": ["Dashboard", "Project_Data", "Monthly_Budget", "Config"], "noErrors": true, "frozen": true, "autoFilter": true, "listValidation": true, "conditional": true, "chartOn": "Dashboard", "maxCharts": 3, "recalc": {"source": "Monthly_Budget", "target": "Dashboard"}}
     }
   ]
 }

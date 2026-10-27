@@ -306,6 +306,7 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 			return done(false, "", failure.detail, "provider")
 		}
 
+		invalidArguments := dropInvalidArguments(turn)
 		if options.RepairToolCall != nil {
 			result.RepairedToolCalls += repairTurnToolCalls(turn, options.RepairToolCall)
 		}
@@ -322,7 +323,9 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 			toolStarted := time.Now()
 			var toolResult ToolResult
 			replacedBy := ""
-			if replaced, by := guards.beforeCall(loop, call); replaced != nil {
+			if original, invalid := invalidArguments[call.ID]; invalid {
+				toolResult, replacedBy = invalidArgumentsResult(call, original), "invalid-arguments"
+			} else if replaced, by := guards.beforeCall(loop, call); replaced != nil {
 				toolResult, replacedBy = *replaced, by
 			} else {
 				toolResult = safeExecute(runCtx, execute, call)

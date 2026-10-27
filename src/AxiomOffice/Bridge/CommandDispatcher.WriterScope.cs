@@ -49,7 +49,8 @@ namespace AxiomOffice.Bridge
             { "writer.setHeaderFooter", "changes the headers and footers of the whole document" },
             { "writer.insertCaption", "inserts a new paragraph" },
             { "writer.writeContent", "appends at the end of the document" },
-            { "writer.deleteParagraphs", "deletes whole paragraphs by number" }
+            { "writer.deleteParagraphs", "deletes whole paragraphs by number" },
+            { "writer.insertLayoutTable", "appends a table at the end of the document" }
         };
 
         // Lệnh THAY cả vùng chọn bằng chữ mới: vô hại với vùng chữ, nhưng nếu vùng chứa TRỌN một bảng thì bảng bị

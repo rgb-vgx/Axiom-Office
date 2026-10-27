@@ -33,6 +33,13 @@ apps: [et]
    giữ hàng tiêu đề; cột chỉ nhận vài giá trị → `et.setValidation {range, source: "Config!$A$2:$A$5"}`
    (hoặc `list`). Biểu đồ đọc thẳng vùng ở sheet khác: `et.addChart {sheet: "Dashboard", range:
    "Data!A1:C7"}` — không chép dữ liệu sang làm bảng trung gian.
+8. **Dashboard / trang tổng quan**: tool `dashboard_from_data {source: "Data!A1:E13", kpis, charts}` (ô KPI là
+   công thức, biểu đồ đọc thẳng sheet dữ liệu) thay cho tự ghi từng ô KPI và từng biểu đồ.
+9. **Tô màu theo mức** dùng kiểu trực quan của `et.setConditionalFormat` thay cho công thức tự viết: `colorScale`
+   (thang màu thấp→cao), `dataBar`, `iconSet {icons: "3traffic"}`, `top`/`bottom {rank: 3, fillColor}`,
+   `aboveAverage`, `duplicate {fillColor}`. Nhiều rule trên **cùng một vùng** phải gửi trong MỘT lần gọi (gọi lại trên
+   đúng vùng đó thì rule cũ bị thay; rule của vùng khác giữ nguyên). `top` xếp hạng MỌI ô của vùng: tô cả hàng của
+   top 3 thì dùng rule `formula` trên cả hàng, vd `{operator: "formula", formula1: "RANK($B2,$B$2:$B$13)<=3", fillColor}`.
 
 ## Checklist
 

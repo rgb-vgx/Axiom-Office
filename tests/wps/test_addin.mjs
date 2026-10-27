@@ -301,10 +301,12 @@ const CHUA_CO_HANDLER = {
   "writer.writeContent": "chi co trong add-in Windows (plan 21 P2); WPS de sau",
   "writer.deleteParagraphs": "chi co trong add-in Windows (plan 21 P2); WPS de sau",
   "writer.addTableRows": "chi co trong add-in Windows (plan 21 P2); WPS de sau",
+  "writer.insertLayoutTable": "chi co trong add-in Windows (plan 21 P3); WPS de sau",
   "writer.checkLayout": "chi co trong add-in Windows (plan 21 P2); WPS de sau",
   "et.createTable": "chi co trong add-in Windows (plan 21 P1); WPS de sau",
   "et.freezePanes": "chi co trong add-in Windows (plan 21 P1); WPS de sau",
   "et.setValidation": "chi co trong add-in Windows (plan 21 P1); WPS de sau",
+  "et.deleteSheet": "chi co trong add-in Windows (plan 21 P3); WPS de sau",
   // Nam lenh lam bai theo mau (docs/architecture/template-design.md muc 6.3): moi co tren PowerPoint (COM InsertFromFile,
   // Shape.Export); WPP chua kiem.
   "wpp.newFromTemplate": "chua co handler trong add-in (chi PowerPoint)",

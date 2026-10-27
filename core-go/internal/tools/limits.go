@@ -19,6 +19,8 @@ var CallLimits = map[string]int{
 	"tavily_search":             8,
 	"write_todos":               30,
 	"doc_design":                8,
+	"doc_from_brief":            4,
+	"dashboard_from_data":       4,
 	"mcp__office__ppt_get_text": 4,
 	"mcp__office__ppt_profile":  4,
 	"mcp__office__doc_get_text": 4,

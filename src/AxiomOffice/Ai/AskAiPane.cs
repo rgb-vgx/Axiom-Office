@@ -1062,6 +1062,7 @@ namespace AxiomOffice.Ai
             "writer.insertCaption",
             "writer.insertHyperlink",
             "writer.insertImage",
+            "writer.insertLayoutTable",
             "writer.insertPageBreak",
             "writer.insertStyledText",
             "writer.insertTable",

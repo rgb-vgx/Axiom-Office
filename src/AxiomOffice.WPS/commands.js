@@ -253,6 +253,15 @@
         { name: "paragraphs", required: true, hint: "array of paragraph numbers" },
         { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
       ] },
+    { name: "writer.insertLayoutTable", kind: "wps", agent: true, undo: true,
+      summary: "Bảng dàn trang KHÔNG viền ở CUỐI bài, định dạng từng dòng trong ô - phần đầu văn bản hành chính (cơ quan | quốc hiệu, tiêu ngữ, ngày tháng) và phần ký (nơi nhận | chức vụ, họ tên)",
+      params: [
+        { name: "rows", required: true, hint: "2D array of cells; a cell is a string ('\\n' = new line) or {lines: [string | {t, bold, italic, underline, size, upper}], align: center|left|right}" },
+        { name: "widths", required: false, hint: "column widths in percent, e.g. [40, 60]; default equal" },
+        { name: "font", required: false, hint: "default Times New Roman" },
+        { name: "size", required: false, hint: "default 13" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
     { name: "writer.undo", kind: "wps", agent: true, undo: false,
       summary: "Hoàn tác (mỗi thao tác AI = 1 bước)",
       params: [
@@ -301,6 +310,12 @@
       params: [
         { name: "sheet", required: true, hint: null },
         { name: "name", required: true, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
+      ] },
+    { name: "et.deleteSheet", kind: "et", agent: true, undo: false,
+      summary: "Xoá một sheet (sheet thừa như Sheet1 của sổ mới, sheet chính lượt này dựng sai); không xoá được sheet cuối cùng",
+      params: [
+        { name: "sheet", required: true, hint: null },
         { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
       ] },
     { name: "et.activateSheet", kind: "et", agent: true, undo: false,
@@ -362,11 +377,12 @@
         { name: "numFmt", required: false, hint: null },
         { name: "horizontal", required: false, hint: null },
         { name: "wrap", required: false, hint: null },
+        { name: "columnWidth", required: false, hint: "width of the range's columns in characters, e.g. 20" },
         { name: "sheet", required: false, hint: null },
         { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
       ] },
     { name: "et.setConditionalFormat", kind: "et", agent: true, undo: true,
-      summary: "Đặt định dạng điều kiện cho vùng: `rules` là mảng rule, mỗi rule có operator (less/lessEqual/greater/greaterEqual/equal/notEqual/between/notBetween/formula), formula1, formula2 (chỉ between), và styleName có sẵn (Good/Bad/Neutral/Warning/Error/...) hoặc bold/italic/fontColor/fillColor/numFmt. Gọi lại trên cùng vùng thì THAY rule cũ của vùng đó, nên nhiều rule trên một vùng phải để trong MỘT lần gọi",
+      summary: "Đặt định dạng điều kiện cho vùng: `rules` là mảng rule, mỗi rule có operator (less/lessEqual/greater/greaterEqual/equal/notEqual/between/notBetween/formula), formula1, formula2 (chỉ between), và bold/italic/fontColor/fillColor; HOẶC `type` trực quan: colorScale {colors: 2-3 màu thấp→cao}, dataBar {color}, iconSet {icons: 3arrows/3traffic/3flags/3symbols/4arrows/5arrows}, top/bottom {rank, percent} + màu, aboveAverage/belowAverage + màu, duplicate/unique + màu. Gọi lại trên cùng vùng thì THAY rule cũ của vùng đó, nên nhiều rule trên một vùng phải để trong MỘT lần gọi",
       params: [
         { name: "range", required: true, hint: null },
         { name: "rules", required: true, hint: "array of rule objects" },

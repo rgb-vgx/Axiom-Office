@@ -111,7 +111,7 @@ def check_package(path: str, required: list[str]) -> dict:
         root = ET.fromstring(package.read(part))
         info = {"formulas": 0, "constants": 0, "text": 0, "errors": [], "frozen": False, "autoFilter": False,
                 "tables": 0, "validations": [], "conditional": [], "charts": 0, "chartRefs": [], "inputFills": set(),
-                "formulaFills": set(), "formatKinds": {}, "formulaSamples": []}
+                "formulaFills": set(), "formatKinds": {}, "formulaSamples": [], "readsSheets": {}}
         for cell in root.iter(S + "c"):
             ref, kind_attr = cell.get("r"), cell.get("t")
             formula, value = cell.find(S + "f"), cell.find(S + "v")
@@ -122,6 +122,10 @@ def check_package(path: str, required: list[str]) -> dict:
                 info["formulas"] += 1
                 if formula.text and len(info["formulaSamples"]) < 6:
                     info["formulaSamples"].append("%s: =%s" % (ref, formula.text[:80]))
+                # Sheet khac ma cong thuc doc (dashboard: o KPI phai doc sheet du lieu).
+                for quoted, plain in re.findall(r"(?:'([^']+)'|([A-Za-z_][\w.]*))!", formula.text or ""):
+                    source = quoted or plain
+                    info["readsSheets"][source] = info["readsSheets"].get(source, 0) + 1
                 if style < len(backgrounds):
                     info["formulaFills"].add(backgrounds[style])
             elif value is not None:

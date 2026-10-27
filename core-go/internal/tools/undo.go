@@ -21,7 +21,7 @@ var noUndoStep = map[string]bool{
 	"writer.newDocument": true, "writer.open": true, "writer.closeAll": true,
 	"writer.lockSelection": true, "writer.unlockSelection": true,
 	"et.newWorkbook": true, "et.open": true, "et.closeAll": true, "et.sheetInfo": true, "et.activateSheet": true,
-	"et.listConditionalFormats": true, "et.listCharts": true,
+	"et.listConditionalFormats": true, "et.listCharts": true, "et.deleteSheet": true,
 	"wpp.newPresentation": true, "wpp.open": true, "wpp.closeAll": true, "wpp.newFromTemplate": true,
 	"wpp.sourceManifest": true, "wpp.renderSlide": true,
 }
@@ -74,4 +74,16 @@ func countUndoable(run *RunContext, action string, mutating bool, result map[str
 	case mutating && makesUndoStep(action):
 		run.undoable[app]++
 	}
+}
+
+// addUndoSteps: tool tu goi bridge (doc_from_brief, dashboard_from_data) - moi lenh sua da chay la mot buoc hoan tac
+// cua luot, de writer.undo / et.undo lui duoc phan tool vua dung.
+func (run *RunContext) addUndoSteps(action string, steps int) {
+	if steps <= 0 {
+		return
+	}
+	if run.undoable == nil {
+		run.undoable = map[string]int{}
+	}
+	run.undoable[undoApp(action)] += steps
 }

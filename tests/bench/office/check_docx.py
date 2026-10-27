@@ -149,7 +149,19 @@ def check_package(path: str) -> dict:
             if id(paragraph) not in in_tables and align not in ("center", "right", "end"):
                 fake.append(text[:60])
 
-    tables = list(body.iter(W + "tbl"))
+    # Bang dan trang (phan dau / phan ky van ban hanh chinh, tem AxiomLayout trong tblCaption): khong phai bang du lieu -
+    # khong can chu thich, khong lap hang tieu de.
+    all_tables = list(body.iter(W + "tbl"))
+
+    def layout_table(table) -> bool:
+        caption = table.find(W + "tblPr/" + W + "tblCaption")
+        return caption is not None and attr(caption, "val").startswith("AxiomLayout")
+    tables = [table for table in all_tables if not layout_table(table)]
+    layout_tables = [table for table in all_tables if layout_table(table)]
+    # Phan dau the thuc NĐ 30: quoc hieu IN HOA dam trong bang dan trang; phan ky co "Noi nhan".
+    admin_header = any(para_text(p).strip() == "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM" and run_props(p)[0]
+                       for table in all_tables for p in table.iter(W + "p"))
+    recipients = any(para_text(p).strip().startswith("Nơi nhận") for p in body.iter(W + "p"))
     repeat_header = sum(1 for table in tables if any(row.find(W + "trPr") is not None and
                                                      row.find(W + "trPr").find(W + "tblHeader") is not None
                                                      for row in table.iter(W + "tr")))
@@ -181,7 +193,8 @@ def check_package(path: str) -> dict:
         "paragraphs": paragraphs, "chars": chars, "headings": len(headings),
         "headingLevels": {str(n): sum(1 for h in headings if h["level"] == n) for n in (1, 2, 3)},
         "headingList": headings[:40], "fakeHeadings": fake[:20], "levelJumps": jumps,
-        "tables": len(tables), "tablesRepeatHeader": repeat_header, "captions": captions, "toc": toc,
+        "tables": len(tables), "layoutTables": len(layout_tables), "adminHeader": admin_header, "recipients": recipients,
+        "tablesRepeatHeader": repeat_header, "captions": captions, "toc": toc,
         "headerRefs": header_refs, "footerRefs": footer_refs, "pageField": page_field, "headerFooterText": header_text[:120],
         "pageBreaks": page_breaks, "maxEmptyParagraphs": max_empty, "drawings": drawings,
         "directFonts": sorted(fonts), "directSizesPt": sorted(size / 2 for size in sizes), "marginsCm": margins[:3],

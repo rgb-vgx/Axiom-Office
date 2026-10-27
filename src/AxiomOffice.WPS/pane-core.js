@@ -111,6 +111,7 @@
     "writer.insertCaption": true,
     "writer.insertHyperlink": true,
     "writer.insertImage": true,
+    "writer.insertLayoutTable": true,
     "writer.insertPageBreak": true,
     "writer.insertStyledText": true,
     "writer.insertTable": true,
