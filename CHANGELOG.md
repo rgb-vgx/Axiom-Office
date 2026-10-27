@@ -5,6 +5,23 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Tính năng theo Claude for Microsoft 365 (27/10/2026)
+
+Theo `docs/research/tinh-nang-con-thieu-so-voi-claude-m365.md` (trạng thái từng mục ở §6). **Lệnh C# mới chưa được
+biên dịch** trong môi trường làm việc; add-in WPS chưa có handler cho các lệnh C# mới (Core báo lệnh không có).
+
+- **Truy vết công thức** (`trace_formula`, Excel): lần ngược ô tiền lệ / hậu duệ qua nhiều sheet, chỉ ra ô lỗi gốc.
+- **Trích dẫn bấm được**: câu trả lời trích `[§12]`, `[Data!C42]`, `[slide 3]`; bấm trong khung chat thì nhảy tới đó
+  (`writer.goto`/`et.goto`/`wpp.goto`).
+- **Excel sắp xếp / lọc** (`et.sort`, `et.filter`): Core hỏi trước khi sắp xếp dữ liệu có sẵn hoặc khi có công thức sẽ
+  trỏ nhầm hàng sau khi sắp xếp.
+- **Word comment và revision**: đọc, thêm, trả lời, đóng comment; đọc và chấp nhận/từ chối revision (luôn hỏi trước).
+- **Chế độ Track Changes cho lượt AI** (`TrackChangesEnabled`, `options.trackChanges`): sửa của AI thành revision tác
+  giả "Axiom AI"; "Hoàn tác lượt này" (`POST /v1/runs/{id}/undo`) từ chối đúng các revision của lượt.
+- **Làm việc xuyên ứng dụng** (`other_document`): lượt đọc/sửa tài liệu Office khác đang mở; sửa thì hỏi một lần mỗi
+  tài liệu, tài liệu đang có lượt khác thì không sửa.
+- **PivotTable** (`et.pivot`) và **xuất biểu đồ thành ảnh** (`et.exportChart`) để chèn sang PowerPoint/Word.
+
 ### Changed — Agent Core: chỉ gửi tool hiếm dùng khi lượt cần tới (27/10/2026)
 
 Progressive disclosure: định nghĩa tool chiếm ~79% tiền tố gửi lại mỗi vòng (~21–22k ký tự mỗi app).

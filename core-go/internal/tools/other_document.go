@@ -11,7 +11,7 @@ import (
 	"axiomoffice/core/internal/office"
 )
 
-// Lam viec xuyen ung dung (docs/research/tinh-nang-con-thieu-so-voi-claude-m365.md X5): luot Word doc so lieu tu bang
+// Lam viec xuyen ung dung (docs/research/tinh-nang-con-thieu-so-voi-claude-m365.md C1): luot Word doc so lieu tu bang
 // Excel dang mo, luot PowerPoint lay noi dung tu bao cao Word... Moi tai lieu khac la mot phien Office (cong bridge) rieng.
 //
 //   - Tiet lo dan (disclosure.go): tool chi mang DANH SACH tai lieu khac; lenh cua app do chi tra ve khi model goi

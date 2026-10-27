@@ -252,6 +252,23 @@ trong lúc đó nhận 409.
 
 Mỗi bước thêm ca vào bộ đo `tests/bench/office` trước khi làm, theo đúng nguyên tắc của plan 21, và đo lại sau khi làm.
 
+## 6. Trạng thái triển khai (27/10/2026)
+
+Nhánh `claude/inspiring-davinci-1fxpeg`. **Mã C# chưa được biên dịch** (môi trường làm việc không có .NET SDK): phải
+qua CI Windows và chạy trên Office thật trước khi phát hành. Mã Go, JS và e2e Python đã chạy thật trên Linux.
+
+| # | Đã làm | Kiểm chứng | Còn lại |
+|---|---|---|---|
+| X2 | Tool `trace_formula` ở Core (`tools/trace_formula.go`, `formula_refs.go`) | Go test với bridge giả | — |
+| W1/X5/W5 | `writer.goto`/`et.goto`/`wpp.goto`; quy tắc trích dẫn trong prompt; link bấm được trong pane Windows và WPS | Go + test WPS (`test_addin_goto.mjs`, `test_pane.mjs`) | Build C#; thử trên Office thật |
+| X1 | `et.sort`/`et.filter` (C#); Core hỏi trước khi sắp xếp dữ liệu có sẵn hoặc khi công thức tham chiếu ra ngoài vùng theo hàng tương đối (`tools/sort_guard.go`) | Go test | Build C#; WPS chưa có handler |
+| W2/W3 | `writer.listComments/addComment/replyComment/resolveComment/editCommentScope`, `writer.listRevisions/reviewRevisions` (C#); policy hỏi trước khi duyệt revision, đóng comment khi người dùng không yêu cầu | Go test policy | Spike `Replies.Add` trên Word 2019; WPS chưa có handler |
+| W4 | `writer.setTracking` (C#, tác giả "Axiom AI", trả lại trạng thái cũ cuối lượt); `TrackChangesEnabled` / `options.trackChanges`; `POST /v1/runs/{id}/undo` từ chối revision của lượt (theo tác giả + thời điểm), lượt không theo dõi thì lùi `undoSteps`; nút "Hoàn tác lượt này" của pane Windows đi qua Core | Go test | **Spike tác giả** trên Microsoft 365 (`UseLocalUserInfo`); test live mục W4; WPS chưa có handler; chưa có công tắc trong pane (chỉ qua cấu hình) |
+| C1 | Tool `other_document` (`tools/other_document.go`) thay cho `office_action {target}` + `use_document` của thiết kế: mô tả tool liệt kê tài liệu khác đang mở, `action: "commands"` trả lệnh của app đó (tiết lộ dần), lệnh chạy qua `office_action` + `RunContext` riêng nên mọi guard áp dụng cho tài liệu đó | Go test + e2e `cross_app` (hai bridge giả) | Không khoá cổng thứ hai: sửa tài liệu đang có lượt khác chạy thì bị từ chối, và sửa tài liệu khác luôn hỏi người dùng một lần mỗi tài liệu mỗi lượt |
+| X3 | `et.pivot` (C#): PivotTable trên sheet mới, fallback `PivotTableWizard` | — | Build C#; thử trên Excel 2019; WPS chưa có handler |
+| P2 | `et.exportChart` (C#): xuất PNG vào thư mục tạm; agent chèn bằng `wpp.addImage`/`writer.insertImage` qua `other_document` (ảnh, không phải biểu đồ sửa được) | — | Build C#; biểu đồ gốc sửa được trong PowerPoint vẫn là spike |
+| C3, C4 | Không làm (ngoài phạm vi / chiến lược) | — | — |
+
 ## Nguồn
 
 - [Claude for Word — tài liệu chính thức](https://claude.com/docs/office-agents/word.md)

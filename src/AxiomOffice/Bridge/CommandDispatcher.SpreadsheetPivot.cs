@@ -6,7 +6,7 @@ using System.Reflection;
 
 namespace AxiomOffice.Bridge
 {
-    // PivotTable và xuất biểu đồ thành ảnh (docs/research/tinh-nang-con-thieu-so-voi-claude-m365.md X6, X7). PivotTable luôn
+    // PivotTable và xuất biểu đồ thành ảnh (docs/research/tinh-nang-con-thieu-so-voi-claude-m365.md X3, P2). PivotTable luôn
     // tạo trên sheet MỚI (không đè dữ liệu người dùng). Biểu đồ sang PowerPoint/Word: et.exportChart ghi PNG vào thư mục tạm,
     // agent chèn ảnh đó bằng wpp.addImage / writer.insertImage qua other_document - không cần clipboard giữa hai tiến trình.
     internal static partial class CommandDispatcher
