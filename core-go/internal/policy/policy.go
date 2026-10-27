@@ -59,6 +59,9 @@ var (
 		"not", "don't", "dont", "never", "no", "without", "avoid")
 )
 
+// resolveWords: cau lenh co yeu cau danh dau comment xong / dong comment.
+var resolveWords = regexp.MustCompile(`(?i)resolve|mark(ed)? (as )?done|đánh dấu (là )?(đã )?xong|đóng (các |những )?(comment|góp ý|bình luận)|đã xử lý xong`)
+
 func set(words ...string) map[string]bool {
 	result := make(map[string]bool, len(words))
 	for _, word := range words {
@@ -124,6 +127,20 @@ func Evaluate(ctx context.Context, action string, params map[string]any, prompt 
 				return Ask("Ghi đè file đã có: " + strings.TrimSpace(path))
 			}
 		}
+	}
+
+	// Chap nhan / tu choi thay doi duoc theo doi: dung toi chu cua nguoi khac (doi tac, dong nghiep) - luon hoi.
+	if action == "writer.reviewRevisions" {
+		verb := "Chấp nhận"
+		if value, _ := params["action"].(string); strings.EqualFold(strings.TrimSpace(value), "reject") {
+			verb = "Từ chối"
+		}
+		return Ask(verb + " thay đổi được theo dõi (track changes) trong tài liệu")
+	}
+
+	// Danh dau comment da xong: chi tu lam khi nguoi dung yeu cau; khong thi hoi (comment la cua nguoi gop y).
+	if action == "writer.resolveComment" && !resolveWords.MatchString(prompt) {
+		return Ask("Đánh dấu comment là đã xong")
 	}
 
 	if action == "wpp.deleteSlide" {

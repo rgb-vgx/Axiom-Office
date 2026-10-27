@@ -817,6 +817,58 @@
         { name: "sheet", required: false, hint: null },
         { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
       ] },
+    { name: "writer.listComments", kind: "wps", agent: true, undo: false,
+      summary: "Đọc comment của tài liệu: id, tác giả, nội dung, chữ được neo (anchor), số đoạn theo writer.outline, đã xong chưa, các trả lời",
+      params: [
+        { name: "includeDone", required: false, hint: "true = include resolved comments (default false)" },
+        { name: "max", required: false, hint: "default 100" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "writer.addComment", kind: "wps", agent: true, undo: true,
+      summary: "Thêm comment vào một đoạn (`paragraph` theo writer.outline) hoặc vào chỗ có chữ `find` (lần xuất hiện đầu)",
+      params: [
+        { name: "text", required: true, hint: null },
+        { name: "paragraph", required: false, hint: null },
+        { name: "find", required: false, hint: "exact text to anchor the comment to" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "writer.replyComment", kind: "wps", agent: true, undo: true,
+      summary: "Trả lời trong luồng của một comment (id theo writer.listComments); nội dung tự thêm tiền tố \"AI: \"",
+      params: [
+        { name: "comment", required: true, hint: "comment id from writer.listComments" },
+        { name: "text", required: true, hint: null },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "writer.resolveComment", kind: "wps", agent: true, undo: true,
+      summary: "Đánh dấu một comment là đã xong (`done: false` để mở lại)",
+      params: [
+        { name: "comment", required: true, hint: "comment id from writer.listComments" },
+        { name: "done", required: false, hint: "default true" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "writer.editCommentScope", kind: "wps", agent: true, undo: true,
+      summary: "Thay chữ ĐƯỢC NEO bởi một comment (sửa đúng chỗ người góp ý chỉ ra), giữ định dạng của ký tự đầu",
+      params: [
+        { name: "comment", required: true, hint: "comment id from writer.listComments" },
+        { name: "text", required: true, hint: "new text for the anchored passage" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "writer.listRevisions", kind: "wps", agent: true, undo: false,
+      summary: "Đọc các thay đổi được theo dõi (redline) - cả header/footer/chú thích: id, loại, tác giả, thời điểm, chữ, số đoạn",
+      params: [
+        { name: "author", required: false, hint: "only revisions by this author" },
+        { name: "max", required: false, hint: "default 200" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "writer.reviewRevisions", kind: "wps", agent: true, undo: true,
+      summary: "Chấp nhận hoặc từ chối thay đổi được theo dõi: theo `ids` (từ writer.listRevisions), theo `author`, hoặc `all: true`",
+      params: [
+        { name: "action", required: true, hint: "accept | reject" },
+        { name: "ids", required: false, hint: "array of revision ids" },
+        { name: "author", required: false, hint: null },
+        { name: "all", required: false, hint: "true = every revision" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
   ];
   // --- END SINH TU DONG ---
 

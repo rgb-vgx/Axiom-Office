@@ -1101,9 +1101,11 @@ namespace AxiomOffice.Ai
         // Lenh writer.* co `undo` trong catalog = dung mot buoc Undo (UndoRecordScope).
         private static readonly HashSet<string> WordEditActions = new HashSet<string>(StringComparer.Ordinal)
         {
+            "writer.addComment",
             "writer.addTableRows",
             "writer.appendText",
             "writer.deleteParagraphs",
+            "writer.editCommentScope",
             "writer.formatSelection",
             "writer.formatTable",
             "writer.heading",
@@ -1118,7 +1120,10 @@ namespace AxiomOffice.Ai
             "writer.insertToc",
             "writer.replaceAll",
             "writer.replaceMany",
+            "writer.replyComment",
+            "writer.resolveComment",
             "writer.restyle",
+            "writer.reviewRevisions",
             "writer.setHeaderFooter",
             "writer.setParagraphAlignment",
             "writer.setStyle",

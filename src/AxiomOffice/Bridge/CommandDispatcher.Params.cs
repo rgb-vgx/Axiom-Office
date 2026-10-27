@@ -555,13 +555,35 @@ namespace AxiomOffice.Bridge
 
             if (!string.IsNullOrEmpty(path))
             {
+                // Word 16.0.20527 (Windows) không còn suy diễn định dạng được khi chỉ truyền tên file:
+                // SaveAs2("x.docx") trên tài liệu mới -> "Incompatible file type and file extension".
+                // Do đó chọn định dạng theo phần mở rộng; tên file lệch (không đường dẫn) lùi về Documents\Axiom.
+                string full = ResolveSavePath(path);
+                int format = SaveFormatFor(kind, full);
+                // Excel/ET hỏi "file đã tồn tại, thay không?" bằng hộp thoại: tắt cảnh báo trong lúc lưu.
+                object alerts = null;
+                try { alerts = app.DisplayAlerts; } catch { }
                 try
                 {
-                    target.SaveAs2(path);
+                    SetAlertsOff(app, kind);
+                    if (format >= 0)
+                    {
+                        try { target.SaveAs2(full, format); }
+                        catch { target.SaveAs(full, format); }
+                    }
+                    else
+                    {
+                        // Phần mở rộng lạ: giữ hành vi cũ (để COM tự quyết, lỗi sẽ báo lên như trước).
+                        try { target.SaveAs2(full); }
+                        catch { target.SaveAs(full); }
+                    }
                 }
-                catch
+                finally
                 {
-                    target.SaveAs(path);
+                    if (alerts != null)
+                    {
+                        try { app.DisplayAlerts = alerts; } catch { }
+                    }
                 }
                 return new Dictionary<string, object>
                 {
@@ -570,12 +592,146 @@ namespace AxiomOffice.Bridge
                 };
             }
 
+            // Tài liệu chưa từng lưu (trên đĩa không có file): Save() sẽ khoe hộp thoại Save As
+            // làm treo bridge. Lưu luôn vào Documents\Axiom với định dạng mặc định của app đó.
+            try
+            {
+                string fullName = Convert.ToString(target.FullName);
+                if (string.IsNullOrEmpty(fullName) || !System.IO.File.Exists(fullName))
+                {
+                    string extension;
+                    int defFormat = DefaultSaveFormat(kind, out extension);
+                    string name = SanitizeFileName(System.IO.Path.GetFileName(fullName)) + extension;
+                    string full = System.IO.Path.Combine(DefaultSaveDir(), name);
+                    SetAlertsOff(app, kind);
+                    try { target.SaveAs2(full, defFormat); }
+                    catch { target.SaveAs(full, defFormat); }
+                    return new Dictionary<string, object>
+                    {
+                        { "saved", true },
+                        { "fullName", Convert.ToString(target.FullName) }
+                    };
+                }
+            }
+            catch (ArgumentException) { throw; }
+            catch (OutOfMemoryException) { throw; }
+            catch { /* Lưu thường như cũ để không đổi hành vi không cần thiết. */ }
+
             target.Save();
             return new Dictionary<string, object>
             {
                 { "saved", true },
                 { "fullName", Convert.ToString(target.FullName) }
             };
+        }
+
+        // Thư mục lưu mặc định khi 'path' chỉ mang tên file lệch (không có đường dẫn): Documents\Axiom.
+        private static string DefaultSaveDir()
+        {
+            return System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                "Axiom");
+        }
+
+        private static string ResolveSavePath(string path)
+        {
+            if (System.IO.Path.IsPathRooted(path))
+            {
+                return path;
+            }
+            if (string.IsNullOrWhiteSpace(System.IO.Path.GetFileName(path)))
+            {
+                throw new ArgumentException("'path' không hợp lệ, cần có tên file, ví dụ 'bao-cao.docx'");
+            }
+            string full = System.IO.Path.Combine(DefaultSaveDir(), path);
+            string folder = System.IO.Path.GetDirectoryName(full);
+            if (!string.IsNullOrEmpty(folder))
+            {
+                System.IO.Directory.CreateDirectory(folder);
+            }
+            return full;
+        }
+
+        // Mã định dạng lưu (WdSaveFormat/XlFileFormat/PpSaveAsFileType) theo phần mở rộng, ứng với từng app.
+        // Truyền cụ thể để không ngầm suy diễn - WPS Writer/ET/WPP cũng hiểu các mã này như Word/Excel/PowerPoint.
+        private static int SaveFormatFor(string kind, string path)
+        {
+            string ext = (System.IO.Path.GetExtension(path) ?? "").ToLowerInvariant();
+            switch (kind)
+            {
+                case "wps":
+                    switch (ext)
+                    {
+                        case ".doc": return 0;    // wdFormatDocument (Word 97-2003)
+                        case ".docx": return 16;  // wdFormatDocumentDefault
+                        case ".docm": return 13;  // wdFormatXMLDocumentMacroEnabled
+                        case ".rtf": return 6;    // wdFormatRTF
+                        case ".txt": return 7;    // wdFormatUnicodeText
+                        case ".pdf": return 17;   // wdFormatPDF
+                    }
+                    break;
+
+                case "et":
+                    switch (ext)
+                    {
+                        case ".xlsx": return 51;  // xlOpenXMLWorkbook
+                        case ".xlsm": return 52;  // xlOpenXMLWorkbookMacroEnabled
+                        case ".xltx": return 54;  // xlOpenXMLTemplate
+                        case ".xls": return 56;   // xlExcel8 (Excel 97-2003)
+                        case ".csv": return 62;   // xlCSVUTF8
+                        case ".ods": return 61;   // xlOpenDocumentSpreadsheet
+                        case ".pdf": return 57;   // xlTypePDF
+                    }
+                    break;
+
+                case "wpp":
+                    switch (ext)
+                    {
+                        case ".ppt": return 1;    // ppSaveAsPresentation (PowerPoint 97-2003)
+                        case ".pptx": return 24;  // ppSaveAsOpenXMLPresentation
+                        case ".pptm": return 25;  // ppSaveAsOpenXMLPresentationMacroEnabled
+                        case ".potx": return 26;  // ppSaveAsOpenXMLTemplate
+                        case ".ppsx": return 28;  // ppSaveAsOpenXMLShow
+                        case ".ppsm": return 29;  // ppSaveAsOpenXMLShowMacroEnabled
+                        case ".odp": return 31;   // ppSaveAsODP
+                        case ".pdf": return 32;   // ppSaveAsPDF
+                    }
+                    break;
+            }
+            return -1; // Phần mở rộng lạ: người gọi tự quyết, không can thiệp COM.
+        }
+
+        // Định dạng và phần mở rộng mặc định cho tài liệu chưa từng lưu (wps=docx, et=xlsx, wpp=pptx).
+        private static int DefaultSaveFormat(string kind, out string extension)
+        {
+            if (kind == "et") { extension = ".xlsx"; return 51; }
+            if (kind == "wpp") { extension = ".pptx"; return 24; }
+            extension = ".docx"; return 16;
+        }
+
+        private static string SanitizeFileName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return "tai-lieu";
+            }
+            foreach (char c in System.IO.Path.GetInvalidFileNameChars())
+            {
+                name = name.Replace(c, '_');
+            }
+            return name;
+        }
+
+        // Word cần WdAlertLevel (0 = tắt), Excel/ET là bool, PowerPoint là PpAlertLevel (1 = tắt).
+        private static void SetAlertsOff(dynamic app, string kind)
+        {
+            try
+            {
+                if (kind == "et") { app.DisplayAlerts = false; }
+                else if (kind == "wpp") { app.DisplayAlerts = 1; } // ppAlertsNone
+                else { app.DisplayAlerts = 0; } // wdAlertsNone
+            }
+            catch { }
         }
     }
 }

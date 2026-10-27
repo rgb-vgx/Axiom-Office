@@ -281,6 +281,13 @@ const CHUA_CO_HANDLER = {
   // Windows; WPS de sau khi do duoc API tren may Linux.
   "et.sort": "chi co trong add-in Windows (X1); WPS de sau",
   "et.filter": "chi co trong add-in Windows (X1); WPS de sau",
+  "writer.listComments": "chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc",
+  "writer.addComment": "chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc",
+  "writer.replyComment": "chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc",
+  "writer.resolveComment": "chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc",
+  "writer.editCommentScope": "chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc",
+  "writer.listRevisions": "chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc",
+  "writer.reviewRevisions": "chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc",
   // Bon lenh kind rong (agent=false) nam trong registry vi registry dung chung cho moi nen tang.
   // Ca bon DEU la lenh cua add-in o ban Windows (CommandDispatcher.cs: app.info, ai.ask, ui.askpane,
   // app.screenshot) - khong phai "Core tu lam roi add-in khong bao gio nhan". O add-in WPS chi
