@@ -31,7 +31,8 @@ namespace AxiomOffice.Bridge
             .Concat(PresentationCommands())
             .Concat(TemplateCommands())
             .Concat(ShapeCommands())
-            .Concat(CheckCommands()))
+            .Concat(CheckCommands())
+            .Concat(NavigationCommands()))
             .ToArray();
 
         private static readonly Dictionary<string, CommandInfo> CommandsByName =

@@ -777,6 +777,26 @@
         { name: "slide", required: false, hint: "slide number; default: every slide" },
         { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
       ] },
+    { name: "writer.goto", kind: "wps", agent: false, undo: false,
+      summary: "Chọn và cuộn tới một đoạn theo số của writer.outline (trích dẫn [§n] trong câu trả lời)",
+      params: [
+        { name: "paragraph", required: true, hint: "paragraph number from writer.outline" },
+        { name: "text", required: false, hint: "first words of the paragraph, to find it if numbering moved" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "et.goto", kind: "et", agent: false, undo: false,
+      summary: "Chọn và cuộn tới một ô/vùng (trích dẫn [Sheet!A1] trong câu trả lời)",
+      params: [
+        { name: "range", required: true, hint: "e.g. 'C42' or 'Data!C42'" },
+        { name: "sheet", required: false, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
+      ] },
+    { name: "wpp.goto", kind: "wpp", agent: false, undo: false,
+      summary: "Chuyển tới một slide (trích dẫn [slide n] trong câu trả lời)",
+      params: [
+        { name: "slide", required: true, hint: "slide number" },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
+      ] },
   ];
   // --- END SINH TU DONG ---
 

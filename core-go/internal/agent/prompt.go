@@ -149,6 +149,21 @@ func Base(appName string) string {
 		"After finishing, reply with a very short summary (1-2 sentences). Never invent tool results."
 }
 
+// CitationRule: trich dan cho nguoi dung bam de nhay toi cho do (pane goi writer.goto / et.goto / wpp.goto). Co dinh theo
+// app nen khong pha cache tien to. Chi trich so/o model THAY trong ket qua lenh doc - trich sai thi bam nhay sai cho.
+func CitationRule(appKind string) string {
+	switch appKind {
+	case "et":
+		return "Citations: when your answer points to specific cells, cite them as [Sheet!A1] or [Sheet!A1:B5] (the user " +
+			"can click them to jump there). Cite only cells you actually read."
+	case "wpp":
+		return "Citations: when your answer points to a specific slide, cite it as [slide n] (the user can click it to jump " +
+			"there). Cite only slides you actually read."
+	}
+	return "Citations: when your answer points to specific places in the document, cite them as [§n], where n is the " +
+		"paragraph number (field \"n\") from writer.outline; the user can click it to jump there. Cite only numbers you saw."
+}
+
 func AppName(appKind string) string {
 	switch appKind {
 	case "et":
@@ -260,7 +275,7 @@ func ConversationSection(summary string, recentLines []string) string {
 // Build: ghep system prompt theo thu tu on dinh de cache duoc (muc 8.8).
 func Build(appKind string, session *office.Session, document *DocumentContext, appSkills []skills.Definition,
 	memories []string, summary string, recentLines []string) string {
-	sections := []string{Base(AppName(appKind)), DocumentSection(session, document)}
+	sections := []string{Base(AppName(appKind)), CitationRule(appKind), DocumentSection(session, document)}
 	for _, section := range []string{
 		SkillsSection(appSkills),
 		MemorySection(memories),

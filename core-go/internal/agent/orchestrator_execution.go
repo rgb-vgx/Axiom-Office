@@ -147,6 +147,11 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 		officeTool = tools.NewReadOnlyOfficeActionTool(catalog, appKind)
 	}
 	list := []tools.Tool{officeTool}
+	// Truy vet cong thuc (chi doc, co ca o lap ke hoach): lam o Core tren et.readRanges/et.sheetInfo nen theo duoc tham chieu
+	// sang sheet khac tren moi backend (tools/trace_formula.go).
+	if appKind == "et" && catalog.Has("et.readRanges") && catalog.Has("et.sheetInfo") {
+		list = append(list, tools.NewTraceFormulaTool())
+	}
 	if !readOnly {
 		list = append(list, o.actTools(appKind, catalog, request)...)
 	}

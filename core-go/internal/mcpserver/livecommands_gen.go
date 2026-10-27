@@ -114,4 +114,7 @@ var liveCommands = []liveCommand{
 	{Name: "writer.checkLayout", Kind: "wps", Params: []liveCommandParam{{Name: "maxPages", Hint: "page limit the user asked for (e.g. 8 for '6-8 pages'): longer = issue too-long with how much to cut"}, {Name: "document", Hint: "full path of the document to work on; default: the active one"}}},
 	{Name: "et.checkRange", Kind: "et", Params: []liveCommandParam{{Name: "range", Hint: "default: the used range"}, {Name: "sheet", Hint: ""}, {Name: "workbook", Hint: "full path of the workbook to work on; default: the active one"}}},
 	{Name: "wpp.checkLayout", Kind: "wpp", Params: []liveCommandParam{{Name: "slide", Hint: "slide number; default: every slide"}, {Name: "presentation", Hint: "full path of the presentation to work on; default: the active one"}}},
+	{Name: "writer.goto", Kind: "wps", Params: []liveCommandParam{{Name: "paragraph", Hint: "paragraph number from writer.outline"}, {Name: "text", Hint: "first words of the paragraph, to find it if numbering moved"}, {Name: "document", Hint: "full path of the document to work on; default: the active one"}}},
+	{Name: "et.goto", Kind: "et", Params: []liveCommandParam{{Name: "range", Hint: "e.g. 'C42' or 'Data!C42'"}, {Name: "sheet", Hint: ""}, {Name: "workbook", Hint: "full path of the workbook to work on; default: the active one"}}},
+	{Name: "wpp.goto", Kind: "wpp", Params: []liveCommandParam{{Name: "slide", Hint: "slide number"}, {Name: "presentation", Hint: "full path of the presentation to work on; default: the active one"}}},
 }
