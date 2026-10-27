@@ -148,7 +148,7 @@ func (t *OtherDocumentTool) childFor(ctx context.Context, session *office.Sessio
 	if tool, ok := t.tools[port]; ok {
 		return tool, t.contexts[port], ""
 	}
-	catalog := parent.Bridge.GetCommands(ctx, port, false)
+	catalog := parent.Bridge.GetCommandsFor(ctx, port, session.App, false)
 	if catalog == nil {
 		return nil, nil, "cannot read the commands of " + DescribeOtherDocument(*session) + " (is it still open?)"
 	}

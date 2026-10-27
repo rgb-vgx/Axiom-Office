@@ -601,11 +601,30 @@ namespace AxiomOffice.Bridge
                 {
                     string extension;
                     int defFormat = DefaultSaveFormat(kind, out extension);
-                    string name = SanitizeFileName(System.IO.Path.GetFileName(fullName)) + extension;
-                    string full = System.IO.Path.Combine(DefaultSaveDir(), name);
-                    SetAlertsOff(app, kind);
-                    try { target.SaveAs2(full, defFormat); }
-                    catch { target.SaveAs(full, defFormat); }
+                    string stem = SanitizeFileName(System.IO.Path.GetFileName(fullName));
+                    System.IO.Directory.CreateDirectory(DefaultSaveDir());
+                    // Không ghi đè file có sẵn (vd Document1.docx của lần trước): thêm " (2)", " (3)"...
+                    string full = System.IO.Path.Combine(DefaultSaveDir(), stem + extension);
+                    for (int n = 2; System.IO.File.Exists(full); n++)
+                    {
+                        full = System.IO.Path.Combine(DefaultSaveDir(), stem + " (" + n + ")" + extension);
+                    }
+                    object previousAlerts = null;
+                    try { previousAlerts = app.DisplayAlerts; } catch { }
+                    try
+                    {
+                        SetAlertsOff(app, kind);
+                        try { target.SaveAs2(full, defFormat); }
+                        catch { target.SaveAs(full, defFormat); }
+                    }
+                    finally
+                    {
+                        // Trả lại cảnh báo của Office: để tắt thì đóng tài liệu chưa lưu sẽ không còn hỏi người dùng.
+                        if (previousAlerts != null)
+                        {
+                            try { app.DisplayAlerts = previousAlerts; } catch { }
+                        }
+                    }
                     return new Dictionary<string, object>
                     {
                         { "saved", true },
@@ -644,6 +663,14 @@ namespace AxiomOffice.Bridge
                 throw new ArgumentException("'path' không hợp lệ, cần có tên file, ví dụ 'bao-cao.docx'");
             }
             string full = System.IO.Path.Combine(DefaultSaveDir(), path);
+            // Core chỉ hỏi "ghi đè file đã có" theo đường dẫn nó nhận được (policy.go, os.Stat) - đường dẫn tương đối thì
+            // Core không thấy file trong Documents\Axiom, còn ở đây cảnh báo của Office bị tắt: ghi đè sẽ im lặng. Báo lỗi
+            // kèm đường dẫn đầy đủ; gửi lại đúng đường dẫn đó thì Core hỏi người dùng trước khi ghi đè.
+            if (System.IO.File.Exists(full))
+            {
+                throw new ArgumentException("file already exists: " + full +
+                    " - to overwrite it, call again with this full path (the user is asked first); otherwise pick another name");
+            }
             string folder = System.IO.Path.GetDirectoryName(full);
             if (!string.IsNullOrEmpty(folder))
             {

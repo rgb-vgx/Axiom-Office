@@ -467,7 +467,10 @@ namespace AxiomOffice.Bridge
             }
             return new Dictionary<string, object>
             {
-                { "comment", newId }, { "before", before }, { "after", RangeText(((dynamic)host.Application).ActiveDocument.Comments[newId].Scope, 200) }
+                // Không tìm lại được comment (newId = 0): chữ ĐÃ được thay - trả kết quả, không ném lỗi (lỗi ở đây làm Core
+                // coi lệnh là thất bại và model sửa lại lần nữa).
+                { "comment", newId }, { "before", before },
+                { "after", newId > 0 ? RangeText(doc.Comments[newId].Scope, 200) : RangeText(doc.Range(start, start + text.Length), 200) }
             };
         }
 
