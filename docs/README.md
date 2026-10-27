@@ -39,6 +39,8 @@ Gói cài Windows còn kèm `scripts/dist/HUONG-DAN-CAI-DAT.txt` (hướng dẫn
 | [research/wps-spike.md](research/wps-spike.md) | Spike: add-in JS trên WPS Office for Linux có làm được không (cơ sở của `architecture/wps-bridge.md`) |
 | [research/skills-review.md](research/skills-review.md) | Review 8 skill dựng sẵn và khoảng trống so với công việc văn phòng |
 | [research/giam-ngu-canh-gui-lai-agent.md](research/giam-ngu-canh-gui-lai-agent.md) | Giảm ngữ cảnh agent gửi lại mỗi vòng: kỹ thuật trên thế giới (đến 10/2026), số đo trên Axiom, lộ trình ưu tiên |
+| [audits/axiom-agent-runtime-deep-audit.md](audits/axiom-agent-runtime-deep-audit.md) | Audit chuyên sâu Agent Runtime: vòng lặp, guard, ranh giới side effect với Office |
+| [audits/wps-linux-live-test-2026-10-28.md](audits/wps-linux-live-test-2026-10-28.md) | Kiểm thử thực tế WPS 12.1.2 trên Linux: kết quả các lệnh make, ba lỗi đã sửa (`appKind`, `et.readRanges`, cache `/commands` theo port), chẩn đoán nạp add-in, live test Excel `trace_formula` và Writer `[§n]` |
 | [../tests/wps/REFERENCE.md](../tests/wps/REFERENCE.md) | Các phép đo trên WPS thật (object model, bridge, ribbon, menu chuột phải, hộp thoại) — đặt cạnh test của add-in WPS |
 
 ## Lộ trình
