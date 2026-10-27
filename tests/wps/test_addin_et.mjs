@@ -68,6 +68,8 @@ const ET_COMMANDS = [
   "et.deleteSheet", "et.formatRanges", "et.readRanges", "et.whatIf",
   // Trich dan bam duoc (27/10/2026): pane goi khi nguoi dung bam [Sheet!A1].
   "et.goto",
+  // Sap xep / loc (27/10/2026): add-in WPS chua co handler (test_addin.mjs CHUA_CO_HANDLER).
+  "et.sort", "et.filter",
 ];
 
 const MUTATING = ["et.addSheet", "et.renameSheet", "et.writeRange", "et.importCsv", "et.writeRanges",

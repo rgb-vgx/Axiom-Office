@@ -83,6 +83,7 @@
     "et.renameSheet": true,
     "et.setConditionalFormat": true,
     "et.setValidation": true,
+    "et.sort": true,
     "et.writeRange": true,
     "et.writeRanges": true,
     "wpp.addChart": true,

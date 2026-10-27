@@ -239,6 +239,18 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 		rememberOverwriteApproval(run, sheets)
 	}
 
+	// Sap xep: doi vi tri du lieu, Excel khong hoan tac duoc qua COM - hoi khi dung du lieu co san hoac co cong thuc se
+	// tro nham hang (sort_guard.go).
+	if action == "et.sort" {
+		if reason := sortGuardReason(ctx, run, params); reason != "" {
+			preview := model.Truncate(model.MarshalRelaxed(params), 200)
+			approved, err := run.ConfirmOrDecline(action, reason, preview)
+			if err != nil || !approved {
+				return Result{JSON: ErrorJSON("user declined: " + reason), Action: action}
+			}
+		}
+	}
+
 	// Policy xac nhan (muc 8.6): hoi nguoi dung truoc lenh rui ro.
 	decision := policy.Evaluate(ctx, action, params, run.Prompt, func(inner context.Context) *int {
 		return policy.WordLength(inner, run.Bridge, run.Office.Port)

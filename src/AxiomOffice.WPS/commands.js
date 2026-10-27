@@ -797,6 +797,26 @@
         { name: "slide", required: true, hint: "slide number" },
         { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
       ] },
+    { name: "et.sort", kind: "et", agent: true, undo: true,
+      summary: "Sắp xếp các hàng của một vùng theo 1-3 cột (`keys`: [{column: chữ tiêu đề hoặc chữ cột, order: asc|desc}]); mặc định hàng đầu là tiêu đề, không bị sắp xếp",
+      params: [
+        { name: "range", required: true, hint: "data incl. header row, e.g. 'A1:F200'" },
+        { name: "keys", required: true, hint: "[{column: 'Doanh thu' or 'C', order: 'asc'|'desc'}], 1-3 keys" },
+        { name: "header", required: false, hint: "true (default): first row is the header" },
+        { name: "sheet", required: false, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
+      ] },
+    { name: "et.filter", kind: "et", agent: true, undo: false,
+      summary: "Lọc hàng (AutoFilter) theo một cột: `values` = danh sách giá trị giữ lại, hoặc `criteria` như '>100'; `clear: true` bỏ mọi bộ lọc của sheet. Chỉ ẩn hàng, không xoá dữ liệu",
+      params: [
+        { name: "range", required: false, hint: "data incl. header row; default: the sheet's used range" },
+        { name: "column", required: false, hint: "header text or column letter" },
+        { name: "values", required: false, hint: "array of values to keep" },
+        { name: "criteria", required: false, hint: "e.g. '>100', '<>0', '=Hà Nội'" },
+        { name: "clear", required: false, hint: "true = remove all filters" },
+        { name: "sheet", required: false, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
+      ] },
   ];
   // --- END SINH TU DONG ---
 

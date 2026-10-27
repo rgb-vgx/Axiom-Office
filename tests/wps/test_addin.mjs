@@ -272,6 +272,10 @@ test("catalogFor(kind): chi tra lenh dung app do; catalog() van la registry day 
 //
 // Danh sach nay chi duoc PHEP ngan di: moi lenh o day ma sau nay co handler thi test ben duoi bat phai bo ra.
 const CHUA_CO_HANDLER = {
+  // Tinh nang theo Claude for M365 (docs/research/tinh-nang-con-thieu-so-voi-claude-m365.md, 27/10/2026): moi co o add-in
+  // Windows; WPS de sau khi do duoc API tren may Linux.
+  "et.sort": "chi co trong add-in Windows (X1); WPS de sau",
+  "et.filter": "chi co trong add-in Windows (X1); WPS de sau",
   // Bon lenh kind rong (agent=false) nam trong registry vi registry dung chung cho moi nen tang.
   // Ca bon DEU la lenh cua add-in o ban Windows (CommandDispatcher.cs: app.info, ai.ask, ui.askpane,
   // app.screenshot) - khong phai "Core tu lam roi add-in khong bao gio nhan". O add-in WPS chi
