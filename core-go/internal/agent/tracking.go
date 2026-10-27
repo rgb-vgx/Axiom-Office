@@ -86,7 +86,8 @@ func (o *Orchestrator) UndoRun(ctx context.Context, run *Run) (map[string]any, s
 	if undone {
 		return nil, "this run was already undone"
 	}
-	action, params := "", map[string]any{}
+	action := ""
+	var params map[string]any
 	switch {
 	case tracking && author != "":
 		action = "writer.reviewRevisions"
