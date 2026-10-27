@@ -133,6 +133,24 @@ func (b *BridgeClient) Health(ctx context.Context, port int) map[string]any {
 	return result.Result
 }
 
+// LiveSession doc GET /session (live=true trong add-in: doc lai ActiveDocument va ghi file registry).
+// Dung khi can biet NGAY tai lieu dang mo: file session chi duoc heartbeat lam moi 25 giay, nen tai lieu
+// vua mo/vua luu xong van con ten cu (other_document bo sot - do 28/10/2026).
+func (b *BridgeClient) LiveSession(ctx context.Context, port int) *Session {
+	result := b.send(ctx, port, "/session", nil, HealthTimeout)
+	if !result.OK {
+		return nil
+	}
+	document, _ := result.Result["document"].(string)
+	documentPath, _ := result.Result["documentPath"].(string)
+	app, _ := result.Result["app"].(string)
+	family, _ := result.Result["family"].(string)
+	return &Session{
+		Pid: intValue(result.Result["pid"]), App: app, Family: family, Port: port,
+		Document: strings.TrimSpace(document), DocumentPath: strings.TrimSpace(documentPath),
+	}
+}
+
 func commandBody(action string, params any) map[string]any {
 	body := map[string]any{"action": action}
 	if params == nil {
