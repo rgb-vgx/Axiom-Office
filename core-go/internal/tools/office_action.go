@@ -215,6 +215,9 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 	if problem := loneSymbolFind(action, params); problem != "" {
 		return Result{JSON: ErrorJSON(problem), Action: action}
 	}
+	if problem := run.checkUncertainRetry(action, params); problem != "" {
+		return Result{JSON: ErrorJSON(problem), Action: action}
+	}
 	if isUndo(action) {
 		var problem string
 		if params, problem = limitUndo(run, action, params); problem != "" {
@@ -316,6 +319,19 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 	countUndoable(run, action, output.Mutating, result.Result)
 	if !result.OK && AppGone(result.Error) {
 		output.Abort = appGoneMessage
+	}
+	switch {
+	case result.OK && ReadOnly(action):
+		run.forgetUncertain()
+	case !result.OK && mayChangeDocument(action) && uncertainOutcome(result.Error):
+		// Ket qua khong ro (uncertain.go): coi nhu CO sua - docStateGuard tang revision nen lenh doc truoc do khong con
+		// duoc coi la "khong doi", va bat buoc kiem chung truoc khi tra loi. Khong dem buoc hoan tac (khong biet co hay
+		// khong) - undo.go chi lui so buoc chac chan cua luot.
+		run.rememberUncertain(action, params)
+		output.Mutating = true
+		output.JSON = model.ErrorJSON(result.Error + " - " + uncertainNote)
+		corelog.Info("run %s: %s result unknown (%s) - treated as possibly applied", run.RunID, action,
+			model.Truncate(result.Error, 160))
 	}
 	return output
 }

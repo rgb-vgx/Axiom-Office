@@ -388,7 +388,9 @@ func (o *Orchestrator) applyResult(ctx context.Context, ex *execution, result mo
 		run.Verified = result.Verified
 		run.Seconds = result.Seconds
 		run.RoundKinds = roundKinds(result.RoundStats)
+		run.UndoSteps = ex.runContext.UndoSteps("writer")
 	})
+	undoSteps := run.UndoSteps
 
 	switch {
 	case result.OK:
@@ -398,20 +400,21 @@ func (o *Orchestrator) applyResult(ctx context.Context, ex *execution, result mo
 			"reply": result.Text, "rounds": result.Rounds, "seconds": round2(result.Seconds),
 			"inputTokens": result.InputTokens, "outputTokens": result.OutputTokens,
 			"cachedTokens": result.CachedTokens, "billableTokens": result.BillableTokens(),
-			"verified": result.Verified, "model": result.Model,
+			"verified": result.Verified, "model": result.Model, "undoSteps": undoSteps,
 		})
 	case result.Cancelled:
 		run.update(func() { run.Status = StatusCancelled })
-		run.Events.Publish("run.cancelled", map[string]any{"seconds": round2(result.Seconds)})
+		run.Events.Publish("run.cancelled", map[string]any{"seconds": round2(result.Seconds), "undoSteps": undoSteps})
 	case result.TimedOut:
 		run.update(func() { run.Status, run.Error, run.ErrorKind = StatusTimedOut, result.Error, "timeout" })
-		run.Events.Publish("run.timedout", map[string]any{"seconds": round2(result.Seconds), "error": result.Error})
+		run.Events.Publish("run.timedout", map[string]any{"seconds": round2(result.Seconds), "error": result.Error,
+			"undoSteps": undoSteps})
 	case result.Stopped:
 		run.update(func() { run.Status, run.Error, run.ErrorKind = StatusStopped, result.Error, "budget" })
 		run.Events.Publish("run.stopped", map[string]any{
 			"error": result.Error, "rounds": result.Rounds,
 			"inputTokens": result.InputTokens, "outputTokens": result.OutputTokens,
-			"cachedTokens": result.CachedTokens, "billableTokens": result.BillableTokens(),
+			"cachedTokens": result.CachedTokens, "billableTokens": result.BillableTokens(), "undoSteps": undoSteps,
 		})
 	default:
 		kind := result.ErrorKind

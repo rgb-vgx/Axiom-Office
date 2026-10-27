@@ -56,6 +56,9 @@ type Run struct {
 	SelectionLock bool
 	Seconds       float64
 	ToolCalls     int
+	// UndoSteps: so buoc hoan tac Word (writer.*) chac chan cua luot khi ket thuc - nut "Hoan tac luot nay" cua pane lui
+	// dung chung nay buoc (tools.RunContext.UndoSteps).
+	UndoSteps     int
 	Transcript    []string
 	Events        *EventStream
 	Confirmations *Confirmations
@@ -145,6 +148,7 @@ func (r *Run) JSON() map[string]any {
 		"verified":       r.Verified,
 		"seconds":        round2(r.Seconds),
 		"toolCalls":      r.ToolCalls,
+		"undoSteps":      r.UndoSteps,
 		"lastEvent":      r.Events.LastSeq(),
 		"transcript":     transcript,
 	}

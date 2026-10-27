@@ -87,3 +87,13 @@ func (run *RunContext) addUndoSteps(action string, steps int) {
 	}
 	run.undoable[undoApp(action)] += steps
 }
+
+// UndoSteps: so buoc hoan tac CHAC CHAN cua luot con lai trong app ("writer", "et", "wpp") - da tru cac lan *.undo cua
+// chinh luot. Pane dung so nay cho nut "Hoan tac luot nay" thay vi tu dem lenh ghi (tu dem thi khong tru duoc lan agent
+// tu undo, va lui vao noi dung co tu truoc luot - audit agent runtime F02).
+func (run *RunContext) UndoSteps(app string) int {
+	if run == nil {
+		return 0
+	}
+	return run.undoable[app]
+}

@@ -104,6 +104,13 @@ func run() int {
 
 	runtime := &api.Runtime{Port: port, Started: time.Now().UTC(), Version: version}
 	stores := store.OpenStores(paths.DatabaseFile)
+	// Mot Core moi nguoi dung (mutex o tren): luot 'running' con trong core.db la cua process truoc da chet giua luot. Tat
+	// SingleInstance thi co the co Core khac dang chay tren cung core.db - khong dong vao luot cua no.
+	if stores.Available && cfg.SingleInstance {
+		if interrupted := stores.Runs.MarkInterrupted(); interrupted > 0 {
+			corelog.Info("startup: %d run(s) left 'running' by the previous Core marked 'interrupted'", interrupted)
+		}
+	}
 	httpClient := &http.Client{} // khong timeout chung: moi request tu dat han bang context
 	models := model.NewSource(httpClient, config.Load)
 	current := models.Current()

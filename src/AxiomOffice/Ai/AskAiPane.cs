@@ -1132,8 +1132,10 @@ namespace AxiomOffice.Ai
             _busyDot.Visible = false;
             _chat.RemoveTyping();
             _lastRunViaCore = result.ViaCore;
-            _lastRunEdits = _runEdits;
-            _undoLink.Visible = host.AppKind == "wps" && _runEdits > 0;
+            // Core biet chinh xac so buoc hoan tac con lai cua luot (da tru lan agent tu writer.undo); tu dem tool.finished
+            // thi khong tru duoc va nut nay lui vao noi dung co tu truoc luot (audit agent runtime F02).
+            _lastRunEdits = result.UndoSteps >= 0 ? result.UndoSteps : _runEdits;
+            _undoLink.Visible = host.AppKind == "wps" && _lastRunEdits > 0;
             if (result.ViaCore && result.Ok)
             {
                 PollExtractedMemories(result.RunId);

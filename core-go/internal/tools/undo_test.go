@@ -74,3 +74,17 @@ func TestUndoLimitedToThisRun(t *testing.T) {
 		t.Fatalf("da lui het viec cua luot thi undo tiep phai bi tu choi: %+v", result)
 	}
 }
+
+func TestUndoStepsSubtractsTheRunsOwnUndo(t *testing.T) {
+	run := &RunContext{}
+	countUndoable(run, "writer.appendText", true, nil)
+	countUndoable(run, "writer.appendText", true, nil)
+	countUndoable(run, "writer.getText", false, nil)
+	countUndoable(run, "writer.undo", false, map[string]any{"undone": 1.0})
+	if got := run.UndoSteps("writer"); got != 1 {
+		t.Fatalf("2 lenh ghi, agent tu undo 1 buoc -> con 1 buoc cho nut Hoan tac luot nay, co %d", got)
+	}
+	if got := (*RunContext)(nil).UndoSteps("writer"); got != 0 {
+		t.Fatalf("luot chua co ngu canh tool thi 0 buoc, co %d", got)
+	}
+}

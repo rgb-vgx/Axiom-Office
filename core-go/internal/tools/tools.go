@@ -127,6 +127,8 @@ type RunContext struct {
 	WebSources WebSourceSaver
 	// calls: so lan goi tung tool/lenh trong luot (CallLimit).
 	calls map[string]int
+	// uncertain: lenh ghi co ket qua khong ro (action + params) - goi lai y het bi chan toi khi doc lai (uncertain.go).
+	uncertain map[string]bool
 	// singleCalls: so lan lenh mot vung (et.formatRange, et.readRange) thanh cong trong luot (batchHint).
 	singleCalls map[string]int
 	// templateBuilt: so slide slides_from_template da dung trong CA luot (cac lo truoc + lo nay) - cau tra loi cuoi

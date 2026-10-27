@@ -5,6 +5,24 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — Agent Core: kết quả mơ hồ, hoàn tác lượt, lượt bị gián đoạn (27/10/2026)
+
+Theo `docs/audits/axiom-agent-runtime-deep-audit.md` (F01, F02, F04, F07, F08).
+
+- **Không gửi lại mù một lệnh ghi có kết quả không rõ** (`tools/uncertain.go`): bridge báo `HOST_BUSY ... still
+  running`, Core hết giờ chờ bridge, hoặc add-in WPS báo "may have been applied" thì lệnh coi như *có thể đã sửa*
+  (revision tăng, phải tự kiểm chứng), lỗi trả model kèm chỉ dẫn đọc lại, và lần gọi lại **y hệt** bị chặn cho tới khi
+  có một lệnh đọc. Trước đây Core coi đó là "không sửa gì" nên model gọi lại → nội dung xuất hiện hai lần. Lệnh chắc
+  chắn chưa chạy (`HOST_BUSY ... was not run`, WPS "not sent, safe to retry") vẫn là lỗi thường.
+- **"Hoàn tác lượt này" lùi đúng số bước của lượt**: sự kiện kết thúc lượt (`run.completed/failed/cancelled/
+  timedout/stopped`) và `GET /v1/runs/{id}` có `undoSteps` — số bước hoàn tác Word chắc chắn còn lại, đã trừ các lần
+  agent tự `writer.undo`. Pane Windows dùng số này thay vì tự đếm lệnh ghi (tự đếm thì lùi vào nội dung có từ trước
+  lượt); Core cũ không gửi trường này thì pane đếm như trước.
+- **Lượt bị gián đoạn**: Core khởi động đổi các lượt còn `running` trong `core.db` (của process trước đã chết) thành
+  `interrupted` thay vì để `running` mãi (chỉ khi bật một-Core-mỗi-người-dùng).
+- Lỗi ghi `runs`/`tool_calls`/`run_rounds` vào `core.db` được ghi `core.log` thay vì bỏ im lặng.
+- `make test-go` (`-race`) xanh trở lại: `resumeWatch.stop()` chờ goroutine theo dõi thoát hẳn.
+
 ### Added — Excel: soát cả sổ, đọc nhiều vùng, thử ô điều khiển một lệnh (27/10/2026)
 
 - `et.checkRange {}` soát cả sổ (`workbook` mỗi sheet một dòng, lỗi mọi sheet gộp kèm `sheet`); sheet chia khối soát

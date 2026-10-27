@@ -1,6 +1,10 @@
 package store
 
-import "database/sql"
+import (
+	"database/sql"
+
+	"axiomoffice/core/internal/corelog"
+)
 
 // RunRow: mot luot chay da luu (docs/architecture/core.md muc 8.5.2).
 type RunRow struct {
@@ -36,18 +40,26 @@ type Runs struct{ db *DB }
 
 func (d *DB) Runs() *Runs { return &Runs{db: d} }
 
+// exec: ghi audit/trang thai luot. Loi ghi khong lam hong luot chay, nhung phai de lai dau vet: truoc 27/10/2026 moi loi
+// (o day, SQLITE_BUSY qua busy_timeout) bi bo im lang va audit mat ma khong ai biet (audit agent runtime F08).
+func (r *Runs) exec(what, runID, query string, args ...any) {
+	if _, err := r.db.sql.Exec(query, args...); err != nil {
+		corelog.Error("core.db: %s for run %s failed: %v", what, runID, err)
+	}
+}
+
 func (r *Runs) Insert(runID string, conversationID *string, model string) {
-	_, _ = r.db.sql.Exec(`INSERT INTO runs (id, conversation_id, status, started_at, model, rounds, input_tokens, output_tokens)
+	r.exec("insert run", runID, `INSERT INTO runs (id, conversation_id, status, started_at, model, rounds, input_tokens, output_tokens)
 		VALUES (?, ?, 'running', ?, ?, 0, 0, 0)`, runID, conversationID, Now(), model)
 }
 
 // SetMemoryStatus: null | queued | done | skipped | failed - doi sau khi run da xong (hang doi nen).
 func (r *Runs) SetMemoryStatus(runID, memoryStatus string) {
-	_, _ = r.db.sql.Exec("UPDATE runs SET memory_status = ? WHERE id = ?", memoryStatus, runID)
+	r.exec("set memory status", runID, "UPDATE runs SET memory_status = ? WHERE id = ?", memoryStatus, runID)
 }
 
 func (r *Runs) Finish(runID, status string, rounds, inputTokens, outputTokens, cachedTokens int, errText *string, memoryStatus *string) {
-	_, _ = r.db.sql.Exec(`UPDATE runs
+	r.exec("finish run", runID, `UPDATE runs
 		SET status = ?, finished_at = ?, rounds = ?, input_tokens = ?, output_tokens = ?, cached_tokens = ?, error = ?,
 		    memory_status = COALESCE(?, memory_status)
 		WHERE id = ?`, status, Now(), rounds, inputTokens, outputTokens, cachedTokens, errText, memoryStatus, runID)
@@ -57,7 +69,7 @@ func (r *Runs) Finish(runID, status string, rounds, inputTokens, outputTokens, c
 // canh model (sau khi cat) - khong ghi noi dung, chi do.
 func (r *Runs) AddToolCall(runID string, seq int, tool string, action, paramsJSON *string, ok bool, errText *string, ms int64,
 	resultChars int) {
-	_, _ = r.db.sql.Exec(`INSERT INTO tool_calls (run_id, seq, tool, action, params_json, ok, error, ms, created_at, result_chars)
+	r.exec("add tool call", runID, `INSERT INTO tool_calls (run_id, seq, tool, action, params_json, ok, error, ms, created_at, result_chars)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, runID, seq, tool, action, truncatePtr(paramsJSON, 2048),
 		boolToInt(ok), truncatePtr(errText, 500), ms, Now(), resultChars)
 }
@@ -70,9 +82,27 @@ type RoundRow struct {
 
 // AddRound: mot vong goi model - de do vong nao gui bao nhieu, vong nao khong goi tool va vi sao.
 func (r *Runs) AddRound(runID string, row RoundRow) {
-	_, _ = r.db.sql.Exec(`INSERT INTO run_rounds (run_id, round, input_tokens, cached_tokens, output_tokens, tool_calls, kind, created_at)
+	r.exec("add round", runID, `INSERT INTO run_rounds (run_id, round, input_tokens, cached_tokens, output_tokens, tool_calls, kind, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, runID, row.Round, row.InputTokens, row.CachedTokens, row.OutputTokens, row.ToolCalls,
 		row.Kind, Now())
+}
+
+// StatusInterrupted: luot dang chay thi Core dung dot ngot (crash, bi kill, may tat) - chi co trong core.db, dat luc Core
+// khoi dong lai. Tai lieu co the da bi sua mot phan ma khong co su kien ket thuc nao.
+const StatusInterrupted = "interrupted"
+
+// MarkInterrupted: luot con 'running' trong core.db khi Core vua khoi dong la luot cua process truoc (moi nguoi dung chi
+// mot Core, va luot chi song trong RAM) - doi sang 'interrupted' de khong treo 'running' mai mai. Tra so luot da doi.
+func (r *Runs) MarkInterrupted() int {
+	result, err := r.db.sql.Exec(`UPDATE runs SET status = ?, finished_at = ?,
+		error = COALESCE(error, 'Agent Core stopped while this run was in progress')
+		WHERE status = 'running'`, StatusInterrupted, Now())
+	if err != nil {
+		corelog.Error("core.db: mark interrupted runs failed: %v", err)
+		return 0
+	}
+	count, _ := result.RowsAffected()
+	return int(count)
 }
 
 // Rounds: cac vong cua mot luot theo thu tu.

@@ -285,7 +285,7 @@ func (o *Orchestrator) finish(run *Run) {
 
 func (o *Orchestrator) fail(run *Run, errorText, kind string) {
 	run.update(func() { run.Status, run.Error, run.ErrorKind = StatusFailed, errorText, kind })
-	run.Events.Publish("run.failed", map[string]any{"error": errorText, "kind": kind})
+	run.Events.Publish("run.failed", map[string]any{"error": errorText, "kind": kind, "undoSteps": run.UndoSteps})
 	corelog.Error("run %s failed [%s]: %s", run.ID, kind, errorText)
 }
 

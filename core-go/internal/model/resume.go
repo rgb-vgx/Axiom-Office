@@ -21,12 +21,15 @@ var (
 type resumeWatch struct {
 	resumed atomic.Bool
 	done    chan struct{}
+	// exited dong khi goroutine theo doi da thoat: stop() cho no de khong con ai doc dong ho sau khi stop tra ve.
+	exited chan struct{}
 }
 
 func watchResume(cancel context.CancelFunc) *resumeWatch {
-	watch := &resumeWatch{done: make(chan struct{})}
+	watch := &resumeWatch{done: make(chan struct{}), exited: make(chan struct{})}
 	check, gap, clock := resumeCheck, resumeGap, wallNow
 	go func() {
+		defer close(watch.exited)
 		ticker := time.NewTicker(check)
 		defer ticker.Stop()
 		last := clock()
@@ -48,7 +51,12 @@ func watchResume(cancel context.CancelFunc) *resumeWatch {
 	return watch
 }
 
-func (w *resumeWatch) stop()         { close(w.done) }
+// stop dung theo doi va cho goroutine thoat han (test doi dong ho gia sau stop - go test -race bao race neu khong cho).
+func (w *resumeWatch) stop() {
+	close(w.done)
+	<-w.exited
+}
+
 func (w *resumeWatch) Resumed() bool { return w.resumed.Load() }
 
 // resumedError: loi tam thoi (IsTransient) de post thu lai ngay tren ket noi moi.

@@ -27,6 +27,9 @@ namespace AxiomOffice.Ai
         public string ConversationId;        // hoi thoai ben Core (de "lam tiep")
         public string RunId;                 // luot chay ben Core (tim memory trich xuat nen cua luot)
         public int Rounds;
+        // UndoSteps: so buoc hoan tac Word chac chan cua luot do Core tinh (da tru lan agent tu undo); -1 = Core khong bao
+        // (Core cu, hoac luot in-process) -> pane tu dem nhu truoc.
+        public int UndoSteps = -1;
         public List<string> Transcript = new List<string>();
     }
 
