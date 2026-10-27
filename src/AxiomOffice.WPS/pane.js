@@ -1752,7 +1752,8 @@
               var ab = makeBubble("bubbleAi");
               var plain = text;
               try { plain = AxiomPaneCore.plainReply(text); } catch (e4) {}
-              addText(ab, plain);
+              // Trich dan [§12] / [Data!C42] / [slide 3] thanh link bam duoc (act "cite" ben duoi).
+              try { Dom.addCitedText(ab, plain); } catch (eCite) { addText(ab, plain); }
               chat.appendChild(ab);
             }
             if (i === lastUser && steps.length > 0) {
@@ -1979,6 +1980,7 @@
     reason: function () { withCtl(function (c) { c.toggleReasoning(); }); },
     planExec: function () { withCtl(function (c) { c.executePlan(); }); },
     undo: function () { withCtl(function (c) { c.undoLastTurn(); }); },
+    cite: function (value) { withCtl(function (c) { c.gotoCitation(value); }); },
     insert: function () { withCtl(function (c) { c.insertReply(); }); },
     forget: function (value) { withCtl(function (c) { c.forget(value); }); },
     retry: doRetry,

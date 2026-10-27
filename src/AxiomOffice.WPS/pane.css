@@ -554,6 +554,12 @@ body {
   margin: var(--axiom-gap-chip) 0;
   background: var(--axiom-divider);
 }
+/* Trich dan bam duoc trong cau tra loi ([§12], [Data!C42], [slide 3]) - pane-dom.js addCitedText. */
+.cite {
+  color: var(--axiom-accent-fg);
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
 .infoLine {
   font-size: var(--axiom-size-caption);
   color: var(--axiom-text-muted);

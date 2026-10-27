@@ -330,6 +330,21 @@ test("Hoan tac luot nay: exec <kind>.undo {count}, xong thi thoi dem", async () 
   assert.match(last.text, /Đã hoàn tác 2 thao tác/);
 });
 
+test("Hoan tac luot nay: dung undoSteps cua Core (da tru lan agent tu undo), khong tu dem", async () => {
+  const h = harness({ "/runs": [200, { ok: true, result: { runId: "r26" } }], "/exec": [200, { ok: true, result: { undone: 1 } }] });
+  await h.pane.send("Viết lại");
+  await tick();
+  FakeSource.last.emit("tool.finished", { data: { callId: "k1", action: "writer.appendText", ok: true } });
+  FakeSource.last.emit("tool.finished", { data: { callId: "k2", action: "writer.appendText", ok: true } });
+  FakeSource.last.emit("tool.finished", { data: { callId: "k3", action: "writer.undo", ok: true } });
+  FakeSource.last.emit("run.completed", { data: { reply: "Xong", seconds: 3, undoSteps: 1 } });
+  await tick();
+  assert.equal(h.state.edits, 1, "Core bao con 1 buoc cua luot - khong lui vao noi dung co tu truoc");
+  await h.pane.undoLastTurn();
+  const call = h.calls.find((c) => c.url === BASE + "exec");
+  assert.deepEqual(call.body, { action: "writer.undo", params: { count: 1 } });
+});
+
 test("Hoan tac (bang tinh): noi ro thao tac WPS chua hoan tac duoc thay vi im lang", async () => {
   const h = harness({ "/runs": [200, { ok: true, result: { runId: "r25b" } }],
     "/exec": [200, { ok: true, result: { undone: 1, restored: [{}], skipped: ["et.formatRange"] } }] }, null, "et");
@@ -740,4 +755,36 @@ test("chuot phai: ShowDialog loi -> quay ve khung chat lon + Core chuyen muc (kh
   ctx.ribbon.OnAction({ Id: "axiomCtxAsk_t", Tag: "askAi" });
   assert.equal(panes[0].Visible, true, "Hoi AI ve doan nay: khung lon hien ra");
   if (ctx.AxiomBridge) { ctx.AxiomBridge.stop(); }
+});
+
+test("trich dan: citationCommand -> lenh goto; gotoCitation POST /exec, loi thi noi ro", async () => {
+  const h = harness({ "/exec": [200, { ok: false, error: "'paragraph' must be between 1 and 3" }] });
+  const map = (t) => JSON.parse(JSON.stringify(h.ctx.AxiomPaneCore.citationCommand(t)));
+  assert.deepEqual(map("§12"), { action: "writer.goto", params: { paragraph: 12 } });
+  assert.deepEqual(map("§ 4"), { action: "writer.goto", params: { paragraph: 4 } });
+  assert.deepEqual(map("slide 3"), { action: "wpp.goto", params: { slide: 3 } });
+  assert.deepEqual(map("'Báo cáo'!A1:B5"), { action: "et.goto", params: { range: "'Báo cáo'!A1:B5" } });
+  assert.equal(h.ctx.AxiomPaneCore.citationCommand("ghi chú"), null);
+  assert.equal(await h.pane.gotoCitation("§9"), false);
+  const call = h.calls.find((c) => c.url === BASE + "exec");
+  assert.deepEqual(call.body, { action: "writer.goto", params: { paragraph: 9 } });
+  const last = h.state.messages[h.state.messages.length - 1];
+  assert.match(last.text, /Không nhảy tới được §9/);
+});
+
+test("trich dan: addCitedText tach link bam duoc, link Markdown thuong giu nguyen chu", () => {
+  const nodes = [];
+  const makeNode = (tag) => ({ tag, attrs: {}, children: [], className: "",
+    setAttribute(k, v) { this.attrs[k] = v; }, appendChild(c) { this.children.push(c); } });
+  const ctx = load(["pane-dom.js"], {
+    document: { createTextNode: (t) => ({ text: t }), createElement: (tag) => makeNode(tag) },
+  });
+  const el = makeNode("div");
+  ctx.AxiomPaneDom.addCitedText(el, "Mức trần ở [§12] và [Data!C42]; xem [web](http://a) hoặc [slide 2].");
+  const links = el.children.filter((c) => c.tag === "span");
+  assert.deepEqual(links.map((l) => l.attrs["data-value"]), ["§12", "Data!C42", "slide 2"]);
+  assert.ok(links.every((l) => l.attrs["data-act"] === "cite" && l.className === "cite"));
+  const text = el.children.map((c) => c.text || (c.children[0] && c.children[0].text)).join("");
+  assert.equal(text, "Mức trần ở [§12] và [Data!C42]; xem [web](http://a) hoặc [slide 2].");
+  nodes.length = 0;
 });

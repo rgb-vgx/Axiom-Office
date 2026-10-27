@@ -1131,6 +1131,13 @@ def test_confirm(work: str, token: str, bridge: FakeBridge, document_path: str, 
         check(declined and "user declined" in (declined[0].get("error") or "") and bridge.actions() == [],
               "interactive=false: lenh rui ro bi tu choi ngay, khong xuong bridge", declined)
         check(time.time() - started < 8, "interactive=false: khong cho het han xac nhan", round(time.time() - started, 1))
+        # Luot khong nhac tep Office nao: khong gui tool file cua server built-in "office" (progressive disclosure,
+        # agent/disclosure.go); test_mcp kiem chieu nguoc lai (nhac ten tep thi co).
+        status, servers = http_json(core.base + "/v1/mcp", token=core.token)
+        office_tools = next((s["tools"] for s in servers["result"]["servers"] if s["name"] == "office"), [])
+        last_tools = [t["function"]["name"] for t in llm.requests()[-1]["body"].get("tools", [])]
+        check(office_tools and "office_action" in last_tools and not any(name.startswith("mcp__office__") for name in last_tools),
+              "luot khong nhac tep: server office co tool file nhung khong gui cho model", (len(office_tools), last_tools))
     finally:
         core.stop()
         llm.stop()
@@ -1176,7 +1183,10 @@ def test_mcp(work: str, token: str, bridge: FakeBridge, document_path: str, sess
         check(servers["hong"]["error"] and not servers["hong"]["tools"], "server loi: bao loi, an tool", servers["hong"])
         check(servers["mau"]["tools"] == ["mcp__mau__add", "mcp__mau__shout", "mcp__mau__fail"], "tool ten mcp__<server>__<tool>", servers["mau"]["tools"])
 
-        status, created = core.run("Dung cong cu MCP", office, document={"name": "bao-cao.xlsx", "fullName": document_path})
+        # Tool file cua server "office" chi duoc gui khi luot nhac toi mot tep Office (agent/disclosure.go) - nguoi dung
+        # muon tao/doc tep thi neu ten tep.
+        status, created = core.run("Dung cong cu MCP, ghi chu vao ghi-chu-mcp.docx", office,
+                                   document={"name": "bao-cao.xlsx", "fullName": document_path})
         run_id = created["result"]["runId"]
         collected: list = []
         url = f"{core.base}/v1/runs/{run_id}/events"

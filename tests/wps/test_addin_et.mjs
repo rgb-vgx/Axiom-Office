@@ -15,6 +15,8 @@
 //   et.renameSheet {sheet, name}           -> {sheet, sheets}
 //   et.activateSheet {sheet}               -> {active}
 //   et.readRange {range, sheet?, formulas?}-> {sheet, range, values} | {sheet, range, formulas}
+//   et.readRanges {reads:[{range, sheet?, formulas?}], sheet?, formulas?}
+//                                          -> {reads:[{sheet, range, values|formulas}], cells}
 //   et.writeRange {range, values, sheet?}  -> {written, sheet}
 //   et.importCsv {path, range?, sheet?, delimiter?, encoding?}
 //                                          -> {path, sheet, range, rows, columns, cells}
@@ -64,8 +66,16 @@ const ET_COMMANDS = [
   "et.undo", "et.exportPdf", "et.save", "et.saveAs", "et.closeAll", "et.checkRange",
   // Plan 21 P1 (26/10/2026): co trong catalog, add-in WPS chua co handler (test_addin.mjs CHUA_CO_HANDLER).
   "et.createTable", "et.freezePanes", "et.setValidation",
-  // Plan 21 P3 (27/10/2026): idem.
-  "et.deleteSheet", "et.formatRanges", "et.readRanges", "et.whatIf",
+  // Plan 21 P3 (27/10/2026): idem (riêng et.readRanges đã có handler từ 28/10/2026 - đường data cho
+  // tool `trace_formula` của Core, orchestrator chỉ gắn tool khi bridge khai đủ et.readRanges + et.sheetInfo).
+  "et.deleteSheet", "et.formatRanges", "et.whatIf",
+  // et.readRanges (28/10/2026): đọc nhiều vùng trong MỘT lời gọi (contract C# CommandDispatcher.SpreadsheetBatch.cs),
+  // đường data cho tool trace_formula (core-go/internal/tools/trace_formula.go).
+  "et.readRanges",
+  // Trich dan bam duoc (27/10/2026): pane goi khi nguoi dung bam [Sheet!A1].
+  "et.goto",
+  // Sap xep / loc (27/10/2026): add-in WPS chua co handler (test_addin.mjs CHUA_CO_HANDLER).
+  "et.sort", "et.filter",
 ];
 
 const MUTATING = ["et.addSheet", "et.renameSheet", "et.writeRange", "et.importCsv", "et.writeRanges",
@@ -75,7 +85,7 @@ const MUTATING = ["et.addSheet", "et.renameSheet", "et.writeRange", "et.importCs
 // van chay voi `range` mac dinh "A1" (metadata ghi required nhung handler co default) - add-in giu
 // dung hanh vi runtime cua LibreOffice, xem test readRange ben duoi.
 const REQUIRES_PARAM = ["et.open", "et.renameSheet", "et.activateSheet", "et.writeRange", "et.importCsv",
-  "et.writeRanges", "et.fillRange", "et.formatRange", "et.setConditionalFormat", "et.addChart",
+  "et.writeRanges", "et.readRanges", "et.fillRange", "et.formatRange", "et.setConditionalFormat", "et.addChart",
   "et.exportPdf", "et.saveAs"];
 
 test("registry: du 27 lenh et.*, metadata giong het registry LibreOffice", () => {
@@ -272,6 +282,43 @@ test("et.writeRanges: gop nhieu vung, kiem HET truoc khi ghi", () => {
   assert.equal(run(ctx, app, "et.readRange", { range: "D1" }).values[0][0], null, "khong duoc ghi vung nao");
   assertFails(ctx, app, "et.writeRanges", {}, /'writes' is required/);
   assertFails(ctx, app, "et.writeRanges", { writes: [] }, /'writes' is required/);
+});
+
+test("et.readRanges: doc nhieu vung/nhieu sheet trong mot loi goi, mirror contract C# EtReadRanges", () => {
+  const ctx = loadAddin();
+  const app = makeEtApp({ sheets: [{ name: "Data", cells: { A1: 10, B1: 0 } }, { name: "Trống" }] });
+  run(ctx, app, "et.writeRange", { sheet: "Trống", range: "C1", values: [["=Data!A1+1"]] });
+
+  // Mot loi goi doc hai sheet: `sheet` top-level lam mac dinh; sheet theo dia chi "Trống!C1" hay sheet
+  // per-read thi uu tien; `formulas` per-read lam le top-level.
+  const out = run(ctx, app, "et.readRanges", { sheet: "Data", reads: [
+    { range: "A1:B1" },
+    { range: "Trống!C1", formulas: true },
+    { range: "A2:B2", sheet: "Trống" },
+  ] });
+  assert.deepEqual(out, { cells: 5, reads: [
+    { sheet: "Data", range: "A1:B1", values: [[10, 0]] },
+    { sheet: "Trống", range: "C1", formulas: [["=Data!A1+1"]] },
+    { sheet: "Trống", range: "A2:B2", values: [[null, null]] },
+  ] });
+
+  // Wrapper {items: ...} nhu et.writeRanges (Core co goi reads qua hop "items").
+  const wrap = run(ctx, app, "et.readRanges", { reads: { items: [{ range: "Data!B1" }] } });
+  assert.equal(wrap.cells, 1);
+  assert.deepEqual(wrap.reads[0].range, "B1");
+
+  // Loi mirror het message cua contract C# EtReadRanges.
+  assertFails(ctx, app, "et.readRanges", {}, /'reads' is required: a list of \{range, sheet\?, formulas\?\}/);
+  assertFails(ctx, app, "et.readRanges", { reads: [] }, /'reads' is required/);
+  assertFails(ctx, app, "et.readRanges", { reads: [["Data!A1"]] }, /reads\[0\] must be an object like \{range, sheet\?, formulas\?\}/);
+  assertFails(ctx, app, "et.readRanges", { reads: [{ sheet: "Data" }] }, /'reads\[0\]' needs 'range', e\.g\. 'A1:C10'/);
+  assertFails(ctx, app, "et.readRanges", { reads: [{ range: "DuLieu!A1" }] },
+    /'reads\[0\]': no sheet named 'DuLieu' \(sheets: Data, Trống\)/);
+  assertFails(ctx, app, "et.readRanges", { reads: [{ range: "Data!khongco" }] },
+    /'reads\[0\]': 'Data!khongco' is not a range address/);
+  // Vuot 4000 o: fail TRUOC khi doc bat ki vung nao (per contract C#, parse het roi moi read).
+  assertFails(ctx, app, "et.readRanges", { reads: [{ range: "Data!A1" }, { range: "A1:ZZ10000" }] },
+    /the ranges hold [0-9]+ cells \(limit 4000 per call\): read only the cells you need/);
 });
 
 test("et.fillRange: mot cong thuc roi dien, tham chieu tuong doi tu dich", () => {
@@ -598,10 +645,14 @@ test("et.* chi chay trong Spreadsheets; lenh la va object model hong khong throw
   assert.equal(unknown.ok, false);
   assert.match(String(unknown.error), /et\.khongCo/);
 
-  for (const action of ["et.listSheets", "et.sheetInfo", "et.readRange", "et.addChart"]) {
+  for (const action of ["et.listSheets", "et.sheetInfo", "et.readRange", "et.readRanges", "et.addChart"]) {
     const broken = mockApp([], { "app.Name": "WPS Spreadsheets",
       "app.ActiveWorkbook": throwing("boom"), "app.ActiveSheet": throwing("boom") });
-    assertFails(ctx, broken, action, { range: "A1:B2", type: "column" }, /boom/);
+    // et.readRanges kiem 'reads' TRUOC khi cham object model (mirror thu tu C# EtReadRanges:
+    // ParamObjects -> EnsureWorkbook), nen truong hop nay phai gui reads day du.
+    const paramsBroken = (action === "et.readRanges") ? { reads: [{ range: "A1:B2" }] }
+      : { range: "A1:B2", type: "column" };
+    assertFails(ctx, broken, action, paramsBroken, /boom/);
   }
 });
 

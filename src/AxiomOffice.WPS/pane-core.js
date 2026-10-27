@@ -83,6 +83,7 @@
     "et.renameSheet": true,
     "et.setConditionalFormat": true,
     "et.setValidation": true,
+    "et.sort": true,
     "et.writeRange": true,
     "et.writeRanges": true,
     "wpp.addChart": true,
@@ -420,6 +421,7 @@
         } else if (type === "confirm.resolved") {
           state.confirmation = null;
         } else if (type === "run.completed") {
+          applyUndoSteps(p);
           var reply = "";
           try {
             if (p.reply !== undefined && p.reply !== null) { reply = safeString(p.reply); }
@@ -447,6 +449,7 @@
           closeSource();
         } else if (type === "run.failed" || type === "run.cancelled" ||
                    type === "run.stopped" || type === "run.timedout") {
+          applyUndoSteps(p);
           var msg = "";
           try {
             if (p.error !== undefined && p.error !== null) { msg = safeString(p.error); }
@@ -487,6 +490,17 @@
         }
       } catch (e7) {}
       try { emit(); } catch (e8) {}
+    }
+
+    // Core bao so buoc hoan tac Word CHAC CHAN cua luot (undoSteps - da tru lan agent tu writer.undo). Tu dem tool.finished
+    // thi khong tru duoc va "Hoan tac luot nay" lui vao noi dung co tu truoc luot (audit agent runtime F02). Chi Writer:
+    // undoSteps cua Core la so buoc writer.*; ET giu cach dem cu. Core cu khong gui truong nay thi giu nguyen.
+    function applyUndoSteps(p) {
+      try {
+        if (kind !== "wps" || !p || p.undoSteps === undefined || p.undoSteps === null) { return; }
+        var steps = Number(p.undoSteps);
+        if (!isNaN(steps) && steps >= 0) { state.edits = Math.floor(steps); }
+      } catch (e) {}
     }
 
     function onEvent(type) {
@@ -923,6 +937,23 @@
       }
     }
 
+    // Bam trich dan trong cau tra loi ([§12], [Data!C42], [slide 3]): chon + cuon toi cho do (writer/et/wpp.goto - chi doc).
+    function gotoCitation(target) {
+      try {
+        var call = citationCommand(target);
+        if (!call || state.running) { return resolved(false); }
+        return exec(call.action, call.params).then(function (outcome) {
+          if (!(outcome && outcome.ok)) {
+            try { pushInfo("Không nhảy tới được " + trimText(target) + ": " + trimText(outcome && outcome.error)); } catch (e) {}
+            emit();
+          }
+          return !!(outcome && outcome.ok);
+        });
+      } catch (e2) {
+        return resolved(false);
+      }
+    }
+
     // "Chen tra loi": dan nguyen cau tra loi cuoi vao tai lieu (AskAiPane.OnInsert - chi o Word).
     function insertReply() {
       try {
@@ -1020,6 +1051,7 @@
       toggleReasoning: toggleReasoning,
       executePlan: executePlan,
       undoLastTurn: undoLastTurn,
+      gotoCitation: gotoCitation,
       insertReply: insertReply,
       forget: forget
     };
@@ -1124,6 +1156,21 @@
     } catch (e) { return { title: "", description: "", suggestions: [] }; }
   }
 
+  // citationCommand: trich dan -> lenh nhay toi ({action, params}); null khi khong phai trich dan.
+  // "§12" -> writer.goto {paragraph: 12}; "slide 3" -> wpp.goto {slide: 3}; "Data!C42" -> et.goto {range}.
+  function citationCommand(target) {
+    var text = trimText(target);
+    if (!text) { return null; }
+    if (text.charAt(0) === "\u00A7") {
+      var paragraph = parseInt(trimText(text.substring(1)), 10);
+      return isNaN(paragraph) ? null : { action: "writer.goto", params: { paragraph: paragraph } };
+    }
+    var slide = /^slide\s+(\d+)$/i.exec(text);
+    if (slide) { return { action: "wpp.goto", params: { slide: parseInt(slide[1], 10) } }; }
+    if (text.indexOf("!") > 0) { return { action: "et.goto", params: { range: text } }; }
+    return null;
+  }
+
   function plainReply(text) {
     try {
       return String(text === undefined || text === null ? "" : text)
@@ -1176,7 +1223,7 @@
     } catch (e) { return "lỗi"; }
   }
 
-  var api = { create: create, ACTION_LABELS: ACTION_LABELS, SUFFIX_LABELS: SUFFIX_LABELS, TOOL_LABELS: TOOL_LABELS, NOUNS: NOUNS, APP_NAMES: APP_NAMES, SUGGESTIONS: SUGGESTIONS, labelFor: labelFor, emptyState: emptyState, plainReply: plainReply, isEdit: isEdit, summary: summary, reasoningPreview: reasoningPreview, errorSummary: errorSummary, EDIT_ACTIONS: EDIT_ACTIONS, UNDO_ACTIONS: UNDO_ACTIONS, INSERT_ACTIONS: INSERT_ACTIONS, PLAN_EXECUTE_PROMPT: PLAN_EXECUTE_PROMPT, REASONING_INLINE_LIMIT: REASONING_INLINE_LIMIT };
+  var api = { create: create, ACTION_LABELS: ACTION_LABELS, SUFFIX_LABELS: SUFFIX_LABELS, TOOL_LABELS: TOOL_LABELS, NOUNS: NOUNS, APP_NAMES: APP_NAMES, SUGGESTIONS: SUGGESTIONS, labelFor: labelFor, emptyState: emptyState, plainReply: plainReply, citationCommand: citationCommand, isEdit: isEdit, summary: summary, reasoningPreview: reasoningPreview, errorSummary: errorSummary, EDIT_ACTIONS: EDIT_ACTIONS, UNDO_ACTIONS: UNDO_ACTIONS, INSERT_ACTIONS: INSERT_ACTIONS, PLAN_EXECUTE_PROMPT: PLAN_EXECUTE_PROMPT, REASONING_INLINE_LIMIT: REASONING_INLINE_LIMIT };
   try {
     if (root) { root.AxiomPaneCore = api; }
   } catch (e) {}

@@ -49,6 +49,10 @@ var noDocumentChange = map[string]bool{
 	"writer.save":        true, "writer.saveAs": true, "writer.exportPdf": true,
 	"wpp.listSlides": true, "wpp.checkLayout": true,
 	"wpp.save": true, "wpp.saveAs": true, "wpp.exportPdf": true,
+	// Nhay toi cho duoc trich dan (pane goi khi nguoi dung bam): chi chon + cuon.
+	"writer.goto": true, "et.goto": true, "wpp.goto": true,
+	// Loc chi an hang (khong doi noi dung): ket qua doc sau do van dung.
+	"et.filter": true,
 }
 
 // ChangesDocument: lenh nay co lam doi noi dung tai lieu dang mo khong.

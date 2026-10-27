@@ -513,3 +513,15 @@ func TestEndedEarlyNoteNamesUncertainEdits(t *testing.T) {
 		t.Fatalf("khong co lenh nao do dang thi khong ke ten lenh: %q", note)
 	}
 }
+
+func TestCitationRuleIsPerAppAndInPrompt(t *testing.T) {
+	for app, mark := range map[string]string{"wps": "[§n]", "et": "[Sheet!A1]", "wpp": "[slide n]"} {
+		if !strings.Contains(CitationRule(app), mark) {
+			t.Fatalf("%s: thieu dang trich dan %s", app, mark)
+		}
+		prompt := Build(app, &office.Session{App: app}, nil, nil, nil, "", nil)
+		if !strings.Contains(prompt, CitationRule(app)) {
+			t.Fatalf("%s: system prompt thieu quy tac trich dan", app)
+		}
+	}
+}

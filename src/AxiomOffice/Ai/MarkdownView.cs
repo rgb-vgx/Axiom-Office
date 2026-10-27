@@ -9,7 +9,8 @@ namespace AxiomOffice.Ai
 {
     // Markdown trong bong bóng trả lời của AI (pane Windows). Model trả **đậm**, ## tiêu đề, - danh sách, `mã`…;
     // vẽ nguyên văn thì người dùng thấy ký hiệu. Chỉ phần model hay dùng: đậm, nghiêng, mã trong dòng, link (chỉ
-    // tô màu, không bấm), tiêu đề, danh sách (lồng theo thụt lề), khối mã, trích dẫn, đường kẻ. Bảng hiện bằng chữ
+    // tô màu, không bấm; trích dẫn tài liệu [§12] / [Data!C42] / [slide 3] thì bấm được - nhảy tới chỗ đó), tiêu đề,
+    // danh sách (lồng theo thụt lề), khối mã, trích dẫn, đường kẻ. Bảng hiện bằng chữ
     // đều (Consolas) cho thẳng cột - pane hẹp, không dựng lưới.
     internal enum MdBlockKind
     {
@@ -31,6 +32,8 @@ namespace AxiomOffice.Ai
         public bool Italic;
         public bool Code;
         public bool Link;
+        // Target: trích dẫn tài liệu bấm được ("§12", "Data!C42", "slide 3"); null = không bấm.
+        public string Target;
     }
 
     internal sealed class MdBlock
@@ -53,6 +56,9 @@ namespace AxiomOffice.Ai
         private static readonly Regex TableRow = new Regex(@"^\s*\|.*\|\s*$");
         private static readonly Regex TableSeparator = new Regex(@"^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$");
         private static readonly Regex LinkPattern = new Regex(@"^\[([^\]]+)\]\(([^)\s]+)\)");
+        // Trích dẫn theo CitationRule của Core (agent/prompt.go): [§12], [Data!C42], ['Báo cáo'!A1:B5], [slide 3].
+        private static readonly Regex CitationPattern = new Regex(
+            @"^\[(§\s?\d{1,6}|[Ss]lide\s+\d{1,4}|(?:'[^'\]]+'|[^\]\s!'\[]+)![A-Za-z]{1,3}\d{1,7}(?::[A-Za-z]{1,3}\d{1,7})?)\](?!\()");
 
         public static List<MdBlock> Parse(string text)
         {
@@ -232,6 +238,14 @@ namespace AxiomOffice.Ai
                 }
                 if (c == '[')
                 {
+                    Match cite = CitationPattern.Match(text.Substring(i));
+                    if (cite.Success)
+                    {
+                        flush();
+                        runs.Add(new MdRun { Text = cite.Value, Link = true, Target = cite.Groups[1].Value, Bold = bold, Italic = italic });
+                        i += cite.Length;
+                        continue;
+                    }
                     Match link = LinkPattern.Match(text.Substring(i));
                     if (link.Success)
                     {
@@ -329,6 +343,7 @@ namespace AxiomOffice.Ai
             public Point At;
             public bool CodeBack;
             public Size Size;
+            public string Target;
         }
 
         public readonly List<Piece> Pieces = new List<Piece>();
@@ -466,13 +481,18 @@ namespace AxiomOffice.Ai
         // cộng từng từ thì khoảng cách giữa các chữ rộng gấp mấy lần (đo 13/10/2026).
         private Piece _segment;
 
+        // Đích trích dẫn của cụm chữ đang xếp (MdRun.Target): hai trích dẫn liền nhau không gộp thành một mảnh.
+        private string _target;
+
         private void Flow(List<MdRun> runs, int left, int width, Color textColor, Font heading)
         {
             _x = left;
             _lineHeight = 0;
             _segment = null;
+            _target = null;
             foreach (MdRun run in runs)
             {
+                _target = run.Target;
                 Font font = heading ?? (run.Code ? Mono : run.Bold && run.Italic ? BoldItalic : run.Bold ? Bold : run.Italic ? Italic : PaneTheme.Body);
                 Color color = run.Link ? PaneTheme.AccentFg : textColor;
                 foreach (Match token in Tokens.Matches(run.Text ?? ""))
@@ -512,7 +532,8 @@ namespace AxiomOffice.Ai
 
         private bool SameStyle(Font font, Color color, bool code)
         {
-            return _segment != null && _segment.Font == font && _segment.Color == color && _segment.CodeBack == code;
+            return _segment != null && _segment.Font == font && _segment.Color == color && _segment.CodeBack == code
+                && _segment.Target == _target;
         }
 
         private string Pending(Font font, Color color, bool code)
@@ -540,7 +561,7 @@ namespace AxiomOffice.Ai
             if (!SameStyle(font, color, code))
             {
                 CloseSegment();
-                _segment = new Piece { Text = "", Font = font, Color = color, At = new Point(_x, _y), CodeBack = code };
+                _segment = new Piece { Text = "", Font = font, Color = color, At = new Point(_x, _y), CodeBack = code, Target = _target };
             }
             _segment.Text += text;
         }
@@ -679,6 +700,19 @@ namespace AxiomOffice.Ai
             {
                 TextRenderer.DrawText(g, piece.Text, piece.Font, new Point(piece.At.X + origin.X, piece.At.Y + origin.Y), piece.Color, Flags);
             }
+        }
+
+        // Trích dẫn tại điểm (toạ độ của layout, đã trừ lề bong bóng); null = không có.
+        public string TargetAt(Point point)
+        {
+            foreach (Piece piece in Pieces)
+            {
+                if (piece.Target != null && new Rectangle(piece.At, piece.Size).Contains(point))
+                {
+                    return piece.Target;
+                }
+            }
+            return null;
         }
 
         private bool InCodeBlock(Piece piece)
