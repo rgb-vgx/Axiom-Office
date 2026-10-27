@@ -276,6 +276,8 @@ const CHUA_CO_HANDLER = {
   // Windows; WPS de sau khi do duoc API tren may Linux.
   "et.sort": "chi co trong add-in Windows (X1); WPS de sau",
   "et.filter": "chi co trong add-in Windows (X1); WPS de sau",
+  "et.pivot": "chi co trong add-in Windows (X6, PivotCaches); can do API PivotTable cua WPS JS",
+  "et.exportChart": "chi co trong add-in Windows (X7, Chart.Export); can do API xuat anh bieu do cua WPS JS",
   "writer.setTracking": "chi co trong add-in Windows (W4, Track Changes cho luot AI); can do API TrackRevisions/UserName cua WPS JS",
   "writer.listComments": "chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc",
   "writer.addComment": "chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc",

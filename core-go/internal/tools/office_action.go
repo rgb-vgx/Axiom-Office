@@ -284,6 +284,10 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 	if result.OK && action == "et.addSheet" {
 		rememberCreatedSheet(run, params)
 	}
+	// PivotTable luon nam tren sheet moi do luot tao (ten that bridge tra ve, co the da them so).
+	if sheet, _ := result.Result["sheet"].(string); result.OK && action == "et.pivot" && sheet != "" {
+		rememberCreatedSheet(run, map[string]any{"name": sheet})
+	}
 	if result.OK {
 		rememberWrittenCells(run, action, params, result.Result)
 	}

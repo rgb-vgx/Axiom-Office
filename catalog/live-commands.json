@@ -2996,6 +2996,74 @@
     ]
   },
   {
+    "name": "et.pivot",
+    "kind": "et",
+    "agent": true,
+    "undo": true,
+    "summary": "Tạo PivotTable trên sheet MỚI từ vùng dữ liệu có hàng tiêu đề: `rows`/`columns` = cột nhóm, `values` = [{column, function: sum|count|average|max|min}]",
+    "params": [
+      {
+        "name": "range",
+        "required": true,
+        "hint": "data incl. header row, e.g. 'A1:F500'"
+      },
+      {
+        "name": "rows",
+        "required": true,
+        "hint": "array of header texts or column letters to group rows by"
+      },
+      {
+        "name": "values",
+        "required": true,
+        "hint": "[{column: 'Doanh thu', function: 'sum'}]; function default sum"
+      },
+      {
+        "name": "columns",
+        "required": false,
+        "hint": "array of header texts/column letters to spread across columns"
+      },
+      {
+        "name": "name",
+        "required": false,
+        "hint": "new sheet name, default 'Pivot'"
+      },
+      {
+        "name": "sheet",
+        "required": false,
+        "hint": null
+      },
+      {
+        "name": "workbook",
+        "required": false,
+        "hint": "full path of the workbook to work on; default: the active one"
+      }
+    ]
+  },
+  {
+    "name": "et.exportChart",
+    "kind": "et",
+    "agent": true,
+    "undo": false,
+    "summary": "Xuất một biểu đồ thành ảnh PNG (thư mục tạm) - trả `path` để chèn sang PowerPoint/Word bằng wpp.addImage / writer.insertImage",
+    "params": [
+      {
+        "name": "chart",
+        "required": false,
+        "hint": "chart name from et.listCharts or 1-based index; default: the only chart"
+      },
+      {
+        "name": "sheet",
+        "required": false,
+        "hint": null
+      },
+      {
+        "name": "workbook",
+        "required": false,
+        "hint": "full path of the workbook to work on; default: the active one"
+      }
+    ]
+  },
+  {
     "name": "writer.listComments",
     "kind": "wps",
     "agent": true,

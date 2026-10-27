@@ -80,6 +80,7 @@
     "et.formatRanges": true,
     "et.freezePanes": true,
     "et.importCsv": true,
+    "et.pivot": true,
     "et.renameSheet": true,
     "et.setConditionalFormat": true,
     "et.setValidation": true,

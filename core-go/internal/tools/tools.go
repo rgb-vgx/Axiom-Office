@@ -56,6 +56,7 @@ var noDocumentChange = map[string]bool{
 	"writer.listComments": true, "writer.listRevisions": true,
 	// Bat/tat theo doi thay doi (Core goi dau/cuoi luot): khong doi noi dung.
 	"writer.setTracking": true,
+	"et.exportChart":     true,
 }
 
 // ChangesDocument: lenh nay co lam doi noi dung tai lieu dang mo khong.
@@ -72,6 +73,7 @@ var readOnly = map[string]bool{
 	"writer.getText": true, "writer.selection": true, "writer.checkTables": true, "writer.outline": true,
 	"writer.checkLayout": true, "writer.listComments": true, "writer.listRevisions": true,
 	"wpp.listSlides": true, "wpp.checkLayout": true,
+	"et.exportChart": true,
 }
 
 // ReadOnly: lenh nay chi doc tai lieu, khong sua va khong ghi file.

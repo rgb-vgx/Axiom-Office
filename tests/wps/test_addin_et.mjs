@@ -70,6 +70,8 @@ const ET_COMMANDS = [
   "et.goto",
   // Sap xep / loc (27/10/2026): add-in WPS chua co handler (test_addin.mjs CHUA_CO_HANDLER).
   "et.sort", "et.filter",
+  // PivotTable / xuat bieu do thanh anh (27/10/2026): idem.
+  "et.pivot", "et.exportChart",
 ];
 
 const MUTATING = ["et.addSheet", "et.renameSheet", "et.writeRange", "et.importCsv", "et.writeRanges",
