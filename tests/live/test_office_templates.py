@@ -156,6 +156,21 @@ def run_excel(out: str) -> None:
         bridge.cmd("et.addSheet", {"name": "Tam"}, record=False)
         chart = bridge.cmd("et.addChart", {"sheet": "Tam", "range": "Data!A1:A7,Data!C1:C7", "type": "line"}, record=False) or {}
         check(chart.get("typeApplied") is True, "addChart vung roi moi phan co ten sheet", str(chart))
+        # Nhieu vung, hai sheet, MOT loi goi; muc sai (mau / sheet) thi khong vung nao bi doi.
+        many = bridge.cmd("et.formatRanges", {"sheet": "Data", "formats": [
+            {"range": "A1:D1", "bold": True, "fillColor": "#DDEBF7", "horizontal": "center"},
+            {"range": "B2:C7", "numFmt": "#,##0", "fillColor": "#FFF2CC"},
+            {"range": "D2:D7", "numFmt": "0%", "fillColor": "#E2EFDA"},
+            {"sheet": "Tam", "range": "A1", "bold": True, "columnWidth": 20}]}, record=False) or {}
+        check(many.get("ranges") == 4 and many.get("sheets") == ["Data", "Tam"], "formatRanges 4 vung 2 sheet mot lan", str(many))
+        bad = bridge.cmd("et.formatRanges", {"sheet": "Data", "formats": [
+            {"range": "D2:D7", "fillColor": "#FF0000"}, {"range": "B2", "fillColor": "do"}]}, expect_ok=False, record=False)
+        check("not a #RRGGBB" in str(bad), "formatRanges tu choi mau sai", str(bad))
+        bad = bridge.cmd("et.formatRanges", {"formats": [{"sheet": "Khong", "range": "A1", "bold": True}]},
+                         expect_ok=False, record=False)
+        check("no sheet named" in str(bad) and "Data" in str(bad), "formatRanges sheet sai ke ten sheet co that", str(bad))
+        bad = bridge.cmd("et.formatRanges", {"formats": [{"range": "A1"}]}, expect_ok=False, record=False)
+        check("nothing to apply" in str(bad), "formatRanges muc khong co thuoc tinh", str(bad))
         deleted = bridge.cmd("et.deleteSheet", {"sheet": "Tam"}, record=False) or {}
         check(deleted.get("sheets") == ["Data"], "deleteSheet", str(deleted))
         last = bridge.cmd("et.deleteSheet", {"sheet": "Data"}, expect_ok=False, record=False)
@@ -168,6 +183,11 @@ def run_excel(out: str) -> None:
         return
     package = zipfile.ZipFile(path)
     report = check_xlsx.check_package(path, ["Data", "Dashboard"])
+    data = report["sheets"]["Data"]
+    check(data["inputFills"] == ["FFFFF2CC"] and data["formulaFills"] == ["FFE2EFDA"],
+          "formatRanges: o nhap / o cong thuc khac mau, lan goi sai khong doi gi", str((data["inputFills"], data["formulaFills"])))
+    check(data["formatKinds"].get("B") == ["grouped"] and data["formatKinds"].get("D") == ["percent"],
+          "formatRanges: dinh dang so tung vung", str(data["formatKinds"]))
     dash = report["sheets"]["Dashboard"]
     check(dash["charts"] == 2 and all(ref.startswith("Data!") for ref in dash["chartRefs"]), "2 bieu do doc thang Data", str(dash["chartRefs"]))
     names = [n for n in package.namelist() if n.startswith("xl/worksheets/sheet")]

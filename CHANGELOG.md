@@ -5,6 +5,18 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Excel: định dạng nhiều vùng một lệnh (27/10/2026)
+
+- **`et.formatRanges`**: `formats` là mảng `{range, sheet?, ...}` cùng thuộc tính như `et.formatRange`; nhiều vùng, nhiều
+  sheet trong một lời gọi; kiểm hết trước khi định dạng (một mục sai thì không vùng nào đổi).
+- Core: kết quả `et.formatRange` từ lần thứ 3 trong lượt nhắc gom phần còn lại vào `et.formatRanges`. Skill
+  `bao-cao-du-lieu`, `mo-hinh-nhieu-sheet`, `bang-diem` hướng dẫn gom định dạng một lần.
+
+### Fixed — Excel (27/10/2026)
+
+- `et.createTable` từ chối khi hàng tiêu đề có ô trống (Excel tự đặt `Column1`, ô tiêu đề bảng không xoá trắng được).
+- `et.checkRange` lấy định dạng số của ô số lẻ thật trong cột, không luôn lấy hàng 2 (báo nhầm `no-number-format`).
+
 ### Added — Word/Excel P3: mẫu văn bản theo loại, dashboard, định dạng có điều kiện nâng cao (27/10/2026)
 
 - **Tool `doc_from_brief`**: văn bản mới theo loại (tờ trình, công văn, thông báo, biên bản, báo cáo, kế hoạch) đúng thể

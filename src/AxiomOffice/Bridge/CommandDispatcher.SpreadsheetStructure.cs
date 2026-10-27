@@ -71,6 +71,24 @@ namespace AxiomOffice.Bridge
                         Convert.ToString(existing.Range.Address[false, false]) + ")");
                 }
             }
+            // Hàng tiêu đề có ô trống thì Excel tự đặt "Column1"... và ô tiêu đề của bảng không xoá trắng được (bộ đo
+            // 27/10/2026 ca B: bảng trên sheet Config A1:B5, model ghi "" vào B1 hơn 10 lần, Excel lại điền Column1).
+            var blankHeaders = new List<string>();
+            int headerCols = Convert.ToInt32(range.Columns.Count);
+            for (int c = 1; c <= headerCols; c++)
+            {
+                dynamic cell = range.Cells[1, c];
+                if (Convert.ToString(cell.Value2 ?? "").Trim().Length == 0)
+                {
+                    blankHeaders.Add(Convert.ToString(cell.Address(false, false)));
+                }
+            }
+            if (blankHeaders.Count > 0)
+            {
+                throw new InvalidOperationException("the first row of the range is the table header and " + string.Join(", ", blankHeaders)
+                    + " is empty (Excel would name it Column1 and a header cell cannot be cleared later): write a header there first, "
+                    + "or make the table only of a block whose first row is filled (a settings sheet with a few values needs no table)");
+            }
             // xlSrcRange = 1, xlYes = 1 (hàng đầu là tiêu đề).
             dynamic table = sheet.ListObjects.Add(1, range, Type.Missing, 1);
             string name = ParamString(p, "name", null);

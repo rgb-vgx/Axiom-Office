@@ -77,6 +77,7 @@
     "et.createTable": true,
     "et.fillRange": true,
     "et.formatRange": true,
+    "et.formatRanges": true,
     "et.freezePanes": true,
     "et.importCsv": true,
     "et.renameSheet": true,

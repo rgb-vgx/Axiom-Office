@@ -41,9 +41,15 @@ namespace AxiomOffice.Bridge
                 Command("et.fillRange", "et", EtFillRange,
                     "Viết MỘT công thức vào ô góc trên-trái của `range` rồi điền ra cả vùng, tham chiếu tương đối tự dịch (dùng cho bảng nghìn dòng: đừng gửi từng ô)",
                     Req("range", "the whole area e.g. 'B2:H1000'"), Opt("formula", "written to the top-left cell first"), Opt("sheet")).ForAgent(),
-                Command("et.formatRange", "et", EtFormatRange, "Định dạng vùng (màu dạng `#RRGGBB`, `horizontal` left/center/right)",
+                Command("et.formatRange", "et", EtFormatRange, "Định dạng MỘT vùng (màu dạng `#RRGGBB`, `horizontal` left/center/right); nhiều vùng thì dùng et.formatRanges",
                     Req("range"), Opt("bold"), Opt("italic"), Opt("fontSize"), Opt("fontColor"), Opt("fillColor"), Opt("numFmt"), Opt("horizontal"), Opt("wrap"),
                     Opt("columnWidth", "width of the range's columns in characters, e.g. 20"), Opt("sheet")).ForAgent(),
+                Command("et.formatRanges", "et", EtFormatRanges,
+                    "Định dạng NHIỀU vùng trong MỘT lời gọi: `formats` là mảng {range, sheet?, bold, italic, fontSize, fontColor, "
+                    + "fillColor, numFmt, horizontal, wrap, columnWidth} (cùng thuộc tính như et.formatRange). Dùng thay cho nhiều lần "
+                    + "et.formatRange (tiêu đề, ô nhập liệu, định dạng số của mọi sheet trong một lần). Kiểm hết trước khi định dạng: "
+                    + "một mục sai thì không vùng nào bị đổi",
+                    Req("formats", "array of {range, sheet?, ...format}"), Opt("sheet", "default sheet for items without one")).ForAgent(),
                 Command("et.addChart", "et", EtAddChart,
                     "Chèn biểu đồ từ vùng dữ liệu; `type` column/bar/line/pie/area/scatter, `width`/`height` tính bằng cm",
                     Req("range", "source data e.g. 'A1:B13'"), Opt("type", "column (default)/bar/line/pie/area/scatter"),
@@ -561,7 +567,95 @@ namespace AxiomOffice.Bridge
             dynamic app = host.Application;
             dynamic wb = EnsureWorkbook(app);
             dynamic sheet = string.IsNullOrEmpty(sheetName) ? wb.ActiveSheet : wb.Worksheets[sheetName];
-            dynamic range = sheet.Range[address];
+            ApplyRangeFormat(sheet.Range[address], p);
+            return new Dictionary<string, object>
+            {
+                { "sheet", Convert.ToString(sheet.Name) },
+                { "range", address }
+            };
+        }
+
+        private static readonly string[] RangeFormatKeys =
+            { "bold", "italic", "fontSize", "fontColor", "fillColor", "numFmt", "horizontal", "wrap", "columnWidth" };
+
+        // Định dạng NHIỀU vùng trong MỘT lời gọi (bộ đo 27/10/2026 ca B: 19 lần et.formatRange, mỗi lần một vùng,
+        // hết 60 vòng). Kiểm HẾT trước khi định dạng (sheet có, địa chỉ đúng, màu #RRGGBB, có ít nhất một thuộc tính):
+        // một mục sai thì không vùng nào bị đổi.
+        private static Dictionary<string, object> EtFormatRanges(IAppHost host, Dictionary<string, object> p)
+        {
+            List<Dictionary<string, object>> formats = ParamObjects(p, "formats");
+            if (formats == null || formats.Count == 0)
+            {
+                throw new InvalidOperationException("'formats' is required: a list of {range, sheet?, bold?, fillColor?, numFmt?, ...}, "
+                    + "e.g. [{\"range\": \"A1:I1\", \"bold\": true, \"fillColor\": \"#DDEBF7\"}, {\"range\": \"D2:E4\", \"numFmt\": \"#,##0\"}]");
+            }
+            dynamic app = host.Application;
+            dynamic wb = EnsureWorkbook(app);
+            string defaultSheet = ParamString(p, "sheet", null);
+            var targets = new List<dynamic>();
+            var sheets = new List<string>();
+            for (int i = 0; i < formats.Count; i++)
+            {
+                Dictionary<string, object> item = formats[i];
+                string address = ParamString(item, "range", null);
+                if (string.IsNullOrEmpty(address))
+                {
+                    throw new InvalidOperationException(string.Format("'formats[{0}]' needs 'range', e.g. 'A1:C1'", i));
+                }
+                if (!RangeFormatKeys.Any(key => HasParam(item, key)))
+                {
+                    throw new InvalidOperationException(string.Format("'formats[{0}]' ({1}) has nothing to apply: give at least one of {2}",
+                        i, address, string.Join("/", RangeFormatKeys)));
+                }
+                foreach (string key in new[] { "fontColor", "fillColor" })
+                {
+                    string color = ParamString(item, key, null);
+                    if (!string.IsNullOrEmpty(color) && !ParseBgrColor(color).HasValue)
+                    {
+                        throw new InvalidOperationException(string.Format("'formats[{0}].{1}': '{2}' is not a #RRGGBB colour", i, key, color));
+                    }
+                }
+                string horizontal = ParamString(item, "horizontal", "left").ToLowerInvariant();
+                if (horizontal != "left" && horizontal != "center" && horizontal != "right")
+                {
+                    throw new InvalidOperationException(string.Format("'formats[{0}].horizontal' must be left/center/right, got '{1}'", i, horizontal));
+                }
+                string sheetName = ParamString(item, "sheet", defaultSheet);
+                dynamic sheet;
+                try
+                {
+                    sheet = string.IsNullOrEmpty(sheetName) ? wb.ActiveSheet : wb.Worksheets[sheetName];
+                }
+                catch (Exception)
+                {
+                    throw new InvalidOperationException(string.Format("'formats[{0}].sheet': no sheet named '{1}' (sheets: {2})",
+                        i, sheetName, string.Join(", ", SheetNames(wb))));
+                }
+                try
+                {
+                    targets.Add(sheet.Range[address]);
+                }
+                catch (Exception)
+                {
+                    throw new InvalidOperationException(string.Format("'formats[{0}].range': '{1}' is not a range address on sheet '{2}'",
+                        i, address, Convert.ToString(sheet.Name)));
+                }
+                string name = Convert.ToString(sheet.Name);
+                if (!sheets.Contains(name))
+                {
+                    sheets.Add(name);
+                }
+            }
+            for (int i = 0; i < formats.Count; i++)
+            {
+                ApplyRangeFormat(targets[i], formats[i]);
+            }
+            sheets.Sort(StringComparer.Ordinal);
+            return new Dictionary<string, object> { { "ranges", formats.Count }, { "sheets", sheets } };
+        }
+
+        private static void ApplyRangeFormat(dynamic range, Dictionary<string, object> p)
+        {
             dynamic font = range.Font;
             if (HasParam(p, "bold"))
             {
@@ -603,11 +697,6 @@ namespace AxiomOffice.Bridge
             {
                 range.EntireColumn.ColumnWidth = Math.Max(1.0, Math.Min(255.0, ParamDouble(p, "columnWidth", 12.0)));
             }
-            return new Dictionary<string, object>
-            {
-                { "sheet", Convert.ToString(sheet.Name) },
-                { "range", address }
-            };
         }
 
         private static Dictionary<string, object> EtActivateSheet(IAppHost host, Dictionary<string, object> p)

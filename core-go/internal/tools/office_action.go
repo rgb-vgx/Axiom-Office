@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 	"unicode"
@@ -297,6 +298,10 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 	if result.OK {
 		raw = TruncateBridgeResult(action, result.Result, raw, run.FocusSlide)
 	}
+	if result.OK && action == "et.formatRange" {
+		run.formatRangeCalls++
+		raw = batchFormatHint(raw, run.formatRangeCalls)
+	}
 	// Lenh that bai thi tai lieu khong doi -> khong tinh la da sua. Lenh ghi tu bao "changed": false (vd wpp.setShapeText
 	// y het chu dang co) cung vay: revision giu nguyen nen lenh doc truoc do van dung (docStateGuard).
 	unchanged := false
@@ -310,6 +315,25 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 		output.Abort = appGoneMessage
 	}
 	return output
+}
+
+// batchFormatHint: tu lan et.formatRange thu 3 trong luot, ket qua nhac gom cac vung con lai vao MOT et.formatRanges.
+// Bo do 27/10/2026 ca B: 19 lan formatRange (moi lan mot vung) -> het 60 vong truoc khi xong.
+func batchFormatHint(raw string, calls int) string {
+	if calls < 3 {
+		return raw
+	}
+	var body map[string]any
+	if json.Unmarshal([]byte(raw), &body) != nil || body == nil {
+		return raw
+	}
+	body["hint"] = fmt.Sprintf("this is et.formatRange call #%d in this request: put ALL remaining formats (any sheet) in ONE "+
+		"et.formatRanges {formats: [{sheet, range, bold?, fillColor?, numFmt?, ...}, ...]}", calls)
+	data, err := json.Marshal(body)
+	if err != nil {
+		return raw
+	}
+	return string(data)
 }
 
 // loneSymbolFind: luot that deepseek 15/10/2026 thay "/" -> "" tren ca giao an de xoa dong "/" ma (thuc ra la

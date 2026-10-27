@@ -685,8 +685,12 @@ def test_core_version():
 def other_live_tests():
     """Lệnh đã có test live trên Office ở file khác (slide, định dạng Word) - không lặp lại ở đây."""
     names = set()
-    for name in ("test_live_slides.py", "test_writer_format.py"):
-        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
+    here = os.path.dirname(os.path.abspath(__file__))
+    # test_office_*.py: lenh plan 21 (cau truc, bo cuc, van ban theo mau, dashboard) - test live rieng tung nhom.
+    files = ["test_live_slides.py", "test_writer_format.py"] + sorted(
+        name for name in os.listdir(here) if name.startswith("test_office_") and name.endswith(".py"))
+    for name in files:
+        path = os.path.join(here, name)
         if os.path.exists(path):
             with open(path, encoding="utf-8") as handle:
                 names.update(re.findall(r'"((?:writer|et|wpp|app)\.[A-Za-z]+)"', handle.read()))

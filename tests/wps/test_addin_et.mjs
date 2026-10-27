@@ -65,7 +65,7 @@ const ET_COMMANDS = [
   // Plan 21 P1 (26/10/2026): co trong catalog, add-in WPS chua co handler (test_addin.mjs CHUA_CO_HANDLER).
   "et.createTable", "et.freezePanes", "et.setValidation",
   // Plan 21 P3 (27/10/2026): idem.
-  "et.deleteSheet",
+  "et.deleteSheet", "et.formatRanges",
 ];
 
 const MUTATING = ["et.addSheet", "et.renameSheet", "et.writeRange", "et.importCsv", "et.writeRanges",

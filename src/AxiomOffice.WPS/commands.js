@@ -366,7 +366,7 @@
         { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
       ] },
     { name: "et.formatRange", kind: "et", agent: true, undo: true,
-      summary: "Định dạng vùng",
+      summary: "Định dạng MỘT vùng (màu dạng `#RRGGBB`, `horizontal` left/center/right); nhiều vùng thì dùng et.formatRanges",
       params: [
         { name: "range", required: true, hint: null },
         { name: "bold", required: false, hint: null },
@@ -379,6 +379,13 @@
         { name: "wrap", required: false, hint: null },
         { name: "columnWidth", required: false, hint: "width of the range's columns in characters, e.g. 20" },
         { name: "sheet", required: false, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
+      ] },
+    { name: "et.formatRanges", kind: "et", agent: true, undo: true,
+      summary: "Định dạng NHIỀU vùng trong MỘT lời gọi: `formats` là mảng {range, sheet?, bold, italic, fontSize, fontColor, fillColor, numFmt, horizontal, wrap, columnWidth} (cùng thuộc tính như et.formatRange). Dùng thay cho nhiều lần et.formatRange (tiêu đề, ô nhập liệu, định dạng số của mọi sheet trong một lần). Kiểm hết trước khi định dạng: một mục sai thì không vùng nào bị đổi",
+      params: [
+        { name: "formats", required: true, hint: "array of {range, sheet?, ...format}" },
+        { name: "sheet", required: false, hint: "default sheet for items without one" },
         { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
       ] },
     { name: "et.setConditionalFormat", kind: "et", agent: true, undo: true,

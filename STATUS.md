@@ -302,6 +302,11 @@ trúc không dây cắt hộp. Sửa: sơ đồ lồng trong khoá `diagram`, `r
   đồ đọc thẳng), `et.setConditionalFormat` kiểu trực quan (thang màu, thanh dữ liệu, biểu tượng, top/bottom...),
   `et.deleteSheet`; Core không gửi lại đối số JSON hỏng (trước đó HTTP 400 hỏng cả lượt). Bộ đo 26 ca (+4 ca P3); đo 7
   ca: **6/7** - `w01` 2 vòng (trước 15), đề B còn hết 60 vòng (định dạng từng ô).
+- **Định dạng nhiều vùng một lệnh** (plan 21 §5.5): `et.formatRanges {formats: [{sheet, range, ...}]}` (kiểm hết trước,
+  một mục sai thì không vùng nào đổi); kết quả `et.formatRange` từ lần thứ 3 trong lượt nhắc gom vào `formatRanges`;
+  `et.createTable` từ chối hàng tiêu đề có ô trống; `et.checkRange` lấy định dạng của ô số lẻ thật. Đề B: định dạng còn
+  10 lần gọi (trước 19) và hết vòng lặp ghi `B1` (Excel tự điền `Column1`), nhưng **vẫn hết 60 vòng** (KPI từng ô bằng
+  `fillRange`, bước đổi giả định để thử, model gần như một lệnh mỗi vòng); chỉ còn 1 lỗi nhỏ (trước 4).
 
 ## 3. Chưa làm / chưa kiểm chứng
 

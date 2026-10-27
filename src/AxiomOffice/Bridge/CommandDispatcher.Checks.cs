@@ -395,9 +395,20 @@ namespace AxiomOffice.Bridge
             for (int c = 1; c <= cols; c++)
             {
                 string format = "";
+                // Định dạng của ô số lẻ đầu tiên trong cột (không phải luôn hàng 2): sheet cấu hình có hàng 2 trống,
+                // ô 0.9 đã để 0% vẫn bị báo no-number-format và model ghi lại mãi (bộ đo 27/10/2026 ca B).
+                int sample = Math.Min(2, rows);
+                for (int r = 1; r < rows; r++)
+                {
+                    if (values[r, c - 1] is double && Math.Abs((double)values[r, c - 1] % 1) > 1e-9)
+                    {
+                        sample = r + 1;
+                        break;
+                    }
+                }
                 try
                 {
-                    format = Convert.ToString(range.Cells[Math.Min(2, rows), c].NumberFormat);
+                    format = Convert.ToString(range.Cells[sample, c].NumberFormat);
                 }
                 catch (Exception)
                 {

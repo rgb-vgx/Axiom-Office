@@ -313,6 +313,31 @@ mức (26 ca). `check_docx` tách bảng dàn trang (tem `AxiomLayout`) khỏi b
 **Sau P3: 6/7 ca đạt** (mỗi ca 1 lần đo). Còn lại: đề B tốn vòng vì định dạng từng ô (gợi ý tiếp: định dạng nhiều vùng
 trong một lệnh).
 
+### 5.5 Định dạng nhiều vùng một lệnh (27/10/2026)
+
+- **`et.formatRanges {formats: [{range, sheet?, bold, italic, fontSize, fontColor, fillColor, numFmt, horizontal, wrap,
+  columnWidth}], sheet?}`**: cùng thuộc tính như `et.formatRange`, nhiều vùng / nhiều sheet trong một lời gọi; kiểm hết
+  trước (sheet có, địa chỉ đúng, màu `#RRGGBB`, mục có ít nhất một thuộc tính) - một mục sai thì không vùng nào đổi.
+- Core: từ lần `et.formatRange` thành công thứ 3 trong lượt, kết quả có `hint` nhắc gom phần còn lại vào `formatRanges`.
+- Skill `bao-cao-du-lieu`, `mo-hinh-nhieu-sheet`, `bang-diem`: định dạng tĩnh của mọi sheet gom một lần gọi.
+- Sửa thêm hai lỗi lộ ra khi đo lại đề B:
+  - `et.createTable` từ chối khi hàng tiêu đề có ô trống (Excel tự đặt `Column1` và ô tiêu đề bảng không xoá trắng được -
+    model ghi `""` vào `Config!B1` hơn 10 lần).
+  - `et.checkRange` lấy định dạng số của **ô số lẻ đầu tiên** trong cột, không luôn lấy hàng 2 (sheet cấu hình có hàng 2
+    trống: ô 0.9 đã để 0% vẫn bị báo `no-number-format`).
+- Test: Go `TestFormatRangeHintsBatchFromThirdCall`; live `test_office_templates.py` (+6: 4 vùng 2 sheet, màu sai,
+  sheet sai, mục rỗng, đọc lại màu / định dạng số trong xlsx) 18/18 Excel, `test_office_structure.py` (+3) Excel 8/8,
+  `test_live_commands.py` 294/294 (kiểm "mọi lệnh có test" nay quét cả `test_office_*.py`).
+
+| Lần đo đề B | `formatRange(s)` | Kết thúc | Lỗi chấm (min) |
+|---|---|---|---|
+| P3 (trước) | 19 `formatRange` | hết 60 vòng | - |
+| `formatRanges` | 1 `formatRanges` + 2 | hết 60 vòng: ghi `""` vào `B1` của bảng (Column1) ~10 lần | 4 |
+| + `createTable`/`checkRange` | 6 `formatRanges` + 4 | hết 60 vòng (KPI từng ô bằng `fillRange`, đổi giả định để thử) | 1 |
+
+Đề B vẫn chưa đạt: phần định dạng đã gọn, số vòng còn lại là các bước khác của một đề lớn với model gần như một lệnh
+mỗi vòng. Lần gọi `formatRanges` đầu gửi vùng của nhiều sheet mà không ghi `sheet` từng mục nên phải làm lại theo sheet.
+
 ## 6. Cách đo sau mỗi thay đổi
 
 1. Chạy lại đúng ca liên quan (`--only`), 3 lần với `ocg/beam-free`; ca P0 chạy cả bộ.

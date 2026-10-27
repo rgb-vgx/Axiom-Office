@@ -25,9 +25,12 @@ apps: [et]
      (`Err:508` = sai dấu phân cách tham số, `#DIV/0!` = mẫu bằng 0, `#REF!` = tham chiếu hỏng...),
      sửa công thức rồi ghi lại — đừng coi `"written": n` là đã xong.
 4. **Number format** theo loại: số nguyên `integer`, tiền `vnd`, tỉ lệ `percent`, điểm `score`, ngày
-   `date` → `et.formatRange {range, numFmt}` cho cả cột dữ liệu.
-5. **Hàng tiêu đề**: `et.formatRange` với các giá trị của `spreadsheet.header`. **Hàng tổng**: giá trị
-   `spreadsheet.totalRow`.
+   `date` → `numFmt` cho cả cột dữ liệu.
+5. **Hàng tiêu đề**: các giá trị của `spreadsheet.header`. **Hàng tổng**: giá trị `spreadsheet.totalRow`.
+   **Gom mọi định dạng vào MỘT `et.formatRanges`**: `{formats: [{sheet: "Data", range: "A1:I1", bold: true,
+   fillColor: "#DDEBF7"}, {sheet: "Data", range: "D2:E40", numFmt: "#,##0"}, {sheet: "Config", range: "B2:B4",
+   fillColor: "#FFF2CC"}, ...]}` — tiêu đề, ô nhập liệu, number format của mọi sheet trong một lần; đừng gọi
+   `et.formatRange` từng vùng (mỗi lần một vòng).
 6. Ghi dữ liệu **một lần** bằng mảng 2 chiều đầy đủ; không ghi từng ô.
 7. **Bảng dùng được**: bảng dữ liệu → `et.createTable {range}` (có nút lọc), `et.freezePanes {rows: 1}`
    giữ hàng tiêu đề; cột chỉ nhận vài giá trị → `et.setValidation {range, source: "Config!$A$2:$A$5"}`
@@ -46,7 +49,7 @@ apps: [et]
 - [ ] Đọc sheet hiện có (`et.listSheets`, `et.readRange`) để không ghi đè dữ liệu của người dùng.
 - [ ] Ghi bảng bằng một lệnh `et.writeRange` (tiêu đề + dữ liệu + công thức).
 - [ ] `formulaErrors` trong kết quả `et.writeRange` phải rỗng; còn thì sửa công thức và ghi lại.
-- [ ] Định dạng: tiêu đề, number format, hàng tổng.
+- [ ] Định dạng: tiêu đề, number format, hàng tổng — một lần `et.formatRanges`.
 - [ ] **Soát**: `et.checkRange` → sửa `numbers-as-text`, `mixed-types`, `no-number-format`, `empty-header`,
       `error-values`. Lặp đến khi hết các loại đó.
 - [ ] Sổ nhiều sheet: `et.checkRange` **không** truyền `range`/`sheet` còn soát ô lỗi ở **mọi** sheet

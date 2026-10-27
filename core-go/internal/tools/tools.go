@@ -123,6 +123,8 @@ type RunContext struct {
 	WebSources WebSourceSaver
 	// calls: so lan goi tung tool/lenh trong luot (CallLimit).
 	calls map[string]int
+	// formatRangeCalls: so lan et.formatRange thanh cong trong luot (batchFormatHint).
+	formatRangeCalls int
 	// templateBuilt: so slide slides_from_template da dung trong CA luot (cac lo truoc + lo nay) - cau tra loi cuoi
 	// tach "dung trong lan nay" voi "co tu luot truoc".
 	templateBuilt int

@@ -115,3 +115,17 @@ func TestOfficeActionParamsChuoiHopLeVaNull(t *testing.T) {
 		t.Fatalf(`"null" = khong tham so, khong phai loi: %+v`, r)
 	}
 }
+
+// Bo do 27/10/2026 ca B: 19 lan et.formatRange tung vung -> tu lan thu 3 ket qua nhac gom vao et.formatRanges.
+func TestFormatRangeHintsBatchFromThirdCall(t *testing.T) {
+	run, _ := recordingBridge(t)
+	tool := NewOfficeActionTool(paramsCatalog(), "et")
+	for call := 1; call <= 3; call++ {
+		result := tool.Invoke(context.Background(), map[string]any{"action": "et.formatRange",
+			"params": map[string]any{"range": "A" + strconv.Itoa(call), "numFmt": "0%"}}, run)
+		hinted := strings.Contains(result.JSON, "et.formatRanges")
+		if !result.OK || hinted != (call == 3) {
+			t.Fatalf("lan %d: goi y chi tu lan thu 3: %s", call, result.JSON)
+		}
+	}
+}

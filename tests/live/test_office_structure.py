@@ -109,6 +109,17 @@ def run_excel(out: str) -> None:
         bridge.cmd("et.addSheet", {"name": "Dashboard"})
         table = bridge.cmd("et.createTable", {"sheet": "Data", "range": "A1:D4", "name": "tblData"}) or {}
         check(table.get("table") == "tblData", "createTable", str(table))
+        # Hang tieu de co o trong -> tu choi (Excel se dat "Column1" va o do khong xoa trang duoc).
+        blank = bridge.cmd("et.createTable", {"sheet": "Config", "range": "A1:B3"}, expect_ok=False, record=False)
+        check("B1 is empty" in str(blank), "createTable tu choi tieu de trong", str(blank))
+        # Sheet cau hinh: hang 2 trong, o 0.9 da de 0% -> khong bao no-number-format (lay dinh dang o so le that).
+        bridge.cmd("et.writeRange", {"sheet": "Config", "range": "D1", "values": [["Ngưỡng"], [None], [0.9]]}, record=False)
+        bridge.cmd("et.formatRange", {"sheet": "Config", "range": "D3", "numFmt": "0%"}, record=False)
+        qa = bridge.cmd("et.checkRange", {"sheet": "Config", "range": "D1:D3"}, record=False) or {}
+        check("no-number-format" not in str(qa), "checkRange doc dinh dang cua o so le, khong phai hang 2", str(qa.get("issues")))
+        bridge.cmd("et.formatRange", {"sheet": "Config", "range": "D3", "numFmt": "General"}, record=False)
+        qa = bridge.cmd("et.checkRange", {"sheet": "Config", "range": "D1:D3"}, record=False) or {}
+        check("no-number-format" in str(qa), "checkRange van bat so le de General", str(qa.get("issues")))
         bridge.cmd("et.freezePanes", {"sheet": "Data", "rows": 1})
         bridge.cmd("et.setValidation", {"sheet": "Data", "range": "D2:D4", "source": "Config!$A$2:$A$3"})
         bridge.cmd("et.setValidation", {"sheet": "Data", "range": "B2:B4", "type": "whole", "min": 0, "max": 1000})

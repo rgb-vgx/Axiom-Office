@@ -307,6 +307,7 @@ const CHUA_CO_HANDLER = {
   "et.freezePanes": "chi co trong add-in Windows (plan 21 P1); WPS de sau",
   "et.setValidation": "chi co trong add-in Windows (plan 21 P1); WPS de sau",
   "et.deleteSheet": "chi co trong add-in Windows (plan 21 P3); WPS de sau",
+  "et.formatRanges": "chi co trong add-in Windows (plan 21 P3); WPS de sau",
   // Nam lenh lam bai theo mau (docs/architecture/template-design.md muc 6.3): moi co tren PowerPoint (COM InsertFromFile,
   // Shape.Export); WPP chua kiem.
   "wpp.newFromTemplate": "chua co handler trong add-in (chi PowerPoint)",

@@ -46,6 +46,9 @@ chung. Số liệu ở `tests/bench/results/`.
    `equal`, `notEqual`, `between`, `notBetween`, `formula`), `formula1`/`formula2`, và `styleName` có
    sẵn (`Good`, `Bad`, `Neutral`, `Warning`, `Error`) hoặc `fillColor`/`fontColor`/`bold`. Nhiều rule
    trên cùng một vùng thì để trong **một** lần gọi; gọi lại trên cùng vùng là **thay** rule cũ.
+   Định dạng tĩnh (tiêu đề, màu ô nhập liệu khác ô công thức, number format) của **mọi sheet** đi trong MỘT
+   `et.formatRanges {formats: [{sheet, range, bold?, fillColor?, numFmt?, ...}, ...]}` ở cuối — không gọi
+   `et.formatRange` từng vùng (đo 27/10/2026: 19 lần formatRange, hết 60 vòng trước khi xong).
 
 7. **Bảng lớn đi bằng công thức + điền**: `et.fillRange` viết một công thức vào ô góc rồi điền ra cả
    vùng (tham chiếu tương đối tự dịch) — đừng gửi từng ô. Dữ liệu thô có sẵn (người dùng đưa, vài
