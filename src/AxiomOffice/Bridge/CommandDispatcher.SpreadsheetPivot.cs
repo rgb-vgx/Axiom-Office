@@ -167,6 +167,25 @@ namespace AxiomOffice.Bridge
             return report;
         }
 
+        // Chart.Export chỉ ghi PNG khi chart object đang là chart được chọn; Activate() trước rồi export.
+        private static bool ExportChartPng(dynamic chartObject, string file)
+        {
+            try { chartObject.Activate(); } catch { }
+            try
+            {
+                return Convert.ToBoolean(chartObject.Chart.Export(file, "PNG"));
+            }
+            catch (Exception ex)
+            {
+                if (ex is System.Runtime.InteropServices.COMException && IsRetryableComError((System.Runtime.InteropServices.COMException)ex))
+                {
+                    throw;
+                }
+                Logger.Info("et.exportChart: " + ex.Message);
+                return false;
+            }
+        }
+
         private static Dictionary<string, object> EtExportChart(IAppHost host, Dictionary<string, object> p)
         {
             dynamic app = host.Application;
@@ -206,10 +225,17 @@ namespace AxiomOffice.Bridge
             Directory.CreateDirectory(directory);
             string safe = new string(names[index - 1].Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c).ToArray());
             string file = Path.Combine(directory, safe + "-" + DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") + ".png");
-            bool exported = Convert.ToBoolean(chartObject.Chart.Export(file, "PNG"));
-            if (!exported || !File.Exists(file))
+            // Chart.Export trả true nhưng ghi file 0 byte khi biểu đồ chưa được kích hoạt (đo 28/10/2026 trên Excel
+            // 16.0.20527: chart tạo bằng Shapes.AddChart2 rồi export ngay -> 0 byte; Activate() trước thì ra PNG thật).
+            bool exported = ExportChartPng(chartObject, file);
+            if (!exported || !File.Exists(file) || new FileInfo(file).Length == 0)
             {
-                throw new InvalidOperationException("the chart could not be exported as PNG");
+                try { if (File.Exists(file)) File.Delete(file); } catch { }
+                exported = ExportChartPng(chartObject, file);
+            }
+            if (!exported || !File.Exists(file) || new FileInfo(file).Length == 0)
+            {
+                throw new InvalidOperationException("the chart could not be exported as PNG (Excel wrote an empty file)");
             }
             return new Dictionary<string, object>
             {
