@@ -66,6 +66,8 @@ const ET_COMMANDS = [
   "et.createTable", "et.freezePanes", "et.setValidation",
   // Plan 21 P3 (27/10/2026): idem.
   "et.deleteSheet", "et.formatRanges", "et.readRanges", "et.whatIf",
+  // Trich dan bam duoc (27/10/2026): pane goi khi nguoi dung bam [Sheet!A1].
+  "et.goto",
 ];
 
 const MUTATING = ["et.addSheet", "et.renameSheet", "et.writeRange", "et.importCsv", "et.writeRanges",

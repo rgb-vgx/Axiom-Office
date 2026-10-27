@@ -26,6 +26,37 @@
     } catch (e) {}
   }
 
+  // Trich dan theo CitationRule cua Core (agent/prompt.go): [§12], [Data!C42], ['Bao cao'!A1:B5], [slide 3]. Link Markdown
+  // [chu](url) khong tinh (lookahead "(").
+  var CITATION = /\[(\u00A7\s?\d{1,6}|[Ss]lide\s+\d{1,4}|(?:'[^'\]]+'|[^\]\s!'\[]+)![A-Za-z]{1,3}\d{1,7}(?::[A-Za-z]{1,3}\d{1,7})?)\](?!\()/g;
+
+  // addCitedText: nhu addText nhung trich dan thanh link bam duoc (data-act="cite" - pane nhay toi cho do).
+  function addCitedText(el, text) {
+    var value = String(text === undefined || text === null ? "" : text);
+    var last = 0;
+    var match;
+    try {
+      CITATION.lastIndex = 0;
+      while ((match = CITATION.exec(value)) !== null) {
+        if (match.index > last) { addText(el, value.substring(last, match.index)); }
+        // span (khong phai <a href="#">): bam khong doi dia chi trang, khung chat khong nhay len dau.
+        var link = document.createElement("span");
+        try {
+          link.className = "cite";
+          link.setAttribute("role", "link");
+          link.setAttribute("tabindex", "0");
+          link.setAttribute("data-act", "cite");
+          link.setAttribute("data-value", match[1]);
+          link.setAttribute("title", "Nhảy tới chỗ này trong tài liệu");
+        } catch (eAttr) {}
+        addText(link, match[0]);
+        el.appendChild(link);
+        last = match.index + match[0].length;
+      }
+    } catch (e) {}
+    if (last < value.length) { addText(el, value.substring(last)); }
+  }
+
   function make(tag, className, text) {
     var el = document.createElement(tag);
     try { if (className) { el.className = className; } } catch (e) {}
@@ -84,6 +115,7 @@
     trimText: trimText,
     clearNode: clearNode,
     addText: addText,
+    addCitedText: addCitedText,
     make: make,
     baseUrl: baseUrl,
     actOf: actOf

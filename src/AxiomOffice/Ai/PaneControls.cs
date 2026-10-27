@@ -336,6 +336,41 @@ namespace AxiomOffice.Ai
             }
         }
 
+        // Bấm trích dẫn tài liệu ([§12], [Data!C42], [slide 3]) trong câu trả lời: pane nhảy tới chỗ đó (AskAiPane).
+        public static event Action<ChatBubble, string> CitationClicked;
+
+        private string CitationAt(Point point)
+        {
+            if (_layout == null)
+            {
+                return null;
+            }
+            int padX = PaneTheme.Px(PaneTheme.BubblePadX);
+            int padY = PaneTheme.Px(PaneTheme.BubblePadY);
+            return _layout.TargetAt(new Point(point.X - padX, point.Y - padY));
+        }
+
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            base.OnMouseMove(e);
+            Cursor = CitationAt(e.Location) != null ? Cursors.Hand : Cursors.Default;
+        }
+
+        protected override void OnMouseClick(MouseEventArgs e)
+        {
+            base.OnMouseClick(e);
+            if (e.Button != MouseButtons.Left)
+            {
+                return;
+            }
+            string target = CitationAt(e.Location);
+            Action<ChatBubble, string> handler = CitationClicked;
+            if (target != null && handler != null)
+            {
+                handler(this, target);
+            }
+        }
+
         protected override void OnKeyDown(KeyEventArgs e)
         {
             base.OnKeyDown(e);

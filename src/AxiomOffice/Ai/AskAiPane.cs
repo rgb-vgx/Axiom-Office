@@ -194,6 +194,7 @@ namespace AxiomOffice.Ai
             _attachLink.LinkClicked += delegate { PickAttachments(); };
             _promptTip.SetToolTip(_prompt, Ui.T("Enter để gửi · Shift+Enter xuống dòng"));
             Ui.Changed += OnUiLanguageChanged;
+            ChatBubble.CitationClicked += OnCitationClicked;
             SetPlanMode(false);
             _moreLink.LinkClicked += delegate { ShowMoreMenu(); };
             _composer.Resize += delegate { LayoutComposer(); };
@@ -215,6 +216,7 @@ namespace AxiomOffice.Ai
             if (disposing)
             {
                 Ui.Changed -= OnUiLanguageChanged;
+                ChatBubble.CitationClicked -= OnCitationClicked;
                 CommandDispatcher.UnlockSelection();
             }
             if (disposing && _run != null)
@@ -222,6 +224,53 @@ namespace AxiomOffice.Ai
                 _run.Cancel();
             }
             base.Dispose(disposing);
+        }
+
+        // Bấm trích dẫn trong câu trả lời ([§12], [Data!C42], [slide 3]): chọn + cuộn tới chỗ đó (writer.goto / et.goto /
+        // wpp.goto - chỉ đọc, gọi thẳng bridge như "Hoàn tác lượt này"). Event là static: chỉ nhận bong bóng của pane này.
+        private void OnCitationClicked(ChatBubble bubble, string target)
+        {
+            Connect host = CurrentHost;
+            if (host == null || _busy || bubble == null || !_chat.Contains(bubble) || string.IsNullOrWhiteSpace(target))
+            {
+                return;
+            }
+            string text = target.Trim();
+            string action;
+            var parameters = new Dictionary<string, object>();
+            int number;
+            if (text.StartsWith("§", StringComparison.Ordinal))
+            {
+                if (!int.TryParse(text.Substring(1).Trim(), out number))
+                {
+                    return;
+                }
+                action = "writer.goto";
+                parameters["paragraph"] = number;
+            }
+            else if (text.StartsWith("slide", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!int.TryParse(text.Substring(5).Trim(), out number))
+                {
+                    return;
+                }
+                action = "wpp.goto";
+                parameters["slide"] = number;
+            }
+            else
+            {
+                action = "et.goto";
+                parameters["range"] = text;
+            }
+            try
+            {
+                object reply = CommandDispatcher.Execute(host, action, parameters);
+                Logger.Info("AskAiPane: citation " + text + " -> " + action + " " + Truncate(new System.Web.Script.Serialization.JavaScriptSerializer().Serialize(reply), 160));
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("AskAiPane: citation " + text + " failed", ex);
+            }
         }
 
         private readonly ToolTip _promptTip = new ToolTip();

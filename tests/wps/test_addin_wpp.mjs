@@ -54,7 +54,7 @@ import { addinCatalog, assertFails, assertKindRefused, assertMetadata, loadAddin
 const WPP_COMMANDS = [
   "wpp.newPresentation", "wpp.open", "wpp.listSlides", "wpp.addSlide", "wpp.addText", "wpp.addTextBox",
   "wpp.addImage", "wpp.addTable", "wpp.setNotes", "wpp.deleteSlide", "wpp.exportPdf", "wpp.save",
-  "wpp.saveAs", "wpp.closeAll", "wpp.checkLayout",
+  "wpp.saveAs", "wpp.closeAll", "wpp.checkLayout", "wpp.goto",
 ];
 
 const MUTATING = ["wpp.addSlide", "wpp.addText", "wpp.addTextBox", "wpp.addImage", "wpp.addTable",

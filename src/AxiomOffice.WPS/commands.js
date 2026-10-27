@@ -3208,6 +3208,64 @@
   }
 
   // ---- WPP (Presentation): khong co UndoRecord, khong lenh nao mo UndoRecord.
+  // ---- Nhay toi cho duoc trich dan (pane goi khi nguoi dung bam [§12] / [Data!C42] / [slide 3]) - chi chon + cuon.
+  function cmdWriterGoto(app, params) {
+    var doc = app.ActiveDocument;
+    var paras = doc.Paragraphs;
+    var count = Number(numProp(paras, "Count"));
+    var index = paramInt(params, "paragraph", 0);
+    if (index < 1 || index > count) { throw new Error("'paragraph' must be between 1 and " + count); }
+    var hint = String(paramString(params, "text", "") || "").replace(/^\s+|\s+$/g, "").substring(0, 30).toLowerCase();
+    var startsWith = function (i) {
+      var t = "";
+      try { t = String(paras.Item(i).Range.Text || "").replace(/^\s+/, "").toLowerCase(); } catch (e) {}
+      return t.indexOf(hint) === 0;
+    };
+    // Tai lieu da doi sau cau tra loi: so doan lech - co chu dau doan thi do quanh do (+-40 doan).
+    if (hint && !startsWith(index)) {
+      for (var offset = 1; offset <= 40; offset++) {
+        if (index - offset >= 1 && startsWith(index - offset)) { index -= offset; break; }
+        if (index + offset <= count && startsWith(index + offset)) { index += offset; break; }
+      }
+    }
+    var range = paras.Item(index).Range;
+    range.Select();
+    try { app.ActiveWindow.ScrollIntoView(range, true); } catch (eScroll) {}
+    var text = "";
+    try { text = String(range.Text || "").replace(/\r/g, "").replace(/^\s+|\s+$/g, ""); } catch (eText) {}
+    return { paragraph: index, text: text.length > 120 ? text.substring(0, 120) + "..." : text };
+  }
+
+  function cmdEtGoto(app, params) {
+    var address = String(paramString(params, "range", "") || "").replace(/^\s+|\s+$/g, "");
+    if (!address) { throw new Error("'range' is required, e.g. 'C42' or 'Data!C42'"); }
+    var sheetParams = { sheet: paramString(params, "sheet", null) };
+    var bang = address.lastIndexOf("!");
+    if (bang > 0) {
+      sheetParams.sheet = address.substring(0, bang).replace(/^'|'$/g, "").replace(/''/g, "'");
+      address = address.substring(bang + 1);
+    }
+    var box = etParseAddr(address);
+    var r = etResolveSheet(app, sheetParams);
+    try { r.ws.Activate(); } catch (eAct) {}
+    var rng = r.ws.Range(etAddrStr(box.r1, box.c1, box.r2, box.c2));
+    rng.Select();
+    return { sheet: r.name, range: etAddrStr(box.r1, box.c1, box.r2, box.c2) };
+  }
+
+  function cmdWppGoto(app, params) {
+    var pres = wppPres(app);
+    var count = Number(numProp(pres.Slides, "Count"));
+    var slide = paramInt(params, "slide", 0);
+    if (slide < 1 || slide > count) { throw new Error("'slide' must be between 1 and " + count); }
+    try {
+      app.ActiveWindow.View.GotoSlide(slide);
+    } catch (eGo) {
+      pres.Slides.Item(slide).Select();
+    }
+    return { slide: slide };
+  }
+
   function wppPres(app) {
     var p = app.ActivePresentation;
     if (p === undefined || p === null) {
@@ -3614,6 +3672,9 @@
     "et.saveAs": cmdEtSaveAs,
     "et.closeAll": cmdEtCloseAll,
     "et.checkRange": cmdEtCheckRange,
+    "writer.goto": cmdWriterGoto,
+    "et.goto": cmdEtGoto,
+    "wpp.goto": cmdWppGoto,
     "wpp.newPresentation": cmdWppNewPresentation,
     "wpp.open": cmdWppOpen,
     "wpp.listSlides": cmdWppListSlides,
