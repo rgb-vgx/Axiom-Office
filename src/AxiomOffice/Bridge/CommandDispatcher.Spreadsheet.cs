@@ -756,9 +756,28 @@ namespace AxiomOffice.Bridge
                     "' already exists on sheet '" + Convert.ToString(sheet.Name) + "'");
             }
 
+            // Vùng nguồn ở sheet khác ("Data!A1:C7", "'Kế hoạch'!A1:C7"): biểu đồ đặt trên `sheet`, dữ liệu đọc thẳng từ sheet
+            // nguồn để tự cập nhật (bộ đo 26/10/2026 ca x09: trước phải chép dữ liệu sang Dashboard làm bảng trung gian).
+            dynamic source = sheet;
+            string local = address;
+            int bang = address.LastIndexOf('!');
+            if (bang > 0)
+            {
+                string sourceName = address.Substring(0, bang).Trim().Trim('\'').Replace("''", "'");
+                local = address.Substring(bang + 1);
+                try
+                {
+                    source = wb.Worksheets[sourceName];
+                }
+                catch (Exception)
+                {
+                    throw new InvalidOperationException("no sheet named '" + sourceName + "' for the chart data");
+                }
+            }
+            dynamic data = source.Range[local];
             dynamic shape = sheet.Shapes.AddChart2(-1, xlType, anchorCell.Left, anchorCell.Top, width, height);
             shape.Name = name;
-            shape.Chart.SetSourceData(sheet.Range[address]);
+            shape.Chart.SetSourceData(data);
             string title = ParamString(p, "title", null);
             bool titleApplied = false;
             if (!string.IsNullOrEmpty(title))

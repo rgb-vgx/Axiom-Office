@@ -196,6 +196,41 @@ khi có máy Linux.
 
 Không còn lỗi critical nào trong 8 ca. Ca trượt còn lại đều do thiếu lệnh (P1) hoặc số vòng (P2).
 
+## 5.2 Kết quả P1 (26/10/2026, đo lại 9 ca, `results/p1-beam-free-2026-10-26/`)
+
+Lệnh mới (C# `CommandDispatcher.WriterStructure.cs`, `CommandDispatcher.SpreadsheetStructure.cs`; catalog + bản sinh):
+
+- **Word**: `writer.setStyle {style, paragraphs}` (style dựng sẵn theo hằng `WdBuiltinStyle`, không phụ thuộc ngôn ngữ
+  giao diện), `writer.insertToc {levels, before}` (gọi lại = cập nhật), `writer.setHeaderFooter {header, footer,
+  pageNumber}`, `writer.insertCaption {text, label, before}` (style Caption + trường SEQ; mặc định cuối bài, `before`
+  = chú thích bảng có sẵn). `insertTable` luôn lặp hàng tiêu đề; **từ chối ô công thức** (`=C2/B2*100` - bảng Word
+  không tính, ca `w03` từng in nguyên chuỗi).
+- **Thứ tự viết nối tiếp**: `appendText` đưa con trỏ về cuối chữ vừa nối; `heading`/`insertTable` sang đoạn mới khi
+  con trỏ ở cuối một đoạn có chữ - trước đó bảng gọi sau `appendText` nằm trên đoạn vừa nối.
+- **Excel**: `et.createTable` (ListObject, có lọc), `et.freezePanes {rows, cols}`, `et.setValidation` (danh sách gõ
+  thẳng / `source` vùng ở sheet khác / số, ngày trong khoảng), `et.addChart` nhận vùng sheet khác (`Data!A1:C7`).
+- Skill `the-thuc-van-ban`, `bao-cao-du-lieu` chỉ cách dùng; khoá vùng bôi đen từ chối `insertToc`,
+  `setHeaderFooter`, `insertCaption`, `setStyle` có `paragraphs`.
+- Test live `tests/live/test_office_structure.py` (14 kiểm tra, Word + Excel thật, gọi thẳng bridge): **14/14**;
+  `test_live_commands.py --apps word,excel` **211/211**.
+
+| Ca | Baseline | Sau P0 | Sau P1 |
+|---|---|---|---|
+| w02 báo cáo dài | không TOC, không số trang | - | TOC + số trang ✓; còn 1 trang trắng cuối (P2) |
+| w03 bảng nhỏ | caption chữ thường | - | số % đúng (công thức bị từ chối); model không gọi `insertCaption` |
+| w08 chuẩn hóa tiêu đề | **mất nội dung**, 60+ vòng | không mất chữ, 60+ vòng | **✓ 5 vòng** |
+| w10 đầu/chân trang | dừng vì chặn lặp | 14 vòng, trượt | **✓ 4 vòng** |
+| a báo cáo 6–8 trang | 60+ vòng, không TOC/số trang/caption | 60+ vòng | 0 lỗi major; còn 11 trang (đề 6–8) và 60 vòng (P2) |
+| x05 bảng 200 dòng | không freeze/lọc | - | **✓ 7 vòng** |
+| x06 danh sách chọn | `DOCUMENT_CLOSED` | thiếu validation | **✓ 8 vòng** |
+| x09 biểu đồ sheet khác | bảng chép trung gian, biểu đồ rác | - | **✓ 10 vòng** (biểu đồ đọc thẳng `Data!`) |
+| b workbook 4 sheet | 60+ vòng, thiếu Table/freeze/validation | 60+ vòng | **✓ 51 vòng** |
+
+**Đạt 6/9 ca P1** (trước P1: 0/9). Toàn bộ 22 ca chưa đo lại một lượt.
+
+Lỗi có sẵn phát hiện thêm: `tests/live/test_writer_format.py` trượt "thân bài căn đều" (18/19) cả trên code trước P1
+- `insertStyledText {alignment: "justify"}` ra `left`; chưa sửa.
+
 ## 6. Cách đo sau mỗi thay đổi
 
 1. Chạy lại đúng ca liên quan (`--only`), 3 lần với `ocg/beam-free`; ca P0 chạy cả bộ.

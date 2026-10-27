@@ -62,6 +62,8 @@ const ET_COMMANDS = [
   "et.activateSheet", "et.readRange", "et.writeRange", "et.importCsv", "et.writeRanges", "et.fillRange",
   "et.formatRange", "et.setConditionalFormat", "et.listConditionalFormats", "et.addChart", "et.listCharts",
   "et.undo", "et.exportPdf", "et.save", "et.saveAs", "et.closeAll", "et.checkRange",
+  // Plan 21 P1 (26/10/2026): co trong catalog, add-in WPS chua co handler (test_addin.mjs CHUA_CO_HANDLER).
+  "et.createTable", "et.freezePanes", "et.setValidation",
 ];
 
 const MUTATING = ["et.addSheet", "et.renameSheet", "et.writeRange", "et.importCsv", "et.writeRanges",
@@ -74,7 +76,7 @@ const REQUIRES_PARAM = ["et.open", "et.renameSheet", "et.activateSheet", "et.wri
   "et.writeRanges", "et.fillRange", "et.formatRange", "et.setConditionalFormat", "et.addChart",
   "et.exportPdf", "et.saveAs"];
 
-test("registry: du 23 lenh et.*, metadata giong het registry LibreOffice", () => {
+test("registry: du 26 lenh et.*, metadata giong het registry LibreOffice", () => {
   const ctx = loadAddin();
   const mine = addinCatalog(ctx).filter((c) => c.name.indexOf("et.") === 0);
   assertMetadata(ET_COMMANDS, mine);

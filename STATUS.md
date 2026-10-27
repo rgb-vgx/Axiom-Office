@@ -288,6 +288,11 @@ trúc không dây cắt hộp. Sửa: sơ đồ lồng trong khoá `diagram`, `r
 - **P0 xong** (plan 21 §5.1): undo không lùi quá việc của lượt, theo dõi tài liệu khi lưu đổi tên, chặn lặp chỉ khi
   lặp liền, ghi đè ô do lượt ghi không hỏi, `doc_design` từ chối tài liệu gần trống. Đo lại 8 ca: hết lỗi critical
   (`w08` không còn mất chữ, `x06` không còn `DOCUMENT_CLOSED`), `x01`/`x04` 0 xác nhận và số vòng giảm một nửa.
+- **P1 xong** (plan 21 §5.2): 7 lệnh mới - Word `setStyle`, `insertToc`, `setHeaderFooter`, `insertCaption`; Excel
+  `createTable`, `freezePanes`, `setValidation` - và `addChart` lấy vùng sheet khác; `appendText`/`heading`/`insertTable`
+  viết nối tiếp đúng thứ tự; `insertTable` từ chối ô công thức. Đo lại 9 ca P1: **6/9** (trước 0/9), đề B đạt lần đầu.
+  Live: `test_office_structure.py` 14/14, `test_live_commands.py --apps word,excel` 211/211. `test_writer_format.py`
+  vẫn 18/19 (căn đều - lỗi có từ trước).
 
 ## 3. Chưa làm / chưa kiểm chứng
 

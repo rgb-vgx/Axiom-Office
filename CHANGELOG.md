@@ -5,6 +5,19 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Word/Excel P1: lệnh cấu trúc có ngữ nghĩa (26/10/2026)
+
+- **Word**: `writer.setStyle` (gán Heading/Title/List... cho đoạn có sẵn theo số đoạn `writer.outline`, style dựng sẵn
+  theo hằng nên không phụ thuộc ngôn ngữ giao diện), `writer.insertToc` (chèn; gọi lại = cập nhật số trang),
+  `writer.setHeaderFooter` (đầu/chân trang mọi section + số trang), `writer.insertCaption` (Caption + trường SEQ, mặc
+  định cuối bài, `before` để chú thích bảng có sẵn). `insertTable` luôn lặp hàng tiêu đề và từ chối ô công thức.
+- **Excel**: `et.createTable` (Excel Table có lọc), `et.freezePanes`, `et.setValidation` (danh sách gõ thẳng, vùng ở
+  sheet khác, số/ngày trong khoảng); `et.addChart` nhận vùng nguồn ở sheet khác (`Data!A1:C7`).
+- **Viết nối tiếp đúng thứ tự**: `appendText` đưa con trỏ về cuối chữ vừa nối; `heading`/`insertTable` sang đoạn mới
+  khi con trỏ ở cuối một đoạn có chữ.
+- Skill `the-thuc-van-ban`, `bao-cao-du-lieu` hướng dẫn lệnh mới; test live `tests/live/test_office_structure.py`.
+- Bộ đo `tests/bench/office`: đọc validation trong `extLst` (x14), Dashboard chỉ có biểu đồ không bị tính là gõ cứng.
+
 ### Fixed — Word/Excel P0: không mất dữ liệu, lượt không tự hỏng (26/10/2026)
 
 - **Undo chỉ lùi việc của lượt**: Core đếm bước hoàn tác do lượt tạo (theo trường `undo` của catalog), `writer.undo`/

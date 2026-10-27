@@ -25,6 +25,8 @@ S = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
 REL = "{http://schemas.openxmlformats.org/package/2006/relationships}"
 RID = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"
 C = "{http://schemas.openxmlformats.org/drawingml/2006/chart}"
+X14 = "{http://schemas.microsoft.com/office/spreadsheetml/2009/9/main}"
+XM = "{http://schemas.microsoft.com/office/excel/2006/main}"
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -142,6 +144,12 @@ def check_package(path: str, required: list[str]) -> dict:
             formula = validation.find(S + "formula1")
             info["validations"].append({"type": validation.get("type"), "sqref": validation.get("sqref"),
                                         "formula": formula.text if formula is not None else ""})
+        # Validation tham chieu sheet khac (vd danh sach o Config) Excel luu trong extLst x14, khong o tren.
+        for validation in root.iter(X14 + "dataValidation"):
+            formula = validation.find(X14 + "formula1/" + XM + "f")
+            sqref = validation.find(XM + "sqref")
+            info["validations"].append({"type": validation.get("type"), "sqref": sqref.text if sqref is not None else "",
+                                        "formula": formula.text if formula is not None else ""})
         for block in root.iter(S + "conditionalFormatting"):
             for rule in block.iter(S + "cfRule"):
                 info["conditional"].append({"sqref": block.get("sqref"), "type": rule.get("type"),
@@ -176,7 +184,7 @@ def check_package(path: str, required: list[str]) -> dict:
             issue("minor", "MIXED_NUMBER_FORMAT", "%s: %s" % (name, mixed))
     dashboard = report["sheets"].get("Dashboard")
     if dashboard is not None:
-        if dashboard["formulas"] == 0:
+        if dashboard["formulas"] == 0 and dashboard["constants"] > 0:
             issue("critical", "DASHBOARD_HARDCODED", "Dashboard khong co cong thuc nao (%d so go cung)" % dashboard["constants"])
         elif dashboard["constants"] > dashboard["formulas"]:
             issue("major", "DASHBOARD_MOSTLY_CONSTANTS", "Dashboard %d so go cung / %d cong thuc" % (dashboard["constants"], dashboard["formulas"]))

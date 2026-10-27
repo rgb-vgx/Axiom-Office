@@ -293,6 +293,14 @@ const CHUA_CO_HANDLER = {
   // (writer.outline da co handler trong WPS JS tu commit P0-03 nen khong con o day.)
   "writer.restyle": "chi co trong add-in Windows (lenh thiet ke, doc_design); WPS JS chua viet handler",
   "writer.insertBlocks": "chi co trong add-in Windows (lenh thiet ke, doc_design); WPS JS chua viet handler",
+  // Lenh cau truc Word/Excel (docs/plans/21-v0 P1, 26/10/2026): moi co o add-in Windows; WPS de sau (may Linux).
+  "writer.setStyle": "chi co trong add-in Windows (plan 21 P1); WPS de sau",
+  "writer.insertToc": "chi co trong add-in Windows (plan 21 P1); WPS de sau",
+  "writer.setHeaderFooter": "chi co trong add-in Windows (plan 21 P1); WPS de sau",
+  "writer.insertCaption": "chi co trong add-in Windows (plan 21 P1); WPS de sau",
+  "et.createTable": "chi co trong add-in Windows (plan 21 P1); WPS de sau",
+  "et.freezePanes": "chi co trong add-in Windows (plan 21 P1); WPS de sau",
+  "et.setValidation": "chi co trong add-in Windows (plan 21 P1); WPS de sau",
   // Nam lenh lam bai theo mau (docs/architecture/template-design.md muc 6.3): moi co tren PowerPoint (COM InsertFromFile,
   // Shape.Export); WPP chua kiem.
   "wpp.newFromTemplate": "chua co handler trong add-in (chi PowerPoint)",

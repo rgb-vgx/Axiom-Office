@@ -17,7 +17,7 @@
     {
       "id": "w03-bang-nho", "app": "word", "kind": "table-small",
       "prompts": ["Chèn bảng kết quả tuyển sinh có tiêu đề bảng (caption) 'Bảng 1. Kết quả tuyển sinh 2024–2026': năm 2024 chỉ tiêu 500, nhập học 480; năm 2025 chỉ tiêu 550, nhập học 541; năm 2026 chỉ tiêu 600, nhập học 612. Thêm cột tỷ lệ nhập học (%) tính đúng, một câu nhận xét dưới bảng."],
-      "mustContain": ["480", "541", "612", "96", "98,4", "102"],
+      "mustContain": ["480", "541", "612", "96", ["98,4", "98,36"], "102"],
       "expect": {"minTables": 1, "captions": 1}
     },
     {

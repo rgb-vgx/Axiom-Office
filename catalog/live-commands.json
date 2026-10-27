@@ -664,6 +664,117 @@
     ]
   },
   {
+    "name": "writer.setStyle",
+    "kind": "wps",
+    "agent": true,
+    "undo": true,
+    "summary": "Gán style cho đoạn CÓ SẴN (không đổi chữ): `paragraphs` = số đoạn theo writer.outline; bỏ trống = các đoạn đang chọn. Style: Heading 1-9, Normal, Title, Subtitle, List Bullet, List Number, Caption, Quote",
+    "params": [
+      {
+        "name": "style",
+        "required": true,
+        "hint": "e.g. 'Heading 2', 'Normal', 'List Bullet'"
+      },
+      {
+        "name": "paragraphs",
+        "required": false,
+        "hint": "array of paragraph numbers from writer.outline (n); default: the selected paragraphs"
+      },
+      {
+        "name": "document",
+        "required": false,
+        "hint": "full path of the document to work on; default: the active one"
+      }
+    ]
+  },
+  {
+    "name": "writer.insertToc",
+    "kind": "wps",
+    "agent": true,
+    "undo": true,
+    "summary": "Mục lục tự động từ các Heading: chưa có thì chèn tại con trỏ (hoặc trước đoạn `before`), đã có thì cập nhật số trang - gọi lại sau khi viết xong",
+    "params": [
+      {
+        "name": "levels",
+        "required": false,
+        "hint": "heading levels 1-9, default 3"
+      },
+      {
+        "name": "before",
+        "required": false,
+        "hint": "paragraph number from writer.outline to insert before; default: at the cursor"
+      },
+      {
+        "name": "document",
+        "required": false,
+        "hint": "full path of the document to work on; default: the active one"
+      }
+    ]
+  },
+  {
+    "name": "writer.setHeaderFooter",
+    "kind": "wps",
+    "agent": true,
+    "undo": true,
+    "summary": "Đầu trang / chân trang cho mọi section (thay nội dung cũ) và số trang tự động",
+    "params": [
+      {
+        "name": "header",
+        "required": false,
+        "hint": "header text; \"\" clears it"
+      },
+      {
+        "name": "footer",
+        "required": false,
+        "hint": "footer text; \"\" clears it"
+      },
+      {
+        "name": "pageNumber",
+        "required": false,
+        "hint": "true or left/center/right: page number field in the footer (after footer text)"
+      },
+      {
+        "name": "align",
+        "required": false,
+        "hint": "left/center/right for header and footer text, default center"
+      },
+      {
+        "name": "document",
+        "required": false,
+        "hint": "full path of the document to work on; default: the active one"
+      }
+    ]
+  },
+  {
+    "name": "writer.insertCaption",
+    "kind": "wps",
+    "agent": true,
+    "undo": true,
+    "summary": "Chú thích có đánh số tự động (style Caption + trường SEQ) \"Bảng 1. ...\": mặc định ở CUỐI bài - gọi ngay trước writer.insertTable; `before` = số đoạn/bảng theo writer.outline để chú thích bảng có sẵn",
+    "params": [
+      {
+        "name": "text",
+        "required": true,
+        "hint": "caption text without the number, e.g. 'Kết quả tuyển sinh 2024-2026'"
+      },
+      {
+        "name": "label",
+        "required": false,
+        "hint": "Bảng (default) / Hình / Biểu đồ..."
+      },
+      {
+        "name": "before",
+        "required": false,
+        "hint": "paragraph/table number from writer.outline to caption; default: end of the document"
+      },
+      {
+        "name": "document",
+        "required": false,
+        "hint": "full path of the document to work on; default: the active one"
+      }
+    ]
+  },
+  {
     "name": "writer.undo",
     "kind": "wps",
     "agent": true,
@@ -1187,6 +1298,123 @@
     "undo": false,
     "summary": "Danh sách biểu đồ trên sheet",
     "params": [
+      {
+        "name": "sheet",
+        "required": false,
+        "hint": null
+      },
+      {
+        "name": "workbook",
+        "required": false,
+        "hint": "full path of the workbook to work on; default: the active one"
+      }
+    ]
+  },
+  {
+    "name": "et.createTable",
+    "kind": "et",
+    "agent": true,
+    "undo": true,
+    "summary": "Biến vùng dữ liệu (hàng đầu là tiêu đề) thành Excel Table: có nút lọc, tự mở rộng, công thức theo cột",
+    "params": [
+      {
+        "name": "range",
+        "required": true,
+        "hint": "data incl. header row, e.g. 'A1:I4'"
+      },
+      {
+        "name": "sheet",
+        "required": false,
+        "hint": null
+      },
+      {
+        "name": "name",
+        "required": false,
+        "hint": "table name, e.g. 'tblProjects'"
+      },
+      {
+        "name": "style",
+        "required": false,
+        "hint": "e.g. 'TableStyleMedium2' (default)"
+      },
+      {
+        "name": "workbook",
+        "required": false,
+        "hint": "full path of the workbook to work on; default: the active one"
+      }
+    ]
+  },
+  {
+    "name": "et.freezePanes",
+    "kind": "et",
+    "agent": true,
+    "undo": true,
+    "summary": "Cố định hàng/cột tiêu đề khi cuộn (rows = số hàng trên cùng, cols = số cột bên trái; 0/0 = bỏ cố định)",
+    "params": [
+      {
+        "name": "rows",
+        "required": false,
+        "hint": "top rows to keep visible, default 1"
+      },
+      {
+        "name": "cols",
+        "required": false,
+        "hint": "left columns to keep visible, default 0"
+      },
+      {
+        "name": "sheet",
+        "required": false,
+        "hint": null
+      },
+      {
+        "name": "workbook",
+        "required": false,
+        "hint": "full path of the workbook to work on; default: the active one"
+      }
+    ]
+  },
+  {
+    "name": "et.setValidation",
+    "kind": "et",
+    "agent": true,
+    "undo": true,
+    "summary": "Kiểm tra dữ liệu nhập cho vùng: danh sách chọn (`list` hoặc `source` là vùng chứa danh sách) hoặc số/ngày trong khoảng (`type` + min/max); thay quy tắc cũ của vùng",
+    "params": [
+      {
+        "name": "range",
+        "required": true,
+        "hint": null
+      },
+      {
+        "name": "list",
+        "required": false,
+        "hint": "array of allowed values"
+      },
+      {
+        "name": "source",
+        "required": false,
+        "hint": "range holding the allowed values, e.g. 'Config!$B$2:$B$5'"
+      },
+      {
+        "name": "type",
+        "required": false,
+        "hint": "list (default when list/source) / whole / decimal / date"
+      },
+      {
+        "name": "min",
+        "required": false,
+        "hint": null
+      },
+      {
+        "name": "max",
+        "required": false,
+        "hint": null
+      },
+      {
+        "name": "message",
+        "required": false,
+        "hint": "error message shown on invalid input"
+      },
       {
         "name": "sheet",
         "required": false,

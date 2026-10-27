@@ -44,7 +44,10 @@ namespace AxiomOffice.Bridge
             { "writer.closeAll", "closes the documents" },
             // InsertBreak của Word THAY cả vùng chọn bằng dấu ngắt: khoá vùng luôn có vùng chọn nên lệnh này
             // xoá cả đoạn đã bôi đen. Muốn ngắt trang thì bỏ bôi đen rồi yêu cầu.
-            { "writer.insertPageBreak", "replaces the whole selected passage with a page break" }
+            { "writer.insertPageBreak", "replaces the whole selected passage with a page break" },
+            { "writer.insertToc", "inserts a table of contents outside the selection" },
+            { "writer.setHeaderFooter", "changes the headers and footers of the whole document" },
+            { "writer.insertCaption", "inserts a new paragraph" }
         };
 
         // Lệnh THAY cả vùng chọn bằng chữ mới: vô hại với vùng chữ, nhưng nếu vùng chứa TRỌN một bảng thì bảng bị

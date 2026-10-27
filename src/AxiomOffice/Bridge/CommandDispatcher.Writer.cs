@@ -186,6 +186,21 @@ namespace AxiomOffice.Bridge
                         inserted.ParagraphFormat.Alignment = ParseAlignment(alignment);
                     }
                 }
+                // Con trỏ về cuối chữ vừa nối: lệnh làm tại con trỏ (heading, insertTable) nối tiếp đúng chỗ thay vì chèn
+                // vào vị trí cũ phía trên (bộ thử 26/10/2026: bảng gọi sau appendText nằm trên đoạn vừa nối). Không thêm
+                // đoạn trống (tài liệu không được có đoạn rỗng thừa); heading/insertTable tự sang đoạn mới khi con trỏ ở
+                // cuối một đoạn có chữ.
+                try
+                {
+                    dynamic cursor = doc.Paragraphs.Last.Range;
+                    cursor.MoveEnd(1, -1);
+                    cursor.Collapse(0);
+                    cursor.Select();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Info("writer.appendText: không đưa được con trỏ về cuối: " + ex.Message);
+                }
             }
             int paragraphs = normalized.Split('\r').Length;
             return new Dictionary<string, object> { { "appended", normalized.Length }, { "paragraphs", paragraphs } };
@@ -481,6 +496,23 @@ namespace AxiomOffice.Bridge
             {
                 throw new ArgumentException("'rows' and 'cols' are required (or pass 'values' as a 2D array to size the table)");
             }
+            // Bảng Word không tính công thức: "=C2/B2*100" hiện nguyên chuỗi cho người đọc (bộ đo 26/10/2026 ca w03). Từ chối
+            // trước khi chèn để model ghi số đã tính.
+            if (valueRows != null)
+            {
+                foreach (IList row in valueRows)
+                {
+                    foreach (object cell in row ?? new object[0])
+                    {
+                        string text = Convert.ToString(cell);
+                        if (text != null && System.Text.RegularExpressions.Regex.IsMatch(text.Trim(), @"^=\s*[A-Za-z(]"))
+                        {
+                            throw new ArgumentException("Word tables do not calculate formulas: cell '" + text.Trim() +
+                                "' would be shown as text. Compute the value yourself and write the number (e.g. 96%)");
+                        }
+                    }
+                }
+            }
             dynamic app = host.Application;
             int filled = 0;
             string styleError = null;
@@ -502,6 +534,14 @@ namespace AxiomOffice.Bridge
                             filled++;
                         }
                     }
+                }
+                // Hàng đầu là tiêu đề: lặp lại ở đầu mỗi trang khi bảng dài qua trang (plan 21 P1; bảng 30 dòng ca w04).
+                try
+                {
+                    table.Rows[1].HeadingFormat = -1;
+                }
+                catch
+                {
                 }
                 if (HasParam(p, "style"))
                 {
@@ -759,10 +799,35 @@ namespace AxiomOffice.Bridge
 
         // Chỗ chèn bảng: điểm cuối vùng chọn (Tables.Add trên vùng chọn có nội dung sẽ thay nó, gặp nội
         // dung không xoá được thì lỗi "The range cannot be deleted"); đang ở trong bảng thì chèn sau bảng.
+        // Vị trí thu gọn nằm ở cuối chữ của một đoạn có chữ (không phải đoạn trống, không trong bảng).
+        private static bool AtEndOfFilledParagraph(dynamic range)
+        {
+            try
+            {
+                if (Convert.ToInt32(range.Start) != Convert.ToInt32(range.End) || Convert.ToBoolean(range.Information(12)))
+                {
+                    return false;
+                }
+                dynamic paragraph = range.Paragraphs[1].Range;
+                string text = Convert.ToString(paragraph.Text).TrimEnd('\r', '\a');
+                return text.Trim().Length > 0 && Convert.ToInt32(range.Start) >= Convert.ToInt32(paragraph.End) - 1;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private static dynamic TableAnchor(dynamic app)
         {
             dynamic range = app.Selection.Range;
             range.Collapse(0);
+            // Con trỏ ở cuối một đoạn có chữ (vd sau writer.appendText): bảng thành đoạn riêng NGAY SAU đoạn đó.
+            if (AtEndOfFilledParagraph(range))
+            {
+                range.InsertParagraphAfter();
+                range.Collapse(0);
+            }
             try
             {
                 if (Convert.ToBoolean(range.Information(12)))
@@ -888,6 +953,11 @@ namespace AxiomOffice.Bridge
             {
                 if (!string.IsNullOrEmpty(text))
                 {
+                    // Con trỏ ở cuối một đoạn có chữ (vd sau writer.appendText): sang đoạn mới, không biến đoạn đó thành tiêu đề.
+                    if (AtEndOfFilledParagraph(app.Selection.Range))
+                    {
+                        app.Selection.TypeParagraph();
+                    }
                     app.Selection.TypeText(text);
                 }
                 string styleName = "Heading " + level;

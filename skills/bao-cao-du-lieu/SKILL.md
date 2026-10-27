@@ -29,6 +29,10 @@ apps: [et]
 5. **Hàng tiêu đề**: `et.formatRange` với các giá trị của `spreadsheet.header`. **Hàng tổng**: giá trị
    `spreadsheet.totalRow`.
 6. Ghi dữ liệu **một lần** bằng mảng 2 chiều đầy đủ; không ghi từng ô.
+7. **Bảng dùng được**: bảng dữ liệu → `et.createTable {range}` (có nút lọc), `et.freezePanes {rows: 1}`
+   giữ hàng tiêu đề; cột chỉ nhận vài giá trị → `et.setValidation {range, source: "Config!$A$2:$A$5"}`
+   (hoặc `list`). Biểu đồ đọc thẳng vùng ở sheet khác: `et.addChart {sheet: "Dashboard", range:
+   "Data!A1:C7"}` — không chép dữ liệu sang làm bảng trung gian.
 
 ## Checklist
 

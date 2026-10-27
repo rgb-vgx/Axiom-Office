@@ -13,8 +13,9 @@ apps: [wps]
 
 ## Quy tắc
 
-1. **Heading thật**: dùng `writer.heading {text, level}` (level 1 cho mục lớn, 2 cho mục con) — không
-   giả heading bằng chữ đậm. Tối đa 3 cấp.
+1. **Heading thật**: viết mới dùng `writer.heading {text, level}` (level 1 cho mục lớn, 2 cho mục con);
+   đoạn **có sẵn** cần thành tiêu đề thì `writer.setStyle {paragraphs: [n], style: "Heading 2"}` (số đoạn từ
+   `writer.outline`) — không giả heading bằng chữ đậm, không gõ lại chữ. Tối đa 3 cấp.
 2. **Font**: văn bản hành chính và báo cáo dùng `fonts.document` (Times New Roman) cỡ `type.body`
    (13); chữ trong bảng cỡ `type.table`.
 3. **Đoạn văn**: dùng `writer.insertStyledText {text, font, size, alignment: "justify"}` với `\n` giữa các
@@ -24,10 +25,14 @@ apps: [wps]
    cũng tự đặt lại định dạng, không kế thừa bold/căn lề của đoạn trước.
 4. **Bảng**: chèn bằng `writer.insertTable {values, style}` với `values` là mảng 2 chiều đầy đủ (hàng
    đầu là tiêu đề), rồi `writer.formatTable` với `style` = `document.tableStyle`, `font`, `size`.
-   Đặt một dòng chú thích ngắn ngay dưới bảng ("Bảng 1. …").
+   Chú thích bảng: `writer.insertCaption {text}` **ngay trước** `writer.insertTable` (tự đánh số "Bảng 1.");
+   bảng có sẵn thì thêm `before` = số của bảng trong `writer.outline`.
 5. **Ngắt trang**: văn bản dài thì mục lớn bắt đầu ở trang mới — `writer.insertPageBreak` ngay trước
    heading đó; đừng gõ dòng trống cho hết trang.
-6. **Không** tự lưu, không đổi tên file.
+6. **Báo cáo nhiều trang**: mục lục `writer.insertToc` (sau trang bìa; gọi lại một lần khi viết xong để
+   cập nhật số trang), số trang và đầu trang `writer.setHeaderFooter {header, pageNumber: true}` — không gõ
+   "MỤC LỤC" hay "Trang 1" bằng tay.
+7. **Không** tự lưu, không đổi tên file.
 
 ## Checklist
 
