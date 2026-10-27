@@ -3461,6 +3461,168 @@
     return { paragraph: index, text: text.length > 120 ? text.substring(0, 120) + "..." : text };
   }
 
+  // --- Sap xep / loc (et.sort, et.filter) - bam contract C# CommandDispatcher.SpreadsheetSort.cs ---
+  //
+  // WPS JS co Range.Sort (toi da 3 khoa, tham so theo vi tri) va Range.AutoFilter - da do tren WPS
+  // 12.1.2 (docs/audits/wps-linux-live-test-2026-10-28.md, muc spike API). Khong co Worksheet.Sort
+  // nhu Excel 2007+, nen chi dung Range.Sort.
+
+  function etSortKeys(params) {
+    var raw = params ? params.keys : null;
+    if (typeof raw === "string") {
+      var t = raw.replace(/^\s+|\s+$/g, "");
+      try { raw = JSON.parse(t); } catch (e) {
+        throw new Error("'keys' must hold 1-3 items like [{\"column\": \"Doanh thu\", \"order\": \"desc\"}]");
+      }
+    }
+    if (!Array.isArray(raw) || raw.length === 0 || raw.length > 3) {
+      throw new Error("'keys' must hold 1-3 items like [{\"column\": \"Doanh thu\", \"order\": \"desc\"}]");
+    }
+    var out = [];
+    for (var i = 0; i < raw.length; i++) {
+      var item = raw[i];
+      if (item === null || typeof item !== "object" || Array.isArray(item)) {
+        throw new Error("'keys' must hold 1-3 items like [{\"column\": \"Doanh thu\", \"order\": \"desc\"}]");
+      }
+      var column = paramString(item, "column", null);
+      if (column === null || String(column).replace(/^\s+|\s+$/g, "") === "") {
+        throw new Error("'keys' must hold 1-3 items like [{\"column\": \"Doanh thu\", \"order\": \"desc\"}]");
+      }
+      var order = String(paramString(item, "order", "asc") || "asc").replace(/^\s+|\s+$/g, "").toLowerCase();
+      out.push({ column: String(column), desc: order.indexOf("desc") === 0 || order === "z-a" });
+    }
+    return out;
+  }
+
+  // Cot trong vung: chu tieu de (hang dau, khong phan biet hoa thuong) hoac chu cot ("C") -> 1..n.
+  function etColumnInRange(rng, column, header) {
+    var wanted = String(column === null || column === undefined ? "" : column).replace(/^\s+|\s+$/g, "");
+    if (wanted === "") {
+      throw new Error("'column' is required: header text or column letter");
+    }
+    var first = Number(numProp(rng, "Column"));
+    var cols = Number(numProp(rng.Columns, "Count"));
+    var c;
+    if (header) {
+      for (c = 1; c <= cols; c++) {
+        var text = String(strProp(rng.Cells.Item(1, c), "Text") || "").replace(/^\s+|\s+$/g, "");
+        if (text.toLowerCase() === wanted.toLowerCase()) { return c; }
+      }
+    }
+    if (wanted.length <= 3 && /^[A-Za-z]+$/.test(wanted)) {
+      var index = etColToNum(wanted.toUpperCase()) - first + 1;
+      if (index >= 1 && index <= cols) { return index; }
+    }
+    var headers = [];
+    if (header) {
+      for (c = 1; c <= cols; c++) {
+        headers.push(String(strProp(rng.Cells.Item(1, c), "Text") || "").replace(/^\s+|\s+$/g, ""));
+      }
+    }
+    throw new Error("column '" + wanted + "' is not in the range" +
+      (headers.length > 0 ? " (headers: " + headers.join(", ") + ")" : ""));
+  }
+
+  function cmdEtSort(app, params) {
+    var address = paramString(params, "range", null);
+    if (address === null || String(address).replace(/^\s+|\s+$/g, "") === "") {
+      throw new Error("'range' is required: the data incl. header row, e.g. 'A1:F200'");
+    }
+    var keys = etSortKeys(params);
+    var header = paramBool(params, "header", true);
+    var wb = etWb(app);
+    var r = etRangeWithSheet(app, wb, paramString(params, "sheet", null),
+      String(address).replace(/^\s+|\s+$/g, ""), "'range'");
+    var rng = r.ws.Range(etAddrStr(r.box.r1, r.box.c1, r.box.r2, r.box.c2));
+    var rows = Number(numProp(rng.Rows, "Count"));
+    if (rows < (header ? 3 : 2)) {
+      throw new Error("the range has too few rows to sort");
+    }
+    var columns = [], orders = [], report = [], i;
+    for (i = 0; i < keys.length; i++) {
+      var col = etColumnInRange(rng, keys[i].column, header);
+      columns.push(col);
+      orders.push(keys[i].desc ? 2 : 1);   // xlDescending = 2, xlAscending = 1
+      report.push({ column: col, order: keys[i].desc ? "desc" : "asc" });
+    }
+    // Range.Sort(Key1, Order1, Key2, Order2, Key3, Order3, Header) - tham so theo vi tri (VBA).
+    rng.Sort(
+      rng.Columns.Item(columns[0]), orders[0],
+      columns.length > 1 ? rng.Columns.Item(columns[1]) : undefined,
+      columns.length > 1 ? orders[1] : undefined,
+      columns.length > 2 ? rng.Columns.Item(columns[2]) : undefined,
+      columns.length > 2 ? orders[2] : undefined,
+      header ? 1 : 2                    // xlYes = 1, xlNo = 2
+    );
+    return {
+      sheet: r.name, range: etAddrStr(r.box.r1, r.box.c1, r.box.r2, r.box.c2),
+      rows: header ? rows - 1 : rows, keys: report
+    };
+  }
+
+  function etFilterValues(params) {
+    var raw = params ? params.values : null;
+    if (typeof raw === "string") {
+      var t = raw.replace(/^\s+|\s+$/g, "");
+      if (t.charAt(0) === "[" || t.charAt(0) === "{") {
+        try { raw = JSON.parse(t); } catch (e) { raw = null; }
+      }
+    }
+    if (!Array.isArray(raw)) { return null; }
+    var out = [];
+    for (var i = 0; i < raw.length; i++) {
+      var v = raw[i];
+      // WPS ET doi gia tri loc dang CHUOI: AutoFilter(2, [7], 7) loc ra 0 dong, [“7”] moi dung
+      // (do tren WPS 12.1.2, 28/10/2026). Ep String de `values: [7]` chay nhu nguoi dung mong doi.
+      if (v === null || v === undefined) { v = ""; } else if (typeof v !== "string") { v = String(v); }
+      out.push(v);
+    }
+    return out;
+  }
+
+  function cmdEtFilter(app, params) {
+    var wb = etWb(app);
+    var ws, rng, name;
+    var address = paramString(params, "range", null);
+    if (address === null || String(address).replace(/^\s+|\s+$/g, "") === "") {
+      var act = etResolveSheet(app, params);
+      ws = act.ws; name = act.name;
+      rng = ws.UsedRange;
+    } else {
+      var r = etRangeWithSheet(app, wb, paramString(params, "sheet", null),
+        String(address).replace(/^\s+|\s+$/g, ""), "'range'");
+      ws = r.ws; name = r.name;
+      rng = ws.Range(etAddrStr(r.box.r1, r.box.c1, r.box.r2, r.box.c2));
+    }
+    var box = etParseAddr(etNormAddr(strProp(rng, "Address")));
+    if (paramBool(params, "clear", false)) {
+      try { if (ws.FilterMode) { ws.ShowAllData(); } } catch (eShow) {}
+      try { if (ws.AutoFilterMode) { ws.AutoFilterMode = false; } } catch (eMode) {}
+      return { sheet: name, cleared: true };
+    }
+    var field = etColumnInRange(rng, paramString(params, "column", null), true);
+    var values = etFilterValues(params);
+    var criteria = paramString(params, "criteria", null);
+    if ((values === null || values.length === 0) &&
+        (criteria === null || String(criteria).replace(/^\s+|\s+$/g, "") === "")) {
+      throw new Error("give 'values' (values to keep) or 'criteria' (e.g. '>100'), or 'clear': true");
+    }
+    if (values !== null && values.length > 0) {
+      rng.AutoFilter(field, values, 7);            // xlFilterValues = 7
+    } else {
+      rng.AutoFilter(field, String(criteria).replace(/^\s+|\s+$/g, ""));
+    }
+    var result = {
+      sheet: name, range: etAddrStr(box.r1, box.c1, box.r2, box.c2), column: field
+    };
+    try {
+      var vis = rng.Columns.Item(1).SpecialCells(12);   // xlCellTypeVisible = 12
+      var n = Number(numProp(vis, "Count")) - 1;
+      if (n >= 0) { result.visibleRows = n; }
+    } catch (eVis) {}
+    return result;
+  }
+
   function cmdEtGoto(app, params) {
     var address = String(paramString(params, "range", "") || "").replace(/^\s+|\s+$/g, "");
     if (!address) { throw new Error("'range' is required, e.g. 'C42' or 'Data!C42'"); }
@@ -3900,6 +4062,8 @@
     "et.checkRange": cmdEtCheckRange,
     "writer.goto": cmdWriterGoto,
     "et.goto": cmdEtGoto,
+    "et.sort": cmdEtSort,
+    "et.filter": cmdEtFilter,
     "wpp.goto": cmdWppGoto,
     "wpp.newPresentation": cmdWppNewPresentation,
     "wpp.open": cmdWppOpen,

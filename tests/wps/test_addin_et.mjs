@@ -688,3 +688,72 @@ test("et.undo: moi lenh co co undo = dung mot buoc, ke ca lenh WPS chua hoan tac
   assert.equal(two.undone, 1);
   assert.deepEqual(run(ctx, app, "et.readRange", { range: "A1:C1" }).values, [["x", "b0", "c0"]]);
 });
+
+// ---- et.sort / et.filter (28/10/2026): WPS 12.1.2 co Range.Sort + Range.AutoFilter (spike thật) ----
+//
+// Contract: src/AxiomOffice/Bridge/CommandDispatcher.SpreadsheetSort.cs. WPS không có Worksheet.Sort
+// (Excel 2007+), nên handler chỉ dùng Range.Sort(Key1, Order1, Key2, Order2, Key3, Order3, Header).
+
+function sortableApp() {
+  return makeEtApp({ sheets: [{ name: "Data", cells: {
+    A1: "Ten", B1: "Diem", A2: "Chi", B2: 9, A3: "An", B3: 7, A4: "Binh", B4: 8,
+  } }] });
+}
+
+test("et.sort: sap xep theo tieu de, tra rows/keys va goi Range.Sort dung khoa + huong", () => {
+  const ctx = loadAddin();
+  const app = sortableApp();
+  const result = run(ctx, app, "et.sort", { range: "A1:B4", keys: [{ column: "Diem", order: "desc" }] });
+  assert.deepEqual(result, { sheet: "Data", range: "A1:B4", rows: 3, keys: [{ column: 2, order: "desc" }] });
+  const log = callsOf(app).join("\n");
+  assert.match(log, /\.Sort\(/, "phai goi Range.Sort: " + log);
+  assert.match(log, /Columns\.Item\(2\),2,/, "khoa thu hai phai la 2 (xlDescending): " + log);
+});
+
+test("et.sort: chu cot ('B') va nhieu khoa; header=false thi sap xep ca hang dau", () => {
+  const ctx = loadAddin();
+  const app = sortableApp();
+  const byLetter = run(ctx, app, "et.sort", { range: "A1:B4", keys: [{ column: "B" }] });
+  assert.deepEqual(byLetter.keys, [{ column: 2, order: "asc" }]);
+  assert.equal(byLetter.rows, 3);
+  const noHeader = run(ctx, app, "et.sort", { range: "A1:B4", header: false, keys: [{ column: "A", order: "desc" }] });
+  assert.equal(noHeader.rows, 4, "header=false: sap xep ca 4 hang");
+  const two = run(ctx, app, "et.sort", { range: "A1:B4", keys: [{ column: "B", order: "desc" }, { column: "A" }] });
+  assert.deepEqual(two.keys, [{ column: 2, order: "desc" }, { column: 1, order: "asc" }]);
+});
+
+test("et.sort: tu choi thieu range/keys, cot la, qua it hang - thong bao khop ban C#", () => {
+  const ctx = loadAddin();
+  const app = sortableApp();
+  assertFails(ctx, app, "et.sort", { keys: [{ column: "B" }] }, /'range' is required/);
+  assertFails(ctx, app, "et.sort", { range: "A1:B4" }, /'keys' must hold 1-3 items/);
+  assertFails(ctx, app, "et.sort", { range: "A1:B4", keys: [] }, /'keys' must hold 1-3 items/);
+  assertFails(ctx, app, "et.sort", { range: "A1:B4", keys: [{ column: "KhongCo" }] }, /not in the range \(headers: Ten, Diem\)/);
+  assertFails(ctx, app, "et.sort", { range: "A1:B2", keys: [{ column: "B" }] }, /too few rows/);
+  assertFails(ctx, app, "et.sort", { range: "A1:B4", keys: [{ column: "B" }, { column: "A" }, { column: "B" }, { column: "A" }] },
+    /'keys' must hold 1-3 items/);
+});
+
+test("et.filter: values -> AutoFilter(field, values, 7); criteria -> AutoFilter(field, criteria)", () => {
+  const ctx = loadAddin();
+  const app = sortableApp();
+  const kept = run(ctx, app, "et.filter", { range: "A1:B4", column: "Diem", values: [7, 9] });
+  assert.deepEqual(kept, { sheet: "Data", range: "A1:B4", column: 2 });
+  assert.match(callsOf(app).join("\n"), /AutoFilter\(2,.*7/s, "loc theo danh sach gia tri");
+
+  const byCriteria = run(ctx, app, "et.filter", { range: "A1:B4", column: "B", criteria: ">8" });
+  assert.equal(byCriteria.column, 2);
+  assert.match(callsOf(app).join("\n"), /AutoFilter\(2,>8\)/);
+});
+
+test("et.filter: clear bo loc (ShowAllData / AutoFilterMode=false), thieu tham so bao ro", () => {
+  const ctx = loadAddin();
+  const app = sortableApp();
+  run(ctx, app, "et.filter", { range: "A1:B4", column: "Diem", values: [7] });
+  const cleared = run(ctx, app, "et.filter", { range: "A1:B4", clear: true });
+  assert.deepEqual(cleared, { sheet: "Data", cleared: true });
+  assert.match(callsOf(app).join("\n"), /ShowAllData\(\)/, "FilterMode=true -> phai goi ShowAllData");
+  assertFails(ctx, app, "et.filter", { range: "A1:B4" }, /'column' is required/);
+  assertFails(ctx, app, "et.filter", { range: "A1:B4", column: "Diem" }, /give 'values'.*or 'criteria'/);
+  assertFails(ctx, app, "et.filter", { range: "A1:B4", column: "KhongCo", values: [1] }, /not in the range/);
+});
