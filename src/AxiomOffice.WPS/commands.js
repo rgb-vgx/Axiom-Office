@@ -2377,6 +2377,132 @@
     return { sheet: r.name, range: etAddrStr(box.r1, box.c1, box.r2, box.c2), values: out };
   }
 
+  // "Data!A1:C5", "'Kế hoạch'!B2" hoặc "A1:C5" (sheet = fallback, rỗng = sheet đang mở) - mirror SheetRange
+  // của contract C# CommandDispatcher.SpreadsheetBatch.cs: lấy dấu `!` CUỐI, gạch quote đầu/cuối tên sheet,
+  // đổi "''" thành "'" (tên chứa dấu nháy đơn).
+  function etRangeWithSheet(app, wb, fallback, text, label) {
+    var sheetName = (fallback === undefined || fallback === null) ? "" : String(fallback);
+    var local = String(text).trim();
+    var bang = local.lastIndexOf("!");
+    if (bang > 0) {
+      sheetName = local.substring(0, bang).trim().replace(/^'+|'+$/g, "").replace(/''/g, "'");
+      local = local.substring(bang + 1).trim();
+    }
+    var box;
+    try { box = etParseAddr(local); } catch (eAddr) {
+      throw new Error(label + ": '" + text + "' is not a range address");
+    }
+    if (sheetName === "") {
+      var r = etResolveSheet(app, {});
+      return { wb: r.wb, ws: r.ws, name: r.name, box: box };
+    }
+    var ws = etFindSheet(wb, sheetName);
+    if (ws === null) {
+      throw new Error(label + ": no sheet named '" + sheetName + "' (sheets: " + etSheetNames(wb).join(", ") + ")");
+    }
+    return { wb: wb, ws: ws, name: sheetName, box: box };
+  }
+
+  // Ma trận công thức: chỉ giữ ô bắt đầu "=", còn lại null (đúng shape et.readRange formulas=true).
+  function etFormulaMatrix(rng, box) {
+    var f = rng.Formula;
+    if (typeof f === "function") { f = f.call(rng); }
+    var fm = f;
+    if (box.r1 === box.r2 && box.c1 === box.c2) { fm = etWrapSingle(f); }
+    else if (!Array.isArray(fm)) { fm = etWrapSingle(fm); }
+    var out = [];
+    var i, j;
+    for (i = 0; i < fm.length; i++) {
+      var row = [];
+      var src = Array.isArray(fm[i]) ? fm[i] : [fm[i]];
+      for (j = 0; j < src.length; j++) {
+        var cell = src[j];
+        row.push((typeof cell === "string" && cell.charAt(0) === "=") ? cell : null);
+      }
+      out.push(row);
+    }
+    return out;
+  }
+
+  // Ma trận giá trị: Value2 cả vùng, undefined -> null.
+  function etValueMatrix(rng, box) {
+    var v = rng.Value2;
+    if (typeof v === "function") { v = v.call(rng); }
+    var vals = v;
+    if (box.r1 === box.r2 && box.c1 === box.c2) { vals = etWrapSingle(v); }
+    else if (!Array.isArray(vals)) { vals = etWrapSingle(vals); }
+    var out = [];
+    var a, b;
+    for (a = 0; a < vals.length; a++) {
+      var line = [];
+      var srow = Array.isArray(vals[a]) ? vals[a] : [vals[a]];
+      for (b = 0; b < srow.length; b++) {
+        var cv = srow[b];
+        line.push((cv === undefined ? null : cv));
+      }
+      out.push(line);
+    }
+    return out;
+  }
+
+  // et.readRanges: đọc NHIỀU vùng (nhiều sheet) trong MỘT lời gọi - mirror EtReadRanges của
+  // CommandDispatcher.SpreadsheetBatch.cs: `reads` là mảng {range, sheet?, formulas?}; `sheet`/`formulas`
+  // top-level làm mặc định cho các mục thiếu; range nhận "Sheet!A1:B6"; kiểm trả HẾT trước khi đọc,
+  //giới hạn 4000 ô mỗi lần gọi.
+  function cmdEtReadRanges(app, params) {
+    var reads = params.reads;
+    if (reads !== null && typeof reads === "object" && !Array.isArray(reads)) {
+      var inner = null, kk;
+      var keys = ["items", "item", "value"];
+      for (kk = 0; kk < keys.length; kk++) {
+        if (reads[keys[kk]] !== undefined) { inner = reads[keys[kk]]; break; }
+      }
+      reads = (inner !== null) ? inner : [reads];
+    }
+    if (!Array.isArray(reads) || reads.length === 0) {
+      throw new Error("'reads' is required: a list of {range, sheet?, formulas?}, e.g. " +
+        "[{\"sheet\": \"Dashboard\", \"range\": \"A1:B6\"}, {\"range\": \"Config!B2:B5\"}]");
+    }
+    var dfltSheet = paramString(params, "sheet", null);
+    var dfltFormulas = paramBool(params, "formulas", false);
+    var wb = etWb(app);
+    var plans = [];
+    var cells = 0;
+    var i, item;
+    for (i = 0; i < reads.length; i++) {
+      item = reads[i];
+      if (item === null || typeof item !== "object" || Array.isArray(item)) {
+        throw new Error("reads[" + i + "] must be an object like {range, sheet?, formulas?}, got " + describeValue(item));
+      }
+      var label = "'reads[" + i + "]'";
+      var text = (item.range !== undefined && item.range !== null) ? String(item.range) : "";
+      if (text === "") { throw new Error(label + " needs 'range', e.g. 'A1:C10'"); }
+      var fallback = (item.sheet !== undefined && item.sheet !== null) ? String(item.sheet) : dfltSheet;
+      var rr = etRangeWithSheet(app, wb, fallback, text, label);
+      cells += (rr.box.r2 - rr.box.r1 + 1) * (rr.box.c2 - rr.box.c1 + 1);
+      plans.push({ item: item, rr: rr });
+    }
+    if (cells > 4000) {
+      throw new Error("the ranges hold " + cells + " cells (limit 4000 per call): read only the cells you " +
+        "need, or use et.readRange for one large area");
+    }
+    var results = [];
+    for (i = 0; i < plans.length; i++) {
+      var plan = plans[i];
+      var box = plan.rr.box;
+      var addrStr = etAddrStr(box.r1, box.c1, box.r2, box.c2);
+      var rng = plan.rr.ws.Range(addrStr);
+      var out = { sheet: plan.rr.name, range: addrStr };
+      if (paramBool(plan.item, "formulas", dfltFormulas)) {
+        out.formulas = etFormulaMatrix(rng, box);
+      } else {
+        out.values = etValueMatrix(rng, box);
+      }
+      results.push(out);
+    }
+    return { reads: results, cells: cells };
+  }
+
   function etDoWriteCells(wb, ws, sheetName, topAddr, rows) {
     var top = etParseAddr(topAddr);
     var r0 = top.r1, c0 = top.c1;
@@ -3677,6 +3803,7 @@
     "et.renameSheet": cmdEtRenameSheet,
     "et.activateSheet": cmdEtActivateSheet,
     "et.readRange": cmdEtReadRange,
+    "et.readRanges": cmdEtReadRanges,
     "et.writeRange": cmdEtWriteRange,
     "et.writeRanges": cmdEtWriteRanges,
     "et.importCsv": cmdEtImportCsv,
@@ -3729,6 +3856,9 @@
   // Cung mot add-in nap trong ca ba app (publish.xml type="wps,et,wpp") nen phai doc
   // app.Name dang chay. KHONG BAO GIO throw: app la/thieu Name/Name khong phai string
   // hay doc Name loi deu tra "wps".
+  // Ten app khac nhau theo build WPS: "WPS Spreadsheets" (REFERENCE.md) hay "WPS Sheets"
+  // (that 12.1.2.29182.AK.preread, do ngay 28/10/2026 - appInfo tra name "WPS Sheets");
+  // "sheet" cung khop ca "Spreadsheet" nen mot dong che ca hai ten.
   function appKind(app) {
     try {
       if (app === undefined || app === null) { return "wps"; }
@@ -3737,8 +3867,9 @@
         try { name = name.call(app); } catch (e) { return "wps"; }
       }
       if (typeof name !== "string") { return "wps"; }
-      if (/spreadsheet/i.test(name)) { return "et"; }
+      if (/spreadsheet|sheet/i.test(name)) { return "et"; }
       if (/presentation|slide/i.test(name)) { return "wpp"; }
+      if (/writer|word|office/i.test(name)) { return "wps"; }
       return "wps";
     } catch (e2) {
       return "wps";

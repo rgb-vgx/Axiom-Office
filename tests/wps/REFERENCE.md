@@ -57,7 +57,9 @@ Vậy `type` nhận **danh sách ngăn bằng dấu phẩy** và một add-in ph
 app nào đang chạy (`Application.Name`) và chỉ khai báo lệnh của app đó — xem `docs/architecture/wps-bridge.md` mục 3.
 
 - `GET` mà WPS gọi khi nạp add-in: `ribbon.xml`, `index.html`, rồi script trong `index.html` — y hệt bản một app.
-- Tên app đo được (`Application.Name`): `WPS Writer`, `WPS Spreadsheets` (ET), `WPS Presentation` (WPP).
+- Tên app đo được (`Application.Name`): `WPS Writer`, `WPS Spreadsheets` (ET), `WPS Presentation` (WPP),
+  nhưng **tùy build**: bản `12.1.2.29182.AK.preread` (28/10/2026) báo ET là `WPS Sheets` — `appKind`
+  (commands.js) phải khớp cả hai, đừng viết Regex chỉ trông vào một tên duy nhất.
   `Application.Version` = `12.0` cả ba; `Application.Build` = `11723` (WPP trả `11.1.0.11723`).
 - `Application` trong cả ba app đều có `CommandBars.ExecuteMso`, `CreateTaskPane`, `FileSystem`
   (`existsSync`/`ReadFile`/`WriteFile`/... — dùng được để tự kiểm file xuất ra).
@@ -365,3 +367,27 @@ viết tiếp cái gì đọc `/health` của bridge thì nhớ bóc `result`.
   nhỏ do trình cài khởi động KHÔNG được (trình cài phải thoát); cân nhắc bản offline, hoặc ghi rõ nếu online là
   cách duy nhất chạy được.
 - `authwebsite.xml` (cùng thư mục `jsaddons`) có thể dùng để cấp quyền cho origin gọi API.
+
+## Nạp add-in trên WPS 12.1.2.29182 (đo 28/10/2026) — thứ tự request và hai cái bẫy
+
+Thứ tự request khi mở tài liệu (đo bằng log HTTP của Core):
+
+1. `GET <url>manifest.xml` — **không bắt buộc**: Core không có file này (404) thì WPS vẫn đi tiếp.
+2. `GET <url>ribbon.xml` — **bắt buộc 200**. Thiếu/404 là WPS dừng im lặng: không request `index.html`,
+   không nạp script, không poll, không hiện tab, không báo lỗi.
+3. `GET <url>index.html` → `probe.js`, `commands.js`, `main.js` → `POST /wps/v1/poll`.
+
+Hai cái bẫy đã dính:
+
+- **Core phục vụ add-in từ `exeDir/wps-addin`** (`wpsbridge.ResolveOptions`; `AXIOM_WPS_ADDIN_DIR` ghi đè).
+  Chạy bản Core build tay ở thư mục khác (ví dụ `/tmp/opencode/axiom-core-new`) thì `AddinDir` thành
+  `/tmp/opencode/wps-addin` — không tồn tại, mọi file 404, WPS dừng ở bước 2. Bản cài đặt thật
+  (`<dataDir>/core/AxiomOffice.Core` + `<dataDir>/core/wps-addin/`) không dính. Khi test bằng binary ngoài
+  thư mục cài đặt **phải** đặt `AXIOM_WPS_ADDIN_DIR=<dataDir>/core/wps-addin`.
+- Triệu chứng dễ đọc sai: app đang mở từ trước vẫn "chạy được" vì JS đã nạp từ Core cũ và chỉ poll tiếp
+  sang Core mới; restart WPS sạch mới lộ 404.
+
+`jsaddins/jsaddinblockhost.ini`: danh sách chặn do **chính WPS ghi** (cơ chế giống Windows: add-in làm chậm
+khởi động bị tự động tắt). Không xóa/sửa file này để "lách"; cách đúng là giữ add-in khởi động nhanh
+(script nhỏ, không làm việc nặng ở top-level). File này không liên quan lỗi 404 ở trên — nó vẫn tồn tại
+trong suốt các lần nạp thành công.

@@ -28,7 +28,7 @@
 
   // Trich dan theo CitationRule cua Core (agent/prompt.go): [§12], [Data!C42], ['Bao cao'!A1:B5], [slide 3]. Link Markdown
   // [chu](url) khong tinh (lookahead "(").
-  var CITATION = /\[(\u00A7\s?\d{1,6}|[Ss]lide\s+\d{1,4}|(?:'[^'\]]+'|[^\]\s!'\[]+)![A-Za-z]{1,3}\d{1,7}(?::[A-Za-z]{1,3}\d{1,7})?)\](?!\()/g;
+  var CITATION = /\[(\u00A7\s?\d{1,6}|[Ss]lide\s+\d{1,4}|(?:'[^'\]]+'|[^\]\s!'[]+)![A-Za-z]{1,3}\d{1,7}(?::[A-Za-z]{1,3}\d{1,7})?)\](?!\()/g;
 
   // addCitedText: nhu addText nhung trich dan thanh link bam duoc (data-act="cite" - pane nhay toi cho do).
   function addCitedText(el, text) {

@@ -233,6 +233,11 @@ test("appKind: doc dung app dang chay tu Application.Name", () => {
   assert.equal(kindOf(etApp()), "et");
   assert.equal(kindOf(wppApp()), "wpp");
   assert.equal(kindOf(writerApp()), "wps");
+  // Ten that theo build: 12.1.2.29182.AK.preread (28/10/2026) bao ET la "WPS Sheets",
+  // khong phai "WPS Spreadsheets" — truoc fix thu vi nhat app bi do nham thanh "wps"
+  // (thay su that: bridge /cmd bao "\"et.readRange\" cannot run in \"WPS Sheets\"").
+  assert.equal(kindOf({ Name: "WPS Sheets" }), "et");
+  assert.equal(kindOf({ Name: "WPS Presentation" }), "wpp");
   // Ten la (WPS Office, ban cu) hoac khong doc duoc -> coi la Writer (app kind "wps" la mac dinh).
   assert.equal(kindOf({ Name: "WPS Office" }), "wps");
   assert.equal(kindOf({}), "wps");
@@ -312,7 +317,8 @@ const CHUA_CO_HANDLER = {
   "et.setValidation": "chi co trong add-in Windows (plan 21 P1); WPS de sau",
   "et.deleteSheet": "chi co trong add-in Windows (plan 21 P3); WPS de sau",
   "et.formatRanges": "chi co trong add-in Windows (plan 21 P3); WPS de sau",
-  "et.readRanges": "chi co trong add-in Windows (plan 21 P3); WPS de sau",
+  // et.readRanges DA CO handler trong add-in WPS JS (28/10/2026): duong data cho tool trace_formula cua Core
+  // (orchestrator_execution.go voi boi Catalog.Has("et.readRanges") && Catalog.Has("et.sheetInfo")).
   "et.whatIf": "chi co trong add-in Windows (plan 21 P3); WPS de sau",
   // Nam lenh lam bai theo mau (docs/architecture/template-design.md muc 6.3): moi co tren PowerPoint (COM InsertFromFile,
   // Shape.Export); WPP chua kiem.
