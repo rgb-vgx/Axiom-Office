@@ -14,7 +14,10 @@ namespace AxiomOffice.Bridge
         public static readonly string BridgeVersion =
             typeof(CommandDispatcher).Assembly.GetName().Version.ToString(3);
 
-        private const int MaxComRetries = 10;
+        // Word 16.0.20527 vừa khởi động có thể từ chối COM (RPC_E_CALL_REJECTED) khá lâu khi các add-in
+        // COM bên thứ ba (WPS PDF, Nitro PDF...) còn đang nạp; 10 lần x ~0.55 giây nghĩa là chết cả rổ lệnh
+        // trong những lần đó. Nâng cửa sổ thử lại lên ~25 giây (30 lần, mỗi lần tối đa 1 giây).
+        private const int MaxComRetries = 30;
 
         private static int _firstCommandLogged;
 
