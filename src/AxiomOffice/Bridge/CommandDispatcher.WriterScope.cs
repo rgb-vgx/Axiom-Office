@@ -29,7 +29,7 @@ namespace AxiomOffice.Bridge
         // Lệnh đọc (không đổi tài liệu) chạy như thường khi đang khoá.
         private static readonly HashSet<string> LockReadOnly = new HashSet<string>(StringComparer.Ordinal)
         {
-            "writer.getText", "writer.selection", "writer.checkTables", "writer.outline", "writer.undo",
+            "writer.getText", "writer.selection", "writer.checkTables", "writer.outline", "writer.checkLayout", "writer.undo",
             "writer.save", "writer.saveAs", "writer.exportPdf"
         };
 
@@ -47,7 +47,9 @@ namespace AxiomOffice.Bridge
             { "writer.insertPageBreak", "replaces the whole selected passage with a page break" },
             { "writer.insertToc", "inserts a table of contents outside the selection" },
             { "writer.setHeaderFooter", "changes the headers and footers of the whole document" },
-            { "writer.insertCaption", "inserts a new paragraph" }
+            { "writer.insertCaption", "inserts a new paragraph" },
+            { "writer.writeContent", "appends at the end of the document" },
+            { "writer.deleteParagraphs", "deletes whole paragraphs by number" }
         };
 
         // Lệnh THAY cả vùng chọn bằng chữ mới: vô hại với vùng chữ, nhưng nếu vùng chứa TRỌN một bảng thì bảng bị

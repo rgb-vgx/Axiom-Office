@@ -33,13 +33,36 @@ def check(ok: bool, name: str, detail: str = "") -> None:
         FAILED.append(name)
 
 
+def style_alignments(styles) -> dict:
+    """styleId -> can le cua style (theo basedOn); Word khong ghi jc vao doan khi doan can giong style cua no."""
+    own, parent, default = {}, {}, "Normal"
+    for style in styles.findall(W + "style"):
+        sid = style.get(W + "styleId")
+        if style.get(W + "type") == "paragraph" and style.get(W + "default") == "1":
+            default = sid
+        jc = style.find(W + "pPr/" + W + "jc")
+        if jc is not None:
+            own[sid] = jc.get(W + "val")
+        based = style.find(W + "basedOn")
+        if based is not None:
+            parent[sid] = based.get(W + "val")
+
+    def resolve(sid, depth=0):
+        if sid in own or depth > 10 or sid not in parent:
+            return own.get(sid, "left")
+        return resolve(parent[sid], depth + 1)
+    return {sid: resolve(sid) for sid in set(own) | set(parent) | {default}} | {"": resolve(default)}
+
+
 def parse(path: str) -> list[dict]:
     with zipfile.ZipFile(path) as archive:
         root = ET.fromstring(archive.read("word/document.xml"))
+        aligns = style_alignments(ET.fromstring(archive.read("word/styles.xml")))
     paragraphs = []
     for paragraph in root.findall(".//" + W + "body/" + W + "p"):
         ppr = paragraph.find(W + "pPr")
-        align = "left"
+        style = ppr.find(W + "pStyle") if ppr is not None else None
+        align = aligns.get(style.get(W + "val") if style is not None else "", aligns[""])
         if ppr is not None and ppr.find(W + "jc") is not None:
             align = ppr.find(W + "jc").get(W + "val")
         text = "".join(t.text or "" for t in paragraph.findall(".//" + W + "t"))

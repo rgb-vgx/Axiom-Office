@@ -13,6 +13,7 @@ var CallLimits = map[string]int{
 	"wpp.sourceManifest":        3,
 	"wpp.listSlides":            6,
 	"wpp.checkLayout":           20,
+	"writer.checkLayout":        10,
 	"wpp.setNotes":              20,
 	"slides_from_template":      40,
 	"tavily_search":             8,

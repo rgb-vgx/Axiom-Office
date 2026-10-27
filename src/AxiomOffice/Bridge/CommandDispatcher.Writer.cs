@@ -40,8 +40,10 @@ namespace AxiomOffice.Bridge
                     Opt("font"), Opt("size"), Opt("color", "#RRGGBB text color"),
                     Opt("headerFill", "#RRGGBB"), Opt("headerColor", "#RRGGBB header text"), Opt("headerBold"),
                     Opt("bandFill", "#RRGGBB every other data row"), Opt("borderColor", "#RRGGBB"), Opt("borders", "false = no borders (layout tables)"),
-                    Opt("alignment", "left/center/right"), Opt("autoFit", "content/window")).ForAgent(),
-                Command("writer.insertPageBreak", "wps", WriterInsertPageBreak, "Ngắt trang").ForAgent(),
+                    Opt("alignment", "left/center/right"), Opt("autoFit", "content/window"),
+                    Opt("keepTogether", "true = keep the whole table on one page")).ForAgent(),
+                Command("writer.insertPageBreak", "wps", WriterInsertPageBreak, "Ngắt trang tại con trỏ, hoặc ngay trước đoạn `before`",
+                    Opt("before", "paragraph number from writer.outline / writer.checkLayout; default: at the cursor")).ForAgent(),
                 Command("writer.insertImage", "wps", WriterInsertImage, "Chèn ảnh tại con trỏ (kích thước theo point)", Req("path"), Opt("width"), Opt("height")).ForAgent(),
                 Command("writer.insertHyperlink", "wps", WriterInsertHyperlink, "Chèn liên kết", Req("url"), Opt("text")).ForAgent(),
                 Command("writer.replaceAll", "wps", WriterReplaceAll, "Tìm và thay toàn bộ", Req("find"), Opt("replace")).ForAgent(),
@@ -417,6 +419,11 @@ namespace AxiomOffice.Bridge
             string[] lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
             using (new UndoRecordScope(host.Application, "AI: insert styled text"))
             {
+                // Khối ngay sau writer.appendText (con trỏ ở cuối một đoạn có chữ): sang đoạn mới, không dính vào đoạn đó.
+                if (block && AtEndOfFilledParagraph(app.Selection.Range))
+                {
+                    app.Selection.TypeParagraph();
+                }
                 for (int i = 0; i < lines.Length; i++)
                 {
                     // Khoi: dat lai toan bo dinh dang. Inline: chi dat thuoc tinh duoc truyen, de chu chen
@@ -496,22 +503,9 @@ namespace AxiomOffice.Bridge
             {
                 throw new ArgumentException("'rows' and 'cols' are required (or pass 'values' as a 2D array to size the table)");
             }
-            // Bảng Word không tính công thức: "=C2/B2*100" hiện nguyên chuỗi cho người đọc (bộ đo 26/10/2026 ca w03). Từ chối
-            // trước khi chèn để model ghi số đã tính.
             if (valueRows != null)
             {
-                foreach (IList row in valueRows)
-                {
-                    foreach (object cell in row ?? new object[0])
-                    {
-                        string text = Convert.ToString(cell);
-                        if (text != null && System.Text.RegularExpressions.Regex.IsMatch(text.Trim(), @"^=\s*[A-Za-z(]"))
-                        {
-                            throw new ArgumentException("Word tables do not calculate formulas: cell '" + text.Trim() +
-                                "' would be shown as text. Compute the value yourself and write the number (e.g. 96%)");
-                        }
-                    }
-                }
+                RejectFormulaCells(valueRows);
             }
             dynamic app = host.Application;
             int filled = 0;
@@ -542,6 +536,18 @@ namespace AxiomOffice.Bridge
                 }
                 catch
                 {
+                }
+                // Bảng nhỏ giữ trên một trang (đề A 26/10/2026: 4 bảng <= 15 dòng bị cắt sang trang).
+                if (rows <= SmallTableRows)
+                {
+                    try
+                    {
+                        KeepTableTogether(table);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Info("writer.insertTable: không giữ được bảng trên một trang: " + ex.Message);
+                    }
                 }
                 if (HasParam(p, "style"))
                 {
@@ -578,6 +584,24 @@ namespace AxiomOffice.Bridge
                 result["styleError"] = styleError;
             }
             return result;
+        }
+
+        // Bảng Word không tính công thức: "=C2/B2*100" hiện nguyên chuỗi cho người đọc (bộ đo 26/10/2026 ca w03). Từ chối
+        // trước khi chèn để model ghi số đã tính.
+        private static void RejectFormulaCells(IEnumerable<IList> valueRows)
+        {
+            foreach (IList row in valueRows)
+            {
+                foreach (object cell in row ?? new object[0])
+                {
+                    string text = Convert.ToString(cell);
+                    if (text != null && System.Text.RegularExpressions.Regex.IsMatch(text.Trim(), @"^=\s*[A-Za-z(]"))
+                    {
+                        throw new ArgumentException("Word tables do not calculate formulas: cell '" + text.Trim() +
+                            "' would be shown as text. Compute the value yourself and write the number (e.g. 96%)");
+                    }
+                }
+            }
         }
 
         // Gán style cho bảng. Với late binding (dynamic) Word KHÔNG có set_Style (chỉ interop mới có) - trước
@@ -634,16 +658,23 @@ namespace AxiomOffice.Bridge
             }
         }
 
-        private static Dictionary<string, object> WriterFormatTable(IAppHost host, Dictionary<string, object> p)
+        // Bảng theo `table` (số thứ tự, 1 = đầu tiên); không truyền = bảng chứa con trỏ, không có thì bảng cuối.
+        // index = số đã dùng (0 = bảng tại con trỏ).
+        private static dynamic TargetTable(dynamic app, Dictionary<string, object> p)
         {
-            dynamic app = host.Application;
+            int index;
+            return TargetTable(app, p, out index);
+        }
+
+        private static dynamic TargetTable(dynamic app, Dictionary<string, object> p, out int index)
+        {
             dynamic doc = app.ActiveDocument;
             int count = Convert.ToInt32(doc.Tables.Count);
             if (count == 0)
             {
                 throw new ArgumentException("the document has no table - use writer.insertTable first");
             }
-            int index = ParamInt(p, "table", 0);
+            index = ParamInt(p, "table", 0);
             dynamic table = null;
             if (index == 0)
             {
@@ -670,6 +701,13 @@ namespace AxiomOffice.Bridge
                 }
                 table = doc.Tables[index];
             }
+            return table;
+        }
+
+        private static Dictionary<string, object> WriterFormatTable(IAppHost host, Dictionary<string, object> p)
+        {
+            int index;
+            dynamic table = TargetTable(host.Application, p, out index);
 
             var skipped = new List<string>();
             var applied = new List<string>();
@@ -708,6 +746,10 @@ namespace AxiomOffice.Bridge
                 if (HasParam(p, "alignment"))
                 {
                     step("alignment", delegate { table.Range.ParagraphFormat.Alignment = ParseAlignment(ParamString(p, "alignment", "left")); });
+                }
+                if (ParamBool(p, "keepTogether", false))
+                {
+                    step("keepTogether", delegate { KeepTableTogether(table); });
                 }
                 if (HasParam(p, "borders"))
                 {
@@ -886,9 +928,25 @@ namespace AxiomOffice.Bridge
         private static Dictionary<string, object> WriterInsertPageBreak(IAppHost host, Dictionary<string, object> p)
         {
             dynamic app = host.Application;
+            int before = ParamInt(p, "before", 0);
             using (new UndoRecordScope(host.Application, "AI: page break"))
             {
-                app.Selection.InsertBreak(7);
+                if (before > 0)
+                {
+                    // Trước một đoạn có sẵn (vd tiêu đề bị dồn xuống cuối trang - writer.checkLayout): "ngắt trang trước" của
+                    // đoạn, không chèn ký tự ngắt vào đầu tiêu đề (ký tự đó lọt vào mục lục).
+                    dynamic doc = app.ActiveDocument;
+                    int total = Convert.ToInt32(doc.Paragraphs.Count);
+                    if (before > total)
+                    {
+                        throw new ArgumentException("paragraph " + before + " does not exist (the document has " + total + ")");
+                    }
+                    doc.Paragraphs[before].PageBreakBefore = -1;
+                }
+                else
+                {
+                    app.Selection.InsertBreak(7);
+                }
             }
             return new Dictionary<string, object> { { "inserted", true } };
         }

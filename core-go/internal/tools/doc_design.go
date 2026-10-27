@@ -149,7 +149,7 @@ func (t *DocDesignTool) Invoke(ctx context.Context, arguments map[string]any, ru
 			// Khong co bridge (test chon kieu): bo qua buoc dem chu.
 		} else if text, problem := bridge("writer.getText", map[string]any{"maxChars": 1}); problem == "" && asInt(text["totalChars"]) < minDesignChars {
 			return Result{JSON: ErrorJSON(fmt.Sprintf("the document has only %d characters - doc_design restyles an EXISTING "+
-				"document. Write the content first with office_action (headings with writer.heading, text, tables), then "+
+				"document. Write the content first with office_action (writer.writeContent: headings, text, lists, tables), then "+
 				"call doc_design only if the user asked to restyle it", asInt(text["totalChars"])))}
 		}
 		style, wish, problem := chooseDocStyle(arguments, run)

@@ -113,6 +113,8 @@ func TestSameTaskKeyUnit(t *testing.T) {
 		{`{"action":"writer.heading","params":{"text":"PHAN 1"}}`, ""},
 		{`{"action":"writer.appendText","params":{"text":"x"}}`, ""},
 		{`{"action":"writer.insertStyledText","params":{"text":"x"}}`, ""},
+		{`{"action":"writer.writeContent","params":{"blocks":[]}}`, ""},
+		{`{"action":"writer.checkLayout","params":{}}`, "office_action writer.checkLayout read"},
 		{`{"action":"wpp.addSlideFromTemplate","params":{"tag":"s1"}}`, ""},
 		{`not-json`, "office_action ?"},
 		{`{}`, "office_action ?"},

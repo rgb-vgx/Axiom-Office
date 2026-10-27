@@ -385,6 +385,7 @@ var sameTaskExempt = map[string]bool{
 	"office_action writer.insertText":          true,
 	"office_action writer.insertStyledText":    true,
 	"office_action writer.insertTable":         true,
+	"office_action writer.writeContent":        true,
 	"office_action writer.insertBlocks format": true,
 	"office_action wpp.addSlide":               true,
 	"office_action wpp.addSlideFromTemplate":   true,

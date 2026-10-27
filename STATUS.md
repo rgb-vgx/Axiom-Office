@@ -291,8 +291,12 @@ trúc không dây cắt hộp. Sửa: sơ đồ lồng trong khoá `diagram`, `r
 - **P1 xong** (plan 21 §5.2): 7 lệnh mới - Word `setStyle`, `insertToc`, `setHeaderFooter`, `insertCaption`; Excel
   `createTable`, `freezePanes`, `setValidation` - và `addChart` lấy vùng sheet khác; `appendText`/`heading`/`insertTable`
   viết nối tiếp đúng thứ tự; `insertTable` từ chối ô công thức. Đo lại 9 ca P1: **6/9** (trước 0/9), đề B đạt lần đầu.
-  Live: `test_office_structure.py` 14/14, `test_live_commands.py --apps word,excel` 211/211. `test_writer_format.py`
-  vẫn 18/19 (căn đều - lỗi có từ trước).
+  Live: `test_office_structure.py` 14/14, `test_live_commands.py --apps word,excel` 211/211.
+- **P2 xong** (plan 21 §5.3): Word `writeContent` (cả mục một lệnh: tiêu đề, đoạn, danh sách thật, bảng + chú thích,
+  ngắt trang), `checkLayout {maxPages}` (trang trắng, tiêu đề cuối trang, bảng nhỏ bị cắt, đoạn trống, quá dài),
+  `deleteParagraphs`, `addTableRows`; bảng nhỏ tự giữ trên một trang; Excel `checkRange` không range soát ô lỗi mọi
+  sheet. Đo 6 ca: **6/6** - đề A đạt lần đầu (18 vòng, 8 trang; trước 60 vòng, 11 trang), `w09` 15 vòng (trước 81),
+  `w02` hết trang trắng. `test_writer_format.py` 19/19 (lỗi "căn đều" là lỗi của test: style Normal đã căn đều).
 
 ## 3. Chưa làm / chưa kiểm chứng
 

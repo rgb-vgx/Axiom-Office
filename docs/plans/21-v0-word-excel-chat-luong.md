@@ -228,8 +228,46 @@ Lệnh mới (C# `CommandDispatcher.WriterStructure.cs`, `CommandDispatcher.Spre
 
 **Đạt 6/9 ca P1** (trước P1: 0/9). Toàn bộ 22 ca chưa đo lại một lượt.
 
-Lỗi có sẵn phát hiện thêm: `tests/live/test_writer_format.py` trượt "thân bài căn đều" (18/19) cả trên code trước P1
-- `insertStyledText {alignment: "justify"}` ra `left`; chưa sửa.
+Lỗi có sẵn phát hiện thêm: `tests/live/test_writer_format.py` trượt "thân bài căn đều" (18/19) cả trên code trước P1.
+Đã rõ ở P2 (§5.3): lỗi của **test**, không phải của lệnh - style Normal của tài liệu đã căn đều nên Word không ghi `jc`
+vào đoạn; test giờ đọc căn lề thực tế (đoạn → style → basedOn), 19/19.
+
+## 5.3 Kết quả P2 (27/10/2026, `results/p2-beam-free-2026-10-27/`, `results/p2b-beam-free-2026-10-27/`)
+
+Lệnh mới (C# `CommandDispatcher.WriterLayout.cs`; catalog + bản sinh), chỉ trên Office Windows (WPS để sau):
+
+- **`writer.writeContent {blocks}`**: viết nhiều khối nối tiếp vào cuối bài trong **một lệnh, một bước hoàn tác** -
+  `{heading, level}`, `{text}` (căn đều mặc định), `{bullets}` / `{numbers}` (danh sách thật của Word, đoạn sau không
+  bị kéo vào danh sách), `{table, caption}`, `{pageBreak}`. Soát hết khối (ô công thức, mảng rỗng) **trước** khi ghi.
+- **`writer.checkLayout {maxPages}`** (chỉ đọc): số trang/chữ, trang của từng tiêu đề, và lỗi kèm cách sửa:
+  `blank-page` (đoạn trống / dấu ngắt nằm trên trang trắng), `heading-at-page-bottom`, `split-table` (bảng ≤ 15 hàng bị
+  cắt), `empty-paragraphs` (đoạn trống liên tiếp), `too-long` (dài hơn `maxPages`, kèm số chữ cần cắt).
+- **`writer.deleteParagraphs {paragraphs}`**: xoá đoạn theo số (đoạn cuối bài: giữ style + định dạng đoạn trước); từ
+  chối đoạn trong bảng / mục lục **trước** khi xoá; lỗi giữa chừng thì lùi phần đã xoá (tất cả hoặc không).
+- **`writer.addTableRows {table, rows, before}`**: thêm hàng vào bảng có sẵn (lộ ra khi đo `w09`: model thay chuỗi có
+  dấu ô, xoá đoạn trong bảng... hết 60 vòng mà bảng vẫn 4 hàng).
+- `insertPageBreak {before}` (đặt "ngắt trang trước" cho đoạn có sẵn), `formatTable {keepTogether}`; `insertTable` tự
+  giữ bảng ≤ 15 hàng trên một trang; chú thích (`insertCaption`) đi liền bảng; `insertStyledText` dạng khối sang đoạn
+  mới khi con trỏ ở cuối một đoạn có chữ (trước đó dính vào đoạn của `appendText`).
+- **Excel**: `et.checkRange` không truyền `range`/`sheet` soát thêm **ô lỗi ở mọi sheet** (`error-cells`:
+  `Tinh!A2 #DIV/0!`).
+- Core: `writer.checkLayout` là lệnh đọc/kiểm chứng (plan mode, `Verifies`), tối đa 10 lần/lượt; `writeContent` miễn
+  đếm "cùng một việc"; lời nhắc tự kiểm nhắc `writer.checkLayout`. Skill `the-thuc-van-ban`: viết cả mục bằng
+  `writeContent`, **ngân sách chữ theo số trang** (~280 chữ/trang A4 Times 13), `checkLayout {maxPages}` trước khi trả
+  lời, số thập phân kiểu Việt Nam; `bao-cao-du-lieu`: `et.checkRange` không range cho sổ nhiều sheet.
+- Test live `tests/live/test_office_layout.py` (22 kiểm tra, Word + Excel thật): **22/22**; `test_office_structure.py`
+  14/14; `test_writer_format.py` 19/19; `test_live_commands.py --apps word,excel` 210/210.
+
+| Ca | Baseline | Sau P1 | Lần đo P2 đầu | Sau sửa (P2b) | Tiêu chí P2 |
+|---|---|---|---|---|---|
+| w01 tờ trình | ✓ 33 vòng | - | **✓ 15 vòng** | - | ≤ 10 vòng: chưa đạt |
+| w02 báo cáo dài | thiếu TOC/số trang | trang trắng cuối | **✓** (`checkLayout` → `deleteParagraphs`) | - | 0 trang trắng ✓ |
+| w03 bảng nhỏ | không caption | không caption | caption ✓, ghi "98.4" | **✓ 4 vòng** | |
+| w09 biên bản 3 lượt | ✓ 81 vòng / 221k | - | ✗ không có lệnh thêm hàng | **✓ 15 vòng / 51k** | ≤ 30 vòng ✓ |
+| x03 sửa công thức | ✓ 7 vòng | - | **✓ 5 vòng** | - | |
+| a báo cáo 6–8 trang | 60+ vòng | 60 vòng, 11 trang | 30 vòng, 11 trang (model thấy số trang, cho là "chấp nhận được") | **✓ 18 vòng, 8 trang**, 0 trang trắng / tiêu đề cuối trang / bảng bị cắt | ≤ 30 vòng ✓ |
+
+Sau P2 cả 6 ca đều đạt (mỗi ca 1 lần đo). Toàn bộ 22 ca chưa đo lại một lượt.
 
 ## 6. Cách đo sau mỗi thay đổi
 

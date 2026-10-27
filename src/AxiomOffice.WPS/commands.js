@@ -136,11 +136,15 @@
         { name: "borders", required: false, hint: "false = no borders (layout tables)" },
         { name: "alignment", required: false, hint: "left/center/right" },
         { name: "autoFit", required: false, hint: "content/window" },
+        { name: "keepTogether", required: false, hint: "true = keep the whole table on one page" },
         { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
       ] },
     { name: "writer.insertPageBreak", kind: "wps", agent: true, undo: true,
-      summary: "Ngắt trang",
-      params: [{ name: "document", required: false, hint: "full path of the document to work on; default: the active one" }] },
+      summary: "Ngắt trang tại con trỏ, hoặc ngay trước đoạn `before`",
+      params: [
+        { name: "before", required: false, hint: "paragraph number from writer.outline / writer.checkLayout; default: at the cursor" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
     { name: "writer.insertImage", kind: "wps", agent: true, undo: true,
       summary: "Chèn ảnh tại con trỏ (kích thước theo point)",
       params: [
@@ -226,6 +230,27 @@
         { name: "text", required: true, hint: "caption text without the number, e.g. 'Kết quả tuyển sinh 2024-2026'" },
         { name: "label", required: false, hint: "Bảng (default) / Hình / Biểu đồ..." },
         { name: "before", required: false, hint: "paragraph/table number from writer.outline to caption; default: end of the document" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "writer.writeContent", kind: "wps", agent: true, undo: true,
+      summary: "Viết NHIỀU khối nối tiếp vào CUỐI bài trong MỘT lệnh (một bước hoàn tác) - dùng thay cho mỗi đoạn một lệnh: tiêu đề, đoạn văn, gạch đầu dòng, danh sách số, bảng kèm chú thích, ngắt trang",
+      params: [
+        { name: "blocks", required: true, hint: "array, in order, of {heading, level} | {text} ('\\n' = new paragraph; optional alignment, bold, italic, size) | {bullets: [..]} | {numbers: [..]} | {table: 2D array, caption, style} | {pageBreak: true}" },
+        { name: "alignment", required: false, hint: "alignment of {text} blocks: justify (default) / left / center / right" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "writer.addTableRows", kind: "wps", agent: true, undo: true,
+      summary: "Thêm hàng vào bảng CÓ SẴN (giữ định dạng của bảng, không dựng lại bảng): mặc định nối cuối bảng, `before` = số hàng để chèn vào giữa (1 = hàng tiêu đề)",
+      params: [
+        { name: "rows", required: true, hint: "2D array, one inner array of cell texts per new row" },
+        { name: "table", required: false, hint: "table number (1 = first, as in writer.checkTables); default: table at cursor, else the last table" },
+        { name: "before", required: false, hint: "row number to insert before; default: after the last row" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "writer.deleteParagraphs", kind: "wps", agent: true, undo: true,
+      summary: "Xoá các đoạn theo số của writer.outline / writer.checkLayout (đoạn trống thừa, đoạn chỉ có dấu ngắt trang, đoạn viết thừa); không xoá được đoạn trong bảng",
+      params: [
+        { name: "paragraphs", required: true, hint: "array of paragraph numbers" },
         { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
       ] },
     { name: "writer.undo", kind: "wps", agent: true, undo: false,
@@ -693,8 +718,14 @@
     { name: "writer.checkTables", kind: "wps", agent: true, undo: false,
       summary: "Soát các bảng (chỉ đọc): số dòng/cột, ô trống, ô tiêu đề lẫn đoạn văn. Bảng dàn trang — bảng đã gọi writer.formatTable với borders:false — được đánh dấu layout và KHÔNG báo empty-cells (ô trống ở đó là cố ý: khoảng trống ký, ô chờ điền)",
       params: [{ name: "document", required: false, hint: "full path of the document to work on; default: the active one" }] },
+    { name: "writer.checkLayout", kind: "wps", agent: true, undo: false,
+      summary: "Soát phân trang (chỉ đọc): số trang, số chữ, trang trắng, tiêu đề nằm cuối trang tách khỏi nội dung, bảng nhỏ bị cắt sang trang, đoạn trống liên tiếp; trang của từng tiêu đề - gọi sau khi viết xong, trước khi trả lời",
+      params: [
+        { name: "maxPages", required: false, hint: "page limit the user asked for (e.g. 8 for '6-8 pages'): longer = issue too-long with how much to cut" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
     { name: "et.checkRange", kind: "et", agent: true, undo: false,
-      summary: "Soát bảng dữ liệu (chỉ đọc): tiêu đề trống, kiểu lẫn lộn, số dạng chữ, number format, dữ liệu lạc ngoài bảng (chỉ khi không truyền range)",
+      summary: "Soát bảng dữ liệu (chỉ đọc): tiêu đề trống, kiểu lẫn lộn, số dạng chữ, number format, công thức trỏ ô trống; không truyền range/sheet thì soát thêm dữ liệu lạc ngoài bảng và ô lỗi (#DIV/0!, #REF!...) ở MỌI sheet",
       params: [
         { name: "range", required: false, hint: "default: the used range" },
         { name: "sheet", required: false, hint: null },

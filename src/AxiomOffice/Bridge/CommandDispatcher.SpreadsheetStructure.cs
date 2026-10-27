@@ -141,7 +141,7 @@ namespace AxiomOffice.Bridge
             if (p != null && p.TryGetValue("list", out rawList) && rawList != null)
             {
                 IList list = UnwrapScalar(rawList) as IList;
-                values = list != null && !(list is string)
+                values = list != null
                     ? list.Cast<object>().Select(v => Convert.ToString(UnwrapScalar(v))).Where(v => !string.IsNullOrEmpty(v)).ToList()
                     : Convert.ToString(UnwrapScalar(rawList)).Split(',').Select(v => v.Trim()).Where(v => v.Length > 0).ToList();
             }

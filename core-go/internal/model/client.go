@@ -52,7 +52,7 @@ const (
 		"now: say what was done, what (if anything) is still missing, and how to continue."
 	VerifyWorkNudge = "Before you finish: check the work you just did. Read the document back with the " +
 		"actions available to you (for example et.readRange or et.checkRange, et.listSheets, writer.getText " +
-		"or writer.checkTables, wpp.listSlides or wpp.checkLayout) and compare what is really there with what " +
+		"or writer.checkTables and writer.checkLayout, wpp.listSlides or wpp.checkLayout) and compare what is really there with what " +
 		"the user asked for: values, ranges, cell types, sheet or slide names, headings and formatting. " +
 		// Doc lai chi bat duoc o trong; no KHONG bat duoc mot o dieu khien khong noi vao dau. Do ngay
 		// 02/10/2026: mot workbook 10.000 duong Monte Carlo co o "Seed Value [change to re-run]" o

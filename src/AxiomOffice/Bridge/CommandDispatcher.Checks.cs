@@ -21,7 +21,7 @@ namespace AxiomOffice.Bridge
                     + "writer.formatTable với borders:false — được đánh dấu layout và KHÔNG báo empty-cells (ô trống ở đó "
                     + "là cố ý: khoảng trống ký, ô chờ điền)").ForAgent(),
                 Command("et.checkRange", "et", EtCheckRange,
-                    "Soát bảng dữ liệu (chỉ đọc): tiêu đề trống, kiểu lẫn lộn, số dạng chữ, number format, dữ liệu lạc ngoài bảng",
+                    "Soát bảng dữ liệu (chỉ đọc): tiêu đề trống, kiểu lẫn lộn, số dạng chữ, number format, công thức trỏ ô trống; không truyền range/sheet thì soát thêm dữ liệu lạc ngoài bảng và ô lỗi (#DIV/0!, #REF!...) ở MỌI sheet",
                     Opt("range", "default: the used range"), Opt("sheet")).ForAgent(),
                 Command("wpp.checkLayout", "wpp", WppCheckLayout,
                     "Soát bố cục slide (chỉ đọc): chữ tràn khung, shape ra ngoài slide, shape chồng nhau, chữ quá nhỏ, "
@@ -449,6 +449,25 @@ namespace AxiomOffice.Bridge
                 // soát thêm không được làm hỏng cả báo cáo
             }
 
+            // Không chỉ định vùng/sheet = soát cả sổ: ô lỗi (#DIV/0!, #REF!...) ở MỌI sheet, kể cả sheet đang không mở (plan 21 P2).
+            if (string.IsNullOrEmpty(address) && string.IsNullOrEmpty(sheetName))
+            {
+                try
+                {
+                    List<string> errorCells = WorkbookErrorCells(wb);
+                    if (errorCells.Count > 0)
+                    {
+                        issues.Add(Issue("error-cells", errorCells.Count + (errorCells.Count >= ErrorCellLimit ? "+" : "")
+                            + " formula cell(s) in the workbook show an error: " + string.Join("; ", errorCells.Take(12))
+                            + " - fix the formula (#DIV/0! = divide by zero/empty, #REF! = deleted reference, #NAME? = typo, #VALUE! = text in maths)",
+                            new Dictionary<string, object> { { "cells", errorCells } }));
+                    }
+                }
+                catch (Exception)
+                {
+                }
+            }
+
             return new Dictionary<string, object>
             {
                 { "sheet", Convert.ToString(sheet.Name) },
@@ -461,6 +480,44 @@ namespace AxiomOffice.Bridge
                 { "issueCount", issues.Count },
                 { "issues", issues }
             };
+        }
+
+        private const int ErrorCellLimit = 40;
+
+        // Ô công thức đang ra lỗi trên mọi sheet ("Sheet!D4 #DIV/0!"). SpecialCells(xlCellTypeFormulas = -4123, xlErrors = 16)
+        // ném lỗi khi sheet không có ô nào như vậy.
+        private static List<string> WorkbookErrorCells(dynamic wb)
+        {
+            var found = new List<string>();
+            foreach (dynamic ws in wb.Worksheets)
+            {
+                dynamic cells;
+                try
+                {
+                    cells = ws.UsedRange.SpecialCells(-4123, 16);
+                }
+                catch (Exception)
+                {
+                    continue;
+                }
+                foreach (dynamic cell in cells.Cells)
+                {
+                    string name = "#ERR";
+                    try
+                    {
+                        name = ExcelErrorName(Convert.ToInt32(cell.Value2));
+                    }
+                    catch (Exception)
+                    {
+                    }
+                    found.Add(Convert.ToString(ws.Name) + "!" + Convert.ToString(cell.Address(false, false)) + " " + name);
+                    if (found.Count >= ErrorCellLimit)
+                    {
+                        return found;
+                    }
+                }
+            }
+            return found;
         }
 
         // Giới hạn khi soi tham chiếu: bảng 50.000 dòng có thể có hàng trăm nghìn công thức, soi hết thì

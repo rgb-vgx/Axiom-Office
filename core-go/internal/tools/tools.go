@@ -43,7 +43,8 @@ var noDocumentChange = map[string]bool{
 	"et.readRange": true, "et.checkRange": true, "et.listSheets": true,
 	"et.save": true, "et.saveAs": true, "et.exportPdf": true,
 	"writer.getText": true, "writer.selection": true, "writer.checkTables": true, "writer.outline": true,
-	"writer.save": true, "writer.saveAs": true, "writer.exportPdf": true,
+	"writer.checkLayout": true,
+	"writer.save":        true, "writer.saveAs": true, "writer.exportPdf": true,
 	"wpp.listSlides": true, "wpp.checkLayout": true,
 	"wpp.save": true, "wpp.saveAs": true, "wpp.exportPdf": true,
 }
@@ -58,7 +59,8 @@ var readOnly = map[string]bool{
 	"app.info": true, "app.screenshot": true,
 	"et.readRange": true, "et.checkRange": true, "et.listSheets": true,
 	"writer.getText": true, "writer.selection": true, "writer.checkTables": true, "writer.outline": true,
-	"wpp.listSlides": true, "wpp.checkLayout": true,
+	"writer.checkLayout": true,
+	"wpp.listSlides":     true, "wpp.checkLayout": true,
 }
 
 // ReadOnly: lenh nay chi doc tai lieu, khong sua va khong ghi file.

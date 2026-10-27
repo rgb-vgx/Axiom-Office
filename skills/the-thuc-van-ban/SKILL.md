@@ -23,16 +23,27 @@ apps: [wps]
    **không** gõ dòng trống: mọi dòng sẽ dồn vào một đoạn, lần căn cuối đè lên cả khối. Tiêu đề văn bản căn
    giữa; tiêu đề mục dùng `writer.heading`. `writer.appendText` chỉ để nối đoạn văn thường vào cuối — nó
    cũng tự đặt lại định dạng, không kế thừa bold/căn lề của đoạn trước.
+   **Viết nội dung mới cả mục một lần** bằng `writer.writeContent {blocks}` — tiêu đề, đoạn văn (căn đều),
+   gạch đầu dòng, danh sách số, bảng kèm chú thích, ngắt trang, theo đúng thứ tự, nối vào cuối bài:
+   `[{heading: "1. Kết quả", level: 1}, {text: "Đoạn 1\nĐoạn 2"}, {bullets: ["Ý 1", "Ý 2"]},
+   {table: [["Năm", "Số"], ["2026", "12"]], caption: "Kết quả 2026"}, {pageBreak: true}]` — một lệnh cho
+   một hay vài mục thay vì mỗi đoạn một lệnh. Danh sách viết bằng `bullets`/`numbers`, không gõ "-" hay "1." tay.
 4. **Bảng**: chèn bằng `writer.insertTable {values, style}` với `values` là mảng 2 chiều đầy đủ (hàng
    đầu là tiêu đề), rồi `writer.formatTable` với `style` = `document.tableStyle`, `font`, `size`.
    Chú thích bảng: `writer.insertCaption {text}` **ngay trước** `writer.insertTable` (tự đánh số "Bảng 1.");
-   bảng có sẵn thì thêm `before` = số của bảng trong `writer.outline`.
-5. **Ngắt trang**: văn bản dài thì mục lớn bắt đầu ở trang mới — `writer.insertPageBreak` ngay trước
-   heading đó; đừng gõ dòng trống cho hết trang.
+   bảng có sẵn thì thêm `before` = số của bảng trong `writer.outline`. Thêm hàng vào bảng **có sẵn**:
+   `writer.addTableRows {table, rows: [[...]]}` — không dựng lại bảng, không thay chuỗi bằng `replaceAll`.
+   Số thập phân viết kiểu Việt Nam: `98,4`, `1.250.000` (không `98.4`).
+5. **Ngắt trang**: văn bản dài thì mục lớn bắt đầu ở trang mới — `{pageBreak: true}` trong
+   `writer.writeContent`, hoặc `writer.insertPageBreak {before: n}` trước heading có sẵn; đừng gõ dòng trống
+   cho hết trang.
 6. **Báo cáo nhiều trang**: mục lục `writer.insertToc` (sau trang bìa; gọi lại một lần khi viết xong để
    cập nhật số trang), số trang và đầu trang `writer.setHeaderFooter {header, pageNumber: true}` — không gõ
    "MỤC LỤC" hay "Trang 1" bằng tay.
-7. **Không** tự lưu, không đổi tên file.
+7. **Độ dài theo số trang**: người dùng nói "khoảng N trang" thì tính **ngân sách chữ trước khi viết**: một trang
+   A4 chữ Times 13 chứa khoảng **280 chữ**; trang bìa và mục lục mỗi thứ chiếm một trang, mỗi bảng nhỏ khoảng nửa
+   trang. Ví dụ "6–8 trang" có bìa + mục lục + 2 bảng → phần chữ ~5 trang ≈ **1.400 chữ**, chia cho các mục.
+8. **Không** tự lưu, không đổi tên file.
 
 ## Checklist
 
@@ -49,3 +60,6 @@ apps: [wps]
     **Không** dùng `writer.replaceAll` để vá một ô: nó thay **mọi** lần xuất hiện trong cả tài liệu và
     không phân biệt hoa/thường.
 - [ ] Đọc lại `writer.getText` để chắc thứ tự mục đúng.
+- [ ] **Soát phân trang** `writer.checkLayout {maxPages}` trước khi trả lời (`maxPages` = mức trên người dùng nói,
+      "6–8 trang" → 8): `too-long` là **lỗi phải sửa** — rút gọn đoạn, bỏ ý trùng cho đến khi hết; `blank-page` / `empty-paragraphs` → `writer.deleteParagraphs` đúng các
+      số đoạn được chỉ; `heading-at-page-bottom` và `split-table` → làm theo cách sửa trong `detail`.

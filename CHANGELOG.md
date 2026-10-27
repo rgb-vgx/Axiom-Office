@@ -5,6 +5,25 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Word/Excel P2: tự soát phân trang, viết cả mục một lệnh (27/10/2026)
+
+- **`writer.writeContent`**: nhiều khối (tiêu đề, đoạn căn đều, gạch đầu dòng / danh sách số thật, bảng kèm chú thích,
+  ngắt trang) nối vào cuối bài trong một lệnh, một bước hoàn tác; soát hết trước khi ghi.
+- **`writer.checkLayout {maxPages}`** (chỉ đọc): số trang/chữ, trang từng tiêu đề; lỗi `blank-page`,
+  `heading-at-page-bottom`, `split-table`, `empty-paragraphs`, `too-long` kèm cách sửa.
+- **`writer.deleteParagraphs`** (tất cả hoặc không; từ chối đoạn trong bảng/mục lục), **`writer.addTableRows`** (thêm
+  hàng vào bảng có sẵn), `insertPageBreak {before}`, `formatTable {keepTogether}`.
+- **Excel**: `et.checkRange` không truyền `range`/`sheet` soát ô lỗi ở mọi sheet (`error-cells`).
+- Skill `the-thuc-van-ban`: viết cả mục một lệnh, ngân sách chữ theo số trang, soát `checkLayout` trước khi trả lời;
+  test live `tests/live/test_office_layout.py`.
+
+### Fixed — Word P2 (27/10/2026)
+
+- `insertTable` tự giữ bảng ≤ 15 hàng trên một trang; chú thích bảng đi liền bảng.
+- `insertStyledText` dạng khối sang đoạn mới khi con trỏ ở cuối đoạn có chữ (trước đó dính vào đoạn của `appendText`).
+- `tests/live/test_writer_format.py` đọc căn lề thực tế (đoạn → style): "thân bài căn đều" trượt vì style Normal đã căn
+  đều nên Word không ghi `jc` vào đoạn - lỗi của test.
+
 ### Added — Word/Excel P1: lệnh cấu trúc có ngữ nghĩa (26/10/2026)
 
 - **Word**: `writer.setStyle` (gán Heading/Title/List... cho đoạn có sẵn theo số đoạn `writer.outline`, style dựng sẵn

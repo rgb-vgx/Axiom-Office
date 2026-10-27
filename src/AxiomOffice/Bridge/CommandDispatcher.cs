@@ -24,6 +24,7 @@ namespace AxiomOffice.Bridge
             .Concat(WriterDesignCommands())
             .Concat(WriterScopeCommands())
             .Concat(WriterStructureCommands())
+            .Concat(WriterLayoutCommands())
             .Concat(SpreadsheetCommands())
             .Concat(SpreadsheetStructureCommands())
             .Concat(PresentationCommands())

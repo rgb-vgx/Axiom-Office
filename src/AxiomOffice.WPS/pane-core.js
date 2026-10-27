@@ -101,7 +101,9 @@
     "wpp.deleteTagged": true,
     "wpp.setNotes": true,
     "wpp.setShapeText": true,
+    "writer.addTableRows": true,
     "writer.appendText": true,
+    "writer.deleteParagraphs": true,
     "writer.formatSelection": true,
     "writer.formatTable": true,
     "writer.heading": true,
@@ -119,7 +121,8 @@
     "writer.setHeaderFooter": true,
     "writer.setParagraphAlignment": true,
     "writer.setStyle": true,
-    "writer.typeText": true
+    "writer.typeText": true,
+    "writer.writeContent": true
   };
   // --- END SINH TU DONG ---
   // "Hoan tac luot nay" / "Chen tra loi": ban Windows chi co o Word (Excel/PowerPoint khong hoan tac duoc qua COM).

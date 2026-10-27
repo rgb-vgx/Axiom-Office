@@ -391,6 +391,8 @@ namespace AxiomOffice.Bridge
             {
                 dynamic target = CaptionParagraph(app, doc, before);
                 target.Style = BuiltinStyle(doc, "caption");
+                // Chú thích đi liền với bảng/hình ngay dưới, không nằm lẻ cuối trang.
+                target.KeepWithNext = -1;
                 // Dựng bằng Range (không gõ theo con trỏ): "Nhãn #. chữ" rồi thay "#" bằng trường SEQ - đếm theo nhãn, "Bảng"
                 // và "Hình" đánh số riêng. wdFieldEmpty = -1, PreserveFormatting = false.
                 dynamic body = target.Range;
