@@ -135,6 +135,7 @@ namespace AxiomOffice.Bridge
                     pres.Slides[i].Delete();
                 }
                 pres.SaveAs(path, 24);
+                TrackPresentation(pres);
                 // Mở qua COM thì cửa sổ mới KHÔNG tự thành cửa sổ hoạt động: không kích hoạt thì các lệnh sau (không
                 // truyền `presentation`) rơi vào bài cũ của người dùng (đo 25/10/2026).
                 try
@@ -1277,12 +1278,43 @@ namespace AxiomOffice.Bridge
         // Bài để làm việc: `presentation` (đường dẫn) nếu có, không thì bài đang hoạt động. Lượt thật 13/10/2026 17:04: khung
         // Axiom gắn vào cửa sổ bài CŨ; giữa lô người dùng bấm vào đó -> "bài đang hoạt động" thành bài cũ, các lệnh sau
         // trúng bài cũ (chặn được nhờ RequireSameSize). Dựng theo mẫu luôn chỉ đích danh bài mới.
+        // Bài đang làm của bridge này. PowerPoint 16 từ chối đổi ActivePresentation khi cửa sổ bài không
+        // phải cửa sổ nổi (đo 28/10/2026: wpp.open trả alreadyOpen nhưng ActivePresentation vẫn là bài cũ,
+        // cả Window.Activate lẫn Application.ActiveWindow đều không đổi). Ghi nhớ bài vừa mở/tạo để lệnh
+        // không truyền `presentation` vẫn làm đúng bài, thay vì tin ActivePresentation.
+        private static string _trackedPresentation;
+
+        internal static void TrackPresentation(dynamic pres)
+        {
+            try
+            {
+                _trackedPresentation = Convert.ToString(pres.FullName);
+            }
+            catch (Exception)
+            {
+                _trackedPresentation = null;
+            }
+        }
+
+        internal static dynamic CurrentPresentation(dynamic app)
+        {
+            if (!string.IsNullOrWhiteSpace(_trackedPresentation))
+            {
+                dynamic found = FindPresentation(app, _trackedPresentation);
+                if (found != null)
+                {
+                    return found;
+                }
+            }
+            return app.ActivePresentation;
+        }
+
         internal static dynamic TargetPresentation(dynamic app, Dictionary<string, object> p)
         {
             string path = ParamString(p, "presentation", null);
             if (string.IsNullOrWhiteSpace(path))
             {
-                return app.ActivePresentation;
+                return CurrentPresentation(app);
             }
             dynamic found = FindPresentation(app, path.Trim());
             if (found == null)
@@ -1303,7 +1335,7 @@ namespace AxiomOffice.Bridge
             dynamic target = null;
             try
             {
-                target = app.ActivePresentation;
+                target = CurrentPresentation(app);
             }
             catch
             {

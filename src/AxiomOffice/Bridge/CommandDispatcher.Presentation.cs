@@ -183,6 +183,7 @@ namespace AxiomOffice.Bridge
         {
             dynamic app = host.Application;
             dynamic pres = app.Presentations.Add();
+            TrackPresentation(pres);
             return new Dictionary<string, object>
             {
                 { "name", Convert.ToString(pres.Name) }
@@ -201,7 +202,43 @@ namespace AxiomOffice.Bridge
             dynamic open = FindPresentation(app, path);
             if (open != null)
             {
-                open.Windows[1].Activate();
+                // Activate() có lúc trả về ngay mà ActivePresentation vẫn là bài khác (flake 28/10/2026: reply
+                // alreadyOpen nhưng lượt sau sửa nhầm from-template.pptx). Chờ tới khi PowerPoint đổi thật.
+                string wanted = Convert.ToString(open.FullName) ?? "";
+                for (int attempt = 0; attempt < 50; attempt++)
+                {
+                    // Bài có thể có nhiều cửa sổ (document + slide show + notes): Activate() window 1 không
+                    // chuyển ActivePresentation nếu đó không phải cửa sổ tài liệu. Kích hoạt mọi cửa sổ tài liệu.
+                    try
+                    {
+                        int windows = Convert.ToInt32(open.Windows.Count);
+                        for (int w = 1; w <= windows; w++)
+                        {
+                            dynamic window = open.Windows[w];
+                            int type = 1;
+                            try { type = Convert.ToInt32(window.Type); } catch (Exception) { }
+                            if (type == 1) // ppWindowDocument
+                            {
+                                window.Activate();
+                            }
+                        }
+                    }
+                    catch (Exception) { }
+                    try
+                    {
+                        dynamic active = app.ActivePresentation;
+                        if (active != null && string.Equals(Convert.ToString(active.FullName) ?? "", wanted,
+                                StringComparison.OrdinalIgnoreCase))
+                        {
+                            break;
+                        }
+                    }
+                    catch (Exception)
+                    {
+                    }
+                    System.Threading.Thread.Sleep(100);
+                }
+                TrackPresentation(open);
                 return new Dictionary<string, object>
                 {
                     { "name", Convert.ToString(open.Name) },
@@ -210,6 +247,7 @@ namespace AxiomOffice.Bridge
                 };
             }
             dynamic pres = app.Presentations.Open(path);
+            TrackPresentation(pres);
             return new Dictionary<string, object>
             {
                 { "name", Convert.ToString(pres.Name) },
@@ -235,7 +273,7 @@ namespace AxiomOffice.Bridge
         {
             int layout = ParamInt(p, "layout", 12);
             dynamic app = host.Application;
-            dynamic pres = app.ActivePresentation;
+            dynamic pres = TargetPresentation(app, p);
             int count = Convert.ToInt32(pres.Slides.Count);
             // index: chen vao vi tri (thay dung cho mot slide da xoa - slides_from_brief "replace"); ngoai 1..count+1 thi cuoi bai.
             int index = ParamInt(p, "index", 0);
@@ -315,7 +353,7 @@ namespace AxiomOffice.Bridge
             int width = ParamInt(p, "width", -1);
             int height = ParamInt(p, "height", -1);
             dynamic app = host.Application;
-            dynamic pres = app.ActivePresentation;
+            dynamic pres = TargetPresentation(app, p);
             dynamic slide = WppGetSlide(pres, ParamInt(p, "slide", 0));
             // Chỉ một chiều thì co theo tỉ lệ ảnh: AddPicture coi -1 là "giữ cỡ gốc" cho TỪNG chiều, nên
             // truyền width=491, height=-1 làm ảnh 16:9 thành 491x445.5 (đo trên PowerPoint 16, 13/10/2026).
@@ -360,7 +398,7 @@ namespace AxiomOffice.Bridge
             int width = ParamInt(p, "width", 600);
             int height = ParamInt(p, "height", 200);
             dynamic app = host.Application;
-            dynamic pres = app.ActivePresentation;
+            dynamic pres = TargetPresentation(app, p);
             dynamic slide = WppGetSlide(pres, ParamInt(p, "slide", 0));
             dynamic tableShape = slide.Shapes.AddTable(rows, cols, left, top, width, height);
             dynamic table = tableShape.Table;
@@ -445,7 +483,7 @@ namespace AxiomOffice.Bridge
         private static Dictionary<string, object> WppDeleteSlide(IAppHost host, Dictionary<string, object> p)
         {
             dynamic app = host.Application;
-            dynamic pres = app.ActivePresentation;
+            dynamic pres = TargetPresentation(app, p);
             dynamic slide = WppGetSlide(pres, ParamInt(p, "slide", 0));
             int index = Convert.ToInt32(slide.SlideIndex);
             slide.Delete();
@@ -464,7 +502,7 @@ namespace AxiomOffice.Bridge
                 throw new InvalidOperationException("'path' is required");
             }
             dynamic app = host.Application;
-            dynamic pres = app.ActivePresentation;
+            dynamic pres = TargetPresentation(app, p);
             try
             {
                 pres.ExportAsFixedFormat(path, 2);
@@ -485,7 +523,7 @@ namespace AxiomOffice.Bridge
             int width = ParamInt(p, "width", 540);
             int height = ParamInt(p, "height", 120);
             dynamic app = host.Application;
-            dynamic pres = app.ActivePresentation;
+            dynamic pres = TargetPresentation(app, p);
             int count = Convert.ToInt32(pres.Slides.Count);
             if (count == 0)
             {
