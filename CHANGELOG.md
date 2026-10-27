@@ -5,6 +5,19 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed — Agent Core: chỉ gửi tool hiếm dùng khi lượt cần tới (27/10/2026)
+
+Progressive disclosure: định nghĩa tool chiếm ~79% tiền tố gửi lại mỗi vòng (~21–22k ký tự mỗi app).
+
+- **Tool file của server MCP built-in `office`** (`doc_*`, `excel_*`, `ppt_*`, làm trên tệp đóng) chỉ được gửi khi
+  prompt của lượt hoặc một câu người dùng trước đó trong hội thoại nhắc tới tệp Office (`.docx/.xlsx/.pptx/.xls/
+  .csv/.tsv`…); tệp đính kèm của pane luôn kèm đường dẫn đầy đủ nên vẫn đọc được. Tool của server MCP người dùng tự cấu
+  hình giữ nguyên.
+- **`web_sources`** chỉ được gửi khi lượt có tìm web (Tavily), hội thoại đã có nguồn lưu, hoặc người dùng nhắc tới
+  nguồn/web/link.
+- Bộ tool chốt một lần ở đầu lượt, không đổi giữa lượt (giữ cache tiền tố). Lượt sửa tài liệu thường gửi ít hơn
+  ~18% (Word), ~34% (Excel), ~20% (PowerPoint) ký tự định nghĩa tool + system prompt mỗi vòng.
+
 ### Fixed — Agent Core: lượt dừng giữa chừng được ghi lại, phạm vi hoàn tác nói rõ (27/10/2026)
 
 Theo `docs/research/hoc-tu-agent-khac.md` (học từ Codex, Grok Build, Claude Code).

@@ -170,13 +170,17 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 	}
 	// Tim kiem web (Tavily): chi khi co khoa trong Thiet lap VA bat TavilyEnabled (toggle tren ribbon);
 	// chi doc web nen co ca trong plan mode.
+	webSearch := false
 	if cfg := o.Config(); cfg.TavilyEnabled {
 		if key := cfg.TavilyApiKey; key != "" {
 			list = append(list, tools.NewWebSearchTool(key))
+			webSearch = true
 		}
 	}
-	// Kho nguon web da tai (web_sources): doc lai/trich dan khoi tai lai - chi doc nen co ca plan mode.
-	if o.WebSources != nil {
+	// Kho nguon web da tai (web_sources): doc lai/trich dan khoi tai lai - chi doc nen co ca plan mode. Chi gui khi luot co
+	// the dung toi (disclosure.go): 1,2k ky tu moi vong cho mot tool phan lon luot khong goi.
+	if o.WebSources != nil && needsWebSources(webSearch,
+		len(o.WebSources.RecentByConversation(conversation.ID, 1)) > 0, request.Prompt) {
 		list = append(list, tools.NewWebSourcesTool(o.WebSources))
 	}
 	// QA thi giac (muc 8.4.6): chi khi nguoi dung bat VisualQaEnabled (doc lai moi luot qua cau hinh).
@@ -188,6 +192,11 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 	// canh gui lai agent") + server nguoi dung cau hinh giu nguyen; loi server khong hong run.
 	if o.MCP != nil {
 		bound := o.MCP.Tools(ctx)
+		// Tool file cua server "office" lam tren tep DONG (tep dinh kem, tep tao moi): chi gui khi luot nhac toi mot tep
+		// Office (disclosure.go) - 2,8-6k ky tu moi vong ma luot sua tai lieu dang mo gan nhu khong dung.
+		if !mentionsOfficeFile(request.Prompt, before) {
+			bound = withoutOfficeFileTools(bound)
+		}
 		if readOnly {
 			bound = tools.ReadOnlyMCP(bound)
 		} else {
