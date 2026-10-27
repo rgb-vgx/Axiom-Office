@@ -41,6 +41,8 @@ type Result struct {
 var noDocumentChange = map[string]bool{
 	"app.info": true, "app.screenshot": true,
 	"et.readRange": true, "et.checkRange": true, "et.listSheets": true,
+	// et.whatIf ghi tam mot o roi tu tra lai (ket qua = bang chung kiem tra, tai lieu khong doi).
+	"et.readRanges": true, "et.whatIf": true,
 	"et.save": true, "et.saveAs": true, "et.exportPdf": true,
 	"writer.getText": true, "writer.selection": true, "writer.checkTables": true, "writer.outline": true,
 	"writer.checkLayout": true,
@@ -58,6 +60,8 @@ func ChangesDocument(action string) bool { return !noDocumentChange[action] }
 var readOnly = map[string]bool{
 	"app.info": true, "app.screenshot": true,
 	"et.readRange": true, "et.checkRange": true, "et.listSheets": true,
+	// et.whatIf ghi tam mot o roi tu tra lai (ket qua = bang chung kiem tra, tai lieu khong doi).
+	"et.readRanges": true, "et.whatIf": true,
 	"writer.getText": true, "writer.selection": true, "writer.checkTables": true, "writer.outline": true,
 	"writer.checkLayout": true,
 	"wpp.listSlides":     true, "wpp.checkLayout": true,
@@ -123,8 +127,8 @@ type RunContext struct {
 	WebSources WebSourceSaver
 	// calls: so lan goi tung tool/lenh trong luot (CallLimit).
 	calls map[string]int
-	// formatRangeCalls: so lan et.formatRange thanh cong trong luot (batchFormatHint).
-	formatRangeCalls int
+	// singleCalls: so lan lenh mot vung (et.formatRange, et.readRange) thanh cong trong luot (batchHint).
+	singleCalls map[string]int
 	// templateBuilt: so slide slides_from_template da dung trong CA luot (cac lo truoc + lo nay) - cau tra loi cuoi
 	// tach "dung trong lan nay" voi "co tu luot truoc".
 	templateBuilt int

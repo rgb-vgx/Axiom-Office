@@ -310,3 +310,48 @@ func TestRunAgentStopsWhenOfficeAppIsGone(t *testing.T) {
 		t.Fatalf("phai dung sau vong 1: %+v (%d request)", result, len(bodies()))
 	}
 }
+
+// Lenh ghi bao "changed": false (o da mang dung gia tri) roi doc xen giua: lan ghi Y HET tiep theo bi chan ngay khi tai
+// lieu chua doi (bo do 27/10/2026 ca B: ghi "P02" vao A12 roi doc lai, lap 5 lan).
+func TestRunAgentBlocksRepeatOfUnchangedWrite(t *testing.T) {
+	replies := []string{}
+	for i := 1; i <= 3; i++ {
+		replies = append(replies, fmt.Sprintf(replyToolCallArgs, fmt.Sprintf("w%d", i), `{"write":"A12"}`),
+			fmt.Sprintf(replyToolCallArgs, fmt.Sprintf("r%d", i), fmt.Sprintf(`{"read":%d}`, i)))
+	}
+	server, _ := verifyServer(t, append(replies, fmt.Sprintf(replyText, "xong")))
+	client := NewClient(server.Client(), "openai", server.URL, "", "m")
+	writes, blocked := 0, ""
+	options := DefaultAgentOptions()
+	options.Verify = false
+	client.RunAgent(context.Background(), "s", nil, "u", mutatingTools(),
+		func(ctx context.Context, call ToolCall) ToolResult {
+			if strings.Contains(call.Arguments, "write") {
+				writes++
+				return ToolResult{CallID: call.ID, Name: call.Name, OK: true, ResultJSON: `{"ok":true,"result":{"changed":false}}`}
+			}
+			return ToolResult{CallID: call.ID, Name: call.Name, OK: true, ResultJSON: `{"ok":true}`}
+		}, options, AgentCallbacks{ToolFinished: func(result ToolResult) {
+			if strings.Contains(result.ResultJSON, "changed nothing") {
+				blocked = result.ResultJSON
+			}
+		}})
+	if writes != 1 || blocked == "" {
+		t.Fatalf("ghi khong doi gi chi chay 1 lan, lan sau bi chan: chay %d, loi %q", writes, blocked)
+	}
+}
+
+// "changed": false nam LONG ben trong ket qua (tung vung theo doi cua et.whatIf) khong phai lenh ghi khong doi gi:
+// khong bi chan nham (bo do 27/10/2026 ca B, lan p3i).
+func TestUnchangedWriteOnlyTopLevel(t *testing.T) {
+	for raw, want := range map[string]bool{
+		`{"ok":true,"result":{"changed":false,"written":1}}`: true,
+		`{"changed":false}`: true,
+		`{"ok":true,"result":{"moved":0,"watch":[{"range":"A1","changed":false}]}}`: false,
+		`{"ok":true,"result":{"written":1}}`:                                        false,
+	} {
+		if unchangedWrite(raw) != want {
+			t.Fatalf("%s: muon %v", raw, want)
+		}
+	}
+}

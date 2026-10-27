@@ -29,6 +29,17 @@ namespace AxiomOffice.Bridge
                 Command("et.readRange", "et", EtReadRange,
                     "Đọc vùng, ví dụ `A1:C10`; `formulas=true` trả về công thức (ô không có công thức = null)",
                     Req("range"), Opt("sheet"), Opt("formulas", "true = trả mảng `formulas` thay cho `values`")).ForAgent(),
+                Command("et.readRanges", "et", EtReadRanges,
+                    "Đọc NHIỀU vùng (nhiều sheet) trong MỘT lời gọi: `reads` là mảng {range, sheet?, formulas?}; `range` nhận cả "
+                    + "'Sheet!A1:B6'. Dùng thay cho nhiều lần et.readRange khi soát lại (tối đa 4000 ô mỗi lần)",
+                    Req("reads", "array of {range, sheet?, formulas?}"), Opt("sheet", "default sheet for items without one"),
+                    Opt("formulas", "true = formulas for every item")).ForAgent(),
+                Command("et.whatIf", "et", EtWhatIf,
+                    "Thử ô điều khiển SỐNG hay CHẾT trong MỘT lời gọi (chỉ đọc): đổi tạm ô giả định `cell` thành `value`, tính lại, "
+                    + "đọc các vùng `watch` trước/sau, rồi TỰ TRẢ LẠI giá trị cũ. `unchanged` = vùng không đổi theo (công thức không "
+                    + "đọc ô đó). Thay cho tự ghi giá trị thử -> đọc -> ghi lại",
+                    Req("cell", "one input cell e.g. 'Config!B2'"), Req("value", "test value e.g. 0.95"),
+                    Req("watch", "ranges that should follow e.g. ['Dashboard!B3:B6']"), Opt("sheet")).ForAgent(),
                 Command("et.writeRange", "et", EtWriteRange, "Ghi vùng bắt đầu từ ô trên-trái `range`",
                     Req("range", "top-left cell e.g. 'A1'"), Req("values", "2D array of rows e.g. [[\"Tên\",\"Điểm\"],[\"An\",9.5]]"), Opt("sheet")).ForAgent(),
                 Command("et.importCsv", "et", EtImportCsv,
@@ -139,8 +150,9 @@ namespace AxiomOffice.Bridge
             string sheetName = ParamString(p, "sheet", null);
             dynamic app = host.Application;
             dynamic wb = app.ActiveWorkbook;
-            dynamic sheet = string.IsNullOrEmpty(sheetName) ? wb.ActiveSheet : wb.Worksheets[sheetName];
-            dynamic range = sheet.Range[address];
+            // Nhận cả "Project_Data!A1:I4" (bộ đo 27/10/2026 ca B: lỗi COM 0x800A03EC khó hiểu khi có tên sheet trong range).
+            dynamic sheet;
+            dynamic range = SheetRange(wb, sheetName, address, "'range'", out sheet);
             var result = new Dictionary<string, object>
             {
                 { "sheet", Convert.ToString(sheet.Name) },
@@ -336,13 +348,86 @@ namespace AxiomOffice.Bridge
             catch
             {
             }
+            bool same = SameCells(target, matrix, rowCount, colCount);
             target.Value2 = matrix;
 
-            return new Dictionary<string, object>
+            var output = new Dictionary<string, object>
             {
                 { "written", rowCount * colCount },
                 { "sheet", Convert.ToString(sheet.Name) }
             };
+            if (same)
+            {
+                // Ghi lại đúng thứ đang có (bộ đo 27/10/2026 ca B: ghi "P02" vào A12 rồi đọc lại, lặp 5 lần): báo rõ để
+                // model thôi ghi lại; Core coi lệnh là không sửa tài liệu và chặn lần lặp y hệt sau đó.
+                output["changed"] = false;
+                output["note"] = "the cells already held exactly these values: nothing changed";
+            }
+            return output;
+        }
+
+        // Ô đích đã mang đúng các giá trị / công thức sắp ghi chưa (so công thức với chuỗi "=...", số với số, chữ với chữ).
+        private static bool SameCells(dynamic target, object[,] matrix, int rows, int cols)
+        {
+            try
+            {
+                object[,] values = AsMatrix(target.Value2, rows, cols);
+                object[,] formulas = AsMatrix(target.Formula, rows, cols);
+                for (int r = 0; r < rows; r++)
+                {
+                    for (int c = 0; c < cols; c++)
+                    {
+                        object incoming = matrix[r, c];
+                        string text = incoming as string;
+                        if (text != null && text.StartsWith("="))
+                        {
+                            if (!string.Equals(text, Convert.ToString(formulas[r, c]), StringComparison.OrdinalIgnoreCase))
+                            {
+                                return false;
+                            }
+                            continue;
+                        }
+                        object existing = values[r, c];
+                        if (incoming == null || (text != null && text.Length == 0))
+                        {
+                            if (existing != null && Convert.ToString(existing).Length > 0)
+                            {
+                                return false;
+                            }
+                            continue;
+                        }
+                        if (Convert.ToString(formulas[r, c]).StartsWith("="))
+                        {
+                            return false;
+                        }
+                        if (text != null)
+                        {
+                            if (!(existing is string) || (string)existing != text)
+                            {
+                                return false;
+                            }
+                            continue;
+                        }
+                        if (incoming is bool)
+                        {
+                            if (!(existing is bool) || (bool)existing != (bool)incoming)
+                            {
+                                return false;
+                            }
+                            continue;
+                        }
+                        if (!(existing is double) || Math.Abs((double)existing - Convert.ToDouble(incoming)) > 1e-9)
+                        {
+                            return false;
+                        }
+                    }
+                }
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
         }
 
         // Viết MỘT công thức vào ô góc rồi điền ra cả vùng (AutoFill của Excel tự dịch tham chiếu tương
@@ -374,11 +459,21 @@ namespace AxiomOffice.Bridge
             }
 
             int written = 0;
+            bool changed = false;
             var sheets = new List<string>();
             var errors = new List<object>();
-            foreach (Dictionary<string, object> item in writes)
+            string defaultSheet = ParamString(p, "sheet", null);
+            foreach (Dictionary<string, object> entry in writes)
             {
+                // `sheet` ngoài là mặc định cho mục không ghi sheet (trước đây bị bỏ qua: ghi vào sheet đang mở).
+                Dictionary<string, object> item = entry;
+                if (!string.IsNullOrEmpty(defaultSheet) && string.IsNullOrEmpty(ParamString(entry, "sheet", null)))
+                {
+                    item = new Dictionary<string, object>(entry);
+                    item["sheet"] = defaultSheet;
+                }
                 Dictionary<string, object> result = EtWriteRange(host, item);
+                changed |= !result.ContainsKey("changed");
                 object count;
                 if (result.TryGetValue("written", out count) && count != null)
                 {
@@ -412,6 +507,11 @@ namespace AxiomOffice.Bridge
             {
                 { "ranges", writes.Count }, { "written", written }, { "sheets", sheets }
             };
+            if (!changed)
+            {
+                output["changed"] = false;
+                output["note"] = "every range already held exactly these values: nothing changed";
+            }
             if (errors.Count > 0)
             {
                 output["formulaErrors"] = errors;
@@ -645,10 +745,40 @@ namespace AxiomOffice.Bridge
                 {
                     sheets.Add(name);
                 }
+                // numFmt Excel không nhận ("#,##0 \"đ" thiếu nháy, "[Red") chỉ lộ khi gán: thử trên ô đầu của vùng rồi trả lại
+                // định dạng cũ, để một mục sai thì vẫn không vùng nào bị đổi.
+                string numFmt = ParamString(item, "numFmt", null);
+                if (!string.IsNullOrEmpty(numFmt))
+                {
+                    dynamic probe = targets[i].Cells[1, 1];
+                    object previous = probe.NumberFormat;
+                    try
+                    {
+                        probe.NumberFormat = numFmt;
+                    }
+                    catch (Exception)
+                    {
+                        throw new InvalidOperationException(string.Format("'formats[{0}].numFmt': Excel does not accept '{1}' "
+                            + "(use codes like '#,##0', '0.0%', 'dd/mm/yyyy', '#,##0 \"đ\"'); nothing was changed", i, numFmt));
+                    }
+                    probe.NumberFormat = previous;
+                }
             }
             for (int i = 0; i < formats.Count; i++)
             {
-                ApplyRangeFormat(targets[i], formats[i]);
+                try
+                {
+                    ApplyRangeFormat(targets[i], formats[i]);
+                }
+                catch (Exception ex)
+                {
+                    // Excel từ chối thường là numFmt lạ (bộ đo 27/10/2026 ca B, p3k): nói rõ mục nào, mục nào đã áp.
+                    string numFmt = ParamString(formats[i], "numFmt", null);
+                    throw new InvalidOperationException(string.Format("'formats[{0}]' ({1}) was refused by Excel: {2}{3}. Items 0-{4} "
+                        + "were applied; send only the remaining items again", i, ParamString(formats[i], "range", ""), ex.Message,
+                        string.IsNullOrEmpty(numFmt) ? "" : " - check numFmt '" + numFmt + "' (use codes like '#,##0', '0.0%', "
+                        + "'dd/mm/yyyy', '#,##0 \"đ\"')", i - 1));
+                }
             }
             sheets.Sort(StringComparer.Ordinal);
             return new Dictionary<string, object> { { "ranges", formats.Count }, { "sheets", sheets } };
@@ -934,15 +1064,41 @@ namespace AxiomOffice.Bridge
             }
             dynamic data = source.Range[local];
             dynamic shape = sheet.Shapes.AddChart2(-1, xlType, anchorCell.Left, anchorCell.Top, width, height);
-            shape.Name = name;
-            shape.Chart.SetSourceData(data);
             string title = ParamString(p, "title", null);
             bool titleApplied = false;
-            if (!string.IsNullOrEmpty(title))
+            // Hỏng giữa chừng thì xoá hình biểu đồ vừa thêm: trước đây mỗi lần lỗi để lại một biểu đồ rỗng (bộ đo 27/10/2026
+            // ca B, p3k: 6 lần "This object has no title" trên vùng chưa có số).
+            try
             {
-                shape.Chart.HasTitle = true;
-                shape.Chart.ChartTitle.Text = title;
-                titleApplied = true;
+                shape.Name = name;
+                shape.Chart.SetSourceData(data);
+                if (Convert.ToInt32(shape.Chart.SeriesCollection().Count) == 0)
+                {
+                    throw new InvalidOperationException("the range '" + address + "' has no numbers to chart: write the data "
+                        + "(or formulas) there first, or point 'range' at the table that holds them");
+                }
+                if (!string.IsNullOrEmpty(title))
+                {
+                    shape.Chart.HasTitle = true;
+                    shape.Chart.ChartTitle.Text = title;
+                    titleApplied = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                try
+                {
+                    shape.Delete();
+                }
+                catch (Exception)
+                {
+                }
+                if (ex is InvalidOperationException)
+                {
+                    throw;
+                }
+                throw new InvalidOperationException("could not build the chart from '" + address + "' (" + ex.Message
+                    + "): check that the range holds a header row and numbers; nothing was added");
             }
             // Đọc lại kiểu THẬT SỰ của biểu đồ thay vì lặp lại điều vừa xin (giống bản LibreOffice).
             string diagram = ChartKindName(shape.Chart);
@@ -1069,7 +1225,9 @@ namespace AxiomOffice.Bridge
             for (int i = 0; i < rules.Count; i++)
             {
                 string visual = NormalizeOperator(ParamString(rules[i], "type", ""));
-                if (visual.Length > 0 && visual != "cellvalue" && visual != "expression")
+                // type "cellIs" / "formula" (tên kiểu của OpenXML/openpyxl - bộ đo 27/10/2026 ca B, p3m: 3 lần gọi hỏng) là rule
+                // so sánh / công thức thường, không phải kiểu trực quan.
+                if (visual.Length > 0 && visual != "cellvalue" && visual != "expression" && visual != "cellis" && visual != "formula")
                 {
                     CheckVisualRule(rules[i], visual, i);
                     plan.Add(new Dictionary<string, object>
@@ -1079,7 +1237,7 @@ namespace AxiomOffice.Bridge
                     });
                     continue;
                 }
-                string key = NormalizeOperator(ParamString(rules[i], "operator", "less"));
+                string key = OperatorKey(ParamString(rules[i], "operator", visual == "formula" || visual == "expression" ? "formula" : "less"));
                 bool isFormula = key == "formula";
                 if (!isFormula && !ConditionalOperators.ContainsKey(key))
                 {
@@ -1087,14 +1245,15 @@ namespace AxiomOffice.Bridge
                         "'rules[{0}].operator' must be one of less/lessEqual/greater/greaterEqual/equal/notEqual/"
                         + "between/notBetween/formula, got '{1}'", i, key));
                 }
-                string formula1 = ParamString(rules[i], "formula1", null);
+                // `value1`/`value` thay cho formula1 (bộ đo 27/10/2026 ca B: 4 lần gọi hỏng vì tên tham số).
+                string formula1 = ParamString(rules[i], "formula1", ParamString(rules[i], "value1", ParamString(rules[i], "value", null)));
                 if (string.IsNullOrEmpty(formula1))
                 {
                     throw new InvalidOperationException(string.Format(
                         "'rules[{0}]' needs 'formula1' - the value to compare with, e.g. "
                         + "{{\"operator\": \"less\", \"formula1\": \"50\"}}", i));
                 }
-                string formula2 = ParamString(rules[i], "formula2", null);
+                string formula2 = ParamString(rules[i], "formula2", ParamString(rules[i], "value2", null));
                 if ((key == "between" || key == "notbetween") && string.IsNullOrEmpty(formula2))
                 {
                     throw new InvalidOperationException(string.Format(
@@ -1102,7 +1261,7 @@ namespace AxiomOffice.Bridge
                 }
                 plan.Add(new Dictionary<string, object>
                 {
-                    { "key", key }, { "input", ParamString(rules[i], "operator", "less") }, { "formula1", formula1 },
+                    { "key", key }, { "input", isFormula ? ParamString(rules[i], "operator", "formula") : ConditionalOperatorNames[ConditionalOperators[key]] }, { "formula1", formula1 },
                     { "formula2", formula2 }, { "rule", rules[i] }
                 });
             }
@@ -1141,8 +1300,8 @@ namespace AxiomOffice.Bridge
                     condition = range.FormatConditions.Add(XlCellValue, ConditionalOperators[key], formula1);
                 }
                 ApplyConditionStyle(condition, rule);
-                // Trả đúng tên toán tử bên gọi đã viết ("greaterEqual"), như bản LibreOffice/WPS - không phải khoá
-                // so khớp viết thường.
+                // Trả tên toán tử chuẩn ("greaterEqual"), như bản LibreOffice/WPS - không phải khoá so khớp viết thường;
+                // model gửi tên khác (greaterThanOrEqual, ">=") thì thấy tên đúng cho lần sau.
                 written.Add(new Dictionary<string, object>
                 {
                     { "operator", item["input"] }, { "formula1", formula1 },
@@ -1259,6 +1418,32 @@ namespace AxiomOffice.Bridge
         }
 
         // "lessEqual" / "less_equal" / "less equal" / "LESS" -> "lessequal"
+        // Tên toán tử kiểu Excel/VBA model hay gửi: greaterThan, greaterThanOrEqual, lessThanOrEqualTo, equalTo, notEqualTo,
+        // và ký hiệu > >= < <= = <> -> khoá của ConditionalOperators.
+        private static string OperatorKey(string value)
+        {
+            string key = NormalizeOperator(value);
+            switch (key)
+            {
+                case ">": return "greater";
+                case ">=": return "greaterequal";
+                case "<": return "less";
+                case "<=": return "lessequal";
+                case "=": case "==": return "equal";
+                case "<>": case "!=": return "notequal";
+            }
+            if (key.StartsWith("xl"))
+            {
+                key = key.Substring(2);
+            }
+            key = key.Replace("orequalto", "equal").Replace("orequal", "equal").Replace("than", "");
+            if (key.EndsWith("to"))
+            {
+                key = key.Substring(0, key.Length - 2);
+            }
+            return key;
+        }
+
         private static string NormalizeOperator(string value)
         {
             return (value ?? "less").Replace("_", "").Replace(" ", "").ToLowerInvariant();

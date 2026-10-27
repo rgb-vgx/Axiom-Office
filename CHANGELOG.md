@@ -5,6 +5,24 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Excel: soát cả sổ, đọc nhiều vùng, thử ô điều khiển một lệnh (27/10/2026)
+
+- `et.checkRange {}` soát cả sổ (`workbook` mỗi sheet một dòng, lỗi mọi sheet gộp kèm `sheet`); sheet chia khối soát
+  theo từng khối; `outside-table` thành `notes`, không tính `issueCount`.
+- `et.readRanges` (nhiều vùng một lời gọi), `et.whatIf` (đổi tạm ô giả định, đọc vùng theo dõi, tự trả lại).
+- `et.writeRange`/`writeRanges` báo `"changed": false` khi ô đã mang đúng giá trị; Core chặn lần ghi y hệt tiếp theo.
+- `et.setConditionalFormat` nhận `greaterThan`, `greaterThanOrEqual`, `xlLessThan`, `>=`… và `value1`/`value`.
+- Core: kết quả `et.readRange` từ lần thứ 4 trong lượt nhắc dùng `et.readRanges`.
+- `et.readRange` nhận "Sheet!A1:B2"; `et.whatIf` báo `usedBy` khi ô chỉ là ngưỡng của định dạng có điều kiện / validation;
+  `et.setConditionalFormat` nhận `type: "cellIs"` / `"formula"`.
+
+### Fixed — Excel (27/10/2026, tiếp)
+
+- `et.writeRanges` bỏ qua `sheet` ngoài và ghi vào sheet đang mở.
+- `et.checkRange` báo nhầm `empty-header` / `mixed-types` trên khối biểu mẫu (tiêu đề một ô, cặp nhãn - giá trị).
+- `et.formatRanges` áp dở dang khi Excel không nhận `numFmt` (nay thử trước, từ chối cả lệnh).
+- `et.addChart` hỏng giữa chừng để lại biểu đồ rỗng.
+
 ### Added — Excel: định dạng nhiều vùng một lệnh (27/10/2026)
 
 - **`et.formatRanges`**: `formats` là mảng `{range, sheet?, ...}` cùng thuộc tính như `et.formatRange`; nhiều vùng, nhiều

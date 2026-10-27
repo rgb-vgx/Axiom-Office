@@ -298,9 +298,12 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 	if result.OK {
 		raw = TruncateBridgeResult(action, result.Result, raw, run.FocusSlide)
 	}
-	if result.OK && action == "et.formatRange" {
-		run.formatRangeCalls++
-		raw = batchFormatHint(raw, run.formatRangeCalls)
+	if result.OK && batchHints[action].batch != "" {
+		if run.singleCalls == nil {
+			run.singleCalls = map[string]int{}
+		}
+		run.singleCalls[action]++
+		raw = batchHint(raw, action, run.singleCalls[action])
 	}
 	// Lenh that bai thi tai lieu khong doi -> khong tinh la da sua. Lenh ghi tu bao "changed": false (vd wpp.setShapeText
 	// y het chu dang co) cung vay: revision giu nguyen nen lenh doc truoc do van dung (docStateGuard).
@@ -317,18 +320,32 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 	return output
 }
 
-// batchFormatHint: tu lan et.formatRange thu 3 trong luot, ket qua nhac gom cac vung con lai vao MOT et.formatRanges.
-// Bo do 27/10/2026 ca B: 19 lan formatRange (moi lan mot vung) -> het 60 vong truoc khi xong.
-func batchFormatHint(raw string, calls int) string {
-	if calls < 3 {
+// batchHints: lenh mot vung -> lenh gom nhieu vung; tu lan goi thu `from` trong luot, ket qua nhac gom phan con lai.
+// Bo do 27/10/2026 ca B: 19 lan et.formatRange, 26 lan et.readRange (moi lan mot vung, moi vong mot lenh) -> het 60 vong.
+var batchHints = map[string]struct {
+	batch, example string
+	from           int
+}{
+	"et.formatRange": {"et.formatRanges", "{formats: [{sheet, range, bold?, fillColor?, numFmt?, ...}, ...]}", 3},
+	"et.readRange":   {"et.readRanges", "{reads: [{range: \"Sheet!A1:D10\", formulas?}, ...]}", 4},
+}
+
+func batchHint(raw, action string, calls int) string {
+	hint := batchHints[action]
+	if calls < hint.from {
 		return raw
 	}
 	var body map[string]any
 	if json.Unmarshal([]byte(raw), &body) != nil || body == nil {
 		return raw
 	}
-	body["hint"] = fmt.Sprintf("this is et.formatRange call #%d in this request: put ALL remaining formats (any sheet) in ONE "+
-		"et.formatRanges {formats: [{sheet, range, bold?, fillColor?, numFmt?, ...}, ...]}", calls)
+	text := fmt.Sprintf("this is %s call #%d in this request: put ALL the remaining ones (any sheet) in ONE %s %s",
+		action, calls, hint.batch, hint.example)
+	// Ket qua doc lon da co hint cua buoc cat (con bao nhieu dong) - noi them, khong de mat.
+	if previous, ok := body["hint"].(string); ok && previous != "" {
+		text = previous + " | " + text
+	}
+	body["hint"] = text
 	data, err := json.Marshal(body)
 	if err != nil {
 		return raw

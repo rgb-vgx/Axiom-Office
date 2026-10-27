@@ -311,12 +311,22 @@ type identicalCallGuard struct {
 	writeAt map[string]int    // chu ky lenh ghi -> revision luc goi gan nhat (truoc khi ghi)
 	pending map[string]string // CallID -> chu ky cua vong dang chay
 	at      map[string]int    // CallID -> revision luc goi
+	// unchangedAt: lenh ghi bao "changed": false (o da mang dung gia tri do) -> revision luc do. Goi lai Y HET khi tai
+	// lieu chua doi tu do thi chan ngay: bo do 27/10/2026 ca B ghi "P02" vao A12 roi doc lai, lap 5 lan (doc xen giua
+	// nen khong phai "noi lien").
+	unchangedAt map[string]int
 }
 
 func (g *identicalCallGuard) beforeCall(loop *agentLoop, call ToolCall) *ToolResult {
 	signature := call.Name + " " + call.Arguments
 	if g.pending == nil {
 		g.readAt, g.writeAt, g.pending, g.at = map[string]int{}, map[string]int{}, map[string]string{}, map[string]int{}
+		g.unchangedAt = map[string]int{}
+	}
+	if at, same := g.unchangedAt[signature]; same && at == loop.revision {
+		return &ToolResult{CallID: call.ID, Name: call.Name, ResultJSON: ErrorJSON(
+			"blocked: this exact write already ran and changed nothing - the cells already hold these values. " +
+				"Do not write it again; move on to the next step or answer the user")}
 	}
 	if at, read := g.readAt[signature]; read && at != loop.revision {
 		g.counts[signature] = 0
@@ -341,6 +351,9 @@ func (g *identicalCallGuard) afterTools(_ *agentLoop, _ *Turn, results []ToolRes
 		signature, ok := g.pending[result.CallID]
 		if ok && result.OK && !result.Mutating {
 			g.readAt[signature] = g.at[result.CallID]
+			if unchangedWrite(result.ResultJSON) {
+				g.unchangedAt[signature] = g.at[result.CallID]
+			}
 		} else if ok && result.Mutating {
 			delete(g.readAt, signature)
 			g.writeAt[signature] = g.at[result.CallID]
@@ -421,7 +434,7 @@ func officeActionTask(arguments string) (string, string) {
 	case strings.HasSuffix(action, ".replaceAll") || strings.HasSuffix(action, ".replaceMany") ||
 		strings.HasSuffix(action, ".replace"):
 		verb = "replace"
-	case strings.HasSuffix(action, ".readRange") || strings.HasSuffix(action, ".getText") ||
+	case strings.HasSuffix(action, ".readRange") || strings.HasSuffix(action, ".readRanges") || strings.HasSuffix(action, ".getText") ||
 		strings.HasSuffix(action, ".listSlides") || strings.HasSuffix(action, ".outline") ||
 		strings.HasSuffix(action, ".checkRange") || strings.HasSuffix(action, ".checkTables") ||
 		strings.HasSuffix(action, ".checkLayout") || strings.HasSuffix(action, ".listSheets"):
@@ -733,4 +746,21 @@ func (f *modelFailure) switchable() bool {
 		return true
 	}
 	return IsContextOverflow(f.status, f.errText)
+}
+
+// unchangedWrite: ket qua lenh ghi bao "changed": false o CAP TREN CUNG ({"changed":false} hoac {"ok":true,"result":
+// {"changed":false}}) - khong tinh truong long ben trong (vd tung vung theo doi cua et.whatIf).
+func unchangedWrite(raw string) bool {
+	if !strings.Contains(raw, `"changed":false`) {
+		return false
+	}
+	var body map[string]any
+	if json.Unmarshal([]byte(raw), &body) != nil {
+		return false
+	}
+	if inner, ok := body["result"].(map[string]any); ok {
+		body = inner
+	}
+	changed, ok := body["changed"].(bool)
+	return ok && !changed
 }

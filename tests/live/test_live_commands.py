@@ -384,7 +384,7 @@ def test_spreadsheet(b, out, run_ai):
     check(table_qa.get("rows") == 3 and table_qa.get("cols") == 3 and "no-number-format" in table_kinds and "outside-table" not in table_kinds,
           "Excel checkRange: 3x3, số lẻ chưa có number format", table_qa)
     sheet_qa = b.cmd("et.checkRange", {}, key="et.checkRange sheet") or {}
-    check("outside-table" in {i.get("type") for i in sheet_qa.get("issues", [])}, "Excel checkRange bắt dữ liệu lạc ngoài bảng", sheet_qa)
+    check("outside-table" in {i.get("type") for i in sheet_qa.get("notes", [])}, "Excel checkRange bắt dữ liệu lạc ngoài bảng (ghi chú)", sheet_qa)
     b.cmd("et.writeRange", {"range": "M1", "values": [["Mã", "Giá"], ["x", "'12"], ["y", "'15"]]}, key="et.writeRange numbers as text")
     text_qa = b.cmd("et.checkRange", {"range": "M1:N3"}, key="et.checkRange numbers as text") or {}
     check("numbers-as-text" in {i.get("type") for i in text_qa.get("issues", [])}, "Excel checkRange bắt số lưu dạng chữ", text_qa)

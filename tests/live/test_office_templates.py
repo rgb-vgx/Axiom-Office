@@ -147,6 +147,14 @@ def run_excel(out: str) -> None:
         scale = bridge.cmd("et.setConditionalFormat", {"sheet": "Data", "range": "E2:E3", "rules": [
             {"type": "colorScale", "minColor": "#FF0000", "maxColor": "#00B050"}]}, record=False) or {}
         check(scale.get("rules") == [{"type": "colorScale"}], "colorScale nhan minColor/maxColor", str(scale))
+        named = bridge.cmd("et.setConditionalFormat", {"sheet": "Data", "range": "F2:F3", "rules": [
+            {"operator": "greaterThanOrEqual", "value1": "5", "fillColor": "#FFC7CE"},
+            {"operator": "xlLessThan", "value": "0", "bold": True}, {"operator": "<>", "formula1": "1", "italic": True},
+            {"type": "cellIs", "operator": "greaterThan", "formula1": "9", "bold": True},
+            {"type": "formula", "formula1": "=$F2>100", "fillColor": "#FFEB9C"}]},
+            record=False) or {}
+        check([r.get("operator") for r in named.get("rules", [])] == ["greaterEqual", "less", "notEqual", "greater", "formula"],
+              "setConditionalFormat nhan greaterThanOrEqual / xlLessThan / <> va value1", str(named))
         listed = bridge.cmd("et.listConditionalFormats", {"sheet": "Data"}, record=False) or {}
         rules = [(f.get("range"), r.get("operator")) for f in listed.get("formats", []) for r in f.get("rules", [])]
         kinds = sorted({kind for _, kind in rules})
@@ -171,6 +179,70 @@ def run_excel(out: str) -> None:
         check("no sheet named" in str(bad) and "Data" in str(bad), "formatRanges sheet sai ke ten sheet co that", str(bad))
         bad = bridge.cmd("et.formatRanges", {"formats": [{"range": "A1"}]}, expect_ok=False, record=False)
         check("nothing to apply" in str(bad), "formatRanges muc khong co thuoc tinh", str(bad))
+        bad = bridge.cmd("et.formatRanges", {"sheet": "Data", "formats": [
+            {"range": "D2:D7", "fillColor": "#FF0000"}, {"range": "B2", "numFmt": "#,##0 \"đ"}]}, expect_ok=False, record=False)
+        check("does not accept" in str(bad), "formatRanges numFmt Excel khong nhan: tu choi truoc khi doi", str(bad))
+        sheet_read = bridge.cmd("et.readRange", {"range": "Data!A1:B1"}, record=False) or {}
+        check(sheet_read.get("values") == [["Tháng", "Doanh thu"]], "readRange nhan 'Sheet!A1:B1'", str(sheet_read))
+        # Doc nhieu vung / thu o dieu khien / soat ca so - moi viec MOT loi goi.
+        reads = bridge.cmd("et.readRanges", {"sheet": "Data", "reads": [
+            {"range": "A1:B2"}, {"range": "Data!D2", "formulas": True}, {"sheet": "Tam", "range": "A1"}]}, record=False) or {}
+        got = reads.get("reads", [])
+        check(len(got) == 3 and got[0].get("values") == [["Tháng", "Doanh thu"], ["T1", 120000000]]
+              and got[1].get("formulas") == [["=1-C2/B2"]] and got[2].get("sheet") == "Tam", "readRanges 3 vung 2 sheet", str(got))
+        bad = bridge.cmd("et.readRanges", {"reads": [{"range": "A1:Z1000"}]}, expect_ok=False, record=False)
+        check("limit" in str(bad), "readRanges qua 4000 o bi tu choi", str(bad))
+        test = bridge.cmd("et.whatIf", {"cell": "Data!B2", "value": 240000000, "watch": ["Data!D2", "D3"]}, record=False) or {}
+        check(test.get("moved") == 1 and test.get("unchanged") == ["Data!D3"] and "hint" in test, "whatIf: D2 doi theo, D3 khong", str(test))
+        back = bridge.cmd("et.readRange", {"sheet": "Data", "range": "B2"}, record=False) or {}
+        check(back.get("values") == [[120000000]], "whatIf tra lai gia tri cu", str(back))
+        # O nguong chi dinh dang co dieu kien doc: gia tri khong doi theo la dung - bao usedBy, khong bao "dead control".
+        bridge.cmd("et.writeRange", {"sheet": "Data", "range": "F10", "values": [[0.5]]}, record=False)
+        bridge.cmd("et.formatRange", {"sheet": "Data", "range": "F10", "fillColor": "#FFF2CC", "numFmt": "0%"}, record=False)
+        bridge.cmd("et.setConditionalFormat", {"sheet": "Data", "range": "G2:G3", "rules": [
+            {"operator": "formula", "formula1": "=$D2>$F$10", "fillColor": "#FFC7CE"}]}, record=False)
+        limit = bridge.cmd("et.whatIf", {"cell": "Data!F10", "value": 0.9, "watch": ["Data!D2:D3"]}, record=False) or {}
+        check(limit.get("moved") == 0 and any("G2:G3" in u for u in limit.get("usedBy", [])) and "not a dead control" in limit.get("hint", ""),
+              "whatIf o nguong: bao usedBy (dinh dang co dieu kien), khong bao o chet", str(limit))
+        bad = bridge.cmd("et.whatIf", {"cell": "Data!D2", "value": 1, "watch": ["D3"]}, expect_ok=False, record=False)
+        check("holds a formula" in str(bad), "whatIf tu choi o cong thuc", str(bad))
+        same = bridge.cmd("et.writeRange", {"sheet": "Data", "range": "A1", "values": [["Tháng", "Doanh thu"], ["T1", 120000000]]},
+                          record=False) or {}
+        check(same.get("changed") is False, "writeRange dung gia tri dang co: changed false", str(same))
+        same = bridge.cmd("et.writeRanges", {"sheet": "Data", "writes": [{"range": "D2", "values": [["=1-C2/B2"]]}]}, record=False) or {}
+        check(same.get("changed") is False, "writeRanges cong thuc dang co: changed false", str(same))
+        moved = bridge.cmd("et.writeRange", {"sheet": "Data", "range": "A1", "values": [["Tháng", "Doanh thu (đ)"]]}, record=False) or {}
+        check("changed" not in moved, "writeRange gia tri moi: khong bao changed", str(moved))
+        bridge.cmd("et.writeRange", {"sheet": "Data", "range": "B1", "values": [["Doanh thu"]]}, record=False)
+        bridge.cmd("et.activateSheet", {"sheet": "Data"}, record=False)
+        whole = bridge.cmd("et.checkRange", record=False) or {}
+        book = {line.get("sheet"): line for line in whole.get("workbook", [])}
+        check(set(book) == {"Data", "Tam"} and book["Data"].get("formulas") == 6 and book["Tam"].get("charts") == 1
+              and "empty-sheet" in book["Tam"].get("issues", []) and book["Data"].get("conditionalFormats", 0) >= 5,
+              "checkRange {} tong quan ca so", str(whole.get("workbook")))
+        check(any(i.get("sheet") == "Tam" and i.get("type") == "empty-sheet" for i in whole.get("issues", [])),
+              "checkRange {}: loi sheet khac gop vao issues kem sheet", str(whole.get("issues")))
+        # Sheet trinh bay chia khoi: soat tung khoi, khong bao empty-header / mixed-types cua ca sheet; outside-table la ghi chu.
+        bridge.cmd("et.writeRange", {"sheet": "Tam", "range": "A1", "values": [
+            ["Bảng điều khiển", None, None], [None, None, None], ["Tổng doanh thu", "=SUM(Data!B2:B7)", None],
+            ["Tổng chi phí", "=SUM(Data!C2:C7)", None], [None, None, None], ["Tháng", "Kế hoạch", "Thực tế"],
+            ["T1", 100, 92], ["T2", 110, 115]]}, record=False)
+        layout = bridge.cmd("et.checkRange", {"sheet": "Tam"}, record=False) or {}
+        kinds = {i.get("type") for i in layout.get("issues", [])}
+        check(not kinds & {"empty-header", "mixed-types", "outside-table"} and
+              "outside-table" in {n.get("type") for n in layout.get("notes", [])},
+              "checkRange sheet chia khoi: khong bao nham, outside-table la ghi chu", str((layout.get("issues"), layout.get("notes"))))
+        bridge.cmd("et.writeRange", {"sheet": "Tam", "range": "B8", "values": [["thiếu"]]}, record=False)
+        layout = bridge.cmd("et.checkRange", {"sheet": "Tam"}, record=False) or {}
+        check(any(i.get("type") == "mixed-types" and "block rows 6-8" in i.get("detail", "") for i in layout.get("issues", [])),
+              "checkRange van bat loi trong mot khoi", str(layout.get("issues")))
+        # Khoi bieu mau (tieu de mot o + cap nhan - gia tri, gia tri lan so / chu): khong bao empty-header / mixed-types.
+        bridge.cmd("et.writeRange", {"sheet": "Tam", "range": "A10", "values": [
+            [None, None], ["Cấu hình", None], ["Ngưỡng cảnh báo", 0.9], ["Ngày báo cáo", "30/06/2026"]]}, record=False)
+        layout = bridge.cmd("et.checkRange", {"sheet": "Tam"}, record=False) or {}
+        form = [i for i in layout.get("issues", []) if "block rows 11-13" in i.get("detail", "")
+                and i.get("type") in ("empty-header", "mixed-types")]
+        check(not form, "checkRange khoi bieu mau (cap nhan - gia tri) khong bao nham", str(form))
         deleted = bridge.cmd("et.deleteSheet", {"sheet": "Tam"}, record=False) or {}
         check(deleted.get("sheets") == ["Data"], "deleteSheet", str(deleted))
         last = bridge.cmd("et.deleteSheet", {"sheet": "Data"}, expect_ok=False, record=False)

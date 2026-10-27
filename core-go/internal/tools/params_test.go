@@ -39,6 +39,7 @@ func paramsCatalog() *office.CommandCatalog {
 		{Name: "et.formatRange", Kind: "et", Agent: true,
 			Params: []office.CommandParam{{Name: "range", Required: true}, {Name: "numFmt"}, {Name: "sheet"}}},
 		{Name: "et.addSheet", Kind: "et", Agent: true, Params: []office.CommandParam{{Name: "name"}}},
+		{Name: "et.readRange", Kind: "et", Agent: true, Params: []office.CommandParam{{Name: "range", Required: true}, {Name: "sheet"}}},
 	}}
 }
 
@@ -126,6 +127,18 @@ func TestFormatRangeHintsBatchFromThirdCall(t *testing.T) {
 		hinted := strings.Contains(result.JSON, "et.formatRanges")
 		if !result.OK || hinted != (call == 3) {
 			t.Fatalf("lan %d: goi y chi tu lan thu 3: %s", call, result.JSON)
+		}
+	}
+}
+
+func TestReadRangeHintsBatchFromFourthCall(t *testing.T) {
+	run, _ := recordingBridge(t)
+	tool := NewOfficeActionTool(paramsCatalog(), "et")
+	for call := 1; call <= 4; call++ {
+		result := tool.Invoke(context.Background(), map[string]any{"action": "et.readRange",
+			"params": map[string]any{"range": "A" + strconv.Itoa(call)}}, run)
+		if hinted := strings.Contains(result.JSON, "et.readRanges"); !result.OK || hinted != (call == 4) {
+			t.Fatalf("lan %d: goi y readRanges chi tu lan thu 4: %s", call, result.JSON)
 		}
 	}
 }

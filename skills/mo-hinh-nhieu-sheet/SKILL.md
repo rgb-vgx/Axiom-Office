@@ -18,7 +18,8 @@ chung. Số liệu ở `tests/bench/results/`.
    sheet dữ liệu rồi hết ngân sách, để **9/13 sheet đề yêu cầu TRỐNG HOÀN TOÀN** — mà phần bị chấm điểm
    lại nằm ở cuối danh sách (`test3-gaps.md`). Đừng làm hết dữ liệu rồi mới tới phân tích; dựng một
    nhánh dọc cho xong (dữ liệu → công thức → dashboard/checks) rồi mới nhân ra. Đối chiếu bằng
-   `et.listSheets` với danh sách đề bài, và đọc lại vài ô của **từng** sheet để chắc nó không rỗng.
+   **một** `et.checkRange {}` (không tham số): `workbook` liệt kê mọi sheet kèm số ô, công thức, biểu đồ,
+   bảng, validation; sheet rỗng hiện `empty-sheet`.
    Sổ mới có sẵn `Sheet1`: đổi tên nó thành sheet đầu tiên của đề (`et.renameSheet`), hoặc xoá sheet thừa bằng
    `et.deleteSheet` — đề nói "đúng N sheet" thì không để sheet thừa.
 
@@ -37,9 +38,12 @@ chung. Số liệu ở `tests/bench/results/`.
    — so giá trị, không so nhãn; và `PASS/FAIL` phải là công thức, không phải chữ gõ sẵn.
 
 5. **Phép thử duy nhất phân biệt ô điều khiển SỐNG với ô CHẾT là đổi rồi đọc lại.** Đọc không phân
-   biệt được. Trước khi trả lời người dùng: đổi một giả định (ví dụ seed/giá), `et.readRange` các ô
-   phải phụ thuộc (KPI, tổng, kết quả check), xác nhận chúng **đổi thật**, rồi trả lại giá trị cũ.
-   Nếu không đổi thì ô điều khiển chết — sửa công thức trước khi báo xong.
+   biệt được. Trước khi trả lời người dùng: **một** `et.whatIf {cell: "Config!B2", value: 0.95, watch:
+   ["Dashboard!B3:B6", "Project_Data!E2:E4"]}` — lệnh tự đổi tạm, đọc trước/sau rồi trả lại giá trị cũ.
+   `unchanged` khác rỗng = ô điều khiển chết — sửa công thức trước khi báo xong. Đừng tự ghi giá trị thử
+   → đọc → ghi lại (đo 27/10/2026: 10 vòng cho một phép thử). Thử ô giả định mà **công thức giá trị** đọc
+   (ngân sách, chi phí, đơn giá) — ô **ngưỡng cảnh báo** chỉ định dạng có điều kiện đọc nên giá trị không đổi
+   theo là đúng (`usedBy` liệt kê rule đọc nó), đừng sửa định dạng có điều kiện vì thế. Một lần `whatIf` là đủ.
 
 6. **Ngưỡng và cảnh báo dùng `et.setConditionalFormat`**, đừng tô màu tay từng ô theo số đã biết: tô
    tay đứng yên khi dữ liệu đổi. Rule nhận `operator` (`less`, `lessEqual`, `greater`, `greaterEqual`,
@@ -50,7 +54,9 @@ chung. Số liệu ở `tests/bench/results/`.
    `et.formatRanges {formats: [{sheet, range, bold?, fillColor?, numFmt?, ...}, ...]}` ở cuối — không gọi
    `et.formatRange` từng vùng (đo 27/10/2026: 19 lần formatRange, hết 60 vòng trước khi xong).
 
-7. **Bảng lớn đi bằng công thức + điền**: `et.fillRange` viết một công thức vào ô góc rồi điền ra cả
+7. **Ô KPI / tổng hợp rời rạc: MỘT `et.writeRange`** có cả nhãn lẫn công thức (`[["Tổng ngân sách",
+   "=SUM(Project_Data!D2:D4)"], ["Tổng chi", "=SUM(Project_Data!E2:E4)"]]`) — không `et.fillRange` từng ô
+   (đo 27/10/2026: 6 vòng cho 6 ô KPI). **Bảng lớn đi bằng công thức + điền**: `et.fillRange` viết một công thức vào ô góc rồi điền ra cả
    vùng (tham chiếu tương đối tự dịch) — đừng gửi từng ô. Dữ liệu thô có sẵn (người dùng đưa, vài
    trăm dòng) gửi **một lần** bằng mảng hai chiều đầy đủ; dữ liệu **giả lập** lớn thì theo quy tắc 11.
 
@@ -69,7 +75,8 @@ chung. Số liệu ở `tests/bench/results/`.
 10. **Đọc để làm tiếp, không đọc để yên tâm.** Đo được: lượt Test 4 rộng gọi `et.readRange` 174 lần
     — mỗi lần kéo cả bảng về là input phình mà không thêm quyết định mới. Đọc 1–2 vùng mục tiêu
     trước khi sửa; sau khi sửa chỉ đọc lại vùng vừa sửa + `et.checkRange`; không đọc lại vùng chưa
-    đổi. Vùng lớn (hơn vài trăm dòng) thì đọc mẫu đầu/cuối + đếm kích thước, không kéo hết 50.001
+    đổi. Cần xem nhiều vùng (KPI, tổng, vài dòng mẫu của từng sheet) thì gom vào **một**
+    `et.readRanges {reads: [{range: "Dashboard!A1:B6"}, {range: "Config!A1:B5", formulas: true}]}`. Vùng lớn (hơn vài trăm dòng) thì đọc mẫu đầu/cuối + đếm kích thước, không kéo hết 50.001
     dòng về.
 
 11. **Dữ liệu giả lập lớn sinh bằng công thức tất định, mỗi cột một `et.fillRange`.** Đề đòi hàng
@@ -90,14 +97,20 @@ chung. Số liệu ở `tests/bench/results/`.
     trỏ sheet dữ liệu (`{label, column, agg, format}`) và 1-4 biểu đồ đọc thẳng vùng dữ liệu
     (`{type, title, x, y: [...]}`) — không chép dữ liệu sang Dashboard, không gõ số KPI.
 
-## Checklist trước khi trả lời
+13. **Lệnh không phụ thuộc nhau gửi CÙNG MỘT phản hồi.** Mỗi phản hồi là một vòng, lượt có hạn 60 vòng.
+    Đo 27/10/2026 (đề 4 sheet): 49/60 vòng chỉ có một lệnh — 6 vòng cho 6 `setConditionalFormat` khác vùng,
+    3 vòng cho 3 `createTable`. Các `createTable`, `freezePanes`, `setValidation`, `setConditionalFormat` của
+    những vùng/sheet khác nhau: gửi chung trong một phản hồi. Chỉ tách vòng khi lệnh sau cần kết quả lệnh trước.
 
-- [ ] Danh sách sheet đề yêu cầu ↔ `et.listSheets`: đủ, không sheet nào rỗng.
-- [ ] `et.checkRange`: `issueCount` = 0, `empty-reference` = 0.
+## Checklist trước khi trả lời (soát trong 2–3 lệnh)
+
+- [ ] **Một** `et.checkRange {}`: `workbook` đủ sheet đề yêu cầu, không `empty-sheet`; `issueCount` = 0,
+      `empty-reference` = 0. `notes` (vd `outside-table` của sheet chia khối) không phải lỗi — đừng sửa
+      theo nó. Sheet chia khối được soát theo từng khối (`block rows 8-14: ...`).
 - [ ] Không số ghi cứng cho giá trị tính được; công thức đọc từ sheet giả định.
 - [ ] `et.setConditionalFormat` cho các ngưỡng/cảnh báo; không tô tay.
-- [ ] Đã đổi một giả định → ô phụ thuộc đổi thật → trả lại.
-- [ ] Đọc lại vài ô đại diện và tự tính tay một dòng để đối chiếu.
+- [ ] **Một** `et.whatIf` trên ô giả định chính: `unchanged` rỗng.
+- [ ] **Một** `et.readRanges` các ô đại diện, tự tính tay một dòng để đối chiếu.
 - [ ] Đã viết plan một lần (sheet → nguồn → fill → check) trước lệnh đầu tiên; không probe quá 2 call.
 - [ ] Không đọc lại vùng chưa đổi; vùng lớn chỉ đọc mẫu đầu/cuối + kích thước.
 - [ ] Dữ liệu giả lập lớn: công thức tất định từ `references/du-lieu-gia-lap.md`, không RAND, không phát tay.

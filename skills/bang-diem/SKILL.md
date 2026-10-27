@@ -31,5 +31,5 @@ Người dùng không cho tên/điểm thì dùng dữ liệu mẫu hợp lý v�
       hàng trung bình lớp.
 - [ ] Một `et.formatRanges`: hàng 1 theo `spreadsheet.header`; các cột điểm + trung bình `numFmt: "0.0"`,
       `horizontal: "center"`; hàng trung bình lớp theo `spreadsheet.totalRow`.
-- [ ] **Soát** `et.checkRange` (không truyền range) → `issueCount` phải = 0, đặc biệt không có
-      `outside-table`. Đọc lại `et.readRange` vùng bảng để chắc công thức ra số.
+- [ ] **Soát** `et.checkRange` (không truyền range) → `issueCount` phải = 0; bảng điểm một khối thì
+      `notes` cũng không nên có `outside-table` (ô lạc ngoài bảng). Đọc lại `et.readRange` vùng bảng để chắc công thức ra số.

@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -21,7 +22,7 @@ namespace AxiomOffice.Bridge
                     + "writer.formatTable với borders:false — được đánh dấu layout và KHÔNG báo empty-cells (ô trống ở đó "
                     + "là cố ý: khoảng trống ký, ô chờ điền)").ForAgent(),
                 Command("et.checkRange", "et", EtCheckRange,
-                    "Soát bảng dữ liệu (chỉ đọc): tiêu đề trống, kiểu lẫn lộn, số dạng chữ, number format, công thức trỏ ô trống; không truyền range/sheet thì soát thêm dữ liệu lạc ngoài bảng và ô lỗi (#DIV/0!, #REF!...) ở MỌI sheet",
+                    "Soát bảng dữ liệu (chỉ đọc): tiêu đề trống, kiểu lẫn lộn, số dạng chữ, number format, công thức trỏ ô trống; KHÔNG truyền range/sheet = soát CẢ SỔ trong một lần: `workbook` mỗi sheet một dòng (vùng dùng, số ô, công thức, biểu đồ, bảng, validation, định dạng điều kiện, loại lỗi; sheet rỗng = empty-sheet), lỗi mọi sheet gộp ở `issues` kèm `sheet`, ô lỗi (#DIV/0!, #REF!...) ở MỌI sheet. Sheet chia khối bằng hàng trống (Dashboard, Config) được soát theo TỪNG khối; `notes` (outside-table) là ghi chú, không tính vào issueCount",
                     Opt("range", "default: the used range"), Opt("sheet")).ForAgent(),
                 Command("wpp.checkLayout", "wpp", WppCheckLayout,
                     "Soát bố cục slide (chỉ đọc): chữ tràn khung, shape ra ngoài slide, shape chồng nhau, chữ quá nhỏ, "
@@ -385,20 +386,140 @@ namespace AxiomOffice.Bridge
                 throw new InvalidOperationException("no workbook is open");
             }
             dynamic sheet = string.IsNullOrEmpty(sheetName) ? wb.ActiveSheet : wb.Worksheets[sheetName];
-            dynamic used = sheet.UsedRange;
-            dynamic range = string.IsNullOrEmpty(address) ? used : sheet.Range[address];
-            int rows = Convert.ToInt32(range.Rows.Count);
-            int cols = Convert.ToInt32(range.Columns.Count);
-            object[,] values = AsMatrix(range.Value2, rows, cols);
-            object[,] formulas = AsMatrix(range.Formula, rows, cols);
+            bool wholeBook = string.IsNullOrEmpty(address) && string.IsNullOrEmpty(sheetName);
+            Dictionary<string, object> report = CheckSheet(wb, sheet, address, wholeBook);
+            if (wholeBook)
+            {
+                AddWorkbookOverview(wb, sheet, report);
+            }
+            return report;
+        }
+
+        private const int OverviewSheetLimit = 30;
+
+        // Soát cả sổ trong MỘT lời gọi (bộ đo 27/10/2026 ca B: 26/60 vòng cuối là listSheets, listCharts, checkRange từng
+        // sheet, readRange từng vùng - mỗi vòng một lệnh). `workbook`: mỗi sheet một dòng (vùng dùng, công thức, biểu đồ,
+        // bảng, validation, định dạng điều kiện, loại lỗi); lỗi của sheet khác gộp vào `issues` kèm `sheet`.
+        private static void AddWorkbookOverview(dynamic wb, dynamic active, Dictionary<string, object> report)
+        {
+            var issues = (List<Dictionary<string, object>>)report["issues"];
+            foreach (Dictionary<string, object> issue in issues)
+            {
+                issue["sheet"] = Convert.ToString(active.Name);
+            }
+            var overview = new List<Dictionary<string, object>>();
+            string activeName = Convert.ToString(active.Name);
+            foreach (dynamic ws in wb.Worksheets)
+            {
+                if (overview.Count >= OverviewSheetLimit)
+                {
+                    break;
+                }
+                string name = Convert.ToString(ws.Name);
+                List<Dictionary<string, object>> sheetIssues;
+                Dictionary<string, object> detail = name == activeName ? report : null;
+                if (detail == null)
+                {
+                    try
+                    {
+                        detail = CheckSheet(wb, ws, null, false);
+                    }
+                    catch (Exception ex)
+                    {
+                        detail = new Dictionary<string, object>
+                        {
+                            { "usedRange", "" }, { "columns", new List<Dictionary<string, object>>() },
+                            { "issues", new List<Dictionary<string, object>> { Issue("check-failed", ex.Message) } }
+                        };
+                    }
+                    sheetIssues = (List<Dictionary<string, object>>)detail["issues"];
+                    foreach (Dictionary<string, object> issue in sheetIssues)
+                    {
+                        issue["sheet"] = name;
+                        issue["detail"] = name + ": " + Convert.ToString(issue["detail"]);
+                        issues.Add(issue);
+                    }
+                    object otherNotes;
+                    if (detail.TryGetValue("notes", out otherNotes) && otherNotes is List<Dictionary<string, object>>)
+                    {
+                        foreach (Dictionary<string, object> note in (List<Dictionary<string, object>>)otherNotes)
+                        {
+                            note["detail"] = name + ": " + Convert.ToString(note["detail"]);
+                            ((List<Dictionary<string, object>>)report["notes"]).Add(note);
+                        }
+                    }
+                }
+                else
+                {
+                    sheetIssues = issues.Where(i => Convert.ToString(i["sheet"]) == name).ToList();
+                }
+                int formulas = 0, cells = 0;
+                foreach (Dictionary<string, object> column in (IEnumerable)detail["columns"])
+                {
+                    formulas += Convert.ToInt32(column["formulas"]);
+                    cells += Convert.ToInt32(column["numbers"]) + Convert.ToInt32(column["texts"]);
+                }
+                var line = new Dictionary<string, object>
+                {
+                    { "sheet", name }, { "usedRange", detail["usedRange"] }, { "filledCells", cells }, { "formulas", formulas },
+                    { "charts", SafeCount(() => ws.ChartObjects().Count) },
+                    { "tables", SafeNames(ws.ListObjects) },
+                    { "validations", SafeCount(() => ws.Cells.SpecialCells(-4174).Count) },
+                    { "conditionalFormats", SafeCount(() => ws.Cells.FormatConditions.Count) },
+                    { "issues", sheetIssues.Select(i => Convert.ToString(i["type"])).Distinct().ToList() }
+                };
+                if (cells == 0)
+                {
+                    var empty = Issue("empty-sheet", name + ": the sheet has no values yet");
+                    empty["sheet"] = name;
+                    issues.Add(empty);
+                    ((List<string>)line["issues"]).Add("empty-sheet");
+                }
+                overview.Add(line);
+            }
+            report["workbook"] = overview;
+            report["issueCount"] = issues.Count;
+        }
+
+        private static int SafeCount(Func<object> count)
+        {
+            try
+            {
+                return Convert.ToInt32(count());
+            }
+            catch (Exception)
+            {
+                // SpecialCells ném lỗi khi sheet không có ô nào loại đó.
+                return 0;
+            }
+        }
+
+        private static List<string> SafeNames(dynamic items)
+        {
+            var names = new List<string>();
+            try
+            {
+                foreach (dynamic item in items)
+                {
+                    names.Add(Convert.ToString(item.Name));
+                }
+            }
+            catch (Exception)
+            {
+            }
+            return names;
+        }
+
+        // Định dạng số đại diện của từng cột trong hàng [first, last]: ô số lẻ đầu tiên (không phải luôn hàng 2 - sheet cấu
+        // hình có hàng 2 trống, ô 0.9 đã để 0% vẫn bị báo no-number-format và model ghi lại mãi, bộ đo 27/10/2026 ca B).
+        private static List<string> ColumnFormats(dynamic range, object[,] values, int first, int last, int cols)
+        {
             var formats = new List<string>();
             for (int c = 1; c <= cols; c++)
             {
                 string format = "";
-                // Định dạng của ô số lẻ đầu tiên trong cột (không phải luôn hàng 2): sheet cấu hình có hàng 2 trống,
-                // ô 0.9 đã để 0% vẫn bị báo no-number-format và model ghi lại mãi (bộ đo 27/10/2026 ca B).
-                int sample = Math.Min(2, rows);
-                for (int r = 1; r < rows; r++)
+                int sample = Math.Min(first + 2, last + 1);
+                for (int r = first + 1; r <= last; r++)
                 {
                     if (values[r, c - 1] is double && Math.Abs((double)values[r, c - 1] % 1) > 1e-9)
                     {
@@ -415,9 +536,112 @@ namespace AxiomOffice.Bridge
                 }
                 formats.Add(format);
             }
+            return formats;
+        }
+
+        // Hàng đầu khối là tiêu đề cột: ít nhất 2 ô có chữ và không ô nào là số.
+        private static bool TableHeader(object[,] values, int cols)
+        {
+            int labels = 0;
+            for (int c = 0; c < cols; c++)
+            {
+                object cell = values[0, c];
+                if (cell == null || Convert.ToString(cell).Trim().Length == 0)
+                {
+                    continue;
+                }
+                if (!(cell is string))
+                {
+                    return false;
+                }
+                labels++;
+            }
+            return labels >= 2;
+        }
+
+        // Dải hàng liền nhau có nội dung, ngăn bởi hàng trống: [đầu, cuối] (chỉ số 0 trong ma trận).
+        private static List<int[]> RowBands(object[,] values, int rows, int cols)
+        {
+            var bands = new List<int[]>();
+            int start = -1;
+            for (int r = 0; r <= rows; r++)
+            {
+                bool filled = false;
+                for (int c = 0; r < rows && c < cols && !filled; c++)
+                {
+                    filled = values[r, c] != null && Convert.ToString(values[r, c]).Trim().Length > 0;
+                }
+                if (filled && start < 0)
+                {
+                    start = r;
+                }
+                else if (!filled && start >= 0)
+                {
+                    bands.Add(new[] { start, r - 1 });
+                    start = -1;
+                }
+            }
+            return bands;
+        }
+
+        private static Dictionary<string, object> CheckSheet(dynamic wb, dynamic sheet, string address, bool wholeBook)
+        {
+            dynamic used = sheet.UsedRange;
+            dynamic range = string.IsNullOrEmpty(address) ? used : sheet.Range[address];
+            int rows = Convert.ToInt32(range.Rows.Count);
+            int cols = Convert.ToInt32(range.Columns.Count);
+            object[,] values = AsMatrix(range.Value2, rows, cols);
+            object[,] formulas = AsMatrix(range.Formula, rows, cols);
+            var formats = ColumnFormats(range, values, 0, rows - 1, cols);
 
             var issues = new List<Dictionary<string, object>>();
-            var columns = ColumnStats(values, formulas, formats, rows, cols, Convert.ToInt32(range.Column), issues);
+            var notes = new List<Dictionary<string, object>>();
+            int firstColumn = Convert.ToInt32(range.Column);
+            int firstRow = Convert.ToInt32(range.Row);
+            // Sheet trình bày (tiêu đề, cặp nhãn - số KPI, bảng nhỏ, khối cấu hình ngăn bởi hàng trống): soát cột theo TỪNG
+            // khối, hàng đầu khối là tiêu đề. Soát cả sheet như một bảng thì báo nhầm empty-header / mixed-types mà model
+            // không sửa được, nên sửa - soát lại tới hết vòng (bộ đo 27/10/2026 ca B, Dashboard và Config).
+            List<int[]> bands = string.IsNullOrEmpty(address) ? RowBands(values, rows, cols) : new List<int[]>();
+            var columns = ColumnStats(values, formulas, formats, rows, cols, firstColumn,
+                bands.Count >= 1 ? new List<Dictionary<string, object>>() : issues);
+            if (bands.Count >= 1)
+            {
+                foreach (int[] band in bands.Where(b => b[1] > b[0]))
+                {
+                    int bandRows = band[1] - band[0] + 1;
+                    var bandValues = new object[bandRows, cols];
+                    var bandFormulas = new object[bandRows, cols];
+                    for (int r = 0; r < bandRows; r++)
+                    {
+                        for (int c = 0; c < cols; c++)
+                        {
+                            bandValues[r, c] = values[band[0] + r, c];
+                            bandFormulas[r, c] = formulas[band[0] + r, c];
+                        }
+                    }
+                    var bandIssues = new List<Dictionary<string, object>>();
+                    ColumnStats(bandValues, bandFormulas, ColumnFormats(range, values, band[0], band[1], cols), bandRows, cols,
+                        firstColumn, bandIssues);
+                    // Khối biểu mẫu (hàng đầu là tiêu đề một ô, hoặc cặp nhãn - giá trị như "Ngưỡng cảnh báo | 0.9"): không có
+                    // hàng tiêu đề cột nên empty-header / mixed-types là báo nhầm (bộ đo 27/10/2026 ca B, lần p3j: model xoá
+                    // rồi dựng lại sheet Config 3 lần cho hết lỗi).
+                    bool table = TableHeader(bandValues, cols);
+                    string block = string.Format("block rows {0}-{1}", firstRow + band[0], firstRow + band[1]);
+                    foreach (Dictionary<string, object> issue in bandIssues)
+                    {
+                        string type = Convert.ToString(issue["type"]);
+                        if (!table && (type == "empty-header" || type == "mixed-types"))
+                        {
+                            continue;
+                        }
+                        if (bands.Count >= 2)
+                        {
+                            issue["detail"] = block + ": " + Convert.ToString(issue["detail"]);
+                        }
+                        issues.Add(issue);
+                    }
+                }
+            }
 
             // Dữ liệu lạc ra ngoài bảng chính (vùng liền kề của ô đầu): UsedRange rộng hơn CurrentRegion.
             string usedAddress = Convert.ToString(used.Address(false, false));
@@ -428,9 +652,11 @@ namespace AxiomOffice.Bridge
                 regionAddress = Convert.ToString(region.Address(false, false));
                 int usedCells = Convert.ToInt32(used.Rows.Count) * Convert.ToInt32(used.Columns.Count);
                 int regionCells = Convert.ToInt32(region.Rows.Count) * Convert.ToInt32(region.Columns.Count);
+                // Chỉ là ghi chú, không tính vào issueCount: sheet nhiều khối (Dashboard, Config) luôn có nội dung ngoài
+                // vùng liền kề của A1 - coi là lỗi thì model xoá / ghi lại ô đúng mãi.
                 if (string.IsNullOrEmpty(address) && usedCells > regionCells)
                 {
-                    issues.Add(Issue("outside-table",
+                    notes.Add(Issue("outside-table",
                         "the sheet has content outside the table " + regionAddress + " (used range " + usedAddress
                         + "): check for stray values written to the wrong cells"));
                 }
@@ -461,7 +687,7 @@ namespace AxiomOffice.Bridge
             }
 
             // Không chỉ định vùng/sheet = soát cả sổ: ô lỗi (#DIV/0!, #REF!...) ở MỌI sheet, kể cả sheet đang không mở (plan 21 P2).
-            if (string.IsNullOrEmpty(address) && string.IsNullOrEmpty(sheetName))
+            if (wholeBook)
             {
                 try
                 {
@@ -489,7 +715,9 @@ namespace AxiomOffice.Bridge
                 { "cols", cols },
                 { "columns", columns },
                 { "issueCount", issues.Count },
-                { "issues", issues }
+                { "issues", issues },
+                // Ghi chú không phải lỗi (outside-table): không cần sửa để issueCount về 0.
+                { "notes", notes }
             };
         }
 

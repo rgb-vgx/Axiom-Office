@@ -307,6 +307,12 @@ trúc không dây cắt hộp. Sửa: sơ đồ lồng trong khoá `diagram`, `r
   `et.createTable` từ chối hàng tiêu đề có ô trống; `et.checkRange` lấy định dạng của ô số lẻ thật. Đề B: định dạng còn
   10 lần gọi (trước 19) và hết vòng lặp ghi `B1` (Excel tự điền `Column1`), nhưng **vẫn hết 60 vòng** (KPI từng ô bằng
   `fillRange`, bước đổi giả định để thử, model gần như một lệnh mỗi vòng); chỉ còn 1 lỗi nhỏ (trước 4).
+- **Đề B ít vòng hơn** (plan 21 §5.6): soát cả sổ một lệnh (`et.checkRange {}` có `workbook`, sheet chia khối soát theo
+  khối, `outside-table` thành `notes`), `et.readRanges`, `et.whatIf` (thử ô điều khiển rồi tự trả lại); `writeRange` báo
+  `changed: false` và Core chặn ghi lặp vô ích; `setConditionalFormat` nhận `greaterThan`/`value1`; gợi ý `readRanges`
+  từ lần `readRange` thứ 4; sửa `writeRanges` bỏ qua `sheet` ngoài; soát khối biểu mẫu không báo nhầm; `formatRanges` thử
+  `numFmt` trước; `whatIf` phân biệt ô ngưỡng (`usedBy`). Đo đề B: **9/17 lần đạt** qua các bước sửa (18-52 vòng; trước
+  0/3), bản gần cuối 2/3 (37, 46 vòng).
 
 ## 3. Chưa làm / chưa kiểm chứng
 

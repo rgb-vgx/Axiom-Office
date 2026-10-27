@@ -332,6 +332,23 @@
         { name: "formulas", required: false, hint: "true = trả mảng `formulas` thay cho `values`" },
         { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
       ] },
+    { name: "et.readRanges", kind: "et", agent: true, undo: false,
+      summary: "Đọc NHIỀU vùng (nhiều sheet) trong MỘT lời gọi: `reads` là mảng {range, sheet?, formulas?}; `range` nhận cả 'Sheet!A1:B6'. Dùng thay cho nhiều lần et.readRange khi soát lại (tối đa 4000 ô mỗi lần)",
+      params: [
+        { name: "reads", required: true, hint: "array of {range, sheet?, formulas?}" },
+        { name: "sheet", required: false, hint: "default sheet for items without one" },
+        { name: "formulas", required: false, hint: "true = formulas for every item" },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
+      ] },
+    { name: "et.whatIf", kind: "et", agent: true, undo: false,
+      summary: "Thử ô điều khiển SỐNG hay CHẾT trong MỘT lời gọi (chỉ đọc): đổi tạm ô giả định `cell` thành `value`, tính lại, đọc các vùng `watch` trước/sau, rồi TỰ TRẢ LẠI giá trị cũ. `unchanged` = vùng không đổi theo (công thức không đọc ô đó). Thay cho tự ghi giá trị thử -> đọc -> ghi lại",
+      params: [
+        { name: "cell", required: true, hint: "one input cell e.g. 'Config!B2'" },
+        { name: "value", required: true, hint: "test value e.g. 0.95" },
+        { name: "watch", required: true, hint: "ranges that should follow e.g. ['Dashboard!B3:B6']" },
+        { name: "sheet", required: false, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
+      ] },
     { name: "et.writeRange", kind: "et", agent: true, undo: true,
       summary: "Ghi vùng từ ô góc trên-trái; `values` là mảng 2 chiều. Công thức viết theo cú pháp en-US (dấu phẩy); nếu máy dùng dấu chấm phẩy thì tự đổi. Công thức còn lỗi trả về ở `formulaErrors`",
       params: [
@@ -748,7 +765,7 @@
         { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
       ] },
     { name: "et.checkRange", kind: "et", agent: true, undo: false,
-      summary: "Soát bảng dữ liệu (chỉ đọc): tiêu đề trống, kiểu lẫn lộn, số dạng chữ, number format, công thức trỏ ô trống; không truyền range/sheet thì soát thêm dữ liệu lạc ngoài bảng và ô lỗi (#DIV/0!, #REF!...) ở MỌI sheet",
+      summary: "Soát bảng dữ liệu (chỉ đọc): tiêu đề trống, kiểu lẫn lộn, số dạng chữ, number format, công thức trỏ ô trống; KHÔNG truyền range/sheet = soát CẢ SỔ trong một lần: `workbook` mỗi sheet một dòng (vùng dùng, số ô, công thức, biểu đồ, bảng, validation, định dạng điều kiện, loại lỗi; sheet rỗng = empty-sheet), lỗi mọi sheet gộp ở `issues` kèm `sheet`, ô lỗi (#DIV/0!, #REF!...) ở MỌI sheet. Sheet chia khối bằng hàng trống (Dashboard, Config) được soát theo TỪNG khối; `notes` (outside-table) là ghi chú, không tính vào issueCount",
       params: [
         { name: "range", required: false, hint: "default: the used range" },
         { name: "sheet", required: false, hint: null },

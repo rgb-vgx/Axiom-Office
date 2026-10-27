@@ -52,9 +52,11 @@ apps: [et]
 - [ ] Định dạng: tiêu đề, number format, hàng tổng — một lần `et.formatRanges`.
 - [ ] **Soát**: `et.checkRange` → sửa `numbers-as-text`, `mixed-types`, `no-number-format`, `empty-header`,
       `error-values`. Lặp đến khi hết các loại đó.
-- [ ] Sổ nhiều sheet: `et.checkRange` **không** truyền `range`/`sheet` còn soát ô lỗi ở **mọi** sheet
-      (`error-cells`: "Sheet!D4 #DIV/0!") — sửa hết trước khi trả lời.
-- [ ] Riêng `outside-table` (sheet đã có nội dung ngoài vùng bảng): **không phải lỗi luôn**. Nếu sheet có
+- [ ] Sổ nhiều sheet: **một** `et.checkRange {}` (không `range`/`sheet`) soát **cả sổ**: `workbook` mỗi sheet
+      một dòng, lỗi của mọi sheet trong `issues` kèm `sheet`, ô lỗi (`error-cells`: "Sheet!D4 #DIV/0!") —
+      sửa hết trước khi trả lời; đừng gọi `checkRange` từng sheet. Xem nhiều vùng: một `et.readRanges`.
+- [ ] Riêng `outside-table` (nằm ở `notes`, không tính vào `issueCount`): **không phải lỗi luôn**. Sheet chia
+      khối (Dashboard, Config) luôn có nó. Nếu sheet có
       sẵn dữ liệu khác cạnh bảng thì đó là bảng/dữ liệu của người dùng — **không xoá**. Chỉ xoá ô mà
       **chính lượt này** bạn đã ghi nhầm; không chắc thì báo người dùng. Muốn chỉ soát đúng bảng bạn vừa
       dựng thì gọi `et.checkRange {range}`.

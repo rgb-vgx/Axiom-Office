@@ -338,6 +338,56 @@ trong một lệnh).
 Đề B vẫn chưa đạt: phần định dạng đã gọn, số vòng còn lại là các bước khác của một đề lớn với model gần như một lệnh
 mỗi vòng. Lần gọi `formatRanges` đầu gửi vùng của nhiều sheet mà không ghi `sheet` từng mục nên phải làm lại theo sheet.
 
+### 5.6 Đề B ít vòng hơn: soát gộp, thử ô điều khiển một lệnh (27/10/2026)
+
+Lần đo trước: 49/60 vòng chỉ một lệnh; 26 vòng cuối là `listSheets`, `listCharts`, `checkRange` từng sheet, `readRange`
+từng vùng và bước "đổi giả định → đọc → trả lại" (~8 vòng).
+
+- **`et.checkRange {}`** (không range/sheet) soát CẢ SỔ: `workbook` mỗi sheet một dòng (vùng dùng, số ô, công thức, biểu
+  đồ, bảng, validation, định dạng điều kiện, loại lỗi; sheet rỗng = `empty-sheet`); lỗi mọi sheet gộp ở `issues` kèm
+  `sheet`. Sheet chia khối bằng hàng trống (Dashboard, Config) soát cột **theo từng khối** (`block rows 8-14: ...`);
+  `outside-table` chuyển sang `notes` (không tính `issueCount`) - trước đó Dashboard/Config luôn có `empty-header`,
+  `mixed-types`, `outside-table` báo nhầm, model sửa - soát lại tới hết 60 vòng (2/3 lần đo p3h).
+- **`et.readRanges {reads: [{range, sheet?, formulas?}]}`**: nhiều vùng / nhiều sheet một lời gọi (≤ 4000 ô).
+- **`et.whatIf {cell, value, watch}`**: đổi tạm ô giả định, tính lại, đọc vùng theo dõi trước/sau, tự trả lại giá trị
+  cũ (kể cả khi lỗi); `unchanged` = vùng không đổi theo (ô điều khiển chết). Kết quả dùng `moved`, không `changed`.
+- **Ghi lặp vô ích**: `et.writeRange`/`writeRanges` báo `"changed": false` khi ô đã mang đúng giá trị; Core chặn lần gọi
+  y hệt tiếp theo khi tài liệu chưa đổi (đo p3f: ghi `"P02"` vào A12 rồi đọc lại, lặp 5 lần). Chỉ xét `changed` ở cấp
+  trên cùng của kết quả (lần đo p3i: guard chặn nhầm `whatIf` vì trường lồng bên trong).
+- `et.setConditionalFormat` nhận `greaterThan`, `greaterThanOrEqual`, `xlLessThan`, `>=`, `<>`… và `value1`/`value`
+  (4 lần gọi hỏng ở p3g); kết quả trả tên toán tử chuẩn. Gợi ý `et.readRanges` từ lần `et.readRange` thứ 4.
+- Sửa lỗi có sẵn: `et.writeRanges` bỏ qua `sheet` ngoài, ghi vào sheet đang mở (Go `overwrite.go` vốn hiểu đúng).
+- Skill `mo-hinh-nhieu-sheet`: soát bằng `checkRange {}` + `whatIf` + `readRanges`; ô KPI một `writeRange`; lệnh không
+  phụ thuộc nhau gửi cùng một phản hồi. `bao-cao-du-lieu`, `bang-diem` theo `notes`.
+- Test: live `test_office_templates.py` Excel 31/31 (readRanges, whatIf, checkRange cả sổ / theo khối, changed false,
+  toán tử), `test_live_commands.py` 294/294, structure 8/8, layout 2/2; Go `TestRunAgentBlocksRepeatOfUnchangedWrite`,
+  `TestUnchangedWriteOnlyTopLevel`, `TestReadRangeHintsBatchFromFourthCall`.
+
+| Lần đo đề B | Đạt | Vòng | Ghi chú |
+|---|---|---|---|
+| p3e (trước §5.6) | 0/1 | 60 | soát từng sheet, đọc từng vùng |
+| p3f (+checkRange cả sổ, readRanges, whatIf) | 1/1 | 52 | vòng lặp ghi `"P02"` vào A12 |
+| p3g (+changed false, writeRanges sheet) | 2/3 | 49, 43, 60 | lần hỏng: toán tử `greaterThan`/`value1`, 26 `readRange` |
+| p3h (+toán tử, gợi ý readRanges) | 1/3 | 29, 60, 60 | hai lần hỏng: dựng xong vòng 14, rồi sửa lỗi báo nhầm ở Dashboard/Config |
+| p3i (+soát theo khối, notes) | 0/1 | 60 | guard chặn nhầm `whatIf`; dựng bảng tháng từng ô; lần 2-3 dừng vì máy thiếu bộ nhớ |
+| p3j (+guard chỉ xét `changed` cấp trên) | 0/1 | 60 | khối Config (tiêu đề một ô + cặp nhãn - giá trị) báo nhầm → xoá, dựng lại Config 3 lần |
+| p3k (+khối biểu mẫu không soát empty-header/mixed-types) | 2/3 | 40, 18, 60 | `numFmt` Excel không nhận giữa `formatRanges`; `readRange` "Sheet!A1"; `addChart` lỗi lặp |
+| p3l (+thử numFmt trước, readRange có tên sheet, addChart dọn) | 1/2 | 60, 44 | `whatIf` ô ngưỡng (chỉ định dạng có điều kiện đọc) báo "dead control" → sửa định dạng mãi; lần 3 dừng (thiếu bộ nhớ) |
+| p3m (+`whatIf` báo `usedBy`) | **2/3** | 37, 46, 60 | lần hỏng: model tự làm sai bảng tháng ở Dashboard; 3 vòng vì `type: "cellIs"` |
+
+Sau p3m thêm: `setConditionalFormat` nhận `type: "cellIs"` / `"formula"` (tên kiểu OpenXML) như rule thường (chưa đo).
+
+Thêm từ p3j-p3m:
+- `et.checkRange`: khối biểu mẫu (hàng đầu không phải tiêu đề cột: một ô, hoặc có số) không soát `empty-header` /
+  `mixed-types`; soát cả sheet luôn đi theo khối.
+- `et.formatRanges` thử từng `numFmt` trên ô đầu vùng (rồi trả lại) trước khi áp: Excel không nhận thì từ chối, không vùng
+  nào đổi. `et.readRange` nhận "Sheet!A1:B2". `et.addChart` hỏng giữa chừng thì xoá hình biểu đồ vừa thêm, báo rõ.
+- `et.whatIf`: vùng theo dõi không đổi mà ô được định dạng có điều kiện / validation đọc → `usedBy` + "not a dead
+  control"; skill: thử ô giả định mà công thức giá trị đọc.
+
+Tổng các lần đo đề B từ §5.6: **9/17 đạt** (18-52 vòng; trước §5.6: 0/3). Lần hỏng nay chủ yếu do model tự làm sai dữ
+liệu rồi sửa mãi; đề B vẫn là ca dao động nhất của bộ đo.
+
 ## 6. Cách đo sau mỗi thay đổi
 
 1. Chạy lại đúng ca liên quan (`--only`), 3 lần với `ocg/beam-free`; ca P0 chạy cả bộ.
