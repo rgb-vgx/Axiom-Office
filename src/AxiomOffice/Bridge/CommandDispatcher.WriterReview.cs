@@ -48,11 +48,17 @@ namespace AxiomOffice.Bridge
         private static string _savedUserName;
         private static string _savedUserInitials;
         private static bool? _savedUseLocalUserInfo;
+        // Tác giả cho revision do lệnh AI tạo. Chỉ đặt tên này TRONG lúc chạy lệnh (RunWithTrackingAuthor):
+        // TrackRevisions bật suốt lượt, nhưng chữ người dùng gõ giữa hai lệnh phải mang tên người dùng - nếu để
+        // UserName = "Axiom AI" suốt lượt thì "Hoàn tác lượt này" (từ chối revision theo tác giả) xoá luôn chữ đó.
+        private static string _trackingAuthor;
+        private static readonly object TrackingAuthorLock = new object();
 
         private static Dictionary<string, object> WriterSetTracking(IAppHost host, Dictionary<string, object> p)
         {
             bool on = ParamBool(p, "on", true);
             string author = (ParamString(p, "author", null) ?? "").Trim();
+            bool restore = ParamBool(p, "restoreAuthor", false);
             dynamic app = host.Application;
             dynamic doc = app.ActiveDocument;
             bool previous = Convert.ToBoolean(doc.TrackRevisions);
@@ -73,16 +79,9 @@ namespace AxiomOffice.Bridge
                         _savedUseLocalUserInfo = null;
                     }
                 }
-                app.UserName = author;
-                try
-                {
-                    app.UserInitials = "AI";
-                }
-                catch
-                {
-                }
+                _trackingAuthor = author;
             }
-            if (ParamBool(p, "restoreAuthor", false) && _savedUserName != null)
+            if (restore && _savedUserName != null)
             {
                 app.UserName = _savedUserName;
                 try
@@ -99,12 +98,83 @@ namespace AxiomOffice.Bridge
                 _savedUserName = null;
                 _savedUserInitials = null;
                 _savedUseLocalUserInfo = null;
+                _trackingAuthor = null;
             }
             doc.TrackRevisions = on;
             return new Dictionary<string, object>
             {
-                { "tracking", Convert.ToBoolean(doc.TrackRevisions) }, { "previous", previous }, { "author", Convert.ToString(app.UserName) ?? "" }
+                { "tracking", Convert.ToBoolean(doc.TrackRevisions) }, { "previous", previous },
+                { "author", restore || _trackingAuthor == null ? (Convert.ToString(app.UserName) ?? "") : _trackingAuthor }
             };
+        }
+
+        // Lệnh writer.* có thể tạo revision. Lệnh chỉ đọc / lưu / chọn KHÔNG đặt tên AI: người dùng có thể đang gõ
+        // trong lúc agent đọc tài liệu, chữ đó phải mang tên người dùng.
+        private static bool MayCreateRevision(string action)
+        {
+            switch (action)
+            {
+                case "writer.getText":
+                case "writer.selection":
+                case "writer.outline":
+                case "writer.checkLayout":
+                case "writer.checkTables":
+                case "writer.listComments":
+                case "writer.listRevisions":
+                case "writer.reviewRevisions":
+                case "writer.goto":
+                case "writer.exportPdf":
+                case "writer.save":
+                case "writer.saveAs":
+                case "writer.closeAll":
+                case "writer.undo":
+                case "writer.lockSelection":
+                case "writer.unlockSelection":
+                case "writer.setTracking":
+                    return false;
+                default:
+                    return true;
+            }
+        }
+
+        // Chạy một lệnh bridge dưới tên tác giả AI (chỉ khi lượt đang bật Track Changes): đặt UserName ngay trước
+        // lệnh và trả lại tên người dùng ngay sau lệnh, nên chữ người dùng gõ xen giữa các lệnh không bị gán cho AI.
+        private static object RunWithTrackingAuthor(IAppHost host, string action, Func<object> run)
+        {
+            if (_trackingAuthor == null || !MayCreateRevision(action) || host.AppKind != "wps")
+            {
+                return run();
+            }
+            dynamic app = host.Application;
+            lock (TrackingAuthorLock)
+            {
+                string savedName = null;
+                string savedInitials = null;
+                bool applied = false;
+                try
+                {
+                    savedName = Convert.ToString(app.UserName) ?? "";
+                    savedInitials = Convert.ToString(app.UserInitials) ?? "";
+                    app.UserName = _trackingAuthor;
+                    try { app.UserInitials = "AI"; } catch { }
+                    applied = true;
+                }
+                catch
+                {
+                }
+                try
+                {
+                    return run();
+                }
+                finally
+                {
+                    if (applied)
+                    {
+                        try { app.UserName = savedName; } catch { }
+                        try { app.UserInitials = savedInitials; } catch { }
+                    }
+                }
+            }
         }
 
         private static int ParagraphNumberAt(dynamic doc, int position)

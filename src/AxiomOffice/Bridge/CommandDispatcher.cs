@@ -110,7 +110,9 @@ namespace AxiomOffice.Bridge
             try
             {
                 // Khoá vùng bôi đen (CommandDispatcher.WriterScope.cs): lệnh writer.* chỉ được đổi chữ trong vùng đã chọn.
-                return Ok(RunInSelectionLock(host, action, command, p));
+                // Khi lượt đang bật Track Changes, lệnh AI chạy dưới tên "Axiom AI", còn chữ người dùng gõ giữa các lệnh
+                // vẫn mang tên người dùng (WriterReview.RunWithTrackingAuthor).
+                return Ok(RunWithTrackingAuthor(host, action, delegate { return RunInSelectionLock(host, action, command, p); }));
             }
             catch (CommandRejectedException ex)
             {
