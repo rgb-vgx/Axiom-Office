@@ -120,6 +120,11 @@ namespace AxiomOffice.Ai
             string url = BuildUrl(endpoint, "/chat/completions");
             var body = new Dictionary<string, object>();
             body["model"] = model;
+            // Phai noi thang: proxy OpenAI-compatible (vd ai.hnspl.vn, 9router) co the mac dinh tra SSE
+            // (`data: {...}` + `data: [DONE]`), trong khi PostJson doc ca body roi parse JSON mot lan ->
+            // "Invalid JSON primitive: ata: [DONE]". Core (Go) tu xu ly SSE qua ParseStream; day la duong
+            // test ket noi cua SettingsForm/llm-test nen chi can ep non-streaming.
+            body["stream"] = false;
             body["messages"] = new object[]
             {
                 new Dictionary<string, object> { { "role", "system" }, { "content", systemPrompt } },

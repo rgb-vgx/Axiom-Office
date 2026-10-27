@@ -333,6 +333,11 @@ namespace AxiomOffice.Bridge
             {
                 throw new ArgumentException("'text' is required");
             }
+            if (text.Trim().Length == 0)
+            {
+                throw new ArgumentException("'text' must be non-empty (delete the passage via writer.replaceAll instead)");
+            }
+            int id = ParamInt(p, "comment", 0);
             dynamic doc = ((dynamic)host.Application).ActiveDocument;
             dynamic comment = CommentById(doc, p);
             if (AncestorOf(comment) != null)
@@ -341,17 +346,128 @@ namespace AxiomOffice.Bridge
             }
             dynamic scope = comment.Scope;
             string before = RangeText(scope, 200);
-            if (Convert.ToInt32(scope.End) <= Convert.ToInt32(scope.Start))
+            int start = Convert.ToInt32(scope.Start);
+            int end = Convert.ToInt32(scope.End);
+            if (end <= start)
             {
                 throw new InvalidOperationException("this comment is not anchored to any text; edit the paragraph instead");
             }
+
+            // Word XOÁ comment khi toàn bộ chữ được neo bị thay (Microsoft xác nhận: comment chỉ còn sống nếu còn
+            // ít nhất 1 ký tự neo gốc; đã đo trên Word 16.0.20527: scope.Text = ..., Delete+Insert, Selection.TypeText
+            // đều giết comment; Find/Replace giữ được comment nhưng thu hẹp neo về ký tự dôi ra; lỗi COM "Object has
+            // been deleted" nổ ngay khi đọc lại Scope). Vậy nên: chụp metadata luồng (text gốc, các trả lời, cờ done)
+            // -> DeleteRecursively xoá cả luồng -> thay chữ trên Range đã nắm [start..end] -> Comments.Add lại trên
+            // chuỗi chữ mới -> Replies.Add lại từng trả lời -> khôi phục Done. Author là tài khoản máy hiện tại
+            // (add-in vốn thêm comment bằng tài khoản đó); thời điểm đổi thành bây giờ.
+            string rootText;
+            bool rootDone;
+            try
+            {
+                rootText = RangeText(comment.Range, 500);
+                rootDone = Convert.ToBoolean(comment.Done);
+            }
+            catch
+            {
+                rootText = before;
+                rootDone = false;
+            }
+            var replies = new List<string>();
+            int total = Convert.ToInt32(doc.Comments.Count);
+            for (int i = 1; i <= total; i++)
+            {
+                if (i == id)
+                {
+                    continue;
+                }
+                dynamic member = doc.Comments[i];
+                dynamic ancestor = AncestorOf(member);
+                if (ancestor == null)
+                {
+                    continue;
+                }
+                int ancestorStart;
+                int ancestorEnd;
+                try
+                {
+                    ancestorStart = Convert.ToInt32(ancestor.Scope.Start);
+                    ancestorEnd = Convert.ToInt32(ancestor.Scope.End);
+                }
+                catch
+                {
+                    continue;
+                }
+                if (ancestorStart == start && ancestorEnd == end)
+                {
+                    replies.Add(RangeText(member.Range, 500));
+                }
+            }
+
             using (new UndoRecordScope(host.Application, "AI: edit commented text"))
             {
-                scope.Text = text.Replace("\r\n", "\r").Replace('\n', '\r');
+                try
+                {
+                    comment.DeleteRecursively();
+                }
+                catch (System.Runtime.InteropServices.COMException ex)
+                {
+                    if (IsRetryableComError(ex))
+                    {
+                        throw;
+                    }
+                    throw new InvalidOperationException("cannot clear this comment thread (needs Word 2013 or later): " + ex.Message);
+                }
+                dynamic target = doc.Range(start, end);
+                target.Text = text.Replace("\r\n", "\r").Replace('\n', '\r');
+                try
+                {
+                    dynamic freshRoot = doc.Comments.Add(target, rootText);
+                    if (rootDone)
+                    {
+                        try { freshRoot.Done = true; } catch { }
+                    }
+                    foreach (string reply in replies)
+                    {
+                        try { freshRoot.Replies.Add(freshRoot.Scope, reply); } catch { }
+                    }
+                }
+                catch (System.Runtime.InteropServices.COMException ex)
+                {
+                    if (IsRetryableComError(ex))
+                    {
+                        throw;
+                    }
+                    throw new InvalidOperationException("cannot re-anchor the comment on the replaced text: " + ex.Message);
+                }
+            }
+            // Chỉ số comment gốc mới: Comments sắp theo vị trí tài liệu, re-add có thể đổi chỉ số.
+            int newId = 0;
+            int afterCount = Convert.ToInt32(doc.Comments.Count);
+            for (int i = 1; i <= afterCount; i++)
+            {
+                dynamic member = doc.Comments[i];
+                if (AncestorOf(member) != null)
+                {
+                    continue;
+                }
+                int memberStart;
+                try
+                {
+                    memberStart = Convert.ToInt32(member.Scope.Start);
+                }
+                catch
+                {
+                    continue;
+                }
+                if (memberStart == start)
+                {
+                    newId = i;
+                    break;
+                }
             }
             return new Dictionary<string, object>
             {
-                { "comment", ParamInt(p, "comment", 0) }, { "before", before }, { "after", RangeText(comment.Scope, 200) }
+                { "comment", newId }, { "before", before }, { "after", RangeText(((dynamic)host.Application).ActiveDocument.Comments[newId].Scope, 200) }
             };
         }
 
