@@ -376,6 +376,19 @@ def test_writer_review(b):
     restored = b.cmd("writer.setTracking", {"on": False, "restoreAuthor": True}) or {}
     check(restored.get("tracking") is False and restored.get("author") == before.get("author"),
           "Word setTracking restoreAuthor trả lại tên người dùng", {"before": before, "after": restored})
+
+    # Số đoạn khi neo ở đầu đoạn > 1 (từng lệch 1); outline ẩn chữ đã xoá khi còn revision (như getText).
+    b.cmd("writer.newDocument")
+    b.cmd("writer.typeText", {"text": "Đoạn gốc một."})
+    b.cmd("writer.appendText", {"text": "Đoạn hai."})
+    anchored = b.cmd("writer.addComment", {"paragraph": 2, "text": "Đoạn 2"}) or {}
+    check(anchored.get("paragraph") == 2, "Word addComment theo đoạn trả đúng số đoạn (đầu đoạn 2)", anchored)
+    b.cmd("writer.setTracking", {"on": True}, record=False)
+    b.cmd("writer.replaceAll", {"find": "gốc một", "replace": "đã sửa một"}, record=False)
+    b.cmd("writer.setTracking", {"on": False}, record=False)
+    outline = b.cmd("writer.outline", record=False) or {}
+    items = outline.get("items") or [{}]
+    check(items[0].get("t") == "Đoạn đã sửa một.", "Word outline ẩn chữ đã xoá khi còn revision", outline)
     b.cmd("writer.closeAll")
 
 
