@@ -1,7 +1,7 @@
 # Báo cáo kiểm thử Windows: Office thật — lần 3 (kiểm 3 bản sửa của `7380bb5`)
 
 Ngày test: **28/10/2026** · nhánh **`main`**, HEAD lúc bắt đầu `7380bb5` · HEAD mã nguồn khi đóng báo cáo:
-`4c0999e` (2 commit sửa lỗi + 1 commit test) · phạm vi: bridge C# cho Microsoft Office + Agent Core Go,
+`9720c55` (3 commit sửa lỗi + 1 commit test; `9720c55` là phần làm nốt, mục 7) · phạm vi: bridge C# cho Microsoft Office + Agent Core Go,
 _kiểm thử trên Microsoft Office thật trên Windows_ (không phải e2e giả lập).
 
 Mục tiêu phiên: (1) build + cài `main` (C# của `7380bb5` chưa từng được biên dịch); (2) chạy 4 suite;
@@ -213,23 +213,65 @@ Sau cả hai bản vá: catalog `OK`, `test_live_commands.py --ai` **`386 passed
 | `a9360a2` | `fix(bridge): writer.outline tra ca chu da xoa khi con revision` |
 | `d8b22e6` | `fix(bridge): so doan cua comment/revision lech 1 khi neo o dau doan` |
 | `4c0999e` | `test(live): kiem so doan cua addComment o dau doan 2 va outline an chu da xoa` |
+| `9720c55` | `fix(bridge): writer.goto/selection tra ca chu da xoa khi con revision` (mục 7.1) |
 
 Đã `git pull --rebase origin main` (không có thay đổi mới) và push `7380bb5..4c0999e` lên `main`, không force-push.
 
 ---
 
-## 7. Việc còn lại
+## 7. Làm nốt (cùng ngày, sau commit báo cáo)
+
+### 7.1. Lệnh đọc khác của Word lẫn chữ đã xoá — `9720c55`
+
+**Triệu chứng:** sau `replaceAll` có theo dõi rồi tắt theo dõi, `writer.goto {paragraph:1}` trả
+`"Đoạn đã sửa mộtgốc một."`, `writer.selection` trả `"Đoạn đã sửa mộtgốc một.\r"`, trong khi `getText`
+trả `"Đoạn đã sửa một.\rĐoạn hai đã neo.\r"`. `goto {text:...}` cũng dò chữ đầu đoạn trên bản có chữ đã xoá.
+
+**Nguyên nhân:** mẫu ẩn revision chỉ được chép vào `getText`, `replaceAll`, `outline`.
+
+**Sửa:** gom thành `HiddenRevisions` (`using`, cùng điều kiện `TrackRevisions || Revisions.Count > 0`), dùng cho
+cả 5 lệnh. Giữ nguyên `listComments` (anchor là chữ comment được gắn vào, kể cả khi chữ đó đã bị xoá — vẫn trả
+`"có neo"`, thông tin có ích). `checkLayout` không đổi: ẩn revision sẽ dàn trang lại cả tài liệu ở mỗi lần gọi.
+
+**Kiểm chứng:** `goto` → `"Đoạn đã sửa một."`, `selection` → `"Đoạn đã sửa một.\r"`; `getText`/`outline`/`goto
+{paragraph:3}` như trước. Thêm kiểm `Word goto/selection ẩn chữ đã xoá khi còn revision`. Sau sửa: catalog `OK`,
+`test_live_commands.py --ai` **`389 passed, 0 failed`**, `test_office_structure.py` **`17 passed, 0 failed`**.
+
+### 7.2. B: người dùng bấm qua lại A ↔ B — ✅ ĐẠT
+
+Lần đầu harness không giành được foreground (mục 4.B). Làm lại như người dùng thật: thu nhỏ cửa sổ đang đè
+lên, giữ Alt trong lúc `SetForegroundWindow`, ESC để tắt KeyTips, rồi click vào cửa sổ đích. Chuỗi
+B → A → B → A, mỗi lần COM ngoài bridge đều báo đúng bài, và `wpp.listSlides` trả đúng theo:
+`B.pptx 4` → `A.pptx 2` → `B.pptx 4` → `A.pptx 2`. `ai.ask "bài này có bao nhiêu slide?"`: `4 slide` khi ở B,
+`2 slide` khi về A. Ở lần chạy chập chờn trước đó, `wpp.listSlides` cũng **luôn** khớp `ActivePresentation` mà
+COM ngoài báo.
+
+### 7.3. Model xoá chữ người dùng gõ giữa lượt — đã thử, KHÔNG sửa được bằng prompt
+
+Tái hiện tất định: một PowerShell canh bridge.log và gõ `Y` (COM `Selection.TypeText` từ process ngoài) ngay khi
+thấy `tool.finished: writer.appendText`. Trên `main` hiện tại, model đọc lại thấy
+`"Kết thúcY."` và gọi `writer.replaceAll {"find":"Kết thúcY.","replace":"Kết thúc."}`, **3/3 lần**.
+
+Đã thử thêm một quy tắc vào system prompt (`LiveDocumentRule`: "the user may type in it while you work. Text you
+did not write and the request does not mention belongs to the user - leave it as it is"). Kết quả với
+`ocg/beam-free`: vẫn **3/3 lần** xoá `Y`. Lý do: `Y` chen vào giữa câu của chính AI, nên model coi đó là lỗi trong
+câu nó vừa viết. Quy tắc không có tác dụng mà vẫn tốn token ở mọi lượt nên **đã bỏ, không commit**. Các lần
+đọc còn lại vẫn đúng: revision `Y` luôn mang tên `Administrator`, lệnh xoá là revision `delete` của `Axiom AI`
+(nên "Hoàn tác lượt này" trả lại được).
+
+Ghi chú harness: SendKeys từ PowerShell nguội mất 4–13 s mới gõ được và có 4/6 lần phím không vào tài liệu
+(không có revision insert lẫn delete — không phải model xoá). Gõ bằng COM từ process đã chạy sẵn thì tất định.
+
+---
+
+## 8. Việc còn lại
 
 1. **`go test -race` chưa chạy** — máy không có gcc (không tự cài theo yêu cầu).
-2. **Model xoá chữ người dùng gõ giữa lượt** (A3): với Track Changes thì "Hoàn tác lượt này" cứu được, nhưng
-   không có Track Changes thì chữ người dùng mất. Cân nhắc báo cho agent biết đoạn nào người dùng vừa sửa
-   (hoặc chỉ dẫn: không "dọn" chữ lạ mà người dùng có thể vừa gõ).
-3. Các lệnh đọc khác của Word chưa soát điều kiện ẩn revision như `getText`/`outline`/`replaceAll`
-   (`writer.selection`, chữ trả về của `writer.goto`, `writer.checkLayout`, `RangeText` của `listComments` anchor).
-   Nên gom thành một helper dùng chung thay vì lặp mẫu `ShowRevisions` ở mỗi lệnh.
-4. B: chưa xác nhận bằng thao tác tay thật việc người dùng bấm **quay lại** A sau khi bridge đã bỏ theo dõi A
-   (harness tự động không giành được foreground lần hai).
-5. B5 kiểm qua `ai.ask` (cùng đường `CoreClient.Run`), chưa bấm câu hỏi trong pane PowerPoint bằng tay.
-6. Máy này là Office 2019 Volume, tài khoản cục bộ: chưa kiểm đường `UseLocalUserInfo` với tài khoản M365 đăng
-   nhập trong phiên này (lần 2 đã kiểm trên Microsoft 365).
-7. WPS không kiểm trong phiên này.
+2. **Model xoá chữ người dùng chen vào câu AI vừa viết** (7.3). Prompt không đủ với model yếu; muốn chặn thì cần
+   cơ chế ở mã: ví dụ bridge ghi lại revision/khoảng chữ người dùng gõ trong lượt và từ chối lệnh sửa đè lên
+   khoảng đó (giống khoá vùng bôi đen), hoặc báo cho agent "đoạn này người dùng vừa sửa". Cần quyết định thiết kế,
+   chưa làm.
+3. B5 kiểm qua `ai.ask` (cùng đường `CoreClient.Run` với pane), chưa bấm câu hỏi trong pane PowerPoint bằng tay.
+4. Máy này là Office 2019 Volume, tài khoản cục bộ: chưa kiểm `UseLocalUserInfo` với tài khoản M365 đăng nhập
+   (lần 2 đã kiểm trên Microsoft 365).
+5. WPS: ngoài phạm vi Windows (chỉ hỗ trợ Microsoft Office trên Windows), không kiểm.
