@@ -188,7 +188,9 @@ namespace AxiomOffice.Bridge
         {
             try
             {
-                return Math.Max(1, Convert.ToInt32(doc.Range(0, Math.Max(0, position)).Paragraphs.Count));
+                // Range(0, đầu đoạn k) dừng ngay trước đoạn k nên chỉ đếm k-1: lấy thêm 1 ký tự để range chạm vào đoạn k.
+                int end = Math.Min(Math.Max(0, position) + 1, Convert.ToInt32(doc.Content.End));
+                return Math.Max(1, Convert.ToInt32(doc.Range(0, end).Paragraphs.Count));
             }
             catch
             {
