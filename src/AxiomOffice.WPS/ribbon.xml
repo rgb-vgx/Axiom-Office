@@ -76,7 +76,7 @@
         </group>
 
         <!-- Du lieu AI va ky nang: thu nguoi dung muon XEM/SUA, khac han nhom He thong ben duoi. -->
-        <group id="axiomManageGroup" label="Bộ nhớ & kỹ năng">
+        <group id="axiomManageGroup" label="Bộ nhớ &amp; kỹ năng">
           <button id="axiomMemory" label="Bộ nhớ AI…" size="large" tag="memory" onAction="ribbon.OnAction" imageMso="FileSave"
                   screentip="Bộ nhớ AI"
                   supertip="Xem, lọc theo phạm vi, xoá tạm, khôi phục, xoá vĩnh viễn những điều AI đã ghi nhớ về bạn và tài liệu."/>

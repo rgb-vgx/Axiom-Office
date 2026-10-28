@@ -4,7 +4,8 @@ Trạng thái: **đã chạy trên WPS thật** (11/10/2026): Core (T1), trình 
 (T2b, T2c). Đóng gói + `install.sh` (T3) xong, đăng ký cả ba app (T5) xong, nhận biết app + đủ 38 lệnh
 `et.*`/`wpp.*` (T6–T8) xong, pane Ask AI trong WPS (T4) xong, ribbon đầy đủ (đợt C — `docs/architecture/ribbon-ui.md`), menu
 chuột phải *Sửa bằng AI* + khung chat mini (20/10/2026, đã thử trên WPS thật — mục 7.3).
-Còn lại: **26/84 mục registry chưa có handler ở add-in WPS** — 25 lệnh Windows + `ui.setup` của LibreOffice
+Còn lại: **các mục registry chưa có handler ở add-in WPS** (danh sách chuẩn: `CHUA_CO_HANDLER` trong
+`tests/wps/test_addin.mjs`) — lệnh Windows + `ui.setup` của LibreOffice
 (danh sách + lý do ở mục 6). Cơ sở thực nghiệm:
 [docs/research/wps-spike.md](../research/wps-spike.md) (hướng B) và [tests/wps/REFERENCE.md](../../tests/wps/REFERENCE.md).
 
@@ -83,7 +84,8 @@ Cùng giao thức và cùng guard với bridge LibreOffice (`Origin` → 403, to
   Lệnh sửa tài liệu chạy trong `Application.UndoRecord.StartCustomRecord("AI: <lệnh>")`/`EndCustomRecord()`
   ⇒ mỗi lệnh AI = một bước Undo. Lỗi handler → `{ok:false, error}`, không bao giờ làm treo vòng lặp.
 - **84 lệnh** trong `commands.js` (đo 26/10/2026): 2 `app.*` + 1 `ai.*` + 2 `ui.*` + 28 `writer.*` + 23 `et.*` +
-  28 `wpp.*` (metadata lấy từ registry LibreOffice). 58 lệnh đã có handler; chỉ **9 lệnh `writer.*`** mở
+  28 `wpp.*` (metadata lấy từ registry LibreOffice); số lệnh còn thiếu handler xem `CHUA_CO_HANDLER`. Ngày
+  28/10/2026 thêm handler `et.sort`/`et.filter`; chỉ **9 lệnh `writer.*`** mở
   `UndoRecord` (danh sách `MUTATING`) — ET/WPP không có nó (mục 6). Lệnh chưa có handler trả
   `unknown action: <lệnh>`; `tests/wps/test_addin.mjs` ghim danh sách lệnh registry chưa có handler (mục 6) và
   **bắt bỏ tên khỏi danh sách ngay khi viết handler**, để lệnh registry không âm thầm rơi vào `unknown action`
@@ -143,7 +145,7 @@ Cùng giao thức và cùng guard với bridge LibreOffice (`Origin` → 403, to
   `may have been applied`); hết giờ này thì job được bỏ nên vòng session mới xoá file session.
 - Object model ET/WPP khác Writer ở vài chỗ (`Cells.Item(r,c)`, `UsedRange.Address()` là hàm, màu BGR, chỉ số
   1-based, `Application.Documents` không có) — bảng đầy đủ ở `tests/wps/REFERENCE.md`.
-- **26 mục registry (84) chưa có handler ở add-in WPS** (26/10/2026) — 25 lệnh của bản Windows + `ui.setup`.
+- **Các mục registry (84) chưa có handler ở add-in WPS** — lệnh của bản Windows + `ui.setup`.
   Nguồn duy nhất của danh sách là `CHUA_CO_HANDLER` trong `tests/wps/test_addin.mjs` — **đừng chép số vào đây**,
   spec sẽ đỏ khi một lệnh được viết handler mà còn nằm trong danh sách, và khi add-in khai với Core một lệnh chưa
   có handler. Chia làm ba nhóm lệnh Windows; mục cuối là đường riêng của LibreOffice:
@@ -163,7 +165,7 @@ Cùng giao thức và cùng guard với bridge LibreOffice (`Origin` → 403, to
     `addShape`, `addConnector`, `addChart` (sơ đồ/biểu đồ của `slides_from_brief`), `renderSlide` (ảnh slide cho
     `look_at_document`). Vì `slides_from_brief` gọi `addParagraphs`/`addGrid` cho **mọi** layout, thiếu các lệnh này
     làm **cả tool** dừng ở slide đầu trên WPS, không riêng layout sơ đồ.
-  - **Mười trong 26 mục có `agent=true`** (`writer.formatTable`, `writer.insertImage`, `writer.insertHyperlink`,
+  - **Nhiều mục còn thiếu có `agent=true`** (`writer.formatTable`, `writer.insertImage`, `writer.insertHyperlink`,
     `writer.replaceMany`, và sáu lệnh `wpp.*`: `newFromTemplate`, `addSlideFromTemplate`, `sourceManifest`,
     `setShapeText`, `deleteShapes`, `copyPicture`) — nghĩa là Core **vẫn đưa chúng cho agent như tool**, và trên máy
     đang chạy WPS agent sẽ nhận `unknown action`. Đây là khoảng trống thật, không phải lỗi hiển thị.

@@ -107,7 +107,8 @@ function strict(path, spec) {
   if (spec.call) {
     handler.apply = (_t, _thisArg, args) => spec.call.apply(null, args);
   }
-  const proxy = new Proxy({}, handler);
+  // Target phai la function khi spec.call co: Proxy tren {} khong goi duoc (typeof "object").
+  const proxy = new Proxy(spec.call ? function () {} : {}, handler);
   LABELS.set(proxy, path);
   if (state) APPS.set(proxy, state);
   return proxy;
@@ -636,6 +637,11 @@ function makeRange(state, sheet, box, labelPath) {
       push(state, prefix + ".Merge()");
     },
     AutoFit: () => push(state, prefix + ".AutoFit()"),
+    // Loc (et.filter): WPS 12.1.2 co Range.AutoFilter(field, criteria|values, operator) - da do that.
+    AutoFilter: (...args) => {
+      sheet.filterMode = true;
+      push(state, prefix + ".AutoFilter(" + fmtArgs(args) + ")");
+    },
     Select: () => push(state, prefix + ".Select()"),
     AutoFill: (...args) => push(state, prefix + ".AutoFill(" + fmtArgs(args) + ")"),
   };
@@ -797,6 +803,11 @@ function makeWorksheet(state, wb, sheet, labelPath) {
     Rows: { get: () => makeCountCollection(state, SHEET_MAX_ROW, (n) => makeRange(state, sheet, { r1: n, c1: 1, r2: n, c2: SHEET_MAX_COL }, prefix + ".Rows.Item(" + n + ")"), prefix + ".Rows") },
     Columns: { get: () => makeCountCollection(state, SHEET_MAX_COL, (n) => makeRange(state, sheet, { r1: 1, c1: n, r2: SHEET_MAX_ROW, c2: n }, prefix + ".Columns.Item(" + n + ")"), prefix + ".Columns") },
     Shapes: { get: () => makeShapesEt(state, sheet) },
+    FilterMode: { get: () => !!sheet.filterMode },
+    AutoFilterMode: {
+      get: () => !!sheet.autoFilterMode,
+      set: (v) => { sheet.autoFilterMode = !!v; push(state, prefix + ".AutoFilterMode=" + fmt(v)); },
+    },
   };
 
   const methods = {
@@ -806,6 +817,10 @@ function makeWorksheet(state, wb, sheet, labelPath) {
       return makeRange(state, sheet, box, "Range(" + normalizeAddr(addr) + ")");
     },
     ChartObjects: () => makeChartObjects(state, sheet),
+    ShowAllData: () => {
+      sheet.filterMode = false;
+      push(state, prefix + ".ShowAllData()");
+    },
     Delete: () => {
       const i = wb.sheets.indexOf(sheet);
       if (i >= 0) wb.sheets.splice(i, 1);

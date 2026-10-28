@@ -47,6 +47,7 @@ test-catalog:
 
 test-wps:
 	python3 tests/wps/test_install_jsaddon.py
+	python3 tests/wps/test_addin_files.py
 	node --test tests/wps/test_addin_fake.mjs tests/wps/test_addin.mjs tests/wps/test_addin_et.mjs tests/wps/test_addin_wpp.mjs tests/wps/test_addin_writer.mjs tests/wps/test_addin_goto.mjs tests/wps/test_probe.mjs tests/wps/test_pane.mjs tests/wps/test_pane_theme.mjs tests/wps/test_pane_view.mjs tests/wps/test_mini_view.mjs
 
 # Hai bo e2e duoi day chay Core THAT qua HTTP nhung khong can WPS: chung dong vai add-in bang

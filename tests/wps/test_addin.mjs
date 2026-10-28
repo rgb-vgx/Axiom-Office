@@ -279,8 +279,6 @@ test("catalogFor(kind): chi tra lenh dung app do; catalog() van la registry day 
 const CHUA_CO_HANDLER = {
   // Tinh nang theo Claude for M365 (docs/research/tinh-nang-con-thieu-so-voi-claude-m365.md, 27/10/2026): moi co o add-in
   // Windows; WPS de sau khi do duoc API tren may Linux.
-  "et.sort": "chi co trong add-in Windows (X1); WPS de sau",
-  "et.filter": "chi co trong add-in Windows (X1); WPS de sau",
   "et.pivot": "chi co trong add-in Windows (X3, PivotCaches); can do API PivotTable cua WPS JS",
   "et.exportChart": "chi co trong add-in Windows (P2, Chart.Export); can do API xuat anh bieu do cua WPS JS",
   "writer.setTracking": "chi co trong add-in Windows (W4, Track Changes cho luot AI); can do API TrackRevisions/UserName cua WPS JS",
