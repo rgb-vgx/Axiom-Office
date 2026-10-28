@@ -26,7 +26,9 @@ namespace AxiomOffice.Bridge
                 }
                 else if (host.AppKind == "wpp")
                 {
-                    doc = app.ActivePresentation;
+                    // PowerPoint 16 có lúc không đổi ActivePresentation sau khi mở bài đã mở; dùng bài bridge
+                    // vừa mở/tạo (CommandDispatcher.TrackPresentation) để ai.ask gửi đúng tài liệu.
+                    doc = CommandDispatcher.CurrentPresentation(app);
                 }
                 else
                 {
@@ -66,7 +68,7 @@ namespace AxiomOffice.Bridge
             }
             if (host.AppKind == "wpp")
             {
-                TryPut(view, "slideCount", () => Convert.ToInt32(app.ActivePresentation.Slides.Count));
+                TryPut(view, "slideCount", () => Convert.ToInt32(CommandDispatcher.CurrentPresentation(app).Slides.Count));
                 if (!TryPut(view, "slide", () => Convert.ToInt32(app.ActiveWindow.View.Slide.SlideIndex)))
                 {
                     TryPut(view, "slide", () => Convert.ToInt32(app.ActiveWindow.Selection.SlideRange.SlideIndex));

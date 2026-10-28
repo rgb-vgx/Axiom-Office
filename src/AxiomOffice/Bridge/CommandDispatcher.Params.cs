@@ -550,7 +550,7 @@ namespace AxiomOffice.Bridge
             }
             else
             {
-                target = app.ActivePresentation;
+                target = CurrentPresentation(app);
             }
 
             if (!string.IsNullOrEmpty(path))

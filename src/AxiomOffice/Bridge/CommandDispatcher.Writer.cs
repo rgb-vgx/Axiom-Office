@@ -62,7 +62,34 @@ namespace AxiomOffice.Bridge
         {
             dynamic app = host.Application;
             dynamic doc = app.ActiveDocument;
-            string text = LabelObjects(doc, Convert.ToString(doc.Content.Text));
+            // Đang bật Track Changes (hoặc còn revision chưa chấp nhận): chữ bị xoá vẫn nằm trong Content.Text (ngay
+            // sau chữ vừa chèn), nên đọc nguyên văn sẽ thấy cả bản cũ lẫn bản mới và agent tưởng lệnh chưa thay được.
+            // Ẩn revision trong lúc đọc để trả về chữ CUỐI (như khi chấp nhận mọi revision); bật lại ngay sau đó.
+            bool? showedRevisions = null;
+            try
+            {
+                if (Convert.ToBoolean(doc.TrackRevisions) || Convert.ToInt32(doc.Revisions.Count) > 0)
+                {
+                    showedRevisions = Convert.ToBoolean(doc.ShowRevisions);
+                    doc.ShowRevisions = false;
+                }
+            }
+            catch
+            {
+                showedRevisions = null;
+            }
+            string text;
+            try
+            {
+                text = LabelObjects(doc, Convert.ToString(doc.Content.Text));
+            }
+            finally
+            {
+                if (showedRevisions.HasValue)
+                {
+                    try { doc.ShowRevisions = showedRevisions.Value; } catch { }
+                }
+            }
             int totalChars = text.Length;
             int maxChars = ParamInt(p, "maxChars", 0);
             bool truncated = false;
@@ -314,47 +341,73 @@ namespace AxiomOffice.Bridge
             {
                 start = lockStart;
             }
-            int lastAt = -1;
-            for (int guard = 0; guard < 200; guard++)
+            // Track Changes: Word giữ chữ bị xoá trong chuỗi text (nằm SAU chữ vừa chèn), nên Find lại thấy đúng chữ
+            // cũ và lặp tới 200 lần - đo 28/10/2026: replaceAll một câu thành 200 bản, tài liệu phình 2.000 ký tự.
+            // Ẩn revision trong lúc thay để Find chỉ thấy chữ cuối; TrackRevisions vẫn ghi revision như thường.
+            bool? showedRevisions = null;
+            try
             {
-                int end = Convert.ToInt32(doc.Content.End);
-                if (locked && LockBounds((object)doc, out lockStart, out lockEnd))
+                if (Convert.ToBoolean(doc.TrackRevisions))
                 {
-                    end = lockEnd;
-                }
-                if (start >= end)
-                {
-                    break;
-                }
-                dynamic range = doc.Range(start, end);
-                dynamic finder = range.Find;
-                finder.ClearFormatting();
-                bool found = Convert.ToBoolean(finder.Execute(ToWordFindText(prefix), false, false, false, false, false, true, 0));
-                if (!found)
-                {
-                    break;
-                }
-                int at = Convert.ToInt32(range.Start);
-                // Find của Word có lúc trả lại đúng chỗ vừa thay (lượt thật 14/10/2026: thay "+ Cách sửa: " bằng chuỗi bắt đầu
-                // bằng chính nó -> chèn lặp 74 lần rồi Word báo "no document is open"). Không tiến lên được thì dừng.
-                if (at < start || at <= lastAt)
-                {
-                    break;
-                }
-                lastAt = at;
-                dynamic whole = doc.Range(at, Math.Min(at + target.Length, end));
-                if (string.Equals(Convert.ToString(whole.Text), target, StringComparison.Ordinal))
-                {
-                    whole.Text = replacement;
-                    count++;
-                    start = at + replacement.Length;
-                }
-                else
-                {
-                    start = Convert.ToInt32(range.End);
+                    showedRevisions = Convert.ToBoolean(doc.ShowRevisions);
+                    doc.ShowRevisions = false;
                 }
             }
-            return count;
+            catch
+            {
+                showedRevisions = null;
+            }
+            try
+            {
+                int lastAt = -1;
+                for (int guard = 0; guard < 200; guard++)
+                {
+                    int end = Convert.ToInt32(doc.Content.End);
+                    if (locked && LockBounds((object)doc, out lockStart, out lockEnd))
+                    {
+                        end = lockEnd;
+                    }
+                    if (start >= end)
+                    {
+                        break;
+                    }
+                    dynamic range = doc.Range(start, end);
+                    dynamic finder = range.Find;
+                    finder.ClearFormatting();
+                    bool found = Convert.ToBoolean(finder.Execute(ToWordFindText(prefix), false, false, false, false, false, true, 0));
+                    if (!found)
+                    {
+                        break;
+                    }
+                    int at = Convert.ToInt32(range.Start);
+                    // Find của Word có lúc trả lại đúng chỗ vừa thay (lượt thật 14/10/2026: thay "+ Cách sửa: " bằng chuỗi bắt đầu
+                    // bằng chính nó -> chèn lặp 74 lần rồi Word báo "no document is open"). Không tiến lên được thì dừng.
+                    if (at < start || at <= lastAt)
+                    {
+                        break;
+                    }
+                    lastAt = at;
+                    dynamic whole = doc.Range(at, Math.Min(at + target.Length, end));
+                    if (string.Equals(Convert.ToString(whole.Text), target, StringComparison.Ordinal))
+                    {
+                        whole.Text = replacement;
+                        count++;
+                        start = at + replacement.Length;
+                    }
+                    else
+                    {
+                        start = Convert.ToInt32(range.End);
+                    }
+                }
+                return count;
+            }
+            finally
+            {
+                if (showedRevisions.HasValue)
+                {
+                    try { doc.ShowRevisions = showedRevisions.Value; } catch { }
+                }
+            }
         }
 
         private static void ApplyWriterFont(dynamic font, Dictionary<string, object> p)

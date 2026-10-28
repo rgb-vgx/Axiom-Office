@@ -110,7 +110,9 @@ namespace AxiomOffice.Bridge
             try
             {
                 // Khoá vùng bôi đen (CommandDispatcher.WriterScope.cs): lệnh writer.* chỉ được đổi chữ trong vùng đã chọn.
-                return Ok(RunInSelectionLock(host, action, command, p));
+                // Khi lượt đang bật Track Changes, lệnh AI chạy dưới tên "Axiom AI", còn chữ người dùng gõ giữa các lệnh
+                // vẫn mang tên người dùng (WriterReview.RunWithTrackingAuthor).
+                return Ok(RunWithTrackingAuthor(host, action, delegate { return RunInSelectionLock(host, action, command, p); }));
             }
             catch (CommandRejectedException ex)
             {
@@ -327,7 +329,7 @@ namespace AxiomOffice.Bridge
         private static Dictionary<string, object> ExportCurrentSlide(IAppHost host, int maxWidth)
         {
             dynamic app = host.Application;
-            dynamic pres = app.ActivePresentation;
+            dynamic pres = CurrentPresentation(app);
             int count = Convert.ToInt32(pres.Slides.Count);
             if (count == 0)
             {
@@ -531,12 +533,18 @@ namespace AxiomOffice.Bridge
             else if (host.AppKind == "wpp")
             {
                 info["presentations"] = Safe(() => Convert.ToInt32(app.Presentations.Count));
-                info["activePresentation"] = Safe(() => new Dictionary<string, object>
+                info["activePresentation"] = Safe(() =>
                 {
-                    { "name", Convert.ToString(app.ActivePresentation.Name) },
-                    { "fullName", Convert.ToString(app.ActivePresentation.FullName) },
-                    { "saved", Convert.ToBoolean(app.ActivePresentation.Saved) },
-                    { "slides", Convert.ToInt32(app.ActivePresentation.Slides.Count) }
+                    // Bài bridge đang làm (có thể khác ActivePresentation thật khi PowerPoint không chịu
+                    // chuyển cửa sổ): pane/agent phải đọc đúng bài đích.
+                    dynamic pres = CurrentPresentation(app);
+                    return new Dictionary<string, object>
+                    {
+                        { "name", Convert.ToString(pres.Name) },
+                        { "fullName", Convert.ToString(pres.FullName) },
+                        { "saved", Convert.ToBoolean(pres.Saved) },
+                        { "slides", Convert.ToInt32(pres.Slides.Count) }
+                    };
                 });
             }
             return info;

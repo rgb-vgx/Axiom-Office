@@ -80,8 +80,10 @@ namespace AxiomOffice.Bridge
                     }
                     if (!SameDocument(app.ActivePresentation, pres) && Convert.ToInt32(pres.Windows.Count) > 0)
                     {
-                        pres.Windows[1].Activate();
+                        try { pres.Windows[1].Activate(); } catch (Exception) { }
                     }
+                    // ActivePresentation có thể không đổi (PowerPoint 16); ghi nhớ bài đích để lệnh dùng.
+                    TrackPresentation(pres);
                     break;
                 case "et":
                     dynamic book = FindIn(app.Workbooks, wanted);

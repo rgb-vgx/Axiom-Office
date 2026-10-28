@@ -212,7 +212,7 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 		}
 	}
 	// Tai lieu Office khac dang mo (other_document.go): chi gui tool khi co - luot mot tai lieu khong ton them chu.
-	if others := otherSessions(o.Sessions, session); len(others) > 0 {
+	if others := o.otherSessions(ctx, session); len(others) > 0 {
 		list = append(list, tools.NewOtherDocumentTool(others, readOnly, o.BusyPort))
 	}
 	registry := tools.NewRegistry(list)
@@ -502,14 +502,27 @@ func targetDocument(document *DocumentContext, session *office.Session) string {
 	return ""
 }
 
-// otherSessions: phien Office song khac phien cua luot (khac cong), co tai lieu mo.
-func otherSessions(directory *office.Directory, current *office.Session) []office.Session {
-	if directory == nil || current == nil {
+// otherSessions: phien Office song khac phien cua luot (khac cong), co tai lieu mo. Hoi /session truc tiep
+// tung bridge: file registry chi duoc heartbeat lam moi 25 giay nen tai lieu vua mo/vua luu van la ten cu.
+func (o *Orchestrator) otherSessions(ctx context.Context, current *office.Session) []office.Session {
+	if o.Sessions == nil || current == nil {
 		return nil
 	}
 	others := []office.Session{}
-	for _, session := range directory.List(false) {
-		if session.Port == current.Port || strings.TrimSpace(session.Document) == "" {
+	for _, session := range o.Sessions.List(false) {
+		if session.Port == current.Port {
+			continue
+		}
+		if o.Bridge != nil {
+			if live := o.Bridge.LiveSession(ctx, session.Port); live != nil {
+				// App/family/pid giu theo registry; chi lay tai lieu dang mo that.
+				session.Document, session.DocumentPath = live.Document, live.DocumentPath
+				if live.App != "" {
+					session.App = live.App
+				}
+			}
+		}
+		if strings.TrimSpace(session.Document) == "" {
 			continue
 		}
 		others = append(others, session)

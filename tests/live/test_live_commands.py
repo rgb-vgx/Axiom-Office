@@ -326,6 +326,59 @@ def test_writer(b, out, png, run_ai):
         b.cmd("writer.save", record=False)
 
 
+def test_writer_review(b):
+    """Comment + Track Changes (W2/W3/W4): luồng comment có trả lời, sửa chữ được neo, từ chối revision."""
+    b.cmd("writer.newDocument")
+    b.cmd("writer.typeText", {"text": "Mục tiêu ban đầu. Đoạn thứ hai."})
+    went = b.cmd("writer.goto", {"paragraph": 1}) or {}
+    check(went.get("paragraph") == 1 and "Mục tiêu ban đầu" in (went.get("text") or ""),
+          "Word goto chọn đúng đoạn", went)
+    added = b.cmd("writer.addComment", {"find": "Mục tiêu ban đầu", "text": "Cần rõ hơn"}) or {}
+    check(added.get("comment") and added.get("paragraph") == 1, "Word addComment neo vào chữ tìm được", added)
+    comment = added.get("comment")
+    replied = b.cmd("writer.replyComment", {"comment": comment, "text": "Đồng ý"}) or {}
+    check(replied.get("replied") is True, "Word replyComment trả lời trong luồng", replied)
+    edited = b.cmd("writer.editCommentScope", {"comment": comment, "text": "Mục tiêu đã rõ"}) or {}
+    check(edited.get("comment") and "Mục tiêu đã rõ" in (edited.get("after") or ""),
+          "Word editCommentScope thay đúng chữ được neo", edited)
+    listing = b.cmd("writer.listComments", {"includeDone": True}) or {}
+    root = next((c for c in listing.get("comments") or [] if "Cần rõ hơn" in (c.get("text") or "")), None)
+    check(root is not None and "Mục tiêu đã rõ" in (root.get("anchor") or "")
+          and len(root.get("replies") or []) == 1 and "Đồng ý" in (root.get("replies")[0].get("text") or ""),
+          "Word editCommentScope giữ comment + reply, neo đúng chữ mới", root)
+    resolved = b.cmd("writer.resolveComment", {"comment": edited.get("comment"), "done": True}) or {}
+    open_list = b.cmd("writer.listComments", {"includeDone": False}) or {}
+    done_list = b.cmd("writer.listComments", {"includeDone": True}) or {}
+    check(resolved.get("done") is True and not any("Cần rõ hơn" in (c.get("text") or "") for c in open_list.get("comments") or [])
+          and any("Cần rõ hơn" in (c.get("text") or "") for c in done_list.get("comments") or []),
+          "Word resolveComment ẩn comment đã xong, includeDone hiện lại", {"open": open_list.get("open"), "done": resolved})
+    b.cmd("writer.resolveComment", {"comment": edited.get("comment"), "done": False})
+    no_revisions = b.cmd("writer.listRevisions") or {}
+    check(no_revisions.get("total") == 0 and no_revisions.get("tracking") is False,
+          "Word listRevisions trả rỗng khi chưa bật theo dõi", no_revisions)
+
+    # Track Changes: chữ do lệnh AI ghi mang tác giả "Axiom AI"; từ chối theo tác giả + since.
+    b.cmd("writer.newDocument")
+    b.cmd("writer.typeText", {"text": "Bản gốc."})
+    before = b.cmd("writer.setTracking", {"on": False}, record=False) or {}
+    tracked = b.cmd("writer.setTracking", {"on": True, "author": "Axiom AI"}) or {}
+    check(tracked.get("tracking") is True and tracked.get("author") == "Axiom AI",
+          "Word setTracking bật theo dõi dưới tác giả AI", tracked)
+    b.cmd("writer.typeText", {"text": " Phần do AI."})
+    revisions = b.cmd("writer.listRevisions", {"author": "Axiom AI"}) or {}
+    check(revisions.get("total", 0) > 0 and "Axiom AI" in (revisions.get("authors") or {}),
+          "Word listRevisions lọc theo tác giả AI", revisions)
+    since = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - 120))
+    rejected = b.cmd("writer.reviewRevisions", {"action": "reject", "author": "Axiom AI", "since": since}) or {}
+    text = (b.cmd("writer.getText", record=False) or {}).get("text") or ""
+    check(rejected.get("count", 0) > 0 and "Phần do AI" not in text,
+          "Word reviewRevisions reject theo author + since", {"reject": rejected, "text": text})
+    restored = b.cmd("writer.setTracking", {"on": False, "restoreAuthor": True}) or {}
+    check(restored.get("tracking") is False and restored.get("author") == before.get("author"),
+          "Word setTracking restoreAuthor trả lại tên người dùng", {"before": before, "after": restored})
+    b.cmd("writer.closeAll")
+
+
 # ---------------------------------------------------------------- Excel / ET
 
 def test_spreadsheet(b, out, run_ai):
@@ -402,6 +455,7 @@ def test_spreadsheet(b, out, run_ai):
     check((a5 is None) == (undo.get("undone", 0) > 0), "et.undo báo đúng số bước đã hoàn tác", {"undo": undo, "A5": a5})
     # Dọn A5 để bước ai.ask sau ghi vào ô TRỐNG (ghi đè ô có chữ thì Core hỏi xác nhận - ai.ask không ai bấm nên từ chối).
     b.cmd("et.writeRange", {"range": "A5", "values": [[None]]}, key="et.writeRange clear A5")
+    test_spreadsheet_pivot(b)
     test_spreadsheet_more(b, out)
     pdf = os.path.join(out, "et.pdf")
     b.cmd("et.exportPdf", {"path": pdf})
@@ -419,6 +473,38 @@ def test_spreadsheet(b, out, run_ai):
         b.cmd("et.save", record=False)
 
 
+def test_spreadsheet_pivot(b):
+    """PivotTable (X3) + sắp xếp/lọc (X1) + goto: dữ liệu 3 cột, nhóm theo Vùng, tổng Doanh thu."""
+    b.cmd("et.addSheet", {"name": "PivotData"})
+    b.cmd("et.writeRange", {"sheet": "PivotData", "range": "A1:C5", "values": [
+        ["Vùng", "Sản phẩm", "Doanh thu"],
+        ["Bắc", "A", 100], ["Bắc", "B", 50], ["Nam", "A", 200], ["Nam", "B", 25]]})
+    pivot = b.cmd("et.pivot", {"sheet": "PivotData", "range": "A1:C5", "rows": ["Vùng"],
+                               "values": [{"column": "Doanh thu", "function": "sum"}], "name": "Pivot"}) or {}
+    values = pivot.get("values") or [{}]
+    check(pivot.get("sheet") == "Pivot" and "Tổng" in (values[0].get("caption") or ""),
+          "Excel pivot tạo PivotTable trên sheet mới", pivot)
+    grid = (b.cmd("et.readRange", {"sheet": "Pivot", "range": "A1:D10"}, record=False) or {}).get("values") or []
+    numbers = [cell for row in grid for cell in row if isinstance(cell, (int, float))]
+    check(any(abs(n - 150) < 0.01 for n in numbers) and any(abs(n - 225) < 0.01 for n in numbers),
+          "Excel pivot đọc lại tổng Doanh thu theo Vùng (150 + 225)", grid)
+    went = b.cmd("et.goto", {"range": "Pivot!A1"}) or {}
+    check(went.get("sheet") == "Pivot" and went.get("range") == "A1", "Excel goto chọn đúng ô", went)
+
+    b.cmd("et.addSheet", {"name": "SortData"})
+    b.cmd("et.writeRange", {"sheet": "SortData", "range": "A1:A4", "values": [["Số"], [20], [9], [2]]})
+    sorted_ok = b.cmd("et.sort", {"sheet": "SortData", "range": "A1:A4",
+                                  "keys": [{"column": "Số", "order": "asc"}]}) or {}
+    cells = (b.cmd("et.readRange", {"sheet": "SortData", "range": "A2:A4"}, record=False) or {}).get("values") or []
+    check(sorted_ok.get("rows") == 3 and [row[0] for row in cells] == [2, 9, 20],
+          "Excel sort sắp xếp tăng dần, giữ hàng tiêu đề", {"sort": sorted_ok, "cells": cells})
+    filtered = b.cmd("et.filter", {"sheet": "SortData", "range": "A1:A4", "column": "Số", "criteria": ">9"}) or {}
+    check(filtered.get("visibleRows") == 1, "Excel filter chỉ giữ hàng khớp điều kiện", filtered)
+    cleared = b.cmd("et.filter", {"sheet": "SortData", "clear": True}) or {}
+    check(cleared.get("cleared") is True, "Excel filter clear bỏ bộ lọc", cleared)
+    b.cmd("et.activateSheet", {"sheet": "Sheet1"}, record=False)
+
+
 def test_spreadsheet_more(b, out):
     """Sheet, biểu đồ, điền công thức, ghi nhiều vùng, CSV, định dạng điều kiện (cùng kịch bản test LibreOffice)."""
     added = b.cmd("et.addSheet", {"name": "Raw_Data"}) or {}
@@ -433,6 +519,9 @@ def test_spreadsheet_more(b, out):
     check(chart.get("chart") and chart.get("type") == "line", "Excel addChart tạo biểu đồ", chart)
     charts = b.cmd("et.listCharts", {"sheet": "Sheet1"}) or {}
     check(chart.get("chart") in [c.get("name") for c in (charts.get("charts") or [])], "Excel listCharts thấy biểu đồ vừa tạo", charts)
+    exported = b.cmd("et.exportChart", {"sheet": "Sheet1", "chart": chart.get("chart")}) or {}
+    check(exported.get("path") and os.path.getsize(exported["path"]) > 100
+          and exported["path"].lower().endswith(".png"), "Excel exportChart ghi PNG thật", exported)
     b.cmd("et.addChart", {"sheet": "Sheet1", "range": "A1:B3", "type": "donut"}, expect_ok=False, key="et.addChart kiểu lạ")
     filled = b.cmd("et.fillRange", {"sheet": "Raw_Data", "range": "A1:A20", "formula": "=ROW()*2"}) or {}
     column = (b.cmd("et.readRange", {"range": "A1:A20", "sheet": "Raw_Data"}, record=False) or {}).get("values") or []
@@ -487,6 +576,8 @@ def test_presentation(b, out, png, run_ai):
     b.cmd("wpp.setNotes", {"text": "Ghi chú thuyết trình", "slide": 1})
     listing = b.cmd("wpp.listSlides")
     check(listing and listing.get("slideCount") == 2, "PowerPoint listSlides có 2 slide", listing)
+    went = b.cmd("wpp.goto", {"slide": 2}) or {}
+    check(went.get("slide") == 2, "PowerPoint goto chuyển tới slide 2", went)
     b.cmd("wpp.addSlide", {"layout": 12}, key="wpp.addSlide third")
     b.cmd("wpp.deleteSlide", {})
     # QA cấu trúc (docs/architecture/core.md 8.4.6): ca dựng sẵn - hai hộp chồng nhau + chữ dài tràn quá đáy slide.
@@ -733,6 +824,7 @@ def main():
             test_http(port, label)
             if app == "word":
                 test_writer(bridge, out, png, args.ai)
+                test_writer_review(bridge)
             elif app == "excel":
                 test_spreadsheet(bridge, out, args.ai)
             else:
