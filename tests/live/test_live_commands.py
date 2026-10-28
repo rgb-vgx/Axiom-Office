@@ -389,6 +389,10 @@ def test_writer_review(b):
     outline = b.cmd("writer.outline", record=False) or {}
     items = outline.get("items") or [{}]
     check(items[0].get("t") == "Đoạn đã sửa một.", "Word outline ẩn chữ đã xoá khi còn revision", outline)
+    went = b.cmd("writer.goto", {"paragraph": 1, "text": "Đoạn đã sửa"}, record=False) or {}
+    selected = b.cmd("writer.selection", record=False) or {}
+    check(went.get("text") == "Đoạn đã sửa một." and (selected.get("text") or "").strip() == "Đoạn đã sửa một.",
+          "Word goto/selection ẩn chữ đã xoá khi còn revision", {"goto": went, "selection": selected})
     b.cmd("writer.closeAll")
 
 

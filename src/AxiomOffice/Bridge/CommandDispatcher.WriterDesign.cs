@@ -57,20 +57,7 @@ namespace AxiomOffice.Bridge
             int index = 0;
             // Cùng điều kiện với writer.getText: còn revision thì chữ bị xoá vẫn nằm trong Range.Text - không ẩn thì outline
             // trả "đã sửa mộtgốc một" (cả đoạn đã xoá) trong khi getText trả chữ cuối, agent tưởng lệnh sửa chưa ăn.
-            bool? showedRevisions = null;
-            try
-            {
-                if (Convert.ToBoolean(doc.TrackRevisions) || Convert.ToInt32(doc.Revisions.Count) > 0)
-                {
-                    showedRevisions = Convert.ToBoolean(doc.ShowRevisions);
-                    doc.ShowRevisions = false;
-                }
-            }
-            catch
-            {
-                showedRevisions = null;
-            }
-            try
+            using (new HiddenRevisions(doc))
             {
                 foreach (dynamic paragraph in doc.Paragraphs)
                 {
@@ -169,13 +156,6 @@ namespace AxiomOffice.Bridge
                         entry["t"] = label.Length > maxChars ? label.Substring(0, maxChars) + "…" : label;
                     }
                     items.Add(entry);
-                }
-            }
-            finally
-            {
-                if (showedRevisions.HasValue)
-                {
-                    try { doc.ShowRevisions = showedRevisions.Value; } catch { }
                 }
             }
             return new Dictionary<string, object> { { "paragraphs", index }, { "items", items } };

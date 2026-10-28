@@ -65,30 +65,10 @@ namespace AxiomOffice.Bridge
             // Đang bật Track Changes (hoặc còn revision chưa chấp nhận): chữ bị xoá vẫn nằm trong Content.Text (ngay
             // sau chữ vừa chèn), nên đọc nguyên văn sẽ thấy cả bản cũ lẫn bản mới và agent tưởng lệnh chưa thay được.
             // Ẩn revision trong lúc đọc để trả về chữ CUỐI (như khi chấp nhận mọi revision); bật lại ngay sau đó.
-            bool? showedRevisions = null;
-            try
-            {
-                if (Convert.ToBoolean(doc.TrackRevisions) || Convert.ToInt32(doc.Revisions.Count) > 0)
-                {
-                    showedRevisions = Convert.ToBoolean(doc.ShowRevisions);
-                    doc.ShowRevisions = false;
-                }
-            }
-            catch
-            {
-                showedRevisions = null;
-            }
             string text;
-            try
+            using (new HiddenRevisions(doc))
             {
                 text = LabelObjects(doc, Convert.ToString(doc.Content.Text));
-            }
-            finally
-            {
-                if (showedRevisions.HasValue)
-                {
-                    try { doc.ShowRevisions = showedRevisions.Value; } catch { }
-                }
             }
             int totalChars = text.Length;
             int maxChars = ParamInt(p, "maxChars", 0);
@@ -138,12 +118,50 @@ namespace AxiomOffice.Bridge
         {
             dynamic app = host.Application;
             dynamic selection = app.Selection;
+            string text;
+            using (new HiddenRevisions(app.ActiveDocument))
+            {
+                text = Convert.ToString(selection.Text);
+            }
             return new Dictionary<string, object>
             {
-                { "text", Convert.ToString(selection.Text) },
+                { "text", text },
                 { "start", Convert.ToInt32(selection.Start) },
                 { "end", Convert.ToInt32(selection.End) }
             };
+        }
+
+        // Ẩn revision trong lúc đọc/tìm chữ (using): còn revision (dù đã tắt theo dõi) thì chữ bị xoá vẫn nằm trong Range.Text /
+        // Selection.Text, ngay sau chữ vừa chèn. Mọi lệnh trả chữ cho agent phải thấy cùng một bản: chữ CUỐI (như khi chấp nhận hết).
+        private sealed class HiddenRevisions : IDisposable
+        {
+            private readonly dynamic _doc;
+            private readonly bool? _showed;
+
+            internal HiddenRevisions(dynamic doc)
+            {
+                _doc = doc;
+                try
+                {
+                    if (Convert.ToBoolean(doc.TrackRevisions) || Convert.ToInt32(doc.Revisions.Count) > 0)
+                    {
+                        _showed = Convert.ToBoolean(doc.ShowRevisions);
+                        doc.ShowRevisions = false;
+                    }
+                }
+                catch
+                {
+                    _showed = null;
+                }
+            }
+
+            public void Dispose()
+            {
+                if (_showed.HasValue)
+                {
+                    try { _doc.ShowRevisions = _showed.Value; } catch { }
+                }
+            }
         }
 
         private static Dictionary<string, object> WriterTypeText(IAppHost host, Dictionary<string, object> p)
@@ -343,23 +361,9 @@ namespace AxiomOffice.Bridge
             }
             // Track Changes: Word giữ chữ bị xoá trong chuỗi text (nằm SAU chữ vừa chèn), nên Find lại thấy đúng chữ
             // cũ và lặp tới 200 lần - đo 28/10/2026: replaceAll một câu thành 200 bản, tài liệu phình 2.000 ký tự.
-            // Ẩn revision trong lúc thay để Find chỉ thấy chữ cuối; TrackRevisions vẫn ghi revision như thường.
-            bool? showedRevisions = null;
-            try
-            {
-                // Cùng điều kiện với writer.getText: còn revision chưa duyệt (dù đã tắt theo dõi) thì chữ bị xoá vẫn nằm trong
-                // tài liệu - không ẩn thì Find khớp vào chữ đã xoá mà getText không cho model thấy.
-                if (Convert.ToBoolean(doc.TrackRevisions) || Convert.ToInt32(doc.Revisions.Count) > 0)
-                {
-                    showedRevisions = Convert.ToBoolean(doc.ShowRevisions);
-                    doc.ShowRevisions = false;
-                }
-            }
-            catch
-            {
-                showedRevisions = null;
-            }
-            try
+            // Ẩn revision trong lúc thay để Find chỉ thấy chữ cuối; TrackRevisions vẫn ghi revision như thường. Cùng điều kiện
+            // với writer.getText: còn revision chưa duyệt (dù đã tắt theo dõi) thì Find khớp vào chữ đã xoá mà model không thấy.
+            using (new HiddenRevisions(doc))
             {
                 int lastAt = -1;
                 for (int guard = 0; guard < 200; guard++)
@@ -402,13 +406,6 @@ namespace AxiomOffice.Bridge
                     }
                 }
                 return count;
-            }
-            finally
-            {
-                if (showedRevisions.HasValue)
-                {
-                    try { doc.ShowRevisions = showedRevisions.Value; } catch { }
-                }
             }
         }
 

@@ -37,38 +37,43 @@ namespace AxiomOffice.Bridge
             {
                 throw new ArgumentException("'paragraph' must be between 1 and " + count);
             }
-            dynamic range = paragraphs.Item(index).Range;
-            // Tài liệu đã đổi sau câu trả lời (thêm/xoá đoạn): số đoạn lệch. Có chữ đầu đoạn thì dò quanh đó (±40 đoạn).
-            if (hint.Length > 0 && !StartsWithHint(Convert.ToString(range.Text), hint))
+            // Dò theo chữ đầu đoạn và đọc chữ trả về trên bản CUỐI (ẩn revision) - cùng bản agent thấy ở writer.outline.
+            string text;
+            using (new HiddenRevisions(doc))
             {
-                for (int offset = 1; offset <= 40; offset++)
+                dynamic range = paragraphs.Item(index).Range;
+                // Tài liệu đã đổi sau câu trả lời (thêm/xoá đoạn): số đoạn lệch. Có chữ đầu đoạn thì dò quanh đó (±40 đoạn).
+                if (hint.Length > 0 && !StartsWithHint(Convert.ToString(range.Text), hint))
                 {
-                    foreach (int candidate in new[] { index - offset, index + offset })
+                    for (int offset = 1; offset <= 40; offset++)
                     {
-                        if (candidate < 1 || candidate > count)
+                        foreach (int candidate in new[] { index - offset, index + offset })
                         {
-                            continue;
-                        }
-                        dynamic other = paragraphs.Item(candidate).Range;
-                        if (StartsWithHint(Convert.ToString(other.Text), hint))
-                        {
-                            range = other;
-                            index = candidate;
-                            offset = 41;
-                            break;
+                            if (candidate < 1 || candidate > count)
+                            {
+                                continue;
+                            }
+                            dynamic other = paragraphs.Item(candidate).Range;
+                            if (StartsWithHint(Convert.ToString(other.Text), hint))
+                            {
+                                range = other;
+                                index = candidate;
+                                offset = 41;
+                                break;
+                            }
                         }
                     }
                 }
+                range.Select();
+                try
+                {
+                    app.ActiveWindow.ScrollIntoView(range, true);
+                }
+                catch
+                {
+                }
+                text = (Convert.ToString(range.Text) ?? "").TrimEnd('\r', '\a').Trim();
             }
-            range.Select();
-            try
-            {
-                app.ActiveWindow.ScrollIntoView(range, true);
-            }
-            catch
-            {
-            }
-            string text = (Convert.ToString(range.Text) ?? "").TrimEnd('\r', '\a').Trim();
             return new Dictionary<string, object> { { "paragraph", index }, { "text", Shorten(text, 120) } };
         }
 
