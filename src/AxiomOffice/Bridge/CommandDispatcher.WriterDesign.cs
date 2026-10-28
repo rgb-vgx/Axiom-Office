@@ -55,103 +55,128 @@ namespace AxiomOffice.Bridge
             var tablesSeen = new HashSet<int>();
             var tables = TableSpans(doc);
             int index = 0;
-            foreach (dynamic paragraph in doc.Paragraphs)
+            // Cùng điều kiện với writer.getText: còn revision thì chữ bị xoá vẫn nằm trong Range.Text - không ẩn thì outline
+            // trả "đã sửa mộtgốc một" (cả đoạn đã xoá) trong khi getText trả chữ cuối, agent tưởng lệnh sửa chưa ăn.
+            bool? showedRevisions = null;
+            try
             {
-                index++;
-                dynamic range = paragraph.Range;
-                int tableIndex = TableAt(tables, Convert.ToInt32(range.Start));
-                if (tableIndex >= 0)
+                if (Convert.ToBoolean(doc.TrackRevisions) || Convert.ToInt32(doc.Revisions.Count) > 0)
                 {
-                    dynamic table = tables[tableIndex];
-                    if (tablesSeen.Add(tableIndex))
+                    showedRevisions = Convert.ToBoolean(doc.ShowRevisions);
+                    doc.ShowRevisions = false;
+                }
+            }
+            catch
+            {
+                showedRevisions = null;
+            }
+            try
+            {
+                foreach (dynamic paragraph in doc.Paragraphs)
+                {
+                    index++;
+                    dynamic range = paragraph.Range;
+                    int tableIndex = TableAt(tables, Convert.ToInt32(range.Start));
+                    if (tableIndex >= 0)
                     {
-                        var header = new List<string>();
+                        dynamic table = tables[tableIndex];
+                        if (tablesSeen.Add(tableIndex))
+                        {
+                            var header = new List<string>();
+                            try
+                            {
+                                foreach (dynamic cell in table.Rows[1].Cells)
+                                {
+                                    header.Add(CleanCellText(Convert.ToString(cell.Range.Text), 40));
+                                }
+                            }
+                            catch
+                            {
+                            }
+                            string caption = TableCaption(doc, table);
+                            var tentry = new System.Collections.Generic.Dictionary<string, object>
+                            {
+                                { "n", index }, { "kind", "table" }, { "rows", Convert.ToInt32(table.Rows.Count) },
+                                { "cols", Convert.ToInt32(table.Columns.Count) }, { "header", header }
+                            };
+                            if (!string.IsNullOrEmpty(caption)) tentry["caption"] = caption;
+                            items.Add(tentry);
+                        }
+                        continue;
+                    }
+                    string text = Convert.ToString(range.Text).TrimEnd('\r', '\a').Trim();
+                    bool hasShape = false;
+                    try
+                    {
+                        hasShape = Convert.ToInt32(range.InlineShapes.Count) > 0 || Convert.ToInt32(range.ShapeRange.Count) > 0;
+                    }
+                    catch
+                    {
+                    }
+                    if (text.Length == 0 && !hasShape)
+                    {
+                        continue;
+                    }
+                    var entry = new Dictionary<string, object> { { "n", index }, { "t", text.Length > maxChars ? text.Substring(0, maxChars) + "…" : text } };
+                    string list = "";
+                    try
+                    {
+                        list = Convert.ToString(range.ListFormat.ListString);
+                    }
+                    catch
+                    {
+                    }
+                    if (!string.IsNullOrEmpty(list))
+                    {
+                        entry["list"] = list;
+                    }
+                    try
+                    {
+                        var marks = new System.Collections.Generic.List<string>();
+                        foreach (dynamic mark in range.Bookmarks)
+                        {
+                            try { marks.Add(System.Convert.ToString(mark.Name)); }
+                            catch { }
+                        }
+                        if (marks.Count > 0) entry["bookmarks"] = marks;
+                    }
+                    catch
+                    {
+                    }
+                    try
+                    {
+                        string style = Convert.ToString(paragraph.Style.NameLocal);
+                        if (!string.IsNullOrEmpty(style) && style != "Normal" && style != "Mặc định")
+                            entry["style"] = style;
+                    }
+                    catch
+                    {
+                    }
+                    if (hasShape && text.Trim('/', ' ').Length == 0)
+                    {
+                        string label = "[ảnh]";
                         try
                         {
-                            foreach (dynamic cell in table.Rows[1].Cells)
+                            foreach (dynamic shape in range.ShapeRange)
                             {
-                                header.Add(CleanCellText(Convert.ToString(cell.Range.Text), 40));
+                                label = ShapeLabel(shape);
+                                break;
                             }
                         }
                         catch
                         {
                         }
-                        string caption = TableCaption(doc, table);
-                        var tentry = new System.Collections.Generic.Dictionary<string, object>
-                        {
-                            { "n", index }, { "kind", "table" }, { "rows", Convert.ToInt32(table.Rows.Count) },
-                            { "cols", Convert.ToInt32(table.Columns.Count) }, { "header", header }
-                        };
-                        if (!string.IsNullOrEmpty(caption)) tentry["caption"] = caption;
-                        items.Add(tentry);
+                        entry["t"] = label.Length > maxChars ? label.Substring(0, maxChars) + "…" : label;
                     }
-                    continue;
+                    items.Add(entry);
                 }
-                string text = Convert.ToString(range.Text).TrimEnd('\r', '\a').Trim();
-                bool hasShape = false;
-                try
+            }
+            finally
+            {
+                if (showedRevisions.HasValue)
                 {
-                    hasShape = Convert.ToInt32(range.InlineShapes.Count) > 0 || Convert.ToInt32(range.ShapeRange.Count) > 0;
+                    try { doc.ShowRevisions = showedRevisions.Value; } catch { }
                 }
-                catch
-                {
-                }
-                if (text.Length == 0 && !hasShape)
-                {
-                    continue;
-                }
-                var entry = new Dictionary<string, object> { { "n", index }, { "t", text.Length > maxChars ? text.Substring(0, maxChars) + "…" : text } };
-                string list = "";
-                try
-                {
-                    list = Convert.ToString(range.ListFormat.ListString);
-                }
-                catch
-                {
-                }
-                if (!string.IsNullOrEmpty(list))
-                {
-                    entry["list"] = list;
-                }
-                try
-                {
-                    var marks = new System.Collections.Generic.List<string>();
-                    foreach (dynamic mark in range.Bookmarks)
-                    {
-                        try { marks.Add(System.Convert.ToString(mark.Name)); }
-                        catch { }
-                    }
-                    if (marks.Count > 0) entry["bookmarks"] = marks;
-                }
-                catch
-                {
-                }
-                try
-                {
-                    string style = Convert.ToString(paragraph.Style.NameLocal);
-                    if (!string.IsNullOrEmpty(style) && style != "Normal" && style != "Mặc định")
-                        entry["style"] = style;
-                }
-                catch
-                {
-                }
-                if (hasShape && text.Trim('/', ' ').Length == 0)
-                {
-                    string label = "[ảnh]";
-                    try
-                    {
-                        foreach (dynamic shape in range.ShapeRange)
-                        {
-                            label = ShapeLabel(shape);
-                            break;
-                        }
-                    }
-                    catch
-                    {
-                    }
-                    entry["t"] = label.Length > maxChars ? label.Substring(0, maxChars) + "…" : label;
-                }
-                items.Add(entry);
             }
             return new Dictionary<string, object> { { "paragraphs", index }, { "items", items } };
         }
