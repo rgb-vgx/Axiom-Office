@@ -19,18 +19,62 @@ phủ các năng lực mới thêm (27–28/10/2026) và các lớp an toàn —
 
 ## A. Đọc hiểu và trích dẫn
 
-**A1 — Hỏi đáp có trích dẫn (Word).**
-Chuẩn bị: văn bản 6 đoạn quy chế: (1) giờ làm 8h–17h; (2) nghỉ phép năm 12 ngày; (3) nghỉ ốm tối đa 10 ngày/năm;
-(4) thai sản 6 tháng; (5) làm thêm giờ tối đa 40 giờ/tháng; (6) phụ cấp ăn trưa 730.000 đ/tháng.
-Prompt: *"Nhân viên được nghỉ ốm bao nhiêu ngày và làm thêm tối đa bao nhiêu giờ? Trích dẫn đoạn."*
+Hỏi–đáp có nguồn thì RAG nào cũng làm được (A1, A2 chỉ là mức sàn). Các bài còn lại đo chỗ Axiom khác RAG: đọc thẳng
+tài liệu **đang mở** (không qua chỉ mục), trích dẫn trỏ vào vị trí thật và đi theo bản mới nhất, ghép thông tin ở xa
+nhau, rồi sửa luôn theo câu trả lời. A7 đo chỗ Axiom có thể thua RAG (văn bản dài hơn cửa sổ ngữ cảnh).
+
+Tài liệu mẫu dùng chung (gọi là **QC6**): văn bản 6 đoạn quy chế — (1) giờ làm 8h–17h; (2) nghỉ phép năm 12 ngày;
+(3) nghỉ ốm tối đa 10 ngày/năm; (4) thai sản 6 tháng; (5) làm thêm giờ tối đa 40 giờ/tháng; (6) phụ cấp ăn trưa
+730.000 đ/tháng.
+
+**A1 — Hỏi đáp có trích dẫn (mức sàn).**
+Chuẩn bị: QC6. Prompt: *"Nhân viên được nghỉ ốm bao nhiêu ngày và làm thêm tối đa bao nhiêu giờ? Trích dẫn đoạn."*
 Đạt khi: trả lời 10 ngày + 40 giờ; có `[§3]` và `[§5]` (đúng số đoạn theo `writer.outline`); bấm trích dẫn nhảy đúng
 đoạn; không sửa tài liệu (audit không có lệnh ghi).
 
-**A2 — Câu hỏi không có trong tài liệu.**
-Cùng tài liệu A1. Prompt: *"Phụ cấp xăng xe là bao nhiêu?"*
+**A2 — Câu hỏi không có trong tài liệu (mức sàn).**
+Chuẩn bị: QC6. Prompt: *"Phụ cấp xăng xe là bao nhiêu?"*
 Đạt khi: nói rõ tài liệu không có thông tin này; không bịa số; không trích dẫn đoạn không liên quan.
 
-**A3 — Trích dẫn ô (Excel).**
+**A3 — Trích dẫn đi theo bản mới nhất.**
+Chuẩn bị: QC6. Lượt 1: *"Nghỉ ốm tối đa bao nhiêu ngày? Trích dẫn đoạn."* (kỳ vọng `[§3]`). Sau đó người dùng **tự gõ**
+thêm 2 đoạn lên đầu văn bản (không qua agent). Lượt 2 trong cùng hội thoại: *"Còn thai sản thì sao? Trích dẫn."*
+Đạt khi: lượt 2 trích `[§6]` (không phải `[§4]` của bản cũ); agent đọc lại tài liệu ở lượt 2 (audit có lệnh đọc), không
+dựa vào kết quả đọc của lượt 1; bấm lại trích dẫn `[§3]` cũ ở lượt 1 thì ghi nhận nó nhảy tới đâu (giới hạn đã biết:
+số đoạn của câu trả lời cũ không tự cập nhật).
+
+**A4 — Ghép thông tin ở xa nhau.**
+Chuẩn bị: QC6 + đoạn (7) *"Tiền làm thêm giờ tính theo mức ở Phụ lục 1."* + khoảng 2 trang nội dung khác + cuối văn
+bản bảng **Phụ lục 1** (Ngạch | Đơn giá làm thêm/giờ): Chuyên viên 60.000 đ; Chuyên viên chính 85.000 đ.
+Prompt: *"Một chuyên viên chính làm thêm tối đa thì được tối đa bao nhiêu tiền mỗi tháng?"*
+Đạt khi: 40 × 85.000 = **3.400.000 đ**; trích cả `[§5]` (giới hạn 40 giờ) lẫn bảng Phụ lục 1; nêu cách tính.
+
+**A5 — Phát hiện mâu thuẫn.**
+Chuẩn bị: QC6, thêm cuối văn bản đoạn *"Phụ lục 2: Người lao động được nghỉ phép năm 14 ngày."*
+Prompt: *"Tôi được nghỉ phép năm bao nhiêu ngày?"*
+Đạt khi: chỉ ra tài liệu ghi hai con số khác nhau (12 ở `[§2]`, 14 ở phụ lục), trích cả hai, không tự chọn một số mà
+không nói; tốt hơn nữa là gợi ý cách xác định số nào có hiệu lực.
+
+**A6 — Độ trung thực của trích dẫn (đo, chấm theo tỉ lệ).**
+Chuẩn bị: văn bản ~3 trang, 25–30 đoạn (vd quy chế chi tiêu nội bộ có nhiều con số). Prompt: *"Tóm tắt các mức chi
+chính, mỗi ý kèm trích dẫn."*
+Chấm: với **từng** câu có trích dẫn, mở đoạn được trích và kiểm câu đó có đúng với đoạn đó không. Ghi
+`đúng / tổng số trích dẫn`, số câu khẳng định không có trích dẫn, số con số sai. Đạt khi ≥ 95% trích dẫn đúng và
+không có con số sai.
+
+**A7 — Văn bản dài (giới hạn đã biết, đo để có số).**
+Chuẩn bị: văn bản ~150 trang (vd ghép nhiều chương quy chế/giáo trình), chèn **một** câu chứa thông tin độc nhất ở
+khoảng trang 120: *"Mã số định danh của dự án là AX-7731."* Prompt: *"Mã số định danh của dự án là gì? Trích dẫn."*
+Ghi lại: đúng/sai; trích dẫn đúng đoạn không; lệnh đã gọi (`writer.outline`, `writer.getText`, `maxChars`…); kết quả đọc
+có bị cắt không (hint "truncated" trong trace); số vòng, token, thời gian. Không chấm trượt: bài này cho số liệu để quyết
+định có cần lệnh đọc theo khoảng đoạn / tìm theo từ khoá hay không (`writer.getText {from, to}`, tìm chữ).
+
+**A8 — Hỏi xong sửa đúng chỗ đã trích.**
+Chuẩn bị: QC6. Prompt: *"Đoạn nào nói về nghỉ ốm? Sửa 10 ngày thành 15 ngày."*
+Đạt khi: trả lời trích `[§3]`; chỉ đoạn 3 đổi (10 → 15), 5 đoạn còn lại giữ nguyên từng ký tự (so `writer.getText`
+trước/sau); không dùng `replaceAll` "10" → "15" trên cả văn bản.
+
+**A9 — Trích dẫn ô (Excel).**
 Chuẩn bị: sheet `Data` A1:C6 (Tháng, Doanh thu, Chi phí) 5 tháng; sheet `Tong` B2 `=SUM(Data!B2:B6)`.
 Prompt: *"Tháng nào chi phí cao nhất? Chỉ ô cho tôi."*
 Đạt khi: đúng tháng; trích dẫn `[Data!C…]` đúng ô; bấm trích dẫn chọn đúng ô.
@@ -177,7 +221,7 @@ này đo mức độ chứ không chấm trượt.
 
 ## H. Hiệu quả (đo, không chấm đạt/trượt)
 
-Chạy 5 bài chuẩn: A1, B1, E1, `w05-sua-mot-muc`, `x03-sua-cong-thuc-loi`; mỗi bài 3 lần. Ghi: số vòng, token
+Chạy 5 bài chuẩn: A4, B1, E1, `w05-sua-mot-muc`, `x03-sua-cong-thuc-loi`; mỗi bài 3 lần. Ghi: số vòng, token
 (`billable`, `cache_hit`), số lệnh đọc lặp (`dup_reads`), thời gian, số lệnh lỗi. So với lần đo trước để phát hiện
 thoái lui (vd sau thay đổi prompt/tool).
 
