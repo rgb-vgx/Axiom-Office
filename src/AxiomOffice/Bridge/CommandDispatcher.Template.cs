@@ -1282,7 +1282,10 @@ namespace AxiomOffice.Bridge
         // phải cửa sổ nổi (đo 28/10/2026: wpp.open trả alreadyOpen nhưng ActivePresentation vẫn là bài cũ,
         // cả Window.Activate lẫn Application.ActiveWindow đều không đổi). Ghi nhớ bài vừa mở/tạo để lệnh
         // không truyền `presentation` vẫn làm đúng bài, thay vì tin ActivePresentation.
+        // Không giữ mãi: người dùng tự chuyển sang bài khác thì "bài này" là bài họ đang xem. Nhớ thêm bài đang hoạt động
+        // lúc ghi nhớ (_activeWhenTracked); về sau ActivePresentation khác cả hai thì người dùng đã chuyển - bỏ bài đã nhớ.
         private static string _trackedPresentation;
+        private static string _activeWhenTracked;
 
         internal static void TrackPresentation(dynamic pres)
         {
@@ -1294,16 +1297,50 @@ namespace AxiomOffice.Bridge
             {
                 _trackedPresentation = null;
             }
+            try
+            {
+                _activeWhenTracked = ActivePresentationName(pres.Application);
+            }
+            catch (Exception)
+            {
+                _activeWhenTracked = null;
+            }
+        }
+
+        private static string ActivePresentationName(dynamic app)
+        {
+            try
+            {
+                return Convert.ToString(app.ActivePresentation.FullName);
+            }
+            catch (Exception)
+            {
+                return null;
+            }
         }
 
         internal static dynamic CurrentPresentation(dynamic app)
         {
             if (!string.IsNullOrWhiteSpace(_trackedPresentation))
             {
-                dynamic found = FindPresentation(app, _trackedPresentation);
-                if (found != null)
+                string active = ActivePresentationName(app);
+                bool switched = !string.IsNullOrEmpty(active) &&
+                    !string.Equals(active, _activeWhenTracked, StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(active, _trackedPresentation, StringComparison.OrdinalIgnoreCase);
+                if (switched)
                 {
-                    return found;
+                    Logger.Info("PowerPoint: active presentation changed to '" + active + "' - no longer targeting '" +
+                        _trackedPresentation + "'");
+                    _trackedPresentation = null;
+                    _activeWhenTracked = null;
+                }
+                else
+                {
+                    dynamic found = FindPresentation(app, _trackedPresentation);
+                    if (found != null)
+                    {
+                        return found;
+                    }
                 }
             }
             return app.ActivePresentation;

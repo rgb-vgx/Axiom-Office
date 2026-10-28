@@ -347,7 +347,9 @@ namespace AxiomOffice.Bridge
             bool? showedRevisions = null;
             try
             {
-                if (Convert.ToBoolean(doc.TrackRevisions))
+                // Cùng điều kiện với writer.getText: còn revision chưa duyệt (dù đã tắt theo dõi) thì chữ bị xoá vẫn nằm trong
+                // tài liệu - không ẩn thì Find khớp vào chữ đã xoá mà getText không cho model thấy.
+                if (Convert.ToBoolean(doc.TrackRevisions) || Convert.ToInt32(doc.Revisions.Count) > 0)
                 {
                     showedRevisions = Convert.ToBoolean(doc.ShowRevisions);
                     doc.ShowRevisions = false;

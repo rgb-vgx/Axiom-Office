@@ -112,6 +112,13 @@ namespace AxiomOffice.Bridge
         // trong lúc agent đọc tài liệu, chữ đó phải mang tên người dùng.
         private static bool MayCreateRevision(string action)
         {
+            // Chỉ lệnh writer.*: ai.ask chạy CẢ lượt (tới 5 phút) và Core gọi ngược /cmd vào bridge trên luồng khác - đặt
+            // tên AI + giữ TrackingAuthorLock quanh ai.ask thì các lệnh đó chờ khoá tới khi ai.ask hết giờ, và chữ người
+            // dùng gõ suốt lượt mang tên AI (khi _trackingAuthor còn sót từ lượt trước bị ngắt).
+            if (action == null || !action.StartsWith("writer.", StringComparison.Ordinal))
+            {
+                return false;
+            }
             switch (action)
             {
                 case "writer.getText":
