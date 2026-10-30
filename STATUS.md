@@ -1,11 +1,15 @@
 ﻿# Tình trạng dự án Axiom Office
 
-Cập nhật: **26/10/2026** · nhánh `main` · đã push đến §2.13 (đợt 26/10: debug trace, slide sơ đồ trên đề thật).
+Cập nhật: **31/10/2026** · nhánh `main` · đợt 31/10 (§2.16: WPS nhiều app cùng mở, hợp đồng lệnh của tool, đóng băng
+LibreOffice) **chưa commit**.
 Số liệu kiểm chứng ở §2.4 là lượt đo **01/10/2026**; số mới của đợt WPS ở §2.6, lượt đo lại toàn bộ ở §2.7, lượt đo
-lại job Windows ở §2.8, đợt Office x64 + sửa định dạng văn bản ở §2.9 và ba đợt 25/10 ở §2.10–2.12.
+lại job Windows ở §2.8, đợt Office x64 + sửa định dạng văn bản ở §2.9, ba đợt 25/10 ở §2.10–2.12, đợt 27–28/10 ở §2.15
+và đợt 31/10 ở §2.16.
 
 Tài liệu này là ảnh chụp nhanh "đã làm được gì / chưa làm được gì". Chi tiết thiết kế nằm ở
-[docs/architecture/core.md](docs/architecture/core.md) (Core + add-in) và [docs/architecture/libreoffice.md](docs/architecture/libreoffice.md) (LibreOffice);
+[docs/architecture/core.md](docs/architecture/core.md) (Core + add-in), [docs/architecture/wps-bridge.md](docs/architecture/wps-bridge.md) (WPS Linux) và
+[docs/architecture/libreoffice.md](docs/architecture/libreoffice.md) (LibreOffice, đóng băng); người mới đọc
+[docs/onboarding/intern-guide.md](docs/onboarding/intern-guide.md) trước;
 hướng dẫn dùng ở [README.md](README.md); lịch sử thay đổi ở [CHANGELOG.md](CHANGELOG.md).
 
 ## 1. Năm thành phần và trạng thái
@@ -15,9 +19,14 @@ hướng dẫn dùng ở [README.md](README.md); lịch sử thay đổi ở [CH
 | **Add-in COM** (`src/AxiomOffice`, net48) | Word/Excel/PowerPoint + WPS, Windows | Chạy trên **Office 2019 x64** (24/10: Word đủ lifecycle, Excel e2e 6/6, LLM thật — §2.9). **Không hỗ trợ Office 32-bit**: mọi add-in .NET làm Office 32-bit crash (§2.9) |
 | **Agent Core** (`core-go/`, Go) | Windows + Linux | **Đã thay bản .NET làm bản phát hành** (G1–G10), qua toàn bộ e2e của bản .NET |
 | **MCP server** (`core-go/internal/mcpserver`, Go) | Windows + Linux | **Một bản duy nhất**, chạy bằng `AxiomOffice.Core.exe mcp`; 61/61 trên cả hai nền tảng (và 103/103 ở bộ parity sâu). Bản C# đã xoá; `AxiomOffice.Host.exe mcp` còn 232 dòng **chuyển tiếp byte** sang Core nên cấu hình cũ không phải đổi |
-| **Extension LibreOffice** (Python UNO) | Windows + Linux (LibreOffice) | **Dừng hỗ trợ từ 25/10/2026**: không phát triển tiếp, không đưa vào plan mới. Lần đo cuối: 281/281 trên LibreOffice thật + wizard 20/20 với Core Go (01/10). Code và CI còn nguyên, gỡ là quyết định riêng |
-| **Add-in WPS Linux** (`src/AxiomOffice.WPS`, JS ES5; Core phục vụ + bridge cổng 47861) | Linux (WPS 12) | Chạy trên WPS thật: 58/84 mục registry có handler (26 chưa: 25 lệnh Windows + `ui.setup` — `docs/architecture/wps-bridge.md` §6); ba tool lớn `slides_from_brief`/`slides_from_template`/`doc_design` chưa chạy trên WPS; ribbon 4 nhóm có icon; khung chat với menu ⋯ và 8 màn hình phụ; menu chuột phải *Sửa bằng AI* + khung chat mini (§2.6) |
+| **Extension LibreOffice** (Python UNO) | Windows + Linux (LibreOffice) | **Đóng băng** (dừng phát triển 25/10/2026; ra khỏi `make test` và CI 31/10/2026 — `make test-lo` chạy tay). Lần đo cuối: 281/281 trên LibreOffice thật + wizard 20/20 với Core Go (01/10). Mã nguồn và `.oxt` trong gói giữ cho người đang dùng; `install.sh` chỉ cài khi máy có LibreOffice + Python UNO. Gỡ hẳn là quyết định riêng |
+| **Add-in WPS Linux** (`src/AxiomOffice.WPS`, JS ES5; Core phục vụ + bridge cổng 47861) | Linux (WPS 12) | Chạy trên WPS thật; số lệnh có handler và tool bị ẩn: xem dòng sinh tự động dưới bảng; ribbon 4 nhóm có icon; khung chat với menu ⋯ và 8 màn hình phụ; menu chuột phải *Sửa bằng AI* + khung chat mini (§2.6) |
 | **Wizard thiết lập** | Windows (WinForms) + Linux (awt) | Bản Linux đã chạy thật (20/20); **bản Windows đã dùng thật trong Word** (24/10: lưu cấu hình + `Thử ngay` OK — §2.9) |
+
+**WPS Linux (sinh tự động từ code, không sửa tay):**
+<!-- BEGIN SINH TU DONG (scripts/generate_wps_gaps.py) - KHONG SUA TAY -->
+64/115 lệnh registry có handler trên WPS (51 chưa có); tool Core bị ẩn trên WPS vì thiếu lệnh: `doc_design`, `doc_from_brief`, `look_at_document`, `slides_from_brief`, `slides_from_template`. Bảng đầy đủ: `docs/architecture/wps-bridge.md` §6.
+<!-- END SINH TU DONG -->
 
 ## 2. Đã làm được
 
@@ -314,6 +323,39 @@ trúc không dây cắt hộp. Sửa: sơ đồ lồng trong khoá `diagram`, `r
   `numFmt` trước; `whatIf` phân biệt ô ngưỡng (`usedBy`). Đo đề B: **9/17 lần đạt** qua các bước sửa (18-52 vòng; trước
   0/3), bản gần cuối 2/3 (37, 46 vòng).
 
+### 2.15 Đợt 27–28/10/2026: tính năng theo Claude for M365, ba lượt kiểm thử Windows, hai lượt WPS
+
+- **Tính năng** (`docs/research/tinh-nang-con-thieu-so-voi-claude-m365.md` §6, chi tiết ở CHANGELOG 27/10): comment và
+  redline trong Word (đọc/thêm/trả lời/đánh dấu xong, chấp nhận/từ chối), chế độ Track Changes cho lượt AI, tool
+  `other_document` (làm việc với tài liệu Office khác đang mở), PivotTable và xuất biểu đồ Excel sang PowerPoint/Word,
+  `et.sort`/`et.filter` (Core hỏi trước khi sắp xếp dữ liệu có sẵn), trích dẫn bấm được (`[§n]`, `[Sheet!A1]`).
+- **Kiểm thử Windows Office** ba lượt 28/10 (`docs/audits/windows-office-live-test-2026-10-28*.md`): sửa Track
+  Changes (`replaceAll` lặp, chữ đã xoá lẫn vào `getText`/`outline`/`goto`), `saveAs` không ghi đè im lặng, PowerPoint
+  giữ đúng bài đích, `et.exportChart` ghi PNG rỗng, số đoạn của comment lệch 1.
+- **Kiểm thử WPS 12.1.2 trên Linux** hai lượt 28/10 (`docs/audits/wps-linux-live-test-2026-10-28*.md`): `ribbon.xml`
+  có `&` trần làm WPS bỏ cả add-in, nhận app `WPS Sheets`, `et.readRanges`, handler `et.sort`/`et.filter`, cache
+  `/commands` theo app. Phát hiện lỗi Writer + Spreadsheets cùng mở (sửa ở §2.16).
+
+### 2.16 Đợt 31/10/2026: WPS nhiều app cùng mở, hợp đồng lệnh của tool, đóng băng LibreOffice
+
+| Việc | Nội dung | Kiểm chứng |
+|---|---|---|
+| Mỗi tiến trình WPS một phiên | `wpsbridge`: client theo `clientId`, client đầu giữ cổng 47861, client sau cổng + file session riêng; pane/mini/ribbon gửi `{client, app}`; relay chuột phải theo client (`docs/architecture/wps-bridge.md` §2.4) | `go test -race ./internal/wpsbridge` (6 ca mới, cổng thật); `test_wps_multiapp_e2e.py` **13/13** (Core cũ đỏ ngay ca đầu); **WPS thật** (dưới bảng) |
+| WPS đóng giữa lệnh | Không còn tiến trình WPS (`/proc`) thì lệnh đang chạy báo lỗi trong vài giây thay vì 300 giây | `TestInFlightCommandFailsFastWhenWPSIsGone`, `...WaitsWhileWPSIsRunning` |
+| Hợp đồng lệnh của tool | `tools/needs.go`: `Required`/`Optional`; Core ẩn tool thiếu lệnh `Required` (cả ở chế độ lập kế hoạch) | `needs_test.go` (thử đột biến: bỏ khai một lệnh thì đỏ); `plan_capabilities_test.go` thêm ca `doc_design` thiếu `writer.restyle` |
+| Số liệu WPS sinh từ code | `scripts/generate_wps_gaps.py` → `wps-bridge.md` §6 và dòng dưới bảng §1 | `make check-gen` |
+| Đóng băng LibreOffice | Ra khỏi `make test` và CI; `install.sh` không còn đòi LibreOffice/UNO (máy chỉ có WPS trước đây không cài được) | `test_install_sh.py` **11/11** (+3 ca), `make test-package` |
+| Dọn | Bỏ mã chết U1000; `make lint` sạch | `make lint` |
+
+Số đo sau đợt (máy dev Ubuntu 24.04): `make test-core` **179/179**, `make test-wps` **217**, `make test-wps-e2e` 36 + 94 + 13,
+`make test-mcp` **61/61**, `go test -race ./...` xanh, `make lint` sạch, `make check-gen` khớp.
+
+**Đo trên WPS 12.1.2 thật** (31/10/2026, Xvfb + HOME tạm, chi tiết `tests/wps/REFERENCE.md` mục cuối): Writer + Sheets cùng
+mở thành hai phiên, `/health` mỗi cổng không còn đảo app; lượt agent từ pane Writer chỉ chạm Writer (model thấy 17 lệnh
+`writer.*`), từ pane Sheets chỉ chạm Sheets (23 lệnh `et.*`); đóng Sheets thì cổng + file session của nó được dọn sau
+~50 giây; WPS chết giữa lệnh thì `/cmd` báo lỗi sau ~1 giây thay vì 300 giây (`wpsoffice` — máy chủ CEF của add-in — thoát
+theo app cuối). Phát hiện phụ: `oem.ini` của bản này không có `JsApiPlugin=true` mà add-in vẫn nạp (chỉ hỏi tin cậy lần đầu).
+
 ## 3. Chưa làm / chưa kiểm chứng
 
 | Việc | Tình trạng | Ghi chú |
@@ -332,7 +374,7 @@ trúc không dây cắt hộp. Sửa: sơ đồ lồng trong khoá `diagram`, `r
 | Embedding với máy chủ thật | Chưa | Chỉ kiểm bằng máy chủ giả trả vector điều khiển được |
 | Lỗi `install.sh` xoá `core.db` | **Đã sửa 20/10/2026** | Cài lại / nâng cấp chuyển `core.db*` sang bản mới; `--uninstall` không `--purge` giữ lại; `tests/linux/test_install_sh.py` +2 ca (đỏ trước khi sửa). Gói phát hành trước ngày này vẫn mang `install.sh` cũ |
 | *Sửa bằng AI* / khung chat mini trên Windows và LibreOffice | Chưa | Mới có trên WPS Linux; Core đã sẵn. LibreOffice cần **khoá vùng bôi đen** trước (chưa có) |
-| Add-in WPS: 26 mục registry chưa có handler (25 lệnh Windows + `ui.setup`) | Chưa | `docs/architecture/wps-bridge.md` §6; hậu quả: `slides_from_brief`, `slides_from_template`, `doc_design` không chạy trên WPS; thiếu `app.screenshot`/`wpp.renderSlide` nên chưa có QA thị giác |
+| Add-in WPS: lệnh registry chưa có handler | Chưa | Số liệu sinh tự động ở §1 (dưới bảng) và bảng đầy đủ ở `docs/architecture/wps-bridge.md` §6; Core ẩn tool thiếu lệnh bắt buộc thay vì để tool hỏng giữa chừng |
 | Bộ nhớ AI trên WPS: sửa / ghim / đặt hạn | Chưa | Màn hình WPS có xoá tạm, khôi phục, xoá vĩnh viễn, lọc phạm vi |
 | Bấm từng nút ribbon WPS trên WPS thật | Chưa | Mới đo qua Core thật + add-in giả; menu chuột phải và khung mini đã thử thật |
 | *Sửa bằng AI* với model thật trên nhiều trường hợp | **Đã chạy 3 lượt thật (24/10/2026)** | Soạn đơn xin việc: 36,3 s / 12 vòng / 10 tool, tự kiểm chứng; đã sửa lỗi định dạng phát hiện từ file kết quả (§2.9). Vị trí cửa sổ `ShowDialog` vẫn không chỉnh được |
@@ -364,7 +406,9 @@ scripts\package.ps1               # zip phát hành
 ```bash
 cd core-go && go test ./... && go build -o axiom-core.exe ./cmd/axiom-core     # Core Go
 AXIOM_E2E_CORE_EXE=<binary> python tests/core/test_core_e2e.py [--only <phần,...>]
-bash scripts/linux/package.sh     # gói Linux (Core Go + .oxt; MCP nằm trong Core)
+bash scripts/linux/package.sh     # gói Linux (Core Go + add-in WPS + .oxt đóng băng; MCP nằm trong Core)
+make check-gen                    # file sinh (catalog, setup, bảng WPS §1) không lệch nguồn
+make test-lo                      # extension LibreOffice đóng băng - chạy tay, không có trong `make test`/CI
 
 # MCP server (cả hai nền tảng; Host.exe mcp chỉ chuyển tiếp sang Core):
 AXIOM_MCP_ARGS="mcp all" python tests/mcp-host/test_mcp_portable.py <binary>
@@ -384,9 +428,13 @@ Các phần e2e chạy riêng được: `fake_bridge`, `guards`, `skills`, `memo
 4. Nhánh C# **không còn đóng băng**: từ 04/10 add-in Windows có thêm ribbon đủ nhóm (Trợ lý / Tìm web / Kiểm tra /
    Quản lý / Hệ thống), chọn ngôn ngữ hiển thị, khoá vùng chọn trong Word, dialog *Công cụ ngoài…*, màu Fluent. `Host.exe mcp` vẫn chỉ là
    shim chuyển tiếp byte sang Core Go (`src/AxiomOffice.Host/Mcp/McpHost.cs`).
-5. Phát hành gói Linux mới để người dùng có `install.sh` đã sửa (§3).
+5. Phát hành gói Linux mới: `install.sh` đã sửa (giữ `core.db`, không còn đòi LibreOffice) và Core có phiên riêng cho
+   từng app WPS (§2.16).
 6. Chạy đề ngân hàng **3 lần trên PowerPoint thật** để nghiệm thu 5.1 (tool tự đi lại dây — code + test đã xong, xem
    §2.12); sau đó làm 5.2–5.3 trong `docs/plans/20-c0-ngu-canh-va-slide.md` §5.
+7. **WPS Linux** (trọng tâm): đo thêm máy khác xem `JsApiPlugin=true` còn cần không (máy dev 31/10 không cần — nếu đúng
+   thì bỏ gợi ý `sudo` của `install.sh` và bước kiểm của `test_wps_bridge_live.py`); viết handler cho các lệnh mà lượt spike 28/10 đã chứng minh WPS có API (`writer.setTracking`, comment/revision,
+   `et.pivot`, `et.exportChart`) — bảng còn thiếu sinh tự động ở §1.
 
 ## 7. Đối chiếu benchmark & lộ trình hiệu năng (02–03/10/2026)
 

@@ -3,7 +3,8 @@
 Trạng thái: **đã chạy trên WPS thật** (11/10/2026): Core (T1), trình cài `--core-url` (T2a), add-in 16 lệnh đợt 1
 (T2b, T2c). Đóng gói + `install.sh` (T3) xong, đăng ký cả ba app (T5) xong, nhận biết app + đủ 38 lệnh
 `et.*`/`wpp.*` (T6–T8) xong, pane Ask AI trong WPS (T4) xong, ribbon đầy đủ (đợt C — `docs/architecture/ribbon-ui.md`), menu
-chuột phải *Sửa bằng AI* + khung chat mini (20/10/2026, đã thử trên WPS thật — mục 7.3).
+chuột phải *Sửa bằng AI* + khung chat mini (20/10/2026, đã thử trên WPS thật — mục 7.3). Mỗi tiến trình WPS một phiên
+bridge riêng (31/10/2026 — mục 2.4).
 Còn lại: **các mục registry chưa có handler ở add-in WPS** (danh sách chuẩn: `CHUA_CO_HANDLER` trong
 `tests/wps/test_addin.mjs`) — lệnh Windows + `ui.setup` của LibreOffice
 (danh sách + lý do ở mục 6). Cơ sở thực nghiệm:
@@ -39,9 +40,12 @@ WPS Writer ── JS add-in (nạp từ http://127.0.0.1:47840/wps/addin/) ◀�
   — trang do Core phục vụ; trình duyệt không cho trang khác giả `Origin`), hoặc khi không có `Origin` mà có
   `X-Auth-Token` đúng (tool/test). `Origin` khác → 403; không `Origin` + sai/thiếu token → 401.
   Body vẫn phải `application/json` (415).
-- `POST /wps/v1/poll` — body `{client, app:"wps", version, document:{name, fullName}, commands:[catalog]}`.
-  Giữ request tới khi có lệnh hoặc hết `AXIOM_WPS_POLL_SECONDS` (mặc định 20) → `{"ok":true,"result":{"jobs":[{id, action, params}]}}`
-  (`jobs` rỗng khi hết giờ). Mỗi lần poll = một heartbeat; `commands` và `document` lần mới nhất được ghi nhớ.
+- `POST /wps/v1/poll` — body `{client:"wps-jsaddon", clientId, app:"wps", version, document:{name, fullName},
+  commands:[catalog]}`. `clientId` định danh **bản add-in** (mỗi tiến trình WPS nạp một bản — mục 2.4); thiếu (add-in
+  cũ) thì mọi poll gộp vào một client như trước. Giữ request tới khi có lệnh của **client đó** hoặc hết
+  `AXIOM_WPS_POLL_SECONDS` (mặc định 20) → `{"ok":true,"result":{"jobs":[{id, action, params}], "port":<cổng bridge của
+  client>}}` (`jobs` rỗng khi hết giờ). Mỗi lần poll = một heartbeat của client; `commands` và `document` lần mới
+  nhất được ghi nhớ theo client.
 - `POST /wps/v1/result` — body `{id, ok:true, result}` hoặc `{id, ok:false, error}` → `{"ok":true}`;
   `id` không tồn tại/đã xong → `{"ok":false,"error":...}` (HTTP 200).
 - **Đã kết nối** = có poll trong `AXIOM_WPS_DISCONNECT_SECONDS` giây gần nhất (mặc định 45), **hoặc** đang có
@@ -66,6 +70,34 @@ Cùng giao thức và cùng guard với bridge LibreOffice (`Origin` → 403, to
   kết nối và khi Core dừng. Nhờ vậy `office_sessions`, agent và pane tìm thấy WPS như mọi bridge khác.
 - Core lọc lệnh gửi agent theo `session.app` (`tools/office_action.go`: lệnh `kind` khác rỗng phải khớp app).
   Vì vậy `app` **phải** theo add-in, hard-code `"wps"` sẽ bỏ im lặng mọi lệnh `et.*`/`wpp.*`.
+
+### 2.4 Mỗi tiến trình WPS một phiên (31/10/2026)
+
+WPS chạy Writer, Spreadsheets, Presentation trong các tiến trình riêng, mỗi tiến trình nạp một bản add-in và poll
+Core độc lập. Trước 31/10/2026 bridge chỉ có **một** hàng đợi và một `app` (= app poll gần nhất): mở Writer và
+Spreadsheets cùng lúc thì `/health` đảo app sau mỗi lần poll và agent của pane Writer đọc nhầm bảng tính
+(`docs/audits/wps-linux-live-test-2026-10-28-run2.md` §4.5). Nay (`core-go/internal/wpsbridge`):
+
+- **Client** = một bản add-in, nhận diện bằng `clientId` (`main.js` sinh lúc nạp: `c<thời gian><ngẫu nhiên>`). Mỗi
+  client có hàng đợi, catalog, tài liệu, trạng thái kết nối riêng.
+- **Client đầu tiên giữ cổng chính** (`AXIOM_WPS_BRIDGE_PORT`, 47861) và file `<pid Core>-wps.json` — cấu hình cũ
+  trỏ 47861 vẫn đúng. Client sau được **cổng riêng** do hệ điều hành cấp và file `<pid Core>-wps-<cổng>.json`. Mỗi
+  cổng nói đúng giao thức bridge (mục 2.3), nên agent, MCP và `office_sessions` thấy mỗi app WPS như một bridge
+  riêng mà không phải biết gì về WPS — giống LibreOffice có ba cổng cho ba app.
+- Client chính mất kết nối rồi một client **mới** xuất hiện: client mới nhận cổng chính; lệnh **chưa giao** của chủ cũ
+  được trả lỗi "not sent, safe to retry" (không bao giờ rơi sang app khác). Client phụ mất kết nối: đóng cổng, xoá
+  file session.
+- **Pane, khung chat mini, ribbon** nhận `?client=<id>&app=<kind>` trong URL (`main.js: paneUrl`) và gửi lại
+  `{client, app}` trong `POST /wps/v1/runs` và `POST /wps/v1/exec`, `?client=&app=` trong `GET /wps/v1/status` và
+  `GET /wps/v1/pane/events`. Core chọn client theo thứ tự: đúng `client` → client đang kết nối của `app` đó (poll gần
+  nhất) → client chính (`Bridge.Resolve`). `exec` chỉ từ chối "run-in-progress" khi lượt đang chạy **trên cùng cổng**
+  — Writer và Spreadsheets chạy lượt song song được.
+- `GET /wps/v1/status` trả thêm `clients: [{clientId, app, port, primary, connected, document}]`.
+- Kiểm chứng: `core-go/internal/wpsbridge/multiclient_test.go` (cổng thật, xen kẽ poll, nhường cổng chính, dọn client
+  phụ) và `tests/wps/test_wps_multiapp_e2e.py` (Core thật + hai add-in giả + LLM giả: lượt từ pane Writer chỉ chạm
+  Writer, model của lượt Spreadsheets chỉ thấy lệnh `et.*`). Bản Core cũ làm e2e này đỏ ngay ca đầu. **Trên WPS 12.1.2
+  thật** (31/10/2026): Writer (`office6/wps`) và Spreadsheets (`office6/et`) là hai tiến trình, hai `clientId`, hai cổng;
+  lượt từ mỗi pane chỉ chạm app của nó; add-in giữ `clientId` khi Core khởi động lại (`tests/wps/REFERENCE.md` mục cuối).
 
 ## 3. Phía add-in (`src/AxiomOffice.WPS/`, ES5 — CEF Chrome 87)
 - Nạp từ `http://127.0.0.1:47840/wps/addin/` (`<jspluginonline>` trong `publish.xml`), nên gọi `/wps/v1/*`
@@ -115,8 +147,10 @@ Cùng giao thức và cùng guard với bridge LibreOffice (`Origin` → 403, to
 ## 6. Giới hạn đã biết
 - Add-in chỉ nạp khi Core đã chạy lúc mở WPS (Core tắt thì WPS bỏ qua add-in im lặng) và khi `JsApiPlugin=true`;
   đăng ký add-in xong phải mở lại WPS.
-- **Một add-in chỉ nói chuyện với một app tại một thời điểm**: bridge WPS có một hàng đợi và một file session, và
-  `app` của phiên là app poll gần nhất. Mở Writer và Spreadsheets cùng lúc thì chỉ app nào vừa poll được phục vụ.
+- **Mỗi tiến trình WPS là một phiên riêng** (từ 31/10/2026, mục 2.4). Trước đó bridge chỉ có một hàng đợi và
+  `app` = app poll gần nhất, nên mở Writer và Spreadsheets cùng lúc thì agent của pane Writer đọc nhầm bảng tính
+  (`docs/audits/wps-linux-live-test-2026-10-28-run2.md` §4.5). Giới hạn còn lại: add-in **bản cũ** (không gửi
+  `clientId`) vẫn gộp mọi app vào một phiên như trước.
 - `writer.undo {count}` gỡ N bước Undo gần nhất của tài liệu, **không phân biệt bước của AI hay của người**:
   object model WPS không cho đọc tên các bước Undo như LibreOffice (bản LibreOffice chỉ gỡ bước `AI: …`).
   Mỗi lệnh AI vẫn là đúng một bước Undo (UndoRecord).
@@ -143,33 +177,106 @@ Cùng giao thức và cùng guard với bridge LibreOffice (`Origin` → 403, to
   chạy" được tính là còn kết nối; chỉ lệnh **chưa giao** cho add-in mới bị bỏ khi mất kết nối, và câu lỗi nói rõ
   `safe to retry`. Lệnh đã giao mà không có kết quả vẫn hết giờ theo `AXIOM_WPS_CMD_WAIT_SECONDS` (với câu lỗi
   `may have been applied`); hết giờ này thì job được bỏ nên vòng session mới xoá file session.
+  **Từ 31/10/2026** Core còn nhìn thẳng vào tiến trình (`wpsbridge/process.go`): lệnh đã giao mà **không còn tiến trình
+  WPS nào** (`/proc/*/comm` là `wps`/`et`/`wpp`/`wpsoffice`) thì báo lỗi trong vài giây (`WPS closed while running the
+  command; the command may have been applied`) thay vì chờ đủ 300 giây. Cố ý thận trọng: chỉ kết luận "đã đóng" khi
+  không còn **bất kỳ** tiến trình WPS nào — kết luận sai sẽ cắt ngang một lệnh đang ghi tài liệu. Không đọc được
+  `/proc` thì giữ hành vi cũ. Đo trên WPS thật: `wpsoffice` là máy chủ CEF dùng chung của add-in và thoát theo app cuối
+  cùng, nên khi WPS chết giữa lệnh `/cmd` báo lỗi sau ~1 giây.
 - Object model ET/WPP khác Writer ở vài chỗ (`Cells.Item(r,c)`, `UsedRange.Address()` là hàm, màu BGR, chỉ số
   1-based, `Application.Documents` không có) — bảng đầy đủ ở `tests/wps/REFERENCE.md`.
-- **Các mục registry (84) chưa có handler ở add-in WPS** — lệnh của bản Windows + `ui.setup`.
-  Nguồn duy nhất của danh sách là `CHUA_CO_HANDLER` trong `tests/wps/test_addin.mjs` — **đừng chép số vào đây**,
-  spec sẽ đỏ khi một lệnh được viết handler mà còn nằm trong danh sách, và khi add-in khai với Core một lệnh chưa
-  có handler. Chia làm ba nhóm lệnh Windows; mục cuối là đường riêng của LibreOffice:
-  - **Ba lệnh `kind` rỗng của Windows** — `ai.ask`, `ui.askpane`, `app.screenshot`. **Sửa lại một câu cũ ở đây
-    (19/10/2026):** trước kia tài liệu này viết chúng "không phải lệnh của app văn phòng, add-in không bao giờ
-    nhận" — **sai**. Ba lệnh này **là** lệnh của add-in ở bản Windows (`CommandDispatcher.cs`: `AiAsk`, `UiAskPane`,
-    `AppScreenshot`); ở add-in WPS, `app.info` có handler còn ba lệnh kia thì không — nên Core gọi chúng qua bridge
-    sẽ nhận `unknown action`. Hệ quả đang thấy được: thiếu `app.screenshot` là **đúng lý do** toggle *Nhìn tài liệu*
-    chưa lên được ribbon WPS (`docs/architecture/ribbon-ui.md` §5.1).
-  - **Chín lệnh `writer.*`**: `newDocument`, `open`, `closeAll`, `formatTable`, `insertImage`, `insertHyperlink`,
-    `replaceMany`, cộng hai lệnh thiết kế chỉ có ở add-in Windows (`restyle`, `insertBlocks`). `writer.checkTables`
-    **đã ra khỏi danh sách** — handler viết xong (`commands.js:873`), nên nút *Soát bảng* trên ribbon chạy được.
-    Dù `restyle`/`insertBlocks` có `agent=false`, `doc_design` gọi thẳng hai lệnh này nên tool đó không chạy trên
-    WPS Writer.
-  - **Mười ba lệnh `wpp.*`**: `newFromTemplate`, `addSlideFromTemplate`, `sourceManifest`, `setShapeText`,
-    `deleteShapes`, `copyPicture` (đường template), `addParagraphs`, `addGrid`, `deleteTagged` (đường compose),
-    `addShape`, `addConnector`, `addChart` (sơ đồ/biểu đồ của `slides_from_brief`), `renderSlide` (ảnh slide cho
-    `look_at_document`). Vì `slides_from_brief` gọi `addParagraphs`/`addGrid` cho **mọi** layout, thiếu các lệnh này
-    làm **cả tool** dừng ở slide đầu trên WPS, không riêng layout sơ đồ.
-  - **Nhiều mục còn thiếu có `agent=true`** (`writer.formatTable`, `writer.insertImage`, `writer.insertHyperlink`,
-    `writer.replaceMany`, và sáu lệnh `wpp.*`: `newFromTemplate`, `addSlideFromTemplate`, `sourceManifest`,
-    `setShapeText`, `deleteShapes`, `copyPicture`) — nghĩa là Core **vẫn đưa chúng cho agent như tool**, và trên máy
-    đang chạy WPS agent sẽ nhận `unknown action`. Đây là khoảng trống thật, không phải lỗi hiển thị.
-  - **`ui.setup`** là lệnh của extension LibreOffice (wizard), không có ở bản Windows lẫn add-in WPS.
+- **Lệnh registry chưa có handler ở add-in WPS** — bảng dưới **sinh tự động** (`scripts/generate_wps_gaps.py`, CI
+  chạy `--check` trong `make check-gen`) từ `CHUA_CO_HANDLER` của `tests/wps/test_addin.mjs` (spec đỏ khi danh sách
+  lệch handler thật), `catalog/live-commands.json` và hợp đồng lệnh của tool ở `core-go/internal/tools/needs.go`.
+  Đừng chép số ra chỗ khác; sửa nguồn rồi chạy lại script.
+
+<!-- BEGIN SINH TU DONG (scripts/generate_wps_gaps.py) - KHONG SUA TAY -->
+
+Registry có **115** lệnh; add-in WPS có handler cho **64**, còn **51** chưa có. Add-in chỉ khai với Core những lệnh có handler (`filterRunnable` trong `main.js`), nên agent **không** được mời gọi lệnh chưa có.
+
+**Writer (`writer.*`) — 26 lệnh**
+
+| Lệnh | Cho agent | Lý do (từ `CHUA_CO_HANDLER`) |
+|---|---|---|
+| `writer.addComment` | có | chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc |
+| `writer.addTableRows` | có | chi co trong add-in Windows (plan 21 P2); WPS de sau |
+| `writer.checkLayout` | có | chi co trong add-in Windows (plan 21 P2); WPS de sau |
+| `writer.closeAll` | không | chua co handler trong add-in |
+| `writer.deleteParagraphs` | có | chi co trong add-in Windows (plan 21 P2); WPS de sau |
+| `writer.editCommentScope` | có | chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc |
+| `writer.formatTable` | có | chua co handler trong add-in (agent=true: tool nay se loi khi may dang la WPS) |
+| `writer.insertBlocks` | không | chi co trong add-in Windows (lenh thiet ke, doc_design); WPS JS chua viet handler |
+| `writer.insertCaption` | có | chi co trong add-in Windows (plan 21 P1); WPS de sau |
+| `writer.insertHyperlink` | có | chua co handler trong add-in (agent=true) |
+| `writer.insertImage` | có | chua co handler trong add-in (agent=true) |
+| `writer.insertLayoutTable` | có | chi co trong add-in Windows (plan 21 P3); WPS de sau |
+| `writer.insertToc` | có | chi co trong add-in Windows (plan 21 P1); WPS de sau |
+| `writer.listComments` | có | chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc |
+| `writer.listRevisions` | có | chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc |
+| `writer.newDocument` | không | chua co handler trong add-in |
+| `writer.open` | không | chua co handler trong add-in |
+| `writer.replaceMany` | có | chua co handler trong add-in (agent=true: tool nay se loi khi may dang la WPS) |
+| `writer.replyComment` | có | chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc |
+| `writer.resolveComment` | có | chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc |
+| `writer.restyle` | không | chi co trong add-in Windows (lenh thiet ke, doc_design); WPS JS chua viet handler |
+| `writer.reviewRevisions` | có | chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc |
+| `writer.setHeaderFooter` | có | chi co trong add-in Windows (plan 21 P1); WPS de sau |
+| `writer.setStyle` | có | chi co trong add-in Windows (plan 21 P1); WPS de sau |
+| `writer.setTracking` | không | chi co trong add-in Windows (W4, Track Changes cho luot AI); can do API TrackRevisions/UserName cua WPS JS |
+| `writer.writeContent` | có | chi co trong add-in Windows (plan 21 P2); WPS de sau |
+
+**Spreadsheets (`et.*`) — 8 lệnh**
+
+| Lệnh | Cho agent | Lý do (từ `CHUA_CO_HANDLER`) |
+|---|---|---|
+| `et.createTable` | có | chi co trong add-in Windows (plan 21 P1); WPS de sau |
+| `et.deleteSheet` | có | chi co trong add-in Windows (plan 21 P3); WPS de sau |
+| `et.exportChart` | có | chi co trong add-in Windows (P2, Chart.Export); can do API xuat anh bieu do cua WPS JS |
+| `et.formatRanges` | có | chi co trong add-in Windows (plan 21 P3); WPS de sau |
+| `et.freezePanes` | có | chi co trong add-in Windows (plan 21 P1); WPS de sau |
+| `et.pivot` | có | chi co trong add-in Windows (X3, PivotCaches); can do API PivotTable cua WPS JS |
+| `et.setValidation` | có | chi co trong add-in Windows (plan 21 P1); WPS de sau |
+| `et.whatIf` | có | chi co trong add-in Windows (plan 21 P3); WPS de sau |
+
+**Presentation (`wpp.*`) — 13 lệnh**
+
+| Lệnh | Cho agent | Lý do (từ `CHUA_CO_HANDLER`) |
+|---|---|---|
+| `wpp.addChart` | không | bieu do goc (slides_from_brief) - chi PowerPoint; WPS JS chua viet handler |
+| `wpp.addConnector` | không | duong noi (slides_from_brief) - chi PowerPoint; WPS JS chua viet handler |
+| `wpp.addGrid` | không | sap xep bai (compose) - chi PowerPoint/LibreOffice; WPS JS chua viet handler |
+| `wpp.addParagraphs` | không | sap xep bai (compose) - chi PowerPoint/LibreOffice; WPS JS chua viet handler |
+| `wpp.addShape` | không | hinh khoi (slides_from_brief) - chi PowerPoint; WPS JS chua viet handler |
+| `wpp.addSlideFromTemplate` | có | chua co handler trong add-in (chi PowerPoint) |
+| `wpp.copyPicture` | có | chua co handler trong add-in (chi PowerPoint) |
+| `wpp.deleteShapes` | có | chua co handler trong add-in (chi PowerPoint) |
+| `wpp.deleteTagged` | không | sap xep bai (compose) - chi PowerPoint/LibreOffice; WPS JS chua viet handler |
+| `wpp.newFromTemplate` | có | chua co handler trong add-in (chi PowerPoint) |
+| `wpp.renderSlide` | không | anh mot slide theo so (look_at_document, benchmark) - chi PowerPoint; WPS JS chua viet handler |
+| `wpp.setShapeText` | có | chua co handler trong add-in (chi PowerPoint) |
+| `wpp.sourceManifest` | có | chua co handler trong add-in (chi PowerPoint) |
+
+**Dùng chung (`kind` rỗng) — 4 lệnh**
+
+| Lệnh | Cho agent | Lý do (từ `CHUA_CO_HANDLER`) |
+|---|---|---|
+| `ai.ask` | không | chua co handler trong add-in WPS (ban Windows: AiAsk trong CommandDispatcher.cs) |
+| `app.screenshot` | không | chua co handler trong add-in WPS (ban Windows: AppScreenshot) - day la ly do nut 'Nhin tai lieu' chua len duoc ribbon WPS, xem docs/architecture/ribbon-ui.md muc 5.1 |
+| `ui.askpane` | không | chua co handler trong add-in WPS (ban Windows: UiAskPane) |
+| `ui.setup` | không | duong cua LibreOffice (setupwizard.py); ban Windows/WPS khong co lenh nay |
+
+**Tool của Core bị ẩn trên WPS** (thiếu lệnh bắt buộc theo `core-go/internal/tools/needs.go`):
+
+| Tool | Lệnh bắt buộc WPS chưa có |
+|---|---|
+| `doc_design` | `writer.restyle`, `writer.insertBlocks` |
+| `doc_from_brief` | `writer.insertLayoutTable`, `writer.writeContent`, `writer.checkLayout` |
+| `look_at_document` | `app.screenshot` |
+| `slides_from_brief` | `wpp.addParagraphs`, `wpp.addShape` |
+| `slides_from_template` | `wpp.sourceManifest`, `wpp.addSlideFromTemplate`, `wpp.setShapeText`, `wpp.deleteShapes`, `wpp.addParagraphs`, `wpp.copyPicture`, `wpp.deleteTagged` |
+
+<!-- END SINH TU DONG -->
+
 - **`FileSystem.readFileString`/`writeFileString` bị sandbox** (đo 11/10/2026): mọi đường dẫn có `/` hoặc `\` đều
   ném `path cannot contains "/" or "\"`, tên file trần trả `null`, và chúng không đọc/ghi được file nào — dù tài
   liệu WPS mô tả chúng như API đọc file. Đọc file thật phải bằng **`FileSystem.ReadFile`** (UTF-8, ném
@@ -199,7 +306,7 @@ phải bằng `Application.ShowDialog(url, "Sửa bằng AI", 440 × devicePixel
 | `GET /wps/v1/memory` · `POST /wps/v1/memory` · `PATCH`/`DELETE /wps/v1/memory/{id}` · `POST /wps/v1/memory/{id}/restore` · `GET /wps/v1/memory/{id}/history` · `DELETE /wps/v1/memory` | `routeBoth` → y hệt `/v1/memory...` | màn hình *Bộ nhớ AI* |
 | `GET /wps/v1/audit` | `GET /v1/audit` | màn hình *Nhật ký hoạt động* |
 | `GET /wps/v1/conversations` · `GET`/`DELETE /wps/v1/conversations/{id}` | `routeBoth` | màn hình *Hội thoại trước…* (mục 7.2) |
-| `POST /wps/v1/pane/request {quickAction}` · `GET /wps/v1/pane/events` (SSE) | **chỉ có ở kênh WPS** | trạm trung chuyển menu chuột phải → khung chat lớn đang mở (`api/wpspane.go`) — **đường dự phòng** khi WPS không có `ShowDialog`: `main.js` (`runQuick`) hiện khung chat lớn rồi gửi, khung chat Writer nghe sự kiện `pane.quick` rồi chạy mục đó **trong hội thoại của nó**. Mỗi yêu cầu giao cho **một** khung chat, giữ 20 giây cho khung chat vừa tạo kịp nối vào; bấm liền hai mục thì mục sau thắng |
+| `POST /wps/v1/pane/request {quickAction}` · `GET /wps/v1/pane/events` (SSE) | **chỉ có ở kênh WPS** | trạm trung chuyển menu chuột phải → khung chat lớn đang mở (`api/wpspane.go`) — **đường dự phòng** khi WPS không có `ShowDialog`: `main.js` (`runQuick`) hiện khung chat lớn rồi gửi, khung chat Writer nghe sự kiện `pane.quick` rồi chạy mục đó **trong hội thoại của nó**. Mỗi yêu cầu giao cho **một** khung chat, giữ 20 giây cho khung chat vừa tạo kịp nối vào; bấm liền hai mục thì mục sau thắng. Yêu cầu mang `client` của add-in gửi và chỉ tới khung chat nghe với cùng `?client=` (mục 2.4); thiếu `client` (bản cũ) thì dùng chung như trước |
 | `GET /wps/v1/quick-actions` | `routeBoth` | `{actions: [{id, label, edits}]}`: khung chat mini dựng chip từ đây, cả hai khung dùng để bong bóng hiện nhãn ("Trau chuốt") thay vì id. Câu lệnh **không** trả ra — nằm trong `agent/quickactions.go` |
 | `GET /wps/v1/setup` · `POST /wps/v1/llm/test` · `GET /wps/v1/llm/models` | `routeBoth` | màn hình *Thiết lập*, nút *Kiểm tra mô hình* |
 | `GET /wps/v1/skills` · `POST /wps/v1/skills/reload` | `routeBoth` | màn hình *Kỹ năng* |
