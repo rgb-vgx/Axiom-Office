@@ -488,17 +488,10 @@ func contentRegions(area [4]float64, row composeRow, withPictures bool) (text, p
 	return slidelayout.ContentRegions(area, row.Callout, calloutFont, len(row.Points) > 0, withPictures)
 }
 
-func estimateLines(text string, width, size float64) int {
-	return slidelayout.EstimateLines(text, width, size)
-}
-
 // cardBoxes: 2-3 the mot hang; 4 the luoi 2x2 (slidelayout.CardBoxes).
 func cardBoxes(area [4]float64, count int) [][4]float64 {
 	return slidelayout.CardBoxes(area, count)
 }
-
-// cardMaxFont: co chu toi da trong the (slidelayout.CardMaxFont).
-const cardMaxFont = slidelayout.CardMaxFont
 
 // fitCards: the cao vua noi dung, ca cum can giua theo chieu doc (slidelayout.FitCards; bo dau nhan "**" khi do).
 func fitCards(area [4]float64, cards []composeCard) [][4]float64 {
