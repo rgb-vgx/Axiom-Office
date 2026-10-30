@@ -9,7 +9,7 @@ Có ba cách dùng, chung một lõi:
 | Cách dùng | Dành cho | Thành phần |
 |---|---|---|
 | **Ask AI** — task pane trong Word/Excel/PowerPoint/WPS (Windows) | Người dùng cuối | `AxiomOffice.dll` (COM add-in) |
-| **Ask AI trên Linux** — pane trong WPS Office for Linux và LibreOffice | Người dùng cuối | add-in JS `src/AxiomOffice.WPS` (Core phục vụ) · extension `.oxt` |
+| **Ask AI trên Linux** — pane trong WPS Office for Linux (trọng tâm) và LibreOffice (đóng băng) | Người dùng cuối | add-in JS `src/AxiomOffice.WPS` (Core phục vụ) · extension `.oxt` |
 | **MCP server** — Claude Desktop, Claude Code, agent khác | AI agent bên ngoài | `AxiomOffice.Core.exe mcp` (`AxiomOffice.Host.exe mcp` chuyển tiếp) |
 | **HTTP API** trên localhost (`/cmd`, `/events`, ...) | Script, tích hợp riêng | bridge trong add-in |
 
@@ -17,13 +17,13 @@ Không cần quyền admin, không cần Python. Gói cài Windows kèm Agent Co
 
 **Hướng dẫn sử dụng cho người dùng cuối** (cài, thiết lập, dùng từng nút, xử lý lỗi): [docs/user/user-manual.md](docs/user/user-manual.md).
 
-LibreOffice dùng **extension Python UNO** (`src\AxiomOffice.LibreOffice`) nói đúng giao thức bridge
-trên (cùng tên lệnh `writer.*`/`et.*`/`wpp.*`, cùng session registry) — xem
-[mục LibreOffice](#libreoffice). Chạy được trên cả Windows và Linux (Ubuntu 24.04 + LibreOffice 24.2 đã kiểm
-chứng; CI chạy LibreOffice thật — xem `docs/architecture/libreoffice.md`).
+**WPS Office for Linux** (trọng tâm phát triển hiện tại) dùng một add-in JS riêng (`src/AxiomOffice.WPS`) do Agent
+Core phục vụ — xem [mục WPS Office for Linux](#wps-office-for-linux).
 
-**WPS Office for Linux** dùng một add-in JS riêng (`src/AxiomOffice.WPS`) do Agent Core phục vụ — xem
-[mục WPS Office for Linux](#wps-office-for-linux).
+LibreOffice dùng **extension Python UNO** (`src\AxiomOffice.LibreOffice`) nói đúng giao thức bridge
+trên (cùng tên lệnh `writer.*`/`et.*`/`wpp.*`, cùng session registry) — xem [mục LibreOffice](#libreoffice).
+**Đóng băng** từ 25/10/2026: không phát triển tiếp, không còn trong `make test`/CI (lần đo cuối trên Ubuntu 24.04 +
+LibreOffice 24.2: 281/281, 01/10/2026).
 
 > Trước đây dự án tên **WPS AI Bridge** (`WpsAiBridge`). Cài bản mới sẽ tự gỡ đăng ký của bản
 > cũ và chuyển cấu hình (port, token, cài đặt AI) từ `HKCU\Software\WpsAiBridge` sang
@@ -31,6 +31,7 @@ chứng; CI chạy LibreOffice thật — xem `docs/architecture/libreoffice.md`
 
 ## Mục lục
 
+- **Người mới: [Axiom Office từ đầu tới cuối](docs/onboarding/intern-guide.md)** — đọc trước tiên
 - [Tình trạng dự án](STATUS.md) — đã làm được gì, chưa làm được gì
 - [Mục lục tài liệu](docs/README.md) — hướng dẫn sử dụng, kiến trúc, nghiên cứu, lộ trình
 - [Kiến trúc](#kiến-trúc)
@@ -641,8 +642,8 @@ powershell -ExecutionPolicy Bypass -File tests\mcp-host\office_roundtrip.ps1 -Di
 powershell -ExecutionPolicy Bypass -File tests\mcp-host\office_roundtrip.ps1 -Dir <thư_mục_output> -Verify
 # Unit test của các MCP Python (oracle đối chiếu)
 cd tests\oracle\word-mcp; .venv\Scripts\python.exe -m unittest discover -s tests
-# Làn LibreOffice: 56 unit test (giải mã tham số + registry lệnh khớp bản C#, logic pane, theme + đọc SSE của
-# Core) và test mọi lệnh trên LibreOffice thật (script tự mở LibreOffice bằng profile người dùng;
+# Làn LibreOffice (ĐÓNG BĂNG - không có trong `make test`/CI, chạy tay khi cần soát lại: make test-lo): unit test
+# (giải mã tham số, logic pane, theme + đọc SSE của Core) và test mọi lệnh trên LibreOffice thật (script tự mở LibreOffice bằng profile người dùng;
 # --ui: bản có cửa sổ; --ai: ai.ask). Chạy được cả trên Linux (đường dẫn soffice tự dò, tắt app bằng
 # SIGTERM, token đọc từ ~/.config/axiom-office/config.json).
 python tests\lo\test_extension.py
@@ -650,9 +651,13 @@ python tests\lo\test_chat.py
 python tests\live\test_live_libreoffice.py [--apps writer,calc,impress] [--ui] [--ai]
 python3 tests/live/test_live_libreoffice.py [--apps writer,calc,impress] [--ui] [--ai]   # Linux
 # Add-in WPS Office for Linux (mục WPS Office for Linux): unit test Node không cần WPS (add-in, ribbon,
-# khung chat, khung chat mini), rồi e2e trên Core thật với add-in giả qua HTTP
+# khung chat, khung chat mini), rồi e2e trên Core thật với add-in giả qua HTTP (gồm Writer + Spreadsheets cùng mở)
 make test-wps
 make test-wps-e2e
+# Mọi thứ không cần app thật (CI job Linux gọi đúng các đích này); file sinh không lệch nguồn; lint
+make test
+make check-gen
+make lint
 # Agent Core (Go): unit test (cần Go 1.26+; chạy được cả Windows lẫn Linux)
 cd core-go && go test ./...
 # Wizard thiết lập (Windows): render wizard thật ra ảnh từng bước để soi giao diện (không cần Office)
@@ -730,10 +735,19 @@ phép đo trên WPS thật: [docs/architecture/wps-bridge.md](docs/architecture/
   (`core-go/internal/agent/quickactions.go`).
 - **Khoá vùng bôi đen**: bôi đen rồi hỏi thì AI chỉ sửa trong đoạn đó — Core gọi `writer.lockSelection` trước mỗi
   lượt và `writer.unlockSelection` khi xong. Lượt từ menu chuột phải / khung mini **bắt buộc** có đoạn bôi đen.
+- **Nhiều app WPS cùng lúc** (từ 31/10/2026): mỗi tiến trình WPS (Writer, Spreadsheets, Presentation) là một phiên
+  bridge riêng — app mở đầu tiên giữ cổng 47861, app sau có cổng + file session riêng; khung chat gửi `client`/`app`
+  của mình nên lượt chạy luôn làm trên đúng app (`docs/architecture/wps-bridge.md` §2.4).
+- **Tool Core cần lệnh mà WPS chưa có thì bị ẩn**, không đưa cho agent để hỏng giữa chừng (bảng sinh tự động ở
+  `docs/architecture/wps-bridge.md` §6).
 - **Kiểm thử**: `make test-wps` (Node, add-in + pane + khung mini, không cần WPS), `make test-wps-e2e` (Core thật +
-  add-in giả qua HTTP), `tests/wps/test_wps_bridge_live.py` (WPS thật, máy dev).
+  add-in giả qua HTTP, gồm ca Writer + Spreadsheets cùng mở), `tests/wps/test_wps_bridge_live.py` (WPS thật, máy dev).
 
 ## LibreOffice
+
+> **ĐÓNG BĂNG từ 25/10/2026** — không phát triển tiếp, không có trong `make test` và CI (31/10/2026). Mã nguồn, target
+> `make test-lo` (chạy tay) và tệp `.oxt` trong gói Linux vẫn giữ để người đang dùng cài lại được; `install.sh` chỉ cài
+> extension khi máy có sẵn LibreOffice + Python UNO. Phần dưới đây mô tả bản đóng băng.
 
 Cùng giao thức, cùng tên lệnh với add-in — nhưng bridge nằm trong **extension Python UNO**
 (`src\AxiomOffice.LibreOffice`), không phải COM add-in, nên không cần .NET và chạy được cả **Windows** lẫn
@@ -811,14 +825,11 @@ Khác bản Office (do UNO):
 
 ### Linux
 
-Yêu cầu: LibreOffice 7.x trở lên + Python UNO (`python3-uno`). **Không cần .NET, không cần Go trên máy
-đích** — bản phát hành kèm Agent Core self-contained (`linux-x64`/`linux-arm64`).
-
-**Máy Ubuntu mới tinh** — chỉ một lệnh apt, rồi cài; phần LLM để wizard lo:
+Gói Linux (`axiom-office-linux-x64-<ver>.tar.gz`) phục vụ **WPS Office for Linux** (chính) và LibreOffice (bản
+đóng băng, chỉ cài khi máy có LibreOffice 7.x + Python UNO — không có thì `install.sh` bỏ qua, `--no-libreoffice` để
+bỏ hẳn). **Không cần .NET, không cần Go trên máy đích** — gói kèm Agent Core self-contained (`linux-x64`/`linux-arm64`).
 
 ```bash
-sudo apt update
-sudo apt install -y libreoffice python3-uno
 sudo apt install -y libsecret-tools      # tuỳ chọn: lưu khoá API vào keyring thay vì file 0600
 
 # Lấy gói: tải artifact "axiom-office-linux-x64" của job `linux` trong GitHub Actions,
@@ -827,11 +838,11 @@ sudo apt install -y libsecret-tools      # tuỳ chọn: lưu khoá API vào key
 scp dist/axiom-office-linux-x64-<ver>.tar.gz nguoidung@may-ubuntu:~
 
 tar -xzf axiom-office-linux-x64-<ver>.tar.gz && cd axiom-office-linux-x64-<ver>
-./install.sh              # không cần tham số: cấu hình AI sau bằng wizard (menu Axiom Office -> Thiết lập…)
-./install.sh --systemd    # tuỳ chọn: Core chạy thường trực (systemd --user)
+./install.sh --systemd    # Core chạy thường trực (systemd --user) - WPS cần Core chạy TRƯỚC khi mở WPS
+./install.sh              # không systemd: Core chỉ chạy khi có app gọi (đủ cho LibreOffice, không đủ cho WPS)
 ```
 
-- **Phải là LibreOffice bản cài từ gói distro (`.deb`/`.rpm`)**. Bản **snap/flatpak không được hỗ trợ**:
+- **LibreOffice (nếu dùng) phải là bản cài từ gói distro (`.deb`/`.rpm`)**. Bản **snap/flatpak không được hỗ trợ**:
   sandbox chặn kết nối `127.0.0.1` tới Agent Core và quyền chạy binary ngoài. Kiểm tra bằng
   `readlink -f "$(command -v soffice)"` — ra `/snap/bin/soffice` thì gỡ snap rồi cài bản apt.
 - Endpoint nội bộ (vd `http://localhost:20128/v1`) thì máy mới phải có đường tới đó trước (cùng mạng hoặc
@@ -848,13 +859,14 @@ tar -xzf axiom-office-linux-x64-<ver>.tar.gz && cd axiom-office-linux-x64-<ver>
   thay khi cài; script chuyển ba tệp đó sang bản mới (và giữ lại khi gỡ). Chỉ `--purge` mới xoá. Gói phát hành
   **trước 20/10/2026** thì không giữ — với các gói đó, sao lưu `core/core.db` trước khi chạy `install.sh` của chúng.
 
-- Cài **không cần root**, chỉ dùng `unopkg` của người dùng. Script **không tự tắt LibreOffice**: đang chạy
-  thì dừng lại và nhắc bạn đóng.
+- Cài **không cần root**. Khi cài extension LibreOffice, script dùng `unopkg` của người dùng và **không tự tắt
+  LibreOffice**: đang chạy thì dừng lại và nhắc bạn đóng.
 - Vị trí: Core `~/.local/share/axiom-office/core/` (kèm `core/skills/` — 8 skill dựng sẵn, Core nạp sẵn
   không cần cấu hình; `core/core.db` — dữ liệu, xem cảnh báo trên; `core/wps-addin/` — add-in WPS), MCP nằm trong
   Core (`core/AxiomOffice.Core mcp`; thư mục `mcp/` của bản cài cũ được tự dọn), cấu hình
   `~/.config/axiom-office/config.json` (quyền `0600`), session dùng chung
-  `$XDG_RUNTIME_DIR/axiom-office/sessions`, log `~/.local/share/axiom-office/bridge.log`.
+  `$XDG_RUNTIME_DIR/axiom-office/sessions`, log Core `~/.local/share/axiom-office/core.log` (extension LibreOffice ghi
+  `bridge.log` cùng thư mục).
 - **Khoá API trên Linux**: pane **Cài đặt** lưu vào **keyring** của người dùng qua `secret-tool` (libsecret)
   khi máy có — `config.json` chỉ giữ `libsecret:LlmApiKey`; máy không có keyring thì lưu thẳng trong file
   `0600`. Core giải mã cả hai, và hiểu cả `dpapi:` (coi như chưa cấu hình nếu không phải máy Windows đã mã hoá).
@@ -914,24 +926,28 @@ core-go/                      Agent Core viết bằng Go (docs/architecture/cor
   internal/api/               endpoint /v1 (health, runs, skills, memory, mcp, setup, log, quick-actions,
                               conversations, audit) + guard; kênh /wps/* (addin, poll/result, runs, exec, config,
                               status, pane) cho add-in WPS Linux
-  internal/wpsbridge/         bridge WPS Linux (cổng 47861): add-in JS poll Core, Core giao lệnh
+  internal/wpsbridge/         bridge WPS Linux: add-in JS poll Core, Core giao lệnh; mỗi tiến trình WPS một phiên
+                              (app đầu cổng 47861, app sau cổng riêng); phát hiện WPS đóng qua /proc
+  internal/tools/needs.go     hợp đồng lệnh của tool lớn: Core ẩn tool khi bridge thiếu lệnh bắt buộc
   internal/mcpserver/         MCP server (subcommand `mcp`, cả Windows lẫn Linux): giao thức, 20 tool file + 30 tool live
   internal/ooxml/ sheet/ xlsx/ docx/ pptx/   engine OOXML + tiện ích bảng tính (port của Host/Mcp\*.cs)
 tests/core/                   test Agent Core: e2e (fake_llm.py, test_core_e2e.py, fakes.py)
 scripts/                      build, install, uninstall, legacy (gỡ bản WpsAiBridge), core (tắt Core), package, libreoffice
   libreoffice.sh              Linux: đóng gói/cài/gỡ .oxt bằng unopkg của người dùng
   package_oxt.py              đóng gói .oxt (Windows + Linux)
-  generate_mcp_commands.py    sinh catalog/live-commands.json + livecommands_gen.go (từ registry extension)
-  linux/install.sh            cài cho người dùng cuối Linux: Core (kèm MCP) vào ~/.local/share, .oxt, config.json,
-                              --systemd (unit axiom-office-core.service), in cấu hình MCP
-  linux/package.sh            tarball linux-x64/arm64: Core (kèm MCP, binary Go) + skills/ + .oxt + install.sh
+  generate_mcp_commands.py    từ catalog/live-commands.json (nguồn chuẩn) sinh livecommands_gen.go + CATALOG của add-in WPS
+  generate_wps_gaps.py        sinh bảng lệnh/tool WPS còn thiếu vào docs/architecture/wps-bridge.md §6 + STATUS.md
+  linux/install.sh            cài cho người dùng cuối Linux: Core (kèm MCP + add-in WPS) vào ~/.local/share, đăng ký
+                              add-in WPS, config.json, --systemd (unit axiom-office-core.service), in cấu hình MCP;
+                              .oxt LibreOffice (đóng băng) chỉ khi máy có LibreOffice + Python UNO
+  linux/package.sh            tarball linux-x64/arm64: Core (kèm MCP, binary Go) + skills/ + wps-addin/ + .oxt + install.sh
   linux/axiom-office-core.service.in  unit systemd --user cho Agent Core
 scripts/dist/                 install.cmd, uninstall.cmd, HUONG-DAN-CAI-DAT.txt (vào gói cài)
 src/AxiomOffice.WPS/          add-in JS (ES5) cho WPS Office for Linux, Core phục vụ: commands.js (lệnh bridge),
                               main.js (ribbon, menu chuột phải, vòng poll), ribbon.xml, pane.html + pane-core.js
                               (khung chat), mini.html (khung chat mini), images/*.svg (icon ribbon)
 scripts/wps/install_jsaddon.py  đăng ký / gỡ add-in WPS trong publish.xml của người dùng (install.sh gọi)
-src/AxiomOffice.LibreOffice/  extension Python UNO cho LibreOffice (nói cùng giao thức bridge)
+src/AxiomOffice.LibreOffice/  extension Python UNO cho LibreOffice (nói cùng giao thức bridge) — ĐÓNG BĂNG
   python/axiom_job.py         component UNO: job OnStartApp -> axiom.bridge.start
   python/axiom_panel.py       component UNO: factory panel cho sidebar
   python/axiom_dispatch.py    component UNO: xu ly URL org.axiomoffice.bridge:... (menu)
@@ -939,9 +955,12 @@ src/AxiomOffice.LibreOffice/  extension Python UNO cho LibreOffice (nói cùng g
                               session; pane: core (client Agent Core), chat (logic hội thoại), theme (màu/cỡ
                               chữ như PaneTheme + PNG góc bo), widgets, chatview, panel, awt, dialogs, dispatch
 tests/live/                   test mọi lệnh bridge trên Office/WPS thật
-tests/wps/                    add-in WPS: unit test Node (make test-wps), e2e Core thật (make test-wps-e2e),
+tests/wps/                    add-in WPS: unit test Node (make test-wps), e2e Core thật (make test-wps-e2e, gồm
+                              Writer + Spreadsheets cùng mở),
                               live trên WPS thật; REFERENCE.md ghi các phép đo trên WPS thật
-tests/lo/                     unit test extension LibreOffice (không cần LibreOffice: uno giả)
+tests/lo/                     unit test extension LibreOffice (không cần LibreOffice: uno giả) — đóng băng, make test-lo chạy tay
+tests/linux/                  trình cài install.sh (HOME tạm, unopkg giả) và tarball (make test-install, test-package)
+docs/                         tài liệu — mục lục docs/README.md; người mới đọc docs/onboarding/intern-guide.md
 tests/mcp-host/               test parity MCP + registry lệnh + round-trip với Office thật
 tests/ui/                     render wizard thiết lập (Windows) ra ảnh từng bước để soi giao diện
 tests/oracle/*-mcp/            bản đối chiếu (oracle) cho test parity MCP

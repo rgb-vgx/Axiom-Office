@@ -31,7 +31,7 @@ Thứ tự làm: **H3 → H2 → H4 → H1** (H5 hoãn).
 | H2 | `CommandWorker` (lệnh trên thread STA riêng, `HOST_BUSY` sau 120 s, lệnh xếp hàng bị bỏ không chạy muộn); `HostDialogs` báo nội dung hộp thoại; Core dùng lại session quá hạn khi bridge trả đúng `pid` (`FindWoken`); model client phát hiện máy vừa thức (đồng hồ thực nhảy) và thử lại (`model/resume.go`) | Live test hộp thoại modal thật; benchmark có cho máy ngủ giữa chừng |
 | H3 | `wpp.listSlides` (C#) đọc bảng `[table RxC]`, nhóm, tiêu đề biểu đồ; bộ chấm có `readGap` (baseline: khác 0 ở `s05`, `s09`, `s13`) | Live test khứ hồi ghi → đọc; đo lại `readGap` sau khi build |
 | H4 | Sổ đối tượng của lượt (`tools/owned.go`): xoá slide/shape do lượt tạo không phải hỏi, số slide dịch theo khi xoá; `wpp.addTable` trả tên shape; `slides_from_brief` cũng ghi sổ | Benchmark `interactive=false` không còn slide trống thừa |
-| H5 | Hoãn (một backend) | Làm cùng WPS |
+| H5 | **31/10/2026, phần tool:** tool gọi lệnh bridge trực tiếp khai `Required`/`Optional` (`core-go/internal/tools/needs.go`); Core ẩn tool khi catalog của phiên thiếu lệnh `Required` (cả ở chế độ lập kế hoạch); `needs_test.go` buộc mọi lệnh trong mã nguồn tool được khai; bảng tool bị ẩn trên WPS sinh tự động (`docs/architecture/wps-bridge.md` §6) | Mức **tham số**: lệnh có nhưng backend bỏ qua một tham số (vd WPS `checkLayout` không báo `overflow`) vẫn chỉ biết lúc gọi |
 | H6 | Quy tắc ghi ở `docs/architecture/core.md` mục 9.1 | — | H3 nhỏ và sửa ngay một lỗi chất lượng đã thấy. H2 và H4 gỡ những chỗ làm
 hỏng phép đo. H1 lớn nhất nên làm sau, khi bộ đo đã đáng tin. H6 là quy tắc áp cho mọi lệnh mới, kể cả lệnh của S0.
 

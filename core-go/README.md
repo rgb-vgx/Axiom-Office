@@ -86,10 +86,10 @@ AXIOM_E2E_CORE_EXE=/duong/dan/axiom-core python tests/core/test_core_e2e.py --on
 | `internal/office` | `Office/SessionDirectory.cs`, `Office/BridgeClient.cs` |
 | `internal/skills` | `Skills/SkillIndex.cs`, `SkillLoader.cs` (phần quy tắc file nằm trong `Tools/SkillTools.cs`) |
 | `internal/policy` | `Agent/PolicyEngine.cs` (tách riêng gói để `tools` và `agent` dùng chung, không vòng import) |
-| `internal/tools` | `Tools/ITool.cs`, `OfficeActionTool.cs`, `SkillTools.cs` |
+| `internal/tools` | `Tools/ITool.cs`, `OfficeActionTool.cs`, `SkillTools.cs`. Thêm sau: các tool lớn (`slides_from_brief`, `slides_from_template`, `doc_design`, `doc_from_brief`, `dashboard_from_data`, `trace_formula`...) và **hợp đồng lệnh** `needs.go` — tool gọi lệnh bridge trực tiếp khai `Required`/`Optional`, Core ẩn tool khi catalog của phiên thiếu lệnh `Required`; `needs_test.go` buộc mọi lệnh trong mã nguồn tool phải được khai |
 | `internal/agent` | `Agent/Orchestrator.cs`, `RunManager.cs`, `RunEventStream.cs`, `PolicyEngine.cs` (phần xác nhận), `PromptBuilder.cs`, `ContextAssembler.cs` |
 | `internal/api` | `Api/CoreApi.cs`, `CoreApiGuard.cs`, `ApiJson.cs`, `SetupEndpoints.cs`, `RunEndpoints.cs`, `SkillEndpoints.cs`. Thêm sau khi bỏ .NET: `log.go` (`GET /v1/log`), `quickactions.go` (`GET /v1/quick-actions`), và kênh `/wps/*` cho add-in WPS Linux — `wps.go` (file add-in, poll/result, runs), `wpsadmin.go` (`routeBoth`, status, exec, config), `wpspane.go` (menu chuột phải → khung chat) |
-| `internal/wpsbridge` | **mới, không có bản .NET**: bridge WPS Linux (cổng riêng 47861) — add-in JS poll Core, Core giao lệnh (`docs/architecture/wps-bridge.md`) |
+| `internal/wpsbridge` | **mới, không có bản .NET**: bridge WPS Linux — add-in JS poll Core, Core giao lệnh. Mỗi tiến trình WPS (client) một phiên: client đầu giữ cổng 47861, client sau có cổng + file session riêng; phát hiện WPS đã đóng giữa lệnh qua `/proc` (`docs/architecture/wps-bridge.md` §2.4, §6) |
 | `internal/doctor` | **mới**: subcommand `doctor` — chẩn đoán một lượt chạy, in báo cáo chữ thường để dán vào chat/email |
 | `internal/cfb` | **mới**: đọc thùng Compound File Binary (OLE2) của `.xls`/`.doc`/`.ppt` đời cũ, không cần LibreOffice |
 | `internal/store` | `Memory/CoreDb.cs`, `ConversationStore.cs`, `RunStore.cs`, `Api/CoreStores.cs` |

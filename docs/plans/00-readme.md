@@ -18,7 +18,7 @@ trong code: trạng thái có thể đã đổi.
 | 6 | `05-p4-provider-va-toolset-gon.md` | Registry provider khai báo | Toolset filter phần lớn đã có (chế độ lập kế hoạch) |
 | 7 | `07-p6-audit-va-an-toan-du-lieu.md` | Ẩn thông tin nhạy cảm trong audit, bản chụp để khôi phục | Audit đã có |
 | 8 | `08-p7-ux-trong-app.md` | Dịch nốt giao diện, lỗi tiếng Việt dễ hiểu | Phần lớn đã có |
-| 9 | `09-p8-libreoffice-parity.md` | Các lệnh còn để trống phía LibreOffice | LibreOffice đã chạy 281/281 |
+| 9 | `09-p8-libreoffice-parity.md` | Các lệnh còn để trống phía LibreOffice và WPS Linux | **Phần LibreOffice đóng băng** (25/10/2026, không làm tiếp). Phần WPS: bảng còn thiếu sinh tự động ở `docs/architecture/wps-bridge.md` §6 |
 | 10 | `18-s0-slide-do-va-spec.md` | Slide: bộ đo chất lượng (24 brief) và thiết kế spec + layout solver dùng chung cho slide từ brief và theo mẫu | **Mới.** Bộ đo xong phần chấm, chưa có baseline thật |
 | 11 | `19-h0-nen-tang-ben-vung.md` | Nền tảng bền: lệnh nhắm tài liệu tường minh, bridge không treo vì hộp thoại/máy ngủ, đọc đủ những gì đã ghi, miễn xác nhận cho đối tượng do lượt tạo, năng lực từng backend | **Mới.** Bằng chứng từ benchmark slide 25/10/2026 |
 | 12 | `20-c0-ngu-canh-va-slide.md` | Bàn giao đợt 25/10/2026: bớt ngữ cảnh gửi lại (đo từng vòng, docStateGuard, AppMCP, cache), slide sơ đồ (đi dây, `replace`, nhóm màu), số đo đề thật, cách đo, việc tiếp | **Mới.** Đọc trước khi làm tiếp slide/ngữ cảnh |

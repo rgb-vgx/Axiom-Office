@@ -5,6 +5,46 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — WPS Linux: mở Writer và Spreadsheets cùng lúc thì agent làm nhầm app (31/10/2026)
+
+- **Mỗi tiến trình WPS một phiên bridge** (`core-go/internal/wpsbridge`): add-in gửi `clientId`; client đầu giữ cổng
+  47861 và `<pid>-wps.json`, client sau có cổng + file session riêng. Trước đây cả ba app chung một hàng đợi và `app` =
+  app poll gần nhất, nên agent của pane Writer đọc bảng tính (`docs/audits/wps-linux-live-test-2026-10-28-run2.md` §4.5).
+- Pane, khung chat mini, ribbon gửi `{client, app}` (`/wps/v1/runs`, `/exec`, `/status`, `/pane/events`); Core chọn đúng
+  client (`Bridge.Resolve`). `exec` chỉ từ chối "run-in-progress" khi lượt chạy trên cùng app; relay menu chuột phải
+  chỉ giao cho khung chat của cùng client.
+- Client chính mất kết nối: lệnh chưa giao của nó trả "not sent, safe to retry", không rơi sang app khác.
+- **WPS đóng giữa lệnh**: Core thấy không còn tiến trình WPS (`/proc`) thì báo lỗi trong vài giây thay vì chờ 300 giây.
+- Test: `wpsbridge/multiclient_test.go`, `tests/wps/test_wps_multiapp_e2e.py` (trong `make test-wps-e2e`; Core cũ đỏ).
+  Đo trên WPS 12.1.2 thật: hai app hai phiên, lượt chạy đúng app, WPS chết giữa lệnh báo lỗi sau ~1 giây
+  (`tests/wps/REFERENCE.md`).
+
+### Changed — Core ẩn tool khi bridge thiếu lệnh tool đó gọi (31/10/2026)
+
+- Hợp đồng `core-go/internal/tools/needs.go`: tool gọi lệnh bridge trực tiếp khai `Required`/`Optional`; Core bỏ tool
+  thiếu lệnh `Required` (ghi log `tools hidden for missing bridge commands`), cả trong mô tả của chế độ lập kế hoạch.
+  Trước đây chỉ kiểm một hai lệnh chọn tay (`doc_design` kiểm `writer.insertBlocks` nhưng còn gọi `writer.restyle`).
+  `look_at_document` giờ cần `app.screenshot` (WPS chưa có nên không còn hiện rồi lỗi).
+- `needs_test.go`: mọi lệnh trong mã nguồn tool phải được khai; tool mới gọi bridge trực tiếp phải có hợp đồng.
+
+### Changed — Số liệu WPS trong tài liệu sinh từ code (31/10/2026)
+
+- `scripts/generate_wps_gaps.py` (trong `make check-gen`) sinh bảng "lệnh chưa có handler ở add-in WPS" và "tool Core bị
+  ẩn trên WPS" vào `docs/architecture/wps-bridge.md` §6 và một dòng ở `STATUS.md`, từ `CHUA_CO_HANDLER`,
+  `catalog/live-commands.json` và `tools/needs.go`. Số chép tay trước đó đã lệch (ghi 26, thực tế 51).
+
+### Changed — Đóng băng extension LibreOffice (31/10/2026)
+
+- `make test` và CI Linux không còn chạy LibreOffice (`make test-lo` chạy tay); CI bỏ bước cài LibreOffice và ba bước
+  live vốn `continue-on-error`.
+- `scripts/linux/install.sh` **không còn đòi LibreOffice/Python UNO**: máy chỉ có WPS cài được (trước đây `die` trước cả
+  bước cài Core). Có LibreOffice + Python UNO thì vẫn cài bản đóng băng; `--no-libreoffice` để bỏ. Sửa lỗi thoát mã 2
+  khi gói không có `.oxt` (`pipefail`). README trong gói viết lại cho WPS.
+
+### Removed — Mã chết `estimateLines`, `cardMaxFont` (31/10/2026)
+
+- Hai lỗi staticcheck U1000 cuối cùng; `make lint` sạch.
+
 ### Added — Tính năng theo Claude for Microsoft 365 (27/10/2026)
 
 Theo `docs/research/tinh-nang-con-thieu-so-voi-claude-m365.md` (trạng thái từng mục ở §6). **Lệnh C# mới chưa được

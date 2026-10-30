@@ -347,11 +347,12 @@ flowchart LR
   (port, pid, version, protocol) khi sẵn sàng. Pane đọc `core.json`, hỏi `/health`, chưa có thì
   khởi động `AxiomOffice.Core.exe` cạnh DLL; build/gỡ cài đặt tắt Core qua `/v1/admin/shutdown`
   (Linux: SIGTERM cũng dừng êm).
-- **LibreOffice** (Linux/Windows): extension Python UNO mở ba bridge `:47851` (Writer) /
+- **LibreOffice** (Linux/Windows, **đóng băng** từ 25/10/2026): extension Python UNO mở ba bridge `:47851` (Writer) /
   `:47852` (Calc) / `:47853` (Impress), cùng giao thức và tên lệnh; session file
   `{pid}-{kind}.json`. Chi tiết: [docs/architecture/libreoffice.md](libreoffice.md).
-- **WPS Linux**: JS add-in (`src/AxiomOffice.WPS`) nối long-poll về Core; Core mở bridge `:47861`
-  nói đúng giao thức bridge. Chi tiết: [docs/architecture/wps-bridge.md](wps-bridge.md).
+- **WPS Linux**: JS add-in (`src/AxiomOffice.WPS`) nối long-poll về Core; Core mở bridge nói đúng giao thức bridge,
+  **một phiên cho mỗi tiến trình WPS**: app đầu ở `:47861`, app sau ở cổng do hệ điều hành cấp (31/10/2026). Chi
+  tiết: [docs/architecture/wps-bridge.md](wps-bridge.md) §2.4.
 
 ## 7. Yêu cầu phi chức năng
 
@@ -733,9 +734,10 @@ flowchart LR
 | `et.*` | đọc/ghi nhiều vùng, `fillRange`, chart, conditional format, `checkRange` | `open` |
 | `wpp.*` | slide/text/ảnh/bảng/notes, `checkLayout`, `sourceManifest`, `addSlideFromTemplate`... | `newPresentation`, `open`, `addTextBox` |
 
-Tổng registry C# hiện **77 lệnh** (tăng từ 47 ban đầu sau các đợt template/design/`replaceMany`/khoá vùng chọn); danh sách chuẩn
-nằm ở `catalog/live-commands.json` (gồm cả biến thể LibreOffice/WPS, 80 mục, 57 `agent=true`) và bảng
-*Danh sách lệnh* trong README (sinh bằng `commands --markdown`).
+Danh sách chuẩn nằm ở `catalog/live-commands.json` (31/10/2026: 115 mục, 85 `agent=true` — đếm lại bằng
+`python3 -c "import json;print(len(json.load(open('catalog/live-commands.json'))))"`, đừng chép số vào tài liệu) và bảng
+*Danh sách lệnh* trong README (sinh bằng `commands --markdown`). Lệnh nào nền tảng nào chưa có: bảng sinh tự động ở
+`docs/architecture/wps-bridge.md` §6 (WPS Linux).
 
 ### 14.2 Luồng thực thi
 
@@ -1135,7 +1137,7 @@ flowchart LR
 | Đường dẫn | Nội dung |
 |---|---|
 | `%LOCALAPPDATA%\AxiomOffice\bridge.log` | Log chung add-in và Host, có `[pid N]` từng dòng |
-| `%LOCALAPPDATA%\AxiomOffice\sessions\{pid}.json` | Session registry (mục 16); LibreOffice: `{pid}-{kind}.json`; WPS Linux: `<pid Core>-wps.json` |
+| `%LOCALAPPDATA%\AxiomOffice\sessions\{pid}.json` | Session registry (mục 16); LibreOffice: `{pid}-{kind}.json`; WPS Linux: `<pid Core>-wps.json` (app đầu) và `<pid Core>-wps-<cổng>.json` (mỗi app WPS sau) |
 | `%LOCALAPPDATA%\AxiomOffice\core.json` | Core đang chạy: `pid`, `port`, `version`, `protocol` (xoá khi Core thoát) |
 | `%LOCALAPPDATA%\AxiomOffice\core.log` | Log của Core |
 | `%LOCALAPPDATA%\AxiomOffice\core\core.db` | SQLite (WAL, schema 4): hội thoại, lượt chạy, audit, memory (mục 22.7) |
@@ -1301,8 +1303,15 @@ flowchart TD
 | `load_skill` / `read_skill_file` | `SkillIndex` | Tầng 2/3 của Agent Skills; chặn `..`, symlink, phần mở rộng lạ; ≤ 64KB; file nhị phân trả đường dẫn tuyệt đối (dùng với `writer.open`) |
 | `remember` / `recall` | `MemoryService` | Chỉ ADD qua bộ chống trùng; phát `memory.written` (plan mode bỏ `remember`) |
 | `write_todos` | built-in | Danh sách việc cho task ≥ 3 bước (không có trong plan mode; một lần mỗi reply) |
-| `slides_from_template` | built-in | Dựng lại cả bài theo mẫu theo lô 25 slide (chỉ PowerPoint có `sourceManifest`; báo `Final` để kết thúc ngay khi xong) |
+| `slides_from_template` | built-in | Dựng lại cả bài theo mẫu theo lô 25 slide (báo `Final` để kết thúc ngay khi xong) |
+| `slides_from_brief`, `doc_design`, `doc_from_brief`, `dashboard_from_data`, `trace_formula` | built-in | Tool lớn: Core tự gọi chuỗi lệnh bridge cố định, model chỉ đưa nội dung |
 | `look_at_document` | bridge `app.screenshot` | Chỉ khi `VisualQaEnabled`; ảnh gửi cho model, không vào audit |
+| `other_document` | session registry | Chỉ khi có tài liệu Office khác đang mở |
+
+Tool gọi lệnh bridge **trực tiếp** khai hợp đồng `Required`/`Optional` (`internal/tools/needs.go`); Core bỏ tool khi
+catalog `/commands` của phiên thiếu một lệnh `Required` (ghi log), kể cả trong mô tả của chế độ lập kế hoạch — model
+không bao giờ được giao một tool sẽ hỏng giữa chừng trên backend đó. `needs_test.go` buộc mọi lệnh có trong mã nguồn
+của tool phải được khai.
 | `tavily_search` | Tavily REST | Chỉ khi `TavilyEnabled` và có `TavilyApiKey`; có cả trong plan mode (chỉ đọc web) |
 | `mcp__<server>__<tool>` | `Manager` + `WrapMCPTools` | Server ngoài cần xác nhận trừ khi `trusted`; làn file `office` hỏi khi ghi vào file đã có (plan mode chỉ còn tool đọc) |
 

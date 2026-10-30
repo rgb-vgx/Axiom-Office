@@ -391,3 +391,31 @@ Hai cái bẫy đã dính:
 khởi động bị tự động tắt). Không xóa/sửa file này để "lách"; cách đúng là giữ add-in khởi động nhanh
 (script nhỏ, không làm việc nặng ở top-level). File này không liên quan lỗi 404 ở trên — nó vẫn tồn tại
 trong suốt các lần nạp thành công.
+
+## Nhiều app cùng mở, tiến trình WPS, WPS chết giữa lệnh (đo 31/10/2026, WPS 12.1.2.29182, Ubuntu 24.04)
+
+Máy dev, Xvfb `:99` (`xvfb-run -a`), HOME tạm (`install_jsaddon.py --test-profile`), Core build từ cây làm việc (cổng
+bridge chính 47961 để không đụng Core thật), LLM giả (`tests/core/fake_llm.py`). Kiểm cho
+`docs/architecture/wps-bridge.md` §2.4.
+
+- **`oem.ini` của bản cài này ở dạng mã hoá** (khoá/giá trị đã băm, mục `[support]` chữ thường) và **không có**
+  `JsApiPlugin=true` — vậy mà add-in vẫn nạp: mỗi app hỏi một lần *"Addin "axiomoffice" on "http://127.0.0.1:<cổng>/wps/addin"
+  is loaded for the first time, trust or not?"* (nút OK ở toạ độ 696,461 trên màn 1280x900). Mục 1 ở đầu tệp (đo 08/10 trên
+  bản cũ) và bước kiểm đầu vào của `test_wps_bridge_live.py` / gợi ý `sudo` của `install.sh` giả định cần dòng đó —
+  **chưa đổi**, vì mới đo trên một máy; cần đo thêm trước khi bỏ.
+- **Mỗi app là một tiến trình riêng**: Writer = `/opt/kingsoft/wps-office/office6/wps`, Spreadsheets = `office6/et`.
+  `/usr/bin/wps` là script bash, tiến trình của nó cũng có `comm` = `wps` (cha của binary thật).
+- **`wpsoffice`** (`office6/wpsoffice Run -Entry=EntryPoint .../addons/kcef/libjsapibrowser.so --server`) là máy chủ CEF
+  dùng chung cho JS add-in (kèm nhiều `promecefpluginh`), cha là tiến trình hệ thống (không thuộc cây của app). Nó **tự
+  thoát khi app WPS cuối cùng thoát** — nên "không còn tiến trình WPS nào" (`wpsbridge/process.go`) là tín hiệu dùng được.
+- Hai bản add-in sinh **hai `clientId` khác nhau**; Writer mở trước giữ cổng chính, Sheets nhận cổng riêng + file
+  `<pid>-wps-<cổng>.json`. 10 mẫu `/health` trong 30 giây: mỗi cổng luôn đúng app (trước đây đảo liên tục).
+  `/commands` cổng Sheets: 28 lệnh, chỉ `app.*`/`et.*`.
+- **Khởi động lại Core**: add-in tự nối lại sau vài giây với **cùng `clientId`** (trang add-in sống trong WPS, không nạp lại).
+- Lượt agent từ pane Writer (`{client, app:"wps"}`) chạy trên phiên Writer, `writer.getText` trả nội dung `bao-cao.docx`,
+  model chỉ thấy 17 lệnh `writer.*`; lượt từ pane Sheets chạy trên phiên Sheets, `et.readRange A1:C3` trả dữ liệu thật,
+  model chỉ thấy 23 lệnh `et.*`. `/wps/v1/exec` và `/wps/v1/status?app=&client=` đi đúng app.
+- **Đóng Sheets** (SIGTERM `et`): sau ~50 giây (ngưỡng 45 giây) cổng của nó đóng, file session bị xoá; Writer không ảnh hưởng.
+- **WPS chết giữa lệnh**: `SIGSTOP` Writer, gửi `writer.getText` (add-in nhận job, gọi vào Writer thì treo → `running=true`),
+  rồi `SIGKILL` Writer: `wpsoffice` thoát theo, `/cmd` trả *"WPS closed while running the command; the command may have
+  been applied…"* khoảng 1 giây sau (trước đây treo tới 300 giây). File session cổng chính xoá sau ngưỡng mất kết nối.

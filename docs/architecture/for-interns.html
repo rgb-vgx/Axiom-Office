@@ -374,6 +374,18 @@ footer{
     <h1>Kiến trúc Axiom Office</h1>
     <p class="lede">Axiom Office là trợ lý AI chạy ngay bên trong LibreOffice và WPS. Trang này mô tả hệ thống đang chạy thật hôm nay: có những tiến trình nào, chúng nói chuyện với nhau bằng gì, dữ liệu nằm ở đâu, và vì sao từng mảnh được tách ra như vậy. Đọc hết trang là đủ để mở mã nguồn và sửa.</p>
     <div class="meta">Cập nhật 12/10/2026 · nhánh main · phạm vi Linux: LibreOffice và WPS</div>
+    <div class="meta" style="border:1px solid currentColor;padding:12px 14px;border-radius:8px;margin-top:14px;line-height:1.55">
+      <b>Ảnh chụp ngày 12/10/2026 — đã lỗi thời ở các điểm sau, đọc bản hiện hành
+      <code>docs/onboarding/intern-guide.md</code> trước.</b>
+      (1) LibreOffice <b>đóng băng</b> từ 25/10/2026, không còn trong <code>make test</code>/CI; Linux tập trung vào WPS.
+      (2) Nguồn chuẩn của lệnh bridge là <code>catalog/live-commands.json</code> (không còn là registry Python); số lệnh
+      đã khác — xem bảng sinh tự động ở <code>docs/architecture/wps-bridge.md</code> §6.
+      (3) Bridge WPS có <b>một phiên cho mỗi tiến trình WPS</b> (31/10/2026): app đầu ở 47861, app sau ở cổng riêng.
+      (4) Core ẩn tool khi bridge thiếu lệnh tool cần (<code>core-go/internal/tools/needs.go</code>).
+      (5) Sau ngày này có thêm comment/redline, Track Changes, <code>other_document</code>, PivotTable, trích dẫn bấm được.
+      (6) Trần một lượt nay là 100 vòng và không có trần token mặc định (<code>core-go/internal/agent/orchestrator.go</code>).
+      Các phần về vòng lặp agent, guard, policy, skill, memory, MCP vẫn đúng về nguyên lý.
+    </div>
 
     <div class="figures">
       <div class="fig"><b>4</b><span>tiến trình, 4 nhóm cổng</span></div>

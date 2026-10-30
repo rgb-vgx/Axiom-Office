@@ -1,5 +1,13 @@
 # Thiết kế tích hợp LibreOffice trên Linux
 
+> **ĐÓNG BĂNG.** Extension LibreOffice dừng phát triển từ **25/10/2026**; từ **31/10/2026** nó ra khỏi `make test` và CI
+> (chạy tay: `make test-lo`), và `scripts/linux/install.sh` chỉ cài extension khi máy có sẵn LibreOffice + Python UNO
+> (không còn là điều kiện để cài Axiom trên Linux). Mã nguồn và tệp `.oxt` trong gói được giữ cho người đang dùng.
+> Điều kiện để bản đóng băng còn chạy: **giao thức bridge** (mục 6: `/health`, `/commands`, `/session`, `/cmd`, file
+> session) và **Core API v1** không được đổi theo kiểu phá vỡ — mọi thay đổi chỉ được thêm. Tài liệu dưới đây là thiết
+> kế lúc làm (gồm cả các quyết định .NET đã được thay bằng Core Go — xem `core-go/README.md`), không cập nhật thêm.
+> Trên Linux, nền tảng đang phát triển là **WPS Office for Linux** — `docs/architecture/wps-bridge.md`.
+
 > Trước 20/10/2026 tài liệu này là `LibreOffice_arch.md` ở gốc repo.
 
 Tài liệu thiết kế để đưa Axiom Office sang **LibreOffice trên Linux** (Writer, Calc, Impress), dùng lại

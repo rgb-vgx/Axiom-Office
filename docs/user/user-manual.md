@@ -1,6 +1,6 @@
 # Hướng dẫn sử dụng Axiom Office
 
-Cập nhật: 20/10/2026
+Cập nhật: 31/10/2026
 
 Axiom Office là trợ lý AI làm việc **ngay trong tài liệu bạn đang mở**: bạn gõ yêu cầu ("soạn đơn xin nghỉ phép",
 "tạo bảng điểm 5 học sinh", "làm 5 slide giới thiệu công ty"), AI tự viết, sửa, định dạng trên chính tài liệu đó,
@@ -11,7 +11,11 @@ Axiom Office chạy trên:
 | Nền tảng | Ứng dụng |
 |---|---|
 | **Windows** | Microsoft Word, Excel, PowerPoint (bản 64-bit) · WPS Office cho Windows (64-bit) |
-| **Linux** | WPS Office for Linux · LibreOffice Writer, Calc, Impress |
+| **Linux** | WPS Office for Linux (Writer, Spreadsheets, Presentation) · LibreOffice Writer, Calc, Impress (bản đóng băng — xem dưới) |
+
+> **LibreOffice đã dừng phát triển (đóng băng từ 25/10/2026).** Bản hiện có vẫn cài và dùng được nếu máy có sẵn
+> LibreOffice, nhưng không có tính năng mới và không được kiểm thử thường xuyên nữa. Trên Linux, nên dùng **WPS
+> Office for Linux**.
 
 Phần lớn tính năng giống nhau trên mọi nơi; chỗ nào khác nhau, hướng dẫn ghi rõ. Bảng tổng hợp ở
 [mục 11](#11-tính-năng-theo-từng-nền-tảng).
@@ -41,8 +45,9 @@ Bạn cần:
   Google Gemini. Bạn cần **địa chỉ máy chủ**, **tên model** và (thường) một **khoá truy cập**. Không rõ thì hỏi
   bộ phận IT.
 - **Windows:** Windows 10/11 64-bit, Office hoặc WPS **bản 64-bit**. Không cần quyền quản trị.
-- **Linux:** WPS Office for Linux và/hoặc LibreOffice cài từ kho của hệ điều hành (gói `.deb`/`.rpm`). Bản
-  LibreOffice dạng **Snap hoặc Flatpak không dùng được**.
+- **Linux:** WPS Office for Linux 12 (cài vào `/opt/kingsoft/wps-office`). **Không cần LibreOffice.** Nếu máy có
+  LibreOffice cài từ kho của hệ điều hành (gói `.deb`/`.rpm`, kèm Python UNO) thì trình cài tự cài thêm bản
+  LibreOffice đóng băng; LibreOffice dạng **Snap hoặc Flatpak không dùng được**.
 
 ---
 
@@ -61,21 +66,21 @@ Muốn chắc Office là bản 64-bit trước khi cài: mở PowerShell, chạy
 
 ### 2.2 Trên Linux
 
-1. Cài các gói cần thiết (Ubuntu/Debian):
+1. (Tuỳ chọn) cất khoá AI vào kho khoá của hệ thống thay vì tệp cấu hình:
 
    ```bash
-   sudo apt install -y libreoffice python3-uno
-   sudo apt install -y libsecret-tools   # tuỳ chọn: cất khoá AI vào kho khoá của hệ thống
+   sudo apt install -y libsecret-tools
    ```
 
-2. **Đóng LibreOffice và WPS**, giải nén gói `axiom-office-linux-x64-<phiên bản>.tar.gz`, rồi trong thư mục đó:
+2. **Đóng WPS** (và LibreOffice nếu có), giải nén gói `axiom-office-linux-x64-<phiên bản>.tar.gz`, rồi trong thư mục đó:
 
    ```bash
    ./install.sh --systemd
    ```
 
-   `--systemd` cho Axiom Office chạy nền ngay từ khi bạn đăng nhập — **nên dùng nếu bạn dùng WPS**, vì WPS phải
-   mở *sau* khi phần nền của Axiom Office đã chạy. Có thể điền sẵn máy chủ AI ngay lúc cài:
+   `--systemd` cho Axiom Office chạy nền ngay từ khi bạn đăng nhập — **nên dùng với WPS**, vì WPS phải mở *sau* khi
+   phần nền của Axiom Office đã chạy. Máy có LibreOffice mà bạn không muốn cài kèm bản LibreOffice: thêm
+   `--no-libreoffice`. Có thể điền sẵn máy chủ AI ngay lúc cài:
    `./install.sh --systemd --endpoint <địa chỉ> --model <tên model> --api-key -` (dấu `-` nghĩa là gõ khoá ở dòng
    tiếp theo, khoá không bị lưu trong lịch sử lệnh).
 
@@ -89,7 +94,9 @@ sao lưu tệp `~/.local/share/axiom-office/core/core.db` trước.)
 ### 2.3 Kiểm tra đã cài xong
 
 - **Word / Excel / PowerPoint / WPS:** trên ribbon có tab **Axiom Office**.
-- **LibreOffice:** trên thanh menu có mục **Axiom Office**, và ở thanh bên (sidebar) có thẻ *Axiom Office*.
+- **LibreOffice (nếu đã cài kèm):** trên thanh menu có mục **Axiom Office**, và ở thanh bên (sidebar) có thẻ *Axiom Office*.
+- **Mở cùng lúc nhiều ứng dụng WPS** (ví dụ Writer và Spreadsheets): mỗi ứng dụng có khung chat riêng, và AI làm
+  việc trên đúng tài liệu của khung chat bạn đang gõ.
 
 Không thấy? Xem [mục 10](#10-khi-có-sự-cố).
 
