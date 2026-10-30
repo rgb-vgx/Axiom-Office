@@ -20,7 +20,10 @@ func testBridge(t *testing.T, mutate func(*Options)) *Bridge {
 	if mutate != nil {
 		mutate(&opts)
 	}
-	return New(opts)
+	b := New(opts)
+	// Test khong nhin /proc that (may chay test co the khong mo WPS): mac dinh "khong biet".
+	b.appAlive = func(string) (bool, bool) { return false, false }
+	return b
 }
 
 // Quyet dinh xac thuc kenh add-in: Origin dung cua Core thi qua, Origin la thi 403, khong Origin

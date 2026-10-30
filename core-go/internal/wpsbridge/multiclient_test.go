@@ -220,3 +220,83 @@ func TestSecondaryClientIsDroppedAfterDisconnect(t *testing.T) {
 		}
 	}
 }
+
+// WPS dong giua luc chay lenh (khong con tien trinh nao): bao loi trong vai giay, khong cho het CmdWaitSeconds, va van
+// canh bao lenh co the da ghi.
+func TestInFlightCommandFailsFastWhenWPSIsGone(t *testing.T) {
+	b := testBridge(t, func(o *Options) { o.DisconnectSeconds = 1; o.CmdWaitSeconds = 60 })
+	b.appAlive = func(string) (bool, bool) { return false, true }
+	b.recordPoll(map[string]any{})
+	started := time.Now()
+	replyCh := make(chan map[string]any, 1)
+	go func() {
+		reply, _ := b.Enqueue("et.importCsv", map[string]any{})
+		replyCh <- reply
+	}()
+	if jobs := takeJobsWithin(t, b, 3*time.Second); len(jobs) != 1 {
+		t.Fatalf("khong lay duoc job: %v", jobs)
+	}
+	select {
+	case reply := <-replyCh:
+		message := textOf(reply["error"])
+		if !strings.Contains(message, "WPS closed") || !strings.Contains(message, "may have been applied") {
+			t.Fatalf("phai bao WPS da dong va canh bao lenh co the da ghi: %q", message)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("WPS da dong thi phai bao loi trong vai giay")
+	}
+	if waited := time.Since(started); waited > 5*time.Second {
+		t.Fatalf("cho qua lau: %v", waited)
+	}
+}
+
+// WPS con chay (hoac khong biet) thi lenh dai van duoc cho - khong cat ngang lenh dang ghi.
+func TestInFlightCommandWaitsWhileWPSIsRunning(t *testing.T) {
+	for _, alive := range []func(string) (bool, bool){
+		func(string) (bool, bool) { return true, true },
+		func(string) (bool, bool) { return false, false },
+	} {
+		b := testBridge(t, func(o *Options) { o.DisconnectSeconds = 1; o.CmdWaitSeconds = 60 })
+		b.appAlive = alive
+		b.recordPoll(map[string]any{})
+		replyCh := make(chan map[string]any, 1)
+		go func() {
+			reply, _ := b.Enqueue("et.importCsv", map[string]any{})
+			replyCh <- reply
+		}()
+		jobs := takeJobsWithin(t, b, 3*time.Second)
+		time.Sleep(2200 * time.Millisecond)
+		select {
+		case reply := <-replyCh:
+			t.Fatalf("lenh dang chay khong duoc bi cat: %v", reply)
+		default:
+		}
+		b.Complete(jobs[0].ID, map[string]any{"ok": true})
+		<-replyCh
+	}
+}
+
+// Doc /proc: tim thay tien trinh WPS theo ten; khong co /proc thi "khong biet".
+func TestWPSAppAliveReadsProc(t *testing.T) {
+	root := t.TempDir()
+	old := procRoot
+	procRoot = root
+	t.Cleanup(func() { procRoot = old })
+	write := func(pid, comm string) {
+		_ = os.MkdirAll(filepath.Join(root, pid), 0o755)
+		_ = os.WriteFile(filepath.Join(root, pid, "comm"), []byte(comm+"\n"), 0o644)
+	}
+	write("10", "bash")
+	write("self", "wps")
+	if alive, known := wpsAppAlive("wps"); alive || !known {
+		t.Fatalf("khong co tien trinh WPS -> (false, true), duoc (%v, %v)", alive, known)
+	}
+	write("42", "et")
+	if alive, known := wpsAppAlive("wps"); !alive || !known {
+		t.Fatalf("con tien trinh WPS -> (true, true), duoc (%v, %v)", alive, known)
+	}
+	procRoot = filepath.Join(root, "khong-co")
+	if _, known := wpsAppAlive("wps"); known {
+		t.Fatal("khong doc duoc /proc -> khong biet")
+	}
+}

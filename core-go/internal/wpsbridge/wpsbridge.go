@@ -145,6 +145,9 @@ type Bridge struct {
 	bridgeServer   *http.Server
 	bridgePort     int
 
+	// appAlive: tien trinh cua app nay con chay khong (known=false: khong biet, vd khong co /proc) - process.go.
+	appAlive func(app string) (alive, known bool)
+
 	stopCh   chan struct{}
 	stopOnce sync.Once
 	stopped  atomic.Bool
@@ -170,6 +173,7 @@ func New(opts Options) *Bridge {
 		clients:    map[string]*Client{},
 		stopCh:     make(chan struct{}),
 		bridgePort: opts.BridgePort,
+		appAlive:   wpsAppAlive,
 	}
 	b.primary = &Client{
 		b: b, primary: true, app: "wps", waiting: map[string]*Job{}, started: b.started,
@@ -432,7 +436,7 @@ func (c *Client) Enqueue(action string, params map[string]any) (map[string]any, 
 
 	// Add-in mat ket noi giua chung (nguoi dung dong WPS) thi bao loi ngay, khong treo toi CmdWaitSeconds.
 	// Lenh da giao cho add-in (dang chay) thi bo qua luat disconnect: add-in don luong khong the vua
-	// chay vua poll, chi het gio theo CmdWaitSeconds.
+	// chay vua poll, chi het gio theo CmdWaitSeconds - tru khi tien trinh cua app da mat han (appGone).
 	timeout := time.NewTimer(time.Duration(cmdWait) * time.Second)
 	defer timeout.Stop()
 	ticker := time.NewTicker(time.Second)
@@ -447,8 +451,13 @@ func (c *Client) Enqueue(action string, params map[string]any) (map[string]any, 
 		case <-ticker.C:
 			b.mu.Lock()
 			sent := !job.sentAt.IsZero()
+			app := c.app
 			b.mu.Unlock()
 			if sent {
+				if c.appGone(app) {
+					c.forget(job)
+					return map[string]any{"ok": false, "error": "WPS closed while running the command; the command may have been applied - check the document before retrying"}, true
+				}
 				continue
 			}
 			if !c.Connected() {
