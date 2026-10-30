@@ -101,6 +101,9 @@ COMMANDS = [
     {"name": "et.save", "kind": "et", "agent": False, "summary": "luu", "params": []},
     {"name": "et.saveAs", "kind": "et", "agent": True, "summary": "luu thanh file", "params": [{"name": "path", "required": True, "hint": None}]},
     {"name": "writer.closeAll", "kind": "wps", "agent": False, "summary": "dong het", "params": []},
+    # Add-in that (Windows CommandCatalog.All, WPS khi co handler) khai ca lenh agent=false; Core chi dua
+    # look_at_document khi bridge co app.screenshot (core-go/internal/tools/needs.go).
+    {"name": "app.screenshot", "kind": None, "agent": False, "summary": "anh chup trang", "params": []},
 ]
 
 

@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -149,7 +150,7 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 	list := []tools.Tool{officeTool}
 	// Truy vet cong thuc (chi doc, co ca o lap ke hoach): lam o Core tren et.readRanges/et.sheetInfo nen theo duoc tham chieu
 	// sang sheet khac tren moi backend (tools/trace_formula.go).
-	if appKind == "et" && catalog.Has("et.readRanges") && catalog.Has("et.sheetInfo") {
+	if appKind == "et" {
 		list = append(list, tools.NewTraceFormulaTool())
 	}
 	if !readOnly {
@@ -214,6 +215,12 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 	// Tai lieu Office khac dang mo (other_document.go): chi gui tool khi co - luot mot tai lieu khong ton them chu.
 	if others := o.otherSessions(ctx, session); len(others) > 0 {
 		list = append(list, tools.NewOtherDocumentTool(others, readOnly, o.BusyPort))
+	}
+	// Tool goi lenh bridge truc tiep ma backend nay thieu lenh bat buoc thi bo (tools/needs.go): dua cho model mot
+	// tool se hong giua chung la de no sua do mot nua tai lieu.
+	list, hidden := tools.WithCommands(list, catalog.Has)
+	if len(hidden) > 0 {
+		corelog.Info("run %s: tools hidden for missing bridge commands: %s", run.ID, describeHidden(hidden))
 	}
 	registry := tools.NewRegistry(list)
 
@@ -534,32 +541,51 @@ func (o *Orchestrator) otherSessions(ctx context.Context, current *office.Sessio
 // MO TA qua PlanCapabilities, de ke hoach dung dung lenh se co khi chay).
 func (o *Orchestrator) actTools(appKind string, catalog *office.CommandCatalog, request *Request) []tools.Tool {
 	list := []tools.Tool{}
-	// Dung lai ca bai theo mau tung lo (docs/architecture/template-design.md muc 6.6): chi trinh chieu, va chi khi
-	// bridge co lenh doc bai nguon (PowerPoint; LibreOffice/WPS chua co).
-	if appKind == "wpp" && catalog.Has("wpp.sourceManifest") {
+	// Tool nao chi dung khi bridge co du lenh no goi: loc chung o prepareExecution theo tools.CommandNeeds, o day
+	// chi chon theo app va tinh huong.
+	//
+	// Dung lai ca bai theo mau tung lo (docs/architecture/template-design.md muc 6.6): chi trinh chieu.
+	if appKind == "wpp" {
 		list = append(list, tools.NewSlidesFromTemplateTool())
 	}
 	// Dung slide moi tu brief (docs/plans/18-s0 M4): Core tinh vi tri theo luoi + tokens, model chi viet chu.
-	if appKind == "wpp" && catalog.Has("wpp.addParagraphs") {
+	if appKind == "wpp" {
 		list = append(list, tools.NewSlidesFromBriefTool(o.Skills))
 	}
-	// Trinh bay lai tai lieu Word theo mau (khoi bo tron nen nhat): chi khi bridge co lenh dung khoi. Dang khoa vung
-	// boi den thi khong mo (doc_design trinh bay lai ca tai lieu, bridge se tu choi).
+	// Trinh bay lai tai lieu Word theo mau (khoi bo tron nen nhat). Dang khoa vung boi den thi khong mo (doc_design
+	// trinh bay lai ca tai lieu, bridge se tu choi).
 	locked := request.Document != nil && request.Document.SelectionLocked
-	if appKind == "wps" && !locked && catalog.Has("writer.insertBlocks") {
+	if appKind == "wps" && !locked {
 		list = append(list, tools.NewDocDesignTool())
 	}
 	// Van ban moi theo loai, dung the thuc NĐ 30 (plan 21 P3): can bang dan trang dinh dang tung dong (Office Windows).
-	if appKind == "wps" && !locked && catalog.Has("writer.insertLayoutTable") && catalog.Has("writer.writeContent") {
+	if appKind == "wps" && !locked {
 		list = append(list, tools.NewDocFromBriefTool())
 	}
 	// Dashboard tu bang du lieu co san (plan 21 P3): o KPI la cong thuc, bieu do doc thang sheet du lieu.
-	if appKind == "et" && catalog.Has("et.addChart") && catalog.Has("et.formatRange") {
+	if appKind == "et" {
 		list = append(list, tools.NewDashboardFromDataTool())
 	}
 	// Danh sach viec (write_todos): chi khi lam that - lap ke hoach da tra ve ke hoach bang chu.
 	list = append(list, tools.NewTodoTool())
-	return list
+	// Loc ngay o day (khong chi o prepareExecution): che do lap ke hoach mo ta cac tool nay cho model
+	// (PlanCapabilities), khong duoc hua mot tool backend khong chay duoc.
+	kept, _ := tools.WithCommands(list, catalog.Has)
+	return kept
+}
+
+// describeHidden: "doc_design (writer.restyle), look_at_document (app.screenshot)" - theo ten tool cho on dinh.
+func describeHidden(hidden map[string][]string) string {
+	names := make([]string, 0, len(hidden))
+	for name := range hidden {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	parts := make([]string, 0, len(names))
+	for _, name := range names {
+		parts = append(parts, name+" ("+strings.Join(hidden[name], ", ")+")")
+	}
+	return strings.Join(parts, ", ")
 }
 
 // roundKinds: dem vong KHONG goi tool theo ly do ("final 1, nudge:verify 1") - log de biet vong nao la thua.

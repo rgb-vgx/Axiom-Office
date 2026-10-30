@@ -11,6 +11,7 @@ import (
 func planCatalog() *office.CommandCatalog {
 	return &office.CommandCatalog{Version: "1.0.0", Commands: []office.Command{
 		{Name: "wpp.listSlides", Kind: "wpp", Agent: true},
+		{Name: "wpp.addSlide", Kind: "wpp", Agent: true},
 		{Name: "wpp.checkLayout", Kind: "wpp", Agent: true},
 		{Name: "wpp.addShape", Kind: "wpp", Agent: true},
 		{Name: "wpp.addConnector", Kind: "wpp", Agent: true},
@@ -26,6 +27,7 @@ func TestPlanCapabilitiesListsWriteActionsAndActTools(t *testing.T) {
 	catalog := planCatalog()
 	text := PlanCapabilities(tools.NewOfficeActionTool(catalog, "wpp"), o.actTools("wpp", catalog, &Request{}))
 	for _, want := range []string{"WHEN THE USER RUNS THE PLAN", "do not call them now", "wpp.addShape", "wpp.addConnector",
+		"wpp.addSlide",
 		"Tool slides_from_brief: "} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("thieu %q: %s", want, text)
@@ -46,7 +48,7 @@ func TestPlanCapabilitiesEmptyWhenNothingToAdd(t *testing.T) {
 	}
 }
 
-// actTools giu dieu kien cu: slides_from_brief chi cho PowerPoint co wpp.addParagraphs, doc_design khong mo khi dang
+// actTools: slides_from_brief chi cho PowerPoint co du lenh no goi (tools.CommandNeeds), doc_design khong mo khi dang
 // khoa vung boi den, write_todos luon co.
 func TestActToolsConditions(t *testing.T) {
 	o := &Orchestrator{}
@@ -60,9 +62,18 @@ func TestActToolsConditions(t *testing.T) {
 	if got := names(o.actTools("wpp", planCatalog(), &Request{})); got != "slides_from_brief,"+tools.TodoToolName {
 		t.Fatalf("wpp: %s", got)
 	}
-	writer := &office.CommandCatalog{Commands: []office.Command{{Name: "writer.insertBlocks", Kind: "wps", Agent: true}}}
+	writer := &office.CommandCatalog{Commands: []office.Command{{Name: "writer.insertBlocks", Kind: "wps", Agent: true},
+		{Name: "writer.restyle", Kind: "wps", Agent: true}, {Name: "writer.outline", Kind: "wps", Agent: true},
+		{Name: "writer.getText", Kind: "wps", Agent: true}}}
 	if got := names(o.actTools("wps", writer, &Request{})); !strings.HasPrefix(got, "doc_design,") {
 		t.Fatalf("wps: %s", got)
+	}
+	// Truoc 31/10/2026 Core chi kiem writer.insertBlocks: backend co insertBlocks ma thieu writer.restyle van nhan
+	// doc_design, roi tool hong giua chung sau khi da sua mot nua tai lieu.
+	partial := &office.CommandCatalog{Commands: []office.Command{{Name: "writer.insertBlocks", Kind: "wps", Agent: true},
+		{Name: "writer.outline", Kind: "wps", Agent: true}, {Name: "writer.getText", Kind: "wps", Agent: true}}}
+	if got := names(o.actTools("wps", partial, &Request{})); strings.Contains(got, "doc_design") {
+		t.Fatalf("thieu writer.restyle thi khong duoc dua doc_design: %s", got)
 	}
 	locked := &Request{Document: &DocumentContext{SelectionLocked: true}}
 	if got := names(o.actTools("wps", writer, locked)); got != tools.TodoToolName {
