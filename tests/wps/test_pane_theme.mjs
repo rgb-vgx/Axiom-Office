@@ -270,7 +270,7 @@ test("main.js: paneUrl() mang ?app=<kind>; pane.html doc lai", () => {
   }
   context.ribbon.OnAction({ Id: "axiomAskAI" });
   assert.equal(created.length, 1, "phai goi Application.CreateTaskPane");
-  assert.equal(created[0].url, "http://127.0.0.1:47840/wps/addin/pane.html?app=et",
-    "pane trong Spreadsheets phai duoc mo voi ?app=et (goi y dung loai tai lieu)");
+  assert.match(created[0].url, /^http:\/\/127\.0\.0\.1:47840\/wps\/addin\/pane\.html\?app=et&client=c[0-9a-z]+$/,
+    "pane trong Spreadsheets phai duoc mo voi ?app=et (goi y dung loai tai lieu) va client id cua add-in");
   if (context.AxiomBridge) { context.AxiomBridge.stop(); }
 });

@@ -12,6 +12,13 @@
 
   // ?quick=<id>: muc chon tu menu chuot phai - chay ngay khi mo. Khong co = "Hoi AI ve doan nay" (cho chon/go).
   var QUICK = "";
+  // CLIENT: id add-in cua Writer mo khung nay (main.js: miniUrl lay tu paneUrl, co ?client=).
+  var CLIENT = "";
+  try {
+    var mcl = /[?&]client=([A-Za-z0-9_-]+)(?:&|$)/.exec(textOf(window.location && window.location.search));
+    if (mcl) { CLIENT = mcl[1]; }
+  } catch (eC) { CLIENT = ""; }
+
   try {
     var mq = /[?&]quick=([a-z]+)/.exec(textOf(window.location && window.location.search));
     if (mq) { QUICK = mq[1]; }
@@ -25,6 +32,7 @@
       EventSource: window.EventSource,
       base: baseUrl(),
       kind: "wps",
+      client: CLIENT,
       requireSelection: true,
       onChange: render
     });

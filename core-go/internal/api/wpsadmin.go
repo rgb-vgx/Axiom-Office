@@ -44,7 +44,10 @@ func mapWPSAdmin(mux *http.ServeMux, deps *Deps) {
 		if !checkWPSAuth(w, r, deps) {
 			return
 		}
-		OK(w, map[string]any{"addin": deps.WPS.Status(), "core": coreStatus(deps)})
+		// ?client=&app=: trang thai cua dung app dang mo pane (WPS co the mo ca ba app, moi app mot phien).
+		query := r.URL.Query()
+		client := deps.WPS.Resolve(query.Get("client"), query.Get("app"))
+		OK(w, map[string]any{"addin": client.Status(), "core": coreStatus(deps)})
 	})
 
 	// POST /wps/v1/exec {action, params}: goi thang mot lenh bridge, khong qua agent, khong ton token.
@@ -68,20 +71,25 @@ func mapWPSAdmin(mux *http.ServeMux, deps *Deps) {
 		if raw, ok := body["params"].(map[string]any); ok {
 			params = raw
 		}
-		// Luot chay dang chay: lenh ngoai se chen vao giua cac buoc cua agent (add-in chay tuan tu nen
-		// khong hong du lieu, nhung agent mat dung trang thai tai lieu no dang theo doi).
+		if body == nil {
+			body = map[string]any{}
+		}
+		client := wpsClientOf(deps, body)
+		// Luot chay dang chay TREN APP NAY: lenh ngoai se chen vao giua cac buoc cua agent (add-in chay tuan tu
+		// nen khong hong du lieu, nhung agent mat dung trang thai tai lieu no dang theo doi). Luot cua app WPS
+		// khac (cong khac) khong lien quan.
 		//
 		// Hai ca 409 duoi day mang ma may doc duoc: pane hien cau tieng Viet rieng cho tung ca
 		// (pane.html: execError) thay vi do chuoi tieng Anh cua Core.
-		if deps.Manager != nil && deps.Manager.Running() > 0 {
+		if deps.Manager != nil && deps.Manager.BusyPort(client.Port()) {
 			ErrorCode(w, http.StatusConflict, "run-in-progress", "a run is in progress: wait for it to finish")
 			return
 		}
-		if !deps.WPS.Connected() {
+		if !client.Connected() {
 			ErrorCode(w, http.StatusConflict, "addin-disconnected", "WPS add-in is not connected: open a document in WPS to connect the add-in")
 			return
 		}
-		reply, ok := deps.WPS.Enqueue(action, params)
+		reply, ok := client.Enqueue(action, params)
 		if !ok {
 			ErrorCode(w, http.StatusConflict, "addin-disconnected", "WPS add-in is not connected: open a document in WPS to connect the add-in")
 			return

@@ -11,6 +11,8 @@
   var actOf = Dom.actOf;
 
   var KIND = "wps";
+  // CLIENT: id add-in cua app mo pane nay (main.js: ?client=) - Core dung de chon dung app khi WPS mo nhieu app.
+  var CLIENT = "";
   var VIEW = "";
   var VIEW_CHECK = "";
   var VIEW_DO = "";
@@ -19,6 +21,8 @@
     try { search = window.location ? window.location.search : ""; } catch (e0) { search = ""; }
     var m = /[?&]app=(wps|et|wpp)(?:&|$)/.exec(search || "");
     if (m) { KIND = m[1]; }
+    var mcl = /[?&]client=([A-Za-z0-9_-]+)(?:&|$)/.exec(search || "");
+    if (mcl) { CLIENT = mcl[1]; }
     // ?view=<ten>: ribbon mo thang mot man hinh phu (main.js: paneUrl). Danh sach nay phai khop
     // main.js:VIEWS - mot ten o do ma khong co o day thi nut ribbon mo ra pane trong.
     // "conversations" chi co o day: no nam trong menu "..." cua pane, ribbon khong co nut rieng.
@@ -40,6 +44,7 @@
       EventSource: window.EventSource,
       base: baseUrl(),
       kind: KIND,
+      client: CLIENT,
       onChange: render
     });
   } catch (e5) {
@@ -422,6 +427,11 @@
   var view = { name: "", busy: false, note: "", scope: "all", data: null, fields: null,
     check: "", todo: "", lines: 0, detail: "" };
 
+  // targetQuery: ?app=&client= cua pane cho GET status (Core tra trang thai cua dung app nay).
+  function targetQuery() {
+    return "?app=" + encodeURIComponent(KIND) + (CLIENT ? "&client=" + encodeURIComponent(CLIENT) : "");
+  }
+
   function api(path, method, body) {
     var opts = { method: method || "GET", headers: {} };
     if (body) {
@@ -484,7 +494,8 @@
   function listenPane() {
     try {
       if (VIEW || KIND !== "wps" || !ctl || typeof window.EventSource !== "function") { return; }
-      var source = new window.EventSource(baseUrl() + "pane/events");
+      // ?client=: chi nhan yeu cau tu ribbon cua CUNG ban add-in (api/wpspane.go) - app WPS khac co khung chat rieng.
+      var source = new window.EventSource(baseUrl() + "pane/events" + (CLIENT ? "?client=" + encodeURIComponent(CLIENT) : ""));
       source.addEventListener("pane.quick", function (evt) {
         var id = "";
         try {
@@ -574,7 +585,7 @@
       return;
     }
     if (name === "status") {
-      api("status").then(function (reply) {
+      api("status" + targetQuery()).then(function (reply) {
         if (view.name !== "status") { return; }
         var result = resultOf(reply);
         view.busy = false;
@@ -1665,7 +1676,7 @@
     view.data = null;
     view.note = "";
     renderView();
-    api("exec", "POST", { action: view.check, params: {} }).then(function (reply) {
+    api("exec", "POST", { action: view.check, params: {}, app: KIND, client: CLIENT }).then(function (reply) {
       if (view.name !== "check") { return; }
       var result = resultOf(reply);
       view.busy = false;

@@ -3,7 +3,9 @@
  *
  * Dinh nghia global AxiomPaneCore.create(options):
  *   options = { fetch, EventSource, base: "<...>/wps/v1/", kind: "wps"|"et"|"wpp", onChange(state),
- *               requireSelection? }  - requireSelection: moi luot gui kem options.requireSelection (khung chat mini canh
+ *               client?, requireSelection? }  - client: id add-in cua app dang mo pane (main.js gui qua URL ?client=);
+ *               moi POST runs/exec gui kem {client, app: kind} de Core chay tren DUNG app khi WPS mo nhieu app.
+ *                 - requireSelection: moi luot gui kem options.requireSelection (khung chat mini canh
  *               doan boi den - mini.html): Core dung ngay neu khong co doan boi den, khong sua ca tai lieu.
  *   state   = { messages: [{role: "user"|"assistant"|"error"|"info", text}],
  *               running, steps: [{action, ok, error?}],
@@ -208,6 +210,7 @@
     var Source = options.EventSource;
     var base = safeString(options.base);
     var kind = trimText(options.kind) || "wps";
+    var client = trimText(options.client);
     var requireSelection = options.requireSelection === true;
     var onChange = options.onChange;
     if (typeof onChange !== "function") {
@@ -686,6 +689,7 @@
         emit();
         try {
           if (state.conversationId) { body.conversationId = state.conversationId; }
+          addTarget(body);
           if (requireSelection) {
             body.options = body.options || {};
             body.options.requireSelection = true;
@@ -876,11 +880,20 @@
       } catch (e) {}
     }
 
+    // addTarget: gan app (va client id neu co) cua pane vao body gui Core - Core chon dung phien WPS (api/wps.go).
+    function addTarget(body) {
+      try {
+        body.app = kind;
+        if (client) { body.client = client; }
+      } catch (e) {}
+      return body;
+    }
+
     // POST base+"exec": goi thang mot lenh bridge, khong qua agent (Core: /wps/v1/exec). Tra {ok, error?, result?}.
     function exec(action, params) {
       var req = null;
       try {
-        req = postJson(fetchFn, base + "exec", { action: action, params: params || {} });
+        req = postJson(fetchFn, base + "exec", addTarget({ action: action, params: params || {} }));
       } catch (e) {
         req = null;
       }

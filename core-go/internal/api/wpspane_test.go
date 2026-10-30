@@ -10,13 +10,13 @@ func TestPaneRelay(t *testing.T) {
 	relay := newPaneRelay()
 	now := time.Now()
 
-	if request, _ := relay.take(now); request != nil {
+	if request, _ := relay.take("", now); request != nil {
 		t.Fatalf("chua co gi ma da co yeu cau: %+v", request)
 	}
 
 	// Khung chat dang cho thi duoc danh thuc khi co yeu cau.
-	_, wake := relay.take(now)
-	if listening := relay.push("polish", now); listening != 0 {
+	_, wake := relay.take("", now)
+	if listening := relay.push("", "polish", now); listening != 0 {
 		t.Fatalf("chua khung chat nao nghe, duoc %d", listening)
 	}
 	select {
@@ -26,37 +26,59 @@ func TestPaneRelay(t *testing.T) {
 	}
 
 	// Giao dung MOT lan: khung chat thu hai khong chay lai cung muc do.
-	if request, _ := relay.take(now); request == nil || request.quickAction != "polish" {
+	if request, _ := relay.take("", now); request == nil || request.quickAction != "polish" {
 		t.Fatalf("phai lay duoc polish, duoc %+v", request)
 	}
-	if request, _ := relay.take(now); request != nil {
+	if request, _ := relay.take("", now); request != nil {
 		t.Fatal("yeu cau da giao thi khong giao lan nua")
 	}
 
 	// Bam lien hai muc: muc sau thang (chi chay viec nguoi dung chon CUOI).
-	relay.push("polish", now)
-	relay.push("shorten", now)
-	if request, _ := relay.take(now); request == nil || request.quickAction != "shorten" {
+	relay.push("", "polish", now)
+	relay.push("", "shorten", now)
+	if request, _ := relay.take("", now); request == nil || request.quickAction != "shorten" {
 		t.Fatalf("muc sau phai thang, duoc %+v", request)
 	}
 
 	// Khung chat moi nap trong vai giay van lay duoc; qua han thi bo - nguoi dung da khong con cho.
-	relay.push("fix", now)
-	if request, _ := relay.take(now.Add(paneRequestTTL - time.Second)); request == nil {
+	relay.push("", "fix", now)
+	if request, _ := relay.take("", now.Add(paneRequestTTL-time.Second)); request == nil {
 		t.Fatal("con han phai lay duoc")
 	}
-	relay.push("fix", now)
-	if request, _ := relay.take(now.Add(paneRequestTTL + time.Second)); request != nil {
+	relay.push("", "fix", now)
+	if request, _ := relay.take("", now.Add(paneRequestTTL+time.Second)); request != nil {
 		t.Fatal("qua han phai bo")
 	}
-	if request, _ := relay.take(now); request != nil {
+	if request, _ := relay.take("", now); request != nil {
 		t.Fatal("yeu cau qua han phai bi xoa, khong nam cho")
 	}
 
 	relay.listen(1)
 	relay.listen(1)
 	relay.listen(-1)
-	if listening := relay.push("fix", now); listening != 1 {
+	if listening := relay.push("", "fix", now); listening != 1 {
 		t.Fatalf("dem khung chat dang nghe sai: %d", listening)
+	}
+}
+
+// Writer va ET cung mo khung chat: yeu cau cua Writer chi toi khung chat Writer; yeu cau khong ghi client (ban cu) va
+// khung chat khong ghi client (ban cu) van dung nhu truoc.
+func TestPaneRelayRoutesByClient(t *testing.T) {
+	relay := newPaneRelay()
+	now := time.Now()
+	relay.push("w1", "polish", now)
+	if request, _ := relay.take("e1", now); request != nil {
+		t.Fatalf("khung chat ET khong duoc lay yeu cau cua Writer: %+v", request)
+	}
+	if request, _ := relay.take("w1", now); request == nil || request.quickAction != "polish" {
+		t.Fatalf("khung chat Writer phai lay duoc: %+v", request)
+	}
+	relay.push("", "fix", now)
+	if request, _ := relay.take("e1", now); request == nil || request.quickAction != "fix" {
+		t.Fatalf("yeu cau khong ghi client -> khung chat nao cung lay: %+v", request)
+	}
+	relay.push("w1", "shorten", now)
+	if request, _ := relay.take("", now); request == nil || request.quickAction != "shorten" {
+		t.Fatalf("khung chat ban cu (khong client) van lay duoc: %+v", request)
 	}
 }

@@ -55,6 +55,7 @@ test-wps:
 test-wps-e2e: core-build
 	AXIOM_E2E_CORE_EXE=$(CURDIR)/dist/core/axiom-core python3 tests/wps/test_wps_bridge_e2e.py
 	AXIOM_E2E_CORE_EXE=$(CURDIR)/dist/core/axiom-core python3 tests/wps/test_wps_pane_e2e.py
+	AXIOM_E2E_CORE_EXE=$(CURDIR)/dist/core/axiom-core python3 tests/wps/test_wps_multiapp_e2e.py
 
 core-build:
 	mkdir -p dist/core

@@ -14,6 +14,19 @@
   var CLIENT = "wps-jsaddon";
   var RETRY_MS = 2000;
 
+  // CLIENT_ID: dinh danh ban add-in nay (moi tien trinh WPS - Writer, Spreadsheets, Presentation - nap mot ban rieng).
+  // Core cap cho moi client mot phien bridge (cong + file session) rieng, nen mo ca Writer va ET cung luc thi agent
+  // van lam dung app (core-go/internal/wpsbridge). Gui kem moi poll va truyen cho pane/khung chat mini qua ?client=.
+  var CLIENT_ID = newClientId();
+
+  function newClientId() {
+    var random = "";
+    try { random = Math.random().toString(36).substring(2, 10); } catch (e) { random = "0"; }
+    var stamp = "";
+    try { stamp = new Date().getTime().toString(36); } catch (e2) { stamp = "0"; }
+    return "c" + stamp + random;
+  }
+
   var running = false;
 
   // Mot task pane cho MOI man hinh (khoa la ten man hinh, "" = khung chat). Khung chat phai dung lai
@@ -44,10 +57,10 @@
       var clean = String(href).split("#")[0].split("?")[0];
       var idx = clean.lastIndexOf("/");
       if (idx >= 0) {
-        return clean.substring(0, idx + 1) + "pane.html?app=" + kind + suffix;
+        return clean.substring(0, idx + 1) + "pane.html?app=" + kind + "&client=" + CLIENT_ID + suffix;
       }
     } catch (e2) {}
-    return "pane.html?app=" + kind + suffix;
+    return "pane.html?app=" + kind + "&client=" + CLIENT_ID + suffix;
   }
 
   // An moi pane khac: nguoi dung chi lam viec voi mot man hinh mot luc, va mot pane bi bo quen ma van
@@ -325,6 +338,7 @@
     try {
       body = {
         client: CLIENT,
+        clientId: CLIENT_ID,
         app: currentAppKind(),
         version: VERSION,
         document: currentDocument(),
@@ -506,7 +520,7 @@
   function runQuick(quickAction) {
     openPane("", "", "");
     try {
-      postJson(endpoint("pane/request"), { quickAction: quickAction }).then(null, function () { return null; });
+      postJson(endpoint("pane/request"), { quickAction: quickAction, client: CLIENT_ID }).then(null, function () { return null; });
     } catch (e) {}
   }
 

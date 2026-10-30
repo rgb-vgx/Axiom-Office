@@ -132,12 +132,12 @@ test("footer: 'Hoan tac luot nay' chay writer.undo {count}, 'Chen tra loi' chen 
   pane.click("undoBtn");
   await tick();
   assert.deepEqual(calls.find((c) => c.url === BASE + "exec").body,
-    { action: "writer.undo", params: { count: 2 } });
+    { action: "writer.undo", params: { count: 2 }, app: "wps" });
   assert.match(pane.text("chat"), /Đã hoàn tác 2 thao tác của lượt vừa rồi\./);
   pane.click("insertBtn");
   await tick();
   const execs = calls.filter((c) => c.url === BASE + "exec");
-  assert.deepEqual(execs[1].body, { action: "writer.insertStyledText", params: { text: "Xong rồi" } });
+  assert.deepEqual(execs[1].body, { action: "writer.insertStyledText", params: { text: "Xong rồi" }, app: "wps" });
   assert.equal(pane.text("statusText"), "Đã chèn vào tài liệu");
 });
 
@@ -352,7 +352,8 @@ const STATUS = { ok: true, result: {
 test("man hinh Trang thai: mot loi goi tra ca tang add-in lan tang Core", async () => {
   const { pane, calls } = paneWith({ "GET /status": [200, STATUS] }, { search: "?app=wps&view=status" });
   await tick();
-  assert.equal(calls.filter((c) => c.url === BASE + "status").length, 1, "pane khong tu hoi bridge (khac cong)");
+  assert.equal(calls.filter((c) => c.url === BASE + "status?app=wps").length, 1,
+    "pane khong tu hoi bridge (khac cong); hoi trang thai cua DUNG app minh");
   const shown = pane.text("view");
   assert.match(shown, /✓ Add-in: đang trả lời ở cổng 47861 \(phiên bản 0\.1\.0\)\./);
   assert.match(shown, /Tài liệu: bao-cao\.docx/);
@@ -364,6 +365,12 @@ test("man hinh Trang thai: mot loi goi tra ca tang add-in lan tang Core", async 
   assert.match(shown, /Kỹ năng: 12 \(1 thư mục nạp lỗi\)/);
   assert.match(shown, /API URL: http:\/\/127\.0\.0\.1:47861\/health/);
   assert.match(shown, /Nhật ký: \/root\/\.local\/share\/axiomoffice\/core\.log/);
+});
+
+test("pane co ?client=: hoi trang thai mang app + client id (Core tra trang thai cua dung app WPS)", async () => {
+  const { calls } = paneWith({ "GET /status": [200, STATUS] }, { search: "?app=et&client=cabc123&view=status" });
+  await tick();
+  assert.equal(calls.filter((c) => c.url === BASE + "status?app=et&client=cabc123").length, 1);
 });
 
 test("man hinh Trang thai: add-in tat va Core loi bo nho thi noi ro, khong bia", async () => {
@@ -451,7 +458,7 @@ test("man hinh Soat: chay dung lenh trong ?check= va doc bao cao bang tieng Viet
   await tick();
   assert.equal(pane.byId("view").hasAttribute("hidden"), false);
   assert.deepEqual(calls.find((c) => c.url === BASE + "exec").body,
-    { action: "writer.checkTables", params: {} }, "nut Soat bang chay dung lenh cua no");
+    { action: "writer.checkTables", params: {}, app: "wps", client: "" }, "nut Soat bang chay dung lenh cua no");
   const shown = pane.text("view");
   assert.match(shown, /Soát bảng/);
   assert.match(shown, /3 bảng trong tài liệu/);
@@ -754,7 +761,7 @@ test("chuot phai: khung chat Writer nghe pane/events; nhan pane.quick -> chay mu
   source.emit("pane.quick", { quickAction: "fix" });
   await tick();
   const posts = calls.filter((c) => c.method === "POST" && c.url.endsWith("/runs"));
-  assert.deepEqual(posts[1].body, { quickAction: "fix", conversationId: "c1" }, "giu hoi thoai dang mo");
+  assert.deepEqual(posts[1].body, { quickAction: "fix", conversationId: "c1", app: "wps" }, "giu hoi thoai dang mo");
   assert.match(pane.text("chat"), /Sửa lỗi chính tả/, "bong bong hien NHAN cua muc");
 });
 

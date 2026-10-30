@@ -87,34 +87,36 @@ func (b *Bridge) ServePoll(w http.ResponseWriter, r *http.Request) {
 	if body == nil {
 		body = map[string]any{}
 	}
-	b.recordPoll(body)
-	b.maybeWriteSession(false)
+	client, needsListener := b.recordPoll(body)
+	if needsListener {
+		b.openClientListener(client)
+	}
+	client.maybeWriteSession(false)
 
+	// Moi poll tra kem cong bridge cua client: add-in khong dung toi, nhung nhin vao la biet app nao o cong nao.
+	reply := func(jobs []*Job) {
+		writeOK(w, map[string]any{"jobs": jobItems(jobs), "port": client.Port()})
+	}
 	deadline := time.Now().Add(time.Duration(b.opts.PollSeconds) * time.Second)
 	for {
-		jobs := b.takeJobs()
+		jobs := client.takeJobs()
 		if len(jobs) > 0 {
-			writeOK(w, map[string]any{"jobs": jobItems(jobs)})
+			reply(jobs)
 			return
 		}
 		if time.Now().After(deadline) || time.Until(deadline) <= 0 {
-			writeOK(w, map[string]any{"jobs": []any{}})
+			reply(nil)
 			return
 		}
 		select {
 		case <-b.stopCh:
-			writeOK(w, map[string]any{"jobs": []any{}})
+			reply(nil)
 			return
 		case <-time.After(50 * time.Millisecond):
 		}
 		if time.Now().After(deadline) {
 			// Kiem tra lan cuoi truoc khi het gio: lenh co the vua vao hang doi.
-			jobs := b.takeJobs()
-			if len(jobs) > 0 {
-				writeOK(w, map[string]any{"jobs": jobItems(jobs)})
-				return
-			}
-			writeOK(w, map[string]any{"jobs": []any{}})
+			reply(client.takeJobs())
 			return
 		}
 	}

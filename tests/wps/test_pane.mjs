@@ -192,7 +192,9 @@ test("ribbon co nut Ask AI; bam mo task pane pane.html va dung lai lan sau", () 
   ctx.ribbon.OnAction({ Id: "axiomAskAI" });
   assert.equal(created.length, 1, "phai goi Application.CreateTaskPane");
   // Application gia khong co Name -> appKind mac dinh "wps" (xem AxiomCommands.appKind).
-  assert.equal(created[0].url, "http://127.0.0.1:47840/wps/addin/pane.html?app=wps");
+  // ?client=<id cua ban add-in nay>: pane gui lai cho Core de chay tren DUNG app khi WPS mo nhieu app.
+  const paneClient = /^http:\/\/127\.0\.0\.1:47840\/wps\/addin\/pane\.html\?app=wps&client=(c[0-9a-z]+)$/.exec(created[0].url);
+  assert.ok(paneClient, "url pane: " + created[0].url);
   assert.equal(created[0].Visible, true);
   created[0].Visible = false;
   ctx.ribbon.OnAction({ Id: "axiomAskAI" });
@@ -322,7 +324,7 @@ test("Hoan tac luot nay: exec <kind>.undo {count}, xong thi thoi dem", async () 
   await h.pane.undoLastTurn();
   const call = h.calls.find((c) => c.url === BASE + "exec");
   assert.ok(call, "phai POST /wps/v1/exec");
-  assert.deepEqual(call.body, { action: "writer.undo", params: { count: 2 } });
+  assert.deepEqual(call.body, { action: "writer.undo", params: { count: 2 }, app: "wps" });
   assert.equal(h.state.edits, 0);
   assert.equal(h.state.canUndo, false, "hoan tac roi thi thoi hien nut");
   const last = h.state.messages[h.state.messages.length - 1];
@@ -342,7 +344,7 @@ test("Hoan tac luot nay: dung undoSteps cua Core (da tru lan agent tu undo), kho
   assert.equal(h.state.edits, 1, "Core bao con 1 buoc cua luot - khong lui vao noi dung co tu truoc");
   await h.pane.undoLastTurn();
   const call = h.calls.find((c) => c.url === BASE + "exec");
-  assert.deepEqual(call.body, { action: "writer.undo", params: { count: 1 } });
+  assert.deepEqual(call.body, { action: "writer.undo", params: { count: 1 }, app: "wps" });
 });
 
 test("Hoan tac (bang tinh): noi ro thao tac WPS chua hoan tac duoc thay vi im lang", async () => {
@@ -355,7 +357,7 @@ test("Hoan tac (bang tinh): noi ro thao tac WPS chua hoan tac duoc thay vi im la
   FakeSource.last.emit("run.completed", { data: { reply: "Xong", seconds: 2 } });
   await tick();
   await h.pane.undoLastTurn();
-  assert.deepEqual(h.calls.find((c) => c.url === BASE + "exec").body, { action: "et.undo", params: { count: 2 } });
+  assert.deepEqual(h.calls.find((c) => c.url === BASE + "exec").body, { action: "et.undo", params: { count: 2 }, app: "et" });
   const last = h.state.messages[h.state.messages.length - 1];
   assert.match(last.text, /Đã hoàn tác 1 thao tác/);
   assert.match(last.text, /1 thao tác chưa hoàn tác được/);
@@ -383,7 +385,7 @@ test("Chen tra loi: exec writer.insertStyledText {text} (chi o Word)", async () 
   assert.equal(h.state.canInsert, true);
   await h.pane.insertReply();
   const call = h.calls.find((c) => c.url === BASE + "exec");
-  assert.deepEqual(call.body, { action: "writer.insertStyledText", params: { text: "**Kính gửi** anh" } });
+  assert.deepEqual(call.body, { action: "writer.insertStyledText", params: { text: "**Kính gửi** anh" }, app: "wps" });
   assert.equal(h.state.status, "Đã chèn vào tài liệu");
   const excel = harness({}, null, "et");
   await excel.pane.send("A");
@@ -610,7 +612,7 @@ test("quick(id): POST runs {quickAction} khong kem prompt, tin nhan hien NHAN cu
   await h.pane.quick("polish");
   await tick();
   const post = h.calls.find((c) => c.method === "POST");
-  assert.deepEqual(post.body, { quickAction: "polish" },
+  assert.deepEqual(post.body, { quickAction: "polish", app: "wps" },
     "chi gui id: cau lenh do Core lay, va lenh nhanh khong di cung lap ke hoach");
   assert.deepEqual(h.state.messages[0], { role: "user", text: "Trau chuốt" });
   assert.equal(h.state.running, true);
@@ -620,7 +622,7 @@ test("quick(id): POST runs {quickAction} khong kem prompt, tin nhan hien NHAN cu
   await h.pane.quick("summarize");
   await tick();
   assert.deepEqual(h.calls.filter((c) => c.method === "POST").pop().body,
-    { quickAction: "summarize", conversationId: "c9" }, "luot sau giu hoi thoai");
+    { quickAction: "summarize", conversationId: "c9", app: "wps" }, "luot sau giu hoi thoai");
 });
 
 test("run.failed kind 'selection'/'selection-lock' -> cau tieng Viet rieng, khong phai chuoi cua Core", async () => {
@@ -696,15 +698,45 @@ test("menu chuot phai: muc quick:<id> -> hien khung chat (dung lai cai dang mo) 
   ctx.ribbon.OnAction({ Id: "axiomQuick_polish_t" });
   assert.equal(created.length, 1, "dung lai khung chat dang mo - giu nguyen hoi thoai");
   assert.equal(created[0].Visible, true, "khung chat phai hien ra");
-  assert.deepEqual(posts, [{ url: "http://127.0.0.1:47840/wps/v1/pane/request", body: { quickAction: "polish" } }]);
+  // client: id cua ban add-in nay - Core chi giao yeu cau cho khung chat cua CUNG app (api/wpspane.go).
+  const client = /[?&]client=(c[0-9a-z]+)/.exec(created[0].url)[1];
+  assert.deepEqual(posts, [{ url: "http://127.0.0.1:47840/wps/v1/pane/request", body: { quickAction: "polish", client } }]);
   ctx.ribbon.OnAction({ Tag: "quick:summarize" });
-  assert.deepEqual(posts[1].body, { quickAction: "summarize" });
+  assert.deepEqual(posts[1].body, { quickAction: "summarize", client });
   assert.equal(ctx.ribbon.OnGetImage({ Id: "axiomQuick_polish_t" }), "", "muc con: chuoi rong, khong phai duong dan 404");
   assert.equal(ctx.ribbon.OnGetImage({ Id: "axiomCtxQuick_t" }), "images/quickMenu.svg");
   if (ctx.AxiomBridge) { ctx.AxiomBridge.stop(); }
 });
 
 // ---- Menu chuot phai -> khung chat mini (mini.html) bang Application.ShowDialog; khong co ShowDialog thi khung lon.
+// Moi ban add-in (moi tien trinh WPS) co mot client id: poll gui no, pane mo ra mang dung id do (?client=), va hai ban
+// add-in khac nhau thi id khac nhau - Core nho vay tach phien Writer/ET (core-go/internal/wpsbridge).
+test("client id: poll gui clientId, pane mang dung id do; hai ban add-in khac id", () => {
+  const ids = [];
+  for (let i = 0; i < 2; i++) {
+    const polls = [];
+    const created = [];
+    const ctx = load(["probe.js", "commands.js", "main.js"], {
+      Application: { CreateTaskPane(url) { const pane = { url, Visible: false }; created.push(pane); return pane; } },
+      location: { href: "http://127.0.0.1:47840/wps/addin/index.html" },
+      fetch: (url, options = {}) => {
+        if (String(url).endsWith("/poll")) { polls.push(JSON.parse(options.body)); }
+        return new Promise(() => {});
+      },
+    });
+    ctx.ribbon.OnAddinLoad();
+    ctx.ribbon.OnAction({ Id: "axiomAskAI" });
+    assert.equal(polls.length, 1, "OnAddinLoad phai poll ngay");
+    const id = polls[0].clientId;
+    assert.match(String(id), /^c[0-9a-z]+$/, "poll phai gui clientId");
+    assert.equal(polls[0].client, "wps-jsaddon", "client van la loai add-in (khong doi hop dong cu)");
+    assert.equal(/[?&]client=([^&]+)/.exec(created[0].url)[1], id, "pane phai mang dung client id cua poll");
+    ids.push(id);
+    ctx.AxiomBridge.stop();
+  }
+  assert.notEqual(ids[0], ids[1], "hai ban add-in phai khac client id");
+});
+
 function mainWith(app, ratio = 1) {
   const posts = [];
   const ctx = load(["probe.js", "commands.js", "main.js"], {
@@ -728,13 +760,15 @@ test("chuot phai: co ShowDialog -> mo khung chat mini canh doan boi den (khong m
   };
   const { ctx, posts } = mainWith(app, 2);
   ctx.ribbon.OnAction({ Id: "axiomQuick_polish_t", Tag: "quick:polish" });
-  assert.deepEqual(dialogs[0], { url: "http://127.0.0.1:47840/wps/addin/mini.html?app=wps&quick=polish",
-    title: "Sửa bằng AI", w: 880, h: 760, modal: false }, "kich thuoc nhan devicePixelRatio nhu SDK");
+  const mini = /^http:\/\/127\.0\.0\.1:47840\/wps\/addin\/mini\.html\?app=wps&client=(c[0-9a-z]+)&quick=polish$/.exec(dialogs[0].url);
+  assert.ok(mini, "khung mini mang ?client= cua add-in de Core chay dung app: " + dialogs[0].url);
+  assert.deepEqual({ ...dialogs[0], url: "" }, { url: "", title: "Sửa bằng AI", w: 880, h: 760, modal: false },
+    "kich thuoc nhan devicePixelRatio nhu SDK");
   assert.equal(panes.length, 0, "khung mini thay cho khung lon");
   assert.equal(posts.length, 0, "khong di vong qua Core khi da mo duoc khung mini");
   // "Hoi AI ve doan nay": khung mini trong, cho chon/go.
   ctx.ribbon.OnAction({ Id: "axiomCtxAsk_l", Tag: "askAi" });
-  assert.equal(dialogs[1].url, "http://127.0.0.1:47840/wps/addin/mini.html?app=wps");
+  assert.equal(dialogs[1].url, "http://127.0.0.1:47840/wps/addin/mini.html?app=wps&client=" + mini[1]);
   // Nut Ask AI tren ribbon (cung tag askAi) van mo khung chat LON.
   ctx.ribbon.OnAction({ Id: "axiomAskAI", Tag: "askAi" });
   assert.equal(panes.length, 1);
@@ -751,7 +785,7 @@ test("chuot phai: ShowDialog loi -> quay ve khung chat lon + Core chuyen muc (kh
   const { ctx, posts } = mainWith(app);
   ctx.ribbon.OnAction({ Id: "axiomQuick_fix_t", Tag: "quick:fix" });
   assert.equal(panes.length, 1);
-  assert.deepEqual(posts, [{ quickAction: "fix" }]);
+  assert.deepEqual(posts, [{ quickAction: "fix", client: /[?&]client=(c[0-9a-z]+)/.exec(panes[0].url)[1] }]);
   ctx.ribbon.OnAction({ Id: "axiomCtxAsk_t", Tag: "askAi" });
   assert.equal(panes[0].Visible, true, "Hoi AI ve doan nay: khung lon hien ra");
   if (ctx.AxiomBridge) { ctx.AxiomBridge.stop(); }
@@ -767,7 +801,7 @@ test("trich dan: citationCommand -> lenh goto; gotoCitation POST /exec, loi thi 
   assert.equal(h.ctx.AxiomPaneCore.citationCommand("ghi chú"), null);
   assert.equal(await h.pane.gotoCitation("§9"), false);
   const call = h.calls.find((c) => c.url === BASE + "exec");
-  assert.deepEqual(call.body, { action: "writer.goto", params: { paragraph: 9 } });
+  assert.deepEqual(call.body, { action: "writer.goto", params: { paragraph: 9 }, app: "wps" });
   const last = h.state.messages[h.state.messages.length - 1];
   assert.match(last.text, /Không nhảy tới được §9/);
 });

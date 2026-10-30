@@ -58,7 +58,7 @@ test("mo tu menu chuot phai (?quick=polish): chay NGAY muc do, bat buoc doan boi
     "?app=wps&quick=polish");
   await tick();
   assert.equal(runs().length, 1, "mo ra la chay, khong bat nguoi dung bam them");
-  assert.deepEqual(runs()[0].body, { quickAction: "polish", options: { requireSelection: true } });
+  assert.deepEqual(runs()[0].body, { quickAction: "polish", options: { requireSelection: true }, app: "wps" });
   assert.match(pane.text("miniBody"), /Trau chuốt/);
   assert.equal(pane.byId("miniStop").hasAttribute("hidden"), false, "dang chay thi co nut Dung");
   assert.equal(pane.byId("miniSend").disabled, true);
@@ -73,7 +73,7 @@ test("mo tu 'Hoi AI ve doan nay': hien chip tu danh sach cua Core; bam chip hoac
   assert.deepEqual(chips.map((c) => c.text), ["Trau chuốt", "Sửa lỗi chính tả", "Tóm tắt"]);
   pane.click(chips[1]);
   await tick();
-  assert.deepEqual(runs()[0].body, { quickAction: "fix", options: { requireSelection: true } });
+  assert.deepEqual(runs()[0].body, { quickAction: "fix", options: { requireSelection: true }, app: "wps" });
   pane.emit("run.completed", { reply: "Đã sửa 2 lỗi" });
   await tick();
   // Go them cho CUNG doan: Enter gui, giu hoi thoai, van bat buoc doan boi den (khong sua ca tai lieu).
@@ -81,7 +81,7 @@ test("mo tu 'Hoi AI ve doan nay': hien chip tu danh sach cua Core; bam chip hoac
   press(pane.byId("miniInput"), 13);
   await tick();
   assert.deepEqual(runs()[1].body,
-    { prompt: "Ngắn hơn nữa", conversationId: "c-mini", options: { requireSelection: true } });
+    { prompt: "Ngắn hơn nữa", conversationId: "c-mini", options: { requireSelection: true }, app: "wps" });
   assert.equal(pane.byId("miniInput").value, "", "gui xong thi xoa o nhap");
 });
 
@@ -102,7 +102,7 @@ test("ket qua: buoc thao tac co nhan tieng Viet, tra loi khong lo **, Hoan tac c
   assert.match(pane.text("miniStatus"), /1 thao tác/);
   pane.click("miniUndo");
   await tick();
-  assert.deepEqual(calls.find((c) => c.url === BASE + "exec").body, { action: "writer.undo", params: { count: 1 } });
+  assert.deepEqual(calls.find((c) => c.url === BASE + "exec").body, { action: "writer.undo", params: { count: 1 }, app: "wps" });
 });
 
 test("chua boi den: Core dung (kind 'selection') -> cau tieng Viet, khong lo chuoi tieng Anh", async () => {

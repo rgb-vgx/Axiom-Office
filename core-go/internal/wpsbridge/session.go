@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -15,17 +16,25 @@ import (
 
 // ---- Bridge WPS tren cong rieng ----
 
-// BridgeMux tra ve mux cho listener rieng (/health, /commands, /session, /cmd).
-func (b *Bridge) BridgeMux() *http.ServeMux {
+// BridgeMux tra ve mux cho listener cua cong chinh (/health, /commands, /session, /cmd): moi request phuc vu client
+// dang giu cong chinh luc do.
+func (b *Bridge) BridgeMux() *http.ServeMux { return b.clientMux(b.Primary) }
+
+// clientMux: mux bridge cho mot client - `current` tra client ma request nay phuc vu.
+func (b *Bridge) clientMux(current func() *Client) *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/health", b.serveBridgeHealth)
-	mux.HandleFunc("/health/", b.serveBridgeHealth)
-	mux.HandleFunc("/commands", b.serveBridgeCommands)
-	mux.HandleFunc("/commands/", b.serveBridgeCommands)
-	mux.HandleFunc("/session", b.serveBridgeSession)
-	mux.HandleFunc("/session/", b.serveBridgeSession)
-	mux.HandleFunc("/cmd", b.serveBridgeCmd)
-	mux.HandleFunc("/cmd/", b.serveBridgeCmd)
+	health := func(w http.ResponseWriter, r *http.Request) { current().serveBridgeHealth(w, r) }
+	commands := func(w http.ResponseWriter, r *http.Request) { current().serveBridgeCommands(w, r) }
+	session := func(w http.ResponseWriter, r *http.Request) { current().serveBridgeSession(w, r) }
+	cmd := func(w http.ResponseWriter, r *http.Request) { current().serveBridgeCmd(w, r) }
+	mux.HandleFunc("/health", health)
+	mux.HandleFunc("/health/", health)
+	mux.HandleFunc("/commands", commands)
+	mux.HandleFunc("/commands/", commands)
+	mux.HandleFunc("/session", session)
+	mux.HandleFunc("/session/", session)
+	mux.HandleFunc("/cmd", cmd)
+	mux.HandleFunc("/cmd/", cmd)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if origin := r.Header.Get("Origin"); origin != "" {
 			writeErr(w, http.StatusForbidden, "requests with an Origin header are not allowed")
@@ -36,10 +45,9 @@ func (b *Bridge) BridgeMux() *http.ServeMux {
 	return mux
 }
 
-// StartBridge mo listener bridge; cong ban thi log canh bao va tiep tuc khong co bridge.
-func (b *Bridge) StartBridge() {
-	mux := b.BridgeMux()
-	guarded := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// guardBridge: guard chung cua moi listener bridge (giong bridge LibreOffice).
+func (b *Bridge) guardBridge(mux *http.ServeMux) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 		if code, ok := DecideBridgeAuth(r.Header.Get("Origin"), r.Header.Get("X-Auth-Token"), b.opts.Token, path, r.Method); !ok {
 			if code == http.StatusForbidden {
@@ -60,17 +68,19 @@ func (b *Bridge) StartBridge() {
 		}
 		mux.ServeHTTP(w, r)
 	})
+}
+
+// StartBridge mo listener cong chinh; cong ban thi log canh bao va tiep tuc khong co bridge.
+func (b *Bridge) StartBridge() {
 	listener, err := net.Listen("tcp", "127.0.0.1:"+strconv.Itoa(b.opts.BridgePort))
 	if err != nil {
 		corelog.Info("wps bridge: cannot listen on 127.0.0.1:%d (%s), continuing without the WPS bridge", b.opts.BridgePort, err.Error())
 		return
 	}
+	server := &http.Server{Handler: b.guardBridge(b.BridgeMux()), ReadHeaderTimeout: 10 * time.Second}
 	b.mu.Lock()
 	b.bridgeListener = listener
 	b.bridgePort = listener.Addr().(*net.TCPAddr).Port
-	b.mu.Unlock()
-	server := &http.Server{Handler: guarded, ReadHeaderTimeout: 10 * time.Second}
-	b.mu.Lock()
 	b.bridgeServer = server
 	b.mu.Unlock()
 	go func() {
@@ -79,7 +89,38 @@ func (b *Bridge) StartBridge() {
 	corelog.Info("wps bridge listening on http://127.0.0.1:%d/", b.ActualBridgePort())
 }
 
-// ActualBridgePort tra ve cong bridge dang nghe (hoac cong cau hinh khi chua mo).
+// openClientListener mo cong rieng cho client phu (cong do he dieu hanh cap). Loi thi client van poll duoc nhung
+// khong co phien bridge (khong ghi file session) - log de con tra.
+func (b *Bridge) openClientListener(client *Client) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		corelog.Info("wps bridge: cannot open a port for WPS client %s (%s)", client.ID(), err.Error())
+		return
+	}
+	server := &http.Server{
+		Handler:           b.guardBridge(b.clientMux(func() *Client { return client })),
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+	port := listener.Addr().(*net.TCPAddr).Port
+	b.mu.Lock()
+	if b.stopped.Load() || b.clients[client.id] != client {
+		// Core dang dung, hoac client da bi bo trong luc mo cong.
+		b.mu.Unlock()
+		_ = listener.Close()
+		return
+	}
+	client.listener = listener
+	client.server = server
+	client.port = port
+	client.sessionPath = filepath.Join(b.opts.SessionDir, strconv.Itoa(os.Getpid())+"-wps-"+strconv.Itoa(port)+".json")
+	b.mu.Unlock()
+	go func() {
+		_ = server.Serve(listener)
+	}()
+	corelog.Info("wps bridge: client %s listening on http://127.0.0.1:%d/", client.ID(), port)
+}
+
+// ActualBridgePort tra ve cong chinh dang nghe (hoac cong cau hinh khi chua mo).
 func (b *Bridge) ActualBridgePort() int {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -96,31 +137,30 @@ func (b *Bridge) bridgeVersion() string {
 	return "0.0.0"
 }
 
-func (b *Bridge) serveBridgeHealth(w http.ResponseWriter, r *http.Request) {
+func (c *Client) serveBridgeHealth(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeErr(w, http.StatusNotFound, "not found: "+r.URL.Path)
 		return
 	}
 	writeOK(w, map[string]any{
-		"app": b.bridgeApp(), "family": "wps-linux", "pid": os.Getpid(),
-		"port": b.ActualBridgePort(), "version": b.bridgeVersion(), "connected": b.Connected(),
+		"app": c.App(), "family": "wps-linux", "pid": os.Getpid(),
+		"port": c.Port(), "version": c.b.bridgeVersion(), "connected": c.Connected(),
 	})
 }
 
-func (b *Bridge) serveBridgeCommands(w http.ResponseWriter, r *http.Request) {
+func (c *Client) serveBridgeCommands(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeErr(w, http.StatusNotFound, "not found: "+r.URL.Path)
 		return
 	}
-	_, cmds, addinVersion, connected := b.Snapshot()
-	if !b.everPolled() {
-		_ = connected
+	_, cmds, addinVersion, _ := c.Snapshot()
+	if !c.everPolled() {
 		writeErr(w, http.StatusOK, "WPS add-in has never connected")
 		return
 	}
 	version := addinVersion
 	if version == "" {
-		version = b.bridgeVersion()
+		version = c.b.bridgeVersion()
 	}
 	if cmds == nil {
 		cmds = []any{}
@@ -128,29 +168,23 @@ func (b *Bridge) serveBridgeCommands(w http.ResponseWriter, r *http.Request) {
 	writeOK(w, map[string]any{"version": version, "commands": cmds})
 }
 
-func (b *Bridge) everPolled() bool {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	return b.everPoll
-}
-
-func (b *Bridge) serveBridgeSession(w http.ResponseWriter, r *http.Request) {
+func (c *Client) serveBridgeSession(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		writeErr(w, http.StatusNotFound, "not found: "+r.URL.Path)
 		return
 	}
-	doc, _, _, _ := b.Snapshot()
-	if !b.everPolled() {
+	doc, _, _, _ := c.Snapshot()
+	if !c.everPolled() {
 		writeErr(w, http.StatusOK, "WPS add-in has never connected")
 		return
 	}
 	writeOK(w, map[string]any{
-		"app": b.bridgeApp(), "family": "wps-linux", "port": b.ActualBridgePort(), "pid": os.Getpid(),
+		"app": c.App(), "family": "wps-linux", "port": c.Port(), "pid": os.Getpid(),
 		"document": doc,
 	})
 }
 
-func (b *Bridge) serveBridgeCmd(w http.ResponseWriter, r *http.Request) {
+func (c *Client) serveBridgeCmd(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeErr(w, http.StatusNotFound, "not found: "+r.URL.Path)
 		return
@@ -172,16 +206,25 @@ func (b *Bridge) serveBridgeCmd(w http.ResponseWriter, r *http.Request) {
 	if raw, ok := body["params"].(map[string]any); ok {
 		params = raw
 	}
-	if !b.Connected() {
+	if !c.Connected() {
 		writeErr(w, http.StatusOK, "WPS add-in is not connected: open a document in WPS to connect the add-in")
 		return
 	}
-	reply, _ := b.Enqueue(action, params)
+	reply, ok := c.Enqueue(action, params)
+	if !ok {
+		writeErr(w, http.StatusOK, "WPS add-in is not connected: open a document in WPS to connect the add-in")
+		return
+	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	encoder := json.NewEncoder(w)
 	encoder.SetEscapeHTML(false)
 	_ = encoder.Encode(reply)
+}
+
+// serveBridgeCmd (Bridge): /cmd cua client chinh - duong tuong thich cho test.
+func (b *Bridge) serveBridgeCmd(w http.ResponseWriter, r *http.Request) {
+	b.Primary().serveBridgeCmd(w, r)
 }
 
 // ---- File session ----
@@ -192,54 +235,52 @@ func docKey(doc map[string]any) string {
 	return name + "\x00" + full
 }
 
-// maybeWriteSession ghi file session khi tai lieu doi (goi ngay sau poll).
-func (b *Bridge) maybeWriteSession(force bool) {
-	if !b.Connected() {
+// maybeWriteSession ghi file session khi tai lieu hoac app doi (goi ngay sau poll).
+func (c *Client) maybeWriteSession(force bool) {
+	if !c.Connected() {
 		return
 	}
-	b.mu.Lock()
-	key := docKey(b.document)
-	app := b.app
+	c.b.mu.Lock()
+	key := docKey(c.document)
+	app := c.app
 	if app == "" {
 		app = "wps"
 	}
-	need := force || !b.wroteSession || key != b.lastDocKey || app != b.lastAppKey
-	b.mu.Unlock()
+	need := force || !c.wroteSession || key != c.lastDocKey || app != c.lastAppKey
+	c.b.mu.Unlock()
 	if need {
-		b.writeSession()
+		c.writeSession()
 	}
 }
 
-// writeSession ghi file <pid>-wps.json nguyen tu (temp + rename).
-func (b *Bridge) writeSession() {
+// writeSession ghi file session cua client nguyen tu (temp + rename). Client phu chua co cong thi bo qua.
+func (c *Client) writeSession() {
+	b := c.b
 	b.mu.Lock()
 	doc := map[string]any{}
-	for key, value := range b.document {
+	for key, value := range c.document {
 		doc[key] = value
 	}
-	port := b.bridgePort
-	if port == 0 {
-		port = b.opts.BridgePort
-	}
+	port := c.portLocked()
 	now := time.Now().UTC()
-	app := b.app
+	app := c.app
 	if app == "" {
 		app = "wps"
 	}
 	payload := map[string]any{
 		"pid": os.Getpid(), "app": app, "family": "wps-linux", "port": port,
 		"host": "wps-jsaddon", "version": b.bridgeVersion(),
-		"started":       b.started.Format("2006-01-02T15:04:05.000Z"),
+		"started":       c.started.Format("2006-01-02T15:04:05.000Z"),
 		"lastSeen":      now.Format("2006-01-02T15:04:05.000Z"),
 		"lastSeenEpoch": float64(now.UnixNano()) / 1e9,
 		"document":      doc["name"],
 		"documentPath":  doc["fullName"],
 	}
-	path := b.sessionPath
-	key := docKey(b.document)
+	path := c.sessionPath
+	key := docKey(c.document)
 	b.mu.Unlock()
 
-	if strings.TrimSpace(b.opts.SessionDir) == "" {
+	if strings.TrimSpace(b.opts.SessionDir) == "" || path == "" || port == 0 {
 		return
 	}
 	_ = os.MkdirAll(b.opts.SessionDir, 0o755)
@@ -260,23 +301,29 @@ func (b *Bridge) writeSession() {
 		return
 	}
 	b.mu.Lock()
-	b.lastWrite = time.Now()
-	b.lastDocKey = key
-	b.lastAppKey = app
-	b.wroteSession = true
+	c.lastWrite = time.Now()
+	c.lastDocKey = key
+	c.lastAppKey = app
+	c.wroteSession = true
 	b.mu.Unlock()
 }
 
-// removeSession xoa file session (bo qua loi).
-func (b *Bridge) removeSession() {
-	b.mu.Lock()
-	path := b.sessionPath
-	b.wroteSession = false
-	b.mu.Unlock()
-	_ = os.Remove(path)
+// writeSession (Bridge): file session cua client chinh - duong tuong thich cho test.
+func (b *Bridge) writeSession() { b.Primary().writeSession() }
+
+// removeSession xoa file session cua client (bo qua loi).
+func (c *Client) removeSession() {
+	c.b.mu.Lock()
+	path := c.sessionPath
+	c.wroteSession = false
+	c.b.mu.Unlock()
+	if path != "" {
+		_ = os.Remove(path)
+	}
 }
 
-// StartSessionLoop bat vong lam moi/xoa file session theo trang thai ket noi.
+// StartSessionLoop bat vong lam moi/xoa file session theo trang thai ket noi cua tung client, va bo client phu da
+// mat ket noi (dong cong cua no).
 func (b *Bridge) StartSessionLoop() {
 	go func() {
 		ticker := time.NewTicker(1 * time.Second)
@@ -289,59 +336,97 @@ func (b *Bridge) StartSessionLoop() {
 				if b.stopped.Load() {
 					return
 				}
-				if b.Connected() {
-					b.mu.Lock()
-					need := !b.wroteSession || time.Since(b.lastWrite) >= SessionRefreshSeconds*time.Second
-					b.mu.Unlock()
-					if need {
-						b.writeSession()
-					}
-				} else if b.sessionExists() {
-					b.removeSession()
-				}
+				b.tickSessions()
 			}
 		}
 	}()
 }
 
-func (b *Bridge) sessionExists() bool {
+// tickSessions: mot vong cua StartSessionLoop.
+func (b *Bridge) tickSessions() {
 	b.mu.Lock()
-	path := b.sessionPath
-	wrote := b.wroteSession
+	clients := b.allClientsLocked()
 	b.mu.Unlock()
-	if !wrote {
-		// Van kiem tra file that: co the do lan chay truoc de lai cung pid? Chi xoa khi ta da tung ghi.
-		return wrote
+	for _, client := range clients {
+		if client.Connected() {
+			b.mu.Lock()
+			need := !client.wroteSession || time.Since(client.lastWrite) >= SessionRefreshSeconds*time.Second
+			b.mu.Unlock()
+			if need {
+				client.writeSession()
+			}
+			continue
+		}
+		if client.sessionWritten() {
+			client.removeSession()
+		}
+		if !client.primary {
+			b.dropClient(client)
+		}
 	}
-	_, err := os.Stat(path)
-	return err == nil
 }
 
-// Start khoi dong bridge (listener + vong session).
+// dropClient bo client phu da mat ket noi: dong cong, tra loi cac lenh chua giao.
+func (b *Bridge) dropClient(client *Client) {
+	b.mu.Lock()
+	if b.clients[client.id] == client {
+		delete(b.clients, client.id)
+	}
+	client.failQueuedLocked()
+	server := client.server
+	client.server = nil
+	client.listener = nil
+	b.mu.Unlock()
+	if server != nil {
+		_ = server.Close()
+		corelog.Info("wps bridge: client %s disconnected, port closed", client.ID())
+	}
+}
+
+func (c *Client) sessionWritten() bool {
+	c.b.mu.Lock()
+	defer c.b.mu.Unlock()
+	return c.wroteSession
+}
+
+// Start khoi dong bridge (listener cong chinh + vong session).
 func (b *Bridge) Start() {
 	b.StartBridge()
 	b.StartSessionLoop()
 }
 
-// Stop dung bridge: dong listener rieng, xoa file session.
+// Stop dung bridge: dong moi listener, xoa moi file session, tra loi moi lenh dang cho.
 func (b *Bridge) Stop() {
 	b.stopOnce.Do(func() {
 		b.stopped.Store(true)
 		close(b.stopCh)
 		b.mu.Lock()
-		server := b.bridgeServer
+		servers := []*http.Server{}
+		if b.bridgeServer != nil {
+			servers = append(servers, b.bridgeServer)
+		}
+		clients := b.allClientsLocked()
+		for _, client := range clients {
+			if client.server != nil {
+				servers = append(servers, client.server)
+			}
+		}
 		b.mu.Unlock()
-		if server != nil {
+		for _, server := range servers {
 			// Dong ngay de Core thoat nhanh khi shutdown (khong cho keep-alive).
 			_ = server.Close()
 		}
-		b.removeSession()
-		// Huy cac poll va /cmd dang cho.
+		for _, client := range clients {
+			client.removeSession()
+		}
+		// Huy cac /cmd dang cho.
 		b.mu.Lock()
-		for _, job := range b.waiting {
-			select {
-			case job.wait <- map[string]any{"ok": false, "error": "Core is stopping"}:
-			default:
+		for _, client := range clients {
+			for _, job := range client.waiting {
+				select {
+				case job.wait <- map[string]any{"ok": false, "error": "Core is stopping"}:
+				default:
+				}
 			}
 		}
 		b.mu.Unlock()

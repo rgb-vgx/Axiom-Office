@@ -56,10 +56,6 @@ func mapWPSRuns(mux *http.ServeMux, deps *Deps) {
 			Error(w, http.StatusServiceUnavailable, "memory unavailable: "+deps.Stores.Error)
 			return
 		}
-		if !deps.WPS.Connected() {
-			Error(w, http.StatusConflict, "WPS add-in is not connected: open a document in WPS to connect the add-in")
-			return
-		}
 		body, parsed := readJSON(r)
 		if !parsed {
 			Error(w, http.StatusBadRequest, "invalid JSON body")
@@ -68,13 +64,19 @@ func mapWPSRuns(mux *http.ServeMux, deps *Deps) {
 		if body == nil {
 			body = map[string]any{}
 		}
+		// Pane/khung chat mini gui client id + app cua chinh no: luot chay tren DUNG app do khi WPS mo nhieu app.
+		client := wpsClientOf(deps, body)
+		if !client.Connected() {
+			Error(w, http.StatusConflict, "WPS add-in is not connected: open a document in WPS to connect the add-in")
+			return
+		}
 		// Office do Core tu gan (giong /health, /session cua bridge WPS); pane khong gui office.
 		body["office"] = map[string]any{
-			"port": float64(deps.WPS.ActualBridgePort()), "pid": float64(pid()),
-			"app": "wps", "family": "wps-linux",
+			"port": float64(client.Port()), "pid": float64(pid()),
+			"app": client.App(), "family": "wps-linux",
 		}
-		// Tai lieu do add-in bao trong lan poll gan nhat.
-		if doc, _, _, _ := deps.WPS.Snapshot(); len(doc) > 0 {
+		// Tai lieu do add-in cua client do bao trong lan poll gan nhat.
+		if doc, _, _, _ := client.Snapshot(); len(doc) > 0 {
 			body["document"] = doc
 		}
 		request, problem := agent.ParseRequest(body)
@@ -88,6 +90,16 @@ func mapWPSRuns(mux *http.ServeMux, deps *Deps) {
 		serveStartRun(w, deps, request)
 	})
 	// GET runs/{id}, events, cancel, confirm: dang ky mot lan cho ca /v1 va /wps/v1 bang routeBoth (runs.go).
+}
+
+// wpsClientOf: client WPS ma yeu cau cua pane nham toi - truong "client" (id add-in gui qua URL pane) va "app"
+// trong body, bo ra khoi body truoc khi body di tiep (agent.ParseRequest khong biet hai truong nay).
+func wpsClientOf(deps *Deps, body map[string]any) *wpsbridge.Client {
+	clientID := strings.TrimSpace(textOf(body["client"]))
+	app := strings.TrimSpace(textOf(body["app"]))
+	delete(body, "client")
+	delete(body, "app")
+	return deps.WPS.Resolve(clientID, app)
 }
 
 // checkWPSAuth: xac thuc kenh add-in cho moi endpoint /wps/v1/* (giong wpsbridge.checkWPSAuth: Origin dung
