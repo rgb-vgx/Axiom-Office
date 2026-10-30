@@ -1,19 +1,22 @@
 #!/usr/bin/env bash
-# Cai Axiom Office cho LibreOffice tren Linux (docs/architecture/libreoffice.md giai doan L3) - khong can root.
+# Cai Axiom Office tren Linux (WPS Office for Linux; LibreOffice neu co) - khong can root.
 #
-#   ./install.sh [--endpoint URL] [--model NAME] [--api-key KEY|-] [--systemd] [--no-wps]   cai / nang cap
+#   ./install.sh [--endpoint URL] [--model NAME] [--api-key KEY|-] [--systemd] [--no-wps] [--no-libreoffice]
 #                 (--api-key - = doc khoa tu stdin; --systemd = bat Core chay thuong truc bang systemd --user;
-#                  --no-wps = khong dang ky add-in WPS du may co WPS)
+#                  --no-wps = khong dang ky add-in WPS du may co WPS;
+#                  --no-libreoffice = khong cai extension LibreOffice du may co LibreOffice)
 #   ./install.sh --uninstall [--purge]                                           go (--purge xoa ca cau hinh, du lieu)
 #
 # Chay tu thu muc giai nen cua axiom-office-linux-x64-<ver>.tar.gz (co core/ va *.oxt canh script):
 #   - Agent Core -> ~/.local/share/axiom-office/core (extension tu khoi dong khi can)
-#   - extension -> unopkg cua nguoi dung
+#   - extension -> unopkg cua nguoi dung, CHI KHI may co LibreOffice + Python UNO. Extension LibreOffice DONG BANG tu
+#                  25/10/2026 (khong phat trien tiep - docs/architecture/libreoffice.md): khong co LibreOffice thi bo qua,
+#                  khong con la dieu kien de cai (truoc 31/10/2026 may chi co WPS khong cai duoc).
 #   - cau hinh  -> ~/.config/axiom-office/config.json (quyen 0600; giu khoa cu, chi ghi khoa duoc truyen)
 #   - MCP       -> ~/.local/share/axiom-office/mcp (in san doan cau hinh cho Claude Code/Desktop)
 #   - WPS       -> co /opt/kingsoft/wps-office thi dang ky add-in (Core phuc vu) vao publish.xml cua nguoi dung;
 #                  in huong dan sudo neu oem.ini chua bat JsApiPlugin (khong tu chay sudo)
-# Khong bao gio tat LibreOffice cua nguoi dung: dang chay thi dung lai va nhac dong.
+# Khong bao gio tat LibreOffice cua nguoi dung: dang chay (va sap cai/go extension) thi dung lai va nhac dong.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -32,7 +35,7 @@ UNOPKG="${UNOPKG:-$(command -v unopkg || echo /usr/lib/libreoffice/program/unopk
 # Thu muc cai WPS (test doi bang AXIOM_WPS_ROOT); khong ton tai = khong co WPS.
 WPS_ROOT="${AXIOM_WPS_ROOT:-/opt/kingsoft/wps-office}"
 
-ENDPOINT="" MODEL="" API_KEY="" UNINSTALL=0 PURGE=0 SYSTEMD=0 NOWPS=0
+ENDPOINT="" MODEL="" API_KEY="" UNINSTALL=0 PURGE=0 SYSTEMD=0 NOWPS=0 NOLO=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --endpoint) ENDPOINT="$2"; shift 2 ;;
@@ -42,6 +45,7 @@ while [ $# -gt 0 ]; do
         --uninstall) UNINSTALL=1; shift ;;
         --purge) PURGE=1; shift ;;
         --no-wps) NOWPS=1; shift ;;
+        --no-libreoffice) NOLO=1; shift ;;
         -h|--help) awk 'NR > 1 && /^#/ { print; next } NR > 1 { exit }' "$0"; exit 0 ;;
         *) echo "Tham so la: $1 (xem --help)" >&2; exit 2 ;;
     esac
@@ -189,15 +193,28 @@ unregister_wps_addin() {
     echo "Da go dang ky add-in WPS (giu add-in khac)"
 }
 
+# libreoffice_skip_reason: rong = cai extension LibreOffice; khac rong = ly do bo qua (in cho nguoi dung).
+libreoffice_skip_reason() {
+    [ "$NOLO" = 1 ] && { echo "--no-libreoffice"; return; }
+    [ -n "$1" ] || { echo "goi khong co AxiomOffice-LibreOffice-*.oxt"; return; }
+    [ -x "$UNOPKG" ] || { echo "may khong co LibreOffice (khong thay unopkg)"; return; }
+    # Test ep ket qua kiem Python UNO bang AXIOM_INSTALL_PYTHON_UNO=1|0 (khong phu thuoc may chay test).
+    case "${AXIOM_INSTALL_PYTHON_UNO:-}" in
+        1) ;;
+        0) echo "thieu Python UNO ($PYTHON_UNO_HINT)"; return ;;
+        *) has_python_uno || { echo "thieu Python UNO ($PYTHON_UNO_HINT)"; return; } ;;
+    esac
+    echo ""
+}
+
 install() {
-    local oxt
+    local oxt skip_lo
     # sort -V: 0.10.0 moi hon 0.9.0 (sort thuong xep theo chu -> cai nham ban cu).
-    oxt="$(ls "$HERE"/AxiomOffice-LibreOffice-*.oxt 2>/dev/null | sort -V | tail -1)"
-    [ -n "$oxt" ] || die "khong thay AxiomOffice-LibreOffice-*.oxt canh install.sh"
+    # `|| true`: khong co .oxt thi `ls` tra 2 va pipefail lam ca script thoat (goi khong kem LibreOffice van cai duoc).
+    oxt="$(ls "$HERE"/AxiomOffice-LibreOffice-*.oxt 2>/dev/null | sort -V | tail -1 || true)"
     [ -x "$HERE/core/AxiomOffice.Core" ] || die "khong thay core/AxiomOffice.Core canh install.sh"
-    [ -x "$UNOPKG" ] || die "khong thay unopkg ($UNOPKG) - cai LibreOffice truoc (vd: sudo apt install libreoffice)."
-    has_python_uno || die "thieu Python UNO: $PYTHON_UNO_HINT"
-    assert_libreoffice_closed
+    skip_lo="$(libreoffice_skip_reason "$oxt")"
+    [ -n "$skip_lo" ] || assert_libreoffice_closed
 
     echo "1/4 Agent Core -> $CORE_DIR"
     stop_core
@@ -209,8 +226,12 @@ install() {
     rm -rf "$CORE_DIR"
     mv "$CORE_DIR.new" "$CORE_DIR"
 
-    echo "2/4 Extension LibreOffice ($(basename "$oxt"))"
-    "$UNOPKG" add --force "$oxt"
+    if [ -z "$skip_lo" ]; then
+        echo "2/4 Extension LibreOffice ($(basename "$oxt")) - ban dong bang, khong phat trien tiep"
+        "$UNOPKG" add --force "$oxt"
+    else
+        echo "2/4 Extension LibreOffice: bo qua ($skip_lo)"
+    fi
 
     echo "3/4 Cau hinh -> $CONFIG_DIR/config.json"
     write_config
@@ -226,7 +247,14 @@ install() {
     register_wps_addin
 
     echo
-    echo "Xong. Mo LibreOffice Writer/Calc/Impress: menu Axiom Office > Ask AI (hoac sidebar)."
+    if [ -d "$WPS_ROOT" ] && [ "$NOWPS" != 1 ]; then
+        echo "Xong. Mo WPS Writer/Spreadsheets/Presentation: tab Axiom Office > Ask AI."
+    else
+        echo "Xong. Agent Core da cai (khong thay WPS o $WPS_ROOT)."
+    fi
+    if [ -z "$skip_lo" ]; then
+        echo "LibreOffice Writer/Calc/Impress: menu Axiom Office > Ask AI (ban dong bang)."
+    fi
     if [ "$SYSTEMD" != 1 ] && systemd_available; then
         echo "(Core chay khi can; muon Core san sang tu dau phien: ./install.sh --systemd)"
     fi
@@ -246,11 +274,14 @@ print_mcp_config() {
 }
 
 uninstall() {
-    assert_libreoffice_closed
+    # Chi can dong LibreOffice khi that su phai go extension.
+    if [ -x "$UNOPKG" ]; then assert_libreoffice_closed; fi
     disable_systemd
     stop_core
     unregister_wps_addin
-    "$UNOPKG" remove "$EXTENSION_ID" 2>/dev/null && echo "Da go extension $EXTENSION_ID" || echo "(extension chua cai)"
+    if [ -x "$UNOPKG" ]; then
+        "$UNOPKG" remove "$EXTENSION_ID" 2>/dev/null && echo "Da go extension $EXTENSION_ID" || echo "(extension chua cai)"
+    fi
     remove_core_keep_data
     rm -rf "$MCP_DIR"
     echo "Da go Agent Core khoi $CORE_DIR (giu du lieu: $CORE_DATA)"

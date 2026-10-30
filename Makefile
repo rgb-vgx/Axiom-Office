@@ -10,7 +10,7 @@ help:
 	@echo "  help        - Hien thi danh sach dich kem mo ta"
 	@echo "  test        - Chay toan bo kiem thu khong can app that"
 	@echo "  test-go     - Kiem thu Go (cd core-go && go test ./...)"
-	@echo "  test-lo     - Kiem thu extension LibreOffice"
+	@echo "  test-lo     - Kiem thu extension LibreOffice (DONG BANG: khong nam trong 'test', chay tay)"
 	@echo "  test-wps    - Kiem thu add-in WPS"
 	@echo "  test-wps-e2e- E2e kenh WPS + pane tren Core that (khong can WPS)"
 	@echo "  test-live-format - Hoi quy dinh dang Word that (can Office x64 + add-in)"
@@ -28,7 +28,9 @@ help:
 	@echo "  lint-py     - Kiem loi Python (ruff check)"
 	@echo "  lint-js     - Kiem loi JS (ESLint: add-in WPS ES5 + tests modern)"
 
-test: test-go test-lo test-bench test-catalog test-wps test-wps-e2e test-core test-mcp test-oracle test-install test-package
+# LibreOffice dong bang tu 25/10/2026 (docs/architecture/libreoffice.md): test-lo khong con trong `test`/CI, chay tay
+# khi can soat lai ban dong bang.
+test: test-go test-bench test-catalog test-wps test-wps-e2e test-core test-mcp test-oracle test-install test-package
 
 # -race: Execute ghi trang thai luot tren goroutine rieng trong khi API doc (agent.Run co khoa rieng).
 test-go:

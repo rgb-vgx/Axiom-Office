@@ -65,6 +65,8 @@ class InstallShTests(unittest.TestCase):
             "XDG_CONFIG_HOME": os.path.join(base, "config"), "XDG_DATA_HOME": os.path.join(base, "data"),
             "XDG_RUNTIME_DIR": os.path.join(base, "run"), "UNOPKG": unopkg,
             "AXIOM_INSTALL_SKIP_LO_CHECK": "1", "AXIOM_WPS_ROOT": self.wps_root,
+            # Mac dinh gia lap may CO Python UNO (khong phu thuoc may chay test); ca rieng ep "0".
+            "AXIOM_INSTALL_PYTHON_UNO": "1",
             "DBUS_SESSION_BUS_ADDRESS": "disabled:",
         }
         os.makedirs(self.env["XDG_RUNTIME_DIR"])
@@ -150,6 +152,34 @@ class InstallShTests(unittest.TestCase):
         text = self.read_publish()
         self.assertNotIn('name="axiomoffice"', text, out)
         self.assertIn(OTHER, text, "giu add-in khac")
+
+    # LibreOffice dong bang (25/10/2026) va khong con la dieu kien cai: may CHI co WPS van cai duoc Core + add-in WPS.
+    # Truoc 31/10/2026 install.sh `die` khi thieu .oxt/unopkg/Python UNO - truoc ca buoc cai Core.
+    def test_wps_only_machine_installs_without_libreoffice(self):
+        self.env["UNOPKG"] = os.path.join(self.tmp.name, "khong-co-unopkg")
+        os.remove(os.path.join(self.stage, "AxiomOffice-LibreOffice-0.1.0.oxt"))
+        code, out = self.run_install()
+        self.assertEqual(code, 0, out)
+        self.assertTrue(os.path.exists(os.path.join(self.core_dir(), "AxiomOffice.Core")), out)
+        self.assertIn('name="axiomoffice"', self.read_publish(), out)
+        self.assertIn("Extension LibreOffice: bo qua", out)
+        self.assertIn("tab Axiom Office", out, "huong dan mo WPS")
+        code, out = self.run_install("--uninstall")
+        self.assertEqual(code, 0, "go cai khong can LibreOffice: " + out)
+        self.assertNotIn('name="axiomoffice"', self.read_publish(), out)
+
+    def test_libreoffice_without_python_uno_is_skipped_not_fatal(self):
+        self.env["AXIOM_INSTALL_PYTHON_UNO"] = "0"
+        code, out = self.run_install()
+        self.assertEqual(code, 0, out)
+        self.assertIn("thieu Python UNO", out)
+        self.assertFalse(os.path.exists(self.unopkg_log), "khong co Python UNO thi khong goi unopkg")
+
+    def test_no_libreoffice_flag_skips_extension(self):
+        code, out = self.run_install("--no-libreoffice")
+        self.assertEqual(code, 0, out)
+        self.assertFalse(os.path.exists(self.unopkg_log), "--no-libreoffice thi khong goi unopkg: " + out)
+        self.assertIn('name="axiomoffice"', self.read_publish(), "van dang ky add-in WPS")
 
     def test_picks_newest_oxt_by_version_not_by_text(self):
         # `sort | tail -1` xep theo chu: 0.10.0 dung truoc 0.9.0 -> cai nham ban cu.

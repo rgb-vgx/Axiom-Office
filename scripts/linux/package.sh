@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Dong goi ban Linux: dist/axiom-office-linux-x64-<ver>.tar.gz gom
 #   core/ (Agent Core linux-x64 - binary Go, may dich khong can runtime + skills/ dung san),
-#   AxiomOffice-LibreOffice-<ver>.oxt, install.sh, README.txt.
+#   core/wps-addin (add-in WPS, Core phuc vu), wps/install_jsaddon.py,
+#   AxiomOffice-LibreOffice-<ver>.oxt (ban DONG BANG, install.sh chi cai khi may co LibreOffice), install.sh, README.txt.
 # MCP server nam ngay trong core/: chay `core/AxiomOffice.Core mcp all`. Khong con .NET o day.
 # Can Go 1.26+. Chay duoc tren Linux hoac Git Bash/WSL.
 #
@@ -59,30 +60,31 @@ cp "$ROOT/scripts/linux/lo-common.sh" "$STAGE/lo-common.sh"
 cp "$ROOT/scripts/linux/axiom-office-core.service.in" "$STAGE/axiom-office-core.service.in"
 chmod +x "$STAGE/install.sh"
 cat >"$STAGE/README.txt" <<EOF
-Axiom Office $VERSION cho LibreOffice tren Linux ($RID)
+Axiom Office $VERSION cho Linux ($RID) - WPS Office for Linux (chinh), LibreOffice (ban dong bang)
 
-Yeu cau: LibreOffice 7.x tro len + Python UNO (Debian/Ubuntu: sudo apt install libreoffice python3-uno).
+Yeu cau: WPS Office for Linux 12 (/opt/kingsoft/wps-office). Khong can root, khong can runtime nao them.
 
-Cai (khong can root; dong LibreOffice truoc):
-    ./install.sh --endpoint http://localhost:20128/v1 --model <ten-model> --api-key -
-    (--api-key - doc khoa tu stdin; bo qua cac tham so LLM thi cau hinh sau trong pane Ask AI > Cai dat)
-    ./install.sh --systemd      # tuy chon: cho Agent Core chay thuong truc (systemd --user)
+Cai (dong WPS truoc):
+    ./install.sh --systemd --endpoint http://localhost:20128/v1 --model <ten-model> --api-key -
+    (--systemd: Agent Core chay thuong truc - Core PHAI chay truoc khi mo WPS, neu khong WPS bo qua add-in;
+     --api-key - doc khoa tu stdin; bo qua cac tham so LLM thi cau hinh sau trong Ask AI > Thiet lap)
 
-Dung: mo Writer/Calc/Impress -> menu Axiom Office > Ask AI (pane nam trong sidebar).
+Buoc admin mot lan tren moi may (bat JS add-in cua WPS, khi oem.ini chua co dong JsApiPlugin=true duoi [Support]):
+    sudo cp -n /opt/kingsoft/wps-office/office6/cfgs/oem.ini /opt/kingsoft/wps-office/office6/cfgs/oem.ini.bak
+    sudo sed -i '/^\[Support\]/a JsApiPlugin=true' /opt/kingsoft/wps-office/office6/cfgs/oem.ini
+
+Dung: mo WPS Writer/Spreadsheets/Presentation -> tab Axiom Office > Ask AI. Add-in nam san trong
+core/wps-addin, do Core phuc vu (khong can chep tay).
+
+LibreOffice (tuy chon, DONG BANG - khong phat trien tiep): may co LibreOffice + Python UNO thi install.sh cai kem
+extension AxiomOffice-LibreOffice-*.oxt (menu Axiom Office > Ask AI); khong co thi bo qua. --no-libreoffice de bo han.
+
 MCP cho Claude Code/Desktop: dung chinh core/AxiomOffice.Core voi tham so "mcp all"; install.sh in san
 doan cau hinh mcpServers khi cai xong.
 Go:  ./install.sh --uninstall [--purge]
 
-WPS Office (tuy chon): add-in WPS nam san trong core/wps-addin, do Core phuc vu
-(khong can chep tay). install.sh tu dang ky add-in khi thay WPS.
-Buoc admin mot lan tren moi may (bat JS add-in cua WPS):
-    sudo cp -n /opt/kingsoft/wps-office/office6/cfgs/oem.ini /opt/kingsoft/wps-office/office6/cfgs/oem.ini.bak
-    sudo sed -i '/^\[Support\]/a JsApiPlugin=true' /opt/kingsoft/wps-office/office6/cfgs/oem.ini
-(khi oem.ini chua co dong JsApiPlugin=true duoi muc [Support]).
-Mo WPS sau khi Core da chay: ./install.sh --systemd de Core chay thuong truc.
-
 Vi tri: Core + MCP ~/.local/share/axiom-office/core,
-        cau hinh ~/.config/axiom-office/config.json, log ~/.local/share/axiom-office/bridge.log
+        cau hinh ~/.config/axiom-office/config.json
 EOF
 
 echo "== Tarball"

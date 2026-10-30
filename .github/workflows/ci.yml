@@ -7,8 +7,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  # Linux la nen tang chinh cua lan LibreOffice (docs/architecture/libreoffice.md): chay duoc ca test that voi soffice.
-  # Khong con .NET o day: MCP server ban Linux la subcommand `mcp` cua chinh Agent Core (Go).
+  # Linux: Agent Core + add-in WPS Linux (trong tam). Khong con .NET o day: MCP server ban Linux la subcommand `mcp`
+  # cua chinh Agent Core (Go). Extension LibreOffice DONG BANG tu 25/10/2026 (docs/architecture/libreoffice.md): khong
+  # con buoc nao cai/chay LibreOffice; `make test-lo` chay tay. Goi van kem .oxt dong bang cho nguoi dang dung.
   linux:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -21,9 +22,6 @@ jobs:
 
       # Moi buoc test goi dich cua Makefile - Makefile la nguon duy nhat liet ke test (truoc day CI chep tay
       # danh sach node --test va bo sot test_pane_view/test_mini_view).
-      - name: Unit test extension LibreOffice (khong can LibreOffice)
-        run: make test-lo
-
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -79,43 +77,9 @@ jobs:
           AXIOM_MCP_ARGS: mcp all
         run: make test-mcp
 
-      - name: Cai LibreOffice + Python UNO (+ xvfb cho phan giao dien)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libreoffice python3-uno xvfb
-          soffice --version
-
-      # install.sh tu choi chay khi thieu Python UNO (no dung unopkg that), nen buoc nay phai sau buoc cai tren.
-      # `python3-uno` cua apt thuoc python HE THONG (/usr/bin/python3): actions/setup-python dat mot ban 3.12 khac
-      # len truoc trong PATH, ban do khong thay /usr/lib/python3/dist-packages nen `python3 -c 'import uno'` that
-      # bai (lan chay 38155510443). Chay bang python he thong - dung nhu may dev, noi moi thu deu la python he thong.
+      # install.sh khong con doi LibreOffice/Python UNO (31/10/2026): test gia lap ca hai qua bien moi truong.
       - name: Trinh cai Linux (install.sh, HOME tam + unopkg gia)
-        run: PATH=/usr/bin:$PATH python3 tests/linux/test_install_sh.py
-
-      - name: Cai extension + test moi lenh bridge tren LibreOffice that
-        # Chua chay duoc tren runner: `unopkg add` sap (std::bad_alloc trong cpp_uno) ngay ca voi profile moi, trong
-        # khi cung LibreOffice 24.2 tren Ubuntu 24.04 o may dev chay binh thuong. Test LibreOffice that chay o may
-        # dev (tests/live/*.py); buoc nay giu lai de xem log, khong lam do ca job.
-        continue-on-error: true
-        run: |
-          bash scripts/libreoffice.sh install
-          bash scripts/libreoffice.sh status
-          python3 tests/live/test_live_libreoffice.py
-
-      - name: Wizard thiet lap (dialog that, profile rieng, LLM gia - qua Xvfb)
-        continue-on-error: true   # can extension da cai o buoc tren (xem ghi chu o do)
-        run: |
-          sudo apt-get install -y --no-install-recommends xdotool
-          xvfb-run -a python3 tests/live/test_setup_wizard.py
-
-      - name: MCP + tool live (LibreOffice dang mo)
-        continue-on-error: true   # can extension da cai (xem ghi chu buoc "Cai extension")
-        env:
-          AXIOM_MCP_ARGS: mcp all
-        run: |
-          setsid soffice --headless --calc --norestore >/tmp/soffice.out 2>&1 </dev/null &
-          for _ in $(seq 40); do curl -s --max-time 1 http://127.0.0.1:47852/health >/dev/null && break; sleep 1; done
-          python3 tests/mcp-host/test_mcp_portable.py "$PWD/dist/core/axiom-core" --live
+        run: make test-install
 
       - name: Dong goi tarball (Core + MCP + oxt) + soi noi dung
         run: |
