@@ -1946,10 +1946,31 @@ export function makeWriterApp(options = {}) {
     style: "",
     undoStack: [],
     group: null,
+    // Theo doi thay doi + comment (do tren WPS 12.1.2 that 31/10/2026 - tests/wps/REFERENCE.md):
+    // - tac gia revision/comment = app.UserName LUC sua/them (doi UserName giua chung thi tac gia doi theo);
+    // - moi cho thay khi TrackRevisions=true sinh HAI revision: Type 2 (xoa, chu cu) roi Type 1 (chen, chu moi);
+    // - Content.Text / Paragraph.Range.Text KHONG chua chu da xoa (khac Word Windows);
+    // - nhieu lan thay trong MOT UndoRecord: doc.Undo(1) go ca nhom, ke ca revision;
+    // - Revision.Date / Comment.Date la doi tuong Date; Revision.Range.StoryType = 1 (than van ban);
+    // - Comment.Range.Text ket bang "\r"; Comment.Scope = Range duoc neo; Replies.Count; Ancestor = null (comment goc).
+    userName: options.userName !== undefined ? String(options.userName) : "thuyetmt",
+    userInitials: options.userInitials !== undefined ? String(options.userInitials) : "t",
+    track: !!options.trackRevisions,
+    revisions: [],
+    comments: [],
+    // Revision.Date / Comment.Date cua WPS that la Date mang GIO DIA PHUONG gan nhan UTC (do 31/10/2026 o +07: luc
+    // 18:30 thi toISOString() ra "...T18:30:00.000Z"). Fake giu y nhu vay: dong ho 09:00 tren may = Date.UTC(..., 9, 0).
+    clock: Date.UTC(2026, 9, 31, 9, 0, 0),
   };
 
-  const snapshot = () => ({ text: state.text, tables: cloneTables(state.tables) });
-  const same = (a, b) => a.text === b.text && JSON.stringify(a.tables) === JSON.stringify(b.tables);
+  const snapshot = () => ({
+    text: state.text, tables: cloneTables(state.tables),
+    revisions: state.revisions.map((r) => Object.assign({}, r)),
+    comments: state.comments.map((c) => Object.assign({}, c)),
+  });
+  const same = (a, b) => a.text === b.text && JSON.stringify(a.tables) === JSON.stringify(b.tables) &&
+    JSON.stringify(a.revisions) === JSON.stringify(b.revisions) && JSON.stringify(a.comments) === JSON.stringify(b.comments);
+  const nextDate = () => { state.clock += 1000; return new Date(state.clock); };
 
   // Thay doi ngoai mot nhom UndoRecord thi tu no la mot buoc hoan tac; trong nhom thi de nhom lo.
   function beforeChange() {
@@ -1971,16 +1992,25 @@ export function makeWriterApp(options = {}) {
       });
     }
     state.tables = next;
+    for (const item of state.revisions.concat(state.comments)) {
+      if (item.start >= to) { item.start += delta; }
+      if (item.end >= to) { item.end += delta; }
+    }
   }
 
+  // Range gia -> vi tri hien tai (Comments.Add nhan lai mot Range do chinh fake tao ra).
+  const rangeBounds = new WeakMap();
+
   function makeRange(from, to, label) {
-    const f = Number(from);
-    const t = Number(to);
+    let f = Number(from);
+    let t = Number(to);
     if (!Number.isFinite(f) || !Number.isFinite(t)) { throw new Error("Range: tham so khong phai so"); }
     if (f < 0 || t < f || t > state.text.length) {
       throw new Error("Range(" + f + "," + t + ") ngoai tai lieu (dai " + state.text.length + ")");
     }
     const path = label + "(" + f + "," + t + ")";
+    // Find.Execute KHONG thay (Replace khac 2) tim thay thi co Range ve dung cho khop - nhu WPS that.
+    const narrow = (a, b) => { f = a; t = b; };
     // Dinh dang cua mot Range: appendText dat lai Font/ParagraphFormat tren doan vua noi vao
     // (khong ke thua bold/can le cua doan cuoi). Fake chi can nhan setter, khong mo phong tung ky tu.
     const rangeFont = () => strict(path + ".Font", {
@@ -2000,13 +2030,13 @@ export function makeWriterApp(options = {}) {
       props: { Alignment: { get: () => 0, set: () => {} } },
       allowed: [],
     });
-    return strict(path, {
+    const range = strict(path, {
       state,
       props: {
         Start: { get: () => f },
         End: { get: () => t },
         Text: { get: () => state.text.slice(f, t) },
-        Find: { get: () => makeFind(f, t, path) },
+        Find: { get: () => makeFind(f, t, path, narrow) },
         Font: { get: rangeFont },
         ParagraphFormat: { get: rangeParagraph },
       },
@@ -2021,13 +2051,16 @@ export function makeWriterApp(options = {}) {
         },
       },
     });
+    rangeBounds.set(range, () => [f, t]);
+    return range;
   }
 
   // Find.Execute(FindText, ..., Forward, Wrap, Format, ReplaceWith, Replace=2): thay trong [f, t).
-  function makeFind(from, to, path) {
+  function makeFind(from, to, path, narrow) {
+    let found = false;
     return strict(path + ".Find", {
       state,
-      props: { Found: { get: () => false } },
+      props: { Found: { get: () => found } },
       methods: {
         Execute: function (findText) {
           const args = Array.prototype.slice.call(arguments);
@@ -2035,7 +2068,13 @@ export function makeWriterApp(options = {}) {
           const replaceMode = args.length > 10 ? Number(args[10]) : 0;
           push(state, "Find.Execute(" + fmtArgs(args) + ")");
           const needle = String(findText);
-          if (needle === "" || replaceMode !== 2) { return false; }
+          if (needle === "") { return false; }
+          if (replaceMode !== 2) {
+            const at = state.text.slice(from, to).toLowerCase().indexOf(needle.toLowerCase());
+            found = at >= 0;
+            if (found && narrow) { narrow(from + at, from + at + needle.length); }
+            return found;
+          }
           const hay = state.text.slice(from, to);
           const lower = hay.toLowerCase();
           const target = needle.toLowerCase();
@@ -2051,7 +2090,28 @@ export function makeWriterApp(options = {}) {
           if (hits === 0) { return false; }
           parts.push(hay.slice(pos));
           beforeChange();
+          if (state.track) {
+            // Tung cho mot, tu sau ra truoc de vi tri cac cho phia truoc khong doi.
+            const spots = [];
+            let p = lower.indexOf(target, 0);
+            while (p >= 0) { spots.push(p); p = lower.indexOf(target, p + needle.length); }
+            const added = [];
+            for (let k = spots.length - 1; k >= 0; k--) {
+              const at = from + spots[k];
+              const old = state.text.slice(at, at + needle.length);
+              const value = String(replaceWith);
+              applyEdit(at, at + needle.length, value);
+              const when = nextDate();
+              added.unshift(
+                { type: 2, author: state.userName, date: when.getTime(), start: at, end: at, text: old },
+                { type: 1, author: state.userName, date: when.getTime(), start: at, end: at + value.length, text: value });
+            }
+            state.revisions = state.revisions.concat(added).sort((a, b) => a.start - b.start || b.type - a.type);
+            found = true;
+            return true;
+          }
           applyEdit(from, to, parts.join(""));
+          found = true;
           return true;
         },
       },
@@ -2252,23 +2312,141 @@ export function makeWriterApp(options = {}) {
           if (!prev) { break; }
           state.text = prev.text;
           state.tables = cloneTables(prev.tables);
+          state.revisions = prev.revisions;
+          state.comments = prev.comments;
           done++;
         }
         return done;
       },
     };
     if (hasRange) { methods.Range = (from, to) => makeRange(from, to, "doc.Range"); }
+    // Paragraphs bat rieng (options.paragraphs): cac test cu duoc viet cho fake khong co Paragraphs va mot so
+    // handler re nhanh khi thay no; test lenh comment/revision can no de doi vi tri -> so doan theo writer.outline.
+    const docProps = {};
+    if (options.paragraphs) { docProps.Paragraphs = { get: () => makeParagraphs() }; }
     return strict("app.ActiveDocument", {
       state,
-      props: {
+      props: Object.assign(docProps, {
         Name: { get: () => state.documentName },
         FullName: { get: () => state.fullPath },
         Path: { get: () => splitPath(state.fullPath).dir },
         Saved: { get: () => state.saved, set: (v) => { state.saved = !!v; } },
         Content: { get: () => makeRange(0, state.text.length, "doc.Content") },
         Tables: { get: () => makeTables() },
-      },
+        TrackRevisions: { get: () => state.track, set: (v) => { push(state, "doc.TrackRevisions=" + fmt(!!v)); state.track = !!v; } },
+        Revisions: { get: () => makeRevisions() },
+        Comments: { get: () => makeComments() },
+      }),
       methods,
+    });
+  }
+
+  // Doan = khoang ket thuc bang "\r" (WPS) hoac "\n" (cach fake ghi khi TypeParagraph); doan cuoi khong can dau ket.
+  function paragraphBounds() {
+    const out = [];
+    let start = 0;
+    for (let i = 0; i < state.text.length; i++) {
+      const ch = state.text[i];
+      if (ch === "\r" || ch === "\n") { out.push([start, i + 1]); start = i + 1; }
+    }
+    if (start < state.text.length || out.length === 0) { out.push([start, state.text.length]); }
+    return out;
+  }
+
+  function makeParagraphs() {
+    const bounds = paragraphBounds();
+    return strict("doc.Paragraphs", {
+      state,
+      props: { Count: { get: () => bounds.length } },
+      methods: {
+        Item: (i) => {
+          const idx = Number(i);
+          if (!Number.isInteger(idx) || idx < 1 || idx > bounds.length) { throw new Error("Paragraphs.Item ngoai tai lieu"); }
+          const b = bounds[idx - 1];
+          return strict("doc.Paragraphs.Item(" + idx + ")", {
+            state,
+            props: { Range: { get: () => makeRange(b[0], b[1], "doc.Paragraphs.Item(" + idx + ").Range") } },
+            methods: {},
+          });
+        },
+      },
+    });
+  }
+
+  function makeRevisions() {
+    return strict("doc.Revisions", {
+      state,
+      props: { Count: { get: () => state.revisions.length } },
+      methods: {
+        Item: (i) => {
+          const idx = Number(i);
+          if (!Number.isInteger(idx) || idx < 1 || idx > state.revisions.length) { throw new Error("Revisions.Item ngoai pham vi"); }
+          const r = state.revisions[idx - 1];
+          const path = "doc.Revisions.Item(" + idx + ")";
+          return strict(path, {
+            state,
+            props: {
+              Type: { get: () => r.type },
+              Author: { get: () => r.author },
+              Date: { get: () => new Date(r.date) },
+              Range: {
+                get: () => strict(path + ".Range", {
+                  state,
+                  props: { Start: { get: () => r.start }, End: { get: () => r.end }, Text: { get: () => r.text },
+                    StoryType: { get: () => 1 } },
+                  methods: {},
+                }),
+              },
+            },
+            methods: {},
+          });
+        },
+      },
+    });
+  }
+
+  function makeComments() {
+    return strict("doc.Comments", {
+      state,
+      props: { Count: { get: () => state.comments.length } },
+      methods: {
+        Add: (range, text) => {
+          const bounds = rangeBounds.get(range);
+          if (!bounds) { throw new Error("Comments.Add: tham so dau phai la Range cua tai lieu"); }
+          const [a, b] = bounds();
+          push(state, "doc.Comments.Add(" + a + "," + b + "," + fmt(String(text)) + ")");
+          beforeChange();
+          state.comments.push({ start: a, end: b, text: String(text), author: state.userName,
+            initial: state.userInitials, done: false, date: nextDate().getTime() });
+          state.comments.sort((x, y) => x.start - y.start);
+          return makeComment(state.comments.findIndex((c) => c.start === a && c.text === String(text)) + 1);
+        },
+        Item: (i) => {
+          const idx = Number(i);
+          if (!Number.isInteger(idx) || idx < 1 || idx > state.comments.length) { throw new Error("Comments.Item ngoai pham vi"); }
+          return makeComment(idx);
+        },
+      },
+    });
+  }
+
+  function makeComment(idx) {
+    const c = state.comments[idx - 1];
+    const path = "doc.Comments.Item(" + idx + ")";
+    return strict(path, {
+      state,
+      props: {
+        Author: { get: () => c.author },
+        Initial: { get: () => c.initial },
+        Index: { get: () => idx },
+        Done: { get: () => c.done, set: (v) => { beforeChange(); c.done = !!v; } },
+        Date: { get: () => new Date(c.date) },
+        Range: { get: () => strict(path + ".Range", { state, props: { Text: { get: () => c.text + "\r" } }, methods: {} }) },
+        Scope: { get: () => makeRange(c.start, c.end, path + ".Scope") },
+        Replies: { get: () => strict(path + ".Replies", { state, props: { Count: { get: () => 0 } }, methods: {} }) },
+        Ancestor: { get: () => null },
+      },
+      methods: {},
     });
   }
 
@@ -2279,6 +2457,8 @@ export function makeWriterApp(options = {}) {
     ActiveDocument: { get: () => makeDocument() },
     Selection: { get: () => makeSelection() },
     UndoRecord: { get: () => makeUndoRecord() },
+    UserName: { get: () => state.userName, set: (v) => { push(state, "app.UserName=" + fmt(String(v))); state.userName = String(v); } },
+    UserInitials: { get: () => state.userInitials, set: (v) => { state.userInitials = String(v); } },
   };
   // Ban WPS Writer cu/khac co the khong co FileSystem: writer.exportPdf phai bao loi, khong duoc bao da ghi.
   if (options.fileSystem !== false) { props.FileSystem = { get: () => makeFileSystem(state) }; }
@@ -2310,6 +2490,18 @@ export function writerStateOf(app) {
     tables: state.tables.map((t) => ({ start: t.start, end: t.end })),
     selection: { start: state.selection.start, end: state.selection.end },
     style: state.style,
+  };
+}
+
+// Track Changes + comment cua tai lieu gia (rieng khoi writerStateOf de cac phep so nguyen trang thai cu khong doi).
+export function writerReviewOf(app) {
+  const state = APPS.get(app);
+  if (!state || state.app !== "wps") throw new Error("writerReviewOf: doi tuong khong phai app Writer gia");
+  return {
+    track: state.track,
+    userName: state.userName,
+    revisions: state.revisions.map((r) => ({ type: r.type, author: r.author, text: r.text })),
+    comments: state.comments.map((c) => ({ author: c.author, text: c.text, anchor: state.text.slice(c.start, c.end), done: c.done })),
   };
 }
 

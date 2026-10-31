@@ -1529,11 +1529,9 @@
     return c;
   }
 
-  function cmdReplaceAll(app, params) {
-    var find = paramString(params, "find", null);
-    var replace = paramString(params, "replace", "");
-    if (replace === null || replace === undefined) { replace = ""; }
-    if (!find) { return { replaced: false, count: 0 }; }
+  // Thay mot cap find/replace: dem so cho khop TRUOC khi thay, roi thay mot lan duy nhat. Dung chung cho
+  // writer.replaceAll va writer.replaceMany (moi cap mot loi goi).
+  function writerReplaceAllIn(app, find, replace) {
     var doc = app.ActiveDocument;
     var content = doc.Content;
     // Dang khoa vung boi den: chi tim trong vung khoa (giong ban Windows), khong quet ca tai lieu. Khong
@@ -1550,7 +1548,6 @@
     }
     var findText = toWordFindText(find);
     var replaceText = toWordFindText(replace);
-    // Dem truoc khi thay (khong tim lai chuoi vua thay) roi thay mot lan duy nhat.
     var count = 0;
     try {
       var docText = "";
@@ -1568,7 +1565,45 @@
       count = countOccurrences(docText, find);
     } catch (e3) { count = 0; }
     content.Find.Execute(findText, false, false, false, false, false, true, 0, false, replaceText, 2);
+    return count;
+  }
+
+  function cmdReplaceAll(app, params) {
+    var find = paramString(params, "find", null);
+    var replace = paramString(params, "replace", "");
+    if (replace === null || replace === undefined) { replace = ""; }
+    if (!find) { return { replaced: false, count: 0 }; }
+    var count = writerReplaceAllIn(app, find, replace);
     return { replaced: count > 0, count: count };
+  }
+
+  // Nhieu cap tim/thay trong MOT lenh (mot buoc hoan tac) - giong WriterReplaceMany cua ban Windows.
+  function cmdWriterReplaceMany(app, params) {
+    var edits = params ? params.edits : undefined;
+    if (!Array.isArray(edits) || edits.length === 0) {
+      throw new Error("'edits' must be a non-empty array of {find, replace}");
+    }
+    if (edits.length > 200) {
+      throw new Error("'edits' has " + edits.length + " items; send at most 200 per call");
+    }
+    var counts = [];
+    var notFound = [];
+    var replaced = 0;
+    for (var i = 0; i < edits.length; i++) {
+      var item = edits[i];
+      // Bo qua cap thieu/khong phai find chuoi; replace thieu coi nhu "".
+      var find = item && typeof item === "object" ? item.find : undefined;
+      if (typeof find !== "string" || find === "") { continue; }
+      var replace = item.replace;
+      if (replace === undefined || replace === null) { replace = ""; }
+      var count = writerReplaceAllIn(app, find, replace);
+      counts.push(count);
+      replaced += count;
+      if (count === 0) { notFound.push(find); }
+    }
+    var result = { edits: counts.length, replaced: replaced, counts: counts };
+    if (notFound.length > 0) { result.notFound = notFound; }
+    return result;
   }
 
   function cmdUndo(app, params) {
@@ -1578,10 +1613,14 @@
     var doc = app.ActiveDocument;
     var undone = 0;
     for (var i = 0; i < count; i++) {
+      var stepped = null;
       try {
-        doc.Undo(1);
-        undone++;
+        stepped = doc.Undo(1);
       } catch (e) { break; }
+      // WPS that tra false/0 khi khong con gi de hoan tac (ban C# thi nem COMException): dung lai tai do,
+      // khong dem thanh buoc da hoan tac (lenh khong doi chu/revision nao khong duoc tinh la hoan tac).
+      if (stepped === false || stepped === 0) { break; }
+      undone++;
     }
     return { undone: undone };
   }
@@ -1607,6 +1646,266 @@
     try { fullName = strProp(doc, "FullName"); } catch (e2) {}
     if (!fullName) { fullName = path; }
     return { saved: true, fullName: fullName };
+  }
+
+  // ---- Track Changes + redline (port cua CommandDispatcher.WriterReview.cs) -----------------------
+  //
+  // Tac gia revision = app.UserName LUC sua (do tren WPS 12.1.2 that 31/10/2026 - tests/wps/REFERENCE.md
+  // "Track Changes va comment"). Ban Windows dat ten moi truoc MOI lenh (RunWithTrackingAuthor), ban
+  // WPS dat luon trong writer.setTracking va giu; ten cu cua nguoi dung duoc luu o day (giong
+  // _savedUserName cua C#) de restoreAuthor tra lai.
+  var savedTrackingUserName = null;
+  var savedTrackingUserInitials = null;
+
+  function cmdWriterSetTracking(app, params) {
+    var on = paramBool(params, "on", true);
+    var author = paramString(params, "author", null);
+    if (author === null) { author = ""; }
+    author = author.replace(/^\s+|\s+$/g, "");
+    var restore = paramBool(params, "restoreAuthor", false);
+    var doc = app.ActiveDocument;
+    var previous = !!doc.TrackRevisions;
+    if (author.length > 0) {
+      // Lan DAU doi ten moi luu ten cu (nhieu lenh author lien tiep khong de ten "Axiom AI" lam ten cu).
+      if (savedTrackingUserName === null) {
+        savedTrackingUserName = strProp(app, "UserName");
+        savedTrackingUserInitials = strProp(app, "UserInitials");
+      }
+      app.UserName = author;
+    }
+    // restoreAuthor khi chua tung doi ten: khong doi gi, khong loi (giong ban C#).
+    if (restore && savedTrackingUserName !== null) {
+      app.UserName = savedTrackingUserName;
+      try { app.UserInitials = savedTrackingUserInitials; } catch (e) {}
+      savedTrackingUserName = null;
+      savedTrackingUserInitials = null;
+    }
+    doc.TrackRevisions = on;
+    return { tracking: !!doc.TrackRevisions, previous: previous, author: strProp(app, "UserName") };
+  }
+
+  // Loai revision - copy RevisionTypeName cua ban C# (so wdRevisionType cua Word).
+  function revisionTypeName(type) {
+    switch (Number(type)) {
+      case 1: return "insert";
+      case 2: return "delete";
+      case 3: return "format";
+      case 4: return "numbering";
+      case 8: return "style";
+      case 10: return "paragraphFormat";
+      case 11: return "tableFormat";
+      case 12: return "sectionFormat";
+      case 14: return "movedFrom";
+      case 15: return "movedTo";
+      case 16: return "cellInsert";
+      case 17: return "cellDelete";
+      default: return "other";
+    }
+  }
+
+  // Ten story - copy StoryName cua ban C# (ban WPS JS add-in chi doc duoc than van ban = 1).
+  function storyName(storyType) {
+    switch (Number(storyType)) {
+      case 1: return "main";
+      case 2: return "footnotes";
+      case 3: return "endnotes";
+      case 4: return "comments";
+      case 5: return "textFrame";
+      case 6:
+      case 7:
+      case 10: return "header";
+      case 8:
+      case 9:
+      case 11: return "footer";
+      default: return "other";
+    }
+  }
+
+  // Revision.Date cua WPS la doi tuong Date JS: format GIO DIA PHUONG "yyyy-MM-dd HH:mm" giong
+  // Convert.ToDateTime(...).ToString("yyyy-MM-dd HH:mm") cua ban Windows. Tra null = khong doc duoc.
+  function formatRevisionDate(value) {
+    try {
+      if (!value || typeof value.getFullYear !== "function") { return null; }
+      var pad = function (n) { return (n < 10 ? "0" : "") + n; };
+      // WPS tra Date mang GIO DIA PHUONG gan nhan UTC (do tren WPS 12.1.2 that, may +07): doc getUTC* moi
+      // ra dung gio tren may; getHours() cong them mui gio lan nua.
+      return value.getUTCFullYear() + "-" + pad(value.getUTCMonth() + 1) + "-" + pad(value.getUTCDate()) +
+        " " + pad(value.getUTCHours()) + ":" + pad(value.getUTCMinutes());
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Chu cua mot Revision.Range giong RangeText cua ban C#: bo ky tu ket doan/o, cat toi `max`.
+  function revisionRangeText(range, max) {
+    var text = "";
+    try {
+      var raw = range.Text;
+      if (typeof raw === "function") { raw = raw.call(range); }
+      text = raw === undefined || raw === null ? "" : String(raw);
+    } catch (e) {
+      text = "";
+    }
+    text = text.split("\r").join(" ").split("\x07").join(" ").replace(/^\s+|\s+$/g, "");
+    return text.length > max ? text.substring(0, max) : text;
+  }
+
+  // So doan (1-based theo writer.outline / writer.goto) cua vi tri `position`: doan nao chua vi tri do.
+  // Khac ban C# (doc.Range(0, position+1).Paragraphs.Count): duyet thu cong doc.Paragraphs de chay duoc
+  // tren ban WPS khong co doc.Range; khong doc duoc thi tra 0 (giong catch cua ban C#).
+  function writerParagraphNumberAt(doc, position) {
+    try {
+      var paras = doc.Paragraphs;
+      var count = Number(paras.Count);
+      if (isNaN(count) || count < 1) { return 0; }
+      var pos = Number(position);
+      if (isNaN(pos)) { return 0; }
+      for (var k = 1; k <= count; k++) {
+        var range = paras.Item(k).Range;
+        var start = numProp(range, "Start");
+        var end = numProp(range, "End");
+        if (start === null || end === null) { return 0; }
+        if (pos >= start && pos < end) { return k; }
+      }
+      // Vi tri o dung sau ky tu cuoi tai lieu (revision xoa chu sau cung): gan doan cuoi cung.
+      return count;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  function cmdWriterListRevisions(app, params) {
+    var author = paramString(params, "author", null);
+    if (author === null) { author = ""; }
+    author = author.replace(/^\s+|\s+$/g, "");
+    var max = paramInt(params, "max", 200);
+    if (isNaN(max)) { max = 200; }
+    max = Math.max(1, max);
+    var doc = app.ActiveDocument;
+    var revisions = doc.Revisions;
+    var count = Number(revisions.Count);
+    if (isNaN(count)) { count = 0; }
+    var authorFilter = author.toLowerCase();
+    var items = [], authors = {}, total = 0;
+    for (var i = 1; i <= count; i++) {
+      var revision = revisions.Item(i);
+      var who = strProp(revision, "Author");
+      // authors dem MOI revision TRUOC khi loc theo `author` (khong bi `max` cat).
+      authors[who] = Object.prototype.hasOwnProperty.call(authors, who) ? authors[who] + 1 : 1;
+      if (authorFilter !== "" && who.toLowerCase() !== authorFilter) { continue; }
+      total++;
+      if (items.length >= max) { continue; }
+      var range = revision.Range;
+      var storyType = 1;
+      try { storyType = Number(range.StoryType); } catch (eStory) { storyType = 1; }
+      if (isNaN(storyType)) { storyType = 1; }
+      // id "<storyIndex>:<chi so>": WPS JS add-in chi doc duoc than van ban nen storyIndex luon 1.
+      var entry = {
+        id: "1:" + i,
+        type: revisionTypeName(revision.Type),
+        author: who,
+        text: revisionRangeText(range, 200),
+        story: storyName(storyType)
+      };
+      var when = null;
+      try { when = formatRevisionDate(revision.Date); } catch (eDate) { when = null; }
+      if (when !== null) { entry.date = when; }
+      if (storyType === 1) {
+        entry.paragraph = writerParagraphNumberAt(doc, numProp(range, "Start"));
+      }
+      items.push(entry);
+    }
+    return { revisions: items, total: total, authors: authors, tracking: !!doc.TrackRevisions };
+  }
+
+  // Them comment (port WriterAddComment cua CommandDispatcher.WriterReview.cs). Tac gia = app.UserName
+  // LUC them (do tren WPS that): writer.setTracking da dat ten nen lenh nay khong doi UserName.
+  function cmdWriterAddComment(app, params) {
+    var text = paramString(params, "text", null);
+    if (text === null) { text = ""; }
+    text = text.replace(/^\s+|\s+$/g, "");
+    if (text.length === 0) { throw new Error("'text' is required"); }
+    var doc = app.ActiveDocument;
+    var find = paramString(params, "find", null);
+    var paragraph = paramInt(params, "paragraph", 0);
+    var anchor = null;
+    if (find !== null && find !== "") {
+      anchor = doc.Content;
+      // Find.Execute khong thay thi tra false; tim THANG (khong replace) thi WPS hep Range ve cho khop
+      // (do tren WPS 12.1.2 that) - dung chinh Range do lam chu neo cho comment.
+      if (find.length > 255 || !anchor.Find.Execute(find)) {
+        throw new Error("'find' text was not found (max 255 characters, exact match)");
+      }
+    } else if (paragraph > 0) {
+      var count = Number(doc.Paragraphs.Count);
+      if (isNaN(count)) { count = 0; }
+      if (paragraph > count) {
+        throw new Error("'paragraph' must be between 1 and " + count);
+      }
+      anchor = doc.Paragraphs.Item(paragraph).Range;
+    } else {
+      throw new Error("give 'paragraph' (from writer.outline) or 'find' (text to anchor the comment to)");
+    }
+    var added = doc.Comments.Add(anchor, text);
+    // So comment = Index cua comment vua tra ve; khong doc duoc Index thi so luong hien tai (giong C#).
+    var number = numProp(added, "Index");
+    if (number === null || !(number > 0)) { number = numProp(doc.Comments, "Count"); }
+    return { comment: number, paragraph: writerParagraphNumberAt(doc, numProp(anchor, "Start")) };
+  }
+
+  // Doc comment (port WriterListComments cua CommandDispatcher.WriterReview.cs): comment goc thi day du
+  // (id/tac gia/noi dung/cat 500/da xong/ngay/chu neo/cat 200/so doan/tra loi), tra loi ghep vao comment
+  // goc theo vi tri neo (Ancestor khong doc duoc thi coi nhu comment goc).
+  function cmdWriterListComments(app, params) {
+    var includeDone = paramBool(params, "includeDone", false);
+    var max = paramInt(params, "max", 100);
+    if (isNaN(max)) { max = 100; }
+    max = Math.max(1, max);
+    var doc = app.ActiveDocument;
+    var comments = doc.Comments;
+    var count = Number(comments.Count);
+    if (isNaN(count)) { count = 0; }
+    var items = [], roots = [], pending = [], open = 0;
+    for (var i = 1; i <= count; i++) {
+      var comment = comments.Item(i);
+      var done = false;
+      try { done = !!comment.Done; } catch (eDone) {}
+      var entry = {
+        id: i,
+        author: strProp(comment, "Author"),
+        text: revisionRangeText(comment.Range, 500),
+        done: done
+      };
+      var when = null;
+      try { when = formatRevisionDate(comment.Date); } catch (eDate) {}
+      if (when !== null) { entry.date = when; }
+      var ancestor = null;
+      try { ancestor = comment.Ancestor; } catch (eAncestor) {}
+      if (ancestor !== null && ancestor !== undefined) {
+        pending.push({ ancestor: ancestor, entry: entry });
+        continue;
+      }
+      var scope = comment.Scope;
+      entry.anchor = revisionRangeText(scope, 200);
+      entry.paragraph = writerParagraphNumberAt(doc, numProp(scope, "Start"));
+      entry.replies = [];
+      roots.push({ start: numProp(scope, "Start"), entry: entry });
+      if (!done) { open++; }
+      if ((includeDone || !done) && items.length < max) { items.push(entry); }
+    }
+    // Ghep tra loi vao comment goc: Ancestor la mot Comment (khong co chi so truc tiep) nen so sanh
+    // theo vi tri Scope.Start cua comment goc, giong ban C#.
+    for (var k = 0; k < pending.length; k++) {
+      var parentStart = null;
+      try { parentStart = numProp(pending[k].ancestor.Scope, "Start"); } catch (eScope) {}
+      for (var m = 0; m < roots.length; m++) {
+        if (parentStart !== null && roots[m].start === parentStart) {
+          roots[m].entry.replies.push(pending[k].entry);
+          break;
+        }
+      }
+    }
+    return { comments: items, open: open, total: count - pending.length };
   }
 
   function pdfHex4(n) {
@@ -1825,7 +2124,9 @@
     "writer.saveAs": true,
     "writer.exportPdf": true,
     "writer.lockSelection": true,
-    "writer.unlockSelection": true
+    "writer.unlockSelection": true,
+    "writer.listRevisions": true,
+    "writer.listComments": true
   };
 
   // Lenh luon cham ra ngoai vung chon: tu choi truoc, noi ro vi sao. Giu du ca cac lenh add-in Windows
@@ -4030,12 +4331,17 @@
     "writer.insertPageBreak": cmdInsertPageBreak,
     "writer.checkTables": cmdWriterCheckTables,
     "writer.replaceAll": cmdReplaceAll,
+    "writer.replaceMany": cmdWriterReplaceMany,
     "writer.undo": cmdUndo,
     "writer.save": cmdSave,
     "writer.saveAs": cmdSaveAs,
     "writer.exportPdf": cmdExportPdf,
     "writer.lockSelection": cmdLockSelection,
     "writer.unlockSelection": cmdUnlockSelection,
+    "writer.setTracking": cmdWriterSetTracking,
+    "writer.listRevisions": cmdWriterListRevisions,
+    "writer.addComment": cmdWriterAddComment,
+    "writer.listComments": cmdWriterListComments,
     "et.newWorkbook": cmdEtNewWorkbook,
     "et.open": cmdEtOpen,
     "et.listSheets": cmdEtListSheets,
