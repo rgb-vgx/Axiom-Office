@@ -450,13 +450,13 @@ bridge chính 47961 để không đụng Core thật), LLM giả (`tests/core/fa
 
 | API | Kết quả đo |
 |---|---|
-| `app.UserName`, `app.UserInitials` | đọc + ghi được; **tác giả revision và comment = `UserName` lúc sửa/thêm** (đổi giữa chừng thì tác giả đổi theo) |
+| `app.UserName`, `app.UserInitials` | đọc + ghi được; **tác giả revision và comment = `UserName` lúc sửa/thêm** (đổi giữa chừng thì tác giả đổi theo). Giá trị **được lưu ngay vào `~/.config/Kingsoft/Office.conf`** — đặt "Axiom AI" mà không trả lại thì người dùng mang tên đó mãi |
 | `doc.TrackRevisions` | đọc + ghi (`boolean`) |
 | `Content.Find.Execute(…, ReplaceWith, 2)` khi đang theo dõi | mỗi chỗ thay sinh **hai** revision: `Type 2` (xoá, chữ cũ) rồi `Type 1` (chèn, chữ mới) |
 | `Content.Text`, `Paragraph.Range.Text` khi có chữ đã xoá | **không** chứa chữ đã xoá (khác Word trên Windows - bản C# phải tự lọc) |
 | Nhiều lần thay trong **một** `UndoRecord` | `doc.Undo(1)` gỡ cả nhóm, kể cả revision |
 | `doc.Undo(1)` | trả `true` khi gỡ được một bước, `false` khi không còn gì để gỡ |
-| `Revision` | `Type`, `Author`, `Date` (đối tượng `Date` của JS), `Range.Start/End/Text`, `Range.StoryType` (= 1 thân văn bản) |
+| `Revision` | `Type`, `Author`, `Date` (đối tượng `Date` của JS, **mang giờ địa phương gắn nhãn UTC**: máy +07 lúc 18:30 thì `toISOString()` ra `…T18:30:00.000Z`, `getHours()` ra 01 hôm sau — đọc `getUTC*`; `Comment.Date` cũng vậy), `Range.Start/End/Text`, `Range.StoryType` (= 1 thân văn bản) |
 | `Range.Find.Execute(text)` (không thay) | tìm thấy thì **co `Range` về chỗ khớp** |
 | `doc.Comments.Add(range, text)` | neo đúng vào `range` (`Comment.Scope`); trả về comment mới |
 | `Comment` | `Author`, `Initial`, `Index`, `Done` (đọc/ghi), `Date` (`Date`), `Range.Text` (kết `"\r"`), `Scope`, `Replies.Count`, `Ancestor` (`null` với comment gốc); còn có `Delete`, `DeleteRecursively`, `Edit`, `Reference`, `Contact`, `IsInk`, `ShowTip` |

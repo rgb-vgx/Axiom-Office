@@ -5,6 +5,23 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — WPS: Track Changes, comment, thay hàng loạt cho agent (P1-1, phần add-in, 31/10/2026)
+
+- Add-in WPS (`src/AxiomOffice.WPS/commands.js`) có thêm `writer.setTracking` (bật/tắt theo dõi thay đổi, đặt tên tác
+  giả "Axiom AI", `restoreAuthor` trả lại tên người dùng), `writer.listRevisions`, `writer.addComment` (neo theo chữ
+  hoặc số đoạn), `writer.listComments`, `writer.replaceMany` (tối đa 200 cặp tìm/thay, một bước hoàn tác, trong vùng
+  khoá thì chỉ thay trong vùng). Port từ bản Windows (`CommandDispatcher.WriterReview.cs`).
+- Sửa khi đo trên WPS 12.1.2 thật: ngày của revision/comment lệch 7 tiếng — WPS trả giờ địa phương gắn nhãn UTC, nay
+  đọc `getUTC*`. `make test-wps` chạy cả `tests/wps/test_addin_review.mjs` (trước đây bị sót trong danh sách).
+- Chưa có: tool soát cả tài liệu và skill chính tả tiếng Việt dùng các lệnh này (`docs/research/doi-chieu-wps-ai.md` §6).
+
+### Added — Lệnh nhanh: đổi giọng văn, viết tiếp, dịch song ngữ (P1-4, 31/10/2026)
+
+- Menu chuột phải *Sửa bằng AI* có 14 mục: thêm *Ngắn gọn*, *Dễ hiểu*, *Tích cực* và gom cùng *Trang trọng* vào menu con
+  *Đổi giọng ▸*; thêm *Viết tiếp* (chèn sau vùng bôi đen) và *Dịch song ngữ* (`agent/quickactions.go`, `ribbon.xml`).
+- Skill `dich-thuat` kèm bảng thuật ngữ hành chính – văn phòng Việt/Anh.
+- Đã thử trên WPS thật (menu, menu lồng, Viết tiếp trong vùng khoá, Hoàn tác); chưa thử với model thật.
+
 ### Added — Sửa, tạo, nhập kỹ năng trong khung chat WPS (31/10/2026)
 
 - Core: `core-go/internal/skills/store.go` + `GET/PUT/DELETE /v1/skills/{name}`, `GET /v1/skills/{name}/file`,

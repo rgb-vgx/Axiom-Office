@@ -23,9 +23,10 @@
      (askAi.svg, quickMenu.svg) - imageMso trong menu ngu canh chua thu. WPS KHONG nhan data URI cho getImage: no
      phan giai chuoi tra ve nhu mot duong dan, truot thi ve dau "?" (SDK: @wps-jsapi/wps/js/ribbon.js).
 
-  Menu chuot phai (<contextMenus> cuoi tep): "Sua bang AI >" 9 muc + "Hoi AI ve doan nay", tren chu thuong va tren
-  dong danh sach. Bam mot muc thi mo KHUNG CHAT MINI canh doan boi den (mini.html, Application.ShowDialog); ban WPS
-  khong co ShowDialog thi quay ve khung chat lon (main.js: openMini / runQuick).
+  Menu chuot phai (<contextMenus> cuoi tep): "Sua bang AI >" 14 muc (4 muc giong van trong menu con "Doi giong >")
+  + "Hoi AI ve doan nay", tren chu thuong va tren dong danh sach. Bam mot muc thi mo KHUNG CHAT MINI canh doan boi
+  den (mini.html, Application.ShowDialog); ban WPS khong co ShowDialog thi quay ve khung chat lon (main.js: openMini /
+  runQuick).
   Ban Windows chi co "Hoi AI ve doan nay" va chi dua contextMenus cho Office (RibbonUi.cs: "WPS khong nhan chac").
   WPS Linux THI NHAN: menu da hien va chay tren WPS that 20/10/2026 (docs/architecture/ribbon-ui.md muc 5.3).
 
@@ -112,11 +113,10 @@
   </ribbon>
   <!-- Menu chuot phai khi boi den (docs/architecture/ribbon-ui.md, "Trong khung chat"): 14 muc "Sua bang AI", cung thu tu va
        nhan voi bang cua Core (agent/quickactions.go) - spec test_pane.mjs ghim hai ben. Nhom tone (Trang trong /
-       Ngan gon / De hieu / Tich cuc) nam trong menu con "Đổi giọng" (axiomCtxTone_<t|l> - menu long trong contextMenu
-       hien va bam duoc tren WPS that 12.1.2, 31/10/2026), roi den Viết tiếp, Dịch song ngữ, vach ngan, ba muc chi-tra-loi.
-       Bam mot muc: main.js mo
-       KHUNG CHAT MINI (mini.html, Application.ShowDialog) va muc do chay ngay trong khung ay. Du phong khi WPS
-       khong co ShowDialog: hien khung chat lon roi nho Core chuyen muc (POST /wps/v1/pane/request -> SSE
+       Ngan gon / De hieu / Tich cuc) nam trong menu con "Doi giong" (axiomCtxTone_<t|l> - menu long trong contextMenu
+       hien va bam duoc tren WPS that 12.1.2, 31/10/2026), roi den Viet tiep, Dich song ngu, vach ngan, ba muc
+       chi-tra-loi. Bam mot muc: main.js mo KHUNG CHAT MINI (mini.html, Application.ShowDialog) va muc do chay ngay
+       trong khung ay. Du phong khi WPS khong co ShowDialog: hien khung chat lon roi nho Core chuyen muc (POST /wps/v1/pane/request -> SSE
        /wps/v1/pane/events), muc chay trong hoi thoai cua khung chat lon.
        ContextMenuText = chuot phai tren chu thuong, ContextMenuList = tren dong danh sach (ten idMso co trong bang
        lenh cua Writer WPS: res/commands/wps). -->
