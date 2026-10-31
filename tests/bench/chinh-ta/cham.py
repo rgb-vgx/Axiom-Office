@@ -25,7 +25,7 @@ def expected_text(case):
         if count != 1:
             raise ValueError(f"{case['id']}: '{wrong}' xuat hien {count} lan, can dung 1")
     for fix in case["fixes"]:
-        text = text.replace(fix["wrong"], fix["right"])
+        text = text.replace(fix["wrong"], fix["right"], 1)
     return text
 
 
