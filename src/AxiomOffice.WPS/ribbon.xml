@@ -110,8 +110,11 @@
       </tab>
     </tabs>
   </ribbon>
-  <!-- Menu chuot phai khi boi den (docs/architecture/ribbon-ui.md, "Trong khung chat"): 9 muc "Sua bang AI", cung thu tu va
-       nhan voi bang cua Core (agent/quickactions.go) - spec test_pane.mjs ghim hai ben. Bam mot muc: main.js mo
+  <!-- Menu chuot phai khi boi den (docs/architecture/ribbon-ui.md, "Trong khung chat"): 14 muc "Sua bang AI", cung thu tu va
+       nhan voi bang cua Core (agent/quickactions.go) - spec test_pane.mjs ghim hai ben. Nhom tone (Trang trong /
+       Ngan gon / De hieu / Tich cuc) nam trong menu con "Đổi giọng" (axiomCtxTone_<t|l> - menu long trong contextMenu
+       hien va bam duoc tren WPS that 12.1.2, 31/10/2026), roi den Viết tiếp, Dịch song ngữ, vach ngan, ba muc chi-tra-loi.
+       Bam mot muc: main.js mo
        KHUNG CHAT MINI (mini.html, Application.ShowDialog) va muc do chay ngay trong khung ay. Du phong khi WPS
        khong co ShowDialog: hien khung chat lon roi nho Core chuyen muc (POST /wps/v1/pane/request -> SSE
        /wps/v1/pane/events), muc chay trong hoi thoai cua khung chat lon.
@@ -125,7 +128,14 @@
         <button id="axiomQuick_shorten_t" label="Rút gọn" tag="quick:shorten" onAction="ribbon.OnAction"/>
         <button id="axiomQuick_expand_t" label="Mở rộng" tag="quick:expand" onAction="ribbon.OnAction"/>
         <button id="axiomQuick_fix_t" label="Sửa lỗi chính tả" tag="quick:fix" onAction="ribbon.OnAction"/>
-        <button id="axiomQuick_formal_t" label="Trang trọng hơn" tag="quick:formal" onAction="ribbon.OnAction"/>
+        <menu id="axiomCtxTone_t" label="Đổi giọng">
+          <button id="axiomQuick_formal_t" label="Trang trọng hơn" tag="quick:formal" onAction="ribbon.OnAction"/>
+          <button id="axiomQuick_concise_t" label="Ngắn gọn hơn" tag="quick:concise" onAction="ribbon.OnAction"/>
+          <button id="axiomQuick_plain_t" label="Dễ hiểu hơn" tag="quick:plain" onAction="ribbon.OnAction"/>
+          <button id="axiomQuick_positive_t" label="Tích cực hơn" tag="quick:positive" onAction="ribbon.OnAction"/>
+        </menu>
+        <button id="axiomQuick_continue_t" label="Viết tiếp" tag="quick:continue" onAction="ribbon.OnAction"/>
+        <button id="axiomQuick_bilingual_t" label="Dịch song ngữ" tag="quick:bilingual" onAction="ribbon.OnAction"/>
         <menuSeparator id="axiomCtxQuickSep_t"/>
         <button id="axiomQuick_summarize_t" label="Tóm tắt" tag="quick:summarize" onAction="ribbon.OnAction"/>
         <button id="axiomQuick_explain_t" label="Giải thích" tag="quick:explain" onAction="ribbon.OnAction"/>
@@ -140,7 +150,14 @@
         <button id="axiomQuick_shorten_l" label="Rút gọn" tag="quick:shorten" onAction="ribbon.OnAction"/>
         <button id="axiomQuick_expand_l" label="Mở rộng" tag="quick:expand" onAction="ribbon.OnAction"/>
         <button id="axiomQuick_fix_l" label="Sửa lỗi chính tả" tag="quick:fix" onAction="ribbon.OnAction"/>
-        <button id="axiomQuick_formal_l" label="Trang trọng hơn" tag="quick:formal" onAction="ribbon.OnAction"/>
+        <menu id="axiomCtxTone_l" label="Đổi giọng">
+          <button id="axiomQuick_formal_l" label="Trang trọng hơn" tag="quick:formal" onAction="ribbon.OnAction"/>
+          <button id="axiomQuick_concise_l" label="Ngắn gọn hơn" tag="quick:concise" onAction="ribbon.OnAction"/>
+          <button id="axiomQuick_plain_l" label="Dễ hiểu hơn" tag="quick:plain" onAction="ribbon.OnAction"/>
+          <button id="axiomQuick_positive_l" label="Tích cực hơn" tag="quick:positive" onAction="ribbon.OnAction"/>
+        </menu>
+        <button id="axiomQuick_continue_l" label="Viết tiếp" tag="quick:continue" onAction="ribbon.OnAction"/>
+        <button id="axiomQuick_bilingual_l" label="Dịch song ngữ" tag="quick:bilingual" onAction="ribbon.OnAction"/>
         <menuSeparator id="axiomCtxQuickSep_l"/>
         <button id="axiomQuick_summarize_l" label="Tóm tắt" tag="quick:summarize" onAction="ribbon.OnAction"/>
         <button id="axiomQuick_explain_l" label="Giải thích" tag="quick:explain" onAction="ribbon.OnAction"/>
