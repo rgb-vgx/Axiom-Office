@@ -1727,8 +1727,10 @@
     try {
       if (!value || typeof value.getFullYear !== "function") { return null; }
       var pad = function (n) { return (n < 10 ? "0" : "") + n; };
-      return value.getFullYear() + "-" + pad(value.getMonth() + 1) + "-" + pad(value.getDate()) +
-        " " + pad(value.getHours()) + ":" + pad(value.getMinutes());
+      // WPS tra Date mang GIO DIA PHUONG gan nhan UTC (do tren WPS 12.1.2 that, may +07): doc getUTC* moi
+      // ra dung gio tren may; getHours() cong them mui gio lan nua.
+      return value.getUTCFullYear() + "-" + pad(value.getUTCMonth() + 1) + "-" + pad(value.getUTCDate()) +
+        " " + pad(value.getUTCHours()) + ":" + pad(value.getUTCMinutes());
     } catch (e) {
       return null;
     }
