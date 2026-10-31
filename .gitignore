@@ -18,3 +18,5 @@ tests/ui/out/
 .claude/worktrees/
 # Thu muc tam cua test WPS (tests/wps/test_wps_bridge_live.py --keep)
 tests/wps/out/
+# CSDL cua may chu MCP nghien cuu web cua opencode (tao trong thu muc lam viec)
+/data/
