@@ -1958,6 +1958,8 @@ export function makeWriterApp(options = {}) {
     track: !!options.trackRevisions,
     revisions: [],
     comments: [],
+    // Revision.Date / Comment.Date cua WPS that la Date mang GIO DIA PHUONG gan nhan UTC (do 31/10/2026 o +07: luc
+    // 18:30 thi toISOString() ra "...T18:30:00.000Z"). Fake giu y nhu vay: dong ho 09:00 tren may = Date.UTC(..., 9, 0).
     clock: Date.UTC(2026, 9, 31, 9, 0, 0),
   };
 

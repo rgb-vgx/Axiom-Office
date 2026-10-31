@@ -75,6 +75,24 @@ test("tracking: listRevisions tra id/loai/tac gia/ngay/chu/story/so doan + total
   assert.match(del.date, DATE, "ngay dang yyyy-MM-dd HH:mm nhu ban Windows (Revision.Date cua WPS la Date)");
 });
 
+test("tracking: ngay revision/comment la gio tren may, khong cong them mui gio (Date cua WPS mang gio dia phuong nhan UTC)", () => {
+  // Dong ho fake bat dau 09:00 tren may; moi lan sua +1 giay. May o +07 (nhu may that) thi doc bang getHours() ra 16:00 - sai.
+  const savedTz = process.env.TZ;
+  process.env.TZ = "Asia/Ho_Chi_Minh";
+  try {
+    const ctx = loadAddin();
+    const app = writer("Phong da tuyen dung.\r");
+    run(ctx, app, "writer.setTracking", { on: true, author: "Axiom AI" });
+    run(ctx, app, "writer.replaceAll", { find: "Phong da", replace: "Phòng đã" });
+    assert.deepEqual(run(ctx, app, "writer.listRevisions", {}).revisions.map((r) => r.date),
+      ["2026-10-31 09:00", "2026-10-31 09:00"]);
+    run(ctx, app, "writer.addComment", { find: "tuyen dung", text: "Xem lai" });
+    assert.equal(run(ctx, app, "writer.listComments", {}).comments[0].date, "2026-10-31 09:00");
+  } finally {
+    if (savedTz === undefined) { delete process.env.TZ; } else { process.env.TZ = savedTz; }
+  }
+});
+
 test("tracking: listRevisions loc theo author va cat theo max; khong co revision thi danh sach rong", () => {
   const ctx = loadAddin();
   const app = writer("a1 b2 a1.\r");
