@@ -43,6 +43,7 @@ Gói cài Windows còn kèm `scripts/dist/HUONG-DAN-CAI-DAT.txt` (hướng dẫn
 | Tài liệu | Nội dung |
 |---|---|
 | [research/wps-spike.md](research/wps-spike.md) | Spike: add-in JS trên WPS Office for Linux có làm được không (cơ sở của `architecture/wps-bridge.md`) |
+| [research/doi-chieu-wps-ai.md](research/doi-chieu-wps-ai.md) | Đối chiếu bộ WPS AI (33 addon) với Axiom trên WPS Linux: bảng khoảng cách có bằng chứng `file:dòng`, ưu tiên, thiết kế P1, trạng thái từng mục (§6), phân công Claude/opencode (§7) |
 | [research/tinh-nang-con-thieu-so-voi-claude-m365.md](research/tinh-nang-con-thieu-so-voi-claude-m365.md) | Đối chiếu với Claude for Microsoft 365: tính năng còn thiếu, thiết kế, trạng thái từng mục (§6) |
 | [research/hoc-tu-agent-khac.md](research/hoc-tu-agent-khac.md) | Học gì từ Claude Code, Codex, Grok Build, Hermes Agent cho các lỗ hổng của agent runtime |
 | [research/skills-review.md](research/skills-review.md) | Review 8 skill dựng sẵn và khoảng trống so với công việc văn phòng |

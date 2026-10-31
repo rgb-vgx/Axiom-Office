@@ -429,3 +429,34 @@ bridge chính 47961 để không đụng Core thật), LLM giả (`tests/core/fa
   `QT_IM_MODULE=fcitx`… từ phiên làm việc, Telex biến `dist` thành `dít` và `ff` thành `f`. Mở WPS test bằng
   `env -u XMODIFIERS -u QT_IM_MODULE -u GTK_IM_MODULE -u SDL_IM_MODULE -u CLUTTER_IM_MODULE`.
 - Trang pane đang mở **không nạp lại** khi bấm lại nút ribbon (dùng lại pane cũ): sửa CSS/JS xong phải mở lại WPS.
+
+## Menu chuột phải lồng nhau và chèn thêm trong vùng khoá (đo 31/10/2026, WPS 12.1.2.29182)
+
+- `<menu>` **lồng trong** `<menu>` của `<contextMenu idMso="ContextMenuText">` hiện đúng (mũi tên mở cấp 3) và nút bên trong
+  gọi `ribbon.OnAction` như nút thường — menu con *Đổi giọng ▸* của P1-4 (`axiomCtxTone_<t|l>`).
+- WPS tự thêm mục **"Full Processing(Q) ▸ Parallel Translate"** vào menu chuột phải khi có vùng chọn (của WPS AI), đẩy
+  *Sửa bằng AI* xuống một dòng — toạ độ bấm trong test xdotool phải lấy lại từ ảnh chụp.
+- Khi `writer.lockSelection` đang khoá: `writer.replaceAll` với `\n` trong chuỗi thay **tạo đoạn mới** ngay trong vùng
+  khoá, giữ định dạng đoạn gốc, `writer.undo {count:1}` gỡ được; `replaceAll` chỉ tìm **trong vùng khoá** (chuỗi xuất
+  hiện hai lần trong tài liệu, chỉ chỗ trong vùng bị sửa). `writer.insertStyledText` thay **cả vùng**, và `*chữ*` được in
+  nguyên dấu sao (lệnh áp một kiểu chữ cho cả khối, không hiểu cú pháp nghiêng).
+- WPS bị dừng bằng `kill` thì lần mở sau hiện dải "The file was not closed properly…" ở đầu trang, đẩy văn bản xuống một
+  dòng; tắt WPS test bằng cách đóng cửa sổ, hoặc lấy lại toạ độ sau khi mở.
+
+## Track Changes và comment (đo 31/10/2026, WPS 12.1.2.29182)
+
+Đo bằng handler tạm `debug.eval` trong bản add-in ở scratchpad (không commit), gọi qua `POST /cmd`. Là nền của P1-1
+(`docs/research/doi-chieu-wps-ai.md`) và của fake `tests/wps/addin_fake.mjs` (`writerReviewOf`).
+
+| API | Kết quả đo |
+|---|---|
+| `app.UserName`, `app.UserInitials` | đọc + ghi được; **tác giả revision và comment = `UserName` lúc sửa/thêm** (đổi giữa chừng thì tác giả đổi theo) |
+| `doc.TrackRevisions` | đọc + ghi (`boolean`) |
+| `Content.Find.Execute(…, ReplaceWith, 2)` khi đang theo dõi | mỗi chỗ thay sinh **hai** revision: `Type 2` (xoá, chữ cũ) rồi `Type 1` (chèn, chữ mới) |
+| `Content.Text`, `Paragraph.Range.Text` khi có chữ đã xoá | **không** chứa chữ đã xoá (khác Word trên Windows - bản C# phải tự lọc) |
+| Nhiều lần thay trong **một** `UndoRecord` | `doc.Undo(1)` gỡ cả nhóm, kể cả revision |
+| `doc.Undo(1)` | trả `true` khi gỡ được một bước, `false` khi không còn gì để gỡ |
+| `Revision` | `Type`, `Author`, `Date` (đối tượng `Date` của JS), `Range.Start/End/Text`, `Range.StoryType` (= 1 thân văn bản) |
+| `Range.Find.Execute(text)` (không thay) | tìm thấy thì **co `Range` về chỗ khớp** |
+| `doc.Comments.Add(range, text)` | neo đúng vào `range` (`Comment.Scope`); trả về comment mới |
+| `Comment` | `Author`, `Initial`, `Index`, `Done` (đọc/ghi), `Date` (`Date`), `Range.Text` (kết `"\r"`), `Scope`, `Replies.Count`, `Ancestor` (`null` với comment gốc); còn có `Delete`, `DeleteRecursively`, `Edit`, `Reference`, `Contact`, `IsInk`, `ShowTip` |
