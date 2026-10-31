@@ -44,6 +44,8 @@ type Request struct {
 	// boi den gui kem. Khong co doan nao thi dung nhu lenh nhanh, de mot cau "ngan hon nua" khong bi hieu thanh sua ca
 	// tai lieu.
 	RequireSelection bool
+	// WholeDocument: lenh ca tai lieu (DocumentActions) - Core khong khoa vung boi den cho luot nay.
+	WholeDocument bool
 	// TrackChanges (options.trackChanges): luot Word sua bang Track Changes; nil = theo cau hinh TrackChangesEnabled.
 	TrackChanges *bool
 }
@@ -128,6 +130,9 @@ func ParseRequest(body map[string]any) (*Request, string) {
 	var trackChanges *bool
 	if value, ok := tryMap(body["options"])["trackChanges"].(bool); ok {
 		trackChanges = &value
+	} else if quick.Track {
+		on := true
+		trackChanges = &on
 	}
 	mode := strings.TrimSpace(textOf(tryMap(body["options"])["mode"]))
 	if mode != "" && mode != "plan" && mode != "act" {
@@ -150,8 +155,9 @@ func ParseRequest(body map[string]any) (*Request, string) {
 		Plan:        mode == "plan" && quick.ID == "",
 		QuickAction: quick.ID,
 		ReadOnly:    quick.ID != "" && !quick.Edits,
-		// Lenh nhanh nao cung lam tren doan boi den, nen luon can doan boi den.
-		RequireSelection: quick.ID != "" || requireSelection,
+		// Lenh menu "Sua bang AI" lam tren doan boi den nen luon can doan boi den; lenh ca tai lieu thi khong.
+		RequireSelection: (quick.ID != "" && !quick.Document) || requireSelection,
+		WholeDocument:    quick.Document,
 		TrackChanges:     trackChanges,
 	}, ""
 }
@@ -213,7 +219,7 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 // Tra ve loi cua add-in khi no TU CHOI khoa (vd ban WPS thieu API); "" khi khoa duoc, khi khong boi den gi,
 // hoac khi app nay khong co khoa vung.
 func (o *Orchestrator) lockSelection(ctx context.Context, run *Run, request *Request, appKind string) string {
-	if o.Bridge == nil || appKind != "wps" {
+	if o.Bridge == nil || appKind != "wps" || request.WholeDocument {
 		return ""
 	}
 	// writer.selection la lenh doc: goi truoc hay sau khi khoa deu ra cung vung (khoa khong doi vung chon).
