@@ -1819,6 +1819,363 @@
     return { inserted: true };
   }
 
+  // ---- writeContent / insertCaption / insertLayoutTable (port cua ban Windows) ----
+
+  // Bang Word khong tinh cong thuc: "=SUM(A1:A2)" hien nguyen chu. Tu choi TRUOC khi chen.
+  function rejectFormulaCells(rows) {
+    for (var r = 0; r < rows.length; r++) {
+      var row = rows[r] || [];
+      for (var c = 0; c < row.length; c++) {
+        var text = cellText(row[c]);
+        if (/^=\s*[A-Za-z(]/.test(text.replace(/^\s+|\s+$/g, ""))) {
+          throw new Error("Word tables do not calculate formulas: cell '" + text.replace(/^\s+|\s+$/g, "") +
+            "' would be shown as text. Compute the value yourself and write the number (e.g. 96%)");
+        }
+      }
+    }
+  }
+
+  function paramBlocks(params, name) {
+    var raw = params ? params[name] : undefined;
+    if (raw === undefined || raw === null || typeof raw === "string" || !Array.isArray(raw)) {
+      throw new Error("'" + name + "' must be an array of blocks, e.g. [{\"heading\": \"1. Mo dau\", \"level\": 1}, {\"text\": \"...\"}]");
+    }
+    var blocks = [];
+    for (var i = 0; i < raw.length; i++) {
+      var block = raw[i];
+      if (block === null || typeof block !== "object" || Array.isArray(block)) {
+        throw new Error("block " + (i + 1) + " is not an object");
+      }
+      blocks.push(block);
+    }
+    if (blocks.length === 0) { throw new Error("'" + name + "' is empty"); }
+    return blocks;
+  }
+
+  // Khoa dau tien co mat quyet dinh loai khoi (cung thu tu voi ban Windows).
+  function blockKind(block, index) {
+    var kinds = ["heading", "text", "bullets", "numbers", "table", "pageBreak"];
+    for (var i = 0; i < kinds.length; i++) {
+      if (Object.prototype.hasOwnProperty.call(block, kinds[i]) || block[kinds[i]] !== undefined) {
+        return kinds[i];
+      }
+    }
+    throw new Error("block " + index + " has none of heading, text, bullets, numbers, table, pageBreak (keys: " +
+      Object.keys(block).join(", ") + ")");
+  }
+
+  // Dong cua khoi danh sach: chuoi co '\n' tach dong, mang thi tung phan tu; bo dong trong.
+  function blockLines(block, key) {
+    var lines = [];
+    var raw = block[key];
+    if (raw === undefined || raw === null) { return lines; }
+    raw = unwrapScalar(raw);
+    if (typeof raw === "string") {
+      var parts = raw.replace(/\r\n/g, "\n").split("\n");
+      for (var i = 0; i < parts.length; i++) { lines.push(parts[i]); }
+    } else if (Array.isArray(raw)) {
+      for (var j = 0; j < raw.length; j++) { lines.push(cellText(unwrapScalar(raw[j]))); }
+    }
+    var out = [];
+    for (var k = 0; k < lines.length; k++) {
+      var text = String(lines[k] === undefined || lines[k] === null ? "" : lines[k]).replace(/^\s+|\s+$/g, "");
+      if (text.length > 0) { out.push(text); }
+    }
+    return out;
+  }
+
+  // Danh sach that (gach dau dong / so tu dong), khong phai dau "-" go tay. Doan sau danh sach la
+  // doan thuong: ngat tu muc cuoi thi WPS keo danh sach sang doan ke.
+  function appendList(app, doc, lines, numbered) {
+    cmdAppendText(app, { text: lines.join("\n"), alignment: "left" });
+    var total = Number(doc.Paragraphs.Count);
+    var range = doc.Range(doc.Paragraphs.Item(total - lines.length + 1).Range.Start, doc.Paragraphs.Item(total).Range.End);
+    // wdBulletGallery = 1, wdNumberGallery = 2; ContinuePreviousList = false: moi danh sach so bat dau lai tu 1.
+    var template = app.ListGalleries.Item(numbered ? 2 : 1).ListTemplates.Item(1);
+    range.ListFormat.ApplyListTemplate(template, false);
+    doc.Content.InsertParagraphAfter();
+    var next = doc.Paragraphs.Last;
+    next.Range.ListFormat.RemoveNumbers();
+    next.Style = builtinStyle(doc, "normal");
+    var cursor = next.Range;
+    cursor.Collapse(1);
+    cursor.Select();
+  }
+
+  // Ngat trang o cuoi bai, tren mot doan rieng (khong dinh vao doan chu truoc).
+  function appendPageBreak(app, doc) {
+    var last = doc.Paragraphs.Last;
+    var text = "";
+    try { text = String(last.Range.Text); } catch (eText) { text = ""; }
+    var inTable = false;
+    try { inTable = !!last.Range.Information(12); } catch (eInfo) { inTable = false; }
+    if (text.replace(/^\s+|\s+$/g, "").length > 0 || inTable) { doc.Content.InsertParagraphAfter(); }
+    app.Selection.EndKey(6);
+    app.Selection.InsertBreak(7);
+  }
+
+  function cmdWriterWriteContent(app, params) {
+    var blocks = paramBlocks(params, "blocks");
+    var bodyAlignment = paramString(params, "alignment", "justify");
+    // Soat HET truoc khi ghi: loi giua chung de lai nua bai.
+    var kinds = [];
+    var i;
+    for (i = 0; i < blocks.length; i++) {
+      var kind = blockKind(blocks[i], i + 1);
+      kinds.push(kind);
+      if (kind === "table") {
+        var values = null;
+        try { values = paramMatrix(blocks[i], "table", false); } catch (eTable) { values = null; }
+        if (values === null || values.length === 0) {
+          throw new Error("block " + (i + 1) + ": 'table' must be a 2D array of rows");
+        }
+        rejectFormulaCells(values);
+      } else if ((kind === "bullets" || kind === "numbers") && blockLines(blocks[i], kind).length === 0) {
+        throw new Error("block " + (i + 1) + ": '" + kind + "' must be a non-empty array of items");
+      } else if (kind === "heading" && paramString(blocks[i], "heading", "").replace(/^\s+|\s+$/g, "") === "") {
+        throw new Error("block " + (i + 1) + ": 'heading' is empty");
+      }
+    }
+    var doc = app.ActiveDocument;
+    var counts = {};
+    // Viet noi tiep o CUOI bai (nhu appendText), khong theo con tro nguoi dung dang de.
+    app.Selection.EndKey(6);
+    for (i = 0; i < blocks.length; i++) {
+      var block = blocks[i];
+      kind = kinds[i];
+      counts[kind] = (counts[kind] || 0) + 1;
+      if (kind === "heading") {
+        app.Selection.EndKey(6);
+        // Con tro o cuoi doan co chu (vd sau writer.appendText): sang doan moi, khong bien doan do
+        // thanh tieu de (giong WriterHeading cua ban Windows).
+        var lastPara = doc.Paragraphs.Last;
+        var lastParaText = "";
+        try { lastParaText = String(lastPara.Range.Text); } catch (eLast) { lastParaText = ""; }
+        if (lastParaText.replace(/^\s+|\s+$/g, "").length > 0) { app.Selection.TypeParagraph(); }
+        cmdHeading(app, { text: paramString(block, "heading", "").replace(/^\s+|\s+$/g, ""), level: paramInt(block, "level", 1) });
+      } else if (kind === "text") {
+        var textParams = {};
+        for (var key in block) {
+          if (Object.prototype.hasOwnProperty.call(block, key)) { textParams[key] = block[key]; }
+        }
+        textParams.alignment = hasParam(block, "alignment") ? paramString(block, "alignment", bodyAlignment) : bodyAlignment;
+        cmdAppendText(app, textParams);
+      } else if (kind === "bullets" || kind === "numbers") {
+        appendList(app, doc, blockLines(block, kind), kind === "numbers");
+      } else if (kind === "table") {
+        var caption = paramString(block, "caption", null);
+        var hasCaption = caption !== null && caption !== undefined && String(caption).replace(/^\s+|\s+$/g, "") !== "";
+        if (hasCaption) {
+          var captionParams = { text: String(caption).replace(/^\s+|\s+$/g, "") };
+          if (hasParam(block, "label")) { captionParams.label = paramString(block, "label", "Bảng"); }
+          cmdWriterInsertCaption(app, captionParams);
+        } else {
+          // WPS GOP bang moi vao bang ngay truoc: hai khoi bang lien nhau phai co mot doan ngan giua.
+          if (i > 0 && kinds[i - 1] === "table") { doc.Content.InsertParagraphAfter(); }
+          app.Selection.EndKey(6);
+        }
+        var tableParams = { values: block.table };
+        if (hasParam(block, "style")) { tableParams.style = block.style; }
+        cmdInsertTable(app, tableParams);
+      } else if (kind === "pageBreak") {
+        if (paramBool(block, "pageBreak", true)) { appendPageBreak(app, doc); }
+      }
+    }
+    counts.blocks = blocks.length;
+    counts.paragraphs = Number(doc.Paragraphs.Count);
+    return counts;
+  }
+
+  function cmdWriterInsertCaption(app, params) {
+    var text = paramString(params, "text", null);
+    if (text === null || text === undefined || text === "") { throw new Error("'text' is required"); }
+    var label = paramString(params, "label", "Bảng");
+    if (label === null || label === undefined) { label = "Bảng"; }
+    label = String(label).replace(/^\s+|\s+$/g, "");
+    if (label === "") { label = "Bảng"; }
+    var before = paramInt(params, "before", 0);
+    // Ban Windows con chen truoc doan/bang co san; WPS chua do duoc API do nen tu choi ro rang.
+    if (before > 0) { throw new Error("'before' is not supported in WPS: the caption is inserted at the end of the document only"); }
+    var doc = app.ActiveDocument;
+    var target = doc.Paragraphs.Last;
+    var lastText = "";
+    try { lastText = String(target.Range.Text); } catch (eText) { lastText = ""; }
+    var inTable = false;
+    try { inTable = !!target.Range.Information(12); } catch (eInfo) { inTable = false; }
+    if (lastText.replace(/^\s+|\s+$/g, "").length > 0 || inTable) {
+      doc.Content.InsertParagraphAfter();
+      target = doc.Paragraphs.Last;
+    }
+    target.Style = builtinStyle(doc, "caption");
+    // Chu thich di lien voi bang/hinh ngay duoi, khong nam le cuoi trang.
+    target.KeepWithNext = -1;
+    // Dung bang Range (khong go theo con tro): "Nhan #. chu" roi thay "#" bang truong SEQ - dem theo nhan.
+    // wdFieldEmpty = -1, PreserveFormatting = false.
+    var body = target.Range;
+    body.MoveEnd(1, -1);
+    body.Text = label + " #. " + text;
+    var hash = Number(body.Start) + label.length + 1;
+    var slot = doc.Range(hash, hash + 1);
+    var field = doc.Fields.Add(slot, -1, "SEQ " + label.split(" ").join("_") + " \\* ARABIC", false);
+    field.Update();
+    var number = String(field.Result.Text);
+    // Cuoi bai: them doan Normal sau chu thich, con tro o do - bang/hinh chen tiep nam ngay duoi.
+    doc.Content.InsertParagraphAfter();
+    var next = doc.Paragraphs.Last;
+    next.Style = builtinStyle(doc, "normal");
+    var cursor = next.Range;
+    cursor.Collapse(1);
+    cursor.Select();
+    return { caption: label + " " + number + ". " + text, number: number };
+  }
+
+  // Can le cua o bang dan trang: mac dinh giua, khong ro thi giua (giong AlignmentOf cua ban Windows).
+  function layoutAlign(value) {
+    var key = (value === undefined || value === null) ? "" : String(value).replace(/^\s+|\s+$/g, "").toLowerCase();
+    if (key === "left") { return 0; }
+    if (key === "right") { return 2; }
+    if (key === "center" || key === "centre") { return 1; }
+    return 1;
+  }
+
+  function parseLayoutLine(raw, size) {
+    raw = unwrapScalar(raw);
+    var entry = (raw !== null && typeof raw === "object" && !Array.isArray(raw)) ? raw : null;
+    if (entry === null) {
+      return { text: cellText(raw), bold: false, italic: false, underline: false, size: size };
+    }
+    var text = paramString(entry, "t", null);
+    if (text === null || text === undefined) { text = paramString(entry, "text", ""); }
+    if (text === null || text === undefined) { text = ""; }
+    if (paramBool(entry, "upper", false)) { text = text.toLocaleUpperCase("vi-VN"); }
+    return {
+      text: text,
+      bold: paramBool(entry, "bold", false),
+      italic: paramBool(entry, "italic", false),
+      underline: paramBool(entry, "underline", false),
+      size: paramInt(entry, "size", size)
+    };
+  }
+
+  function parseLayoutCell(raw, size) {
+    raw = unwrapScalar(raw);
+    var cell = { lines: [], align: 1 };
+    var entry = (raw !== null && typeof raw === "object" && !Array.isArray(raw)) ? raw : null;
+    var lines;
+    if (entry !== null) {
+      cell.align = layoutAlign(paramString(entry, "align", "center"));
+      if (hasParam(entry, "lines")) {
+        // Giu nguyen mang (ke ca mang mot phan tu): unwrapScalar se go mang 1 phan tu thanh chinh phan tu.
+        var value = entry.lines;
+        if (Array.isArray(value)) {
+          lines = value;
+        } else {
+          value = unwrapScalar(value);
+          if (Array.isArray(value)) {
+            lines = value;
+          } else {
+            lines = String(value === undefined || value === null ? "" : value).replace(/\r\n/g, "\n").split("\n");
+          }
+        }
+      } else {
+        lines = [""];
+      }
+    } else if (Array.isArray(raw)) {
+      lines = raw;
+    } else {
+      lines = String(raw === undefined || raw === null ? "" : raw).replace(/\r\n/g, "\n").split("\n");
+    }
+    for (var i = 0; i < lines.length; i++) { cell.lines.push(parseLayoutLine(lines[i], size)); }
+    if (cell.lines.length === 0) {
+      cell.lines.push({ text: "", bold: false, italic: false, underline: false, size: size });
+    }
+    return cell;
+  }
+
+  function cmdWriterInsertLayoutTable(app, params) {
+    // Khong unwrap mang ngoai: bang mot hang [[a, b]] se bi go thanh [a, b] (o thanh hang).
+    var raw = params ? params.rows : undefined;
+    if (raw === undefined || raw === null || typeof raw === "string" || !Array.isArray(raw)) {
+      throw new Error("'rows' must be a 2D array of cells, e.g. [[\"TRUONG THPT A\", \"CONG HOA XA HOI CHU NGHIA VIET NAM\"]]");
+    }
+    var size = paramInt(params, "size", 13);
+    var font = paramString(params, "font", "Times New Roman");
+    var grid = [];
+    var r, c, i;
+    for (r = 0; r < raw.length; r++) {
+      var cells = raw[r];
+      if (!Array.isArray(cells) || typeof cells === "string") {
+        throw new Error("row " + (grid.length + 1) + " must be an array of cells");
+      }
+      var row = [];
+      for (c = 0; c < cells.length; c++) { row.push(parseLayoutCell(cells[c], size)); }
+      grid.push(row);
+    }
+    var rows = grid.length;
+    var cols = 0;
+    for (r = 0; r < rows; r++) { if (grid[r].length > cols) { cols = grid[r].length; } }
+    if (rows === 0 || cols === 0) { throw new Error("'rows' is empty"); }
+    var widths = paramIntList(params, "widths");
+    if (widths.length > 0) {
+      var bad = widths.length !== cols;
+      for (i = 0; i < widths.length; i++) { if (widths[i] <= 0) { bad = true; } }
+      if (bad) {
+        throw new Error("'widths' needs " + cols + " positive percentages, got [" + widths.join(", ") + "]");
+      }
+    }
+    var doc = app.ActiveDocument;
+    app.Selection.EndKey(6);
+    var table = doc.Tables.Add(tableAnchor(app), rows, cols);
+    table.Borders.Enable = 0;
+    // Bang dan trang: cung tem voi writer.formatTable {borders:false}.
+    table.Title = LAYOUT_TABLE_NAME;
+    table.Range.Font.Name = font;
+    table.Range.ParagraphFormat.SpaceBefore = 0;
+    table.Range.ParagraphFormat.SpaceAfter = 0;
+    // wdLineSpaceSingle = 0.
+    table.Range.ParagraphFormat.LineSpacingRule = 0;
+    if (widths.length > 0) {
+      // wdPreferredWidthPercent = 2.
+      table.PreferredWidthType = 2;
+      table.PreferredWidth = 100;
+      var total = 0;
+      for (i = 0; i < widths.length; i++) { total += widths[i]; }
+      for (c = 0; c < cols; c++) {
+        var column = table.Columns.Item(c + 1);
+        column.PreferredWidthType = 2;
+        column.PreferredWidth = 100 * widths[c] / total;
+      }
+    }
+    for (r = 0; r < rows; r++) {
+      for (c = 0; c < cols; c++) {
+        var cell = c < grid[r].length ? grid[r][c]
+          : { lines: [{ text: "", bold: false, italic: false, underline: false, size: size }], align: 1 };
+        var range = table.Cell(r + 1, c + 1).Range;
+        var parts = [];
+        for (i = 0; i < cell.lines.length; i++) { parts.push(cell.lines[i].text); }
+        range.Text = parts.join("\r");
+        var paragraphs = table.Cell(r + 1, c + 1).Range.Paragraphs;
+        var count = Number(paragraphs.Count);
+        for (i = 0; i < cell.lines.length && i < count; i++) {
+          var line = cell.lines[i];
+          var paragraph = paragraphs.Item(i + 1);
+          paragraph.Alignment = cell.align;
+          var text = paragraph.Range;
+          text.Font.Bold = line.bold ? -1 : 0;
+          text.Font.Italic = line.italic ? -1 : 0;
+          text.Font.Underline = line.underline ? 1 : 0;
+          text.Font.Size = line.size;
+        }
+      }
+    }
+    var index = Number(doc.Range(0, table.Range.End).Tables.Count);
+    // Con tro ra sau bang: phan viet tiep (writeContent, appendText) nam duoi bang.
+    var after = table.Range;
+    after.Collapse(0);
+    after.Select();
+    return { table: index, rows: rows, cols: cols, layout: true };
+  }
+
   function countOccurrences(haystack, needle) {
     if (needle === undefined || needle === null) { return 0; }
     var h = String(haystack === undefined || haystack === null ? "" : haystack);
@@ -4967,6 +5324,9 @@
     "writer.formatTable": cmdWriterFormatTable,
     "writer.insertTable": cmdInsertTable,
     "writer.insertPageBreak": cmdInsertPageBreak,
+    "writer.insertCaption": cmdWriterInsertCaption,
+    "writer.writeContent": cmdWriterWriteContent,
+    "writer.insertLayoutTable": cmdWriterInsertLayoutTable,
     "writer.checkTables": cmdWriterCheckTables,
     "writer.replaceAll": cmdReplaceAll,
     "writer.replaceMany": cmdWriterReplaceMany,
