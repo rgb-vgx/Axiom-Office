@@ -487,13 +487,14 @@
   // Nguoi dung boi den, bam chuot phai, chon "Trau chuot": main.js hien khung chat roi nho Core chuyen muc do toi day
   // (ribbon khong noi thang duoc vao trang nay - docs/architecture/ribbon-ui.md muc 7). Khung chat nghe SSE pane/events va chay
   // muc do trong CHINH hoi thoai dang mo. Day la loi vao DUY NHAT cua "Sua bang AI" - khung chat khong ve menu rieng
-  // (20/10/2026, theo yeu cau nguoi dung). Chi khung chat cua Writer nghe: man hinh phu (?view=) va Calc/Impress
-  // khong co menu nay. EventSource tu noi lai khi Core khoi dong lai.
+  // (20/10/2026, theo yeu cau nguoi dung). Khung chat cua Writer va Presentation nghe (nut "Tao slide tu tai lieu"
+  // o Presentation cung di duong nay); man hinh phu (?view=) va Calc thi khong. EventSource tu noi lai khi Core
+  // khoi dong lai.
   var quickReady = null;
 
   function listenPane() {
     try {
-      if (VIEW || KIND !== "wps" || !ctl || typeof window.EventSource !== "function") { return; }
+      if (VIEW || (KIND !== "wps" && KIND !== "wpp") || !ctl || typeof window.EventSource !== "function") { return; }
       // ?client=: chi nhan yeu cau tu ribbon cua CUNG ban add-in (api/wpspane.go) - app WPS khac co khung chat rieng.
       var source = new window.EventSource(baseUrl() + "pane/events" + (CLIENT ? "?client=" + encodeURIComponent(CLIENT) : ""));
       source.addEventListener("pane.quick", function (evt) {
@@ -2178,12 +2179,32 @@
           planBtn.appendChild(document.createTextNode(state.plan ? "● Lập kế hoạch trước" : "○ Lập kế hoạch trước"));
         } catch (ePlan) {}
       }
+      // Lenh dang cho cau go (Soan van ban): the nho o tren o soan, placeholder la cau hoi cua lenh.
+      var pending = null;
+      try { pending = state.pendingAction || null; } catch (ePending) { pending = null; }
+      var pendingChip = $("pendingChip");
+      if (pendingChip) {
+        try {
+          if (pending && pending.id) {
+            pendingChip.removeAttribute("hidden");
+            var pendingLabel = $("pendingLabel");
+            if (pendingLabel) {
+              clearNode(pendingLabel);
+              pendingLabel.appendChild(document.createTextNode(textOf(pending.label)));
+            }
+          } else {
+            pendingChip.setAttribute("hidden", "hidden");
+          }
+        } catch (eChip) {}
+      }
       var input = $("input");
       if (input) {
         try {
-          input.setAttribute("placeholder", state.plan
-            ? "Mô tả việc cần làm - AI lập kế hoạch trước, chưa sửa gì…"
-            : "Nhập yêu cầu cho tài liệu này…");
+          input.setAttribute("placeholder", pending && pending.input
+            ? String(pending.input)
+            : (state.plan
+              ? "Mô tả việc cần làm - AI lập kế hoạch trước, chưa sửa gì…"
+              : "Nhập yêu cầu cho tài liệu này…"));
         } catch (ePh) {}
       }
       var status = $("statusText");
@@ -2292,6 +2313,7 @@
   var ACTIONS = {
     more: function () { setMenu(!menuOpen()); },
     "new": function () { withCtl(function (c) { c.newConversation(); }); },
+    cancelPending: function () { withCtl(function (c) { c.cancelPending(); }); },
     send: doSend,
     stop: function () { withCtl(function (c) { c.stop(); }); },
     approve: function () { withCtl(function (c) { c.confirm(true); }); },

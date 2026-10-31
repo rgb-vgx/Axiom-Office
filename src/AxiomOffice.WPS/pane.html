@@ -31,6 +31,11 @@
   <main id="chat" role="log" aria-live="polite" aria-label="Hội thoại"></main>
   <div id="composer">
     <div id="composerBox">
+      <div id="pendingChip" class="pendingChip" hidden>
+        <span id="pendingLabel" class="pendingLabel"></span>
+        <button id="pendingCancel" class="pendingCancel" type="button" data-act="cancelPending"
+                title="Huỷ lệnh đang chờ" aria-label="Huỷ lệnh đang chờ">×</button>
+      </div>
       <textarea id="input" rows="2" aria-label="Yêu cầu cho AI" placeholder="Nhập yêu cầu cho tài liệu này…"></textarea>
       <div class="composerFoot">
         <button id="planToggle" class="planToggle" type="button" data-act="plan" aria-pressed="false"

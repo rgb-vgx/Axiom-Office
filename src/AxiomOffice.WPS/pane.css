@@ -413,6 +413,51 @@ body {
 #composerBox:focus-within {
   border-color: var(--axiom-focus);
 }
+/* The lenh dang cho cau go (Soan van ban): chip nho trong o soan, nut huy ben phai. */
+.pendingChip {
+  display: flex;
+  align-items: center;
+  gap: var(--axiom-gap-chip);
+  margin-bottom: var(--axiom-gap-chip);
+  padding: 2px var(--axiom-gap-chip) 2px var(--axiom-pad-x);
+  background: var(--axiom-chip-hover);
+  border: 1px solid var(--axiom-chip-border);
+  border-radius: var(--axiom-radius-control);
+  color: var(--axiom-accent-fg);
+  font-size: var(--axiom-size-caption);
+}
+.pendingChip[hidden] {
+  display: none;
+}
+.pendingLabel {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+.pendingCancel {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--axiom-radius-control);
+  color: var(--axiom-accent-fg);
+  font-family: system-ui,"Segoe UI","Noto Sans",sans-serif;
+  font-size: var(--axiom-size-small);
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 200ms ease;
+}
+.pendingCancel:hover {
+  background: var(--axiom-chip-border);
+}
+.pendingCancel:active {
+  opacity: 0.75;
+}
 #input {
   width: 100%;
   box-sizing: border-box;

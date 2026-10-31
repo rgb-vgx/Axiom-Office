@@ -417,6 +417,9 @@
     axiomCheckTables: "checkTables",
     axiomProofread: "doc:proofread",
     axiomTableTidy: "doc:tableTidy",
+    axiomSmartCreate: "doc:smartCreate",
+    axiomSlidesFromDoc: "doc:slidesFromDoc",
+    axiomRbTone: "toneMenu",
     axiomCheckRange: "checkRange",
     axiomMemory: "memory",
     axiomSkills: "skills",
@@ -436,6 +439,8 @@
   // Muc "Sua bang AI" trong menu chuot phai: id = axiomQuick_<muc>_<t|l>, tag = "quick:<muc>". Khong liet ke tung
   // muc vao TAGS_BY_ID - danh sach muc la cua Core (agent/quickactions.go), them muc thi chi phai sua ribbon.xml.
   var QUICK_ID = /^axiomQuick_([a-z]+)_[tl]$/;
+  // Nut "Viet voi AI" tren ribbon: id = axiomRb_<muc>, tag = "quick:<muc>" (cung tag voi menu chuot phai).
+  var RIBBON_QUICK_ID = /^axiomRb_([a-z]+)$/;
   var QUICK_TAG = "quick:";
   // Lenh ca tai lieu (nut "Kiem tra tai lieu" cua Writer): tag = "doc:<id>", luon chay trong khung chat LON.
   var DOC_TAG = "doc:";
@@ -468,7 +473,10 @@
   var ICON_DIR = "images/";
   // Tag co tep anh that trong images/ - spec test ghim khop dung danh sach tep. Tag khac (vd nut ribbon da chuyen
   // sang imageMso) thi OnGetImage tra chuoi rong: tra duong dan khong ton tai la WPS ve dau "?".
-  var ICON_FILES = { askAi: true, quickMenu: true };
+  var ICON_FILES = { askAi: true, doc_slidesFromDoc: true, doc_smartCreate: true,
+    quick_bilingual: true, quick_continue: true, quick_expand: true, quick_explain: true,
+    quick_fix: true, quickMenu: true, quick_polish: true, quick_rewrite: true, quick_shorten: true,
+    quick_summarize: true, quick_translate: true, toneMenu: true };
 
   function tagOf(control) {
     var tag = "";
@@ -480,6 +488,8 @@
     if (Object.prototype.hasOwnProperty.call(TAGS_BY_ID, id)) { return TAGS_BY_ID[id]; }
     var quick = QUICK_ID.exec(id);
     if (quick) { return QUICK_TAG + quick[1]; }
+    var ribbonQuick = RIBBON_QUICK_ID.exec(id);
+    if (ribbonQuick) { return QUICK_TAG + ribbonQuick[1]; }
     return "";
   }
 
@@ -539,12 +549,20 @@
   function OnGetVisible(control) {
     try {
       var tag = tagOf(control);
-      // Lenh ca tai lieu chi co o Writer.
+      // Lenh ca tai lieu: "Tao slide tu tai lieu" chi o Presentation, cac lenh doc:<id> khac chi o Writer.
       if (tag.indexOf(DOC_TAG) === 0) {
         var docKind = "";
         try { docKind = currentAppKind() || ""; } catch (eD) { docKind = ""; }
         if (docKind === "" || docKind === "unknown") { return true; }
+        if (tag.substring(DOC_TAG.length) === "slidesFromDoc") { return docKind === "wpp"; }
         return docKind === "wps";
+      }
+      // Nut "Viet voi AI" tren ribbon va menu Doi giong chi co o Writer.
+      if (tag.indexOf(QUICK_TAG) === 0 || tag === "toneMenu") {
+        var writeKind = "";
+        try { writeKind = currentAppKind() || ""; } catch (eW) { writeKind = ""; }
+        if (writeKind === "" || writeKind === "unknown") { return true; }
+        return writeKind === "wps";
       }
       if (!Object.prototype.hasOwnProperty.call(CHECK_KINDS, tag)) { return true; }
       var kind = "";
@@ -564,8 +582,9 @@
   function OnGetImage(control) {
     try {
       var tag = tagOf(control);
-      // Chi tag co tep that (ICON_FILES). Muc "quick:<muc>" va nut ribbon dung imageMso thi khong co tep rieng.
-      if (Object.prototype.hasOwnProperty.call(ICON_FILES, tag)) { return ICON_DIR + tag + ".svg"; }
+      // Ten tep = tag voi ':' thanh '_' ("quick:polish" -> images/quick_polish.svg).
+      var name = tag.replace(/:/g, "_");
+      if (Object.prototype.hasOwnProperty.call(ICON_FILES, name)) { return ICON_DIR + name + ".svg"; }
     } catch (e) {}
     return "";
   }

@@ -242,7 +242,8 @@
       canUndo: false,
       canInsert: false,
       quickActions: [],
-      documentActions: []
+      documentActions: [],
+      pendingAction: null
     };
     var runId = null;
     var source = null;
@@ -605,6 +606,14 @@
     function send(prompt) {
       var text = trimText(prompt);
       if (!text) { return false; }
+      // Lenh can go yeu cau (Soan van ban): cau vua go la prompt cua lenh do, khong phai mot luot moi.
+      var pending = null;
+      try { pending = state.pendingAction || null; } catch (ePend) { pending = null; }
+      if (pending && pending.id) {
+        var pendingLabel = trimText(pending.label) || safeString(pending.id);
+        try { state.pendingAction = null; } catch (eClear) {}
+        return startRun(pendingLabel + ": " + text, { quickAction: pending.id, prompt: text });
+      }
       var body = { prompt: text };
       // "Lap ke hoach truoc": Core chi cho doc tai lieu va tra ve ke hoach (CoreClient: mode "plan").
       try { if (state.plan) { body.options = { mode: "plan" }; } } catch (e) {}
@@ -617,14 +626,26 @@
       var actionId = trimText(id);
       if (!actionId) { return false; }
       var label = actionId;
+      var docAction = null;
       try {
         for (var i = 0; i < state.quickActions.length; i++) {
           if (state.quickActions[i].id === actionId) { label = state.quickActions[i].label; }
         }
         for (var j = 0; j < state.documentActions.length; j++) {
-          if (state.documentActions[j].id === actionId) { label = state.documentActions[j].label; }
+          if (state.documentActions[j].id === actionId) {
+            label = state.documentActions[j].label;
+            docAction = state.documentActions[j];
+          }
         }
       } catch (e) {}
+      // Lenh can go yeu cau: chua chay, chi cho cau go o o soan (send se gui kem prompt).
+      try {
+        if (docAction && trimText(docAction.input) !== "") {
+          state.pendingAction = { id: actionId, label: label, input: trimText(docAction.input) };
+          emit();
+          return true;
+        }
+      } catch (ePending) {}
       // Muc chon tu menu chuot phai (main.js -> Core -> pane) den bat ky luc nao, ke ca giua mot luot dang chay - noi
       // ro la bi bo qua, khong im lang nuot mat viec nguoi dung vua chon.
       if (state.running) {
@@ -635,22 +656,25 @@
       return startRun(label, { quickAction: actionId });
     }
 
-    // parseActions: doc [{id, label, edits}] cua Core, bo muc thieu id/nhan.
+    // parseActions: doc [{id, label, edits, app, input}] cua Core, bo muc thieu id/nhan.
     function parseActions(raw) {
       var out = [];
       for (var i = 0; i < raw.length; i++) {
         var id = trimText(raw[i] && raw[i].id);
         var label = trimText(raw[i] && raw[i].label);
-        if (id && label) { out.push({ id: id, label: label, edits: !!raw[i].edits }); }
+        if (id && label) {
+          out.push({ id: id, label: label, edits: !!raw[i].edits,
+            app: trimText(raw[i] && raw[i].app), input: trimText(raw[i] && raw[i].input) });
+        }
       }
       return out;
     }
 
-    // loadQuickActions: danh sach muc lay tu Core, khong chep tay. Chi Writer: lenh nhanh can khoa vung boi den,
-    // ma khoa vung moi co cho van ban (Calc/Impress khong co doan van de boi den).
+    // loadQuickActions: danh sach muc lay tu Core, khong chep tay. Writer co menu boi den; Presentation chi co
+    // lenh ca tai lieu (Tao slide tu tai lieu). Calc khong hoi: khong co doan van de boi den.
     function loadQuickActions() {
       try {
-        if (kind !== "wps") { return resolved(false); }
+        if (kind !== "wps" && kind !== "wpp") { return resolved(false); }
         var req = null;
         try { req = fetchFn(base + "quick-actions", { method: "GET" }); } catch (e) { req = null; }
         if (!req || typeof req.then !== "function") { return resolved(false); }
@@ -665,10 +689,17 @@
             list = parseActions((result && result.actions) || []);
             docs = parseActions((result && result.documentActions) || []);
           } catch (e2) { list = []; docs = []; }
-          state.quickActions = list;
-          state.documentActions = docs;
+          // DocumentActions cua Core co the danh cho app khac: chi giu lenh cua app dang mo (app rong = Writer).
+          var quick = kind === "wps" ? list : [];
+          var forKind = [];
+          for (var di = 0; di < docs.length; di++) {
+            var docApp = docs[di].app || "wps";
+            if (docApp === kind) { forKind.push(docs[di]); }
+          }
+          state.quickActions = quick;
+          state.documentActions = forKind;
           emit();
-          return list.length > 0;
+          return quick.length + forKind.length > 0;
         }).then(null, function () {
           state.quickActions = [];
           state.documentActions = [];
@@ -1064,6 +1095,15 @@
       } catch (e) {}
     }
 
+    // Huy lenh dang cho cau go: quay ve o soan thuong, khong gui gi.
+    function cancelPending() {
+      try {
+        state.pendingAction = null;
+        emit();
+      } catch (e) {}
+      return true;
+    }
+
     function getState() {
       try {
         return JSON.parse(JSON.stringify(state));
@@ -1075,6 +1115,7 @@
     return {
       send: send,
       quick: quick,
+      cancelPending: cancelPending,
       loadQuickActions: loadQuickActions,
       confirm: confirm,
       choose: choose,
