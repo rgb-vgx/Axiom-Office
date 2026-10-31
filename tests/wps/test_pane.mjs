@@ -522,10 +522,10 @@ const RIBBON_IMAGE_MSO = {
 
 // Nut AI (nhom Tao moi + Viet voi AI, 01/11/2026): imageMso hop nghia deu ra "?" tren WPS that (do 32 ten), nen dung bo
 // SVG rieng theo phong cach icon net cua tab WPS AI - getImage, KHONG imageMso. Bon muc con cua menu Doi giong: khong icon.
-const RIBBON_AI = ["axiomSmartCreate", "axiomSlidesFromDoc", "axiomRb_polish", "axiomRb_rewrite", "axiomRb_continue",
+const RIBBON_AI = ["axiomHistory", "axiomSmartCreate", "axiomSmartEdit", "axiomSlidesFromDoc", "axiomSummarizeDoc", "axiomTranslateDoc", "axiomRb_polish", "axiomRb_rewrite", "axiomRb_continue",
   "axiomRb_expand", "axiomRb_shorten", "axiomRb_fix", "axiomRbTone", "axiomRb_bilingual", "axiomRb_translate",
   "axiomRb_summarize", "axiomRb_explain"];
-const RIBBON_TONE = ["axiomRb_formal", "axiomRb_concise", "axiomRb_plain", "axiomRb_positive"];
+const RIBBON_TONE = ["axiomRb_formal", "axiomRb_academic", "axiomRb_concise", "axiomRb_plain", "axiomRb_positive"];
 const iconName = (tag) => tag.replace(":", "_");
 
 test("ribbon.xml: nut cu dung imageMso dung bang da do; nut AI dung getImage + SVG rieng; moi nut MOT nguon icon", () => {
@@ -752,7 +752,7 @@ function coreQuickActions() {
 
 test("ribbon.xml contextMenus: chu thuong + dong danh sach, 'Sua bang AI' khop DUNG bang cua Core", () => {
   const core = coreQuickActions();
-  assert.equal(core.length, 14, "doc duoc bang QuickActions cua Core (P1-4: 14 muc)");
+  assert.equal(core.length, 15, "doc duoc bang QuickActions cua Core (P1-4: 14 muc + Hoc thuat hon 01/11/2026)");
   const context = ribbonControls("context");
   const menus = context.filter((c) => c.kind === "contextMenu").map((c) => c.idMso);
   assert.deepEqual(menus, ["ContextMenuText", "ContextMenuList"]);
@@ -936,9 +936,9 @@ test("trich dan: addCitedText tach link bam duoc, link Markdown thuong giu nguye
 });
 
 // ---- Nhom Tao moi + Viet voi AI (01/11/2026): nut theo ung dung, lenh can go yeu cau (Soan van ban).
-// Bang Core: QuickActions (14 muc menu Sua bang AI) + DocumentActions (smartCreate: app wps + input; slidesFromDoc: app wpp).
+// Bang Core: QuickActions (15 muc menu Sua bang AI) + DocumentActions (smartCreate: app wps + input; slidesFromDoc: app wpp).
 
-test("ribbon.xml: nhom Tao moi + Viet voi AI dung thu tu; 14 muc Viet voi AI khop DUNG bang Core (tag, nhan)", () => {
+test("ribbon.xml: nhom Tao moi + Viet voi AI dung thu tu; 15 muc Viet voi AI khop DUNG bang Core (tag, nhan)", () => {
   const xml = fs.readFileSync(path.join(ADDIN, "ribbon.xml"), "utf8");
   const groups = [...xml.matchAll(/<group id="([A-Za-z]+)"/g)].map((m) => m[1]);
   assert.deepEqual(groups, ["axiomAssistantGroup", "axiomCreateGroup", "axiomWriteGroup", "axiomCheckGroup",
@@ -1044,4 +1044,26 @@ test("lenh dang cho cau go + dang co luot chay: send bi tu choi nhung KHONG mat 
   assert.equal(await h.pane.send("Thông báo"), false, "dang chay thi khong gui");
   h.pane.setPlan(false); // phat lai state (onChange) de doc trang thai that, khong phai ban chup cu
   assert.equal(h.state.pendingAction && h.state.pendingAction.id, "smartCreate", "van cho - nguoi dung gui lai duoc");
+});
+
+test("dot 2 (01/11/2026): Sua thong minh + Tom tat/Dich song ngu ca bai chi o Writer; Lich su moi app, mo Hoi thoai truoc", () => {
+  const seen = {};
+  for (const name of ["WPS Writer", "WPS Presentation"]) {
+    const ctx = load(["probe.js", "commands.js", "main.js"], { Application: { Name: name } });
+    seen[name] = ["axiomSmartEdit", "axiomSummarizeDoc", "axiomTranslateDoc", "axiomRb_academic"]
+      .map((id) => ctx.ribbon.OnGetVisible({ Id: id }));
+  }
+  assert.deepEqual(seen, { "WPS Writer": [true, true, true, true], "WPS Presentation": [false, false, false, false] });
+  const xml = fs.readFileSync(path.join(ADDIN, "ribbon.xml"), "utf8");
+  const history = /<button id="axiomHistory"([^>]*)>/.exec(/<group id="axiomAssistantGroup"[^>]*>([\s\S]*?)<\/group>/.exec(xml)[1]);
+  assert.ok(history && !/getVisible/.test(history[1]), "Lich su nam o nhom Tro ly, hien o moi app");
+  const panes = [];
+  const { ctx, posts } = mainWith({ Name: "WPS Presentation", CreateTaskPane(url) { const p = { url, Visible: false }; panes.push(p); return p; } });
+  ctx.ribbon.OnAction({ Id: "axiomHistory" });
+  assert.equal(panes.length, 1);
+  assert.match(panes[0].url, /[?&]view=conversations(&|$)/);
+  assert.equal(posts.length, 0, "chi mo man hinh, khong chay luot");
+  ctx.ribbon.OnAction({ Id: "axiomSummarizeDoc" });
+  assert.deepEqual(posts.map((p) => p.quickAction), ["summarizeDoc"]);
+  if (ctx.AxiomBridge) { ctx.AxiomBridge.stop(); }
 });

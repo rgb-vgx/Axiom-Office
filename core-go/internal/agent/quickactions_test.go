@@ -107,11 +107,11 @@ func TestQuickActionsMenuLayout(t *testing.T) {
 			t.Fatalf("%s: nhom la %q", action.ID, action.Group)
 		}
 	}
-	want := "polish rewrite shorten expand fix formal concise plain positive continue bilingual summarize explain translate"
+	want := "polish rewrite shorten expand fix formal academic concise plain positive continue bilingual summarize explain translate"
 	if got := strings.Join(ids, " "); got != want {
 		t.Fatalf("thu tu menu:\n got %s\nwant %s", got, want)
 	}
-	if got := strings.Join(tone, " "); got != "formal concise plain positive" {
+	if got := strings.Join(tone, " "); got != "formal academic concise plain positive" {
 		t.Fatalf("nhom Doi giong: %s", got)
 	}
 	for _, id := range []string{"continue", "bilingual"} {

@@ -184,6 +184,8 @@ def main() -> int:
         # Luot 6: lenh nhanh "Tom tat" (CHI DOC) - model co tinh goi lenh sua, Core phai chan.
         {"tool": "office_action", "arguments": {"action": "writer.appendText", "params": {"text": "KHÔNG ĐƯỢC GHI"}}},
         {"text": "Tóm tắt: báo cáo tuần"},
+        # Luot 8: lenh CA TAI LIEU "Tom tat ca bai" (chi doc, khong can boi den).
+        {"text": "Tóm tắt cả bài: báo cáo tuần"},
     ])
     core = base.Core(base.core_exe(work), work, base.TOKEN, base.free_port(), addin_dir, session_dir, {
         "AXIOM_LLM_PROVIDER": "openai", "AXIOM_LLM_ENDPOINT": "http://127.0.0.1:%d/v1" % llm.port,
@@ -543,6 +545,17 @@ def main() -> int:
         check(failed and failed[0].get("kind") == "selection" and len(llm.requests()) == before,
               "khung chat mini: go tay + requireSelection, chua boi den -> dung, kind 'selection', khong goi model",
               events[-2:])
+        # ---- luot 8: Tom tat ca bai (lenh ca tai lieu, chi doc): KHONG can boi den, khong khoa vung, system prompt co luat
+        # lenh ca tai lieu - khong phai luat "doan boi den" cua menu Sua bang AI (truoc 01/11/2026 lenh ca tai lieu nhan nham).
+        before = len(llm.requests())
+        status, _, text = base.request(core.base + "/wps/v1/runs", "POST", {"quickAction": "summarizeDoc"}, own)
+        events = sse(core.base + "/wps/v1/runs/%s/events" % (base.as_json(text).get("result") or {}).get("runId"), own)
+        done = [payload(d) for e, d in events if e == "run.completed"]
+        check(done and done[0].get("reply") == "Tóm tắt cả bài: báo cáo tuần",
+              "lenh ca tai lieu Tom tat ca bai: chua boi den van chay, tra loi trong khung chat", [e for e, _ in events])
+        asked = json.dumps(llm.requests()[before:before + 1], ensure_ascii=False)
+        check("ONE-CLICK DOCUMENT ANSWER" in asked and "ONE-CLICK ANSWER" not in asked and "ONE-CLICK EDIT" not in asked,
+              "lenh ca tai lieu: system prompt co luat ca tai lieu, khong co luat doan boi den", "")
         addin.selected = len(SELECTION_TEXT)
 
         # ---- menu chuot phai -> khung chat dang mo: Core lam tram trung chuyen (api/wpspane.go). main.js POST

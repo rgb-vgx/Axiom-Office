@@ -13,7 +13,7 @@ func TestQuickActionsListsDocumentActionsSeparately(t *testing.T) {
 	result, _ := decode(t, reply.Body.String())["result"].(map[string]any)
 	actions, _ := result["actions"].([]any)
 	documents, _ := result["documentActions"].([]any)
-	if reply.Code != 200 || len(actions) != 14 || len(documents) != 4 {
+	if reply.Code != 200 || len(actions) != 15 || len(documents) != 7 {
 		t.Fatalf("quick-actions: %d %s", reply.Code, reply.Body.String())
 	}
 	first, _ := documents[0].(map[string]any)

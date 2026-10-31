@@ -272,9 +272,14 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 	}
 	// Lenh nhanh "Sua bang AI": nguoi dung bam lenh la da quyet - sua ngay, khong hoi lai (quickactions.go).
 	if request.QuickAction != "" {
-		if request.ReadOnly {
+		switch {
+		case request.WholeDocument && request.ReadOnly:
+			systemPrompt += "\n\n" + DocumentAnswerRule
+		case request.WholeDocument:
+			systemPrompt += "\n\n" + DocumentEditRule
+		case request.ReadOnly:
 			systemPrompt += "\n\n" + QuickAnswerRule
-		} else {
+		default:
 			systemPrompt += "\n\n" + QuickEditRule
 		}
 	}

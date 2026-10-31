@@ -403,7 +403,9 @@
     checkTables: "check",
     checkRange: "check",
     testModel: "status",
-    copyUrl: "status"
+    copyUrl: "status",
+    // Nut "Lich su" tren ribbon: man hinh Hoi thoai truoc cua pane (truoc 01/11/2026 chi co trong menu "...").
+    history: "conversations"
   };
 
   // Viec man hinh phai lam ngay khi vua mo (gui qua ?do=): hai muc trong menu "Khac" khong phai la
@@ -420,6 +422,10 @@
     axiomSmartCreate: "doc:smartCreate",
     axiomSlidesFromDoc: "doc:slidesFromDoc",
     axiomRbTone: "toneMenu",
+    axiomSmartEdit: "doc:smartEdit",
+    axiomSummarizeDoc: "doc:summarizeDoc",
+    axiomTranslateDoc: "doc:translateDoc",
+    axiomHistory: "history",
     axiomCheckRange: "checkRange",
     axiomMemory: "memory",
     axiomSkills: "skills",
@@ -476,7 +482,8 @@
   var ICON_FILES = { askAi: true, doc_slidesFromDoc: true, doc_smartCreate: true,
     quick_bilingual: true, quick_continue: true, quick_expand: true, quick_explain: true,
     quick_fix: true, quickMenu: true, quick_polish: true, quick_rewrite: true, quick_shorten: true,
-    quick_summarize: true, quick_translate: true, toneMenu: true };
+    quick_summarize: true, quick_translate: true, toneMenu: true,
+    doc_smartEdit: true, doc_summarizeDoc: true, doc_translateDoc: true, history: true };
 
   function tagOf(control) {
     var tag = "";

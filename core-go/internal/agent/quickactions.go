@@ -67,6 +67,11 @@ var QuickActions = []QuickAction{
 	// Nhom "Doi giong ▸" (docs/research/doi-chieu-wps-ai.md P1-4, doi chieu kwpsaigc cua WPS AI).
 	{ID: "formal", Label: "Trang trọng hơn", Edits: true, Group: "tone", Prompt: "Viết lại đoạn văn đang bôi đen với " +
 		"giọng trang trọng, lịch sự, hợp với văn bản công việc; giữ nguyên ý và ngôn ngữ của đoạn." + quickEditTail},
+	// Hoc thuat (WPS AI "Make Academic", 01/11/2026).
+	{ID: "academic", Label: "Học thuật hơn", Edits: true, Group: "tone", Prompt: "Viết lại đoạn văn đang bôi đen với " +
+		"văn phong học thuật: khách quan, chính xác, dùng thuật ngữ đúng chuyên ngành, câu chặt chẽ, tránh khẩu ngữ và " +
+		"cảm xúc cá nhân; không thêm trích dẫn, số liệu hay nguồn không có trong đoạn; giữ nguyên ý và ngôn ngữ của đoạn." +
+		quickEditTail},
 	{ID: "concise", Label: "Ngắn gọn hơn", Edits: true, Group: "tone", Prompt: "Viết lại đoạn văn đang bôi đen cho " +
 		"ngắn gọn, súc tích hơn: bỏ từ thừa và câu rườm rà, gộp ý trùng; giữ đủ ý, số liệu, tên riêng và ngôn ngữ của " +
 		"đoạn." + quickEditTail},
@@ -105,6 +110,18 @@ const QuickEditRule = "ONE-CLICK EDIT for this turn: the user selected text and 
 
 const QuickAnswerRule = "ONE-CLICK ANSWER for this turn: the user selected text and picked the menu command quoted " +
 	"in their message. Answer it directly about the selected text; do not ask follow-up questions."
+
+// Lenh CA TAI LIEU (nut ribbon doc:<id>): hai quy tac tren noi ve "doan boi den" - sai voi lenh lam tren ca bai (truoc
+// 01/11/2026 Soat chinh ta, Lam dep bang, Soan van ban deu nhan QuickEditRule). Cung tinh than: bam la da quyet, khong hoi lai.
+const DocumentEditRule = "ONE-CLICK DOCUMENT COMMAND for this turn: the user clicked the ribbon command quoted in " +
+	"their message (with their request after it, if any). It works on the WHOLE open document, not on a selection. That " +
+	"IS the instruction to change the document - do it now with the tools named in the message. Do not ask for " +
+	"confirmation or offer options: the user undoes the whole turn with one click. If nothing needs to change, change " +
+	"nothing and say so in one sentence. Finish with a short summary of what changed."
+
+const DocumentAnswerRule = "ONE-CLICK DOCUMENT ANSWER for this turn: the user clicked the ribbon command quoted in " +
+	"their message. Read the whole open document and answer in the chat; do not change the document and do not ask " +
+	"follow-up questions."
 
 // DocumentActions: lenh lam tren CA TAI LIEU, chay tu nut ribbon (docs/research/doi-chieu-wps-ai.md P1-1, P1-3). Cung
 // duong {quickAction: id} voi menu "Sua bang AI" nhung khong can boi den va khong nam trong menu do. Cau lenh chi dinh
@@ -155,6 +172,30 @@ var DocumentActions = []QuickAction{
 		"ngắn, các ý ngắn gọn; giữ đúng số liệu và tên riêng của tài liệu, không thêm điều tài liệu không có. Viết bằng " +
 		"ngôn ngữ của tài liệu. Bài trình chiếu đã có slide thì thêm vào sau, không xoá slide cũ. Cuối cùng báo đã dựng " +
 		"bao nhiêu slide từ tài liệu nào."},
+	// Sua thong minh (WPS AI "Smart Edit"): nguoi dung go cach sua ca bai; sua bang Track Changes de duyet tung cho.
+	{ID: "smartEdit", Label: "Sửa thông minh", Edits: true, Document: true, Track: true, App: "wps",
+		Input: "Bạn muốn sửa tài liệu thế nào? Ví dụ: viết gọn lại phần mở đầu, thống nhất cách xưng hô, đổi giọng trang trọng hơn",
+		Prompt: "Sửa tài liệu đang mở theo yêu cầu của người dùng ở cuối tin nhắn này. Đọc hết bằng writer.outline với " +
+			"maxChars 4000 (có số đoạn), cần chi tiết thì writer.getText. Chỉ sửa đúng phần và đúng kiểu người dùng yêu " +
+			"cầu; phần khác giữ nguyên. Đổi câu chữ trong đoạn có sẵn bằng writer.replaceMany (mỗi find lấy cả câu hoặc cả " +
+			"cụm để chỉ khớp đúng chỗ đó, giữ chữ hoa/thường); thêm nội dung mới thì writer.writeContent hoặc chèn sau câu " +
+			"bằng writer.replaceAll (câu đó + ký tự xuống dòng \\n + phần thêm); đổi kiểu tiêu đề thì writer.setStyle. Không " +
+			"bịa số liệu, tên riêng, ngày tháng. Các chỗ sửa được ghi bằng Track Changes để người dùng chấp nhận hay từ " +
+			"chối từng chỗ. Cuối cùng báo ngắn gọn đã sửa những gì.\n\nYêu cầu của người dùng: "},
+	// Tom tat ca bai (WPS AI "Summarize" tren ca tai lieu): chi tra loi trong khung chat.
+	{ID: "summarizeDoc", Label: "Tóm tắt cả bài", Document: true, App: "wps", Prompt: "Tóm tắt toàn bộ tài liệu đang " +
+		"mở. Đọc hết bằng writer.outline với maxChars 8000, phần nào cần chi tiết thì writer.getText. Trả lời trong khung " +
+		"chat, bằng ngôn ngữ của tài liệu: một câu nêu tài liệu nói về gì, rồi các ý chính theo từng mục lớn (mỗi ý một " +
+		"dòng ngắn, giữ đúng số liệu, tên riêng, mốc thời gian), cuối cùng là việc cần làm hoặc kết luận nếu tài liệu có. " +
+		"Không thêm điều tài liệu không có. Không sửa tài liệu."},
+	// Dich song ngu ca bai (WPS AI "Parallel Translate"): ban dich nam ngay duoi tung doan goc.
+	{ID: "translateDoc", Label: "Dịch song ngữ cả bài", Edits: true, Document: true, App: "wps", Prompt: "Dịch song ngữ " +
+		"toàn bộ tài liệu đang mở: ngay dưới mỗi đoạn văn và mỗi tiêu đề, chèn bản dịch của chính đoạn đó, giữ đoạn gốc. " +
+		"Tài liệu tiếng Việt thì dịch sang tiếng Anh; ngôn ngữ khác thì dịch sang tiếng Việt. Đọc hết bằng writer.outline " +
+		"với maxChars 8000 (có số đoạn). Chèn bằng writer.replaceMany, mỗi lần tối đa vài chục đoạn: find là câu cuối của " +
+		"đoạn (đủ dài để chỉ khớp một chỗ), replace là chính câu đó + ký tự xuống dòng \\n + bản dịch của cả đoạn. Bỏ qua " +
+		"đoạn trống, ô bảng, số liệu đứng riêng, và đoạn đã có bản dịch ngay dưới. Dịch sát nghĩa, giữ tên riêng, số " +
+		"liệu, đơn vị; thuật ngữ dịch thống nhất trong cả bài. Cuối cùng báo đã dịch bao nhiêu đoạn và sang ngôn ngữ nào."},
 }
 
 // FindQuickAction: tra muc theo id trong menu "Sua bang AI" roi trong lenh ca tai lieu (phan biet hoa thuong - id do Core

@@ -25,7 +25,7 @@
     if (mcl) { CLIENT = mcl[1]; }
     // ?view=<ten>: ribbon mo thang mot man hinh phu (main.js: paneUrl). Danh sach nay phai khop
     // main.js:VIEWS - mot ten o do ma khong co o day thi nut ribbon mo ra pane trong.
-    // "conversations" chi co o day: no nam trong menu "..." cua pane, ribbon khong co nut rieng.
+    // "conversations": menu "..." cua pane va nut "Lich su" tren ribbon (?view=conversations).
     var mv = /[?&]view=(memory|audit|setup|skills|status|check|log|conversations)(?:&|$)/.exec(search || "");
     if (mv) { VIEW = mv[1]; }
     // ?check=<lenh>: ba nut "Soat ..." tren ribbon dung chung mot man hinh, nen man hinh phai biet

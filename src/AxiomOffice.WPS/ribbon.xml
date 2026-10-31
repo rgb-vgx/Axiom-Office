@@ -57,6 +57,9 @@
           <button id="axiomAskAI" label="Ask AI" size="large" tag="askAi" onAction="ribbon.OnAction" imageMso="Help"
                   screentip="Mở khung trò chuyện với AI"
                   supertip="Hỏi AI ngay bên cạnh tài liệu. AI đọc và sửa trực tiếp tài liệu đang mở; mỗi lượt sửa là một bước Hoàn tác."/>
+          <button id="axiomHistory" label="Lịch sử" size="large" tag="history" onAction="ribbon.OnAction"
+                  getImage="ribbon.OnGetImage" screentip="Lịch sử trò chuyện"
+                  supertip="Xem lại các cuộc trò chuyện trước với AI (mở trong khung bên cạnh, chỉ xem)."/>
         </group>
 
         <!-- Tạo mới (01/11/2026, đối chiếu tab WPS AI: Smart Create, Generate Slides from Doc): lệnh cả tài liệu doc:<id>
@@ -67,6 +70,9 @@
           <button id="axiomSmartCreate" label="Soạn văn bản" size="large" tag="doc:smartCreate" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
                   getImage="ribbon.OnGetImage" screentip="Soạn văn bản mới bằng AI"
                   supertip="Gõ yêu cầu (loại văn bản, mục đích, nội dung chính); AI soạn cả bài vào cuối tài liệu với tiêu đề, đoạn văn, danh sách, bảng. Chỗ thiếu thông tin để trống cho bạn điền."/>
+          <button id="axiomSmartEdit" label="Sửa thông minh" size="large" tag="doc:smartEdit" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
+                  getImage="ribbon.OnGetImage" screentip="Sửa cả tài liệu theo yêu cầu"
+                  supertip="Gõ cách muốn sửa (viết gọn, đổi giọng, thống nhất thuật ngữ…); AI sửa cả bài, mỗi chỗ sửa là một Theo dõi thay đổi để bạn nhận hoặc từ chối."/>
           <button id="axiomSlidesFromDoc" label="Tạo slide từ tài liệu" size="large" tag="doc:slidesFromDoc" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
                   getImage="ribbon.OnGetImage" screentip="Tạo slide từ tài liệu Writer đang mở"
                   supertip="AI đọc tài liệu văn bản đang mở trong WPS Writer và dựng bài trình chiếu: bìa, các mục chính, số liệu, tóm tắt. Slide cũ được giữ nguyên."/>
@@ -75,7 +81,7 @@
         <!-- Viết với AI: 14 mục "Sửa bằng AI" của menu chuột phải đưa lên ribbon (cùng tag quick:<id>, cùng nhãn bảng Core),
              chỉ Writer. Bấm: giống menu chuột phải - khung chat mini cạnh đoạn bôi đen; chưa bôi đen thì Core báo. WPS xếp
              nút nhỏ 2 hàng mỗi cột: Viết lại/Viết tiếp, Mở rộng/Rút gọn, Sửa lỗi/Đổi giọng, Dịch song ngữ/Dịch,
-             Tóm tắt/Giải thích. -->
+             Tóm tắt/Giải thích, rồi hai lệnh cả bài (Tóm tắt cả bài, Dịch song ngữ cả bài - doc:<id>, không cần bôi đen). -->
         <group id="axiomWriteGroup" label="Viết với AI">
           <button id="axiomRb_polish" label="Trau chuốt" size="large" tag="quick:polish" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
                   getImage="ribbon.OnGetImage" screentip="Trau chuốt đoạn văn"
@@ -96,8 +102,9 @@
                   getImage="ribbon.OnGetImage" screentip="Sửa lỗi chính tả trong đoạn"
                   supertip="Sửa chính tả, ngữ pháp, dấu câu; câu đúng thì giữ nguyên. Bôi đen đoạn văn trước; AI chỉ sửa trong đoạn đó, một bước Hoàn tác."/>
           <menu id="axiomRbTone" label="Đổi giọng" tag="toneMenu" getVisible="ribbon.OnGetVisible" getImage="ribbon.OnGetImage"
-                screentip="Đổi giọng văn" supertip="Viết lại đoạn bôi đen theo giọng khác: trang trọng, ngắn gọn, dễ hiểu, tích cực.">
+                screentip="Đổi giọng văn" supertip="Viết lại đoạn bôi đen theo giọng khác: trang trọng, học thuật, ngắn gọn, dễ hiểu, tích cực.">
             <button id="axiomRb_formal" label="Trang trọng hơn" tag="quick:formal" onAction="ribbon.OnAction"/>
+            <button id="axiomRb_academic" label="Học thuật hơn" tag="quick:academic" onAction="ribbon.OnAction"/>
             <button id="axiomRb_concise" label="Ngắn gọn hơn" tag="quick:concise" onAction="ribbon.OnAction"/>
             <button id="axiomRb_plain" label="Dễ hiểu hơn" tag="quick:plain" onAction="ribbon.OnAction"/>
             <button id="axiomRb_positive" label="Tích cực hơn" tag="quick:positive" onAction="ribbon.OnAction"/>
@@ -114,6 +121,12 @@
           <button id="axiomRb_explain" label="Giải thích" tag="quick:explain" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
                   getImage="ribbon.OnGetImage" screentip="Giải thích đoạn văn"
                   supertip="Giải thích nghĩa, thuật ngữ, ý của đoạn bôi đen. Bôi đen đoạn văn trước; AI trả lời trong khung chat, không sửa tài liệu."/>
+          <button id="axiomSummarizeDoc" label="Tóm tắt cả bài" tag="doc:summarizeDoc" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
+                  getImage="ribbon.OnGetImage" screentip="Tóm tắt cả tài liệu"
+                  supertip="Tóm tắt toàn bộ tài liệu theo từng mục, giữ đúng số liệu. Không cần bôi đen; AI trả lời trong khung chat, không sửa tài liệu."/>
+          <button id="axiomTranslateDoc" label="Dịch song ngữ cả bài" tag="doc:translateDoc" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
+                  getImage="ribbon.OnGetImage" screentip="Dịch song ngữ cả tài liệu"
+                  supertip="Chèn bản dịch ngay dưới từng đoạn (tiếng Việt sang tiếng Anh, ngôn ngữ khác sang tiếng Việt), giữ đoạn gốc. Không cần bôi đen."/>
         </group>
 
         <!-- Ba nút soát: chỉ đọc, không dùng AI, mỗi nút một ứng dụng. Nhãn nêu rõ đối tượng được soát để
@@ -197,6 +210,7 @@
         <button id="axiomQuick_fix_t" label="Sửa lỗi chính tả" tag="quick:fix" onAction="ribbon.OnAction"/>
         <menu id="axiomCtxTone_t" label="Đổi giọng">
           <button id="axiomQuick_formal_t" label="Trang trọng hơn" tag="quick:formal" onAction="ribbon.OnAction"/>
+          <button id="axiomQuick_academic_t" label="Học thuật hơn" tag="quick:academic" onAction="ribbon.OnAction"/>
           <button id="axiomQuick_concise_t" label="Ngắn gọn hơn" tag="quick:concise" onAction="ribbon.OnAction"/>
           <button id="axiomQuick_plain_t" label="Dễ hiểu hơn" tag="quick:plain" onAction="ribbon.OnAction"/>
           <button id="axiomQuick_positive_t" label="Tích cực hơn" tag="quick:positive" onAction="ribbon.OnAction"/>
@@ -219,6 +233,7 @@
         <button id="axiomQuick_fix_l" label="Sửa lỗi chính tả" tag="quick:fix" onAction="ribbon.OnAction"/>
         <menu id="axiomCtxTone_l" label="Đổi giọng">
           <button id="axiomQuick_formal_l" label="Trang trọng hơn" tag="quick:formal" onAction="ribbon.OnAction"/>
+          <button id="axiomQuick_academic_l" label="Học thuật hơn" tag="quick:academic" onAction="ribbon.OnAction"/>
           <button id="axiomQuick_concise_l" label="Ngắn gọn hơn" tag="quick:concise" onAction="ribbon.OnAction"/>
           <button id="axiomQuick_plain_l" label="Dễ hiểu hơn" tag="quick:plain" onAction="ribbon.OnAction"/>
           <button id="axiomQuick_positive_l" label="Tích cực hơn" tag="quick:positive" onAction="ribbon.OnAction"/>

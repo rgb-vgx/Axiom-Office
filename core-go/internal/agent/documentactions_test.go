@@ -12,7 +12,8 @@ func TestDocumentActionsTable(t *testing.T) {
 	ids := []string{}
 	for _, action := range DocumentActions {
 		ids = append(ids, action.ID)
-		if action.Label == "" || action.Prompt == "" || !action.Edits || !action.Document {
+		// Tom tat ca bai la lenh ca tai lieu duy nhat chi tra loi (khong sua).
+		if action.Label == "" || action.Prompt == "" || action.Edits == (action.ID == "summarizeDoc") || !action.Document {
 			t.Fatalf("muc hong: %+v", action)
 		}
 		if strings.Contains(action.Prompt, "đang bôi đen") {
@@ -22,7 +23,7 @@ func TestDocumentActionsTable(t *testing.T) {
 			t.Fatalf("%s trung id voi menu Sua bang AI", action.ID)
 		}
 	}
-	if got := strings.Join(ids, " "); got != "proofread tableTidy smartCreate slidesFromDoc" {
+	if got := strings.Join(ids, " "); got != "proofread tableTidy smartCreate slidesFromDoc smartEdit summarizeDoc translateDoc" {
 		t.Fatalf("lenh ca tai lieu: %s", got)
 	}
 	for _, action := range QuickActions {
@@ -150,5 +151,51 @@ func TestLockSelectionSkippedForWholeDocument(t *testing.T) {
 	}
 	if strings.Join(actions, " ") != "writer.selection writer.lockSelection" {
 		t.Fatalf("luot thuong van khoa nhu cu: %v", actions)
+	}
+}
+
+// Doi chieu WPS AI dot 2 (01/11/2026): Sua thong minh (go yeu cau, Track Changes), Tom tat ca bai (chi tra loi), Dich song
+// ngu ca bai (chen ban dich duoi tung doan); "Hoc thuat hon" trong nhom Doi giong.
+func TestSecondWaveActions(t *testing.T) {
+	edit, _ := FindQuickAction("smartEdit")
+	if edit.Input == "" || !edit.Track || edit.App != "wps" || !edit.Edits {
+		t.Fatalf("smartEdit: %+v", edit)
+	}
+	for _, want := range []string{"writer.outline", "writer.replaceMany", "Track Changes", "phần khác giữ nguyên"} {
+		if !strings.Contains(edit.Prompt, want) {
+			t.Fatalf("smartEdit thieu %q", want)
+		}
+	}
+	sum, _ := FindQuickAction("summarizeDoc")
+	if sum.Edits || sum.Input != "" || sum.App != "wps" || !strings.Contains(sum.Prompt, "Không sửa tài liệu") {
+		t.Fatalf("summarizeDoc: %+v", sum)
+	}
+	tr, _ := FindQuickAction("translateDoc")
+	for _, want := range []string{"writer.replaceMany", "tiếng Anh", "tiếng Việt", "giữ đoạn gốc", "\\n"} {
+		if !strings.Contains(tr.Prompt, want) {
+			t.Fatalf("translateDoc thieu %q: %q", want, tr.Prompt)
+		}
+	}
+	academic, ok := findIn(QuickActions, "academic")
+	if !ok || academic.Group != "tone" || academic.Label != "Học thuật hơn" || !strings.Contains(academic.Prompt, "đang bôi đen") {
+		t.Fatalf("academic: %+v", academic)
+	}
+
+	office := map[string]any{"port": float64(1)}
+	request, _ := ParseRequest(map[string]any{"quickAction": "summarizeDoc", "office": office})
+	if !request.ReadOnly || !request.WholeDocument || request.RequireSelection {
+		t.Fatalf("summarizeDoc: chi doc, ca tai lieu, khong can boi den: %+v", request)
+	}
+}
+
+// Quy tac cua luot: lenh ca tai lieu khong duoc nhan quy tac noi ve "doan boi den".
+func TestDocumentRulesDoNotTalkAboutSelection(t *testing.T) {
+	for name, rule := range map[string]string{"DocumentEditRule": DocumentEditRule, "DocumentAnswerRule": DocumentAnswerRule} {
+		if !strings.Contains(rule, "WHOLE") && !strings.Contains(rule, "whole") {
+			t.Fatalf("%s phai noi la ca tai lieu: %q", name, rule)
+		}
+		if strings.Contains(rule, "selected text") {
+			t.Fatalf("%s khong duoc noi ve doan boi den: %q", name, rule)
+		}
 	}
 }
