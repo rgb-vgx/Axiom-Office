@@ -4612,6 +4612,259 @@
     throw new Error("'align' must be left/center/right, got '" + String(raw) + "'");
   }
 
+  function wppRound1(value) {
+    return Math.round(value * 10) / 10;
+  }
+
+  function cmdWppAddShape(app, params) {
+    var r = wppSlide(app, params);
+    // MsoAutoShapeType: 1 chu nhat, 5 bo goc, 9 elip, 52 chevron.
+    var kind = paramString(params, "shape", "rect");
+    var type;
+    switch (kind) {
+      case "rounded": type = 5; break;
+      case "oval": type = 9; break;
+      case "chevron": type = 52; break;
+      case "rect":
+      case "line": type = 1; break;
+      default: throw new Error("'shape' must be rect, rounded, oval, chevron or line, got " + kind);
+    }
+    var shape = r.slide.Shapes.AddShape(type, wppNumber(params, "left", 40), wppNumber(params, "top", 130),
+      wppNumber(params, "width", 200), wppNumber(params, "height", 80));
+    var fill = parseBgrColor(paramString(params, "fill", null));
+    if (fill !== null) {
+      shape.Fill.Visible = -1;
+      // Hinh moi cua WPS mang nen gradient: phai Solid() roi moi gan mau.
+      shape.Fill.Solid();
+      shape.Fill.ForeColor.RGB = fill;
+    } else {
+      shape.Fill.Visible = 0;
+    }
+    var line = parseBgrColor(paramString(params, "line", null));
+    if (line !== null) {
+      shape.Line.Visible = -1;
+      shape.Line.ForeColor.RGB = line;
+      shape.Line.Weight = 1.25;
+      if (paramBool(params, "dash", false)) { shape.Line.DashStyle = 4; }
+    } else {
+      shape.Line.Visible = 0;
+    }
+    // AutoShape cua WPS co bong san - tat cho moi hinh hai lenh nay ve.
+    shape.Shadow.Visible = 0;
+    var text = paramString(params, "text", null);
+    if (text !== null && text !== undefined && text !== "") {
+      var frame = shape.TextFrame;
+      frame.WordWrap = -1;
+      frame.AutoSize = 0;
+      frame.MarginLeft = 6;
+      frame.MarginRight = 6;
+      frame.VerticalAnchor = String(paramString(params, "anchor", "middle")).toLowerCase() === "top" ? 1 : 3;
+      var range = frame.TextRange;
+      // "\n" cua PowerPoint la ngat dong trong doan; moi dong mot doan ("\r").
+      range.Text = text.replace(/\r\n/g, "\r").replace(/\n/g, "\r");
+      range.ParagraphFormat.Alignment = 2;
+      range.Font.Size = wppNumber(params, "fontSize", 18);
+      range.Font.Bold = paramBool(params, "bold", false) ? -1 : 0;
+      if (paramBool(params, "boldFirst", false)) { range.Paragraphs(1).Font.Bold = -1; }
+      var font = paramString(params, "font", null);
+      if (font !== null && String(font).replace(/^\s+|\s+$/g, "") !== "") { range.Font.Name = font; }
+      var color = parseBgrColor(paramString(params, "color", "#262626"));
+      if (color !== null) { range.Font.Color.RGB = color; }
+      // Chu cua hinh WPS co bong san - tat khi ghi chu.
+      range.Font.Shadow = 0;
+    }
+    return { slide: r.index, shape: String(strProp(shape, "Name")) };
+  }
+
+  function cmdWppAddParagraphs(app, params) {
+    var raw = params ? params.paragraphs : null;
+    var items = [], i;
+    if (typeof raw === "string") {
+      var trimmed = raw.replace(/^\s+/, "");
+      if (trimmed.charAt(0) === "[" || trimmed.charAt(0) === "{") {
+        try { raw = JSON.parse(raw); } catch (eParse) {}
+      }
+    }
+    if (Array.isArray(raw)) {
+      for (i = 0; i < raw.length; i++) {
+        var entry = raw[i];
+        if (entry === null || typeof entry !== "object" || Array.isArray(entry)) { continue; }
+        var rawText = entry.t === undefined || entry.t === null ? "" : String(entry.t);
+        if (rawText.replace(/^\s+|\s+$/g, "").length > 0) { items.push(entry); }
+      }
+    }
+    if (items.length === 0) {
+      throw new Error("'paragraphs' must be a non-empty array of {t, l, b, i, n, u}");
+    }
+    var left = wppNumber(params, "left", 60);
+    var top = wppNumber(params, "top", 60);
+    var width = wppNumber(params, "width", 540);
+    var height = wppNumber(params, "height", 300);
+    var maxSize = Math.max(8, paramInt(params, "fontSize", 24));
+    var minSize = Math.max(8, Math.min(maxSize, paramInt(params, "minFontSize", 16)));
+    var r = wppSlide(app, params);
+    // The / o luu y: hinh chu nhat (bo goc) co nen thay cho khung chu tron.
+    var box = paramString(params, "box", "");
+    var fill = parseBgrColor(paramString(params, "fill", null));
+    var line = parseBgrColor(paramString(params, "line", null));
+    var boxed = box === "rounded" || box === "rect" || fill !== null;
+    var shape = boxed
+      ? r.slide.Shapes.AddShape(box === "rect" ? 1 : 5, left, top, width, height)
+      : r.slide.Shapes.AddTextbox(1, left, top, width, height);
+    if (boxed) {
+      if (fill !== null) {
+        shape.Fill.Visible = -1;
+        shape.Fill.Solid();
+        shape.Fill.ForeColor.RGB = fill;
+      } else {
+        shape.Fill.Visible = 0;
+      }
+      if (line !== null) {
+        shape.Line.Visible = -1;
+        shape.Line.ForeColor.RGB = line;
+        shape.Line.Weight = 1;
+      } else {
+        shape.Line.Visible = 0;
+      }
+      // WPS khong gan duoc Adjustments (bo goc) - chi tat bong.
+      shape.Shadow.Visible = 0;
+    }
+    var frame = shape.TextFrame;
+    if (boxed) {
+      frame.MarginLeft = 10;
+      frame.MarginRight = 10;
+      frame.MarginTop = 8;
+      frame.MarginBottom = 8;
+    }
+    try { frame.AutoSize = 0; } catch (eAuto) {}
+    frame.WordWrap = -1;
+    frame.VerticalAnchor = String(paramString(params, "anchor", "top")).toLowerCase() === "middle" ? 3 : 1;
+
+    function flag(item, key) { return item[key] === true; }
+    function levelOf(item) {
+      var value = item.l;
+      if (value === undefined || value === null) { return 1; }
+      var level = Math.round(Number(value));
+      if (isNaN(level)) { return 1; }
+      return Math.max(1, Math.min(5, level));
+    }
+
+    var lines = [];
+    // Tu khoa **...**: bo dau, nho vi tri (doan, vi tri 1-based trong doan, do dai) de in dam + to mau sau.
+    var emphasis = [];
+    for (i = 0; i < items.length; i++) {
+      var item = items[i];
+      var prefix = item.n === undefined || item.n === null ? "" : String(item.n).replace(/^\s+|\s+$/g, "");
+      var body = String(item.t).replace(/^\s+|\s+$/g, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n/g, "\v");
+      var head = prefix.length > 0 ? prefix + " " : "";
+      var plain = head;
+      var cursor = 0;
+      while (true) {
+        var open = body.indexOf("**", cursor);
+        var close = open < 0 ? -1 : body.indexOf("**", open + 2);
+        if (open < 0 || close < 0) {
+          plain += body.substring(cursor);
+          break;
+        }
+        plain += body.substring(cursor, open);
+        var word = body.substring(open + 2, close);
+        if (word.length > 0) {
+          emphasis.push([i + 1, plain.length + 1, word.length]);
+        }
+        plain += word;
+        cursor = close + 2;
+      }
+      lines.push(plain);
+    }
+
+    var range = frame.TextRange;
+    range.Text = lines.join("\r");
+    var font = paramString(params, "font", null);
+    if (font !== null && String(font).replace(/^\s+|\s+$/g, "") !== "") { range.Font.Name = font; }
+    var color = parseBgrColor(paramString(params, "color", null));
+    var accent = parseBgrColor(paramString(params, "accent", null));
+    if (color !== null) {
+      range.Font.Color.RGB = color;
+    } else if (boxed) {
+      // Hinh khoi cua WPS mac dinh chu trang: chu tren nen nhat phai toi.
+      range.Font.Color.RGB = 0x262626;
+    }
+    range.Font.Bold = 0;
+    range.Font.Italic = 0;
+    // Chu cua hinh WPS co bong san - tat khi ghi chu.
+    range.Font.Shadow = 0;
+    range.ParagraphFormat.Alignment = 1;
+
+    for (i = 0; i < items.length; i++) {
+      item = items[i];
+      var paragraph = range.Paragraphs(i + 1);
+      var level = levelOf(item);
+      paragraph.IndentLevel = level;
+      if (flag(item, "b")) {
+        paragraph.Font.Bold = -1;
+        if (accent !== null) { paragraph.Font.Color.RGB = accent; }
+      }
+      if (flag(item, "i")) { paragraph.Font.Italic = -1; }
+      var align = item.a;
+      if (align !== undefined && align !== null && String(align).toLowerCase() === "center") {
+        paragraph.ParagraphFormat.Alignment = 2;
+      }
+      var bullet = paragraph.ParagraphFormat.Bullet;
+      if (flag(item, "u")) {
+        bullet.Visible = -1;
+        // WPS: Visible = -1 khong kem Type la danh so; Type 1 + Character 8226 moi la dau cham.
+        bullet.Type = 1;
+        bullet.Character = 8226;
+      } else {
+        bullet.Visible = 0;
+      }
+    }
+
+    var highlight = parseBgrColor(paramString(params, "highlight", null));
+    if (highlight === null) { highlight = accent; }
+    for (i = 0; i < emphasis.length; i++) {
+      try {
+        var run = range.Paragraphs(emphasis[i][0]).Characters(emphasis[i][1], emphasis[i][2]);
+        run.Font.Bold = -1;
+        if (highlight !== null) { run.Font.Color.RGB = highlight; }
+      } catch (eRun) {}
+    }
+
+    var inner = Number(frame.MarginTop) + Number(frame.MarginBottom);
+    var chosen = minSize;
+    var overflow = true;
+    var range2 = shape.TextFrame2.TextRange;
+    for (var size = maxSize; size >= minSize; size--) {
+      range.Font.Size = size;
+      for (i = 0; i < items.length; i++) {
+        item = items[i];
+        // Thut le dat tren TUNG doan (TextFrame2); moi cap 1,2 em; doan co gach dau dong treo 0,9 em.
+        var lvl = levelOf(item);
+        var hang = flag(item, "u") ? wppRound1(0.9 * size) : 0;
+        var format2 = range2.Paragraphs(i + 1).ParagraphFormat;
+        format2.LeftIndent = wppRound1((lvl - 1) * 1.2 * size + hang);
+        format2.FirstLineIndent = -hang;
+        var format = range.Paragraphs(i + 1).ParagraphFormat;
+        format.LineRuleBefore = 0;
+        // Cach nhom: doan cap 1 (tru doan dau) cach tren 0,35 em; doan con dinh voi doan cha.
+        format.SpaceBefore = i > 0 && lvl === 1 ? wppRound1(0.35 * size) : 0;
+      }
+      if (Number(range.BoundHeight) <= height - inner + 1) {
+        chosen = size;
+        overflow = false;
+        break;
+      }
+    }
+    shape.Height = height;
+    return {
+      slide: r.index,
+      shape: String(strProp(shape, "Name")),
+      fontSize: chosen,
+      textHeight: wppRound1(Number(range.BoundHeight)),
+      overflow: overflow
+    };
+  }
+
   function cmdWppAddText(app, params) {
     var text = paramString(params, "text", "");
     if (text === null || text === undefined) { text = ""; }
@@ -4762,6 +5015,8 @@
     "wpp.listSlides": cmdWppListSlides,
     "wpp.addSlide": cmdWppAddSlide,
     "wpp.addText": cmdWppAddText,
+    "wpp.addShape": cmdWppAddShape,
+    "wpp.addParagraphs": cmdWppAddParagraphs,
     "wpp.addTextBox": cmdWppAddTextBox,
     "wpp.addImage": cmdWppAddImage,
     "wpp.addTable": cmdWppAddTable,
