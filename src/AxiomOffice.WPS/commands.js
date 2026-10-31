@@ -1781,6 +1781,96 @@
     return { revisions: items, total: total, authors: authors, tracking: !!doc.TrackRevisions };
   }
 
+  // Them comment (port WriterAddComment cua CommandDispatcher.WriterReview.cs). Tac gia = app.UserName
+  // LUC them (do tren WPS that): writer.setTracking da dat ten nen lenh nay khong doi UserName.
+  function cmdWriterAddComment(app, params) {
+    var text = paramString(params, "text", null);
+    if (text === null) { text = ""; }
+    text = text.replace(/^\s+|\s+$/g, "");
+    if (text.length === 0) { throw new Error("'text' is required"); }
+    var doc = app.ActiveDocument;
+    var find = paramString(params, "find", null);
+    var paragraph = paramInt(params, "paragraph", 0);
+    var anchor = null;
+    if (find !== null && find !== "") {
+      anchor = doc.Content;
+      // Find.Execute khong thay thi tra false; tim THANG (khong replace) thi WPS hep Range ve cho khop
+      // (do tren WPS 12.1.2 that) - dung chinh Range do lam chu neo cho comment.
+      if (find.length > 255 || !anchor.Find.Execute(find)) {
+        throw new Error("'find' text was not found (max 255 characters, exact match)");
+      }
+    } else if (paragraph > 0) {
+      var count = Number(doc.Paragraphs.Count);
+      if (isNaN(count)) { count = 0; }
+      if (paragraph > count) {
+        throw new Error("'paragraph' must be between 1 and " + count);
+      }
+      anchor = doc.Paragraphs.Item(paragraph).Range;
+    } else {
+      throw new Error("give 'paragraph' (from writer.outline) or 'find' (text to anchor the comment to)");
+    }
+    var added = doc.Comments.Add(anchor, text);
+    // So comment = Index cua comment vua tra ve; khong doc duoc Index thi so luong hien tai (giong C#).
+    var number = numProp(added, "Index");
+    if (number === null || !(number > 0)) { number = numProp(doc.Comments, "Count"); }
+    return { comment: number, paragraph: writerParagraphNumberAt(doc, numProp(anchor, "Start")) };
+  }
+
+  // Doc comment (port WriterListComments cua CommandDispatcher.WriterReview.cs): comment goc thi day du
+  // (id/tac gia/noi dung/cat 500/da xong/ngay/chu neo/cat 200/so doan/tra loi), tra loi ghep vao comment
+  // goc theo vi tri neo (Ancestor khong doc duoc thi coi nhu comment goc).
+  function cmdWriterListComments(app, params) {
+    var includeDone = paramBool(params, "includeDone", false);
+    var max = paramInt(params, "max", 100);
+    if (isNaN(max)) { max = 100; }
+    max = Math.max(1, max);
+    var doc = app.ActiveDocument;
+    var comments = doc.Comments;
+    var count = Number(comments.Count);
+    if (isNaN(count)) { count = 0; }
+    var items = [], roots = [], pending = [], open = 0;
+    for (var i = 1; i <= count; i++) {
+      var comment = comments.Item(i);
+      var done = false;
+      try { done = !!comment.Done; } catch (eDone) {}
+      var entry = {
+        id: i,
+        author: strProp(comment, "Author"),
+        text: revisionRangeText(comment.Range, 500),
+        done: done
+      };
+      var when = null;
+      try { when = formatRevisionDate(comment.Date); } catch (eDate) {}
+      if (when !== null) { entry.date = when; }
+      var ancestor = null;
+      try { ancestor = comment.Ancestor; } catch (eAncestor) {}
+      if (ancestor !== null && ancestor !== undefined) {
+        pending.push({ ancestor: ancestor, entry: entry });
+        continue;
+      }
+      var scope = comment.Scope;
+      entry.anchor = revisionRangeText(scope, 200);
+      entry.paragraph = writerParagraphNumberAt(doc, numProp(scope, "Start"));
+      entry.replies = [];
+      roots.push({ start: numProp(scope, "Start"), entry: entry });
+      if (!done) { open++; }
+      if ((includeDone || !done) && items.length < max) { items.push(entry); }
+    }
+    // Ghep tra loi vao comment goc: Ancestor la mot Comment (khong co chi so truc tiep) nen so sanh
+    // theo vi tri Scope.Start cua comment goc, giong ban C#.
+    for (var k = 0; k < pending.length; k++) {
+      var parentStart = null;
+      try { parentStart = numProp(pending[k].ancestor.Scope, "Start"); } catch (eScope) {}
+      for (var m = 0; m < roots.length; m++) {
+        if (parentStart !== null && roots[m].start === parentStart) {
+          roots[m].entry.replies.push(pending[k].entry);
+          break;
+        }
+      }
+    }
+    return { comments: items, open: open, total: count - pending.length };
+  }
+
   function pdfHex4(n) {
     return ("0000" + (n & 0xFFFF).toString(16)).slice(-4).toUpperCase();
   }
@@ -1998,7 +2088,8 @@
     "writer.exportPdf": true,
     "writer.lockSelection": true,
     "writer.unlockSelection": true,
-    "writer.listRevisions": true
+    "writer.listRevisions": true,
+    "writer.listComments": true
   };
 
   // Lenh luon cham ra ngoai vung chon: tu choi truoc, noi ro vi sao. Giu du ca cac lenh add-in Windows
@@ -4211,6 +4302,8 @@
     "writer.unlockSelection": cmdUnlockSelection,
     "writer.setTracking": cmdWriterSetTracking,
     "writer.listRevisions": cmdWriterListRevisions,
+    "writer.addComment": cmdWriterAddComment,
+    "writer.listComments": cmdWriterListComments,
     "et.newWorkbook": cmdEtNewWorkbook,
     "et.open": cmdEtOpen,
     "et.listSheets": cmdEtListSheets,
