@@ -111,7 +111,7 @@ function makeFont(targets, path) {
   });
 }
 
-function makeParagraphFormat(targets, path, state) {
+function makeParagraphFormat(targets, path) {
   const set = (key) => (v) => { for (const p of targets()) { p[key] = v; } };
   const get = (key) => () => { const list = targets(); return list.length ? list[0][key] : 9999999; };
   return strict(path, {
@@ -152,7 +152,7 @@ function makeRange(state, startIn, endIn, path) {
       },
     },
     Font: { get: () => makeFont(targets, path + ".Font") },
-    ParagraphFormat: { get: () => makeParagraphFormat(targets, path + ".ParagraphFormat", state) },
+    ParagraphFormat: { get: () => makeParagraphFormat(targets, path + ".ParagraphFormat") },
     ListFormat: { get: () => strict(path + ".ListFormat", {
       ListType: { get: () => (targets()[0] || {}).list || 0 },
     }, {
