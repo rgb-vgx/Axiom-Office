@@ -39,7 +39,7 @@ function strict(path, props, methods = {}) {
   });
 }
 
-const rw = (obj, key, path) => ({ get: () => obj[key], set: (v) => { obj[key] = typeof v === "number" ? v : v; } });
+const rw = (obj, key) => ({ get: () => obj[key], set: (v) => { obj[key] = typeof v === "number" ? v : v; } });
 
 function newParagraph(text, base) {
   return {
