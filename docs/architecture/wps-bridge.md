@@ -192,7 +192,7 @@ Spreadsheets cùng lúc thì `/health` đảo app sau mỗi lần poll và agent
 
 <!-- BEGIN SINH TU DONG (scripts/generate_wps_gaps.py) - KHONG SUA TAY -->
 
-Registry có **115** lệnh; add-in WPS có handler cho **73**, còn **42** chưa có. Add-in chỉ khai với Core những lệnh có handler (`filterRunnable` trong `main.js`), nên agent **không** được mời gọi lệnh chưa có.
+Registry có **115** lệnh; add-in WPS có handler cho **75**, còn **40** chưa có. Add-in chỉ khai với Core những lệnh có handler (`filterRunnable` trong `main.js`), nên agent **không** được mời gọi lệnh chưa có.
 
 **Writer (`writer.*`) — 17 lệnh**
 
@@ -229,15 +229,13 @@ Registry có **115** lệnh; add-in WPS có handler cho **73**, còn **42** chư
 | `et.setValidation` | có | chi co trong add-in Windows (plan 21 P1); WPS de sau |
 | `et.whatIf` | có | chi co trong add-in Windows (plan 21 P3); WPS de sau |
 
-**Presentation (`wpp.*`) — 13 lệnh**
+**Presentation (`wpp.*`) — 11 lệnh**
 
 | Lệnh | Cho agent | Lý do (từ `CHUA_CO_HANDLER`) |
 |---|---|---|
 | `wpp.addChart` | không | bieu do goc (slides_from_brief) - chi PowerPoint; WPS JS chua viet handler |
 | `wpp.addConnector` | không | duong noi (slides_from_brief) - chi PowerPoint; WPS JS chua viet handler |
 | `wpp.addGrid` | không | sap xep bai (compose) - chi PowerPoint/LibreOffice; WPS JS chua viet handler |
-| `wpp.addParagraphs` | không | sap xep bai (compose) - chi PowerPoint/LibreOffice; WPS JS chua viet handler |
-| `wpp.addShape` | không | hinh khoi (slides_from_brief) - chi PowerPoint; WPS JS chua viet handler |
 | `wpp.addSlideFromTemplate` | có | chua co handler trong add-in (chi PowerPoint) |
 | `wpp.copyPicture` | có | chua co handler trong add-in (chi PowerPoint) |
 | `wpp.deleteShapes` | có | chua co handler trong add-in (chi PowerPoint) |
@@ -263,8 +261,7 @@ Registry có **115** lệnh; add-in WPS có handler cho **73**, còn **42** chư
 | `doc_design` | `writer.restyle`, `writer.insertBlocks` |
 | `doc_from_brief` | `writer.insertLayoutTable`, `writer.writeContent`, `writer.checkLayout` |
 | `look_at_document` | `app.screenshot` |
-| `slides_from_brief` | `wpp.addParagraphs`, `wpp.addShape` |
-| `slides_from_template` | `wpp.sourceManifest`, `wpp.addSlideFromTemplate`, `wpp.setShapeText`, `wpp.deleteShapes`, `wpp.addParagraphs`, `wpp.copyPicture`, `wpp.deleteTagged` |
+| `slides_from_template` | `wpp.sourceManifest`, `wpp.addSlideFromTemplate`, `wpp.setShapeText`, `wpp.deleteShapes`, `wpp.copyPicture`, `wpp.deleteTagged` |
 
 <!-- END SINH TU DONG -->
 

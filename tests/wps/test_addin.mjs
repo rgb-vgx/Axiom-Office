@@ -328,12 +328,10 @@ const CHUA_CO_HANDLER = {
   "wpp.deleteShapes": "chua co handler trong add-in (chi PowerPoint)",
   "wpp.copyPicture": "chua co handler trong add-in (chi PowerPoint)",
   // Ba lenh sap xep bai (compose) cua duong tao slide tu mau: PowerPoint + LibreOffice compose.
-  "wpp.addParagraphs": "sap xep bai (compose) - chi PowerPoint/LibreOffice; WPS JS chua viet handler",
   "wpp.addGrid": "sap xep bai (compose) - chi PowerPoint/LibreOffice; WPS JS chua viet handler",
   "wpp.deleteTagged": "sap xep bai (compose) - chi PowerPoint/LibreOffice; WPS JS chua viet handler",
   // Hinh khoi va duong noi cua slides_from_brief (docs/plans/18-s0 P2): moi co tren PowerPoint; WPS la to-do khi sang
   // host Linux (docs/plans/19-h0 muc "To-do WPS").
-  "wpp.addShape": "hinh khoi (slides_from_brief) - chi PowerPoint; WPS JS chua viet handler",
   "wpp.addConnector": "duong noi (slides_from_brief) - chi PowerPoint; WPS JS chua viet handler",
   "wpp.addChart": "bieu do goc (slides_from_brief) - chi PowerPoint; WPS JS chua viet handler",
   "wpp.renderSlide": "anh mot slide theo so (look_at_document, benchmark) - chi PowerPoint; WPS JS chua viet handler",
