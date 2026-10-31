@@ -5,6 +5,20 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Sửa, tạo, nhập kỹ năng trong khung chat WPS (31/10/2026)
+
+- Core: `core-go/internal/skills/store.go` + `GET/PUT/DELETE /v1/skills/{name}`, `GET /v1/skills/{name}/file`,
+  `POST /v1/skills`, `POST /v1/skills/import` (cả dưới `/wps/v1/*`). Chỉ ghi thư mục kỹ năng cá nhân; sửa kỹ năng sẵn có
+  thì chép thành bản riêng che bản gốc (khôi phục = xoá bản riêng); xoá = chuyển vào `skills-trash`; nhập thư mục hoặc
+  `.zip`/`.skill` có xem trước, chặn zip-slip và link, bỏ file AI không dùng được, giới hạn kích thước. `SKILL.md` ghi
+  lại giữ nguyên khoá lạ (`license`, `metadata`) và luôn nạp lại được (kiểm bằng chính bộ đọc). Lỗi trả câu tiếng Việt.
+- Pane WPS, màn hình *Kỹ năng*: nút *Sửa* / *Xoá* / *Khôi phục bản gốc* trên từng thẻ, *Tạo mới*, *Nhập kỹ năng…*; màn
+  hình sửa (mô tả, ứng dụng, nội dung Markdown, tệp tham chiếu) và màn hình nhập (xem trước, đánh dấu thay).
+- Sửa trong lúc làm: kiểm "thư mục đã có" dùng nhầm `filesafe.Exists` (chỉ nhận file) — tạo/lưu có thể ghi đè thư mục
+  hỏng cùng tên; ô đường dẫn nhập không được đọc; ô soạn dùng font đơn cách vẽ lệch dấu tiếng Việt trên WPS thật.
+- Đo trên WPS 12.1.2 thật (Xvfb, HOME tạm): nhập `.zip` (bỏ `tao.py`, giữ `license`), sửa kỹ năng sẵn có thành bản riêng
+  (bản gốc không đổi), khôi phục qua `window.confirm` (hộp thoại gốc của WPS) — đều đúng.
+
 ### Fixed — WPS Linux: mở Writer và Spreadsheets cùng lúc thì agent làm nhầm app (31/10/2026)
 
 - **Mỗi tiến trình WPS một phiên bridge** (`core-go/internal/wpsbridge`): add-in gửi `clientId`; client đầu giữ cổng

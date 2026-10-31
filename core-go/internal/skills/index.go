@@ -58,6 +58,9 @@ type snapshot struct {
 	skills    map[string]Definition
 	resources map[string]string
 	errs      []Failure
+	// shadowed: skill cua nguon truoc bi skill CUNG TEN o nguon sau che (vd ban rieng cua nguoi dung che ban san
+	// co) - de giao dien noi duoc "dang dung ban rieng" va khoi phuc ban goc (store.go).
+	shadowed map[string]Definition
 }
 
 // Index: quet cac nguon theo thu tu uu tien, nguon sau ghi de nguon truoc khi trung ten.
@@ -123,6 +126,24 @@ func (i *Index) Find(name string) *Definition {
 	return nil
 }
 
+// Shadowed: ban cua nguon truoc dang bi skill cung ten che (ok=false khi khong co).
+func (i *Index) Shadowed(name string) (Definition, bool) {
+	i.mu.RLock()
+	defer i.mu.RUnlock()
+	definition, ok := i.current.shadowed[strings.TrimSpace(name)]
+	return definition, ok
+}
+
+// SourceDir: thu muc cua nguon theo ten ("user", "builtin"...); "" khi khong co.
+func (i *Index) SourceDir(name string) string {
+	for _, source := range i.sources {
+		if source.Name == name {
+			return source.Dir
+		}
+	}
+	return ""
+}
+
 // ResourceDirectory: thu muc goi tai nguyen (vd "_design"), theo cung thu tu uu tien voi skill.
 func (i *Index) ResourceDirectory(name string) string {
 	i.mu.RLock()
@@ -132,6 +153,7 @@ func (i *Index) ResourceDirectory(name string) string {
 
 func (i *Index) Reload() {
 	skills := map[string]Definition{}
+	shadowed := map[string]Definition{}
 	resources := map[string]string{}
 	errs := []Failure{}
 	for _, source := range i.sources {
@@ -161,6 +183,9 @@ func (i *Index) Reload() {
 			skill, failure := Load(directory, source.Name)
 			switch {
 			case skill != nil:
+				if previous, ok := skills[skill.Name]; ok {
+					shadowed[skill.Name] = previous
+				}
 				skills[skill.Name] = *skill
 			case failure != nil:
 				errs = append(errs, *failure)
@@ -169,7 +194,7 @@ func (i *Index) Reload() {
 	}
 
 	i.mu.Lock()
-	i.current = snapshot{skills: skills, resources: resources, errs: errs}
+	i.current = snapshot{skills: skills, resources: resources, errs: errs, shadowed: shadowed}
 	i.mu.Unlock()
 
 	message := "skills loaded: " + strconv.Itoa(len(skills)) + " ok, " + strconv.Itoa(len(errs)) + " error(s)"

@@ -425,7 +425,7 @@
   // Moi duong deu di qua kenh /wps/v1/* (cung goc voi Core, khong token) - xem docs/architecture/wps-bridge.md muc 7.
 
   var view = { name: "", busy: false, note: "", scope: "all", data: null, fields: null,
-    check: "", todo: "", lines: 0, detail: "" };
+    check: "", todo: "", lines: 0, detail: "", sk: null };
 
   // targetQuery: ?app=&client= cua pane cho GET status (Core tra trang thai cua dung app nay).
   function targetQuery() {
@@ -523,6 +523,7 @@
     view.todo = textOf(action);
     view.lines = 0;
     view.detail = "";
+    view.sk = null;
     renderView();
     loadView();
   }
@@ -537,6 +538,7 @@
     view.todo = "";
     view.lines = 0;
     view.detail = "";
+    view.sk = null;
     renderView();
   }
 
@@ -969,6 +971,9 @@
   }
 
   function renderSkillsView(box) {
+    var sk = skillState();
+    if (sk.mode === "edit" || sk.mode === "new") { renderSkillEditor(box); return; }
+    if (sk.mode === "import") { renderSkillImport(box); return; }
     viewTitle(box, "Kỹ năng");
     if (view.note) { viewNote(box, view.note); }
     if (view.busy) { viewNote(box, "Đang tải…"); return; }
@@ -1002,9 +1007,10 @@
       var parts = [];
       if (trimText(skill.description) !== "") { parts.push(textOf(skill.description)); }
       parts.push(apps.length > 0 ? "dùng cho: " + apps.join(", ") : "dùng cho mọi ứng dụng");
-      parts.push(sourceLabel(skill.source));
+      parts.push(sourceLabel(skill.source) + (skill.overrides ? " (bản riêng thay bản gốc)" : ""));
       addText(body, parts.join(" · "));
       card.appendChild(body);
+      renderSkillCardActions(card, skill);
       box.appendChild(card);
     }
     if (failures.length > 0) {
@@ -1023,8 +1029,338 @@
     }
     var extra = document.createElement("div");
     try { extra.className = "btnRow"; } catch (e3) {}
+    viewButton(extra, "Nhập kỹ năng…", "skillImportOpen", "", false);
+    viewButton(extra, "Tạo mới", "skillNew", "", false);
     viewButton(extra, "Nạp lại", "skillsReload", "", false);
     viewFoot(box, extra);
+  }
+
+  // ---- Sua / tao / nhap ky nang (Core: skills/store.go qua /wps/v1/skills/*) ----
+  // view.sk: trang thai rieng cua man hinh Ky nang - mode "" (danh sach) | "edit" | "new" | "import". Moi thay doi ghi
+  // vao thu muc ky nang CA NHAN; sua ky nang san co thi Core tao ban rieng che ban goc (khoi phuc = xoa ban rieng).
+
+  var SKILL_APPS = [["wps", "Văn bản"], ["et", "Bảng tính"], ["wpp", "Trình chiếu"]];
+  var SKILL_TEMPLATE = "# Tên kỹ năng\n\nKhi nào dùng, các bước AI cần làm, định dạng mong muốn, ví dụ.\n";
+
+  function skillState() {
+    if (!view.sk) { view.sk = { mode: "" }; }
+    return view.sk;
+  }
+
+  function skillField(label, id, value, rows, note) {
+    var row = document.createElement("div");
+    try { row.className = "settingBlock"; } catch (e) {}
+    var name = document.createElement("label");
+    try { name.className = "settingLabel"; name.setAttribute("for", id); } catch (e2) {}
+    addText(name, label);
+    row.appendChild(name);
+    var field = document.createElement(rows > 1 ? "textarea" : "input");
+    try {
+      field.id = id;
+      field.className = rows > 1 ? "field fieldArea" : "field";
+      if (rows > 1) { field.setAttribute("rows", String(rows)); } else { field.type = "text"; }
+      field.setAttribute("spellcheck", "false");
+      field.value = textOf(value);
+    } catch (e3) {}
+    row.appendChild(field);
+    if (note) {
+      var hint = document.createElement("div");
+      try { hint.className = "settingHint"; } catch (e4) {}
+      addText(hint, note);
+      row.appendChild(hint);
+    }
+    return row;
+  }
+
+  // readSkillFields: chep gia tri cac o dang hien vao view.sk.fields TRUOC moi lan ve lai (ve lai xoa DOM).
+  function readSkillFields() {
+    var sk = skillState();
+    var el = $("sk_import_path");
+    if (el) { sk.path = String(el.value || ""); }
+    el = $("sk_import_overwrite");
+    if (el) { sk.overwrite = !!el.checked; }
+    var f = sk.fields;
+    if (!f) { return; }
+    el = $("sk_name");
+    if (el) { f.name = String(el.value || ""); }
+    el = $("sk_desc");
+    if (el) { f.description = String(el.value || ""); }
+    el = $("sk_body");
+    if (el) { f.body = String(el.value || ""); }
+    for (var i = 0; i < SKILL_APPS.length; i++) {
+      el = $("sk_app_" + SKILL_APPS[i][0]);
+      if (el) { f.apps[SKILL_APPS[i][0]] = !!el.checked; }
+    }
+    el = $("sk_file");
+    if (el && sk.openFile) { f.files[sk.openFile] = String(el.value || ""); }
+  }
+
+  function skillFieldsOf(detail) {
+    var apps = {};
+    var list = (detail && detail.apps) || [];
+    for (var i = 0; i < list.length; i++) { apps[list[i]] = true; }
+    return { name: textOf(detail && detail.name), description: textOf(detail && detail.description),
+      body: textOf(detail && detail.body), apps: apps, files: {} };
+  }
+
+  function renderSkillCardActions(card, skill) {
+    var row = document.createElement("div");
+    try { row.className = "btnRow cardActions"; } catch (e) {}
+    viewButton(row, "Sửa", "skillEdit", textOf(skill.name), false);
+    if (skill.source === "user" && skill.overrides) {
+      viewButton(row, "Khôi phục bản gốc", "skillRestore", textOf(skill.name), false);
+    } else if (skill.source === "user") {
+      viewButton(row, "Xoá", "skillDelete", textOf(skill.name), false);
+    }
+    card.appendChild(row);
+  }
+
+  function renderSkillEditor(box) {
+    var sk = skillState();
+    var f = sk.fields;
+    var isNew = sk.mode === "new";
+    viewTitle(box, isNew ? "Kỹ năng mới" : "Sửa kỹ năng: " + f.name);
+    if (view.note) { viewNote(box, view.note); }
+    if (view.busy) { viewNote(box, "Đang lưu…"); return; }
+    var detail = sk.detail || {};
+    if (!isNew && detail.source && detail.source !== "user") {
+      viewNote(box, "Đây là kỹ năng " + sourceLabel(detail.source) + ". Khi lưu, Axiom tạo bản riêng của bạn — bản gốc " +
+        "giữ nguyên, bấm \"Khôi phục bản gốc\" để quay lại.");
+    } else if (detail.overrides) {
+      viewNote(box, "Đang dùng bản riêng của bạn thay cho bản " + sourceLabel(detail.originalSource) + ".");
+    }
+    if (isNew) {
+      box.appendChild(skillField("Tên", "sk_name", f.name, 1,
+        "Chữ thường không dấu, số và dấu '-' (vd: bao-cao-quy). Không đổi được sau khi tạo."));
+    }
+    box.appendChild(skillField("Mô tả", "sk_desc", f.description, 3,
+      "AI đọc mô tả để quyết định khi nào dùng kỹ năng — nêu rõ việc gì, khi nào (tối đa 1024 ký tự)."));
+
+    var appsRow = document.createElement("div");
+    try { appsRow.className = "settingBlock"; } catch (eA) {}
+    var appsLabel = document.createElement("div");
+    try { appsLabel.className = "settingLabel"; } catch (eB) {}
+    addText(appsLabel, "Dùng cho");
+    appsRow.appendChild(appsLabel);
+    for (var i = 0; i < SKILL_APPS.length; i++) {
+      var key = SKILL_APPS[i][0];
+      var wrap = document.createElement("label");
+      try { wrap.className = "checkLabel"; wrap.setAttribute("for", "sk_app_" + key); } catch (eC) {}
+      var box1 = document.createElement("input");
+      try { box1.id = "sk_app_" + key; box1.type = "checkbox"; box1.className = "check"; box1.checked = !!f.apps[key]; } catch (eD) {}
+      wrap.appendChild(box1);
+      addText(wrap, " " + SKILL_APPS[i][1]);
+      appsRow.appendChild(wrap);
+    }
+    var appsHint = document.createElement("div");
+    try { appsHint.className = "settingHint"; } catch (eE) {}
+    addText(appsHint, "Không chọn ô nào = dùng cho mọi ứng dụng.");
+    appsRow.appendChild(appsHint);
+    box.appendChild(appsRow);
+
+    box.appendChild(skillField("Nội dung (Markdown)", "sk_body", f.body, 14,
+      "Hướng dẫn AI đọc khi nạp kỹ năng. Tệp tham chiếu nằm trong thư mục kỹ năng, AI mở khi cần."));
+
+    var files = detail.files || [];
+    if (files.length > 0) {
+      viewSection(box, "Tệp tham chiếu (" + files.length + ")");
+      var fileRow = document.createElement("div");
+      try { fileRow.className = "btnRow fileList"; } catch (eF) {}
+      for (var k = 0; k < files.length; k++) {
+        var file = files[k] || {};
+        if (!file.text) { continue; }
+        var btn = viewButton(fileRow, textOf(file.path), "skillFile", textOf(file.path), sk.openFile === file.path);
+        try { btn.setAttribute("title", "Sửa " + textOf(file.path)); } catch (eG) {}
+      }
+      box.appendChild(fileRow);
+      if (sk.openFile) {
+        box.appendChild(skillField(sk.openFile, "sk_file", f.files[sk.openFile], 10, ""));
+      }
+    }
+
+    var extra = document.createElement("div");
+    try { extra.className = "btnRow"; } catch (eH) {}
+    viewButton(extra, isNew ? "Tạo" : "Lưu", "skillSave", "", true);
+    viewButton(extra, "Huỷ", "skillBack", "", false);
+    viewFoot(box, extra);
+  }
+
+  function renderSkillImport(box) {
+    var sk = skillState();
+    viewTitle(box, "Nhập kỹ năng");
+    if (view.note) { viewNote(box, view.note); }
+    box.appendChild(skillField("Đường dẫn", "sk_import_path", sk.path, 1,
+      "Thư mục có SKILL.md (hoặc chứa nhiều thư mục kỹ năng), hoặc tệp .zip / .skill trên máy này. Kỹ năng được chép " +
+      "vào thư mục cá nhân; tệp AI không dùng được (vd script .py) bị bỏ qua."));
+    var over = document.createElement("label");
+    try { over.className = "checkLabel"; over.setAttribute("for", "sk_import_overwrite"); } catch (e) {}
+    var check = document.createElement("input");
+    try {
+      check.id = "sk_import_overwrite"; check.type = "checkbox"; check.className = "check"; check.checked = !!sk.overwrite;
+      // Bam o nay thi ve lai ngay: trang thai tung ky nang va so tren nut "Nhap N ky nang" theo o vua doi.
+      check.setAttribute("data-act", "skillImportToggle");
+    } catch (e2) {}
+    over.appendChild(check);
+    addText(over, " Thay kỹ năng cá nhân cùng tên (bản cũ vào thùng rác)");
+    box.appendChild(over);
+    if (view.busy) { viewNote(box, "Đang đọc…"); }
+    var preview = sk.preview;
+    var importable = 0;
+    if (preview && !view.busy) {
+      var items = preview.items || [];
+      viewSection(box, "Tìm thấy (" + items.length + ")");
+      for (var i = 0; i < items.length; i++) {
+        var item = items[i] || {};
+        var state = "Sẽ nhập";
+        var bad = false;
+        if (item.error) { state = "Không nhập được: " + textOf(item.error); bad = true; }
+        else if (item.conflict === "user" && !sk.overwrite) { state = "Đã có kỹ năng cá nhân cùng tên — đánh dấu ô Thay ở trên để nhập"; bad = true; }
+        else if (item.conflict === "user") { state = "Sẽ thay kỹ năng cá nhân cùng tên"; }
+        else if (item.conflict === "override") { state = "Sẽ dùng thay kỹ năng sẵn có cùng tên (bản gốc giữ nguyên)"; }
+        if (!bad) { importable++; }
+        var card = makeCard(textOf(item.name), bad ? "cardBad" : "skillCard", bad ? "cardTitleErr" : "");
+        var body = document.createElement("div");
+        try { body.className = "cardBody"; } catch (e3) {}
+        var parts = [];
+        if (trimText(item.description) !== "") { parts.push(textOf(item.description)); }
+        parts.push(item.files + " tệp tham chiếu");
+        if ((item.skipped || []).length > 0) { parts.push("bỏ qua: " + item.skipped.join(", ")); }
+        parts.push(state);
+        addText(body, parts.join(" · "));
+        card.appendChild(body);
+        box.appendChild(card);
+      }
+    }
+    var extra = document.createElement("div");
+    try { extra.className = "btnRow"; } catch (e4) {}
+    viewButton(extra, "Xem trước", "skillImportPreview", "", !preview);
+    if (preview && importable > 0) { viewButton(extra, "Nhập " + importable + " kỹ năng", "skillImportRun", "", true); }
+    viewButton(extra, "Huỷ", "skillBack", "", false);
+    viewFoot(box, extra);
+  }
+
+  function skillBackToList(note) {
+    view.sk = { mode: "" };
+    view.note = note || "";
+    view.busy = true;
+    view.data = null;
+    renderView();
+    // Danh sach liet ke lai sau khi ghi (Core da nap lai) - giu cau thong bao vua dat.
+    api("skills?app=" + encodeURIComponent(KIND)).then(function (reply) {
+      if (view.name !== "skills") { return; }
+      var result = resultOf(reply);
+      view.busy = false;
+      if (!result) { view.note = apiError(reply); } else { view.data = result; }
+      renderView();
+    }, function () { view.busy = false; view.note = "Không kết nối được Agent Core"; renderView(); });
+  }
+
+  function skillEdit(name) {
+    view.busy = true;
+    view.note = "";
+    renderView();
+    api("skills/" + encodeURIComponent(name)).then(function (reply) {
+      if (view.name !== "skills") { return; }
+      var detail = resultOf(reply);
+      view.busy = false;
+      if (!detail) { view.note = apiError(reply); renderView(); return; }
+      view.sk = { mode: "edit", detail: detail, fields: skillFieldsOf(detail), openFile: "" };
+      renderView();
+    }, function () { view.busy = false; view.note = "Không kết nối được Agent Core"; renderView(); });
+  }
+
+  function skillNew() {
+    view.note = "";
+    view.sk = { mode: "new", detail: null, openFile: "",
+      fields: { name: "", description: "", body: SKILL_TEMPLATE, apps: {}, files: {} } };
+    renderView();
+  }
+
+  function skillFile(path) {
+    readSkillFields();
+    var sk = skillState();
+    if (sk.openFile === path) { return; }
+    if (Object.prototype.hasOwnProperty.call(sk.fields.files, path)) { sk.openFile = path; renderView(); return; }
+    api("skills/" + encodeURIComponent(sk.fields.name) + "/file?path=" + encodeURIComponent(path)).then(function (reply) {
+      var result = resultOf(reply);
+      if (!result) { view.note = apiError(reply); renderView(); return; }
+      sk.fields.files[path] = textOf(result.text);
+      sk.openFile = path;
+      view.note = "";
+      renderView();
+    }, function () { view.note = "Không kết nối được Agent Core"; renderView(); });
+  }
+
+  function skillSave() {
+    readSkillFields();
+    var sk = skillState();
+    var f = sk.fields;
+    var apps = [];
+    for (var i = 0; i < SKILL_APPS.length; i++) {
+      if (f.apps[SKILL_APPS[i][0]]) { apps.push(SKILL_APPS[i][0]); }
+    }
+    var body = { description: f.description, apps: apps, body: f.body, files: f.files };
+    var isNew = sk.mode === "new";
+    if (isNew) { body.name = trimText(f.name); }
+    view.busy = true;
+    view.note = "";
+    renderView();
+    var req = isNew ? api("skills", "POST", body) : api("skills/" + encodeURIComponent(f.name), "PUT", body);
+    req.then(function (reply) {
+      var saved = resultOf(reply);
+      view.busy = false;
+      if (!saved) { view.note = apiError(reply); renderView(); return; }
+      var note = (isNew ? "Đã tạo" : "Đã lưu") + " kỹ năng \"" + textOf(saved.name) + "\".";
+      var forApps = saved.apps || [];
+      if (forApps.length > 0 && forApps.indexOf(KIND) < 0) {
+        note += " Kỹ năng này không dùng cho " + appName() + " nên không hiện trong danh sách ở đây.";
+      }
+      skillBackToList(note);
+    }, function () { view.busy = false; view.note = "Không kết nối được Agent Core"; renderView(); });
+  }
+
+  function skillRemove(name, restore) {
+    var ask = restore
+      ? "Khôi phục bản gốc của \"" + name + "\"? Bản riêng của bạn chuyển vào thùng rác."
+      : "Xoá kỹ năng \"" + name + "\"? Kỹ năng chuyển vào thùng rác (skills-trash).";
+    var yes = false;
+    try { yes = window.confirm(ask); } catch (e) { yes = false; }
+    if (!yes) { return; }
+    api("skills/" + encodeURIComponent(name), "DELETE").then(function (reply) {
+      var result = resultOf(reply);
+      if (!result) { view.note = apiError(reply); renderView(); return; }
+      skillBackToList(result.restored ? "Đã khôi phục bản gốc của \"" + name + "\"." : "Đã xoá \"" + name + "\" (vào thùng rác).");
+    }, function () { view.note = "Không kết nối được Agent Core"; renderView(); });
+  }
+
+  function skillImportOpen() {
+    view.note = "";
+    view.sk = { mode: "import", path: "", overwrite: false, preview: null };
+    renderView();
+  }
+
+  function skillImport(dryRun) {
+    readSkillFields();
+    var sk = skillState();
+    if (trimText(sk.path) === "") { view.note = "Nhập đường dẫn tới thư mục kỹ năng hoặc tệp .zip."; renderView(); return; }
+    view.busy = true;
+    view.note = "";
+    renderView();
+    api("skills/import", "POST", { path: trimText(sk.path), dryRun: dryRun, overwrite: !!sk.overwrite }).then(function (reply) {
+      var result = resultOf(reply);
+      view.busy = false;
+      if (!result) { sk.preview = null; view.note = apiError(reply); renderView(); return; }
+      if (dryRun) { sk.preview = result; renderView(); return; }
+      var done = [];
+      var failed = [];
+      var items = result.items || [];
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].imported) { done.push(textOf(items[i].name)); } else { failed.push(textOf(items[i].name)); }
+      }
+      var note = done.length > 0 ? "Đã nhập " + done.length + " kỹ năng: " + done.join(", ") + "." : "Không nhập được kỹ năng nào.";
+      if (failed.length > 0) { note += " Bỏ qua: " + failed.join(", ") + "."; }
+      skillBackToList(note);
+    }, function () { view.busy = false; view.note = "Không kết nối được Agent Core"; renderView(); });
   }
 
   // ---- Man hinh "Trang thai" (Windows: RibbonUi.StatusReport) ----
@@ -2010,6 +2346,17 @@
     logReload: reloadView,
     statusCopyUrl: copyApiUrl,
     skillsReload: reloadSkills,
+    skillEdit: skillEdit,
+    skillNew: skillNew,
+    skillFile: skillFile,
+    skillSave: skillSave,
+    skillBack: function () { skillBackToList(""); },
+    skillDelete: function (value) { skillRemove(value, false); },
+    skillRestore: function (value) { skillRemove(value, true); },
+    skillImportOpen: skillImportOpen,
+    skillImportPreview: function () { skillImport(true); },
+    skillImportRun: function () { skillImport(false); },
+    skillImportToggle: function () { readSkillFields(); renderView(); },
     checkRun: runCheck,
     logMore: function () {
       view.lines = (view.lines || DEFAULT_LOG_LINES) + DEFAULT_LOG_LINES;

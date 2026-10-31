@@ -974,3 +974,153 @@ test("menu '...': co tieu de nhom va vai tro menu cho trinh doc man hinh", () =>
   assert.equal(items.length, 5);
   for (const item of items) { assert.equal(item.getAttribute("role"), "menuitem"); }
 });
+
+// ---- Man hinh "Ky nang": sua / tao / nhap (Core: skills/store.go qua /wps/v1/skills/*) ----
+
+const SKILL_LIST = { ok: true, result: {
+  skills: [
+    { name: "bang-diem", description: "Lập bảng điểm", apps: ["et"], source: "builtin", directory: "/a/bang-diem" },
+    { name: "the-thuc", description: "Thể thức", apps: [], source: "user", directory: "/u/the-thuc", overrides: true },
+    { name: "cua-toi", description: "Của tôi", apps: [], source: "user", directory: "/u/cua-toi", overrides: false },
+  ],
+  errors: [], sources: [{ name: "builtin", directory: "/a", exists: true }],
+} };
+const actBtn = (pane, act, value) => pane.find((el) => el.getAttribute && el.getAttribute("data-act") === act &&
+  (value === undefined || el.getAttribute("data-value") === value));
+
+test("ky nang: moi the co nut Sua; Xoa chi cho ban ca nhan, ban rieng thay ban goc thi la Khoi phuc", async () => {
+  const { pane } = paneWith({ "GET /skills": [200, SKILL_LIST] }, { search: "?app=et&view=skills" });
+  await tick();
+  for (const name of ["bang-diem", "the-thuc", "cua-toi"]) { assert.ok(actBtn(pane, "skillEdit", name), "Sua " + name); }
+  assert.equal(actBtn(pane, "skillDelete", "bang-diem"), null, "ky nang san co khong xoa duoc");
+  assert.ok(actBtn(pane, "skillRestore", "the-thuc"), "ban rieng che ban goc -> Khoi phuc ban goc");
+  assert.ok(actBtn(pane, "skillDelete", "cua-toi"));
+  assert.match(pane.text("view"), /cá nhân \(bản riêng thay bản gốc\)/);
+  assert.ok(actBtn(pane, "skillImportOpen") && actBtn(pane, "skillNew"), "co Nhap ky nang / Tao moi");
+});
+
+test("ky nang: sua ky nang san co -> PUT dung noi dung, kem tep tham chieu vua sua; xong ve danh sach", async () => {
+  const detail = { ok: true, result: { name: "bang-diem", description: "Lập bảng điểm", apps: ["et"], body: "# Bảng điểm",
+    source: "builtin", directory: "/a/bang-diem", overrides: false,
+    files: [{ path: "references/mau.md", size: 10, text: true }, { path: "mau.xlsx", size: 99, text: false }] } };
+  const saved = { ok: true, result: { name: "bang-diem", apps: ["et"], source: "user", overrides: true } };
+  const { pane, calls } = paneWith({
+    "GET /skills": [200, SKILL_LIST],
+    "GET /skills/bang-diem": [200, detail],
+    "GET /skills/bang-diem/file": [200, { ok: true, result: { path: "references/mau.md", text: "mẫu gốc" } }],
+    "PUT /skills/bang-diem": [200, saved],
+  }, { search: "?app=et&view=skills" });
+  await tick();
+  pane.click(actBtn(pane, "skillEdit", "bang-diem"));
+  await tick();
+  assert.match(pane.text("view"), /Sửa kỹ năng: bang-diem/);
+  assert.match(pane.text("view"), /Khi lưu, Axiom tạo bản riêng của bạn/, "ban san co: noi ro se tao ban rieng");
+  assert.equal(pane.byId("sk_desc").value, "Lập bảng điểm");
+  assert.equal(pane.byId("sk_app_et").checked, true);
+  assert.equal(actBtn(pane, "skillFile", "mau.xlsx"), null, "tep nhi phan khong sua tren giao dien");
+  pane.byId("sk_desc").value = "Bảng điểm lớp tôi";
+  pane.byId("sk_app_wps").checked = true;
+  pane.click(actBtn(pane, "skillFile", "references/mau.md"));
+  await tick();
+  assert.equal(pane.byId("sk_desc").value, "Bảng điểm lớp tôi", "mo tep khong lam mat chu vua go");
+  assert.equal(pane.byId("sk_file").value, "mẫu gốc");
+  pane.byId("sk_file").value = "mẫu mới";
+  pane.click(actBtn(pane, "skillSave"));
+  await tick();
+  const put = calls.find((c) => c.method === "PUT");
+  assert.equal(put.url, BASE + "skills/bang-diem");
+  assert.deepEqual(put.body, { description: "Bảng điểm lớp tôi", apps: ["wps", "et"], body: "# Bảng điểm",
+    files: { "references/mau.md": "mẫu mới" } });
+  assert.match(pane.text("view"), /Đã lưu kỹ năng "bang-diem"\./);
+  assert.ok(actBtn(pane, "skillEdit", "bang-diem"), "luu xong ve danh sach");
+});
+
+test("ky nang: loi tu Core (cau tieng Viet) hien tren man hinh sua, khong mat chu da go", async () => {
+  const { pane } = paneWith({
+    "GET /skills": [200, SKILL_LIST],
+    "POST /skills": [400, { ok: false, code: "invalid", error: "Tên kỹ năng chỉ gồm chữ thường không dấu, số và dấu '-' (vd: bao-cao-quy)." }],
+  }, { search: "?app=wps&view=skills" });
+  await tick();
+  pane.click(actBtn(pane, "skillNew"));
+  assert.match(pane.text("view"), /Kỹ năng mới/);
+  pane.byId("sk_name").value = "Báo Cáo";
+  pane.byId("sk_desc").value = "Báo cáo quý";
+  pane.click(actBtn(pane, "skillSave"));
+  await tick();
+  assert.match(pane.text("view"), /Tên kỹ năng chỉ gồm chữ thường/);
+  assert.equal(pane.byId("sk_name").value, "Báo Cáo", "o nhap giu nguyen de sua lai");
+  assert.equal(pane.byId("sk_desc").value, "Báo cáo quý");
+});
+
+test("ky nang: tao moi gui POST kem ten; ky nang khong dung cho app dang mo thi noi ro vi sao khong thay", async () => {
+  const { pane, calls } = paneWith({
+    "GET /skills": [200, SKILL_LIST],
+    "POST /skills": [200, { ok: true, result: { name: "bao-cao-quy", apps: ["et"], source: "user" } }],
+  }, { search: "?app=wps&view=skills" });
+  await tick();
+  pane.click(actBtn(pane, "skillNew"));
+  pane.byId("sk_name").value = " bao-cao-quy ";
+  pane.byId("sk_desc").value = "Báo cáo quý";
+  pane.byId("sk_app_et").checked = true;
+  pane.click(actBtn(pane, "skillSave"));
+  await tick();
+  const post = calls.find((c) => c.method === "POST");
+  assert.equal(post.body.name, "bao-cao-quy");
+  assert.deepEqual(post.body.apps, ["et"]);
+  assert.match(pane.text("view"), /Đã tạo kỹ năng "bao-cao-quy"\. Kỹ năng này không dùng cho Writer/);
+});
+
+test("ky nang: khoi phuc ban goc hoi truoc; tu choi thi khong goi Core", async () => {
+  let answer = false;
+  const { pane, calls } = paneWith({
+    "GET /skills": [200, SKILL_LIST],
+    "DELETE /skills/the-thuc": [200, { ok: true, result: { trash: "/t", restored: true } }],
+  }, { search: "?app=wps&view=skills", confirm: () => answer });
+  await tick();
+  pane.click(actBtn(pane, "skillRestore", "the-thuc"));
+  await tick();
+  assert.equal(calls.filter((c) => c.method === "DELETE").length, 0, "huy hop thoai -> khong xoa");
+  answer = true;
+  pane.click(actBtn(pane, "skillRestore", "the-thuc"));
+  await tick();
+  assert.equal(calls.filter((c) => c.method === "DELETE").length, 1);
+  assert.match(pane.text("view"), /Đã khôi phục bản gốc của "the-thuc"\./);
+});
+
+test("ky nang: nhap tu ngoai - xem truoc roi moi nhap; xung dot ten noi ro, chua danh dau Thay thi khong nhap", async () => {
+  const preview = { ok: true, result: { source: "/tmp/goi.zip", items: [
+    { name: "hop-dong", description: "Soạn hợp đồng", apps: [], files: 2, skipped: ["tao.py"], imported: false },
+    { name: "cua-toi", description: "Bản khác", apps: [], files: 0, skipped: [], conflict: "user", imported: false },
+    { name: "hong", apps: [], files: 0, skipped: [], error: "Thiếu mô tả", imported: false },
+  ] } };
+  const done = { ok: true, result: { source: "/tmp/goi.zip", items: [
+    { name: "hop-dong", imported: true }, { name: "cua-toi", conflict: "user", imported: false } ] } };
+  const { pane, calls } = paneWith({
+    "GET /skills": [200, SKILL_LIST],
+    "POST /skills/import": (req) => [200, req.body.dryRun ? preview : done],
+  }, { search: "?app=wps&view=skills" });
+  await tick();
+  pane.click(actBtn(pane, "skillImportOpen"));
+  pane.click(actBtn(pane, "skillImportPreview"));
+  assert.match(pane.text("view"), /Nhập đường dẫn/, "chua go duong dan thi nhac");
+  assert.equal(calls.filter((c) => c.url.endsWith("skills/import")).length, 0);
+  pane.byId("sk_import_path").value = "/tmp/goi.zip";
+  pane.click(actBtn(pane, "skillImportPreview"));
+  await tick();
+  const shown = pane.text("view");
+  assert.match(shown, /hop-dong[\s\S]*bỏ qua: tao\.py · Sẽ nhập/);
+  assert.match(shown, /Đã có kỹ năng cá nhân cùng tên — đánh dấu ô Thay/);
+  assert.match(shown, /Không nhập được: Thiếu mô tả/);
+  assert.equal(pane.text("view").indexOf("Nhập 1 kỹ năng") >= 0, true, "chi dem ky nang nhap duoc");
+  // Danh dau "Thay": trang thai va so tren nut doi ngay, roi bo danh dau lai.
+  pane.byId("sk_import_overwrite").checked = true;
+  pane.click(pane.byId("sk_import_overwrite"));
+  assert.match(pane.text("view"), /Sẽ thay kỹ năng cá nhân cùng tên[\s\S]*Nhập 2 kỹ năng/);
+  pane.byId("sk_import_overwrite").checked = false;
+  pane.click(pane.byId("sk_import_overwrite"));
+  pane.click(actBtn(pane, "skillImportRun"));
+  await tick();
+  const run = calls.filter((c) => c.url.endsWith("skills/import")).pop();
+  assert.deepEqual(run.body, { path: "/tmp/goi.zip", dryRun: false, overwrite: false });
+  assert.match(pane.text("view"), /Đã nhập 1 kỹ năng: hop-dong\. Bỏ qua: cua-toi\./);
+});

@@ -1055,3 +1055,20 @@ button:focus,
   cursor: default;
   text-decoration: none;
 }
+/* O soan nhieu dong (man hinh Ky nang: mo ta, noi dung Markdown, tep tham chieu). Giu font cua .field, KHONG dung font
+   don cach: tren WPS that (31/10/2026) font monospace cua CEF ve dau tieng Viet lech ra ngoai chu ("Thê`thức"). */
+.fieldArea {
+  resize: vertical;
+  min-height: 3.2em;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+/* Nut tren tung the ky nang: nho, sat duoi mo ta. */
+.cardActions {
+  margin-top: var(--axiom-gap-tool-line);
+}
+.fileList button {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

@@ -223,7 +223,7 @@ menu chuột phải.
 | **Nhìn tài liệu** | Cho AI xem ảnh trang tài liệu để tự kiểm tra trình bày (tốn thêm token) | ✓ | — | trong *Cài đặt nâng cao…* |
 | **Soát bố cục / Soát bảng / Soát vùng dữ liệu** | Soát lỗi trình bày, không dùng AI — [mục 7](#7-soát-tài-liệu--không-dùng-ai) | ✓ | ✓ | *Soát tài liệu…* |
 | **Bộ nhớ AI…** | Quản lý những điều AI ghi nhớ — [mục 8](#8-bộ-nhớ-ai) | ✓ | ✓ | liên kết *Ghi nhớ* |
-| **Kỹ năng…** | Xem các kỹ năng AI đang có cho ứng dụng này; *Nạp lại* sau khi thêm/sửa kỹ năng. AI tự chọn kỹ năng hợp với yêu cầu | ✓ | ✓ | ✓ |
+| **Kỹ năng…** | Xem các kỹ năng AI đang có cho ứng dụng này; *Nạp lại* sau khi thêm/sửa kỹ năng. AI tự chọn kỹ năng hợp với yêu cầu. **WPS trên Linux** còn có: *Sửa* (mô tả, ứng dụng dùng, nội dung, tệp tham chiếu), *Tạo mới*, *Nhập kỹ năng…* từ thư mục hoặc tệp `.zip`/`.skill` (xem trước rồi mới nhập), *Xoá* / *Khôi phục bản gốc* — xem dưới bảng | ✓ | ✓ | ✓ |
 | **Công cụ ngoài…** | Thêm, sửa, tắt công cụ ngoài (MCP) cho AI | ✓ | — | — |
 | **Thiết lập…** | Kết nối máy chủ AI — [mục 3](#3-thiết-lập-lần-đầu-kết-nối-máy-chủ-ai) | ✓ | ✓ | ✓ |
 | **Ngôn ngữ · Language** | Tiếng Việt / English / tự động | ✓ | — | theo ngôn ngữ LibreOffice |
@@ -233,6 +233,18 @@ menu chuột phải.
 | Khác ▸ **Sao chép API URL** | Chép địa chỉ kiểm tra kỹ thuật (dành cho IT) | ✓ | ✓ | — |
 | Khác ▸ **Cài đặt nâng cao…** | Tuỳ chọn chi tiết (model dự phòng, ngữ cảnh, …) | ✓ | — | ✓ |
 | Khác ▸ **Tắt Agent Core…** | Tắt phần nền (lần hỏi AI sau tự bật lại) | ✓ | — | trong *Cài đặt nâng cao…* |
+
+**Sửa và nhập kỹ năng (WPS trên Linux).** Trong màn hình *Kỹ năng*:
+
+- **Sửa** một kỹ năng: đổi mô tả (AI đọc mô tả để biết khi nào dùng), chọn ứng dụng dùng, sửa nội dung và tệp tham
+  chiếu, rồi *Lưu*. Sửa kỹ năng **sẵn có** thì Axiom tạo **bản riêng** của bạn, bản gốc giữ nguyên; bấm *Khôi phục bản
+  gốc* để quay lại.
+- **Tạo mới**: đặt tên bằng chữ thường không dấu và dấu `-` (ví dụ `bao-cao-quy`), viết mô tả và nội dung.
+- **Nhập kỹ năng…**: dán đường dẫn tới thư mục có `SKILL.md` (hoặc chứa nhiều thư mục kỹ năng) hay tệp `.zip`/`.skill`,
+  bấm *Xem trước* để thấy sẽ nhập gì (tệp AI không dùng được như script `.py` bị bỏ qua), rồi *Nhập*. Trùng tên kỹ năng cá
+  nhân thì phải đánh dấu *Thay…*.
+- **Xoá** chỉ áp dụng cho kỹ năng cá nhân; kỹ năng bị chuyển vào thư mục `skills-trash` cạnh thư mục kỹ năng (lấy lại
+  được bằng tay), không xoá hẳn. Kỹ năng cá nhân nằm ở `~/.local/share/axiom-office/skills`.
 
 Mỗi nút *Soát* dành cho một loại tài liệu: bố cục cho trình chiếu, bảng cho văn bản, vùng dữ liệu cho bảng tính.
 Trên Windows, ribbon chỉ hiện nút hợp với ứng dụng đang mở. Trên WPS có thể thấy cả ba; bấm nhầm nút của ứng dụng

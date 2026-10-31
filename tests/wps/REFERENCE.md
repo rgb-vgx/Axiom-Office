@@ -419,3 +419,13 @@ bridge chính 47961 để không đụng Core thật), LLM giả (`tests/core/fa
 - **WPS chết giữa lệnh**: `SIGSTOP` Writer, gửi `writer.getText` (add-in nhận job, gọi vào Writer thì treo → `running=true`),
   rồi `SIGKILL` Writer: `wpsoffice` thoát theo, `/cmd` trả *"WPS closed while running the command; the command may have
   been applied…"* khoảng 1 giây sau (trước đây treo tới 300 giây). File session cổng chính xoá sau ngưỡng mất kết nối.
+
+## Màn hình Kỹ năng: sửa / nhập trên WPS thật (đo 31/10/2026, WPS 12.1.2.29182)
+
+- `window.confirm` trong pane hiện **hộp thoại gốc của WPS** (biểu tượng ⓘ, nút OK/Cancel), trả đúng true/false.
+- `<textarea>` dùng font đơn cách (`ui-monospace`, `DejaVu Sans Mono`…) thì CEF vẽ **dấu tiếng Việt lệch ra ngoài chữ**
+  ("Thê`thức"); dùng font của `.field` thì đúng — `pane.css` `.fieldArea` không đặt `font-family`.
+- **Gõ phím bằng `xdotool` dưới Xvfb đi qua bộ gõ của người dùng**: WPS kế thừa `XMODIFIERS=@im=fcitx`,
+  `QT_IM_MODULE=fcitx`… từ phiên làm việc, Telex biến `dist` thành `dít` và `ff` thành `f`. Mở WPS test bằng
+  `env -u XMODIFIERS -u QT_IM_MODULE -u GTK_IM_MODULE -u SDL_IM_MODULE -u CLUTTER_IM_MODULE`.
+- Trang pane đang mở **không nạp lại** khi bấm lại nút ribbon (dùng lại pane cũ): sửa CSS/JS xong phải mở lại WPS.
