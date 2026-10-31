@@ -1434,6 +1434,154 @@
     return { alignment: alignment };
   }
 
+  // Style dung san cua Word theo hang WdBuiltinStyle: ten style bi dich theo ngon ngu giao dien ("Heading 1"
+  // co the la "De muc 1"), hang so thi khong.
+  var BUILTIN_STYLES = {
+    "normal": -1, "heading 1": -2, "heading 2": -3, "heading 3": -4, "heading 4": -5,
+    "heading 5": -6, "heading 6": -7, "heading 7": -8, "heading 8": -9, "heading 9": -10,
+    "caption": -35, "list bullet": -49, "list number": -50, "title": -63, "subtitle": -75,
+    "quote": -181
+  };
+
+  // WPS tra NULL (khong nem loi) khi khong co style, va gan ten la thi am tham thanh Normal: phai kiem
+  // TRUOC khi gan de khong doi doan nao.
+  function builtinStyle(doc, name) {
+    var trimmed = String(name === undefined || name === null ? "" : name).replace(/^\s+|\s+$/g, "");
+    var key = trimmed.toLowerCase();
+    var style = null;
+    try {
+      if (Object.prototype.hasOwnProperty.call(BUILTIN_STYLES, key)) {
+        style = doc.Styles.Item(BUILTIN_STYLES[key]);
+      } else {
+        style = doc.Styles.Item(trimmed);
+      }
+    } catch (e) {
+      style = null;
+    }
+    if (style === null || style === undefined) {
+      throw new Error("unknown style '" + name + "'; use Heading 1-9, Normal, Title, Subtitle, List Bullet, List Number, Caption or Quote");
+    }
+    return style;
+  }
+
+  function paramIntList(params, name) {
+    var out = [];
+    if (!hasParam(params, name)) { return out; }
+    var raw = unwrapScalar(params[name]);
+    if (raw === undefined || raw === null) { return out; }
+    var list = Array.isArray(raw) ? raw : [raw];
+    for (var i = 0; i < list.length; i++) {
+      var item = unwrapScalar(list[i]);
+      if (item === undefined || item === null) { continue; }
+      var n = Number(item);
+      if (!isNaN(n) && isFinite(n)) { out.push(Math.round(n)); }
+    }
+    return out;
+  }
+
+  // Chu cua doan de bao lai: bo dau xuong dong cuoi doan, cat 60 ky tu.
+  function paragraphText(paragraph) {
+    var text = "";
+    try { text = strProp(paragraph.Range, "Text"); } catch (e) { text = ""; }
+    text = text.replace(/^\s+|\s+$/g, "");
+    return text.length > 60 ? text.substring(0, 60) + "…" : text;
+  }
+
+  function cmdWriterSetStyle(app, params) {
+    var styleName = paramString(params, "style", null);
+    if (!styleName) {
+      throw new Error("'style' is required, e.g. 'Heading 2'");
+    }
+    var numbers = paramIntList(params, "paragraphs");
+    if (numbers.length > 0 && selectionLock !== null) {
+      throw new Error("the user's selection is locked: call writer.setStyle without 'paragraphs' to style the selected paragraphs only");
+    }
+    var doc = app.ActiveDocument;
+    // Kiem style va moi so doan TRUOC khi doi doan nao.
+    var style = builtinStyle(doc, styleName);
+    var total = Number(doc.Paragraphs.Count);
+    var applied = [];
+    var i, paragraph;
+    if (numbers.length === 0) {
+      var selected = app.Selection.Paragraphs;
+      var count = Number(selected.Count);
+      for (i = 1; i <= count; i++) {
+        paragraph = selected.Item(i);
+        paragraph.Style = style;
+        applied.push(paragraphText(paragraph));
+      }
+    } else {
+      for (i = 0; i < numbers.length; i++) {
+        if (numbers[i] < 1 || numbers[i] > total) {
+          throw new Error("paragraph " + numbers[i] + " does not exist (the document has " + total + "; numbers come from writer.outline)");
+        }
+      }
+      for (i = 0; i < numbers.length; i++) {
+        paragraph = doc.Paragraphs.Item(numbers[i]);
+        paragraph.Style = style;
+        applied.push(paragraphText(paragraph));
+      }
+    }
+    return { style: String(style.NameLocal), paragraphs: applied.length, texts: applied };
+  }
+
+  function tocEntries(doc) {
+    try {
+      return Number(doc.TablesOfContents.Item(1).Range.Paragraphs.Count);
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  function cmdWriterInsertToc(app, params) {
+    var doc = app.ActiveDocument;
+    var levels = paramInt(params, "levels", 3);
+    levels = Math.max(1, Math.min(9, levels));
+    var existing = Number(doc.TablesOfContents.Count);
+    if (existing > 0) {
+      for (var i = 1; i <= existing; i++) {
+        doc.TablesOfContents.Item(i).Update();
+      }
+      return { updated: existing, entries: tocEntries(doc) };
+    }
+    var before = paramInt(params, "before", 0);
+    var where;
+    if (before > 0) {
+      var total = Number(doc.Paragraphs.Count);
+      if (before > total) {
+        throw new Error("paragraph " + before + " does not exist (the document has " + total + ")");
+      }
+      doc.Paragraphs.Item(before).Range.InsertParagraphBefore();
+      // Doan moi mang style cua doan dich (thuong la Heading): dat Normal de khong thanh tieu de trong.
+      doc.Paragraphs.Item(before).Style = builtinStyle(doc, "normal");
+      where = doc.Paragraphs.Item(before).Range;
+      where.Collapse(1);
+    } else {
+      where = app.Selection.Range;
+      where.Collapse(1);
+    }
+    // UseHeadingStyles = true, UpperHeadingLevel 1, LowerHeadingLevel = levels.
+    var created = doc.TablesOfContents.Add(where, true, 1, levels);
+    created.Update();
+    // Con tro ra doan SAU muc luc (o cuoi bai thi them doan trong de viet tiep); loi o day khong lam hong lenh.
+    try {
+      var last = created.Range.Paragraphs.Last;
+      var next = last.Next();
+      if (next === null || next === undefined) {
+        last.Range.InsertParagraphAfter();
+        next = last.Next();
+        next.Style = builtinStyle(doc, "normal");
+      }
+      var cursor = next.Range;
+      cursor.Collapse(1);
+      cursor.Select();
+      if (before > 0) {
+        app.Selection.EndKey(6);
+      }
+    } catch (e) {}
+    return { inserted: true, levels: levels, entries: tocEntries(doc) };
+  }
+
   function tableAnchor(app) {
     var range = app.Selection.Range;
     try { range.Collapse(0); } catch (e) {}
@@ -4398,6 +4546,8 @@
     "writer.heading": cmdHeading,
     "writer.formatSelection": cmdFormatSelection,
     "writer.setParagraphAlignment": cmdSetParagraphAlignment,
+    "writer.setStyle": cmdWriterSetStyle,
+    "writer.insertToc": cmdWriterInsertToc,
     "writer.insertTable": cmdInsertTable,
     "writer.insertPageBreak": cmdInsertPageBreak,
     "writer.checkTables": cmdWriterCheckTables,
