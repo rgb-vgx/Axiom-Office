@@ -506,8 +506,10 @@ const RIBBON_IMAGE_MSO = {
   axiomCheckLayout: "SlideShowFromCurrent", // chi trinh chieu - dung nut Soat bo cuc cua trinh chieu
   axiomCheckTables: "TableInsertDialogWord", // chi van ban (TableInsert khong co trong Writer cua WPS)
   axiomCheckRange: "DataValidation", // chi bang tinh
-  axiomProofread: "SpellingMenu", // chi van ban (spell_check_kd trong bang lenh Writer)
-  axiomTableTidy: "TableAutoFitWindow", // chi van ban (table_auto_fit_window_kd)
+  // Do 01/11/2026: ten co trong bang lenh van co the ra dau "?" (SpellingMenu, TableAutoFitWindow, BordersAll,
+  // FieldCheckBox, StylesPane...) - chi dung ten DA THAY icon tren WPS that (tests/wps/REFERENCE.md).
+  axiomProofread: "ReviewTrackChanges", // chi van ban (but sua - lenh sua bang Track Changes)
+  axiomTableTidy: "TableAutoFitContents", // chi van ban
   axiomMemory: "FileSave", // ca ba app; ban Windows dung RecordsSaveRecord - WPS khong co
   axiomSkills: "JsAddInsDialog", // ca ba app
   axiomSetup: "ApplicationOptionsDialog", // ca ba app; ban Windows dung ControlWizards - WPS khong co

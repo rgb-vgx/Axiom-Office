@@ -118,8 +118,8 @@ var DocumentActions = []QuickAction{
 	{ID: "tableTidy", Label: "Làm đẹp bảng", Edits: true, Document: true, Prompt: "Làm đẹp các bảng dữ liệu trong tài " +
 		"liệu đang mở mà không đổi chữ trong bảng. Gọi writer.checkTables để biết có những bảng nào. Với mỗi bảng dữ liệu " +
 		"gọi writer.formatTable một lần (table = số thứ tự): style \"Table Grid\", font và cỡ chữ giống phần thân bài " +
-		"(không rõ thì Times New Roman 13 cho văn bản hành chính, 12 nếu bảng nhiều cột), headerBold true để hàng tiêu đề " +
-		"đậm và lặp lại khi sang trang, autoFit \"window\" để bảng vừa lề trang. Bảng dàn trang (writer.checkTables ghi " +
+		"(không rõ thì Times New Roman 13 cho văn bản hành chính, 12 nếu bảng nhiều cột), borders true (WPS không tự kẻ khung theo " +
+		"style), headerBold true để hàng tiêu đề đậm và lặp lại khi sang trang, autoFit \"window\" để bảng vừa lề trang. Bảng dàn trang (writer.checkTables ghi " +
 		"layout, như phần đầu công văn hay phần chữ ký) thì để nguyên. Sau đó gọi writer.checkTables lần nữa và báo ngắn " +
 		"gọn đã làm gì với từng bảng; mục nào trả về trong skipped (WPS không làm được) thì nói rõ."},
 }

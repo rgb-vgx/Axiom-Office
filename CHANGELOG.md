@@ -5,6 +5,23 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — WPS: soát chính tả cả bài, làm đẹp bảng, style + mục lục, công thức bảng tính (P1-1/2/3/5, 01/11/2026)
+
+- Nhóm *Kiểm tra tài liệu* của Writer có thêm hai nút dùng AI: **Soát chính tả** (sửa lỗi chính tả, dấu, gõ nhầm của cả
+  bài thành Track Changes để duyệt từng chỗ; chỗ chưa chắc thì ghi chú) và **Làm đẹp bảng** (kẻ khung, hàng tiêu đề
+  đậm và lặp lại mỗi trang, vừa lề trang, font thân bài; không đổi chữ). Core: `DocumentActions` trong
+  `agent/quickactions.go` — không cần bôi đen, không khoá vùng chọn; `GET /v1/quick-actions` trả thêm `documentActions`.
+- Add-in WPS có thêm `writer.reviewRevisions` (để *Hoàn tác lượt này* của lượt có Track Changes chạy được trên WPS:
+  từ chối đúng thay đổi của "Axiom AI" từ lúc bắt đầu lượt), `writer.setStyle`, `writer.insertToc`, `writer.formatTable`.
+- Skill mới `chinh-ta-tieng-viet` (sửa chắc chắn / chỉ ghi chú / không đụng tới, bảng lỗi hay gặp) và
+  `cong-thuc-bang-tinh` (công thức đã thử trên WPS Spreadsheets thật: đọc số tiền thành chữ tiếng Việt bằng
+  `LET`+`LAMBDA`, năm sinh/giới tính từ CCCD, thâm niên, ngày công trừ ngày lễ, đếm không trùng, tra cứu).
+- Đo trên WPS 12.1.2 thật (`tests/wps/REFERENCE.md`): gán tên style lạ thì WPS âm thầm đổi về Normal (handler kiểm
+  trước); bảng chèn trong đoạn tiêu đề mang style Heading (`formatTable` đưa về Normal); `Table Grid` không tự kẻ khung;
+  màu nền hàng bị bỏ qua (báo trong `skipped`); nhiều tên `imageMso` có trong bảng lệnh vẫn ra dấu "?".
+- Chưa làm: *Kỹ năng…* và *Kiểm tra mô hình* đang hiện icon "?" (lỗi có sẵn); chưa thử soát chính tả / làm đẹp bảng
+  với model thật (máy chủ AI nội bộ tắt lúc đo).
+
 ### Added — WPS: Track Changes, comment, thay hàng loạt cho agent (P1-1, phần add-in, 31/10/2026)
 
 - Add-in WPS (`src/AxiomOffice.WPS/commands.js`) có thêm `writer.setTracking` (bật/tắt theo dõi thay đổi, đặt tên tác

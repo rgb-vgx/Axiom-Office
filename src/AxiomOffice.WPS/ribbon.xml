@@ -60,7 +60,8 @@
         </group>
 
         <!-- Ba nút soát: chỉ đọc, không dùng AI, mỗi nút một ứng dụng. Nhãn nêu rõ đối tượng được soát để
-             người dùng không bấm nhầm nút của ứng dụng khác (WPS có thể bỏ qua getVisible). -->
+             người dùng không bấm nhầm nút của ứng dụng khác (WPS có thể bỏ qua getVisible). Hai nút doc:<id>
+             (Soát chính tả, Làm đẹp bảng) thì dùng AI, chỉ Writer: lệnh cả tài liệu của Core. -->
         <group id="axiomCheckGroup" label="Kiểm tra tài liệu">
           <button id="axiomCheckLayout" label="Soát bố cục" size="large" tag="checkLayout"
                   getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction" imageMso="SlideShowFromCurrent"
@@ -72,11 +73,11 @@
                   supertip="Tìm ô trống và ô tiêu đề lẫn cả đoạn văn trong các bảng. Chỉ đọc, không sửa tài liệu và không dùng AI."/>
           <!-- Lệnh cả tài liệu: mở khung chat lớn (không phải khung mini) rồi nhờ Core chạy. -->
           <button id="axiomProofread" label="Soát chính tả" size="large" tag="doc:proofread"
-                  getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction" imageMso="SpellingMenu"
+                  getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction" imageMso="ReviewTrackChanges"
                   screentip="Soát chính tả cả bài bằng AI"
                   supertip="AI sửa lỗi chính tả, dấu và lỗi gõ của cả tài liệu dưới dạng Theo dõi thay đổi để bạn nhận hoặc từ chối; chỗ nào chưa chắc thì thêm bình luận."/>
           <button id="axiomTableTidy" label="Làm đẹp bảng" size="large" tag="doc:tableTidy"
-                  getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction" imageMso="TableAutoFitWindow"
+                  getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction" imageMso="TableAutoFitContents"
                   screentip="Làm đẹp các bảng bằng AI"
                   supertip="AI định dạng các bảng dữ liệu của tài liệu (kẻ khung, tiêu đề in đậm và lặp lại mỗi trang, vừa chiều rộng trang, phông chữ thân bảng) mà không đổi nội dung chữ; mỗi bảng là một bước Hoàn tác."/>
           <button id="axiomCheckRange" label="Soát vùng dữ liệu" size="large" tag="checkRange"

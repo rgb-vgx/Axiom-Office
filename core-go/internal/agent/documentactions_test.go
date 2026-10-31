@@ -41,7 +41,8 @@ func TestDocumentActionsTable(t *testing.T) {
 		t.Fatal("proofread: sua bang Track Changes de nguoi dung duyet tung cho")
 	}
 	tidy, _ := FindQuickAction("tableTidy")
-	for _, want := range []string{"writer.checkTables", "writer.formatTable", "skipped"} {
+	// borders: tren WPS that style "Table Grid" khong tu ke khung (do 01/11/2026) - phai bat borders.
+	for _, want := range []string{"writer.checkTables", "writer.formatTable", "skipped", "borders true"} {
 		if !strings.Contains(tidy.Prompt, want) {
 			t.Fatalf("tableTidy: cau lenh thieu %q: %q", want, tidy.Prompt)
 		}

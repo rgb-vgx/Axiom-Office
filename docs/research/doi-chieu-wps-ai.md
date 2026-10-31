@@ -211,8 +211,10 @@ liệu giả, đọc lại kết quả đúng.
 |---|---|
 | Giai đoạn 1 (tài liệu này) | Xong 31/10/2026; P1 đã duyệt, làm P1-4 trước |
 | P1-4 | **Xong, đã merge vào main** (31/10/2026): phần Claude (câu lệnh 5 mục mới + `Group: "tone"` trong `quickactions.go`, skill `dich-thuat` + bảng thuật ngữ, test) và phần opencode (`ribbon.xml`: menu con *Đổi giọng*, Viết tiếp, Dịch song ngữ, qua aidev TASK-000142). Đã thử trên WPS thật: menu đủ 14 mục, *Viết tiếp* chèn đúng chỗ trong vùng khoá, *Hoàn tác* gỡ một bước. **Chưa thử với model thật** (máy chủ AI nội bộ tắt lúc đo) |
-| P1-1 | **Phần add-in xong, đã merge vào main** (31/10/2026): `writer.setTracking`, `writer.listRevisions`, `writer.addComment`, `writer.listComments`, `writer.replaceMany` — test đỏ + fake theo số đo WPS thật do Claude viết, handler do opencode viết qua aidev (TASK-000143/144/145). Kiểm trên WPS thật phát hiện và đã sửa: ngày lệch 7 tiếng (WPS trả giờ địa phương gắn nhãn UTC); `make test-wps` sót `test_addin_review.mjs`. **Còn lại (phần Claude):** tool soát cả tài liệu dùng các lệnh này — luôn `restoreAuthor` khi xong, vì `app.UserName` của WPS được lưu bền; skill chính tả tiếng Việt; nút/lệnh nhanh; bộ câu đánh giá |
-| P1-2, P1-3, P1-5 | Chưa làm |
+| P1-1 | **Xong, đã merge** (01/11/2026): handler add-in (`setTracking`, `listRevisions`, `addComment`, `listComments`, `replaceMany`, `reviewRevisions`), lệnh cả tài liệu `proofread` (Core: `DocumentActions`, không khoá vùng chọn, bật Track Changes), nút *Soát chính tả* trên ribbon Writer, skill `chinh-ta-tieng-viet`. Đã kiểm trên WPS thật mọi lệnh và đường chạy qua Core. **Chưa:** thử với model thật, bộ câu đánh giá chất lượng soát chính tả |
+| P1-2 | **Xong, đã merge** (01/11/2026): `writer.setStyle`, `writer.insertToc` trên WPS (kiểm tên style trước vì WPS âm thầm đổi tên lạ thành Normal); skill `the-thuc-van-ban` đã dùng hai lệnh này từ trước |
+| P1-3 | **Xong, đã merge** (01/11/2026): `writer.formatTable` (đưa ô mang style Heading về Normal, màu nền WPS bỏ qua vào `skipped`), lệnh cả tài liệu `tableTidy` (kèm `borders: true` vì `Table Grid` không tự kẻ khung trên WPS), nút *Làm đẹp bảng* |
+| P1-5 | **Xong, đã merge** (01/11/2026): skill `cong-thuc-bang-tinh`; spike ET 12.1.2 có đủ `XLOOKUP`/`FILTER`/`UNIQUE`/`LET`/`LAMBDA`/`NETWORKDAYS.INTL`, không có hàm đọc số thành chữ tiếng Việt → công thức `LET`+`LAMBDA` đã thử 20/20 ca trên ET thật |
 
 ## 7. Phân công phát triển: Claude và opencode
 
