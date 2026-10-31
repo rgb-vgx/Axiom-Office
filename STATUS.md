@@ -25,7 +25,7 @@ hướng dẫn dùng ở [README.md](README.md); lịch sử thay đổi ở [CH
 
 **WPS Linux (sinh tự động từ code, không sửa tay):**
 <!-- BEGIN SINH TU DONG (scripts/generate_wps_gaps.py) - KHONG SUA TAY -->
-75/115 lệnh registry có handler trên WPS (40 chưa có); tool Core bị ẩn trên WPS vì thiếu lệnh: `doc_design`, `doc_from_brief`, `look_at_document`, `slides_from_template`. Bảng đầy đủ: `docs/architecture/wps-bridge.md` §6.
+78/115 lệnh registry có handler trên WPS (37 chưa có); tool Core bị ẩn trên WPS vì thiếu lệnh: `doc_design`, `doc_from_brief`, `look_at_document`, `slides_from_template`. Bảng đầy đủ: `docs/architecture/wps-bridge.md` §6.
 <!-- END SINH TU DONG -->
 
 ## 2. Đã làm được
