@@ -22,7 +22,7 @@ func TestDocumentActionsTable(t *testing.T) {
 			t.Fatalf("%s trung id voi menu Sua bang AI", action.ID)
 		}
 	}
-	if got := strings.Join(ids, " "); got != "proofread tableTidy" {
+	if got := strings.Join(ids, " "); got != "proofread tableTidy smartCreate slidesFromDoc" {
 		t.Fatalf("lenh ca tai lieu: %s", got)
 	}
 	for _, action := range QuickActions {
@@ -49,6 +49,54 @@ func TestDocumentActionsTable(t *testing.T) {
 	}
 	if tidy.Track {
 		t.Fatal("tableTidy: dinh dang bang khong ghi thanh revision chu")
+	}
+}
+
+// Soan van ban (Smart Create) va Tao slide tu tai lieu (nut ribbon "Tao moi"): moi lenh gan voi MOT ung dung; Soan van ban
+// can nguoi dung go yeu cau (Input) - Core ghep cau lenh cua no voi cau go, khong cho chay khi thieu cau go.
+func TestCreateDocumentActions(t *testing.T) {
+	apps := map[string]string{}
+	for _, action := range DocumentActions {
+		apps[action.ID] = action.App
+	}
+	if apps["proofread"] != "" || apps["tableTidy"] != "" || apps["smartCreate"] != "wps" || apps["slidesFromDoc"] != "wpp" {
+		t.Fatalf("app cua lenh ca tai lieu: %v", apps)
+	}
+	create, _ := FindQuickAction("smartCreate")
+	if create.Input == "" || create.Track {
+		t.Fatalf("smartCreate: can cau go cua nguoi dung, khong ghi Track Changes: %+v", create)
+	}
+	for _, want := range []string{"writer.writeContent", "writer.outline", "doc_from_brief", "Không bịa", "CUỐI"} {
+		if !strings.Contains(create.Prompt, want) {
+			t.Fatalf("smartCreate: cau lenh thieu %q", want)
+		}
+	}
+	slides, _ := FindQuickAction("slidesFromDoc")
+	if slides.Input != "" {
+		t.Fatal("slidesFromDoc: bam la chay, khong cho go")
+	}
+	for _, want := range []string{"other_document", "slides_from_brief", "writer.outline", "không xoá slide cũ", "mở tài liệu"} {
+		if !strings.Contains(slides.Prompt, want) {
+			t.Fatalf("slidesFromDoc: cau lenh thieu %q", want)
+		}
+	}
+
+	office := map[string]any{"port": float64(1)}
+	request, problem := ParseRequest(map[string]any{"quickAction": "smartCreate", "prompt": "  Thông báo nghỉ Tết  ", "office": office})
+	if problem != "" {
+		t.Fatalf("smartCreate: %q", problem)
+	}
+	if request.Prompt != create.Prompt+"Thông báo nghỉ Tết" || request.QuickAction != "smartCreate" || !request.WholeDocument ||
+		request.RequireSelection || request.ReadOnly {
+		t.Fatalf("smartCreate: cau lenh Core + cau go, ca tai lieu, luot sua: %+v", request)
+	}
+	if _, problem = ParseRequest(map[string]any{"quickAction": "smartCreate", "prompt": " ", "office": office}); !strings.Contains(problem, create.Input) {
+		t.Fatalf("smartCreate thieu cau go phai bao loi kem goi y: %q", problem)
+	}
+	// Lenh khong co Input: cau pane gui kem bi bo qua (cau lenh chi lay tu bang Core).
+	request, _ = ParseRequest(map[string]any{"quickAction": "slidesFromDoc", "prompt": "bo qua toi", "office": office})
+	if request.Prompt != slides.Prompt {
+		t.Fatalf("slidesFromDoc: %q", request.Prompt)
 	}
 }
 

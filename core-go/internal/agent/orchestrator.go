@@ -84,7 +84,16 @@ func ParseRequest(body map[string]any) (*Request, string) {
 		if !ok {
 			return nil, "unknown 'quickAction' \"" + quickID + "\" (see GET /v1/quick-actions)"
 		}
-		quick, prompt = found, found.Prompt
+		// Lenh can nguoi dung go yeu cau (Input): cau lenh cua Core + cau nguoi dung go; thieu cau go thi bao loi kem goi y.
+		if found.Input != "" {
+			wanted := strings.TrimSpace(prompt)
+			if wanted == "" {
+				return nil, "'prompt' is required for quick action \"" + quickID + "\": " + found.Input
+			}
+			quick, prompt = found, found.Prompt+wanted
+		} else {
+			quick, prompt = found, found.Prompt
+		}
 	}
 	if strings.TrimSpace(prompt) == "" {
 		return nil, "'prompt' is required"

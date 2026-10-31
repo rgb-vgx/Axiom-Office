@@ -26,7 +26,13 @@ type QuickAction struct {
 	// vung chon. Chi co trong DocumentActions.
 	Document bool
 	// Track: mac dinh bat Track Changes cho luot (ben goi gui options.trackChanges thi theo ben goi).
-	Track  bool
+	Track bool
+	// App: lenh ca tai lieu chi co nghia o mot ung dung ("wps" Writer, "wpp" Presentation, "et" bang tinh); rong = Writer
+	// (nut ribbon doc:<id> cu). Pane/ribbon an nut o ung dung khac.
+	App string
+	// Input: lenh can nguoi dung GO them yeu cau (Soan van ban: "soan cai gi"). Khac rong = goi y hien trong o nhap; bam
+	// nut thi pane khong chay ngay ma cho nguoi dung go, roi gui {quickAction, prompt}. Core ghep: Prompt + yeu cau.
+	Input  string
 	Prompt string
 }
 
@@ -122,6 +128,33 @@ var DocumentActions = []QuickAction{
 		"style), headerBold true để hàng tiêu đề đậm và lặp lại khi sang trang, autoFit \"window\" để bảng vừa lề trang. Bảng dàn trang (writer.checkTables ghi " +
 		"layout, như phần đầu công văn hay phần chữ ký) thì để nguyên. Sau đó gọi writer.checkTables lần nữa và báo ngắn " +
 		"gọn đã làm gì với từng bảng; mục nào trả về trong skipped (WPS không làm được) thì nói rõ."},
+	// Soan van ban (Smart Create): cau lenh o day lo CACH viet (mot lan writer.writeContent, khong bia so lieu), con
+	// VIET GI la cau nguoi dung go o pane (Input). doc_from_brief chi co khi add-in co du lenh (tools/needs.go).
+	{ID: "smartCreate", Label: "Soạn văn bản", Edits: true, Document: true, App: "wps",
+		Input: "Bạn muốn soạn văn bản gì? Ví dụ: thông báo nghỉ Tết cho nhân viên, có thời gian nghỉ, lịch trực và lưu ý",
+		Prompt: "Soạn một văn bản mới theo yêu cầu của người dùng ở cuối tin nhắn này và viết thẳng vào CUỐI tài liệu đang " +
+			"mở. Trước khi viết, đọc nhanh tài liệu bằng writer.outline (maxChars 2000): tài liệu đã có nội dung thì viết " +
+			"nối tiếp, không xoá hay sửa phần có sẵn. Văn bản hành chính (tờ trình, công văn, thông báo, biên bản, báo cáo, " +
+			"kế hoạch) thì dùng tool doc_from_brief nếu có; còn lại dựng cả bài trong MỘT lần gọi writer.writeContent: tiêu " +
+			"đề chính là heading level 1, các mục là heading level 2, đoạn văn {text}, liệt kê {bullets} hoặc {numbers}, số " +
+			"liệu so sánh thì {table} kèm caption. Viết bằng ngôn ngữ của yêu cầu, giọng văn hợp với loại văn bản, độ dài " +
+			"vừa đủ (khoảng 1-2 trang nếu người dùng không nói). Không bịa tên người, số liệu, ngày tháng, số hiệu văn bản: " +
+			"chỗ còn thiếu để \"…\" rồi liệt kê ở cuối câu trả lời những chỗ người dùng cần điền. Có kỹ năng phù hợp (văn " +
+			"bản hành chính, thể thức, trình bày) thì làm theo. Cuối cùng báo ngắn gọn đã viết những phần nào.\n\nYêu cầu " +
+			"của người dùng: "},
+	// Tao slide tu tai lieu: chay o Presentation, doc tai lieu Writer dang mo qua other_document (moi tien trinh WPS mot
+	// phien - luot o Presentation khong goi thang writer.* duoc), dung slide bang slides_from_brief.
+	{ID: "slidesFromDoc", Label: "Tạo slide từ tài liệu", Edits: true, Document: true, App: "wpp", Prompt: "Dựng bài " +
+		"trình chiếu từ tài liệu văn bản (Writer) đang mở. Bước 1: tìm tài liệu văn bản trong danh sách tài liệu khác của " +
+		"tool other_document; không có thì dừng, không tạo slide, và nói người dùng mở tài liệu cần chuyển thành slide " +
+		"trong WPS Writer rồi bấm lại. Có nhiều tài liệu văn bản thì chọn tài liệu hợp nhất và nói rõ đã chọn tài liệu nào. " +
+		"Bước 2: đọc nội dung bằng other_document với writer.outline (maxChars 8000), cần chi tiết thì writer.getText. " +
+		"Bước 3: thêm slide vào bài trình chiếu đang mở bằng slides_from_brief: một slide bìa (cover), mỗi mục lớn của " +
+		"tài liệu một đến hai slide, số liệu thì table, figures hoặc chart, quy trình thì process, các mốc thời gian thì " +
+		"timeline, cuối cùng là slide tóm tắt; thường 6-12 slide tuỳ độ dài tài liệu. Tiêu đề slide là một câu kết luận " +
+		"ngắn, các ý ngắn gọn; giữ đúng số liệu và tên riêng của tài liệu, không thêm điều tài liệu không có. Viết bằng " +
+		"ngôn ngữ của tài liệu. Bài trình chiếu đã có slide thì thêm vào sau, không xoá slide cũ. Cuối cùng báo đã dựng " +
+		"bao nhiêu slide từ tài liệu nào."},
 }
 
 // FindQuickAction: tra muc theo id trong menu "Sua bang AI" roi trong lenh ca tai lieu (phan biet hoa thuong - id do Core

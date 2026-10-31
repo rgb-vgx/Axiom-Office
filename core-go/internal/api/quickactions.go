@@ -20,7 +20,15 @@ func mapQuickActions(mux *http.ServeMux, deps *Deps) {
 func listActions(actions []agent.QuickAction) []any {
 	list := []any{}
 	for _, action := range actions {
-		list = append(list, map[string]any{"id": action.ID, "label": action.Label, "edits": action.Edits})
+		item := map[string]any{"id": action.ID, "label": action.Label, "edits": action.Edits}
+		// app/input chi co o lenh ca tai lieu can (nut ribbon theo ung dung, lenh cho nguoi dung go yeu cau).
+		if action.App != "" {
+			item["app"] = action.App
+		}
+		if action.Input != "" {
+			item["input"] = action.Input
+		}
+		list = append(list, item)
 	}
 	return list
 }
