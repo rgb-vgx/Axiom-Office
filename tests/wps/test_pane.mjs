@@ -506,6 +506,8 @@ const RIBBON_IMAGE_MSO = {
   axiomCheckLayout: "SlideShowFromCurrent", // chi trinh chieu - dung nut Soat bo cuc cua trinh chieu
   axiomCheckTables: "TableInsertDialogWord", // chi van ban (TableInsert khong co trong Writer cua WPS)
   axiomCheckRange: "DataValidation", // chi bang tinh
+  axiomProofread: "SpellingMenu", // chi van ban (spell_check_kd trong bang lenh Writer)
+  axiomTableTidy: "TableAutoFitWindow", // chi van ban (table_auto_fit_window_kd)
   axiomMemory: "FileSave", // ca ba app; ban Windows dung RecordsSaveRecord - WPS khong co
   axiomSkills: "JsAddInsDialog", // ca ba app
   axiomSetup: "ApplicationOptionsDialog", // ca ba app; ban Windows dung ControlWizards - WPS khong co
@@ -578,6 +580,65 @@ test("OnGetImage: tra duong dan tuong doi images/<tag>.svg; khong biet tag thi t
       "anh '" + control.tag + "' lech the mo/dong");
   }
   if (ctx.AxiomBridge) { ctx.AxiomBridge.stop(); }
+});
+
+// ---- Lenh ca tai lieu (docs/research/doi-chieu-wps-ai.md P1-1, P1-3): nut ribbon trong nhom Kiem tra tai lieu cua
+// Writer, tag "doc:<id>" voi <id> trong DocumentActions cua Core (core-go/internal/agent/quickactions.go). Bam nut: hien
+// khung chat LON (khong phai khung mini canh doan boi den - lenh lam ca tai lieu) roi nho Core chuyen lenh toi no
+// (POST pane/request {quickAction: <id>}), giong duong du phong cua menu chuot phai.
+
+test("ribbon.xml: nut Soat chinh ta + Lam dep bang trong nhom Kiem tra tai lieu, tag doc:<id>, chi hien o Writer", () => {
+  const xml = fs.readFileSync(path.join(ADDIN, "ribbon.xml"), "utf8");
+  const group = /<group id="axiomCheckGroup"[^>]*>([\s\S]*?)<\/group>/.exec(xml)[1];
+  for (const [id, tag, label] of [["axiomProofread", "doc:proofread", "Soát chính tả"], ["axiomTableTidy", "doc:tableTidy", "Làm đẹp bảng"]]) {
+    const button = new RegExp('<button id="' + id + '"([^>]*)>').exec(group);
+    assert.ok(button, "#" + id + " phai nam trong nhom axiomCheckGroup");
+    assert.match(button[1], new RegExp('\\stag="' + tag + '"'));
+    assert.match(button[1], new RegExp('\\slabel="' + label + '"'));
+    assert.match(button[1], /\sonAction="ribbon\.OnAction"/);
+    assert.match(button[1], /\sgetVisible="ribbon\.OnGetVisible"/);
+    assert.match(button[1], /\ssupertip="[^"]+"/);
+  }
+  const ctx = load(["probe.js", "commands.js", "main.js"], { Application: { Name: "WPS Spreadsheets" } });
+  assert.equal(ctx.ribbon.OnGetVisible({ Id: "axiomProofread", Tag: "doc:proofread" }), false, "an o bang tinh");
+  assert.equal(ctx.ribbon.OnGetVisible({ Id: "axiomTableTidy" }), false, "WPS chi dien Id: suy tag tu Id");
+  const writer = load(["probe.js", "commands.js", "main.js"], { Application: { Name: "WPS Writer" } });
+  assert.equal(writer.ribbon.OnGetVisible({ Id: "axiomProofread", Tag: "doc:proofread" }), true);
+});
+
+test("nut doc:<id> -> hien khung chat LON + POST pane/request {quickAction}; KHONG mo khung mini du co ShowDialog", () => {
+  const dialogs = [];
+  const panes = [];
+  const app = {
+    Name: "WPS Writer",
+    ShowDialog(url) { dialogs.push(url); },
+    CreateTaskPane(url) { const pane = { url, Visible: false }; panes.push(pane); return pane; },
+  };
+  const { ctx, posts } = mainWith(app);
+  ctx.ribbon.OnAction({ Id: "axiomProofread" });
+  assert.equal(dialogs.length, 0, "lenh ca tai lieu khong dung khung mini");
+  assert.equal(panes.length, 1);
+  assert.equal(panes[0].Visible, true);
+  const client = /[?&]client=(c[0-9a-z]+)/.exec(panes[0].url)[1];
+  assert.deepEqual(posts, [{ quickAction: "proofread", client }]);
+  ctx.ribbon.OnAction({ Id: "axiomTableTidy", Tag: "doc:tableTidy" });
+  assert.equal(panes.length, 1, "dung lai khung chat dang mo");
+  assert.deepEqual(posts[1], { quickAction: "tableTidy", client });
+  if (ctx.AxiomBridge) { ctx.AxiomBridge.stop(); }
+});
+
+test("loadQuickActions: documentActions cua Core -> nhan cho bong bong; khong lot vao menu Sua bang AI", async () => {
+  const withDocs = { ok: true, result: { actions: QUICK.result.actions,
+    documentActions: [{ id: "proofread", label: "Soát chính tả cả bài", edits: true }] } };
+  const h = harness({ "/quick-actions": [200, withDocs],
+    "/runs": [200, { ok: true, result: { runId: "d1", conversationId: "c1" } }] });
+  assert.equal(await h.pane.loadQuickActions(), true);
+  assert.deepEqual(h.state.quickActions.map((a) => a.id), ["polish", "summarize"], "menu boi den giu nguyen");
+  assert.deepEqual(h.state.documentActions.map((a) => [a.id, a.label]), [["proofread", "Soát chính tả cả bài"]]);
+  await h.pane.quick("proofread");
+  await tick();
+  assert.deepEqual(h.calls.find((c) => c.method === "POST").body, { quickAction: "proofread", app: "wps" });
+  assert.deepEqual(h.state.messages[0], { role: "user", text: "Soát chính tả cả bài" });
 });
 
 // ---- Menu "Sua bang AI" (lenh nhanh): danh sach lay tu Core, chi gui id - cau lenh nam trong Core.
