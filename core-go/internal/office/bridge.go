@@ -143,6 +143,11 @@ func (b *BridgeClient) LiveSession(ctx context.Context, port int) *Session {
 	}
 	document, _ := result.Result["document"].(string)
 	documentPath, _ := result.Result["documentPath"].(string)
+	// Bridge WPS tra `document` la object {name, fullName} (LibreOffice/Windows: chuoi + documentPath).
+	if object, ok := result.Result["document"].(map[string]any); ok {
+		document, _ = object["name"].(string)
+		documentPath, _ = object["fullName"].(string)
+	}
 	app, _ := result.Result["app"].(string)
 	family, _ := result.Result["family"].(string)
 	return &Session{

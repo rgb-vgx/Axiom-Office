@@ -284,3 +284,30 @@ func TestPortsListsLiveSessionsOfOneApp(t *testing.T) {
 		t.Fatalf("thu muc khong ton tai phai tra rong: %v", got)
 	}
 }
+
+// GET /session: bridge LibreOffice/Windows tra `document` la chuoi + `documentPath`; bridge WPS (wpsbridge, 31/10/2026) tra
+// `document` la object {name, fullName}. Doc sai dang WPS thi tai lieu rong -> other_document bo qua MOI tai lieu WPS
+// khac (luot that 01/11/2026: "Tao slide tu tai lieu" khong thay tai lieu Writer dang mo).
+func TestLiveSessionReadsBothDocumentShapes(t *testing.T) {
+	reply := ""
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(reply))
+	}))
+	defer server.Close()
+	port := portOf(t, server.URL)
+	client := NewBridgeClient(server.Client(), "tok")
+	for _, body := range []string{
+		`{"ok":true,"result":{"app":"wps","document":"bao-cao.docx","documentPath":"/home/u/bao-cao.docx","pid":7}}`,
+		`{"ok":true,"result":{"app":"wps","document":{"name":"bao-cao.docx","fullName":"/home/u/bao-cao.docx"},"pid":7}}`,
+	} {
+		reply = body
+		live := client.LiveSession(context.Background(), port)
+		if live == nil || live.Document != "bao-cao.docx" || live.DocumentPath != "/home/u/bao-cao.docx" || live.App != "wps" {
+			t.Fatalf("%s -> %+v", body, live)
+		}
+	}
+	reply = `{"ok":true,"result":{"app":"wpp","document":null}}`
+	if live := client.LiveSession(context.Background(), port); live == nil || live.Document != "" {
+		t.Fatalf("khong co tai lieu: %+v", live)
+	}
+}
