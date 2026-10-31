@@ -5,6 +5,18 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — WPS: đủ bộ WPS AI — Sửa thông minh, Tóm tắt / Dịch song ngữ cả bài, Học thuật hơn, Lịch sử (01/11/2026)
+
+- Ribbon: **Lịch sử** (mở *Hội thoại trước*, mọi app), **Sửa thông minh** (gõ cách sửa, AI sửa cả bài thành Track
+  Changes), **Tóm tắt cả bài** (trả lời trong khung chat), **Dịch song ngữ cả bài** (bản dịch ngay dưới từng đoạn; Việt →
+  Anh, ngôn ngữ khác → Việt); **Học thuật hơn** trong *Đổi giọng* và menu chuột phải.
+- Core: lệnh cả tài liệu có quy tắc riêng (`DocumentEditRule`/`DocumentAnswerRule`) — trước đây chúng nhận nhầm quy tắc
+  của menu bôi đen ("sửa trong đoạn đang bôi đen").
+- Sửa: `other_document` không thấy tài liệu WPS khác đang mở (bridge WPS trả `document` dạng object) — làm việc xuyên ứng
+  dụng trên WPS (vd *Tạo slide từ tài liệu*) nay chạy được.
+- Đã thử với model thật (`ocg/deepseek-v4.1-flash`): Soạn văn bản, Tạo slide từ tài liệu (7 slide), Dịch song ngữ cả bài,
+  Tóm tắt cả bài, Sửa thông minh.
+
 ### Added — WPS: Soạn văn bản, Tạo slide từ tài liệu, nhóm "Viết với AI" trên ribbon (01/11/2026)
 
 - Tab *Axiom Office* có thêm hai nhóm, đối chiếu tab WPS AI: **Tạo mới** — *Soạn văn bản* (Writer: gõ yêu cầu, AI soạn
