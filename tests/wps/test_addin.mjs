@@ -284,7 +284,6 @@ const CHUA_CO_HANDLER = {
   "writer.replyComment": "chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc",
   "writer.resolveComment": "chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc",
   "writer.editCommentScope": "chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc",
-  "writer.reviewRevisions": "chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc",
   // Bon lenh kind rong (agent=false) nam trong registry vi registry dung chung cho moi nen tang.
   // Ca bon DEU la lenh cua add-in o ban Windows (CommandDispatcher.cs: app.info, ai.ask, ui.askpane,
   // app.screenshot) - khong phai "Core tu lam roi add-in khong bao gio nhan". O add-in WPS chi
@@ -298,7 +297,6 @@ const CHUA_CO_HANDLER = {
   "writer.newDocument": "chua co handler trong add-in",
   "writer.open": "chua co handler trong add-in",
   "writer.closeAll": "chua co handler trong add-in",
-  "writer.formatTable": "chua co handler trong add-in (agent=true: tool nay se loi khi may dang la WPS)",
   "writer.insertImage": "chua co handler trong add-in (agent=true)",
   "writer.insertHyperlink": "chua co handler trong add-in (agent=true)",
   // Hai lenh thiet ke: chi co o add-in Windows (COM); LibreOffice bao not supported.
@@ -306,8 +304,6 @@ const CHUA_CO_HANDLER = {
   "writer.restyle": "chi co trong add-in Windows (lenh thiet ke, doc_design); WPS JS chua viet handler",
   "writer.insertBlocks": "chi co trong add-in Windows (lenh thiet ke, doc_design); WPS JS chua viet handler",
   // Lenh cau truc Word/Excel (docs/plans/21-v0 P1, 26/10/2026): moi co o add-in Windows; WPS de sau (may Linux).
-  "writer.setStyle": "chi co trong add-in Windows (plan 21 P1); WPS de sau",
-  "writer.insertToc": "chi co trong add-in Windows (plan 21 P1); WPS de sau",
   "writer.setHeaderFooter": "chi co trong add-in Windows (plan 21 P1); WPS de sau",
   "writer.insertCaption": "chi co trong add-in Windows (plan 21 P1); WPS de sau",
   "writer.writeContent": "chi co trong add-in Windows (plan 21 P2); WPS de sau",

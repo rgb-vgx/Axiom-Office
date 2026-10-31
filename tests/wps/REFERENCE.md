@@ -460,3 +460,24 @@ bridge chính 47961 để không đụng Core thật), LLM giả (`tests/core/fa
 | `Range.Find.Execute(text)` (không thay) | tìm thấy thì **co `Range` về chỗ khớp** |
 | `doc.Comments.Add(range, text)` | neo đúng vào `range` (`Comment.Scope`); trả về comment mới |
 | `Comment` | `Author`, `Initial`, `Index`, `Done` (đọc/ghi), `Date` (`Date`), `Range.Text` (kết `"\r"`), `Scope`, `Replies.Count`, `Ancestor` (`null` với comment gốc); còn có `Delete`, `DeleteRecursively`, `Edit`, `Reference`, `Contact`, `IsInk`, `ShowTip` |
+
+## Duyệt thay đổi, style, mục lục, định dạng bảng, hàm ET (đo 01/11/2026, WPS 12.1.2.29182)
+
+Đo bằng handler tạm `debug.eval` (scratchpad, không commit). Là nền của `writer.reviewRevisions` (P1-1), `writer.setStyle` +
+`writer.insertToc` (P1-2), `writer.formatTable` (P1-3), skill công thức ET (P1-5) và của fake
+`tests/wps/addin_fake_structure.mjs`.
+
+| API | Kết quả đo |
+|---|---|
+| `Revision.Accept()` / `Reject()` (khi **tắt** theo dõi) | là function; từ chối revision chèn thì chữ mất, từ chối revision xoá thì chữ cũ trở lại; duyệt **ngược** theo tác giả giữ nguyên thay đổi của người khác; cả loạt trong một `UndoRecord` thì `doc.Undo(1)` gỡ lại |
+| `Revision.Date` so với giờ thật | đổi về UTC thật bằng `d.getTime() + d.getTimezoneOffset() * 60000` (lệch ~1,5 giây); chính xác tới giây |
+| `doc.Styles.Item(x)` | tên tiếng Anh (`"Heading 1"`, `"Title"`, `"Normal"`) **phân biệt hoa thường**; hằng `WdBuiltinStyle` dùng được (`-2` = Heading 1, `-63` = Title); tên không có trả **`null`**, không ném lỗi |
+| `Paragraph.Style = …` | nhận tên, hằng số, đối tượng style; **tên không có thì đoạn âm thầm thành Normal** — phải kiểm `Styles.Item` trước |
+| `writer.outline` sau khi gán | đọc đúng `style` mới; `Paragraph.OutlineLevel` = 1..9 cho Heading, 10 cho đoạn thường |
+| `doc.TablesOfContents.Add(range, true, 1, n)` | tạo mục lục từ Heading 1..n (`Range.Text` = `"tiêu đề\t1\r"` mỗi dòng); `toc.Update()` đọc lại Heading mới |
+| Bảng: `AutoFitBehavior(1\|2)`, `Rows.Item(1).HeadingFormat`, `Range.Font.Name/Size`, `Rows.Item(1).Range.Font.Bold`, `Cell(r,c).Range.ParagraphFormat.Alignment`, `Borders.Enable` | đều chạy, đọc lại đúng |
+| `table.Style = "Table Grid"` | chạy; đọc lại ra tên bản địa của WPS (`"网格型"`) |
+| `Rows.Item(n).Shading.BackgroundPatternColor = màu` | **bị bỏ qua** (đọc lại `-16777216` = auto) |
+| Bảng chèn khi con trỏ ở đoạn Heading | chữ trong ô mang style Heading (xanh, đậm, hàng cao); `Cell(r,c).Range.Style.NameLocal` và `…ParagraphFormat.OutlineLevel` đọc được; `table.Range.Style = -1` đưa cả bảng về Normal **và** xoá chữ đậm/font đã đặt — phải làm trước |
+| Hàm ET 12.1.2 | có: `XLOOKUP`, `UNIQUE`, `FILTER`, `SORT`, `SEQUENCE`, `LET`, `LAMBDA`, `MAP`, `REDUCE`, `TEXTJOIN`, `TEXTSPLIT`, `HSTACK`, `IFS`, `SWITCH`, `CONCAT`, `DATEDIF`, `YEARFRAC`, `EDATE`, `NETWORKDAYS.INTL` (chuỗi `"0000011"` và mã 11 đều đúng); `TEXT(d,"dd/mm/yyyy")` đúng. **Không** có hàm đọc số thành chữ tiếng Việt (`NUMBERSTRING` ra `#N/A`) |
+
