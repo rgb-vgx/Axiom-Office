@@ -415,6 +415,8 @@
     axiomAskAI: "askAi",
     axiomCheckLayout: "checkLayout",
     axiomCheckTables: "checkTables",
+    axiomProofread: "doc:proofread",
+    axiomTableTidy: "doc:tableTidy",
     axiomCheckRange: "checkRange",
     axiomMemory: "memory",
     axiomSkills: "skills",
@@ -435,6 +437,8 @@
   // muc vao TAGS_BY_ID - danh sach muc la cua Core (agent/quickactions.go), them muc thi chi phai sua ribbon.xml.
   var QUICK_ID = /^axiomQuick_([a-z]+)_[tl]$/;
   var QUICK_TAG = "quick:";
+  // Lenh ca tai lieu (nut "Kiem tra tai lieu" cua Writer): tag = "doc:<id>", luon chay trong khung chat LON.
+  var DOC_TAG = "doc:";
 
   // Nut "Soat ..." nao ung voi lenh nao: pane nhan ten tag qua ?check= roi tra cuu o day, de mot nut
   // bam sai app van chay DUNG lenh cua no (add-in tra loi ro "lenh nay can ung dung kia").
@@ -535,6 +539,13 @@
   function OnGetVisible(control) {
     try {
       var tag = tagOf(control);
+      // Lenh ca tai lieu chi co o Writer.
+      if (tag.indexOf(DOC_TAG) === 0) {
+        var docKind = "";
+        try { docKind = currentAppKind() || ""; } catch (eD) { docKind = ""; }
+        if (docKind === "" || docKind === "unknown") { return true; }
+        return docKind === "wps";
+      }
       if (!Object.prototype.hasOwnProperty.call(CHECK_KINDS, tag)) { return true; }
       var kind = "";
       try { kind = currentAppKind() || ""; } catch (eK) { kind = ""; }
@@ -562,6 +573,12 @@
   function OnAction(control) {
     try {
       var tag = tagOf(control);
+      // Lenh ca tai lieu: luon mo khung chat LON (khong dung khung mini canh doan boi den).
+      if (tag.indexOf(DOC_TAG) === 0) {
+        runQuick(tag.substring(DOC_TAG.length));
+        try { start(); } catch (eDoc) {}
+        return;
+      }
       // Menu chuot phai: mo khung chat mini canh doan boi den. Khong mo duoc thi quay ve khung chat lon.
       if (tag.indexOf(QUICK_TAG) === 0) {
         var quick = tag.substring(QUICK_TAG.length);

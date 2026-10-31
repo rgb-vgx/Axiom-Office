@@ -19,7 +19,9 @@
  *                               EventSource(base+"runs/<id>/events"); dang chay thi bo qua (tra false).
  *                               409 (add-in chua ket noi) -> message "error" tieng Viet.
  * controller.loadQuickActions() -> GET base+"quick-actions" -> state.quickActions = [{id, label, edits}] - nhan cua
- *                               cac muc "Sua bang AI" (menu chuot phai); chi Writer, app khac giu []. Loi -> [].
+ *                               cac muc "Sua bang AI" (menu chuot phai); state.documentActions = [{id, label, edits}] -
+ *                               nhan cua cac lenh ca tai lieu (nut ribbon Writer, khong vao menu chuot phai);
+ *                               chi Writer, app khac giu []. Loi -> [].
  * controller.quick(id)       -> POST base+"runs" {quickAction: id, conversationId?} - cau lenh do Core lay theo id;
  *                               tin nhan nguoi dung hien NHAN cua muc. Bo qua "Lap ke hoach truoc" (viec nho, ro).
  * controller.confirm(ok)     -> POST base+"runs/<id>/confirm" {confirmationId, approved: ok}
@@ -239,7 +241,8 @@
       lastReply: "",
       canUndo: false,
       canInsert: false,
-      quickActions: []
+      quickActions: [],
+      documentActions: []
     };
     var runId = null;
     var source = null;
@@ -618,6 +621,9 @@
         for (var i = 0; i < state.quickActions.length; i++) {
           if (state.quickActions[i].id === actionId) { label = state.quickActions[i].label; }
         }
+        for (var j = 0; j < state.documentActions.length; j++) {
+          if (state.documentActions[j].id === actionId) { label = state.documentActions[j].label; }
+        }
       } catch (e) {}
       // Muc chon tu menu chuot phai (main.js -> Core -> pane) den bat ky luc nao, ke ca giua mot luot dang chay - noi
       // ro la bi bo qua, khong im lang nuot mat viec nguoi dung vua chon.
@@ -627,6 +633,17 @@
         return false;
       }
       return startRun(label, { quickAction: actionId });
+    }
+
+    // parseActions: doc [{id, label, edits}] cua Core, bo muc thieu id/nhan.
+    function parseActions(raw) {
+      var out = [];
+      for (var i = 0; i < raw.length; i++) {
+        var id = trimText(raw[i] && raw[i].id);
+        var label = trimText(raw[i] && raw[i].label);
+        if (id && label) { out.push({ id: id, label: label, edits: !!raw[i].edits }); }
+      }
+      return out;
     }
 
     // loadQuickActions: danh sach muc lay tu Core, khong chep tay. Chi Writer: lenh nhanh can khoa vung boi den,
@@ -642,20 +659,19 @@
           return readJson(resp);
         }).then(function (data) {
           var list = [];
+          var docs = [];
           try {
             var result = (data && data.result !== undefined) ? data.result : data;
-            var raw = (result && result.actions) || [];
-            for (var i = 0; i < raw.length; i++) {
-              var id = trimText(raw[i] && raw[i].id);
-              var label = trimText(raw[i] && raw[i].label);
-              if (id && label) { list.push({ id: id, label: label, edits: !!raw[i].edits }); }
-            }
-          } catch (e2) { list = []; }
+            list = parseActions((result && result.actions) || []);
+            docs = parseActions((result && result.documentActions) || []);
+          } catch (e2) { list = []; docs = []; }
           state.quickActions = list;
+          state.documentActions = docs;
           emit();
           return list.length > 0;
         }).then(null, function () {
           state.quickActions = [];
+          state.documentActions = [];
           emit();
           return false;
         });
