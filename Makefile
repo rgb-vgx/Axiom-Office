@@ -42,6 +42,7 @@ test-lo:
 # Bo cham benchmark slide (docs/plans/18): thuan, khong can PowerPoint. Chay bo brief that: tests/bench/slides/run.py.
 test-bench:
 	python3 -m unittest discover -s tests/bench/slides -v
+	python3 -m unittest discover -s tests/bench/chinh-ta -v
 
 # Catalog lenh bridge (catalog/live-commands.json - nguon chuan): dinh dang, tham so chon tai lieu, khop ban C# (khi da build).
 test-catalog:
