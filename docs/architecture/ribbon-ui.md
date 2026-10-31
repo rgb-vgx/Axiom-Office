@@ -260,19 +260,23 @@ Số đo đầy đủ (hình dạng JSON, ngữ nghĩa `lines`/`truncated`, cái
   | Nút | `imageMso` | Có ở | Ghi chú |
   |---|---|---|---|
   | Ask AI | `Help` | cả ba | như Windows |
-  | Soát bố cục | `SlideShowFromCurrent` | trình chiếu | như Windows |
+  | Soát bố cục | `SelectionPane` | trình chiếu | Windows dùng `SlideShowFromCurrent` — ra "?" trên WPP (đo 01/11/2026) |
   | Soát bảng | `TableInsertDialogWord` | văn bản | Windows dùng `TableInsert` — Writer của WPS không có |
   | Soát vùng dữ liệu | `DataValidation` | bảng tính | như Windows |
   | Bộ nhớ AI… | `FileSave` | cả ba | thay `RecordsSaveRecord` |
-  | Kỹ năng… | `JsAddInsDialog` | cả ba | thay `SmartArtInsert` (chỉ có ở văn bản) |
+  | Kỹ năng… | `AddInManager` | cả ba | thay `SmartArtInsert` (chỉ có ở văn bản); `JsAddInsDialog` ra "?" (đo 01/11/2026) |
   | Thiết lập… | `ApplicationOptionsDialog` | cả ba | thay `ControlWizards` |
   | Trạng thái | `About` | cả ba | thay `Info` |
   | Mở nhật ký | `FileOpen` | cả ba | như Windows |
   | Khác ▸ | `FileProperties` | cả ba | thay `PropertySheet` |
-  | Kiểm tra mô hình | `ReviewNewComment` | cả ba | thay `AcceptInvitation` |
+  | Kiểm tra mô hình | `ReviewAcceptChange` | cả ba | thay `AcceptInvitation`; `ReviewNewComment` ra "?" (đo 01/11/2026) |
   | Sao chép API URL | `Copy` | cả ba | như Windows |
+  | Soát chính tả | `ReviewTrackChanges` | văn bản | nút AI, chỉ Writer (01/11/2026) |
+  | Làm đẹp bảng | `TableAutoFitContents` | văn bản | nút AI, chỉ Writer (01/11/2026) |
 
-  Đổi tên nào thì phải tra lại bảng lệnh của WPS và thử trên WPS thật — tên không có thì nút không có icon. Người
+  Đổi tên nào thì phải **thử trên WPS thật ở từng app** — có tên trong bảng lệnh vẫn có thể ra dấu "?", và có tên
+  không nằm trong bảng mà vẫn hiện (bảng tên đã thử: `tests/wps/REFERENCE.md`). Đo 01/11/2026 ở cả Writer,
+  Spreadsheets, Presentation: mọi nút trong bảng trên đều hiện icon. Người
   dùng xác nhận "hiện icon" (20/10/2026) nhưng chưa nhìn riêng từng app — ba nút *Soát* dùng tên chỉ có ở một app,
   nên trong app khác (nếu WPS bỏ qua `getVisible`) chúng có thể không có icon.
 - **Màu icon menu chuột phải**: hằng số `#0F6CBD` nằm trong **từng tệp** `images/<tag>.svg` (không đọc từ

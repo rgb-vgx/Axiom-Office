@@ -503,7 +503,7 @@ function iconFiles() {
 // nao thi phai tra lai bang lenh cua WPS (docs/architecture/ribbon-ui.md muc 5.3) va thu lai tren WPS that.
 const RIBBON_IMAGE_MSO = {
   axiomAskAI: "Help", // ca ba app (question_kd)
-  axiomCheckLayout: "SlideShowFromCurrent", // chi trinh chieu - dung nut Soat bo cuc cua trinh chieu
+  axiomCheckLayout: "SelectionPane", // chi trinh chieu; SlideShowFromCurrent ra "?" tren WPP that (01/11/2026)
   axiomCheckTables: "TableInsertDialogWord", // chi van ban (TableInsert khong co trong Writer cua WPS)
   axiomCheckRange: "DataValidation", // chi bang tinh
   // Do 01/11/2026: ten co trong bang lenh van co the ra dau "?" (SpellingMenu, TableAutoFitWindow, BordersAll,
@@ -511,12 +511,12 @@ const RIBBON_IMAGE_MSO = {
   axiomProofread: "ReviewTrackChanges", // chi van ban (but sua - lenh sua bang Track Changes)
   axiomTableTidy: "TableAutoFitContents", // chi van ban
   axiomMemory: "FileSave", // ca ba app; ban Windows dung RecordsSaveRecord - WPS khong co
-  axiomSkills: "JsAddInsDialog", // ca ba app
+  axiomSkills: "AddInManager", // da thay icon o ca ba app (01/11/2026); JsAddInsDialog ra "?"
   axiomSetup: "ApplicationOptionsDialog", // ca ba app; ban Windows dung ControlWizards - WPS khong co
   axiomStatus: "About", // ca ba app; ban Windows dung Info - WPS khong co
   axiomLog: "FileOpen", // ca ba app
   axiomMoreMenu: "FileProperties", // ca ba app; ban Windows dung PropertySheet - WPS khong co
-  axiomTestModel: "ReviewNewComment", // ca ba app; ban Windows dung AcceptInvitation - WPS khong co
+  axiomTestModel: "ReviewAcceptChange", // da thay icon o ca ba app (01/11/2026); ReviewNewComment ra "?"
   axiomCopyUrl: "Copy", // ca ba app
 };
 

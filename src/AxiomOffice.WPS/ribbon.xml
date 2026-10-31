@@ -64,7 +64,7 @@
              (Soát chính tả, Làm đẹp bảng) thì dùng AI, chỉ Writer: lệnh cả tài liệu của Core. -->
         <group id="axiomCheckGroup" label="Kiểm tra tài liệu">
           <button id="axiomCheckLayout" label="Soát bố cục" size="large" tag="checkLayout"
-                  getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction" imageMso="SlideShowFromCurrent"
+                  getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction" imageMso="SelectionPane"
                   screentip="Soát bố cục bài trình chiếu"
                   supertip="Tìm chữ tràn khung, khung ra ngoài trang, khung chồng nhau, chữ quá nhỏ. Chỉ đọc, không sửa tài liệu và không dùng AI."/>
           <button id="axiomCheckTables" label="Soát bảng" size="large" tag="checkTables"
@@ -91,7 +91,7 @@
           <button id="axiomMemory" label="Bộ nhớ AI…" size="large" tag="memory" onAction="ribbon.OnAction" imageMso="FileSave"
                   screentip="Bộ nhớ AI"
                   supertip="Xem, lọc theo phạm vi, xoá tạm, khôi phục, xoá vĩnh viễn những điều AI đã ghi nhớ về bạn và tài liệu."/>
-          <button id="axiomSkills" label="Kỹ năng…" size="large" tag="skills" onAction="ribbon.OnAction" imageMso="JsAddInsDialog"
+          <button id="axiomSkills" label="Kỹ năng…" size="large" tag="skills" onAction="ribbon.OnAction" imageMso="AddInManager"
                   screentip="Kỹ năng"
                   supertip="Các kỹ năng AI đang có cho ứng dụng này; nạp lại sau khi thêm hoặc sửa kỹ năng."/>
         </group>
@@ -109,7 +109,7 @@
                   supertip="Xem phần cuối nhật ký của Agent Core (cùng tệp mà bản Windows mở bằng trình soạn thảo)."/>
           <!-- Menu "Khác" gom viec chan doan phu, de nhom He thong chi con ba nut chinh. -->
           <menu id="axiomMoreMenu" label="Khác" tag="more" imageMso="FileProperties">
-            <button id="axiomTestModel" label="Kiểm tra mô hình" tag="testModel" onAction="ribbon.OnAction" imageMso="ReviewNewComment"
+            <button id="axiomTestModel" label="Kiểm tra mô hình" tag="testModel" onAction="ribbon.OnAction" imageMso="ReviewAcceptChange"
                     screentip="Kiểm tra mô hình"
                     supertip="Gửi một câu hỏi ngắn tới model đang cấu hình để xem có trả lời được không."/>
             <button id="axiomCopyUrl" label="Sao chép API URL" tag="copyUrl" onAction="ribbon.OnAction" imageMso="Copy"

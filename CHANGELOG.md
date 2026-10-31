@@ -19,8 +19,9 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 - Đo trên WPS 12.1.2 thật (`tests/wps/REFERENCE.md`): gán tên style lạ thì WPS âm thầm đổi về Normal (handler kiểm
   trước); bảng chèn trong đoạn tiêu đề mang style Heading (`formatTable` đưa về Normal); `Table Grid` không tự kẻ khung;
   màu nền hàng bị bỏ qua (báo trong `skipped`); nhiều tên `imageMso` có trong bảng lệnh vẫn ra dấu "?".
-- Chưa làm: *Kỹ năng…* và *Kiểm tra mô hình* đang hiện icon "?" (lỗi có sẵn); chưa thử soát chính tả / làm đẹp bảng
-  với model thật (máy chủ AI nội bộ tắt lúc đo).
+- Sửa icon "?" có sẵn từ trước, thử ở cả Writer, Spreadsheets, Presentation: *Kỹ năng…* → `AddInManager`, *Kiểm tra mô
+  hình* → `ReviewAcceptChange`, *Soát bố cục* (Presentation) → `SelectionPane`.
+- Chưa làm: chưa thử soát chính tả / làm đẹp bảng với model thật (máy chủ AI nội bộ tắt lúc đo).
 
 ### Added — WPS: Track Changes, comment, thay hàng loạt cho agent (P1-1, phần add-in, 31/10/2026)
 
