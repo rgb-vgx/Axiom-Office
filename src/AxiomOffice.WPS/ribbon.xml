@@ -12,7 +12,9 @@
      khong phai cua getVisible.
 
   Icon (giong ban Windows: moi nut deu co icon):
-   - Nut tren RIBBON dung imageMso = bo icon co san cua chinh WPS (do tren WPS 12.1.2 that 20/10/2026: hien
+   - Nut moi tu 01/11/2026 (Lich su, nhom Tao moi, Viet voi AI, Soat chinh ta ...) dung getImage -> SVG rieng trong
+     images/ (main.js ICON_FILES): bo imageMso cua WPS chi ve duoc vai ten (do 01/11, tests/wps/REFERENCE.md).
+   - Nut cu tren RIBBON dung imageMso = bo icon co san cua chinh WPS (do tren WPS 12.1.2 that 20/10/2026: hien
      dung icon). WPS tra ten kieu Office qua bang lenh cua no - /opt/kingsoft/wps-office/office6/res/commands/
      <wps|et|wpp>/ongmani/*.kuip, moi lenh co idMso="..." va icon="..._kd". CHI dung ten co trong bang do: ten
      khong co thi WPS khong ve icon. Ten nao chi co o mot app (SlideShowFromCurrent: trinh chieu,
@@ -23,7 +25,7 @@
      (askAi.svg, quickMenu.svg) - imageMso trong menu ngu canh chua thu. WPS KHONG nhan data URI cho getImage: no
      phan giai chuoi tra ve nhu mot duong dan, truot thi ve dau "?" (SDK: @wps-jsapi/wps/js/ribbon.js).
 
-  Menu chuot phai (<contextMenus> cuoi tep): "Sua bang AI >" 14 muc (4 muc giong van trong menu con "Doi giong >")
+  Menu chuot phai (<contextMenus> cuoi tep): "Sua bang AI >" 15 muc (5 muc giong van trong menu con "Doi giong >")
   + "Hoi AI ve doan nay", tren chu thuong va tren dong danh sach. Bam mot muc thi mo KHUNG CHAT MINI canh doan boi
   den (mini.html, Application.ShowDialog); ban WPS khong co ShowDialog thi quay ve khung chat lon (main.js: openMini /
   runQuick).

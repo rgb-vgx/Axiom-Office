@@ -29,8 +29,8 @@ help:
 	@echo "  lint-js     - Kiem loi JS (ESLint: add-in WPS ES5 + tests modern)"
 
 # LibreOffice dong bang tu 25/10/2026 (docs/architecture/libreoffice.md): test-lo khong con trong `test`/CI, chay tay
-# khi can soat lai ban dong bang.
-test: test-go test-bench test-catalog test-wps test-wps-e2e test-core test-mcp test-oracle test-install test-package
+# khi can soat lai ban dong bang. check-gen dung dau (vai giay) - CI chay no, truoc day `make test` o may thi khong.
+test: check-gen test-go test-bench test-catalog test-wps test-wps-e2e test-core test-mcp test-oracle test-install test-package
 
 # -race: Execute ghi trang thai luot tren goroutine rieng trong khi API doc (agent.Run co khoa rieng).
 test-go:

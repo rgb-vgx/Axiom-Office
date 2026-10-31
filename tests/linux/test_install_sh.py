@@ -130,6 +130,17 @@ class InstallShTests(unittest.TestCase):
         self.assertIn('name="axiomoffice"', self.read_publish())
         self.assertNotIn("sudo", out, "JsApiPlugin da bat thi khong in lenh sudo")
 
+    def test_encrypted_oem_ini_gets_no_sudo_hint(self):
+        # WPS 12.1.2 (do 01/11/2026, tests/wps/REFERENCE.md): oem.ini da ma hoa, muc [support] chu thuong, khong co
+        # JsApiPlugin ma add-in van nap sau hop thoai tin cay. Lenh sed '/^\[Support\]/a' khong khop dong nao.
+        with open(self.oem, "w") as handle:
+            handle.write("[useranalysis]\nqcQVSSyiT2ir6bvb7oJNkg..=-oqsL74hpiah3RGyR6hniw..\n[support]\nab..=cd..\n")
+        code, out = self.run_install()
+        self.assertEqual(code, 0, out)
+        self.assertIn('name="axiomoffice"', self.read_publish())
+        self.assertNotIn("sudo", out, "lenh sudo sed khong lam gi tren oem.ini ma hoa")
+        self.assertIn("trust", out, "nhac bam OK hop thoai tin cay add-in")
+
     def test_without_wps_or_with_no_wps_flag_nothing_is_written(self):
         shutil.rmtree(self.wps_root)
         code, out = self.run_install()

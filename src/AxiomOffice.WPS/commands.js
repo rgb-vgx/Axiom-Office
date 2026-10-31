@@ -4877,7 +4877,9 @@
     });
   }
 
-  // Soat bo cuc: khong bao `overflow` (WPS khong do duoc chieu cao chu that).
+  // Soat bo cuc nhu ban Windows (CommandDispatcher.Checks.cs LayoutIssues). `overflow` dung TextRange.BoundHeight - do
+  // duoc tren WPS 12.1.2 (01/11/2026; khung khong tu gian nen chu tran thi BoundHeight > Height). Khong co
+  // connector-crossing/connector-overlap (chi ban Microsoft Office).
   function cmdWppCheckLayout(app, params) {
     var pres = wppPres(app);
     var count = Number(pres.Slides.Count);
@@ -4898,17 +4900,26 @@
         var shape = slide.Shapes.Item(j);
         var nm = strProp(shape, "Name");
         var t = wppShapeText(shape);
-        var size = 0;
+        var size = 0, textHeight = 0;
         if (t) {
           try { size = Number(shape.TextFrame.TextRange.Font.Size) || 0; } catch (e) { size = 0; }
+          try { textHeight = Number(shape.TextFrame.TextRange.BoundHeight) || 0; } catch (e2) { textHeight = 0; }
         }
         boxes.push({ name: String(nm), left: Number(shape.Left), top: Number(shape.Top),
-          width: Number(shape.Width), height: Number(shape.Height), chars: t.length, minFont: size });
+          width: Number(shape.Width), height: Number(shape.Height), chars: t.length, minFont: size,
+          textHeight: textHeight });
       }
       var issues = [], total = 0;
       for (j = 0; j < boxes.length; j++) {
         var b = boxes[j];
         total += b.chars;
+        if (b.chars && b.textHeight > b.height + 2) {
+          issues.push({ type: "overflow",
+            detail: "text of '" + b.name + "' needs " + Math.round(b.textHeight) + "pt height but the box is " +
+              Math.round(b.height) + "pt: shorten the text, move details to notes (wpp.setNotes) or split into two " +
+              "slides; keep fontSize at the design size",
+            shapes: [b.name] });
+        }
         if (b.left < -2 || b.top < -2 ||
             b.left + b.width > slideWidth + 2 || b.top + b.height > slideHeight + 2) {
           issues.push({ type: "offslide",

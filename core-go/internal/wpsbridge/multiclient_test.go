@@ -300,3 +300,39 @@ func TestWPSAppAliveReadsProc(t *testing.T) {
 		t.Fatal("khong doc duoc /proc -> khong biet")
 	}
 }
+
+// File session ghi `started` voi hau to Z: phai la gio UTC that, ca o client phu (truoc day client phu lay
+// time.Now() gio dia phuong nen may +07 ghi lech 7 tieng so voi lastSeen).
+func TestSessionStartedIsUTCForEveryClient(t *testing.T) {
+	saved := time.Local
+	time.Local = time.FixedZone("ICT", 7*3600)
+	t.Cleanup(func() { time.Local = saved })
+
+	b := startedBridge(t, nil)
+	b.opts.PollSeconds = 0
+	pollAs(t, b, map[string]any{"clientId": "w1", "app": "wps", "document": map[string]any{"name": "a.docx"}})
+	pollAs(t, b, map[string]any{"clientId": "e1", "app": "et", "document": map[string]any{"name": "b.xlsx"}})
+	b.tickSessions()
+
+	entries, _ := os.ReadDir(b.opts.SessionDir)
+	checked := 0
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		raw, _ := os.ReadFile(filepath.Join(b.opts.SessionDir, entry.Name()))
+		var session map[string]any
+		_ = json.Unmarshal(raw, &session)
+		started, err := time.Parse(time.RFC3339, session["started"].(string))
+		if err != nil {
+			t.Fatalf("%s: started %v khong doc duoc: %v", entry.Name(), session["started"], err)
+		}
+		if drift := time.Since(started); drift < -time.Minute || drift > time.Minute {
+			t.Fatalf("%s: started %v lech %v so voi gio UTC that", entry.Name(), session["started"], drift)
+		}
+		checked++
+	}
+	if checked != 2 {
+		t.Fatalf("can 2 file session (Writer + ET), doc duoc %d", checked)
+	}
+}

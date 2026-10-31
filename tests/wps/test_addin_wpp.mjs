@@ -37,9 +37,9 @@
 //   do tren WPS that co 2 placeholder: 1 = so trang, 2 = ghi chu).
 // - `exportPdf`: API goc (ExportAsFixedFormat/SaveAs .pdf) bao thanh cong ma KHONG ghi file, nen add-in
 //   kiem bang FileSystem.existsSync roi tu dung PDF. Ket qua phai la file "%PDF" that.
-// - `checkLayout`: khong bao `overflow` (can chieu cao chu that, object model WPS khong do duoc);
-//   bon loai issue con lai (offslide, small-font, overlap, dense) lam duoc, nguong giong ban LibreOffice
-//   (sai so 2pt, chu nho nhat 12pt, 600 ky tu/slide).
+// - `checkLayout`: offslide, small-font, overlap, dense nguong giong ban LibreOffice (sai so 2pt, chu nho nhat
+//   12pt, 600 ky tu/slide). `overflow` (TextRange.BoundHeight, do duoc tu 01/11/2026) spec o test_addin_shapes.mjs
+//   vi fake o day khong mo phong chieu cao chu.
 // - Registry KHONG co `wpp.undo` (khac `et.undo`) va WPP khong co UndoRecord: khong lenh nao cua add-in
 //   duoc mo UndoRecord.
 // - Tham so `text` cua addText/addTextBox/setNotes: metadata ghi required nhung ban LibreOffice van chay

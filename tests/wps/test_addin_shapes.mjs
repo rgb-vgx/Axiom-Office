@@ -169,3 +169,20 @@ test("addParagraphs: highlight rieng cho chu nhan manh; doan rong bi bo; khong c
   fails(ctx, app, "wpp.addParagraphs", {}, /'paragraphs' must be a non-empty array/);
   assert.equal(shapesOf(app)[0].shapes.length, 1);
 });
+
+// ---- checkLayout: tran chu ----
+// TextRange.BoundHeight do duoc tren WPS 12.1.2 (01/11/2026) nen wpp.checkLayout bao `overflow` nhu ban Windows
+// (CommandDispatcher.Checks.cs LayoutIssues: chieu cao chu > chieu cao khung + 2pt).
+
+test("checkLayout: chu cao hon khung thi bao overflow; khung vua chu thi khong", () => {
+  const ctx = loadAddin();
+  const app = makeShapesApp();
+  run(ctx, app, "wpp.addShape", { left: 10, top: 20, width: 200, height: 40, text: "x".repeat(100) });
+  run(ctx, app, "wpp.addShape", { left: 300, top: 20, width: 200, height: 80, text: "Vua khung" });
+  const [tight, roomy] = shapesOf(app)[0].shapes;
+  assert.ok(boundHeightOf(tight) > tight.height + 2 && boundHeightOf(roomy) <= roomy.height, "dieu kien cua phep thu");
+  const out = run(ctx, app, "wpp.checkLayout");
+  const issues = out.slides[0].issues;
+  assert.deepEqual(issues.map((i) => [i.type, i.shapes]), [["overflow", [tight.name]]]);
+  assert.match(issues[0].detail, new RegExp("needs " + Math.round(boundHeightOf(tight)) + "pt height but the box is 40pt"));
+});

@@ -401,8 +401,9 @@ bridge chính 47961 để không đụng Core thật), LLM giả (`tests/core/fa
 - **`oem.ini` của bản cài này ở dạng mã hoá** (khoá/giá trị đã băm, mục `[support]` chữ thường) và **không có**
   `JsApiPlugin=true` — vậy mà add-in vẫn nạp: mỗi app hỏi một lần *"Addin "axiomoffice" on "http://127.0.0.1:<cổng>/wps/addin"
   is loaded for the first time, trust or not?"* (nút OK ở toạ độ 696,461 trên màn 1280x900). Mục 1 ở đầu tệp (đo 08/10 trên
-  bản cũ) và bước kiểm đầu vào của `test_wps_bridge_live.py` / gợi ý `sudo` của `install.sh` giả định cần dòng đó —
-  **chưa đổi**, vì mới đo trên một máy; cần đo thêm trước khi bỏ.
+  bản cũ) và bước kiểm đầu vào của `test_wps_bridge_live.py` giả định cần dòng đó — **chưa đổi**, vì mới đo trên một
+  máy. Từ 01/11/2026 `install.sh` chỉ in gợi ý `sudo` khi `oem.ini` ở dạng thường (có `[Support]`); với file mã hoá
+  lệnh `sed '/^\[Support\]/a …'` của gợi ý không khớp dòng nào, nên nó chỉ nhắc bấm OK hộp thoại tin cậy.
 - **Mỗi app là một tiến trình riêng**: Writer = `/opt/kingsoft/wps-office/office6/wps`, Spreadsheets = `office6/et`.
   `/usr/bin/wps` là script bash, tiến trình của nó cũng có `comm` = `wps` (cha của binary thật).
 - **`wpsoffice`** (`office6/wpsoffice Run -Entry=EntryPoint .../addons/kcef/libjsapibrowser.so --server`) là máy chủ CEF
@@ -511,7 +512,7 @@ quả về `/result` — chạy song song với WPS đang mở của người d�
 - `TextRange.Words(n)` trả **null**; `Paragraphs(k).Characters(start, len)` dùng được.
 - **`TextRange.BoundHeight` đo được** chiều cao chữ (theo cỡ chữ, xuống dòng, `SpaceBefore`; khung không tự giãn,
   `AutoSize` 0): rộng 300, cỡ 20 → 96; cỡ 40 → 288 — khớp mô hình số dòng × 1,2 × cỡ chữ. Ghi chú cũ "WPS không đo
-  được chiều cao chữ" (lý do `wpp.checkLayout` không báo `overflow`) không còn đúng với 12.1.2.
+  được chiều cao chữ" không còn đúng với 12.1.2 — `wpp.checkLayout` báo `overflow` từ 01/11/2026.
 - `TextFrame2.TextRange.Paragraphs(k).ParagraphFormat.LeftIndent/FirstLineIndent`, `ParagraphFormat.SpaceBefore`,
   `LineRuleBefore` chạy. `default.pptx` là 720×540.
 

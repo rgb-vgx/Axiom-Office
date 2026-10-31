@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Ribbon toi thieu: WPS chi nap add-in co ribbon. Them nut/getImage o day khi can do cach WPS ve icon. -->
+<customUI xmlns="http://schemas.microsoft.com/office/2006/01/customui" onLoad="OnAddinLoad">
+  <ribbon><tabs><tab id="axiomProbeTab" label="Axiom Probe">
+    <group id="g1" label="Probe">
+      <button id="b1" label="Probe" size="large" imageMso="Help" onAction="OnAction"/>
+    </group>
+  </tab></tabs></ribbon>
+</customUI>

@@ -5,6 +5,18 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — rà soát WPS Linux 01/11/2026
+
+- `wpp.checkLayout` trên WPS báo `overflow` (chữ cao hơn khung) như bản Windows. Ghi chú cũ "WPS không đo được chiều
+  cao chữ" sai với 12.1.2: `TextRange.BoundHeight` đo được, đã thử trên WPS thật (khung 200×40, 100 ký tự cỡ 18 → 108pt).
+- File session WPS: `started` của app thứ hai trở đi ghi giờ địa phương kèm hậu tố `Z` (máy +07 lệch 7 tiếng so với
+  `lastSeen`) — nay luôn là UTC.
+- `install.sh`: không in lệnh `sudo` bật `JsApiPlugin` khi `oem.ini` ở dạng mã hoá (WPS 12.x) — lệnh `sed` đó không
+  khớp dòng nào và add-in vẫn nạp sau hộp thoại tin cậy; thay bằng lời nhắc bấm OK.
+- `make test` chạy cả `check-gen` như CI.
+- `scripts/wps/probe/`: REPL đo object model WPS thật (Xvfb + HOME tạm), chạy được `commands.js` thật.
+- Tài liệu: README (ribbon, menu chuột phải 15 mục, icon SVG), đầu `ribbon.xml`, `wps-bridge.md`, `REFERENCE.md`.
+
 ### Added — WPS: đủ bộ WPS AI — Sửa thông minh, Tóm tắt / Dịch song ngữ cả bài, Học thuật hơn, Lịch sử (01/11/2026)
 
 - Ribbon: **Lịch sử** (mở *Hội thoại trước*, mọi app), **Sửa thông minh** (gõ cách sửa, AI sửa cả bài thành Track

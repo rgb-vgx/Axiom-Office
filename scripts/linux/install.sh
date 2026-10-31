@@ -15,7 +15,8 @@
 #   - cau hinh  -> ~/.config/axiom-office/config.json (quyen 0600; giu khoa cu, chi ghi khoa duoc truyen)
 #   - MCP       -> ~/.local/share/axiom-office/mcp (in san doan cau hinh cho Claude Code/Desktop)
 #   - WPS       -> co /opt/kingsoft/wps-office thi dang ky add-in (Core phuc vu) vao publish.xml cua nguoi dung;
-#                  in huong dan sudo neu oem.ini chua bat JsApiPlugin (khong tu chay sudo)
+#                  in huong dan sudo neu oem.ini dang thuong chua bat JsApiPlugin (khong tu chay sudo); oem.ini ma
+#                  hoa (WPS 12.x) thi chi nhac bam OK hop thoai tin cay add-in
 # Khong bao gio tat LibreOffice cua nguoi dung: dang chay (va sap cai/go extension) thi dung lai va nhac dong.
 set -euo pipefail
 
@@ -175,7 +176,13 @@ register_wps_addin() {
     echo "WPS: dang ky add-in (Core http://127.0.0.1:$PORT)"
     python3 "$HERE/wps/install_jsaddon.py" --home "$HOME" --core-url "http://127.0.0.1:$PORT"
     OEM="$WPS_ROOT/office6/cfgs/oem.ini"
-    if ! grep -q '^[[:space:]]*JsApiPlugin[[:space:]]*=[[:space:]]*true' "$OEM" 2>/dev/null; then
+    if grep -q '^[[:space:]]*JsApiPlugin[[:space:]]*=[[:space:]]*true' "$OEM" 2>/dev/null; then
+        :
+    elif ! grep -q '^\[Support\]' "$OEM" 2>/dev/null; then
+        # oem.ini ma hoa (WPS 12.x, muc [support] chu thuong): khong can JsApiPlugin, lenh sed duoi khong khop dong
+        # nao (do 01/11/2026, tests/wps/REFERENCE.md). WPS hoi tin cay add-in mot lan moi app.
+        echo "  WPS: lan dau moi app hoi \"Addin axiomoffice ... trust or not?\" - bam OK"
+    else
         echo "  WPS can bat JS add-in mot lan (quyen admin, JsApiPlugin=true trong $OEM):"
         echo "    sudo cp -n \"$OEM\" \"$OEM.bak\""
         echo "    sudo sed -i '/^\\[Support\\]/a JsApiPlugin=true' \"$OEM\""

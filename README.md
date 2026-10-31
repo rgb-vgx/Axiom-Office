@@ -717,21 +717,26 @@ phép đo trên WPS thật: [docs/architecture/wps-bridge.md](docs/architecture/
 
 - **Cài**: `scripts/linux/install.sh` tự đăng ký add-in khi có `/opt/kingsoft/wps-office` (ghi một dòng
   `jspluginonline` vào `~/.local/share/Kingsoft/wps/jsaddons/publish.xml`, giữ add-in khác; `--no-wps` để bỏ qua).
-  WPS cần bật một lần `JsApiPlugin=true` trong `oem.ini` (script **in** lệnh `sudo`, không tự chạy). Mở WPS **sau**
-  khi Core đã chạy, nên dùng `./install.sh --systemd`.
-- **Ribbon** (tab *Axiom Office*, `ribbon.xml`): *Trợ lý* (Ask AI) · *Kiểm tra* (Soát bố cục / Soát bảng / Soát vùng
-  dữ liệu) · *Quản lý* (Bộ nhớ AI…, Kỹ năng…) · *Hệ thống* (Thiết lập…, Trạng thái, Mở nhật ký, Khác ▸ Kiểm tra mô
-  hình / Sao chép API URL). Icon ribbon là `imageMso` — bộ icon có sẵn của WPS, như bản Windows dùng icon của Office (tên phải có trong bảng
-  lệnh của WPS — `docs/architecture/ribbon-ui.md` §5.3). Các control
+  Lần đầu mỗi app WPS hỏi *"Addin axiomoffice … trust or not?"* — bấm OK. Bản WPS cũ có `oem.ini` dạng thường cần bật
+  một lần `JsApiPlugin=true` (script **in** lệnh `sudo`, không tự chạy); bản 12.x có `oem.ini` mã hoá thì không cần.
+  Mở WPS **sau** khi Core đã chạy, nên dùng `./install.sh --systemd`.
+- **Ribbon** (tab *Axiom Office*, `ribbon.xml`): *Trợ lý* (Ask AI, Lịch sử) · *Tạo mới* (Soạn văn bản, Sửa thông
+  minh — Writer; Tạo slide từ tài liệu — Presentation) · *Viết với AI* (Writer: các lệnh của menu chuột phải cho đoạn
+  bôi đen, menu Đổi giọng, cùng Tóm tắt cả bài / Dịch song ngữ cả bài) · *Kiểm tra tài liệu* (Soát bố cục / Soát
+  bảng / Soát vùng dữ liệu; Soát chính tả, Làm đẹp bảng dùng AI) · *Bộ nhớ & kỹ năng* (Bộ nhớ AI…, Kỹ năng…) · *Hệ thống* (Thiết lập…, Trạng thái, Mở nhật ký,
+  Khác ▸ Kiểm tra mô hình / Sao chép API URL). Icon: nút cũ dùng `imageMso` (bộ icon có sẵn của WPS; tên phải có
+  trong bảng lệnh của WPS — `docs/architecture/ribbon-ui.md` §5.3), nút mới từ 01/11/2026 dùng SVG riêng trong
+  `images/` qua `getImage`. Các control
   Windows **cố ý không có** trên WPS (Nhìn tài liệu, Tìm web, Công cụ ngoài, Cài đặt nâng cao, Tắt Agent Core, menu
   ngôn ngữ) — lý do ghi đầu `ribbon.xml` và `docs/architecture/ribbon-ui.md` §2.
 - **Khung chat** (`pane.html`): menu **⋯** (Trò chuyện mới / Hội thoại trước… / Ghi nhớ / Nhật ký / Thiết lập), các
   màn hình phụ (Bộ nhớ AI, Nhật ký hoạt động, Thiết lập, Kỹ năng, Trạng thái, Nhật ký Core, Soát tài liệu, Hội
   thoại), công tắc *Lập kế hoạch trước*, footer *Hoàn tác lượt này* / *Chèn trả lời* / *Dừng*.
-- **Menu chuột phải khi bôi đen** (Writer): **Sửa bằng AI ▸** Trau chuốt · Viết lại · Rút gọn · Mở rộng · Sửa lỗi
-  chính tả · Trang trọng hơn │ Tóm tắt · Giải thích · Dịch, và **Hỏi AI về đoạn này**. Mỗi mục mở **khung chat
+- **Menu chuột phải khi bôi đen** (Writer): **Sửa bằng AI ▸** 15 mục — Trau chuốt · Viết lại · Rút gọn · Mở rộng ·
+  Sửa lỗi chính tả · Viết tiếp · Dịch song ngữ · **Đổi giọng ▸** (Trang trọng · Học thuật · Ngắn gọn · Dễ hiểu · Tích
+  cực hơn) │ Tóm tắt · Giải thích · Dịch, và **Hỏi AI về đoạn này**. Mỗi mục mở **khung chat
   mini** (`mini.html`, `Application.ShowDialog`) cạnh tài liệu: chạy ngay, gõ thêm được, có Hoàn tác / Dừng / Đóng.
-  Ba mục sau vạch ngăn chỉ trả lời, Core chặn không cho sửa tài liệu. Câu lệnh của 9 mục nằm trong Core
+  Ba mục sau vạch ngăn chỉ trả lời, Core chặn không cho sửa tài liệu. Câu lệnh của 15 mục nằm trong Core
   (`core-go/internal/agent/quickactions.go`).
 - **Khoá vùng bôi đen**: bôi đen rồi hỏi thì AI chỉ sửa trong đoạn đó — Core gọi `writer.lockSelection` trước mỗi
   lượt và `writer.unlockSelection` khi xong. Lượt từ menu chuột phải / khung mini **bắt buộc** có đoạn bôi đen.

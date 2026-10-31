@@ -270,7 +270,7 @@ func (c *Client) writeSession() {
 	payload := map[string]any{
 		"pid": os.Getpid(), "app": app, "family": "wps-linux", "port": port,
 		"host": "wps-jsaddon", "version": b.bridgeVersion(),
-		"started":       c.started.Format("2006-01-02T15:04:05.000Z"),
+		"started":       c.started.UTC().Format("2006-01-02T15:04:05.000Z"),
 		"lastSeen":      now.Format("2006-01-02T15:04:05.000Z"),
 		"lastSeenEpoch": float64(now.UnixNano()) / 1e9,
 		"document":      doc["name"],

@@ -147,7 +147,7 @@ func (r *Run) JSON() map[string]any {
 		"conversationId": nilIfEmpty(r.ConversationID),
 		"port":           r.Port,
 		"status":         r.Status,
-		"started":        r.Started.Format("2006-01-02T15:04:05.000Z"),
+		"started":        r.Started.UTC().Format("2006-01-02T15:04:05.000Z"),
 		"finished":       r.finishedText(),
 		"reply":          nilIfEmpty(r.Reply),
 		"error":          nilIfEmpty(r.Error),
