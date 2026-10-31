@@ -1582,6 +1582,169 @@
     return { inserted: true, levels: levels, entries: tocEntries(doc) };
   }
 
+  // Bang theo `table` (so thu tu, 1 = dau tien); khong truyen = bang chua con tro, khong co thi bang cuoi.
+  // index = so da dung (0 = bang tai con tro).
+  function targetTable(app, params) {
+    var doc = app.ActiveDocument;
+    var count = Number(doc.Tables.Count);
+    if (count === 0) {
+      throw new Error("the document has no table - use writer.insertTable first");
+    }
+    var index = paramInt(params, "table", 0);
+    var table = null;
+    if (index === 0) {
+      try {
+        if (app.Selection.Information(12)) {
+          table = app.Selection.Tables.Item(1);
+        }
+      } catch (eSel) {
+        table = null;
+      }
+      if (table === null) {
+        index = count;
+      }
+    }
+    if (table === null) {
+      if (index < 1 || index > count) {
+        throw new Error("'table' must be between 1 and " + count + ", got " + index);
+      }
+      table = doc.Tables.Item(index);
+    }
+    return { table: table, index: index };
+  }
+
+  // Dinh dang bang da co. Moi phan boc try rieng: phan host khong ho tro (WPS) vao "skipped" thay vi
+  // lam hong ca lenh. WPS 12.1.2: bang chen vao doan Heading thi chu trong o mang style Heading, va bo
+  // qua mau nen hang - ca hai deu do lai o day.
+  function cmdWriterFormatTable(app, params) {
+    var target = targetTable(app, params);
+    var table = target.table;
+    var index = target.index;
+    var doc = app.ActiveDocument;
+    var applied = [];
+    var skipped = [];
+    var rowCount = Number(table.Rows.Count);
+    var colCount = Number(table.Columns.Count);
+    var hasHeading = false;
+    var r, c, level, color, borderColor, bandFill, headerFill, headerColor, headerBold, borders, fit;
+    function step(name, fn) {
+      try {
+        fn();
+        applied.push(name);
+      } catch (e) {
+        skipped.push(name + ": " + errMessage(e));
+      }
+    }
+    // Bang dan trang: bo khung thi danh tem trong Table.Title (Word 2010+); co khung thi bo tem.
+    function markLayout(layout) {
+      var current = "";
+      try { current = String(table.Title || ""); } catch (eTitle) { current = ""; }
+      if (layout) {
+        table.Title = LAYOUT_TABLE_NAME;
+      } else if (current.indexOf(LAYOUT_TABLE_NAME) === 0) {
+        table.Title = "AxiomTable";
+      }
+    }
+    // Phai chay TRUOC tien: dat lai style cua bang tren WPS cung xoa dam va font.
+    for (r = 1; r <= rowCount && !hasHeading; r++) {
+      for (c = 1; c <= colCount; c++) {
+        try {
+          level = Number(table.Cell(r, c).Range.ParagraphFormat.OutlineLevel);
+          if (level >= 1 && level <= 9) { hasHeading = true; break; }
+        } catch (eCell) {}
+      }
+    }
+    if (hasHeading) {
+      step("bodyStyle", function () { table.Range.Style = builtinStyle(doc, "normal"); });
+    }
+    if (hasParam(params, "style")) {
+      step("style", function () { table.Style = paramString(params, "style", "Table Grid"); });
+    }
+    if (hasParam(params, "font")) {
+      step("font", function () { table.Range.Font.Name = paramString(params, "font", null); });
+    }
+    if (hasParam(params, "size")) {
+      step("size", function () { table.Range.Font.Size = paramInt(params, "size", 11); });
+    }
+    color = parseBgrColor(paramString(params, "color", null));
+    if (color !== null) {
+      step("color", function () { table.Range.Font.Color = color; });
+    }
+    if (hasParam(params, "alignment")) {
+      step("alignment", function () { table.Range.ParagraphFormat.Alignment = parseAlignment(paramString(params, "alignment", "left")); });
+    }
+    if (paramBool(params, "keepTogether", false)) {
+      step("keepTogether", function () {
+        table.Rows.AllowBreakAcrossPages = 0;
+        if (rowCount > 1) {
+          var range = table.Range.Document.Range(table.Rows.Item(1).Range.Start, table.Rows.Item(rowCount - 1).Range.End);
+          range.ParagraphFormat.KeepWithNext = -1;
+        }
+      });
+    }
+    if (hasParam(params, "borders")) {
+      borders = paramBool(params, "borders", true);
+      step("borders", function () {
+        table.Borders.Enable = borders ? 1 : 0;
+        markLayout(!borders);
+      });
+      if (!borders) {
+        step("layout-table", function () {
+          if (!isLayoutTable(table)) {
+            throw new Error("could not mark the table as a layout table (Table.Title)");
+          }
+        });
+      }
+    }
+    borderColor = parseBgrColor(paramString(params, "borderColor", null));
+    if (borderColor !== null) {
+      step("borderColor", function () {
+        table.Borders.Enable = 1;
+        table.Borders.OutsideColor = borderColor;
+        table.Borders.InsideColor = borderColor;
+        markLayout(false);
+      });
+    }
+    bandFill = parseBgrColor(paramString(params, "bandFill", null));
+    if (bandFill !== null) {
+      step("bandFill", function () {
+        for (var br = 3; br <= rowCount; br += 2) {
+          table.Rows.Item(br).Shading.BackgroundPatternColor = bandFill;
+          if (Number(table.Rows.Item(br).Shading.BackgroundPatternColor) !== bandFill) {
+            throw new Error("WPS ignored the row color");
+          }
+        }
+      });
+    }
+    headerFill = parseBgrColor(paramString(params, "headerFill", null));
+    headerColor = parseBgrColor(paramString(params, "headerColor", null));
+    headerBold = paramBool(params, "headerBold", headerFill !== null || headerColor !== null);
+    if (headerFill !== null) {
+      step("headerFill", function () {
+        table.Rows.Item(1).Shading.BackgroundPatternColor = headerFill;
+        if (Number(table.Rows.Item(1).Shading.BackgroundPatternColor) !== headerFill) {
+          throw new Error("WPS ignored the row color");
+        }
+      });
+    }
+    if (headerColor !== null) {
+      step("headerColor", function () { table.Rows.Item(1).Range.Font.Color = headerColor; });
+    }
+    if (hasParam(params, "headerBold") || headerFill !== null || headerColor !== null) {
+      step("headerBold", function () {
+        table.Rows.Item(1).Range.Font.Bold = headerBold ? -1 : 0;
+        table.Rows.Item(1).HeadingFormat = -1;
+      });
+    }
+    if (hasParam(params, "autoFit")) {
+      fit = String(paramString(params, "autoFit", "content") || "content").replace(/^\s+|\s+$/g, "").toLowerCase();
+      step("autoFit", function () { table.AutoFitBehavior(fit === "window" ? 2 : 1); });
+    }
+    var result = { table: index === 0 ? "at cursor" : index, rows: rowCount, cols: colCount, applied: applied };
+    if (skipped.length > 0) { result.skipped = skipped; }
+    return result;
+  }
+
   function tableAnchor(app) {
     var range = app.Selection.Range;
     try { range.Collapse(0); } catch (e) {}
@@ -4548,6 +4711,7 @@
     "writer.setParagraphAlignment": cmdSetParagraphAlignment,
     "writer.setStyle": cmdWriterSetStyle,
     "writer.insertToc": cmdWriterInsertToc,
+    "writer.formatTable": cmdWriterFormatTable,
     "writer.insertTable": cmdInsertTable,
     "writer.insertPageBreak": cmdInsertPageBreak,
     "writer.checkTables": cmdWriterCheckTables,
