@@ -1529,11 +1529,9 @@
     return c;
   }
 
-  function cmdReplaceAll(app, params) {
-    var find = paramString(params, "find", null);
-    var replace = paramString(params, "replace", "");
-    if (replace === null || replace === undefined) { replace = ""; }
-    if (!find) { return { replaced: false, count: 0 }; }
+  // Thay mot cap find/replace: dem so cho khop TRUOC khi thay, roi thay mot lan duy nhat. Dung chung cho
+  // writer.replaceAll va writer.replaceMany (moi cap mot loi goi).
+  function writerReplaceAllIn(app, find, replace) {
     var doc = app.ActiveDocument;
     var content = doc.Content;
     // Dang khoa vung boi den: chi tim trong vung khoa (giong ban Windows), khong quet ca tai lieu. Khong
@@ -1550,7 +1548,6 @@
     }
     var findText = toWordFindText(find);
     var replaceText = toWordFindText(replace);
-    // Dem truoc khi thay (khong tim lai chuoi vua thay) roi thay mot lan duy nhat.
     var count = 0;
     try {
       var docText = "";
@@ -1568,7 +1565,45 @@
       count = countOccurrences(docText, find);
     } catch (e3) { count = 0; }
     content.Find.Execute(findText, false, false, false, false, false, true, 0, false, replaceText, 2);
+    return count;
+  }
+
+  function cmdReplaceAll(app, params) {
+    var find = paramString(params, "find", null);
+    var replace = paramString(params, "replace", "");
+    if (replace === null || replace === undefined) { replace = ""; }
+    if (!find) { return { replaced: false, count: 0 }; }
+    var count = writerReplaceAllIn(app, find, replace);
     return { replaced: count > 0, count: count };
+  }
+
+  // Nhieu cap tim/thay trong MOT lenh (mot buoc hoan tac) - giong WriterReplaceMany cua ban Windows.
+  function cmdWriterReplaceMany(app, params) {
+    var edits = params ? params.edits : undefined;
+    if (!Array.isArray(edits) || edits.length === 0) {
+      throw new Error("'edits' must be a non-empty array of {find, replace}");
+    }
+    if (edits.length > 200) {
+      throw new Error("'edits' has " + edits.length + " items; send at most 200 per call");
+    }
+    var counts = [];
+    var notFound = [];
+    var replaced = 0;
+    for (var i = 0; i < edits.length; i++) {
+      var item = edits[i];
+      // Bo qua cap thieu/khong phai find chuoi; replace thieu coi nhu "".
+      var find = item && typeof item === "object" ? item.find : undefined;
+      if (typeof find !== "string" || find === "") { continue; }
+      var replace = item.replace;
+      if (replace === undefined || replace === null) { replace = ""; }
+      var count = writerReplaceAllIn(app, find, replace);
+      counts.push(count);
+      replaced += count;
+      if (count === 0) { notFound.push(find); }
+    }
+    var result = { edits: counts.length, replaced: replaced, counts: counts };
+    if (notFound.length > 0) { result.notFound = notFound; }
+    return result;
   }
 
   function cmdUndo(app, params) {
@@ -4294,6 +4329,7 @@
     "writer.insertPageBreak": cmdInsertPageBreak,
     "writer.checkTables": cmdWriterCheckTables,
     "writer.replaceAll": cmdReplaceAll,
+    "writer.replaceMany": cmdWriterReplaceMany,
     "writer.undo": cmdUndo,
     "writer.save": cmdSave,
     "writer.saveAs": cmdSaveAs,
