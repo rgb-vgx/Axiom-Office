@@ -281,13 +281,9 @@ const CHUA_CO_HANDLER = {
   // Windows; WPS de sau khi do duoc API tren may Linux.
   "et.pivot": "chi co trong add-in Windows (X3, PivotCaches); can do API PivotTable cua WPS JS",
   "et.exportChart": "chi co trong add-in Windows (P2, Chart.Export); can do API xuat anh bieu do cua WPS JS",
-  "writer.setTracking": "chi co trong add-in Windows (W4, Track Changes cho luot AI); can do API TrackRevisions/UserName cua WPS JS",
-  "writer.listComments": "chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc",
-  "writer.addComment": "chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc",
   "writer.replyComment": "chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc",
   "writer.resolveComment": "chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc",
   "writer.editCommentScope": "chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc",
-  "writer.listRevisions": "chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc",
   "writer.reviewRevisions": "chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc",
   // Bon lenh kind rong (agent=false) nam trong registry vi registry dung chung cho moi nen tang.
   // Ca bon DEU la lenh cua add-in o ban Windows (CommandDispatcher.cs: app.info, ai.ask, ui.askpane,
@@ -305,7 +301,6 @@ const CHUA_CO_HANDLER = {
   "writer.formatTable": "chua co handler trong add-in (agent=true: tool nay se loi khi may dang la WPS)",
   "writer.insertImage": "chua co handler trong add-in (agent=true)",
   "writer.insertHyperlink": "chua co handler trong add-in (agent=true)",
-  "writer.replaceMany": "chua co handler trong add-in (agent=true: tool nay se loi khi may dang la WPS)",
   // Hai lenh thiet ke: chi co o add-in Windows (COM); LibreOffice bao not supported.
   // (writer.outline da co handler trong WPS JS tu commit P0-03 nen khong con o day.)
   "writer.restyle": "chi co trong add-in Windows (lenh thiet ke, doc_design); WPS JS chua viet handler",
