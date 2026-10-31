@@ -650,7 +650,10 @@ test("run.failed kind 'selection'/'selection-lock' -> cau tieng Viet rieng, khon
 
 // ---- Menu chuot phai (contextMenus): cung muc, cung thu tu va nhan voi bang cua Core.
 function coreQuickActions() {
-  const go = fs.readFileSync(path.join(ROOT, "core-go", "internal", "agent", "quickactions.go"), "utf8");
+  const source = fs.readFileSync(path.join(ROOT, "core-go", "internal", "agent", "quickactions.go"), "utf8");
+  // Chi bang QuickActions (menu chuot phai): DocumentActions cung file la lenh ca tai lieu cua nut ribbon.
+  const start = source.indexOf("var QuickActions = []QuickAction{");
+  const go = source.slice(start, source.indexOf("\n}\n", start));
   return [...go.matchAll(/\{ID: "([a-z]+)", Label: "([^"]+)"(, Edits: true)?(, Group: "([a-z]+)")?/g)]
     .map((m) => ({ id: m[1], label: m[2], edits: !!m[3], group: m[5] || "" }));
 }

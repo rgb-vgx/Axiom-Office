@@ -21,7 +21,12 @@ type QuickAction struct {
 	Edits bool
 	// Group: muc nam trong menu con cua menu chuot phai - "tone" = "Doi giong ▸" (ribbon.xml: axiomCtxTone_<t|l>). Rong =
 	// nam thang trong menu "Sua bang AI". Thu tu trong menu van la thu tu cua bang nay.
-	Group  string
+	Group string
+	// Document: lenh lam tren CA TAI LIEU (nut ribbon, khong nam trong menu chuot phai): khong can boi den, Core khong khoa
+	// vung chon. Chi co trong DocumentActions.
+	Document bool
+	// Track: mac dinh bat Track Changes cho luot (ben goi gui options.trackChanges thi theo ben goi).
+	Track  bool
 	Prompt string
 }
 
@@ -95,9 +100,41 @@ const QuickEditRule = "ONE-CLICK EDIT for this turn: the user selected text and 
 const QuickAnswerRule = "ONE-CLICK ANSWER for this turn: the user selected text and picked the menu command quoted " +
 	"in their message. Answer it directly about the selected text; do not ask follow-up questions."
 
-// FindQuickAction: tra muc theo id (phan biet hoa thuong - id do Core cap, pane gui lai nguyen van).
+// DocumentActions: lenh lam tren CA TAI LIEU, chay tu nut ribbon (docs/research/doi-chieu-wps-ai.md P1-1, P1-3). Cung
+// duong {quickAction: id} voi menu "Sua bang AI" nhung khong can boi den va khong nam trong menu do. Cau lenh chi dinh
+// lenh bridge cu the vi model hay tu "viet lai cho hay hon" khi duoc bao soat chinh ta, va hay ve lai bang tu dau thay vi
+// dinh dang bang co san.
+var DocumentActions = []QuickAction{
+	{ID: "proofread", Label: "Soát chính tả cả bài", Edits: true, Document: true, Track: true, Prompt: "Soát chính tả " +
+		"cả tài liệu đang mở, theo ngôn ngữ của tài liệu. Đọc hết bằng writer.outline với maxChars 4000 (có số đoạn). " +
+		"Chỉ sửa lỗi chắc chắn: sai chính tả, sai hoặc thiếu dấu thanh, gõ nhầm, lặp từ, thừa hoặc thiếu khoảng trắng, dấu " +
+		"câu đặt sai. Sửa bằng writer.replaceMany, gom nhiều chỗ vào một lần gọi; mỗi find lấy cả cụm quanh chỗ sai để chỉ " +
+		"khớp đúng chỗ đó, giữ nguyên chữ hoa/thường. Không viết lại câu, không đổi văn phong hay cách dùng từ vốn đúng; " +
+		"không sửa tên riêng, tên cơ quan, số liệu, ngày tháng, trích dẫn, thuật ngữ và từ nước ngoài. Chỗ đáng ngờ mà không " +
+		"chắc (câu tối nghĩa, từ có thể dùng sai, thuật ngữ không thống nhất) thì không sửa, thêm ghi chú bằng " +
+		"writer.addComment (find = cụm đó) nói lý do và gợi ý. Có kỹ năng chính tả tiếng Việt thì làm theo. Các chỗ sửa " +
+		"được ghi bằng Track Changes để người dùng chấp nhận hay từ chối từng chỗ. Cuối cùng báo ngắn gọn số chỗ đã sửa, " +
+		"số ghi chú và vài ví dụ; không thấy lỗi thì nói rõ."},
+	{ID: "tableTidy", Label: "Làm đẹp bảng", Edits: true, Document: true, Prompt: "Làm đẹp các bảng dữ liệu trong tài " +
+		"liệu đang mở mà không đổi chữ trong bảng. Gọi writer.checkTables để biết có những bảng nào. Với mỗi bảng dữ liệu " +
+		"gọi writer.formatTable một lần (table = số thứ tự): style \"Table Grid\", font và cỡ chữ giống phần thân bài " +
+		"(không rõ thì Times New Roman 13 cho văn bản hành chính, 12 nếu bảng nhiều cột), headerBold true để hàng tiêu đề " +
+		"đậm và lặp lại khi sang trang, autoFit \"window\" để bảng vừa lề trang. Bảng dàn trang (writer.checkTables ghi " +
+		"layout, như phần đầu công văn hay phần chữ ký) thì để nguyên. Sau đó gọi writer.checkTables lần nữa và báo ngắn " +
+		"gọn đã làm gì với từng bảng; mục nào trả về trong skipped (WPS không làm được) thì nói rõ."},
+}
+
+// FindQuickAction: tra muc theo id trong menu "Sua bang AI" roi trong lenh ca tai lieu (phan biet hoa thuong - id do Core
+// cap, pane gui lai nguyen van).
 func FindQuickAction(id string) (QuickAction, bool) {
-	for _, action := range QuickActions {
+	if action, ok := findIn(QuickActions, id); ok {
+		return action, true
+	}
+	return findIn(DocumentActions, id)
+}
+
+func findIn(list []QuickAction, id string) (QuickAction, bool) {
+	for _, action := range list {
 		if action.ID == id {
 			return action, true
 		}
