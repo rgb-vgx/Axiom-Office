@@ -648,16 +648,16 @@ test("run.failed kind 'selection'/'selection-lock' -> cau tieng Viet rieng, khon
   assert.equal(h.state.messages[h.state.messages.length - 1].text, "the bridge is not answering");
 });
 
-// ---- Menu chuot phai (contextMenus): cung 9 muc, cung thu tu va nhan voi bang cua Core.
+// ---- Menu chuot phai (contextMenus): cung muc, cung thu tu va nhan voi bang cua Core.
 function coreQuickActions() {
   const go = fs.readFileSync(path.join(ROOT, "core-go", "internal", "agent", "quickactions.go"), "utf8");
-  return [...go.matchAll(/\{ID: "([a-z]+)", Label: "([^"]+)"(, Edits: true)?/g)]
-    .map((m) => ({ id: m[1], label: m[2], edits: !!m[3] }));
+  return [...go.matchAll(/\{ID: "([a-z]+)", Label: "([^"]+)"(, Edits: true)?(, Group: "([a-z]+)")?/g)]
+    .map((m) => ({ id: m[1], label: m[2], edits: !!m[3], group: m[5] || "" }));
 }
 
 test("ribbon.xml contextMenus: chu thuong + dong danh sach, 'Sua bang AI' khop DUNG bang cua Core", () => {
   const core = coreQuickActions();
-  assert.equal(core.length, 9, "doc duoc bang QuickActions cua Core");
+  assert.equal(core.length, 14, "doc duoc bang QuickActions cua Core (P1-4: 14 muc)");
   const context = ribbonControls("context");
   const menus = context.filter((c) => c.kind === "contextMenu").map((c) => c.idMso);
   assert.deepEqual(menus, ["ContextMenuText", "ContextMenuList"]);
@@ -675,6 +675,19 @@ test("ribbon.xml contextMenus: chu thuong + dong danh sach, 'Sua bang AI' khop D
     const sep = block.findIndex((c) => c.kind === "menuSeparator");
     const firstAnswer = core.find((a) => !a.edits).id;
     assert.equal(block[sep + 1].tag, "quick:" + firstAnswer);
+    // P1-4 (docs/research/doi-chieu-wps-ai.md): cac muc nhom "tone" nam trong menu con "Doi giong" - do tren WPS 12.1.2
+    // that 31/10/2026: menu long trong contextMenu hien va bam duoc (OnAction toi add-in nhu muc thuong).
+    const xml = fs.readFileSync(path.join(ADDIN, "ribbon.xml"), "utf8");
+    const tone = new RegExp('<menu id="axiomCtxTone_' + suffix + '"([^>]*)>([\\s\\S]*?)</menu>').exec(xml);
+    assert.ok(tone, "thieu menu con <menu id=\"axiomCtxTone_" + suffix + "\"> (Doi giong) trong menu Sua bang AI");
+    assert.match(tone[1], /label="Đổi giọng"/, "menu con co nhan 'Đổi giọng'");
+    assert.doesNotMatch(tone[1], /getImage=/, "menu con khong co tep anh rieng - getImage se ra dau '?'");
+    const inTone = [...tone[2].matchAll(/tag="quick:([a-z]+)"/g)].map((m) => m[1]);
+    assert.deepEqual(inTone, core.filter((a) => a.group === "tone").map((a) => a.id),
+      "menu con Doi giong chua DUNG cac muc nhom tone cua Core, dung thu tu");
+    const quickMenu = new RegExp('<menu id="axiomCtxQuick_' + suffix + '"[\\s\\S]*?<menuSeparator').exec(xml);
+    assert.ok(quickMenu && quickMenu[0].indexOf('id="axiomCtxTone_' + suffix + '"') > 0,
+      "menu con Doi giong nam TRONG menu Sua bang AI, truoc vach ngan");
     const ask = context.find((c) => c.id === "axiomCtxAsk_" + suffix);
     assert.ok(ask && ask.tag === "askAi" && ask.label === "Hỏi AI về đoạn này", "con co muc 'Hoi AI ve doan nay'");
   }

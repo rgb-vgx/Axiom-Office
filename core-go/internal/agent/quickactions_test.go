@@ -60,8 +60,14 @@ func TestQuickActionsTable(t *testing.T) {
 		}
 		if action.Edits {
 			edits++
-			if !strings.HasSuffix(action.Prompt, quickEditTail) {
-				t.Fatalf("%s: muc sua phai ket bang quickEditTail", action.ID)
+			// Viet tiep / Dich song ngu CHEN them (quickInsertTail chi dinh writer.replaceAll - do tren WPS that 31/10/2026);
+			// moi muc sua khac sua trong vung (quickEditTail).
+			want := quickEditTail
+			if action.ID == "continue" || action.ID == "bilingual" {
+				want = quickInsertTail
+			}
+			if !strings.HasSuffix(action.Prompt, want) {
+				t.Fatalf("%s: muc sua ket sai duoi cau lenh", action.ID)
 			}
 		} else {
 			answers++
@@ -70,7 +76,8 @@ func TestQuickActionsTable(t *testing.T) {
 			}
 		}
 		// Dich doi ngon ngu la chu dich; cac muc con lai phai giu ngon ngu cua doan.
-		if action.ID != "translate" && action.ID != "explain" && !strings.Contains(action.Prompt, "ngôn ngữ") {
+		if action.ID != "translate" && action.ID != "explain" && action.ID != "bilingual" &&
+			!strings.Contains(action.Prompt, "ngôn ngữ") {
 			t.Fatalf("%s: cau lenh phai noi giu ngon ngu cua doan: %q", action.ID, action.Prompt)
 		}
 	}
@@ -82,6 +89,36 @@ func TestQuickActionsTable(t *testing.T) {
 	}
 	if edits == 0 || answers == 0 {
 		t.Fatal("phai co ca muc sua lan muc chi doc")
+	}
+}
+
+// Menu "Sua bang AI" sau P1-4 (docs/research/doi-chieu-wps-ai.md): 14 muc dung thu tu; nhom "Doi giong ▸" liền nhau.
+// ribbon.xml (tests/wps/test_pane.mjs) phai theo dung bang nay.
+func TestQuickActionsMenuLayout(t *testing.T) {
+	ids := []string{}
+	tone := []string{}
+	for _, action := range QuickActions {
+		ids = append(ids, action.ID)
+		switch action.Group {
+		case "tone":
+			tone = append(tone, action.ID)
+		case "":
+		default:
+			t.Fatalf("%s: nhom la %q", action.ID, action.Group)
+		}
+	}
+	want := "polish rewrite shorten expand fix formal concise plain positive continue bilingual summarize explain translate"
+	if got := strings.Join(ids, " "); got != want {
+		t.Fatalf("thu tu menu:\n got %s\nwant %s", got, want)
+	}
+	if got := strings.Join(tone, " "); got != "formal concise plain positive" {
+		t.Fatalf("nhom Doi giong: %s", got)
+	}
+	for _, id := range []string{"continue", "bilingual"} {
+		action, _ := FindQuickAction(id)
+		if !strings.Contains(action.Prompt, "writer.replaceAll") || !strings.Contains(action.Prompt, "Giữ nguyên chữ đã bôi đen") {
+			t.Fatalf("%s: phai chen bang writer.replaceAll va giu nguyen doan goc: %q", id, action.Prompt)
+		}
 	}
 }
 

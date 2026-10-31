@@ -18,13 +18,24 @@ type QuickAction struct {
 	// Edits: muc nay SUA tai lieu. false = chi tra loi trong khung chat (Tom tat, Giai thich, Dich): luot chay
 	// chi duoc goi lenh doc (cung bo tool cua che do lap ke hoach), nen "khong sua tai lieu" la dieu Core CHAN
 	// that, khong chi la loi dan trong cau lenh.
-	Edits  bool
+	Edits bool
+	// Group: muc nam trong menu con cua menu chuot phai - "tone" = "Doi giong ▸" (ribbon.xml: axiomCtxTone_<t|l>). Rong =
+	// nam thang trong menu "Sua bang AI". Thu tu trong menu van la thu tu cua bang nay.
+	Group  string
 	Prompt string
 }
 
 // Ket cau chung cua cac muc sua: chi trong vung boi den (khoa vung cua bridge chan phan con lai), va bao lai
 // ngan gon da doi gi de nguoi dung biet co can bam "Hoan tac luot nay" khong.
 const quickEditTail = " Chỉ sửa trong đoạn đang bôi đen, sửa thẳng vào tài liệu, rồi nói ngắn gọn đã đổi những gì."
+
+// Ket cau cua muc THEM chu (Viet tiep, Dich song ngu): khoa vung cua bridge giu phan chu truoc/sau vung boi den, nen chen
+// vao CUOI vung la hop le. Do tren WPS 12.1.2 that (31/10/2026): writer.replaceAll voi "\n" trong chuoi thay tao doan moi
+// ngay trong vung khoa, giu dinh dang doan goc, hoan tac mot buoc; writer.insertStyledText thi thay ca vung va khong hieu
+// cu phap *nghieng* - nen cau lenh chi dinh replaceAll.
+const quickInsertTail = " Giữ nguyên chữ đã bôi đen, chỉ chèn thêm trong vùng bôi đen bằng writer.replaceAll (tìm câu " +
+	"cuối của đoạn, đủ dài để chỉ khớp một chỗ, rồi thay bằng chính câu đó + ký tự xuống dòng \\n + phần thêm), không " +
+	"sửa phần khác của tài liệu, rồi nói ngắn gọn đã thêm những gì."
 
 // Ket cau chung cua cac muc chi doc.
 const quickAnswerTail = " Trả lời ngay trong khung chat, không sửa tài liệu."
@@ -42,8 +53,25 @@ var QuickActions = []QuickAction{
 		"tiết hoặc ví dụ phù hợp với nội dung; không bịa số liệu hay sự kiện; giữ ngôn ngữ của đoạn." + quickEditTail},
 	{ID: "fix", Label: "Sửa lỗi chính tả", Edits: true, Prompt: "Sửa lỗi chính tả, ngữ pháp và dấu câu trong đoạn " +
 		"văn đang bôi đen; câu nào không sai thì giữ nguyên cách diễn đạt; giữ ngôn ngữ của đoạn." + quickEditTail},
-	{ID: "formal", Label: "Trang trọng hơn", Edits: true, Prompt: "Viết lại đoạn văn đang bôi đen với giọng trang " +
-		"trọng, lịch sự, hợp với văn bản công việc; giữ nguyên ý và ngôn ngữ của đoạn." + quickEditTail},
+	// Nhom "Doi giong ▸" (docs/research/doi-chieu-wps-ai.md P1-4, doi chieu kwpsaigc cua WPS AI).
+	{ID: "formal", Label: "Trang trọng hơn", Edits: true, Group: "tone", Prompt: "Viết lại đoạn văn đang bôi đen với " +
+		"giọng trang trọng, lịch sự, hợp với văn bản công việc; giữ nguyên ý và ngôn ngữ của đoạn." + quickEditTail},
+	{ID: "concise", Label: "Ngắn gọn hơn", Edits: true, Group: "tone", Prompt: "Viết lại đoạn văn đang bôi đen cho " +
+		"ngắn gọn, súc tích hơn: bỏ từ thừa và câu rườm rà, gộp ý trùng; giữ đủ ý, số liệu, tên riêng và ngôn ngữ của " +
+		"đoạn." + quickEditTail},
+	{ID: "plain", Label: "Dễ hiểu hơn", Edits: true, Group: "tone", Prompt: "Viết lại đoạn văn đang bôi đen cho dễ " +
+		"hiểu với người đọc phổ thông: câu ngắn, từ thông dụng, thuật ngữ khó thì nói lại bằng lời đơn giản; không đổi ý, " +
+		"không bỏ số liệu; giữ ngôn ngữ của đoạn." + quickEditTail},
+	{ID: "positive", Label: "Tích cực hơn", Edits: true, Group: "tone", Prompt: "Viết lại đoạn văn đang bôi đen với " +
+		"giọng tích cực, xây dựng hơn: nhấn vào kết quả đạt được và hướng khắc phục thay vì lời chê trách; không phóng " +
+		"đại, không bịa thêm thông tin; giữ ngôn ngữ của đoạn." + quickEditTail},
+	{ID: "continue", Label: "Viết tiếp", Edits: true, Prompt: "Viết tiếp sau đoạn văn đang bôi đen một đến hai đoạn " +
+		"ngắn: cùng giọng văn và ngôn ngữ của đoạn, nối mạch ý, không lặp lại ý đã có, không bịa số liệu hay sự kiện." +
+		quickInsertTail},
+	{ID: "bilingual", Label: "Dịch song ngữ", Edits: true, Prompt: "Dịch song ngữ đoạn văn đang bôi đen: ngay dưới " +
+		"MỖI đoạn gốc chèn bản dịch của chính đoạn đó (tiếng Việt thì dịch sang tiếng Anh, tiếng nước ngoài thì dịch sang " +
+		"tiếng Việt); làm lần lượt từng đoạn; không sửa chữ của bản gốc; nếu có kỹ năng dịch thuật hoặc bảng thuật ngữ " +
+		"thì dùng đúng thuật ngữ trong đó." + quickInsertTail},
 	{ID: "summarize", Label: "Tóm tắt", Prompt: "Tóm tắt đoạn văn đang bôi đen thành vài ý chính, viết bằng " +
 		"ngôn ngữ của đoạn." + quickAnswerTail},
 	{ID: "explain", Label: "Giải thích", Prompt: "Giải thích đoạn văn đang bôi đen bằng lời dễ hiểu: ý chính là " +
