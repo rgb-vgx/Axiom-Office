@@ -192,9 +192,9 @@ Spreadsheets cùng lúc thì `/health` đảo app sau mỗi lần poll và agent
 
 <!-- BEGIN SINH TU DONG (scripts/generate_wps_gaps.py) - KHONG SUA TAY -->
 
-Registry có **115** lệnh; add-in WPS có handler cho **69**, còn **46** chưa có. Add-in chỉ khai với Core những lệnh có handler (`filterRunnable` trong `main.js`), nên agent **không** được mời gọi lệnh chưa có.
+Registry có **115** lệnh; add-in WPS có handler cho **73**, còn **42** chưa có. Add-in chỉ khai với Core những lệnh có handler (`filterRunnable` trong `main.js`), nên agent **không** được mời gọi lệnh chưa có.
 
-**Writer (`writer.*`) — 21 lệnh**
+**Writer (`writer.*`) — 17 lệnh**
 
 | Lệnh | Cho agent | Lý do (từ `CHUA_CO_HANDLER`) |
 |---|---|---|
@@ -203,21 +203,17 @@ Registry có **115** lệnh; add-in WPS có handler cho **69**, còn **46** chư
 | `writer.closeAll` | không | chua co handler trong add-in |
 | `writer.deleteParagraphs` | có | chi co trong add-in Windows (plan 21 P2); WPS de sau |
 | `writer.editCommentScope` | có | chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc |
-| `writer.formatTable` | có | chua co handler trong add-in (agent=true: tool nay se loi khi may dang la WPS) |
 | `writer.insertBlocks` | không | chi co trong add-in Windows (lenh thiet ke, doc_design); WPS JS chua viet handler |
 | `writer.insertCaption` | có | chi co trong add-in Windows (plan 21 P1); WPS de sau |
 | `writer.insertHyperlink` | có | chua co handler trong add-in (agent=true) |
 | `writer.insertImage` | có | chua co handler trong add-in (agent=true) |
 | `writer.insertLayoutTable` | có | chi co trong add-in Windows (plan 21 P3); WPS de sau |
-| `writer.insertToc` | có | chi co trong add-in Windows (plan 21 P1); WPS de sau |
 | `writer.newDocument` | không | chua co handler trong add-in |
 | `writer.open` | không | chua co handler trong add-in |
 | `writer.replyComment` | có | chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc |
 | `writer.resolveComment` | có | chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc |
 | `writer.restyle` | không | chi co trong add-in Windows (lenh thiet ke, doc_design); WPS JS chua viet handler |
-| `writer.reviewRevisions` | có | chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc |
 | `writer.setHeaderFooter` | có | chi co trong add-in Windows (plan 21 P1); WPS de sau |
-| `writer.setStyle` | có | chi co trong add-in Windows (plan 21 P1); WPS de sau |
 | `writer.writeContent` | có | chi co trong add-in Windows (plan 21 P2); WPS de sau |
 
 **Spreadsheets (`et.*`) — 8 lệnh**

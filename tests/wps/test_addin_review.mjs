@@ -13,7 +13,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { makeWriterApp, writerStateOf, writerReviewOf } from "./addin_fake.mjs";
+import { makeWriterApp, writerStateOf, writerReviewOf, writerAdvanceClock } from "./addin_fake.mjs";
 import { loadAddin, run } from "./addin_harness.mjs";
 
 const DATE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/;   // "yyyy-MM-dd HH:mm" nhu ban Windows
@@ -211,4 +211,69 @@ test("replaceMany: dang khoa vung boi den thi chi thay trong vung (giong writer.
   assert.deepEqual(reply.counts, [1], "chi dem cho trong vung khoa");
   assert.equal(writerStateOf(app).text, "x b2 a1.\r");
   run(ctx, app, "writer.unlockSelection", {});
+});
+
+// ---- reviewRevisions: writer.reviewRevisions ----
+// "Hoan tac luot nay" cua Core khi luot bat Track Changes (core-go/internal/agent/tracking.go UndoRun) goi
+// {action: "reject", author: "Axiom AI", since: <luc bat dau luot, UTC>}. Do tren WPS 12.1.2 that (01/11/2026):
+// Revision.Accept/Reject chay khi TAT theo doi; tu choi theo tac gia giu nguyen thay doi cua nguoi khac; mot UndoRecord go
+// lai ca nhom. Revision.Date mang gio dia phuong gan nhan UTC (REFERENCE.md) - so voi `since` phai doi ve UTC that.
+
+function withTz(tz, body) {
+  const saved = process.env.TZ;
+  process.env.TZ = tz;
+  try { return body(); } finally {
+    if (saved === undefined) { delete process.env.TZ; } else { process.env.TZ = saved; }
+  }
+}
+
+test("reviewRevisions: reject theo author + since chi go thay doi cua luot nay; giu cua nguoi dung va luot AI truoc", () => {
+  withTz("Asia/Ho_Chi_Minh", () => {
+    const ctx = loadAddin();
+    const app = writer("mot hai ba bon nam.\r");
+    run(ctx, app, "writer.setTracking", { on: true, author: "Axiom AI" });
+    run(ctx, app, "writer.replaceAll", { find: "mot", replace: "một" });          // luot AI truoc: ~09:00 tren may
+    run(ctx, app, "writer.setTracking", { on: true, restoreAuthor: true });
+    run(ctx, app, "writer.replaceAll", { find: "hai", replace: "HAI" });          // nguoi dung go
+    writerAdvanceClock(app, 10 * 60 * 1000);
+    run(ctx, app, "writer.setTracking", { on: true, author: "Axiom AI" });
+    run(ctx, app, "writer.replaceMany", { edits: [{ find: "ba", replace: "BA" }, { find: "nam", replace: "năm" }] });
+    // Luot nay bat dau 09:05 tren may (+07) = 02:05 UTC; luot AI truoc luc 09:00 khong duoc dong toi.
+    const reply = run(ctx, app, "writer.reviewRevisions", { action: "reject", author: "axiom ai", since: "2026-10-31T02:05:00Z" });
+    assert.deepEqual(reply, { action: "reject", count: 4 });
+    assert.equal(writerStateOf(app).text, "một HAI ba bon nam.\r");
+    assert.deepEqual(writerReviewOf(app).revisions.map((r) => [r.author, r.text]),
+      [["Axiom AI", "mot"], ["Axiom AI", "một"], ["thuyetmt", "hai"], ["thuyetmt", "HAI"]]);
+    assert.equal(writerReviewOf(app).track, true, "tra lai trang thai theo doi nhu truoc lenh");
+    run(ctx, app, "writer.undo", { count: 1 });
+    assert.equal(writerStateOf(app).text, "một HAI BA bon năm.\r", "ca loat tu choi la MOT buoc hoan tac");
+    assert.equal(writerReviewOf(app).revisions.length, 8);
+  });
+});
+
+test("reviewRevisions: accept all giu chu moi va xoa het danh dau; theo ids thi chi cap do", () => {
+  const ctx = loadAddin();
+  const app = writer("mot hai.\r");
+  run(ctx, app, "writer.setTracking", { on: true, author: "Axiom AI" });
+  run(ctx, app, "writer.replaceMany", { edits: [{ find: "mot", replace: "một" }, { find: "hai", replace: "hài" }] });
+  const ids = run(ctx, app, "writer.listRevisions", {}).revisions.map((r) => r.id);
+  assert.deepEqual(ids, ["1:1", "1:2", "1:3", "1:4"]);
+  assert.deepEqual(run(ctx, app, "writer.reviewRevisions", { action: "reject", ids: ["1:3", "1:4"] }), { action: "reject", count: 2 });
+  assert.equal(writerStateOf(app).text, "một hai.\r");
+  assert.deepEqual(run(ctx, app, "writer.reviewRevisions", { action: "ACCEPT", all: true }), { action: "accept", count: 2 });
+  assert.equal(writerStateOf(app).text, "một hai.\r");
+  assert.deepEqual(writerReviewOf(app).revisions, []);
+});
+
+test("reviewRevisions: tham so sai hoac id khong co thi bao loi ro, khong doi tai lieu", () => {
+  const ctx = loadAddin();
+  const app = writer("mot.\r");
+  run(ctx, app, "writer.setTracking", { on: true, author: "Axiom AI" });
+  run(ctx, app, "writer.replaceAll", { find: "mot", replace: "một" });
+  fails(ctx, app, "writer.reviewRevisions", { action: "xoa", all: true }, /'action' must be 'accept' or 'reject'/);
+  fails(ctx, app, "writer.reviewRevisions", { action: "reject" }, /give 'ids' \(from writer.listRevisions\), 'author', or 'all': true/);
+  fails(ctx, app, "writer.reviewRevisions", { action: "reject", author: "Axiom AI", since: "hom qua" }, /'since' must be an ISO 8601 time/);
+  fails(ctx, app, "writer.reviewRevisions", { action: "reject", ids: ["1:1", "9:9"] }, /unknown revision ids: 9:9/);
+  assert.equal(writerStateOf(app).text, "một.\r");
+  assert.equal(writerReviewOf(app).revisions.length, 2);
 });

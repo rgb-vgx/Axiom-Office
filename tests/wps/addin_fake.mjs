@@ -2398,11 +2398,27 @@ export function makeWriterApp(options = {}) {
                 }),
               },
             },
-            methods: {},
+            // Do tren WPS 12.1.2 that (01/11/2026): Accept/Reject la function; tu choi revision chen thi chu mat, tu
+            // choi revision xoa thi chu cu tro lai; ca hai bo revision khoi danh sach. Chi da do KHI TAT theo doi (ban
+            // C# cung tat truoc) - dang theo doi thi fake tu choi han de handler khong dua vao hanh vi chua do.
+            methods: {
+              Accept: () => settleRevision(r, "Accept"),
+              Reject: () => settleRevision(r, "Reject"),
+            },
           });
         },
       },
     });
+  }
+
+  function settleRevision(r, how) {
+    if (!state.revisions.includes(r)) { throw new Error("Revision." + how + ": revision da duoc xu ly"); }
+    if (state.track) { throw new Error("Revision." + how + " khi dang TrackRevisions: chua do tren WPS that - tat theo doi truoc"); }
+    push(state, "Revision." + how + "(" + r.type + "," + fmt(r.text) + ")");
+    beforeChange();
+    state.revisions = state.revisions.filter((x) => x !== r);
+    if (how === "Reject" && r.type === 1) { applyEdit(r.start, r.end, ""); }
+    if (how === "Reject" && r.type === 2) { applyEdit(r.start, r.start, r.text); }
   }
 
   function makeComments() {
@@ -2503,6 +2519,13 @@ export function writerReviewOf(app) {
     revisions: state.revisions.map((r) => ({ type: r.type, author: r.author, text: r.text })),
     comments: state.comments.map((c) => ({ author: c.author, text: c.text, anchor: state.text.slice(c.start, c.end), done: c.done })),
   };
+}
+
+// Dong ho cua fake (gio tren may, gan nhan UTC nhu Revision.Date cua WPS) tien them `ms`: tach revision cua hai luot.
+export function writerAdvanceClock(app, ms) {
+  const state = APPS.get(app);
+  if (!state || state.app !== "wps") throw new Error("writerAdvanceClock: doi tuong khong phai app Writer gia");
+  state.clock += ms;
 }
 
 // ---------------------------------------------------------------------------------------------

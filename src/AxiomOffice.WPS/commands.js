@@ -1434,6 +1434,317 @@
     return { alignment: alignment };
   }
 
+  // Style dung san cua Word theo hang WdBuiltinStyle: ten style bi dich theo ngon ngu giao dien ("Heading 1"
+  // co the la "De muc 1"), hang so thi khong.
+  var BUILTIN_STYLES = {
+    "normal": -1, "heading 1": -2, "heading 2": -3, "heading 3": -4, "heading 4": -5,
+    "heading 5": -6, "heading 6": -7, "heading 7": -8, "heading 8": -9, "heading 9": -10,
+    "caption": -35, "list bullet": -49, "list number": -50, "title": -63, "subtitle": -75,
+    "quote": -181
+  };
+
+  // WPS tra NULL (khong nem loi) khi khong co style, va gan ten la thi am tham thanh Normal: phai kiem
+  // TRUOC khi gan de khong doi doan nao.
+  function builtinStyle(doc, name) {
+    var trimmed = String(name === undefined || name === null ? "" : name).replace(/^\s+|\s+$/g, "");
+    var key = trimmed.toLowerCase();
+    var style = null;
+    try {
+      if (Object.prototype.hasOwnProperty.call(BUILTIN_STYLES, key)) {
+        style = doc.Styles.Item(BUILTIN_STYLES[key]);
+      } else {
+        style = doc.Styles.Item(trimmed);
+      }
+    } catch (e) {
+      style = null;
+    }
+    if (style === null || style === undefined) {
+      throw new Error("unknown style '" + name + "'; use Heading 1-9, Normal, Title, Subtitle, List Bullet, List Number, Caption or Quote");
+    }
+    return style;
+  }
+
+  function paramIntList(params, name) {
+    var out = [];
+    if (!hasParam(params, name)) { return out; }
+    var raw = unwrapScalar(params[name]);
+    if (raw === undefined || raw === null) { return out; }
+    var list = Array.isArray(raw) ? raw : [raw];
+    for (var i = 0; i < list.length; i++) {
+      var item = unwrapScalar(list[i]);
+      if (item === undefined || item === null) { continue; }
+      var n = Number(item);
+      if (!isNaN(n) && isFinite(n)) { out.push(Math.round(n)); }
+    }
+    return out;
+  }
+
+  // Chu cua doan de bao lai: bo dau xuong dong cuoi doan, cat 60 ky tu.
+  function paragraphText(paragraph) {
+    var text = "";
+    try { text = strProp(paragraph.Range, "Text"); } catch (e) { text = ""; }
+    text = text.replace(/^\s+|\s+$/g, "");
+    return text.length > 60 ? text.substring(0, 60) + "…" : text;
+  }
+
+  function cmdWriterSetStyle(app, params) {
+    var styleName = paramString(params, "style", null);
+    if (!styleName) {
+      throw new Error("'style' is required, e.g. 'Heading 2'");
+    }
+    var numbers = paramIntList(params, "paragraphs");
+    if (numbers.length > 0 && selectionLock !== null) {
+      throw new Error("the user's selection is locked: call writer.setStyle without 'paragraphs' to style the selected paragraphs only");
+    }
+    var doc = app.ActiveDocument;
+    // Kiem style va moi so doan TRUOC khi doi doan nao.
+    var style = builtinStyle(doc, styleName);
+    var total = Number(doc.Paragraphs.Count);
+    var applied = [];
+    var i, paragraph;
+    if (numbers.length === 0) {
+      var selected = app.Selection.Paragraphs;
+      var count = Number(selected.Count);
+      for (i = 1; i <= count; i++) {
+        paragraph = selected.Item(i);
+        paragraph.Style = style;
+        applied.push(paragraphText(paragraph));
+      }
+    } else {
+      for (i = 0; i < numbers.length; i++) {
+        if (numbers[i] < 1 || numbers[i] > total) {
+          throw new Error("paragraph " + numbers[i] + " does not exist (the document has " + total + "; numbers come from writer.outline)");
+        }
+      }
+      for (i = 0; i < numbers.length; i++) {
+        paragraph = doc.Paragraphs.Item(numbers[i]);
+        paragraph.Style = style;
+        applied.push(paragraphText(paragraph));
+      }
+    }
+    return { style: String(style.NameLocal), paragraphs: applied.length, texts: applied };
+  }
+
+  function tocEntries(doc) {
+    try {
+      return Number(doc.TablesOfContents.Item(1).Range.Paragraphs.Count);
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  function cmdWriterInsertToc(app, params) {
+    var doc = app.ActiveDocument;
+    var levels = paramInt(params, "levels", 3);
+    levels = Math.max(1, Math.min(9, levels));
+    var existing = Number(doc.TablesOfContents.Count);
+    if (existing > 0) {
+      for (var i = 1; i <= existing; i++) {
+        doc.TablesOfContents.Item(i).Update();
+      }
+      return { updated: existing, entries: tocEntries(doc) };
+    }
+    var before = paramInt(params, "before", 0);
+    var where;
+    if (before > 0) {
+      var total = Number(doc.Paragraphs.Count);
+      if (before > total) {
+        throw new Error("paragraph " + before + " does not exist (the document has " + total + ")");
+      }
+      doc.Paragraphs.Item(before).Range.InsertParagraphBefore();
+      // Doan moi mang style cua doan dich (thuong la Heading): dat Normal de khong thanh tieu de trong.
+      doc.Paragraphs.Item(before).Style = builtinStyle(doc, "normal");
+      where = doc.Paragraphs.Item(before).Range;
+      where.Collapse(1);
+    } else {
+      where = app.Selection.Range;
+      where.Collapse(1);
+    }
+    // UseHeadingStyles = true, UpperHeadingLevel 1, LowerHeadingLevel = levels.
+    var created = doc.TablesOfContents.Add(where, true, 1, levels);
+    created.Update();
+    // Con tro ra doan SAU muc luc (o cuoi bai thi them doan trong de viet tiep); loi o day khong lam hong lenh.
+    try {
+      var last = created.Range.Paragraphs.Last;
+      var next = last.Next();
+      if (next === null || next === undefined) {
+        last.Range.InsertParagraphAfter();
+        next = last.Next();
+        next.Style = builtinStyle(doc, "normal");
+      }
+      var cursor = next.Range;
+      cursor.Collapse(1);
+      cursor.Select();
+      if (before > 0) {
+        app.Selection.EndKey(6);
+      }
+    } catch (e) {}
+    return { inserted: true, levels: levels, entries: tocEntries(doc) };
+  }
+
+  // Bang theo `table` (so thu tu, 1 = dau tien); khong truyen = bang chua con tro, khong co thi bang cuoi.
+  // index = so da dung (0 = bang tai con tro).
+  function targetTable(app, params) {
+    var doc = app.ActiveDocument;
+    var count = Number(doc.Tables.Count);
+    if (count === 0) {
+      throw new Error("the document has no table - use writer.insertTable first");
+    }
+    var index = paramInt(params, "table", 0);
+    var table = null;
+    if (index === 0) {
+      try {
+        if (app.Selection.Information(12)) {
+          table = app.Selection.Tables.Item(1);
+        }
+      } catch (eSel) {
+        table = null;
+      }
+      if (table === null) {
+        index = count;
+      }
+    }
+    if (table === null) {
+      if (index < 1 || index > count) {
+        throw new Error("'table' must be between 1 and " + count + ", got " + index);
+      }
+      table = doc.Tables.Item(index);
+    }
+    return { table: table, index: index };
+  }
+
+  // Dinh dang bang da co. Moi phan boc try rieng: phan host khong ho tro (WPS) vao "skipped" thay vi
+  // lam hong ca lenh. WPS 12.1.2: bang chen vao doan Heading thi chu trong o mang style Heading, va bo
+  // qua mau nen hang - ca hai deu do lai o day.
+  function cmdWriterFormatTable(app, params) {
+    var target = targetTable(app, params);
+    var table = target.table;
+    var index = target.index;
+    var doc = app.ActiveDocument;
+    var applied = [];
+    var skipped = [];
+    var rowCount = Number(table.Rows.Count);
+    var colCount = Number(table.Columns.Count);
+    var hasHeading = false;
+    var r, c, level, color, borderColor, bandFill, headerFill, headerColor, headerBold, borders, fit;
+    function step(name, fn) {
+      try {
+        fn();
+        applied.push(name);
+      } catch (e) {
+        skipped.push(name + ": " + errMessage(e));
+      }
+    }
+    // Bang dan trang: bo khung thi danh tem trong Table.Title (Word 2010+); co khung thi bo tem.
+    function markLayout(layout) {
+      var current = "";
+      try { current = String(table.Title || ""); } catch (eTitle) { current = ""; }
+      if (layout) {
+        table.Title = LAYOUT_TABLE_NAME;
+      } else if (current.indexOf(LAYOUT_TABLE_NAME) === 0) {
+        table.Title = "AxiomTable";
+      }
+    }
+    // Phai chay TRUOC tien: dat lai style cua bang tren WPS cung xoa dam va font.
+    for (r = 1; r <= rowCount && !hasHeading; r++) {
+      for (c = 1; c <= colCount; c++) {
+        try {
+          level = Number(table.Cell(r, c).Range.ParagraphFormat.OutlineLevel);
+          if (level >= 1 && level <= 9) { hasHeading = true; break; }
+        } catch (eCell) {}
+      }
+    }
+    if (hasHeading) {
+      step("bodyStyle", function () { table.Range.Style = builtinStyle(doc, "normal"); });
+    }
+    if (hasParam(params, "style")) {
+      step("style", function () { table.Style = paramString(params, "style", "Table Grid"); });
+    }
+    if (hasParam(params, "font")) {
+      step("font", function () { table.Range.Font.Name = paramString(params, "font", null); });
+    }
+    if (hasParam(params, "size")) {
+      step("size", function () { table.Range.Font.Size = paramInt(params, "size", 11); });
+    }
+    color = parseBgrColor(paramString(params, "color", null));
+    if (color !== null) {
+      step("color", function () { table.Range.Font.Color = color; });
+    }
+    if (hasParam(params, "alignment")) {
+      step("alignment", function () { table.Range.ParagraphFormat.Alignment = parseAlignment(paramString(params, "alignment", "left")); });
+    }
+    if (paramBool(params, "keepTogether", false)) {
+      step("keepTogether", function () {
+        table.Rows.AllowBreakAcrossPages = 0;
+        if (rowCount > 1) {
+          var range = table.Range.Document.Range(table.Rows.Item(1).Range.Start, table.Rows.Item(rowCount - 1).Range.End);
+          range.ParagraphFormat.KeepWithNext = -1;
+        }
+      });
+    }
+    if (hasParam(params, "borders")) {
+      borders = paramBool(params, "borders", true);
+      step("borders", function () {
+        table.Borders.Enable = borders ? 1 : 0;
+        markLayout(!borders);
+      });
+      if (!borders) {
+        step("layout-table", function () {
+          if (!isLayoutTable(table)) {
+            throw new Error("could not mark the table as a layout table (Table.Title)");
+          }
+        });
+      }
+    }
+    borderColor = parseBgrColor(paramString(params, "borderColor", null));
+    if (borderColor !== null) {
+      step("borderColor", function () {
+        table.Borders.Enable = 1;
+        table.Borders.OutsideColor = borderColor;
+        table.Borders.InsideColor = borderColor;
+        markLayout(false);
+      });
+    }
+    bandFill = parseBgrColor(paramString(params, "bandFill", null));
+    if (bandFill !== null) {
+      step("bandFill", function () {
+        for (var br = 3; br <= rowCount; br += 2) {
+          table.Rows.Item(br).Shading.BackgroundPatternColor = bandFill;
+          if (Number(table.Rows.Item(br).Shading.BackgroundPatternColor) !== bandFill) {
+            throw new Error("WPS ignored the row color");
+          }
+        }
+      });
+    }
+    headerFill = parseBgrColor(paramString(params, "headerFill", null));
+    headerColor = parseBgrColor(paramString(params, "headerColor", null));
+    headerBold = paramBool(params, "headerBold", headerFill !== null || headerColor !== null);
+    if (headerFill !== null) {
+      step("headerFill", function () {
+        table.Rows.Item(1).Shading.BackgroundPatternColor = headerFill;
+        if (Number(table.Rows.Item(1).Shading.BackgroundPatternColor) !== headerFill) {
+          throw new Error("WPS ignored the row color");
+        }
+      });
+    }
+    if (headerColor !== null) {
+      step("headerColor", function () { table.Rows.Item(1).Range.Font.Color = headerColor; });
+    }
+    if (hasParam(params, "headerBold") || headerFill !== null || headerColor !== null) {
+      step("headerBold", function () {
+        table.Rows.Item(1).Range.Font.Bold = headerBold ? -1 : 0;
+        table.Rows.Item(1).HeadingFormat = -1;
+      });
+    }
+    if (hasParam(params, "autoFit")) {
+      fit = String(paramString(params, "autoFit", "content") || "content").replace(/^\s+|\s+$/g, "").toLowerCase();
+      step("autoFit", function () { table.AutoFitBehavior(fit === "window" ? 2 : 1); });
+    }
+    var result = { table: index === 0 ? "at cursor" : index, rows: rowCount, cols: colCount, applied: applied };
+    if (skipped.length > 0) { result.skipped = skipped; }
+    return result;
+  }
+
   function tableAnchor(app) {
     var range = app.Selection.Range;
     try { range.Collapse(0); } catch (e) {}
@@ -1816,6 +2127,77 @@
       items.push(entry);
     }
     return { revisions: items, total: total, authors: authors, tracking: !!doc.TrackRevisions };
+  }
+
+  // Duyet thay doi (port WriterReviewRevisions cua CommandDispatcher.WriterReview.cs): "Hoan tac luot nay" cua Core goi
+  // {action: "reject", author: "Axiom AI", since}. Do tren WPS 12.1.2 that: Accept/Reject chay khi TAT theo doi; Date
+  // mang gio dia phuong gan nhan UTC nen doi ve UTC that (getTimezoneOffset) truoc khi so voi `since`.
+  function cmdWriterReviewRevisions(app, params) {
+    var action = paramString(params, "action", "");
+    action = (action === null ? "" : action).replace(/^\s+|\s+$/g, "").toLowerCase();
+    if (action !== "accept" && action !== "reject") {
+      throw new Error("'action' must be 'accept' or 'reject'");
+    }
+    var ids = [];
+    if (params && Array.isArray(params.ids)) {
+      for (var n = 0; n < params.ids.length; n++) {
+        if (params.ids[n] !== null && params.ids[n] !== undefined) { ids.push(String(params.ids[n]).replace(/^\s+|\s+$/g, "")); }
+      }
+    }
+    var author = paramString(params, "author", "");
+    author = (author === null ? "" : author).replace(/^\s+|\s+$/g, "").toLowerCase();
+    var all = paramBool(params, "all", false);
+    var since = null;
+    var sinceText = paramString(params, "since", null);
+    if (sinceText !== null && sinceText !== "") {
+      since = Date.parse(sinceText);
+      if (isNaN(since)) { throw new Error("'since' must be an ISO 8601 time, e.g. 2026-10-27T08:30:00Z"); }
+      since -= 60000;   // lui mot phut cho chac (giong C#)
+    }
+    if (ids.length === 0 && author === "" && !all) {
+      throw new Error("give 'ids' (from writer.listRevisions), 'author', or 'all': true");
+    }
+    var doc = app.ActiveDocument;
+    var revisions = doc.Revisions;
+    var count = Number(revisions.Count);
+    if (isNaN(count)) { count = 0; }
+    var targets = [], found = {};
+    for (var i = 1; i <= count; i++) {
+      var revision = revisions.Item(i);
+      var id = "1:" + i;   // cung cach danh so voi writer.listRevisions
+      var byAuthor = author !== "" && strProp(revision, "Author").toLowerCase() === author;
+      if (byAuthor && since !== null) {
+        var when = null;
+        try {
+          var date = revision.Date;
+          when = date.getTime() + date.getTimezoneOffset() * 60000;
+        } catch (eDate) { when = null; }
+        byAuthor = when !== null && when >= since;
+      }
+      var byId = ids.indexOf(id) >= 0;
+      if (byId) { found[id] = true; }
+      if (all || byId || byAuthor) { targets.push(revision); }
+    }
+    var missing = [];
+    for (var k = 0; k < ids.length; k++) {
+      if (!found[ids[k]]) { missing.push(ids[k]); }
+    }
+    if (missing.length > 0 && !all) {
+      throw new Error("unknown revision ids: " + missing.join(", ") + " (read them again with writer.listRevisions)");
+    }
+    // Dang theo doi thi chap nhan/tu choi khong duoc tao them revision; duyet NGUOC de chi so phia truoc khong doi.
+    var tracking = !!doc.TrackRevisions;
+    doc.TrackRevisions = false;
+    var done = 0;
+    try {
+      for (var t = targets.length - 1; t >= 0; t--) {
+        if (action === "accept") { targets[t].Accept(); } else { targets[t].Reject(); }
+        done++;
+      }
+    } finally {
+      doc.TrackRevisions = tracking;
+    }
+    return { action: action, count: done };
   }
 
   // Them comment (port WriterAddComment cua CommandDispatcher.WriterReview.cs). Tac gia = app.UserName
@@ -4327,6 +4709,9 @@
     "writer.heading": cmdHeading,
     "writer.formatSelection": cmdFormatSelection,
     "writer.setParagraphAlignment": cmdSetParagraphAlignment,
+    "writer.setStyle": cmdWriterSetStyle,
+    "writer.insertToc": cmdWriterInsertToc,
+    "writer.formatTable": cmdWriterFormatTable,
     "writer.insertTable": cmdInsertTable,
     "writer.insertPageBreak": cmdInsertPageBreak,
     "writer.checkTables": cmdWriterCheckTables,
@@ -4340,6 +4725,7 @@
     "writer.unlockSelection": cmdUnlockSelection,
     "writer.setTracking": cmdWriterSetTracking,
     "writer.listRevisions": cmdWriterListRevisions,
+    "writer.reviewRevisions": cmdWriterReviewRevisions,
     "writer.addComment": cmdWriterAddComment,
     "writer.listComments": cmdWriterListComments,
     "et.newWorkbook": cmdEtNewWorkbook,
