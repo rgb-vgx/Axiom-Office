@@ -1124,3 +1124,45 @@ test("ky nang: nhap tu ngoai - xem truoc roi moi nhap; xung dot ten noi ro, chua
   assert.deepEqual(run.body, { path: "/tmp/goi.zip", dryRun: false, overwrite: false });
   assert.match(pane.text("view"), /Đã nhập 1 kỹ năng: hop-dong\. Bỏ qua: cua-toi\./);
 });
+
+// ---- Lenh can go yeu cau (Soan van ban, 01/11/2026) va khung chat Presentation nghe nut ribbon (Tao slide tu tai lieu).
+const CREATE_LIST = { ok: true, result: { actions: [], documentActions: [
+  { id: "smartCreate", label: "Soạn văn bản", edits: true, app: "wps", input: "Bạn muốn soạn văn bản gì?" },
+  { id: "slidesFromDoc", label: "Tạo slide từ tài liệu", edits: true, app: "wpp" }] } };
+
+test("Soan van ban: nut ribbon -> the 'Soạn văn bản' (nut huy) + o soan goi y yeu cau; Gui -> chay lenh voi cau go", async () => {
+  const { pane, calls } = paneWith({ "GET /quick-actions": [200, CREATE_LIST],
+    "POST /runs": [200, { ok: true, result: { runId: "s1", conversationId: "c1" } }] });
+  await tick();
+  paneSource(pane).emit("pane.quick", { quickAction: "smartCreate" });
+  await tick();
+  assert.equal(calls.filter((c) => c.method === "POST").length, 0);
+  assert.equal(pane.byId("input").getAttribute("placeholder"), "Bạn muốn soạn văn bản gì?");
+  const chip = pane.byId("pendingChip");
+  assert.ok(chip && !chip.hasAttribute("hidden"), "the lenh dang cho (#pendingChip) hien");
+  assert.match(pane.text("pendingChip"), /Soạn văn bản/);
+  await startRun(pane, "Kế hoạch hội thao");
+  assert.deepEqual(calls.find((c) => c.method === "POST").body, { quickAction: "smartCreate", prompt: "Kế hoạch hội thao", app: "wps" });
+  assert.ok(pane.byId("pendingChip").hasAttribute("hidden"), "gui xong thi an the");
+  assert.equal(pane.byId("input").getAttribute("placeholder"), "Nhập yêu cầu cho tài liệu này…");
+
+  pane.emit("run.completed", { reply: "Đã soạn" });
+  await tick();
+  paneSource(pane).emit("pane.quick", { quickAction: "smartCreate" });
+  await tick();
+  pane.click("pendingCancel");
+  assert.ok(pane.byId("pendingChip").hasAttribute("hidden"), "bam huy (#pendingCancel) thi an the");
+  assert.equal(pane.byId("input").getAttribute("placeholder"), "Nhập yêu cầu cho tài liệu này…");
+});
+
+test("Presentation: khung chat nghe pane/events; Tao slide tu tai lieu chay ngay, bong bong hien nhan", async () => {
+  const { pane, calls } = paneWith({ "GET /quick-actions": [200, CREATE_LIST],
+    "POST /runs": [200, { ok: true, result: { runId: "p1" } }] }, { search: "?app=wpp" });
+  await tick();
+  const source = paneSource(pane);
+  assert.ok(source, "khung chat Presentation phai nghe nut ribbon");
+  source.emit("pane.quick", { quickAction: "slidesFromDoc" });
+  await tick();
+  assert.deepEqual(calls.find((c) => c.method === "POST").body, { quickAction: "slidesFromDoc", app: "wpp" });
+  assert.match(pane.text("chat"), /Tạo slide từ tài liệu/);
+});
