@@ -1775,8 +1775,6 @@
   }
 
   function cmdWriterListRevisions(app, params) {
-    // existing function unchanged
-
     var author = paramString(params, "author", null);
     if (author === null) { author = ""; }
     author = author.replace(/^\s+|\s+$/g, "");
@@ -1820,86 +1818,78 @@
     return { revisions: items, total: total, authors: authors, tracking: !!doc.TrackRevisions };
   }
 
+  // Duyet thay doi (port WriterReviewRevisions cua CommandDispatcher.WriterReview.cs): "Hoan tac luot nay" cua Core goi
+  // {action: "reject", author: "Axiom AI", since}. Do tren WPS 12.1.2 that: Accept/Reject chay khi TAT theo doi; Date
+  // mang gio dia phuong gan nhan UTC nen doi ve UTC that (getTimezoneOffset) truoc khi so voi `since`.
   function cmdWriterReviewRevisions(app, params) {
-    var action = (paramString(params, "action", null) || "").trim().toLowerCase();
+    var action = paramString(params, "action", "");
+    action = (action === null ? "" : action).replace(/^\s+|\s+$/g, "").toLowerCase();
     if (action !== "accept" && action !== "reject") {
-        throw new Error("'action' must be 'accept' or 'reject'");
+      throw new Error("'action' must be 'accept' or 'reject'");
     }
-    var idsRaw = params.ids;
     var ids = [];
-    if (Array.isArray(idsRaw)) {
-        for (var ii = 0; ii < idsRaw.length; ii++) {
-            var s = idsRaw[ii];
-            if (s != null) { ids.push(String(s).trim()); }
-        }
+    if (params && Array.isArray(params.ids)) {
+      for (var n = 0; n < params.ids.length; n++) {
+        if (params.ids[n] !== null && params.ids[n] !== undefined) { ids.push(String(params.ids[n]).replace(/^\s+|\s+$/g, "")); }
+      }
     }
-    var author = paramString(params, "author", null);
-    if (author !== null) { author = author.trim(); }
+    var author = paramString(params, "author", "");
+    author = (author === null ? "" : author).replace(/^\s+|\s+$/g, "").toLowerCase();
     var all = paramBool(params, "all", false);
-    var sinceStr = paramString(params, "since", null);
     var since = null;
-    if (sinceStr !== null) {
-        var ms = Date.parse(sinceStr);
-        if (isNaN(ms)) { throw new Error("'since' must be an ISO 8601 time, e.g. 2026-10-27T08:30:00Z"); }
-        since = ms - 60000; // subtract 60 seconds
+    var sinceText = paramString(params, "since", null);
+    if (sinceText !== null && sinceText !== "") {
+      since = Date.parse(sinceText);
+      if (isNaN(since)) { throw new Error("'since' must be an ISO 8601 time, e.g. 2026-10-27T08:30:00Z"); }
+      since -= 60000;   // lui mot phut cho chac (giong C#)
     }
-    if (!all && ids.length === 0 && (author === null || author === "")) {
-        throw new Error("give 'ids' (from writer.listRevisions), 'author', or 'all': true");
+    if (ids.length === 0 && author === "" && !all) {
+      throw new Error("give 'ids' (from writer.listRevisions), 'author', or 'all': true");
     }
     var doc = app.ActiveDocument;
     var revisions = doc.Revisions;
     var count = Number(revisions.Count);
     if (isNaN(count)) { count = 0; }
-    // map ids to revisions for existence check
-    var revById = {};
+    var targets = [], found = {};
     for (var i = 1; i <= count; i++) {
-        revById["1:" + i] = revisions.Item(i);
+      var revision = revisions.Item(i);
+      var id = "1:" + i;   // cung cach danh so voi writer.listRevisions
+      var byAuthor = author !== "" && strProp(revision, "Author").toLowerCase() === author;
+      if (byAuthor && since !== null) {
+        var when = null;
+        try {
+          var date = revision.Date;
+          when = date.getTime() + date.getTimezoneOffset() * 60000;
+        } catch (eDate) { when = null; }
+        byAuthor = when !== null && when >= since;
+      }
+      var byId = ids.indexOf(id) >= 0;
+      if (byId) { found[id] = true; }
+      if (all || byId || byAuthor) { targets.push(revision); }
     }
     var missing = [];
-    if (!all) {
-        for (var ii = 0; ii < ids.length; ii++) {
-            if (!revById.hasOwnProperty(ids[ii])) { missing.push(ids[ii]); }
-        }
-        if (missing.length > 0) {
-            throw new Error("unknown revision ids: " + missing.join(", ") + " (read them again with writer.listRevisions)");
-        }
+    for (var k = 0; k < ids.length; k++) {
+      if (!found[ids[k]]) { missing.push(ids[k]); }
     }
-    var authorLow = author ? author.toLowerCase() : null;
-    var targets = [];
-    for (var i = 1; i <= count; i++) {
-        var rev = revisions.Item(i);
-        var id = "1:" + i;
-        var match = false;
-        if (all) { match = true; }
-        else if (ids.length && ids.indexOf(id) >= 0) { match = true; }
-        else if (authorLow) {
-            var revAuthor = strProp(rev, "Author");
-            if (revAuthor && revAuthor.toLowerCase() === authorLow) {
-                if (since !== null) {
-                    var d = rev.Date;
-                    var real = Number(d) + d.getTimezoneOffset() * 60000;
-                    if (real >= since) { match = true; }
-                } else { match = true; }
-            }
-        }
-        if (match) { targets.push(rev); }
+    if (missing.length > 0 && !all) {
+      throw new Error("unknown revision ids: " + missing.join(", ") + " (read them again with writer.listRevisions)");
     }
+    // Dang theo doi thi chap nhan/tu choi khong duoc tao them revision; duyet NGUOC de chi so phia truoc khong doi.
     var tracking = !!doc.TrackRevisions;
     doc.TrackRevisions = false;
-    var processed = 0;
+    var done = 0;
     try {
-        for (var t = targets.length - 1; t >= 0; t--) {
-            var rev = targets[t];
-            if (action === "accept") { rev.Accept(); } else { rev.Reject(); }
-            processed++;
-        }
+      for (var t = targets.length - 1; t >= 0; t--) {
+        if (action === "accept") { targets[t].Accept(); } else { targets[t].Reject(); }
+        done++;
+      }
     } finally {
-        doc.TrackRevisions = tracking;
+      doc.TrackRevisions = tracking;
     }
-    return { action: action, count: processed };
-}
+    return { action: action, count: done };
+  }
 
-// Them comment (port WriterAddComment cua CommandDispatcher.WriterReview.cs). Tac gia = app.UserName
+  // Them comment (port WriterAddComment cua CommandDispatcher.WriterReview.cs). Tac gia = app.UserName
   // LUC them (do tren WPS that): writer.setTracking da dat ten nen lenh nay khong doi UserName.
   function cmdWriterAddComment(app, params) {
     var text = paramString(params, "text", null);
