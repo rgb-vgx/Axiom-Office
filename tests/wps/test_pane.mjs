@@ -1034,3 +1034,14 @@ test("quick(id) voi lenh can go (input): KHONG chay ngay - cho cau go; send(cau)
   await h.pane.quick("proofread");
   assert.equal(h.state.pendingAction, null);
 });
+
+test("lenh dang cho cau go + dang co luot chay: send bi tu choi nhung KHONG mat lenh dang cho", async () => {
+  const h = harness({ "/quick-actions": [200, CREATE], "/runs": [200, { ok: true, result: { runId: "b1" } }] });
+  await h.pane.loadQuickActions();
+  await h.pane.send("Việc khác");
+  await tick();
+  await h.pane.quick("smartCreate");
+  assert.equal(await h.pane.send("Thông báo"), false, "dang chay thi khong gui");
+  h.pane.setPlan(false); // phat lai state (onChange) de doc trang thai that, khong phai ban chup cu
+  assert.equal(h.state.pendingAction && h.state.pendingAction.id, "smartCreate", "van cho - nguoi dung gui lai duoc");
+});

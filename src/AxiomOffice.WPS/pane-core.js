@@ -611,8 +611,12 @@
       try { pending = state.pendingAction || null; } catch (ePend) { pending = null; }
       if (pending && pending.id) {
         var pendingLabel = trimText(pending.label) || safeString(pending.id);
-        try { state.pendingAction = null; } catch (eClear) {}
-        return startRun(pendingLabel + ": " + text, { quickAction: pending.id, prompt: text });
+        // Dang co luot chay thi startRun tu choi: giu lenh dang cho de nguoi dung gui lai, khong mat.
+        var started = startRun(pendingLabel + ": " + text, { quickAction: pending.id, prompt: text });
+        if (started) {
+          try { state.pendingAction = null; emit(); } catch (eClear) {}
+        }
+        return started;
       }
       var body = { prompt: text };
       // "Lap ke hoach truoc": Core chi cho doc tai lieu va tra ve ke hoach (CoreClient: mode "plan").

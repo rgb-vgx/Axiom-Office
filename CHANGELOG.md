@@ -5,6 +5,25 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — WPS: Soạn văn bản, Tạo slide từ tài liệu, nhóm "Viết với AI" trên ribbon (01/11/2026)
+
+- Tab *Axiom Office* có thêm hai nhóm, đối chiếu tab WPS AI: **Tạo mới** — *Soạn văn bản* (Writer: gõ yêu cầu, AI soạn
+  cả bài vào cuối tài liệu, chỗ thiếu thông tin để "…" cho người dùng điền) và *Tạo slide từ tài liệu* (Presentation:
+  đọc tài liệu Writer đang mở, dựng bài trình chiếu, giữ slide cũ); **Viết với AI** — 14 mục của menu chuột phải "Sửa
+  bằng AI" (Trau chuốt, Viết lại, Viết tiếp, Mở rộng, Rút gọn, Sửa lỗi chính tả, Đổi giọng ▾, Dịch song ngữ, Dịch, Tóm
+  tắt, Giải thích) đưa lên ribbon, chỉ Writer. Icon: bộ 13 SVG riêng theo phong cách icon nét của WPS AI (`imageMso` hợp
+  nghĩa đều ra "?" trên WPS thật).
+- Khung chat: lệnh cần gõ yêu cầu hiện thẻ lệnh đang chờ (có nút huỷ) và gợi ý trong ô soạn; Presentation cũng nhận
+  lệnh từ nút ribbon.
+- Core: `QuickAction.App`/`Input`; lệnh cả tài liệu `smartCreate`, `slidesFromDoc`; `GET /v1/quick-actions` trả thêm
+  `app`/`input`.
+- Add-in WPS có thêm `writer.writeContent` (viết nhiều khối một lần: tiêu đề, đoạn, danh sách thật, bảng kèm chú thích,
+  ngắt trang), `writer.insertLayoutTable` (bảng không viền phần đầu/phần ký văn bản hành chính), `writer.insertCaption`
+  (cuối bài), `wpp.addShape`, `wpp.addParagraphs` (tự chọn cỡ chữ lớn nhất vừa khung) — `slides_from_brief` hết bị ẩn
+  trên WPS. `doc_from_brief` vẫn ẩn tới khi có `writer.checkLayout`.
+- Đo trên WPS 12.1.2 thật (`tests/wps/REFERENCE.md`): WPS gộp hai bảng liền nhau; hình mới có nền gradient + bóng;
+  bullet bật một mình ra đánh số; `Words(n)` trả null; `TextRange.BoundHeight` đo được chiều cao chữ.
+
 ### Added — WPS: soát chính tả cả bài, làm đẹp bảng, style + mục lục, công thức bảng tính (P1-1/2/3/5, 01/11/2026)
 
 - Nhóm *Kiểm tra tài liệu* của Writer có thêm hai nút dùng AI: **Soát chính tả** (sửa lỗi chính tả, dấu, gõ nhầm của cả

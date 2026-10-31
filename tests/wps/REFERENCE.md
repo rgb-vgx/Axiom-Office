@@ -483,3 +483,40 @@ bridge chính 47961 để không đụng Core thật), LLM giả (`tests/core/fa
 | `table.Style = "Table Grid"` rồi xuất PDF | bảng **không có đường kẻ** (khác Word); phải `Borders.Enable = 1` (`writer.formatTable {borders: true}`) |
 | `imageMso` của nút ribbon add-in | tên có trong bảng lệnh `.kuip` **vẫn có thể ra dấu "?"**. Thấy icon: `Help`, `FileOpen`, `FileSave`, `About`, `TableInsertDialogWord`, `FindDialog`, `ReviewTrackChanges`, `ReviewAcceptChange`, `FormatPainter`, `ClearFormatting`, `TableAutoFitContents`, `ConvertTextToTable`, `TableInsert`, `EmphasisMark`, `WordCount`, `TableProperties`. Ra "?": `SpellingMenu`, `TableAutoFitWindow`, `BordersAll`, `FieldCheckBox`, `FindAndReplaceDialog`, `TableBordersMenu`, `StylesPane`, `GroupStyles`, `ReviewNewComment`, `JsAddInsDialog`; riêng Presentation còn ra "?": `SlideShowFromCurrent`, `SlideShowFromBeginning`, `ViewSlideSorterView`, `SlideLayoutGallery`, `SlideNew`, `ObjectsAlignMenu`, `ViewGridlines`, `GridSettings`, `ShapesInsertGallery`. Thấy icon ở **cả ba app** (Writer, Spreadsheets, Presentation): `AddInManager`, `ReviewAcceptChange`, `VisualBasic`, `HyperlinkInsert`, `ChartInsert`, `PictureInsertFromFile`, `FindDialog`, `WordCount`; Presentation: `SelectionPane`. Chọn icon mới thì thử trên WPS thật ở từng app |
 
+
+## Soạn văn bản, hình khối slide, icon ribbon (đo 01/11/2026, WPS 12.1.2.29182)
+
+Đo bằng REPL: add-in tạm (HOME tạm + Xvfb, cổng riêng) hỏi server cục bộ `/job`, chạy đoạn JS với `Application`, gửi kết
+quả về `/result` — chạy song song với WPS đang mở của người dùng. Writer bản này báo `Application.Name` = **`WPS Docs`**.
+
+**Writer — soạn cả bài** (fake: `addin_fake_compose.mjs`):
+
+| Việc | Kết quả đo |
+|---|---|
+| Vị trí ký tự | đoạn = chữ + 1; ô bảng = chữ các đoạn trong ô + 1 (Text đọc ra `…\r\u0007`); mỗi hàng thêm 1 |
+| `doc.Content.InsertAfter(s)` | chèn **trước** dấu đoạn cuối; `Content.End` của cùng một object tự tăng theo chữ chèn |
+| `Tables.Add(Selection.Range,…)` ở cuối đoạn **có chữ** | bảng nằm **sau** đoạn đó; sau bảng luôn có một đoạn trống |
+| Chèn bảng ngay sau một bảng | WPS **gộp** vào bảng cũ (`Tables.Count` không tăng, object trả về là bảng cũ) — cần một đoạn ngăn |
+| `ListGalleries.Item(1/2).ListTemplates.Item(1)` + `ListFormat.ApplyListTemplate(t, false)` | `ListType` 2 (gạch đầu dòng) / 3 (số, `ListString` "2."); đoạn mới sau danh sách **thừa kế** danh sách, `RemoveNumbers()` gỡ được |
+| `Paragraph.Style = -35`, `KeepWithNext = -1`, `doc.Fields.Add(range, -1, "SEQ Bảng \* ARABIC", false)` | chạy; `Result.Text` = số thứ tự; `Paragraphs.Last` dùng được |
+| `Table.Title`, `Borders.Enable = 0`, `PreferredWidthType = 2` + `PreferredWidth`, `Columns.Item(c).PreferredWidth` | chạy |
+| `Repaginate`, `ComputeStatistics(2/0)`, `Range.Information(3/6/12)`, `Paragraph.OutlineLevel` | chạy (Heading 1 = 1, đoạn thường = 10) — đủ cho `writer.checkLayout` sau này |
+
+**Presentation — hình khối, đoạn chữ** (fake: `addin_fake_shapes.mjs`):
+
+- `Shapes.AddShape(type,…)`: chữ nhật 1, bo góc 5, elip 9, chevron 52. Hình mới mang style theme: **nền gradient, bóng,
+  chữ trắng có bóng, căn giữa**. `Fill.ForeColor.RGB` khi chưa `Fill.Solid()` vẫn ra gradient; `Shadow.Visible = 0`,
+  `TextRange.Font.Shadow = 0` tắt bóng. `Adjustments.Item(1) = x` không gán được.
+- `Bullet.Visible = -1` một mình ra **đánh số** ("1.", `Type` 2) — phải `Type = 1`, `Character = 8226`.
+- `TextRange.Words(n)` trả **null**; `Paragraphs(k).Characters(start, len)` dùng được.
+- **`TextRange.BoundHeight` đo được** chiều cao chữ (theo cỡ chữ, xuống dòng, `SpaceBefore`; khung không tự giãn,
+  `AutoSize` 0): rộng 300, cỡ 20 → 96; cỡ 40 → 288 — khớp mô hình số dòng × 1,2 × cỡ chữ. Ghi chú cũ "WPS không đo
+  được chiều cao chữ" (lý do `wpp.checkLayout` không báo `overflow`) không còn đúng với 12.1.2.
+- `TextFrame2.TextRange.Paragraphs(k).ParagraphFormat.LeftIndent/FirstLineIndent`, `ParagraphFormat.SpaceBefore`,
+  `LineRuleBefore` chạy. `default.pptx` là 720×540.
+
+**Icon ribbon**: thử 32 tên `imageMso` hợp nghĩa cho nhóm AI (Writer), chỉ **`FileNew`, `FormatPainter`, `WordTools`,
+`ViewOutlineView`** hiện icon (`TranslateToSimplifiedChinese` hiện chữ Hán); còn lại ra "?" (`FileNewBlankDocument`,
+`InkDrawPen`, `FontSizeDecrease/Increase`, `ChangeCaseGallery`, `QuickStylesGallery`, `ProxyProofreadAICmd`…). Nút AI vì
+vậy dùng `getImage` + SVG riêng (viewBox 24, nét `#3B3B3B`, điểm nhấn `#0F6CBD`) — hiện đủ, đồng bộ với tab WPS AI.
+Nút nhỏ trên ribbon WPS xếp **2 hàng** mỗi cột (Office là 3), nhãn nhóm không hiện.
