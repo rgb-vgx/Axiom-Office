@@ -1335,18 +1335,23 @@
     return String(raw === undefined || raw === null ? "" : raw).replace(/\f/g, "").replace(/[\r\x07]+$/, "").trim();
   }
 
+  // Vi tri moi bang doc MOT lan: tim bang chua doan duyet tren mang so, khong goi lai Range cua tung bang cho tung doan
+  // (bai 5000 doan x 50 bang = nua trieu lan goi object model).
   function layoutTables(doc) {
     var out = [];
     var count = Number(doc.Tables.Count);
     if (isNaN(count)) { count = 0; }
-    for (var i = 1; i <= count; i++) { out.push(doc.Tables.Item(i)); }
+    for (var i = 1; i <= count; i++) {
+      var table = doc.Tables.Item(i);
+      var range = table.Range;
+      out.push({ table: table, start: Number(range.Start), end: Number(range.End) });
+    }
     return out;
   }
 
   function layoutTableAt(tables, position) {
     for (var i = 0; i < tables.length; i++) {
-      var range = tables[i].Range;
-      if (position >= Number(range.Start) && position < Number(range.End)) { return i; }
+      if (position >= tables[i].start && position < tables[i].end) { return i; }
     }
     return -1;
   }
@@ -1386,7 +1391,7 @@
         // Bang: mot muc cho ca bang (o cua bang 200 dong la hang tram doan - khong hoi trang tung o).
         if (!tableSeen[tableIndex]) {
           tableSeen[tableIndex] = true;
-          var table = tables[tableIndex];
+          var table = tables[tableIndex].table;
           var first = Number(table.Range.Characters.First.Information(3));
           var last = Number(table.Range.Characters.Last.Information(3));
           for (page = first; page <= last; page++) { contentPages[page] = true; }
