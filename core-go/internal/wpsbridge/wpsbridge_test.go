@@ -2,6 +2,7 @@ package wpsbridge
 
 import (
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -13,8 +14,16 @@ import (
 
 func testBridge(t *testing.T, mutate func(*Options)) *Bridge {
 	t.Helper()
+	// Cong trong cua he dieu hanh, KHONG de 0: New() doi 0 thanh 47861, ma may dev co Core that giu cong do - bridge cua
+	// test khong mo duoc cong, van bao 47861 cho add-in, va test goi nham sang Core that ma van xanh (do 01/11/2026).
+	probe, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("khong lay duoc cong trong: %v", err)
+	}
+	port := probe.Addr().(*net.TCPAddr).Port
+	_ = probe.Close()
 	opts := Options{
-		AddinDir: t.TempDir(), BridgePort: 0, PollSeconds: 1, DisconnectSeconds: 2,
+		AddinDir: t.TempDir(), BridgePort: port, PollSeconds: 1, DisconnectSeconds: 2,
 		SessionDir: t.TempDir(), Token: "tok", Version: "9.9.9", CorePort: 47840,
 	}
 	if mutate != nil {
