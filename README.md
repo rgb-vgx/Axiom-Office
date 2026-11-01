@@ -720,7 +720,7 @@ phép đo trên WPS thật: [docs/architecture/wps-bridge.md](docs/architecture/
   Lần đầu mỗi app WPS hỏi *"Addin axiomoffice … trust or not?"* — bấm OK. Bản WPS cũ có `oem.ini` dạng thường cần bật
   một lần `JsApiPlugin=true` (script **in** lệnh `sudo`, không tự chạy); bản 12.x có `oem.ini` mã hoá thì không cần.
   Mở WPS **sau** khi Core đã chạy, nên dùng `./install.sh --systemd`.
-- **Ribbon** (tab *Axiom Office*, `ribbon.xml`): *Trợ lý* (Ask AI, Lịch sử) · *Cả tài liệu* (Soạn văn bản, Sửa thông
+- **Ribbon** (tab *Axiom Office*, `ribbon.xml`): *Trợ lý* (Ask AI; lịch sử trò chuyện là nút đồng hồ trên đầu khung chat) · *Cả tài liệu* (Soạn văn bản, Sửa thông
   minh, Tóm tắt cả bài, Dịch song ngữ cả bài — Writer; Tạo slide từ tài liệu — Presentation và Writer, chạy trong
   Presentation đang mở) · *Viết với AI* (Writer, đoạn bôi đen: các lệnh của menu chuột phải, menu Đổi giọng) ·
   *Kiểm tra tài liệu* (Soát bố cục / Soát

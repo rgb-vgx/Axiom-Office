@@ -1166,3 +1166,14 @@ test("Presentation: khung chat nghe pane/events; Tao slide tu tai lieu chay ngay
   assert.deepEqual(calls.find((c) => c.method === "POST").body, { quickAction: "slidesFromDoc", app: "wpp" });
   assert.match(pane.text("chat"), /Tạo slide từ tài liệu/);
 });
+
+test("header: nut Lich su (dong ho) canh '...' mo thang man hinh Hoi thoai truoc - thay nut Lich su tren ribbon", async () => {
+  const { pane } = paneWith({ "GET /conversations": [200, { ok: true, result: CONVOS }] });
+  const btn = pane.byId("historyIconBtn");
+  assert.ok(btn, "pane.html thieu #historyIconBtn");
+  assert.equal(btn.parentNode, pane.byId("paneHeader"), "nut nam tren header, khong an trong menu");
+  assert.equal(btn.getAttribute("title"), "Lịch sử trò chuyện");
+  pane.click("historyIconBtn");
+  await tick();
+  assert.match(pane.text("view"), /Giáo án tuần 3/, "mo man hinh Hoi thoai truoc");
+});

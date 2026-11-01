@@ -522,7 +522,7 @@ const RIBBON_IMAGE_MSO = {
 
 // Nut AI (nhom Tao moi + Viet voi AI, 01/11/2026): imageMso hop nghia deu ra "?" tren WPS that (do 32 ten), nen dung bo
 // SVG rieng theo phong cach icon net cua tab WPS AI - getImage, KHONG imageMso. Bon muc con cua menu Doi giong: khong icon.
-const RIBBON_AI = ["axiomHistory", "axiomSmartCreate", "axiomSmartEdit", "axiomSlidesFromDoc", "axiomSummarizeDoc", "axiomTranslateDoc", "axiomRb_polish", "axiomRb_rewrite", "axiomRb_continue",
+const RIBBON_AI = ["axiomSmartCreate", "axiomSmartEdit", "axiomSlidesFromDoc", "axiomSummarizeDoc", "axiomTranslateDoc", "axiomRb_polish", "axiomRb_rewrite", "axiomRb_continue",
   "axiomRb_expand", "axiomRb_shorten", "axiomRb_fix", "axiomRbTone", "axiomRb_bilingual", "axiomRb_translate",
   "axiomRb_summarize", "axiomRb_explain"];
 const RIBBON_TONE = ["axiomRb_formal", "axiomRb_academic", "axiomRb_concise", "axiomRb_plain", "axiomRb_positive"];
@@ -1060,7 +1060,7 @@ test("lenh dang cho cau go + dang co luot chay: send bi tu choi nhung KHONG mat 
   assert.equal(h.state.pendingAction && h.state.pendingAction.id, "smartCreate", "van cho - nguoi dung gui lai duoc");
 });
 
-test("dot 2 (01/11/2026): Sua thong minh + Tom tat/Dich song ngu ca bai chi o Writer; Lich su moi app, mo Hoi thoai truoc", () => {
+test("dot 2 (01/11/2026): Sua thong minh + Tom tat/Dich song ngu ca bai chi o Writer; Lich su chuyen sang khung chat", () => {
   const seen = {};
   for (const name of ["WPS Writer", "WPS Presentation"]) {
     const ctx = load(["probe.js", "commands.js", "main.js"], { Application: { Name: name } });
@@ -1069,14 +1069,14 @@ test("dot 2 (01/11/2026): Sua thong minh + Tom tat/Dich song ngu ca bai chi o Wr
   }
   assert.deepEqual(seen, { "WPS Writer": [true, true, true, true], "WPS Presentation": [false, false, false, false] });
   const xml = fs.readFileSync(path.join(ADDIN, "ribbon.xml"), "utf8");
-  const history = /<button id="axiomHistory"([^>]*)>/.exec(/<group id="axiomAssistantGroup"[^>]*>([\s\S]*?)<\/group>/.exec(xml)[1]);
-  assert.ok(history && !/getVisible/.test(history[1]), "Lich su nam o nhom Tro ly, hien o moi app");
-  const panes = [];
-  const { ctx, posts } = mainWith({ Name: "WPS Presentation", CreateTaskPane(url) { const p = { url, Visible: false }; panes.push(p); return p; } });
-  ctx.ribbon.OnAction({ Id: "axiomHistory" });
-  assert.equal(panes.length, 1);
-  assert.match(panes[0].url, /[?&]view=conversations(&|$)/);
-  assert.equal(posts.length, 0, "chi mo man hinh, khong chay luot");
+  // Lich su: nut dong ho tren header khung chat (test_pane_view.mjs), khong con tren ribbon.
+  assert.doesNotMatch(xml, /id="axiomHistory"/, "Lich su da chuyen sang khung chat");
+  // Soan van ban + Sua thong minh: nut NHO (icon trai, nhan phai) xep chong mot cot nhu Viet lai / Viet tiep.
+  const create = /<group id="axiomCreateGroup"[^>]*>([\s\S]*?)<\/group>/.exec(xml)[1];
+  const order = [...create.matchAll(/<button id="([A-Za-z]+)"([^>]*)>/g)].map((m) => [m[1], /size="large"/.test(m[2])]);
+  assert.deepEqual(order.slice(0, 2), [["axiomSmartCreate", false], ["axiomSmartEdit", false]],
+    "Soan van ban tren, Sua thong minh duoi, cung mot cot (nut nho)");
+  const { ctx, posts } = mainWith({ Name: "WPS Writer", CreateTaskPane() { return { Visible: false }; } });
   ctx.ribbon.OnAction({ Id: "axiomSummarizeDoc" });
   assert.deepEqual(posts.map((p) => p.quickAction), ["summarizeDoc"]);
   if (ctx.AxiomBridge) { ctx.AxiomBridge.stop(); }

@@ -518,6 +518,9 @@ body {
   margin-left: auto;
 }
 /* Nut "..." tren header (Word Copilot: tieu de + mot nut ...). Mo ra menu #moreMenu. */
+/* Nut bieu tuong tren header (Lich su tro chuyen): cung khuon voi nut "...", icon SVG net theo currentColor
+   nen tu doi mau theo theme sang/toi. */
+.headIconBtn,
 #moreBtn {
   width: 28px;
   height: 28px;
@@ -536,10 +539,12 @@ body {
   cursor: pointer;
   transition: background-color 200ms ease, color 200ms ease;
 }
+.headIconBtn:hover,
 #moreBtn:hover {
   background: var(--axiom-chip-hover);
   color: var(--axiom-text-primary);
 }
+.headIconBtn:active,
 #moreBtn:active {
   background: var(--axiom-chip-border);
 }

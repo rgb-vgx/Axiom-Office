@@ -12,7 +12,7 @@
      khong phai cua getVisible.
 
   Icon (giong ban Windows: moi nut deu co icon):
-   - Nut moi tu 01/11/2026 (Lich su, nhom Tao moi, Viet voi AI, Soat chinh ta ...) dung getImage -> SVG rieng trong
+   - Nut moi tu 01/11/2026 (nhom Ca tai lieu, Viet voi AI, Soat chinh ta ...) dung getImage -> SVG rieng trong
      images/ (main.js ICON_FILES): bo imageMso cua WPS chi ve duoc vai ten (do 01/11, tests/wps/REFERENCE.md).
    - Nut cu tren RIBBON dung imageMso = bo icon co san cua chinh WPS (do tren WPS 12.1.2 that 20/10/2026: hien
      dung icon). WPS tra ten kieu Office qua bang lenh cua no - /opt/kingsoft/wps-office/office6/res/commands/
@@ -59,9 +59,6 @@
           <button id="axiomAskAI" label="Ask AI" size="large" tag="askAi" onAction="ribbon.OnAction" imageMso="Help"
                   screentip="Mở khung trò chuyện với AI"
                   supertip="Hỏi AI ngay bên cạnh tài liệu. AI đọc và sửa trực tiếp tài liệu đang mở; mỗi lượt sửa là một bước Hoàn tác."/>
-          <button id="axiomHistory" label="Lịch sử" size="large" tag="history" onAction="ribbon.OnAction"
-                  getImage="ribbon.OnGetImage" screentip="Lịch sử trò chuyện"
-                  supertip="Xem lại các cuộc trò chuyện trước với AI (mở trong khung bên cạnh, chỉ xem)."/>
         </group>
 
         <!-- Cả tài liệu (01/11/2026, đối chiếu tab WPS AI: Smart Create, Smart Edit, Generate Slides from Doc): MỌI lệnh AI
@@ -72,10 +69,10 @@
              tài liệu Writer qua other_document. Icon: SVG riêng theo phong cách
              icon nét của tab WPS AI (images/<tag, ':' thành '_'>.svg) - imageMso hợp nghĩa đều ra "?" trên WPS thật. -->
         <group id="axiomCreateGroup" label="Cả tài liệu">
-          <button id="axiomSmartCreate" label="Soạn văn bản" size="large" tag="doc:smartCreate" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
+          <button id="axiomSmartCreate" label="Soạn văn bản" tag="doc:smartCreate" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
                   getImage="ribbon.OnGetImage" screentip="Soạn văn bản mới bằng AI"
                   supertip="Gõ yêu cầu (loại văn bản, mục đích, nội dung chính); AI soạn cả bài vào cuối tài liệu với tiêu đề, đoạn văn, danh sách, bảng. Chỗ thiếu thông tin để trống cho bạn điền."/>
-          <button id="axiomSmartEdit" label="Sửa thông minh" size="large" tag="doc:smartEdit" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
+          <button id="axiomSmartEdit" label="Sửa thông minh" tag="doc:smartEdit" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
                   getImage="ribbon.OnGetImage" screentip="Sửa cả tài liệu theo yêu cầu"
                   supertip="Gõ cách muốn sửa (viết gọn, đổi giọng, thống nhất thuật ngữ…); AI sửa cả bài, mỗi chỗ sửa là một Theo dõi thay đổi để bạn nhận hoặc từ chối."/>
           <button id="axiomSummarizeDoc" label="Tóm tắt cả bài" size="large" tag="doc:summarizeDoc" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
