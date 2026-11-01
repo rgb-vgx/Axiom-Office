@@ -305,9 +305,7 @@ const CHUA_CO_HANDLER = {
   "writer.insertBlocks": "chi co trong add-in Windows (lenh thiet ke, doc_design); WPS JS chua viet handler",
   // Lenh cau truc Word/Excel (docs/plans/21-v0 P1, 26/10/2026): moi co o add-in Windows; WPS de sau (may Linux).
   "writer.setHeaderFooter": "chi co trong add-in Windows (plan 21 P1); WPS de sau",
-  "writer.deleteParagraphs": "chi co trong add-in Windows (plan 21 P2); WPS de sau",
   "writer.addTableRows": "chi co trong add-in Windows (plan 21 P2); WPS de sau",
-  "writer.checkLayout": "chi co trong add-in Windows (plan 21 P2); WPS de sau",
   "et.createTable": "chi co trong add-in Windows (plan 21 P1); WPS de sau",
   "et.freezePanes": "chi co trong add-in Windows (plan 21 P1); WPS de sau",
   "et.setValidation": "chi co trong add-in Windows (plan 21 P1); WPS de sau",
