@@ -75,25 +75,29 @@
           <button id="axiomSmartEdit" label="Sửa thông minh" tag="doc:smartEdit" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
                   getImage="ribbon.OnGetImage" screentip="Sửa cả tài liệu theo yêu cầu"
                   supertip="Gõ cách muốn sửa (viết gọn, đổi giọng, thống nhất thuật ngữ…); AI sửa cả bài, mỗi chỗ sửa là một Theo dõi thay đổi để bạn nhận hoặc từ chối."/>
-          <button id="axiomSummarizeDoc" label="Tóm tắt cả bài" size="large" tag="doc:summarizeDoc" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
+          <button id="axiomSummarizeDoc" label="Tóm tắt cả bài" tag="doc:summarizeDoc" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
                   getImage="ribbon.OnGetImage" screentip="Tóm tắt cả tài liệu"
                   supertip="Tóm tắt toàn bộ tài liệu theo từng mục, giữ đúng số liệu. Không cần bôi đen; AI trả lời trong khung chat, không sửa tài liệu."/>
-          <button id="axiomTranslateDoc" label="Dịch song ngữ cả bài" size="large" tag="doc:translateDoc" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
+          <button id="axiomTranslateDoc" label="Dịch song ngữ cả bài" tag="doc:translateDoc" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
                   getImage="ribbon.OnGetImage" screentip="Dịch song ngữ cả tài liệu"
                   supertip="Chèn bản dịch ngay dưới từng đoạn (tiếng Việt sang tiếng Anh, ngôn ngữ khác sang tiếng Việt), giữ đoạn gốc. Không cần bôi đen."/>
-          <button id="axiomSlidesFromDoc" label="Tạo slide từ tài liệu" size="large" tag="doc:slidesFromDoc" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
+          <button id="axiomSlidesFromDoc" label="Tạo slide từ tài liệu" tag="doc:slidesFromDoc" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
                   getImage="ribbon.OnGetImage" screentip="Tạo slide từ tài liệu Writer đang mở"
                   supertip="AI đọc tài liệu văn bản đang mở trong WPS Writer và dựng bài trình chiếu trong WPS Presentation đang mở: bìa, các mục chính, số liệu, tóm tắt. Bấm được ở cả Writer lẫn Presentation; cần mở sẵn cả hai. Slide cũ được giữ nguyên."/>
         </group>
 
         <!-- Viết với AI: 15 mục "Sửa bằng AI" của menu chuột phải đưa lên ribbon (cùng tag quick:<id>, cùng nhãn bảng Core),
-             chỉ Writer. Bấm: giống menu chuột phải - khung chat mini cạnh đoạn bôi đen; chưa bôi đen thì Core báo. WPS xếp
-             nút nhỏ 2 hàng mỗi cột: Viết lại/Viết tiếp, Mở rộng/Rút gọn, Sửa lỗi/Đổi giọng, Dịch song ngữ/Dịch,
-             Tóm tắt/Giải thích. Lệnh cả bài nằm ở nhóm "Cả tài liệu". -->
+             chỉ Writer. Bấm: giống menu chuột phải - khung chat mini cạnh đoạn bôi đen; chưa bôi đen thì Core báo. Toàn
+             nút NHỎ (icon trái, nhãn phải); WPS xếp 2 nút mỗi cột theo thứ tự trong tệp, nên thứ tự ở đây là từng cặp:
+             Trau chuốt/Sửa lỗi chính tả, Viết lại/Viết tiếp, Mở rộng/Rút gọn, Dịch song ngữ/Dịch, Tóm tắt/Giải thích,
+             rồi Đổi giọng ▾ một mình. Lệnh cả bài nằm ở nhóm "Cả tài liệu". -->
         <group id="axiomWriteGroup" label="Viết với AI">
-          <button id="axiomRb_polish" label="Trau chuốt" size="large" tag="quick:polish" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
+          <button id="axiomRb_polish" label="Trau chuốt" tag="quick:polish" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
                   getImage="ribbon.OnGetImage" screentip="Trau chuốt đoạn văn"
                   supertip="Sửa câu chữ cho trôi chảy, mạch lạc; giữ ý, giọng văn và ngôn ngữ. Bôi đen đoạn văn trước; AI chỉ sửa trong đoạn đó, một bước Hoàn tác."/>
+          <button id="axiomRb_fix" label="Sửa lỗi chính tả" tag="quick:fix" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
+                  getImage="ribbon.OnGetImage" screentip="Sửa lỗi chính tả trong đoạn"
+                  supertip="Sửa chính tả, ngữ pháp, dấu câu; câu đúng thì giữ nguyên. Bôi đen đoạn văn trước; AI chỉ sửa trong đoạn đó, một bước Hoàn tác."/>
           <button id="axiomRb_rewrite" label="Viết lại" tag="quick:rewrite" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
                   getImage="ribbon.OnGetImage" screentip="Viết lại đoạn văn"
                   supertip="Diễn đạt lại bằng cách khác, giữ nguyên ý. Bôi đen đoạn văn trước; AI chỉ sửa trong đoạn đó, một bước Hoàn tác."/>
@@ -106,17 +110,6 @@
           <button id="axiomRb_shorten" label="Rút gọn" tag="quick:shorten" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
                   getImage="ribbon.OnGetImage" screentip="Rút gọn đoạn văn"
                   supertip="Còn khoảng một nửa độ dài, giữ ý chính và số liệu. Bôi đen đoạn văn trước; AI chỉ sửa trong đoạn đó, một bước Hoàn tác."/>
-          <button id="axiomRb_fix" label="Sửa lỗi chính tả" tag="quick:fix" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
-                  getImage="ribbon.OnGetImage" screentip="Sửa lỗi chính tả trong đoạn"
-                  supertip="Sửa chính tả, ngữ pháp, dấu câu; câu đúng thì giữ nguyên. Bôi đen đoạn văn trước; AI chỉ sửa trong đoạn đó, một bước Hoàn tác."/>
-          <menu id="axiomRbTone" label="Đổi giọng" tag="toneMenu" getVisible="ribbon.OnGetVisible" getImage="ribbon.OnGetImage"
-                screentip="Đổi giọng văn" supertip="Viết lại đoạn bôi đen theo giọng khác: trang trọng, học thuật, ngắn gọn, dễ hiểu, tích cực.">
-            <button id="axiomRb_formal" label="Trang trọng hơn" tag="quick:formal" onAction="ribbon.OnAction"/>
-            <button id="axiomRb_academic" label="Học thuật hơn" tag="quick:academic" onAction="ribbon.OnAction"/>
-            <button id="axiomRb_concise" label="Ngắn gọn hơn" tag="quick:concise" onAction="ribbon.OnAction"/>
-            <button id="axiomRb_plain" label="Dễ hiểu hơn" tag="quick:plain" onAction="ribbon.OnAction"/>
-            <button id="axiomRb_positive" label="Tích cực hơn" tag="quick:positive" onAction="ribbon.OnAction"/>
-          </menu>
           <button id="axiomRb_bilingual" label="Dịch song ngữ" tag="quick:bilingual" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
                   getImage="ribbon.OnGetImage" screentip="Dịch song ngữ"
                   supertip="Chèn bản dịch ngay dưới đoạn gốc, giữ đoạn gốc. Bôi đen đoạn văn trước; AI chỉ sửa trong đoạn đó, một bước Hoàn tác."/>
@@ -129,6 +122,14 @@
           <button id="axiomRb_explain" label="Giải thích" tag="quick:explain" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
                   getImage="ribbon.OnGetImage" screentip="Giải thích đoạn văn"
                   supertip="Giải thích nghĩa, thuật ngữ, ý của đoạn bôi đen. Bôi đen đoạn văn trước; AI trả lời trong khung chat, không sửa tài liệu."/>
+          <menu id="axiomRbTone" label="Đổi giọng" tag="toneMenu" getVisible="ribbon.OnGetVisible" getImage="ribbon.OnGetImage"
+                screentip="Đổi giọng văn" supertip="Viết lại đoạn bôi đen theo giọng khác: trang trọng, học thuật, ngắn gọn, dễ hiểu, tích cực.">
+            <button id="axiomRb_formal" label="Trang trọng hơn" tag="quick:formal" onAction="ribbon.OnAction"/>
+            <button id="axiomRb_academic" label="Học thuật hơn" tag="quick:academic" onAction="ribbon.OnAction"/>
+            <button id="axiomRb_concise" label="Ngắn gọn hơn" tag="quick:concise" onAction="ribbon.OnAction"/>
+            <button id="axiomRb_plain" label="Dễ hiểu hơn" tag="quick:plain" onAction="ribbon.OnAction"/>
+            <button id="axiomRb_positive" label="Tích cực hơn" tag="quick:positive" onAction="ribbon.OnAction"/>
+          </menu>
         </group>
 
         <!-- Ba nút soát: chỉ đọc, không dùng AI, mỗi nút một ứng dụng. Nhãn nêu rõ đối tượng được soát để

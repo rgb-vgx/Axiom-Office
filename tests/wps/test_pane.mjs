@@ -1074,8 +1074,16 @@ test("dot 2 (01/11/2026): Sua thong minh + Tom tat/Dich song ngu ca bai chi o Wr
   // Soan van ban + Sua thong minh: nut NHO (icon trai, nhan phai) xep chong mot cot nhu Viet lai / Viet tiep.
   const create = /<group id="axiomCreateGroup"[^>]*>([\s\S]*?)<\/group>/.exec(xml)[1];
   const order = [...create.matchAll(/<button id="([A-Za-z]+)"([^>]*)>/g)].map((m) => [m[1], /size="large"/.test(m[2])]);
-  assert.deepEqual(order.slice(0, 2), [["axiomSmartCreate", false], ["axiomSmartEdit", false]],
-    "Soan van ban tren, Sua thong minh duoi, cung mot cot (nut nho)");
+  assert.deepEqual(order, [["axiomSmartCreate", false], ["axiomSmartEdit", false], ["axiomSummarizeDoc", false],
+    ["axiomTranslateDoc", false], ["axiomSlidesFromDoc", false]],
+  "Ca tai lieu: toan nut nho, tung cap mot cot (Soan/Sua thong minh, Tom tat/Dich song ngu ca bai, Tao slide)");
+  // Viet voi AI: toan nut nho, xep tung cap (WPS dat 2 nut nho mot cot theo thu tu trong tep), Doi giong cuoi.
+  const write = /<group id="axiomWriteGroup"[^>]*>([\s\S]*?)<\/group>/.exec(xml)[1];
+  const top = [...write.matchAll(/^ {10}<(?:button|menu) id="([A-Za-z_]+)"([^>]*)>/gm)].map((m) => [m[1], /size="large"/.test(m[2])]);
+  assert.deepEqual(top.map((t) => t[0]), ["axiomRb_polish", "axiomRb_fix", "axiomRb_rewrite", "axiomRb_continue",
+    "axiomRb_expand", "axiomRb_shorten", "axiomRb_bilingual", "axiomRb_translate", "axiomRb_summarize", "axiomRb_explain",
+    "axiomRbTone"]);
+  assert.ok(top.every((t) => !t[1]), "Viet voi AI: khong con nut lon");
   const { ctx, posts } = mainWith({ Name: "WPS Writer", CreateTaskPane() { return { Visible: false }; } });
   ctx.ribbon.OnAction({ Id: "axiomSummarizeDoc" });
   assert.deepEqual(posts.map((p) => p.quickAction), ["summarizeDoc"]);
