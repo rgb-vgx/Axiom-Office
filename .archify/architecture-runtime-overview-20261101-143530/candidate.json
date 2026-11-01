@@ -1,0 +1,533 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Axiom Office — kiến trúc runtime (WPS Linux)",
+    "output": ".archify/architecture-runtime-overview-20261101-143530/axiom-office-runtime.html",
+    "locale": "vi",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/rgb-vgx/Axiom-Office.git",
+      "provider": "github",
+      "link_mode": "local-only",
+      "revision": "6663dfeba51ecd0741720454d2e1d6bfee9d1237"
+    }
+  },
+  "components": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "Người dùng",
+      "sublabel": "trong WPS",
+      "pos": [
+        40,
+        240
+      ],
+      "size": [
+        120,
+        64
+      ],
+      "sources": [
+        {
+          "path": "README.md",
+          "line": 12,
+          "label": "Ask AI trên Linux"
+        }
+      ]
+    },
+    {
+      "id": "pane",
+      "type": "frontend",
+      "label": "Pane Ask AI",
+      "sublabel": "pane · ribbon · chat mini",
+      "pos": [
+        280,
+        240
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "src/AxiomOffice.WPS/pane-core.js",
+          "line": 1,
+          "end_line": 50
+        },
+        {
+          "path": "src/AxiomOffice.WPS/pane.js",
+          "line": 491,
+          "end_line": 500
+        }
+      ]
+    },
+    {
+      "id": "addin",
+      "type": "frontend",
+      "label": "JS add-in",
+      "sublabel": "nhận lệnh · chạy lệnh",
+      "tag": "UndoRecord",
+      "pos": [
+        280,
+        420
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "src/AxiomOffice.WPS/main.js",
+          "line": 1,
+          "end_line": 20
+        },
+        {
+          "path": "src/AxiomOffice.WPS/main.js",
+          "line": 239,
+          "end_line": 331
+        },
+        {
+          "path": "src/AxiomOffice.WPS/commands.js",
+          "line": 19,
+          "end_line": 19
+        }
+      ]
+    },
+    {
+      "id": "coreapi",
+      "type": "backend",
+      "label": "Core HTTP API",
+      "sublabel": "127.0.0.1:47840",
+      "pos": [
+        610,
+        240
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "core-go/cmd/axiom-core/main.go",
+          "line": 202,
+          "end_line": 238
+        },
+        {
+          "path": "core-go/internal/api/wps.go",
+          "line": 15,
+          "end_line": 56
+        },
+        {
+          "path": "core-go/internal/api/runs.go",
+          "line": 21,
+          "end_line": 57
+        }
+      ]
+    },
+    {
+      "id": "agent",
+      "type": "backend",
+      "label": "Agent Orchestrator",
+      "sublabel": "vòng lặp agent · tools",
+      "pos": [
+        870,
+        240
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "core-go/cmd/axiom-core/main.go",
+          "line": 156,
+          "end_line": 165
+        },
+        {
+          "path": "core-go/internal/agent/orchestrator.go",
+          "line": 203,
+          "end_line": 230
+        },
+        {
+          "path": "core-go/internal/tools/office_action.go",
+          "line": 282,
+          "end_line": 282
+        }
+      ]
+    },
+    {
+      "id": "llm",
+      "type": "cloud",
+      "label": "Nhà cung cấp LLM",
+      "sublabel": "OpenAI-compat · Anthropic",
+      "pos": [
+        870,
+        60
+      ],
+      "size": [
+        150,
+        60
+      ],
+      "sources": [
+        {
+          "path": "core-go/internal/model/client.go",
+          "line": 272,
+          "end_line": 290
+        }
+      ]
+    },
+    {
+      "id": "skills",
+      "type": "database",
+      "label": "Skills",
+      "sublabel": "thư mục skills/",
+      "pos": [
+        1150,
+        100
+      ],
+      "size": [
+        140,
+        60
+      ],
+      "sources": [
+        {
+          "path": "core-go/cmd/axiom-core/main.go",
+          "line": 126,
+          "end_line": 132
+        }
+      ]
+    },
+    {
+      "id": "sqlite",
+      "type": "database",
+      "label": "core.db (SQLite)",
+      "sublabel": "runs · hội thoại · memory",
+      "pos": [
+        1150,
+        242
+      ],
+      "size": [
+        150,
+        60
+      ],
+      "sources": [
+        {
+          "path": "core-go/internal/store/db.go",
+          "line": 13,
+          "end_line": 40
+        },
+        {
+          "path": "core-go/cmd/axiom-core/main.go",
+          "line": 105,
+          "end_line": 150
+        }
+      ]
+    },
+    {
+      "id": "bridge",
+      "type": "messagebus",
+      "label": "Bridge WPS",
+      "sublabel": "hàng đợi lệnh · :47861",
+      "pos": [
+        870,
+        420
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "core-go/cmd/axiom-core/main.go",
+          "line": 180,
+          "end_line": 183
+        },
+        {
+          "path": "core-go/internal/wpsbridge/http.go",
+          "line": 80,
+          "end_line": 96
+        },
+        {
+          "path": "core-go/internal/wpsbridge/wpsbridge.go",
+          "line": 157,
+          "end_line": 157
+        }
+      ]
+    },
+    {
+      "id": "sessions",
+      "type": "database",
+      "label": "File phiên",
+      "sublabel": "agent/MCP đọc tìm cổng",
+      "pos": [
+        870,
+        590
+      ],
+      "size": [
+        150,
+        60
+      ],
+      "sources": [
+        {
+          "path": "core-go/internal/wpsbridge/session.go",
+          "line": 290,
+          "end_line": 321
+        },
+        {
+          "path": "core-go/internal/office/sessions.go",
+          "line": 22,
+          "end_line": 22
+        }
+      ],
+      "tag": "<pid>-wps*.json"
+    },
+    {
+      "id": "mcpserver",
+      "type": "backend",
+      "label": "axiom-core mcp",
+      "sublabel": "MCP server (stdio)",
+      "pos": [
+        1150,
+        420
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "core-go/cmd/axiom-core/main.go",
+          "line": 60,
+          "end_line": 68
+        },
+        {
+          "path": "core-go/internal/mcpserver/livetools.go",
+          "line": 38,
+          "end_line": 62
+        }
+      ]
+    },
+    {
+      "id": "mcpclient",
+      "type": "external",
+      "label": "MCP client",
+      "sublabel": "Claude Code/Desktop",
+      "pos": [
+        1420,
+        420
+      ],
+      "size": [
+        140,
+        64
+      ],
+      "sources": [
+        {
+          "path": "README.md",
+          "line": 13,
+          "label": "MCP server"
+        }
+      ]
+    },
+    {
+      "id": "files",
+      "type": "database",
+      "label": "File Office",
+      "sublabel": "trên đĩa, không cần mở WPS",
+      "pos": [
+        1150,
+        590
+      ],
+      "size": [
+        150,
+        60
+      ],
+      "sources": [
+        {
+          "path": "core-go/internal/mcpserver/filetools_word.go",
+          "line": 13,
+          "end_line": 29
+        }
+      ]
+    },
+    {
+      "id": "doc",
+      "type": "frontend",
+      "label": "Tài liệu đang mở",
+      "sublabel": "Writer · Spreadsheets · Slide",
+      "pos": [
+        280,
+        590
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "sources": [
+        {
+          "path": "src/AxiomOffice.WPS/main.js",
+          "line": 266,
+          "end_line": 304
+        },
+        {
+          "path": "src/AxiomOffice.WPS/commands.js",
+          "line": 19,
+          "end_line": 21
+        }
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Tiến trình WPS (CEF)",
+      "wraps": [
+        "pane",
+        "addin",
+        "doc"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "Agent Core (một tiến trình Go)",
+      "wraps": [
+        "coreapi",
+        "agent",
+        "bridge"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "ask",
+      "from": "user",
+      "to": "pane",
+      "label": "Ask AI",
+      "variant": "emphasis"
+    },
+    {
+      "id": "start-run",
+      "from": "pane",
+      "to": "coreapi",
+      "label": "POST /wps/v1/runs · SSE",
+      "variant": "emphasis"
+    },
+    {
+      "id": "execute",
+      "from": "coreapi",
+      "to": "agent",
+      "label": "chạy lượt",
+      "variant": "emphasis"
+    },
+    {
+      "id": "chat",
+      "from": "agent",
+      "to": "llm",
+      "label": "HTTPS chat"
+    },
+    {
+      "id": "load-skill",
+      "from": "agent",
+      "to": "skills",
+      "label": "load_skill"
+    },
+    {
+      "id": "persist",
+      "from": "agent",
+      "to": "sqlite",
+      "label": "lưu hội thoại"
+    },
+    {
+      "id": "cmd",
+      "from": "agent",
+      "to": "bridge",
+      "label": "POST /cmd",
+      "variant": "emphasis"
+    },
+    {
+      "id": "poll",
+      "from": "addin",
+      "to": "bridge",
+      "label": "long-poll :47840 /wps/v1/poll · result",
+      "variant": "dashed"
+    },
+    {
+      "id": "write-session",
+      "from": "bridge",
+      "to": "sessions",
+      "label": "ghi phiên"
+    },
+    {
+      "id": "mcp-stdio",
+      "from": "mcpclient",
+      "to": "mcpserver",
+      "label": "stdio JSON-RPC"
+    },
+    {
+      "id": "mcp-live",
+      "from": "mcpserver",
+      "to": "bridge",
+      "label": "làn live: /cmd"
+    },
+    {
+      "id": "mcp-file",
+      "from": "mcpserver",
+      "to": "files",
+      "label": "làn file: đọc/ghi"
+    },
+    {
+      "id": "edit-doc",
+      "from": "addin",
+      "to": "doc",
+      "label": "sửa qua window.Application",
+      "variant": "emphasis"
+    },
+    {
+      "id": "agent-file-lane",
+      "from": "agent",
+      "to": "mcpserver",
+      "label": "MCP 'office' khi nhắc file",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Đọc theo thứ tự",
+      "items": [
+        "1. Người dùng gõ vào Pane Ask AI → Core HTTP API → Agent Orchestrator",
+        "2. Agent hỏi LLM; LLM muốn sửa tài liệu thì agent gửi lệnh POST /cmd vào Bridge WPS",
+        "3. JS add-in liên tục hỏi Core \"có lệnh không?\", lấy lệnh, sửa thẳng vào tài liệu đang mở (Ctrl+Z được), rồi gửi kết quả về",
+        "4. Nhánh phải: agent ngoài (Claude Code…) dùng cùng bridge qua axiom-core mcp"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Vì sao đảo chiều",
+      "items": [
+        "JS add-in chạy trong trình duyệt nhúng (CEF) nên không mở được cổng nghe",
+        "Nên Core làm bridge thay WPS: giữ hàng đợi, add-in tự đến lấy",
+        "Mỗi tiến trình WPS (Writer, Spreadsheets…) là một client, có cổng bridge riêng",
+        "File add-in và pane cũng do Core phục vụ: GET /wps/addin/"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Thuật ngữ",
+      "items": [
+        "Bridge: giao thức /health, /commands, /session, /cmd mà mọi app văn phòng đều nói",
+        "Long-poll: request giữ tới khi có lệnh hoặc hết 20 giây rồi gọi lại",
+        "SSE: luồng sự kiện một chiều Core → pane (tiến độ, câu trả lời)",
+        "MCP: giao thức để agent bên ngoài gọi tool; làn live sửa tài liệu đang mở, làn file sửa file trên đĩa"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Ngoài phạm vi sơ đồ",
+      "items": [
+        "COM add-in Windows và extension LibreOffice (đóng băng) nói cùng giao thức bridge",
+        "Làn live = sửa tài liệu đang mở qua bridge; làn file = đọc/ghi file trên đĩa, không cần mở WPS",
+        "Tất cả chạy trên 127.0.0.1, một Core cho mỗi người dùng"
+      ]
+    }
+  ]
+}

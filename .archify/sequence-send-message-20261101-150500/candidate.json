@@ -1,0 +1,488 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Một lượt Ask AI trong WPS — từ lúc bấm Gửi",
+    "output": ".archify/sequence-send-message-20261101-150500/ask-ai-turn.html",
+    "locale": "vi",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/rgb-vgx/Axiom-Office.git",
+      "provider": "github",
+      "link_mode": "local-only",
+      "revision": "6663dfeba51ecd0741720454d2e1d6bfee9d1237"
+    }
+  },
+  "participants": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "Người dùng",
+      "sublabel": "trong WPS",
+      "sources": [
+        {
+          "path": "README.md",
+          "line": 12
+        }
+      ]
+    },
+    {
+      "id": "pane",
+      "type": "frontend",
+      "label": "Pane Ask AI",
+      "sublabel": "pane-core.js",
+      "sources": [
+        {
+          "path": "src/AxiomOffice.WPS/pane-core.js",
+          "line": 18,
+          "end_line": 45
+        },
+        {
+          "path": "src/AxiomOffice.WPS/pane-core.js",
+          "line": 606,
+          "end_line": 762
+        }
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "Core API",
+      "sublabel": "/wps/v1 :47840",
+      "sources": [
+        {
+          "path": "core-go/internal/api/wps.go",
+          "line": 50,
+          "end_line": 104
+        },
+        {
+          "path": "core-go/internal/api/runs.go",
+          "line": 134,
+          "end_line": 155
+        },
+        {
+          "path": "core-go/internal/agent/events.go",
+          "line": 19,
+          "end_line": 76
+        }
+      ]
+    },
+    {
+      "id": "agent",
+      "type": "backend",
+      "label": "Orchestrator",
+      "sublabel": "agent + vòng model",
+      "sources": [
+        {
+          "path": "core-go/internal/agent/orchestrator_execution.go",
+          "line": 44,
+          "end_line": 257
+        },
+        {
+          "path": "core-go/internal/agent/orchestrator_execution.go",
+          "line": 413,
+          "end_line": 495
+        },
+        {
+          "path": "core-go/internal/agent/orchestrator.go",
+          "line": 203,
+          "end_line": 309
+        }
+      ]
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "core.db",
+      "sublabel": "SQLite",
+      "sources": [
+        {
+          "path": "core-go/internal/store/db.go",
+          "line": 13,
+          "end_line": 40
+        }
+      ]
+    },
+    {
+      "id": "llm",
+      "type": "cloud",
+      "label": "LLM",
+      "sublabel": "OpenAI / Anthropic",
+      "sources": [
+        {
+          "path": "core-go/internal/model/client.go",
+          "line": 272,
+          "end_line": 290
+        }
+      ]
+    },
+    {
+      "id": "bridge",
+      "type": "messagebus",
+      "label": "Bridge WPS",
+      "sublabel": ":47861 hàng đợi",
+      "sources": [
+        {
+          "path": "core-go/internal/wpsbridge/session.go",
+          "line": 24,
+          "end_line": 37
+        },
+        {
+          "path": "core-go/internal/wpsbridge/session.go",
+          "line": 187,
+          "end_line": 187
+        },
+        {
+          "path": "core-go/internal/wpsbridge/http.go",
+          "line": 80,
+          "end_line": 96
+        }
+      ]
+    },
+    {
+      "id": "addin",
+      "type": "frontend",
+      "label": "JS add-in",
+      "sublabel": "main.js",
+      "sources": [
+        {
+          "path": "src/AxiomOffice.WPS/main.js",
+          "line": 266,
+          "end_line": 304
+        },
+        {
+          "path": "src/AxiomOffice.WPS/commands.js",
+          "line": 19,
+          "end_line": 19
+        }
+      ]
+    }
+  ],
+  "segments": [
+    {
+      "from": 160,
+      "to": 535,
+      "label": "1 · Nhận lượt"
+    },
+    {
+      "from": 545,
+      "to": 640,
+      "label": "2 · Chuẩn bị ngữ cảnh"
+    },
+    {
+      "from": 645,
+      "to": 1012,
+      "label": "3 · Vòng agent (lặp)"
+    },
+    {
+      "from": 1022,
+      "to": 1200,
+      "label": "4 · Kết thúc"
+    }
+  ],
+  "messages": [
+    {
+      "id": "type-send",
+      "from": "user",
+      "to": "pane",
+      "y": 172,
+      "label": "gõ tin + Gửi",
+      "variant": "emphasis"
+    },
+    {
+      "id": "post-run",
+      "from": "pane",
+      "to": "api",
+      "y": 200,
+      "label": "POST /wps/v1/runs",
+      "variant": "emphasis",
+      "note": "kèm prompt, conversationId, client, app"
+    },
+    {
+      "id": "start-exec",
+      "from": "api",
+      "to": "agent",
+      "y": 255,
+      "label": "Execute (goroutine)",
+      "variant": "emphasis",
+      "note": "gắn cổng bridge + tài liệu"
+    },
+    {
+      "id": "lock-sel",
+      "from": "agent",
+      "to": "bridge",
+      "y": 310,
+      "label": "/health · lockSelection",
+      "variant": "default",
+      "note": "Writer: khóa đoạn đang bôi đen"
+    },
+    {
+      "id": "lock-job",
+      "from": "bridge",
+      "to": "addin",
+      "y": 365,
+      "label": "job (qua poll)",
+      "variant": "dashed"
+    },
+    {
+      "id": "lock-res",
+      "from": "addin",
+      "to": "bridge",
+      "y": 393,
+      "label": "result",
+      "variant": "return"
+    },
+    {
+      "id": "create-conv",
+      "from": "agent",
+      "to": "db",
+      "y": 421,
+      "label": "tạo/lấy hội thoại",
+      "variant": "default"
+    },
+    {
+      "id": "run-id",
+      "from": "api",
+      "to": "pane",
+      "y": 449,
+      "label": "{runId, conversationId}",
+      "variant": "return",
+      "note": "chờ có conversationId"
+    },
+    {
+      "id": "open-sse",
+      "from": "pane",
+      "to": "api",
+      "y": 504,
+      "label": "SSE runs/{id}/events",
+      "variant": "dashed",
+      "note": "phát lại sự kiện đã có"
+    },
+    {
+      "id": "save-user",
+      "from": "agent",
+      "to": "db",
+      "y": 559,
+      "label": "lưu tin user",
+      "variant": "default"
+    },
+    {
+      "id": "get-catalog",
+      "from": "agent",
+      "to": "bridge",
+      "y": 587,
+      "label": "GET /commands",
+      "variant": "default",
+      "note": "catalog → tool; thêm skills, memory, MCP"
+    },
+    {
+      "id": "ask-llm",
+      "from": "agent",
+      "to": "llm",
+      "y": 653,
+      "label": "chat: prompt + tools",
+      "variant": "emphasis"
+    },
+    {
+      "id": "tool-call",
+      "from": "llm",
+      "to": "agent",
+      "y": 681,
+      "label": "tool call office_action",
+      "variant": "return"
+    },
+    {
+      "id": "confirm",
+      "from": "agent",
+      "to": "pane",
+      "y": 709,
+      "label": "confirm.required (nếu rủi ro)",
+      "variant": "security",
+      "note": "chờ người dùng duyệt; từ chối → tool trả lỗi cho model"
+    },
+    {
+      "id": "post-cmd",
+      "from": "agent",
+      "to": "bridge",
+      "y": 764,
+      "label": "POST /cmd {action, params}",
+      "variant": "emphasis"
+    },
+    {
+      "id": "deliver-job",
+      "from": "bridge",
+      "to": "addin",
+      "y": 792,
+      "label": "job (long-poll trả về)",
+      "variant": "emphasis",
+      "note": "chạy qua window.Application"
+    },
+    {
+      "id": "post-result",
+      "from": "addin",
+      "to": "bridge",
+      "y": 858,
+      "label": "POST /wps/v1/result",
+      "variant": "return"
+    },
+    {
+      "id": "cmd-result",
+      "from": "bridge",
+      "to": "agent",
+      "y": 886,
+      "label": "{ok, result}",
+      "variant": "return"
+    },
+    {
+      "id": "tool-events",
+      "from": "agent",
+      "to": "pane",
+      "y": 914,
+      "label": "SSE tool.started/finished",
+      "variant": "dashed"
+    },
+    {
+      "id": "next-round",
+      "from": "agent",
+      "to": "llm",
+      "y": 942,
+      "label": "kết quả tool → vòng sau",
+      "variant": "default",
+      "note": "lặp tới khi hết tool call"
+    },
+    {
+      "id": "final-reply",
+      "from": "llm",
+      "to": "agent",
+      "y": 998,
+      "label": "câu trả lời cuối",
+      "variant": "return"
+    },
+    {
+      "id": "save-reply",
+      "from": "agent",
+      "to": "db",
+      "y": 1040,
+      "label": "lưu reply vào hội thoại",
+      "variant": "default"
+    },
+    {
+      "id": "completed",
+      "from": "agent",
+      "to": "pane",
+      "y": 1068,
+      "label": "SSE run.completed",
+      "variant": "return"
+    },
+    {
+      "id": "show",
+      "from": "pane",
+      "to": "user",
+      "y": 1096,
+      "label": "hiện câu trả lời",
+      "variant": "return"
+    },
+    {
+      "id": "finish-db",
+      "from": "agent",
+      "to": "db",
+      "y": 1124,
+      "label": "Runs.Finish · hàng đợi memory",
+      "variant": "default"
+    },
+    {
+      "id": "unlock",
+      "from": "agent",
+      "to": "bridge",
+      "y": 1152,
+      "label": "unlockSelection",
+      "variant": "default",
+      "note": "finish(): luôn chạy, rồi đóng SSE"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "pane",
+      "from": 200,
+      "to": 1096,
+      "type": "frontend"
+    },
+    {
+      "participant": "api",
+      "from": 200,
+      "to": 504,
+      "type": "backend"
+    },
+    {
+      "participant": "agent",
+      "from": 255,
+      "to": 1152,
+      "type": "backend"
+    },
+    {
+      "participant": "bridge",
+      "from": 310,
+      "to": 393,
+      "type": "messagebus"
+    },
+    {
+      "participant": "bridge",
+      "from": 764,
+      "to": 886,
+      "type": "messagebus"
+    },
+    {
+      "participant": "addin",
+      "from": 365,
+      "to": 393,
+      "type": "frontend"
+    },
+    {
+      "participant": "addin",
+      "from": 792,
+      "to": 858,
+      "type": "frontend"
+    },
+    {
+      "participant": "llm",
+      "from": 653,
+      "to": 681,
+      "type": "cloud"
+    },
+    {
+      "participant": "llm",
+      "from": 942,
+      "to": 998,
+      "type": "cloud"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Điểm mấu chốt",
+      "items": [
+        "POST /runs trả runId khi đã có hội thoại; agent chạy nền, pane theo dõi qua SSE",
+        "Agent không gọi thẳng WPS: lệnh vào hàng đợi bridge, add-in long-poll lấy về",
+        "Vòng 3 lặp mỗi lần model gọi tool (đọc hoặc sửa tài liệu)"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Rẽ nhánh / thất bại",
+      "items": [
+        "Add-in chưa kết nối → POST /runs trả 409, không tạo lượt",
+        "Huỷ, hết giờ, hết ngân sách → run.cancelled / timedout / stopped",
+        "Lỗi bridge hay provider → run.failed; finish() luôn mở khoá vùng chọn",
+        "Lệnh đã giao mà WPS đóng → lỗi \"may have been applied\""
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Cách đọc",
+      "items": [
+        "Sự kiện SSE thực ra đi qua Core API; vẽ thẳng agent → pane cho gọn",
+        "Bước khoá vùng chọn chỉ có ở Writer; ET/WPP bỏ qua"
+      ]
+    }
+  ]
+}
