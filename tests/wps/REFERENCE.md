@@ -521,3 +521,15 @@ quả về `/result` — chạy song song với WPS đang mở của người d�
 `InkDrawPen`, `FontSizeDecrease/Increase`, `ChangeCaseGallery`, `QuickStylesGallery`, `ProxyProofreadAICmd`…). Nút AI vì
 vậy dùng `getImage` + SVG riêng (viewBox 24, nét `#3B3B3B`, điểm nhấn `#0F6CBD`) — hiện đủ, đồng bộ với tab WPS AI.
 Nút nhỏ trên ribbon WPS xếp **2 hàng** mỗi cột (Office là 3), nhãn nhóm không hiện.
+
+### Writer: phân trang và xoá đoạn (đo 01/11/2026, `scripts/wps/probe`, cho `writer.checkLayout` / `writer.deleteParagraphs`)
+
+- `doc.Repaginate()`, `ComputeStatistics(2)` (số trang) / `(0)` (số chữ) chạy.
+- `doc.Paragraphs` gồm cả đoạn trong ô bảng (`Text` = `"A\r\u0007"`) **và** một đoạn "dấu cuối hàng" mỗi hàng
+  (`"\r\u0007"`). `Range.Information(12)` trả **boolean**. Chú thích `Bảng N.` của `writeContent` nằm **trước** bảng.
+- Dấu ngắt trang là **một đoạn** `Text` = `"\f\r"` nằm ở trang **trước** dấu ngắt; hai dấu ngắt liền nhau → đoạn thứ hai
+  đứng một mình trên trang trắng. `writeContent {text: ""}` không tạo đoạn trống (bị bỏ).
+- `Paragraphs.Item(n).Range.Delete()` xoá cả đoạn, kể cả đoạn `"\f\r"` (số trang 3 → 2) và đoạn trống cuối bài; số
+  đoạn sau **dồn lên** — xoá nhiều đoạn phải đi từ số lớn về số nhỏ.
+- `Application.UndoRecord.StartCustomRecord` có trong Writer; `doc.TablesOfContents.Count` = 0 khi chưa có mục lục.
+

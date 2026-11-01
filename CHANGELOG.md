@@ -5,6 +5,22 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — WPS: soát phân trang, văn bản hành chính, "Tạo slide" ở Writer (01/11/2026)
+
+- `writer.checkLayout` + `writer.deleteParagraphs` trên WPS (TASK-000160, port bản Windows; đã chạy trên WPS thật: bắt
+  trang trắng, đoạn trống liên tiếp, quá số trang; xoá đúng đoạn, từ chối đoạn trong bảng) → tool `doc_from_brief` (soạn
+  văn bản hành chính theo mẫu) **không còn bị ẩn** trên WPS.
+- Ribbon: nhóm *Tạo mới* thành **Cả tài liệu** — gom mọi lệnh AI làm trên cả bài (Soạn văn bản, Sửa thông minh, Tóm tắt
+  cả bài, Dịch song ngữ cả bài, Tạo slide từ tài liệu); *Viết với AI* chỉ còn lệnh cho đoạn bôi đen, nên "Tóm tắt" và
+  "Tóm tắt cả bài" không còn đứng cạnh nhau.
+- **Tạo slide từ tài liệu bấm được ở Writer** (như WPS AI): Core chuyển lượt sang phiên Presentation đang mở
+  (`QuickAction.ShownIn`); chưa mở Presentation thì báo rõ cần mở.
+- Menu chuột phải sinh từ bảng lệnh của Core (`scripts/generate_ribbon_menus.py`, TASK-000159); `make check-gen` bắt lệch.
+- Test hợp đồng add-in → bridge → Core dùng chung file mẫu (`tests/wps/contract/`); test `wpsbridge` không còn gọi nhầm
+  Core thật đang chạy trên máy dev (trước dùng cổng 47861 cố định).
+- `make test-wps-live`: Core thật + add-in thật + WPS thật dưới Xvfb, tự bấm hộp thoại tin cậy; không còn đòi
+  `JsApiPlugin` khi `oem.ini` mã hoá.
+
 ### Fixed — rà soát WPS Linux 01/11/2026
 
 - `wpp.checkLayout` trên WPS báo `overflow` (chữ cao hơn khung) như bản Windows. Ghi chú cũ "WPS không đo được chiều
@@ -44,7 +60,7 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 - Add-in WPS có thêm `writer.writeContent` (viết nhiều khối một lần: tiêu đề, đoạn, danh sách thật, bảng kèm chú thích,
   ngắt trang), `writer.insertLayoutTable` (bảng không viền phần đầu/phần ký văn bản hành chính), `writer.insertCaption`
   (cuối bài), `wpp.addShape`, `wpp.addParagraphs` (tự chọn cỡ chữ lớn nhất vừa khung) — `slides_from_brief` hết bị ẩn
-  trên WPS. `doc_from_brief` vẫn ẩn tới khi có `writer.checkLayout`.
+  trên WPS. `doc_from_brief` vẫn ẩn tới khi có `writer.checkLayout` (đã có từ đợt sau cùng ngày).
 - Đo trên WPS 12.1.2 thật (`tests/wps/REFERENCE.md`): WPS gộp hai bảng liền nhau; hình mới có nền gradient + bóng;
   bullet bật một mình ra đánh số; `Words(n)` trả null; `TextRange.BoundHeight` đo được chiều cao chữ.
 

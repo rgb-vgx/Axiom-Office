@@ -720,9 +720,10 @@ phép đo trên WPS thật: [docs/architecture/wps-bridge.md](docs/architecture/
   Lần đầu mỗi app WPS hỏi *"Addin axiomoffice … trust or not?"* — bấm OK. Bản WPS cũ có `oem.ini` dạng thường cần bật
   một lần `JsApiPlugin=true` (script **in** lệnh `sudo`, không tự chạy); bản 12.x có `oem.ini` mã hoá thì không cần.
   Mở WPS **sau** khi Core đã chạy, nên dùng `./install.sh --systemd`.
-- **Ribbon** (tab *Axiom Office*, `ribbon.xml`): *Trợ lý* (Ask AI, Lịch sử) · *Tạo mới* (Soạn văn bản, Sửa thông
-  minh — Writer; Tạo slide từ tài liệu — Presentation) · *Viết với AI* (Writer: các lệnh của menu chuột phải cho đoạn
-  bôi đen, menu Đổi giọng, cùng Tóm tắt cả bài / Dịch song ngữ cả bài) · *Kiểm tra tài liệu* (Soát bố cục / Soát
+- **Ribbon** (tab *Axiom Office*, `ribbon.xml`): *Trợ lý* (Ask AI, Lịch sử) · *Cả tài liệu* (Soạn văn bản, Sửa thông
+  minh, Tóm tắt cả bài, Dịch song ngữ cả bài — Writer; Tạo slide từ tài liệu — Presentation và Writer, chạy trong
+  Presentation đang mở) · *Viết với AI* (Writer, đoạn bôi đen: các lệnh của menu chuột phải, menu Đổi giọng) ·
+  *Kiểm tra tài liệu* (Soát bố cục / Soát
   bảng / Soát vùng dữ liệu; Soát chính tả, Làm đẹp bảng dùng AI) · *Bộ nhớ & kỹ năng* (Bộ nhớ AI…, Kỹ năng…) · *Hệ thống* (Thiết lập…, Trạng thái, Mở nhật ký,
   Khác ▸ Kiểm tra mô hình / Sao chép API URL). Icon: nút cũ dùng `imageMso` (bộ icon có sẵn của WPS; tên phải có
   trong bảng lệnh của WPS — `docs/architecture/ribbon-ui.md` §5.3), nút mới từ 01/11/2026 dùng SVG riêng trong

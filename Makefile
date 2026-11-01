@@ -1,4 +1,4 @@
-.PHONY: help test test-go test-lo test-bench test-catalog test-wps test-wps-e2e test-core test-mcp test-oracle test-install test-live-format core-build check-gen package clean fmt lint lint-go lint-py lint-js
+.PHONY: help test test-go test-lo test-bench test-catalog test-wps test-wps-e2e test-wps-live test-core test-mcp test-oracle test-install test-live-format core-build check-gen package clean fmt lint lint-go lint-py lint-js
 
 GOBIN := $(shell go env GOPATH)/bin
 RUFF ?= $(shell command -v ruff 2>/dev/null || echo python3 -m ruff)
@@ -13,6 +13,7 @@ help:
 	@echo "  test-lo     - Kiem thu extension LibreOffice (DONG BANG: khong nam trong 'test', chay tay)"
 	@echo "  test-wps    - Kiem thu add-in WPS"
 	@echo "  test-wps-e2e- E2e kenh WPS + pane tren Core that (khong can WPS)"
+	@echo "  test-wps-live - Core that + add-in that + WPS that duoi Xvfb (can WPS, xvfb-run, xdotool; chay tay)"
 	@echo "  test-live-format - Hoi quy dinh dang Word that (can Office x64 + add-in)"
 	@echo "  test-core   - Build Agent Core Go va kiem thu e2e"
 	@echo "  test-mcp    - Kiem thu MCP portable tren binary vua build"
@@ -59,6 +60,11 @@ test-wps-e2e: core-build
 	AXIOM_E2E_CORE_EXE=$(CURDIR)/dist/core/axiom-core python3 tests/wps/test_wps_bridge_e2e.py
 	AXIOM_E2E_CORE_EXE=$(CURDIR)/dist/core/axiom-core python3 tests/wps/test_wps_pane_e2e.py
 	AXIOM_E2E_CORE_EXE=$(CURDIR)/dist/core/axiom-core python3 tests/wps/test_wps_multiapp_e2e.py
+
+# WPS THAT (khong nam trong `test`/CI: can WPS Office for Linux, xvfb-run, xdotool, va khong co WPS dang mo): HOME tam,
+# Xvfb rieng, tu bam OK hop thoai tin cay add-in. Lan luot Writer, Spreadsheets, Presentation; vai phut.
+test-wps-live: core-build
+	AXIOM_E2E_CORE_EXE=$(CURDIR)/dist/core/axiom-core python3 tests/wps/test_wps_bridge_live.py
 
 core-build:
 	mkdir -p dist/core

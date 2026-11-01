@@ -7,10 +7,12 @@ WPS va goi tung lenh cua app do qua POST /cmd, doc lai de kiem.
 Mot Core cho ca ba luot: bridge WPS chi phuc vu app poll gan nhat (docs/architecture/wps-bridge.md muc 6), nen giua hai
 app phai doi bridge bao mat ket noi (va file session bi xoa) truoc khi mo app ke tiep.
 
-Can: WPS Office for Linux, xvfb-run, xdotool (boi den that trong bai do khoa vung), JsApiPlugin=true trong
-oem.ini (tests/wps/REFERENCE.md), khong co WPS dang chay cho nguoi dung nay.
+Can: WPS Office for Linux, xvfb-run, xdotool (boi den that trong bai do khoa vung; bam OK hop thoai tin cay add-in),
+khong co WPS dang chay cho nguoi dung nay. oem.ini dang thuong (co [Support]) phai co JsApiPlugin=true; oem.ini ma hoa
+(WPS 12.x) thi khong can - add-in nap sau hop thoai tin cay ma test tu bam (tests/wps/REFERENCE.md, do 31/10/2026).
 
     python3 tests/wps/test_wps_bridge_live.py [--keep] [--apps wps,et,wpp] [--timeout 120]
+    make test-wps-live
 """
 from __future__ import annotations
 
@@ -48,25 +50,43 @@ DISCONNECT_SECONDS = 45
 
 
 def wps_running() -> list:
-    out = subprocess.run(["pgrep", "-u", str(os.getuid()), "-f", "office6/(wps|et|wpp)( |$)"],
+    # WPS 12.1.2 chay app duoi ten `office6/wpsoffice /prometheus <tep>` (do 01/11/2026); ban cu: office6/wps|et|wpp.
+    out = subprocess.run(["pgrep", "-u", str(os.getuid()), "-f", "office6/((wps|et|wpp)( |$)|wpsoffice /prometheus)"],
                          capture_output=True, text=True).stdout
     return out.split()
 
 
-def wps_display_env() -> dict:
-    """DISPLAY/XAUTHORITY cua WPS dang chay: `xvfb-run -a` cap so hien thi dong nen khong doan duoc -
-    phai doc tu /proc/<pid>/environ cua chinh tien trinh WPS."""
-    out = subprocess.run(["pgrep", "-u", str(os.getuid()), "-f", "office6/wps( |$)"],
-                         capture_output=True, text=True).stdout
-    for pid in out.split():
-        try:
-            with open("/proc/%s/environ" % pid, "rb") as handle:
-                raw = handle.read().decode("utf-8", "replace")
-        except OSError:
+def oem_blocks_addins(text: str) -> bool:
+    """True khi oem.ini dang THUONG (co muc [Support]) ma chua bat JsApiPlugin - khi do WPS bo qua moi JS add-in.
+    oem.ini ma hoa cua WPS 12.x (muc [support] chu thuong, khoa da bam) khong co dong nay ma add-in van nap."""
+    if "JsApiPlugin=true" in text.replace(" ", ""):
+        return False
+    return any(line.strip() == "[Support]" for line in text.splitlines())
+
+
+def session_display_env(sid: int) -> dict:
+    """DISPLAY/XAUTHORITY cua Xvfb ma test khoi chay: doc tu DONG LENH cua tien trinh Xvfb cung SESSION voi xvfb-run
+    (Popen start_new_session) - `Xvfb :N ... -auth <tep>`. KHONG doc bien moi truong cua tien trinh: xvfb-run va cac
+    tien trinh khac trong session thua huong DISPLAY cua nguoi chay test (vd :0 = man hinh THAT) - 01/11/2026 test da
+    bam chuot len man hinh that vi doc nham nhu vay. Khong tim thay Xvfb -> {} (khong bam, khong go phim)."""
+    for entry in os.listdir("/proc"):
+        if not entry.isdigit():
             continue
-        env = dict(item.split("=", 1) for item in raw.split("\0") if "=" in item)
-        if env.get("DISPLAY"):
-            return {"DISPLAY": env["DISPLAY"], "XAUTHORITY": env.get("XAUTHORITY", "")}
+        try:
+            with open("/proc/%s/stat" % entry, encoding="utf-8", errors="replace") as handle:
+                fields = handle.read().rsplit(")", 1)[1].split()
+            if int(fields[3]) != sid:  # sau "(comm)": state ppid pgrp session
+                continue
+            with open("/proc/%s/cmdline" % entry, "rb") as handle:
+                argv = handle.read().decode("utf-8", "replace").split("\0")
+        except (OSError, ValueError, IndexError):
+            continue
+        if not argv or os.path.basename(argv[0]) != "Xvfb":
+            continue
+        display = next((a for a in argv[1:] if a.startswith(":") and a[1:].isdigit()), "")
+        auth = argv[argv.index("-auth") + 1] if "-auth" in argv[:-1] else ""
+        if display:
+            return {"DISPLAY": display, "XAUTHORITY": auth}
     return {}
 
 
@@ -77,7 +97,10 @@ class WpsKeys:
 
     def __init__(self, live):
         self.env = dict(os.environ)
-        self.env.update(wps_display_env())
+        # Khong co Xvfb cua test thi KHONG dung DISPLAY thua huong (man hinh that): bo DISPLAY de xdotool khong noi duoc.
+        self.env.pop("DISPLAY", None)
+        self.env.pop("XAUTHORITY", None)
+        self.env.update(session_display_env(live.process.pid))
         self.window = ""
         for pattern in ["%s - Writer" % live.document, "Writer"]:
             found = self._xdotool("search", "--onlyvisible", "--name", pattern)
@@ -188,7 +211,19 @@ class Session:
             env=env, cwd=self.home, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
 
     def wait_connected(self) -> bool:
-        return base.wait_for(lambda: self.connected() and self.app_name() == self.kind, self.timeout)
+        # Lan dau moi app (HOME tam nen lan nao cung la lan dau) WPS hoi "Addin ... is loaded for the first time, trust or
+        # not?": bam OK (696,461 tren man 1280x900, do 31/10/2026) moi 3 giay cho toi khi add-in ket noi.
+        deadline = time.time() + self.timeout
+        while time.time() < deadline:
+            if self.connected() and self.app_name() == self.kind:
+                return True
+            display = session_display_env(self.process.pid)
+            if display.get("DISPLAY", ":0") != os.environ.get("DISPLAY") and shutil.which("xdotool"):
+                env = dict(os.environ, **display)
+                subprocess.run(["xdotool", "mousemove", "696", "461", "click", "1"], env=env,
+                               capture_output=True, timeout=10)
+            time.sleep(3)
+        return False
 
     def stop(self) -> None:
         if self.process is not None:
@@ -602,7 +637,7 @@ def main() -> int:
             oem = handle.read()
     except OSError:
         pass
-    if "JsApiPlugin=true" not in oem.replace(" ", ""):
+    if oem_blocks_addins(oem):
         print("FAIL %s chua bat JsApiPlugin=true (can sudo, xem tests/wps/REFERENCE.md)" % OEM_INI)
         return 1
     missing = [name for name in ("wps", "et", "wpp", "xvfb-run", "xdotool") if not shutil.which(name)]
