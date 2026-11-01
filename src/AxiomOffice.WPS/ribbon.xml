@@ -201,7 +201,10 @@
        trong khung ay. Du phong khi WPS khong co ShowDialog: hien khung chat lon roi nho Core chuyen muc (POST /wps/v1/pane/request -> SSE
        /wps/v1/pane/events), muc chay trong hoi thoai cua khung chat lon.
        ContextMenuText = chuot phai tren chu thuong, ContextMenuList = tren dong danh sach (ten idMso co trong bang
-       lenh cua Writer WPS: res/commands/wps). -->
+       lenh cua Writer WPS: res/commands/wps).
+       Khoi duoi SINH tu bang QuickActions cua Core: sua quickactions.go roi chay python3 scripts/generate_ribbon_menus.py
+       (make check-gen bao lech). -->
+  <!-- BEGIN SINH TU DONG (scripts/generate_ribbon_menus.py) - KHONG SUA TAY -->
   <contextMenus>
     <contextMenu idMso="ContextMenuText">
       <menu id="axiomCtxQuick_t" label="Sửa bằng AI" tag="quickMenu" getImage="ribbon.OnGetImage" insertBeforeMso="Cut">
@@ -250,4 +253,5 @@
       <button id="axiomCtxAsk_l" label="Hỏi AI về đoạn này" tag="askAi" onAction="ribbon.OnAction" getImage="ribbon.OnGetImage" insertBeforeMso="Cut"/>
     </contextMenu>
   </contextMenus>
+  <!-- END SINH TU DONG -->
 </customUI>

@@ -113,8 +113,9 @@ class CheckTest(unittest.TestCase):
             text = handle.read()
         self.assertEqual(text.count(BEGIN), 1)
         self.assertEqual(text.count(END), 1)
-        self.assertLess(text.index(BEGIN), text.index("<contextMenus>"))
-        self.assertGreater(text.index(END), text.index("</contextMenus>"))
+        # Phan tu that (thut le 2, ca dong) - chu "<contextMenus>" con xuat hien trong chu thich dau tep.
+        self.assertLess(text.index(BEGIN), text.index("\n  <contextMenus>\n"))
+        self.assertGreater(text.index(END), text.index("\n  </contextMenus>\n"))
         result = self.run_script("--check")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
