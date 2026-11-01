@@ -660,15 +660,20 @@
       return startRun(label, { quickAction: actionId });
     }
 
-    // parseActions: doc [{id, label, edits, app, input}] cua Core, bo muc thieu id/nhan.
+    // parseActions: doc [{id, label, edits, app, shownIn, input}] cua Core, bo muc thieu id/nhan.
     function parseActions(raw) {
       var out = [];
       for (var i = 0; i < raw.length; i++) {
         var id = trimText(raw[i] && raw[i].id);
         var label = trimText(raw[i] && raw[i].label);
         if (id && label) {
+          var shown = [];
+          var list = raw[i].shownIn;
+          if (Object.prototype.toString.call(list) === "[object Array]") {
+            for (var s = 0; s < list.length; s++) { if (trimText(list[s])) { shown.push(trimText(list[s])); } }
+          }
           out.push({ id: id, label: label, edits: !!raw[i].edits,
-            app: trimText(raw[i] && raw[i].app), input: trimText(raw[i] && raw[i].input) });
+            app: trimText(raw[i] && raw[i].app), shownIn: shown, input: trimText(raw[i] && raw[i].input) });
         }
       }
       return out;
@@ -693,12 +698,15 @@
             list = parseActions((result && result.actions) || []);
             docs = parseActions((result && result.documentActions) || []);
           } catch (e2) { list = []; docs = []; }
-          // DocumentActions cua Core co the danh cho app khac: chi giu lenh cua app dang mo (app rong = Writer).
+          // DocumentActions cua Core co the danh cho app khac: chi giu lenh cua app dang mo (app rong = Writer) hoac lenh
+          // hien ca o app nay (shownIn - Tao slide tu tai lieu o Writer: Core chuyen luot sang Presentation).
           var quick = kind === "wps" ? list : [];
           var forKind = [];
           for (var di = 0; di < docs.length; di++) {
             var docApp = docs[di].app || "wps";
-            if (docApp === kind) { forKind.push(docs[di]); }
+            var shownHere = false;
+            for (var si = 0; si < docs[di].shownIn.length; si++) { if (docs[di].shownIn[si] === kind) { shownHere = true; } }
+            if (docApp === kind || shownHere) { forKind.push(docs[di]); }
           }
           state.quickActions = quick;
           state.documentActions = forKind;

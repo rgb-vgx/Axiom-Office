@@ -36,6 +36,10 @@ SHEET = {"clientId": "csheet1", "app": "et",
          "commands": [{"name": "et.readRange", "kind": "et", "agent": True, "summary": "Đọc vùng",
                        "params": [{"name": "range", "required": True, "hint": None},
                                   {"name": "sheet", "required": False, "hint": None}]}]}
+SLIDES = {"clientId": "cslides1", "app": "wpp",
+          "document": {"name": "trinh-bay.pptx", "fullName": "/home/u/trinh-bay.pptx"},
+          "commands": [{"name": "wpp.listSlides", "kind": "wpp", "agent": True, "summary": "Liệt kê slide",
+                        "params": []}]}
 
 
 class AppAddin(threading.Thread):
@@ -62,17 +66,21 @@ class AppAddin(threading.Thread):
                     answer = {"ok": True, "result": {"text": "Báo cáo tuần", "totalChars": 12, "truncated": False}}
                 elif job.get("action") == "et.readRange":
                     answer = {"ok": True, "result": {"values": [["Doanh thu", 120]]}}
+                elif job.get("action") == "wpp.listSlides":
+                    answer = {"ok": True, "result": {"slides": []}}
                 else:
                     answer = {"ok": False, "error": "unknown action: " + str(job.get("action"))}
                 base.request(self.core.base + "/wps/v1/result", "POST", dict(answer, id=job.get("id")),
                              {"Origin": self.core.origin})
 
 
-def run_from_pane(core, client, app, prompt):
+def run_from_pane(core, client, app, prompt, quick=None):
     """Gui luot chay nhu pane cua mot app (body mang client + app) va doc SSE toi het."""
     own = {"Origin": core.origin}
-    status, _, text = base.request(core.base + "/wps/v1/runs", "POST",
-                                   {"prompt": prompt, "client": client, "app": app}, own)
+    body = {"prompt": prompt, "client": client, "app": app}
+    if quick:
+        body["quickAction"] = quick
+    status, _, text = base.request(core.base + "/wps/v1/runs", "POST", body, own)
     run = base.as_json(text).get("result") or {}
     if status != 200 or not run.get("runId"):
         return status, text, []
@@ -93,6 +101,9 @@ def main() -> int:
         # Luot tu pane Spreadsheets: model doc bang.
         {"tool": "office_action", "arguments": {"action": "et.readRange", "params": {"range": "A1:B1"}}},
         {"text": "Doanh thu 120"},
+        # "Tao slide tu tai lieu" bam o Writer: luot chuyen sang phien Presentation.
+        {"tool": "office_action", "arguments": {"action": "wpp.listSlides", "params": {}}},
+        {"text": "Đã dựng bài trình chiếu"},
     ])
     bridge_port = base.free_port()
     core = base.Core(base.core_exe(work), work, base.TOKEN, bridge_port, addin_dir, session_dir, {
@@ -101,7 +112,7 @@ def main() -> int:
         "AXIOM_MEMORY_ENABLED": "0", "XDG_CONFIG_HOME": os.path.join(work, "xdg"),
     })
     own = {"Origin": core.origin}
-    writer, sheet = AppAddin(core, WRITER), AppAddin(core, SHEET)
+    writer, sheet, slides = AppAddin(core, WRITER), AppAddin(core, SHEET), AppAddin(core, SLIDES)
     try:
         writer.start()
         base.wait_for(lambda: writer.port, 10)
@@ -169,9 +180,27 @@ def main() -> int:
         check(addin.get("app") == "et" and (addin.get("document") or {}).get("name") == "ban-hang.xlsx",
               "status mang client ET -> trang thai cua ET", addin)
         check(len(addin.get("clients") or []) == 2, "status liet ke ca hai app WPS", addin.get("clients"))
+
+        # "Tao slide tu tai lieu" bam o WRITER (01/11/2026, WPS AI dat nut nay o Writer): lenh chay o Presentation
+        # (DocumentActions App "wpp") nen Core chuyen luot sang phien WPP dang mo; chua mo Presentation thi 409 noi ro.
+        status, text, events = run_from_pane(core, WRITER["clientId"], "wps", "", quick="slidesFromDoc")
+        check(status == 409 and "WPS Presentation" in text and events == [],
+              "Tao slide o Writer khi chua mo Presentation -> 409 noi ro can mo Presentation", (status, text[:300]))
+        slides.start()
+        base.wait_for(lambda: slides.port, 10)
+        writer_before = list(writer.actions)
+        status, text, events = run_from_pane(core, WRITER["clientId"], "wps", "", quick="slidesFromDoc")
+        names = [name for name, _ in events]
+        started = next((payload(data) for name, data in events if name == "run.started"), {})
+        check(status == 200 and "run.completed" in names and started.get("app") == "wpp"
+              and started.get("port") == slides.port,
+              "Tao slide o Writer -> luot chay tren phien Presentation", (status, text[:200], started, names))
+        check("wpp.listSlides" in slides.actions and writer.actions == writer_before,
+              "Tao slide o Writer: lenh wpp.* toi add-in Presentation, Writer khong nhan lenh", (writer.actions, slides.actions))
     finally:
         writer.stop_flag.set()
         sheet.stop_flag.set()
+        slides.stop_flag.set()
         core.stop()
         llm.stop()
         shutil.rmtree(work, ignore_errors=True)

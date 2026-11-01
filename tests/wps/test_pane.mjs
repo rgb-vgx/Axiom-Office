@@ -672,6 +672,20 @@ test("loadQuickActions: documentActions cua Core -> nhan cho bong bong; khong lo
   assert.deepEqual(h.state.messages[0], { role: "user", text: "Soát chính tả cả bài" });
 });
 
+test("loadQuickActions: lenh ca tai lieu cua app khac co shownIn app nay thi giu (Tao slide tu tai lieu o Writer)", async () => {
+  const docs = { ok: true, result: { actions: [], documentActions: [
+    { id: "proofread", label: "Soát chính tả cả bài", edits: true },
+    { id: "slidesFromDoc", label: "Tạo slide từ tài liệu", edits: true, app: "wpp", shownIn: ["wps"] },
+    { id: "deckOnly", label: "Chỉ trình chiếu", edits: true, app: "wpp" },
+  ] } };
+  const writer = harness({ "/quick-actions": [200, docs] });
+  await writer.pane.loadQuickActions();
+  assert.deepEqual(writer.state.documentActions.map((a) => a.id), ["proofread", "slidesFromDoc"]);
+  const slides = harness({ "/quick-actions": [200, docs] }, null, "wpp");
+  await slides.pane.loadQuickActions();
+  assert.deepEqual(slides.state.documentActions.map((a) => a.id), ["slidesFromDoc", "deckOnly"]);
+});
+
 // ---- Menu "Sua bang AI" (lenh nhanh): danh sach lay tu Core, chi gui id - cau lenh nam trong Core.
 const QUICK = { ok: true, result: { actions: [
   { id: "polish", label: "Trau chuốt", edits: true },
@@ -950,7 +964,7 @@ test("ribbon.xml: nhom Tao moi + Viet voi AI dung thu tu; 15 muc Viet voi AI kho
 }
 );
 
-test("OnGetVisible: Soan van ban + Viet voi AI chi o Writer, Tao slide tu tai lieu chi o Presentation; WPS chi dien Id van dung", () => {
+test("OnGetVisible: Soan van ban + Viet voi AI chi o Writer, Tao slide tu tai lieu o Presentation VA Writer; WPS chi dien Id van dung", () => {
   const seen = {};
   for (const name of ["WPS Writer", "WPS Presentation", "WPS Spreadsheets"]) {
     const ctx = load(["probe.js", "commands.js", "main.js"], { Application: { Name: name } });
@@ -959,7 +973,7 @@ test("OnGetVisible: Soan van ban + Viet voi AI chi o Writer, Tao slide tu tai li
       v({ Id: "axiomRb_polish" }), v({ Tag: "quick:explain" }), v({ Id: "axiomRbTone" }), v({ Id: "axiomProofread" })];
   }
   assert.deepEqual(seen, {
-    "WPS Writer": [true, false, true, true, true, true],
+    "WPS Writer": [true, true, true, true, true, true],
     "WPS Presentation": [false, true, false, false, false, false],
     "WPS Spreadsheets": [false, false, false, false, false, false],
   });

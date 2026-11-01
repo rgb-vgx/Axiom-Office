@@ -556,12 +556,13 @@
   function OnGetVisible(control) {
     try {
       var tag = tagOf(control);
-      // Lenh ca tai lieu: "Tao slide tu tai lieu" chi o Presentation, cac lenh doc:<id> khac chi o Writer.
+      // Lenh ca tai lieu: cac lenh doc:<id> chi o Writer; "Tao slide tu tai lieu" o Presentation VA Writer (bam o Writer
+      // thi Core chuyen luot sang phien Presentation dang mo - QuickAction.ShownIn).
       if (tag.indexOf(DOC_TAG) === 0) {
         var docKind = "";
         try { docKind = currentAppKind() || ""; } catch (eD) { docKind = ""; }
         if (docKind === "" || docKind === "unknown") { return true; }
-        if (tag.substring(DOC_TAG.length) === "slidesFromDoc") { return docKind === "wpp"; }
+        if (tag.substring(DOC_TAG.length) === "slidesFromDoc") { return docKind === "wpp" || docKind === "wps"; }
         return docKind === "wps";
       }
       // Nut "Viet voi AI" tren ribbon va menu Doi giong chi co o Writer.

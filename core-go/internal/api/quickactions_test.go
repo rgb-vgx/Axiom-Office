@@ -34,3 +34,22 @@ func TestQuickActionsListsDocumentActionsSeparately(t *testing.T) {
 		t.Fatal("cau lenh (prompt) khong tra ra cho pane")
 	}
 }
+
+// shownIn: ung dung khac App cung hien nut (pane Writer giu "Tao slide tu tai lieu" trong documentActions cua no).
+func TestQuickActionsReportShownIn(t *testing.T) {
+	handler, _ := newSkillsHandler(t)
+	reply := call(handler, "GET", "/wps/v1/quick-actions", "", wpsOrigin)
+	result, _ := decode(t, reply.Body.String())["result"].(map[string]any)
+	documents, _ := result["documentActions"].([]any)
+	for _, raw := range documents {
+		item, _ := raw.(map[string]any)
+		shown, has := item["shownIn"].([]any)
+		if item["id"] == "slidesFromDoc" {
+			if !has || len(shown) != 1 || shown[0] != "wps" || item["app"] != "wpp" {
+				t.Fatalf("slidesFromDoc: app wpp, shownIn [wps]; duoc %v", item)
+			}
+		} else if has {
+			t.Fatalf("%v khong co shownIn", item)
+		}
+	}
+}

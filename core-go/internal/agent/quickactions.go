@@ -30,6 +30,10 @@ type QuickAction struct {
 	// App: lenh ca tai lieu chi co nghia o mot ung dung ("wps" Writer, "wpp" Presentation, "et" bang tinh); rong = Writer
 	// (nut ribbon doc:<id> cu). Pane/ribbon an nut o ung dung khac.
 	App string
+	// ShownIn: ung dung KHAC App cung hien nut nay; bam o do thi Core chuyen luot sang phien cua App dang mo (POST
+	// /wps/v1/runs), chua mo App thi bao nguoi dung mo. Tao slide tu tai lieu: WPS AI dat nut o Writer, nhung lenh dung
+	// slide chi chay trong Presentation (moi tien trinh WPS mot phien).
+	ShownIn []string
 	// Input: lenh can nguoi dung GO them yeu cau (Soan van ban: "soan cai gi"). Khac rong = goi y hien trong o nhap; bam
 	// nut thi pane khong chay ngay ma cho nguoi dung go, roi gui {quickAction, prompt}. Core ghep: Prompt + yeu cau.
 	Input  string
@@ -161,17 +165,18 @@ var DocumentActions = []QuickAction{
 			"của người dùng: "},
 	// Tao slide tu tai lieu: chay o Presentation, doc tai lieu Writer dang mo qua other_document (moi tien trinh WPS mot
 	// phien - luot o Presentation khong goi thang writer.* duoc), dung slide bang slides_from_brief.
-	{ID: "slidesFromDoc", Label: "Tạo slide từ tài liệu", Edits: true, Document: true, App: "wpp", Prompt: "Dựng bài " +
-		"trình chiếu từ tài liệu văn bản (Writer) đang mở. Bước 1: tìm tài liệu văn bản trong danh sách tài liệu khác của " +
-		"tool other_document; không có thì dừng, không tạo slide, và nói người dùng mở tài liệu cần chuyển thành slide " +
-		"trong WPS Writer rồi bấm lại. Có nhiều tài liệu văn bản thì chọn tài liệu hợp nhất và nói rõ đã chọn tài liệu nào. " +
-		"Bước 2: đọc nội dung bằng other_document với writer.outline (maxChars 8000), cần chi tiết thì writer.getText. " +
-		"Bước 3: thêm slide vào bài trình chiếu đang mở bằng slides_from_brief: một slide bìa (cover), mỗi mục lớn của " +
-		"tài liệu một đến hai slide, số liệu thì table, figures hoặc chart, quy trình thì process, các mốc thời gian thì " +
-		"timeline, cuối cùng là slide tóm tắt; thường 6-12 slide tuỳ độ dài tài liệu. Tiêu đề slide là một câu kết luận " +
-		"ngắn, các ý ngắn gọn; giữ đúng số liệu và tên riêng của tài liệu, không thêm điều tài liệu không có. Viết bằng " +
-		"ngôn ngữ của tài liệu. Bài trình chiếu đã có slide thì thêm vào sau, không xoá slide cũ. Cuối cùng báo đã dựng " +
-		"bao nhiêu slide từ tài liệu nào."},
+	{ID: "slidesFromDoc", Label: "Tạo slide từ tài liệu", Edits: true, Document: true, App: "wpp",
+		ShownIn: []string{"wps"}, Prompt: "Dựng bài " +
+			"trình chiếu từ tài liệu văn bản (Writer) đang mở. Bước 1: tìm tài liệu văn bản trong danh sách tài liệu khác của " +
+			"tool other_document; không có thì dừng, không tạo slide, và nói người dùng mở tài liệu cần chuyển thành slide " +
+			"trong WPS Writer rồi bấm lại. Có nhiều tài liệu văn bản thì chọn tài liệu hợp nhất và nói rõ đã chọn tài liệu nào. " +
+			"Bước 2: đọc nội dung bằng other_document với writer.outline (maxChars 8000), cần chi tiết thì writer.getText. " +
+			"Bước 3: thêm slide vào bài trình chiếu đang mở bằng slides_from_brief: một slide bìa (cover), mỗi mục lớn của " +
+			"tài liệu một đến hai slide, số liệu thì table, figures hoặc chart, quy trình thì process, các mốc thời gian thì " +
+			"timeline, cuối cùng là slide tóm tắt; thường 6-12 slide tuỳ độ dài tài liệu. Tiêu đề slide là một câu kết luận " +
+			"ngắn, các ý ngắn gọn; giữ đúng số liệu và tên riêng của tài liệu, không thêm điều tài liệu không có. Viết bằng " +
+			"ngôn ngữ của tài liệu. Bài trình chiếu đã có slide thì thêm vào sau, không xoá slide cũ. Cuối cùng báo đã dựng " +
+			"bao nhiêu slide từ tài liệu nào."},
 	// Sua thong minh (WPS AI "Smart Edit"): nguoi dung go cach sua ca bai; sua bang Track Changes de duyet tung cho.
 	{ID: "smartEdit", Label: "Sửa thông minh", Edits: true, Document: true, Track: true, App: "wps",
 		Input: "Bạn muốn sửa tài liệu thế nào? Ví dụ: viết gọn lại phần mở đầu, thống nhất cách xưng hô, đổi giọng trang trọng hơn",
@@ -200,6 +205,20 @@ var DocumentActions = []QuickAction{
 
 // FindQuickAction: tra muc theo id trong menu "Sua bang AI" roi trong lenh ca tai lieu (phan biet hoa thuong - id do Core
 // cap, pane gui lai nguyen van).
+// RunsIn: ung dung that su chay lenh khi bam o ung dung `from` - App neu `from` nam trong ShownIn, khong thi "" (chay tai
+// cho nhu moi lenh).
+func (a QuickAction) RunsIn(from string) string {
+	if a.App == "" || a.App == from {
+		return ""
+	}
+	for _, app := range a.ShownIn {
+		if app == from {
+			return a.App
+		}
+	}
+	return ""
+}
+
 func FindQuickAction(id string) (QuickAction, bool) {
 	if action, ok := findIn(QuickActions, id); ok {
 		return action, true

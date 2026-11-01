@@ -25,6 +25,9 @@ func listActions(actions []agent.QuickAction) []any {
 		if action.App != "" {
 			item["app"] = action.App
 		}
+		if len(action.ShownIn) > 0 {
+			item["shownIn"] = action.ShownIn
+		}
 		if action.Input != "" {
 			item["input"] = action.Input
 		}

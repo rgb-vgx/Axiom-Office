@@ -199,3 +199,22 @@ func TestDocumentRulesDoNotTalkAboutSelection(t *testing.T) {
 		}
 	}
 }
+
+// Tao slide tu tai lieu hien ca o Writer (WPS AI dat nut o Writer) nhung chay o Presentation: RunsIn noi Core chuyen luot
+// sang dau. Lenh khac chay tai cho.
+func TestRunsInMovesSlidesFromWriterToPresentation(t *testing.T) {
+	slides, _ := FindQuickAction("slidesFromDoc")
+	for from, want := range map[string]string{"wps": "wpp", "wpp": "", "et": ""} {
+		if got := slides.RunsIn(from); got != want {
+			t.Fatalf("slidesFromDoc.RunsIn(%q) = %q, can %q", from, got, want)
+		}
+	}
+	for _, id := range []string{"smartCreate", "proofread", "polish"} {
+		action, _ := FindQuickAction(id)
+		for _, from := range []string{"wps", "wpp", "et"} {
+			if got := action.RunsIn(from); got != "" {
+				t.Fatalf("%s.RunsIn(%q) = %q, can chay tai cho", id, from, got)
+			}
+		}
+	}
+}

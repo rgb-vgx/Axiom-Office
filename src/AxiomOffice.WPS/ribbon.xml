@@ -64,26 +64,35 @@
                   supertip="Xem lại các cuộc trò chuyện trước với AI (mở trong khung bên cạnh, chỉ xem)."/>
         </group>
 
-        <!-- Tạo mới (01/11/2026, đối chiếu tab WPS AI: Smart Create, Generate Slides from Doc): lệnh cả tài liệu doc:<id>
-             của Core (agent/quickactions.go DocumentActions). Soạn văn bản chỉ ở Writer và chờ người dùng gõ yêu cầu
-             (Input); Tạo slide từ tài liệu chỉ ở Presentation, đọc tài liệu Writer đang mở. Icon: SVG riêng theo phong cách
+        <!-- Cả tài liệu (01/11/2026, đối chiếu tab WPS AI: Smart Create, Smart Edit, Generate Slides from Doc): MỌI lệnh AI
+             làm trên cả bài (doc:<id> của Core, agent/quickactions.go DocumentActions), không cần bôi đen - tách khỏi
+             "Viết với AI" (chỉ đoạn bôi đen) để "Tóm tắt" / "Tóm tắt cả bài" không đứng cạnh nhau. Soạn văn bản, Sửa
+             thông minh chờ người dùng gõ yêu cầu (Input). Tạo slide từ tài liệu hiện ở Presentation VÀ Writer: chạy trong
+             Presentation (bấm ở Writer thì Core chuyển lượt sang phiên Presentation đang mở - QuickAction.ShownIn), đọc
+             tài liệu Writer qua other_document. Icon: SVG riêng theo phong cách
              icon nét của tab WPS AI (images/<tag, ':' thành '_'>.svg) - imageMso hợp nghĩa đều ra "?" trên WPS thật. -->
-        <group id="axiomCreateGroup" label="Tạo mới">
+        <group id="axiomCreateGroup" label="Cả tài liệu">
           <button id="axiomSmartCreate" label="Soạn văn bản" size="large" tag="doc:smartCreate" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
                   getImage="ribbon.OnGetImage" screentip="Soạn văn bản mới bằng AI"
                   supertip="Gõ yêu cầu (loại văn bản, mục đích, nội dung chính); AI soạn cả bài vào cuối tài liệu với tiêu đề, đoạn văn, danh sách, bảng. Chỗ thiếu thông tin để trống cho bạn điền."/>
           <button id="axiomSmartEdit" label="Sửa thông minh" size="large" tag="doc:smartEdit" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
                   getImage="ribbon.OnGetImage" screentip="Sửa cả tài liệu theo yêu cầu"
                   supertip="Gõ cách muốn sửa (viết gọn, đổi giọng, thống nhất thuật ngữ…); AI sửa cả bài, mỗi chỗ sửa là một Theo dõi thay đổi để bạn nhận hoặc từ chối."/>
+          <button id="axiomSummarizeDoc" label="Tóm tắt cả bài" size="large" tag="doc:summarizeDoc" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
+                  getImage="ribbon.OnGetImage" screentip="Tóm tắt cả tài liệu"
+                  supertip="Tóm tắt toàn bộ tài liệu theo từng mục, giữ đúng số liệu. Không cần bôi đen; AI trả lời trong khung chat, không sửa tài liệu."/>
+          <button id="axiomTranslateDoc" label="Dịch song ngữ cả bài" size="large" tag="doc:translateDoc" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
+                  getImage="ribbon.OnGetImage" screentip="Dịch song ngữ cả tài liệu"
+                  supertip="Chèn bản dịch ngay dưới từng đoạn (tiếng Việt sang tiếng Anh, ngôn ngữ khác sang tiếng Việt), giữ đoạn gốc. Không cần bôi đen."/>
           <button id="axiomSlidesFromDoc" label="Tạo slide từ tài liệu" size="large" tag="doc:slidesFromDoc" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
                   getImage="ribbon.OnGetImage" screentip="Tạo slide từ tài liệu Writer đang mở"
-                  supertip="AI đọc tài liệu văn bản đang mở trong WPS Writer và dựng bài trình chiếu: bìa, các mục chính, số liệu, tóm tắt. Slide cũ được giữ nguyên."/>
+                  supertip="AI đọc tài liệu văn bản đang mở trong WPS Writer và dựng bài trình chiếu trong WPS Presentation đang mở: bìa, các mục chính, số liệu, tóm tắt. Bấm được ở cả Writer lẫn Presentation; cần mở sẵn cả hai. Slide cũ được giữ nguyên."/>
         </group>
 
         <!-- Viết với AI: 15 mục "Sửa bằng AI" của menu chuột phải đưa lên ribbon (cùng tag quick:<id>, cùng nhãn bảng Core),
              chỉ Writer. Bấm: giống menu chuột phải - khung chat mini cạnh đoạn bôi đen; chưa bôi đen thì Core báo. WPS xếp
              nút nhỏ 2 hàng mỗi cột: Viết lại/Viết tiếp, Mở rộng/Rút gọn, Sửa lỗi/Đổi giọng, Dịch song ngữ/Dịch,
-             Tóm tắt/Giải thích, rồi hai lệnh cả bài (Tóm tắt cả bài, Dịch song ngữ cả bài - doc:<id>, không cần bôi đen). -->
+             Tóm tắt/Giải thích. Lệnh cả bài nằm ở nhóm "Cả tài liệu". -->
         <group id="axiomWriteGroup" label="Viết với AI">
           <button id="axiomRb_polish" label="Trau chuốt" size="large" tag="quick:polish" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
                   getImage="ribbon.OnGetImage" screentip="Trau chuốt đoạn văn"
@@ -123,12 +132,6 @@
           <button id="axiomRb_explain" label="Giải thích" tag="quick:explain" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
                   getImage="ribbon.OnGetImage" screentip="Giải thích đoạn văn"
                   supertip="Giải thích nghĩa, thuật ngữ, ý của đoạn bôi đen. Bôi đen đoạn văn trước; AI trả lời trong khung chat, không sửa tài liệu."/>
-          <button id="axiomSummarizeDoc" label="Tóm tắt cả bài" tag="doc:summarizeDoc" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
-                  getImage="ribbon.OnGetImage" screentip="Tóm tắt cả tài liệu"
-                  supertip="Tóm tắt toàn bộ tài liệu theo từng mục, giữ đúng số liệu. Không cần bôi đen; AI trả lời trong khung chat, không sửa tài liệu."/>
-          <button id="axiomTranslateDoc" label="Dịch song ngữ cả bài" tag="doc:translateDoc" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
-                  getImage="ribbon.OnGetImage" screentip="Dịch song ngữ cả tài liệu"
-                  supertip="Chèn bản dịch ngay dưới từng đoạn (tiếng Việt sang tiếng Anh, ngôn ngữ khác sang tiếng Việt), giữ đoạn gốc. Không cần bôi đen."/>
         </group>
 
         <!-- Ba nút soát: chỉ đọc, không dùng AI, mỗi nút một ứng dụng. Nhãn nêu rõ đối tượng được soát để
