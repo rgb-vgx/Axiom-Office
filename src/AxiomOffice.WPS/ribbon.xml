@@ -80,7 +80,7 @@
                   supertip="AI đọc tài liệu văn bản đang mở trong WPS Writer và dựng bài trình chiếu: bìa, các mục chính, số liệu, tóm tắt. Slide cũ được giữ nguyên."/>
         </group>
 
-        <!-- Viết với AI: 14 mục "Sửa bằng AI" của menu chuột phải đưa lên ribbon (cùng tag quick:<id>, cùng nhãn bảng Core),
+        <!-- Viết với AI: 15 mục "Sửa bằng AI" của menu chuột phải đưa lên ribbon (cùng tag quick:<id>, cùng nhãn bảng Core),
              chỉ Writer. Bấm: giống menu chuột phải - khung chat mini cạnh đoạn bôi đen; chưa bôi đen thì Core báo. WPS xếp
              nút nhỏ 2 hàng mỗi cột: Viết lại/Viết tiếp, Mở rộng/Rút gọn, Sửa lỗi/Đổi giọng, Dịch song ngữ/Dịch,
              Tóm tắt/Giải thích, rồi hai lệnh cả bài (Tóm tắt cả bài, Dịch song ngữ cả bài - doc:<id>, không cần bôi đen). -->
@@ -193,9 +193,9 @@
       </tab>
     </tabs>
   </ribbon>
-  <!-- Menu chuot phai khi boi den (docs/architecture/ribbon-ui.md, "Trong khung chat"): 14 muc "Sua bang AI", cung thu tu va
+  <!-- Menu chuot phai khi boi den (docs/architecture/ribbon-ui.md, "Trong khung chat"): 15 muc "Sua bang AI", cung thu tu va
        nhan voi bang cua Core (agent/quickactions.go) - spec test_pane.mjs ghim hai ben. Nhom tone (Trang trong /
-       Ngan gon / De hieu / Tich cuc) nam trong menu con "Doi giong" (axiomCtxTone_<t|l> - menu long trong contextMenu
+       Hoc thuat / Ngan gon / De hieu / Tich cuc) nam trong menu con "Doi giong" (axiomCtxTone_<t|l> - menu long trong contextMenu
        hien va bam duoc tren WPS that 12.1.2, 31/10/2026), roi den Viet tiep, Dich song ngu, vach ngan, ba muc
        chi-tra-loi. Bam mot muc: main.js mo KHUNG CHAT MINI (mini.html, Application.ShowDialog) va muc do chay ngay
        trong khung ay. Du phong khi WPS khong co ShowDialog: hien khung chat lon roi nho Core chuyen muc (POST /wps/v1/pane/request -> SSE
