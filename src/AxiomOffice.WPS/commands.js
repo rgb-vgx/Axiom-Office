@@ -1318,6 +1318,248 @@
     return { tableCount: count, tables: report, issueCount: issues.length, issues: issues };
   }
 
+  // Soat phan trang (chi doc) - port WriterCheckLayout cua ban Windows. Chup bo cuc sau Repaginate: moi doan mang
+  // san trang cua no. WPS khac Word: Information(12) tra boolean, Paragraphs gom ca doan "dau cuoi hang" cua bang
+  // (mot bang van chi tinh mot muc), va muc luc dung Start <= vi tri < End.
+  var LAYOUT_PARAGRAPH_LIMIT = 5000;
+  var LAYOUT_HEADING_LIMIT = 80;
+  var LAYOUT_SMALL_TABLE_ROWS = 15;
+
+  function layoutShorten(text, max) {
+    return text.length <= max ? text : text.substring(0, max) + "...";
+  }
+
+  function layoutPlainText(raw) {
+    // \r va \x07 la ky tu ket doan/ket o cua Word: bo o cuoi doan truoc khi trim.
+    // eslint-disable-next-line no-control-regex -- \x07 la ky tu nghiep vu cua Word, khong phai loi
+    return String(raw === undefined || raw === null ? "" : raw).replace(/\f/g, "").replace(/[\r\x07]+$/, "").trim();
+  }
+
+  function layoutTables(doc) {
+    var out = [];
+    var count = Number(doc.Tables.Count);
+    if (isNaN(count)) { count = 0; }
+    for (var i = 1; i <= count; i++) { out.push(doc.Tables.Item(i)); }
+    return out;
+  }
+
+  function layoutTableAt(tables, position) {
+    for (var i = 0; i < tables.length; i++) {
+      var range = tables[i].Range;
+      if (position >= Number(range.Start) && position < Number(range.End)) { return i; }
+    }
+    return -1;
+  }
+
+  function layoutInsideToc(doc, position) {
+    try {
+      var tocs = doc.TablesOfContents;
+      var count = Number(tocs.Count);
+      for (var i = 1; i <= count; i++) {
+        var range = tocs.Item(i).Range;
+        // Khac ban Windows: doan NGAY SAU muc luc (position === End) khong phai doan cua muc luc.
+        if (position >= Number(range.Start) && position < Number(range.End)) { return true; }
+      }
+    } catch (e) {}
+    return false;
+  }
+
+  function cmdWriterCheckLayout(app, params) {
+    var doc = app.ActiveDocument;
+    doc.Repaginate();
+    var pages = Number(doc.ComputeStatistics(2));
+    var words = Number(doc.ComputeStatistics(0));
+    var tables = layoutTables(doc);
+    var total = Number(doc.Paragraphs.Count);
+    var items = [];
+    var contentPages = {};
+    var tableSeen = {};
+    var splitTables = [];
+    var n, i, j, page;
+    var limit = total < LAYOUT_PARAGRAPH_LIMIT ? total : LAYOUT_PARAGRAPH_LIMIT;
+    for (n = 1; n <= limit; n++) {
+      var paragraph = doc.Paragraphs.Item(n);
+      var range = paragraph.Range;
+      var start = Number(range.Start);
+      var tableIndex = layoutTableAt(tables, start);
+      if (tableIndex >= 0) {
+        // Bang: mot muc cho ca bang (o cua bang 200 dong la hang tram doan - khong hoi trang tung o).
+        if (!tableSeen[tableIndex]) {
+          tableSeen[tableIndex] = true;
+          var table = tables[tableIndex];
+          var first = Number(table.Range.Characters.First.Information(3));
+          var last = Number(table.Range.Characters.Last.Information(3));
+          for (page = first; page <= last; page++) { contentPages[page] = true; }
+          if (last > first && Number(table.Rows.Count) <= LAYOUT_SMALL_TABLE_ROWS && !isLayoutTable(table)) {
+            splitTables.push(tableIndex + 1);
+          }
+          items.push({ n: n, text: "", content: true, pageBreak: false,
+            level: 10, startPage: first, page: last, table: tableIndex + 1 });
+        }
+        continue;
+      }
+      var raw = String(range.Text === undefined || range.Text === null ? "" : range.Text);
+      var item = { n: n, text: layoutPlainText(raw), content: false,
+        pageBreak: raw.indexOf("\f") >= 0, level: 10, startPage: 0, page: 0, table: 0 };
+      var shape = false;
+      try { shape = Number(range.InlineShapes.Count) > 0; } catch (eShape) { shape = false; }
+      // Doan cua muc luc (truong TOC) tu cap nhat, khong sua/xoa tay duoc: coi la co noi dung.
+      item.content = item.text.length > 0 || shape || layoutInsideToc(doc, start);
+      item.page = Number(range.Information(3));
+      item.startPage = item.page;
+      if (item.content) {
+        item.startPage = Number(doc.Range(start, start).Information(3));
+        for (page = item.startPage; page <= item.page; page++) { contentPages[page] = true; }
+        try { item.level = Number(paragraph.OutlineLevel); } catch (eLevel) { item.level = 10; }
+      }
+      items.push(item);
+    }
+
+    var issues = [];
+    // Trang trang: khong co chu, anh hay bang - chi doan trong / dau ngat trang.
+    for (page = 1; page <= pages; page++) {
+      if (contentPages[page]) { continue; }
+      var empties = [];
+      for (i = 0; i < items.length; i++) {
+        if (!items[i].content && items[i].table === 0 && items[i].page === page) {
+          empties.push(items[i].n);
+        }
+      }
+      var fix = empties.length > 0
+        ? "delete the empty paragraph(s) / page break(s) " + empties.join(", ") + " with writer.deleteParagraphs {\"paragraphs\": [" + empties.join(", ") + "]}"
+        : "remove the extra page break or empty paragraphs around it";
+      issues.push({ type: "blank-page", detail: "page " + page + " of " + pages + " is blank: " + fix,
+        page: page, paragraphs: empties });
+    }
+    // Tieu de la thu cuoi cung tren trang, noi dung cua no sang trang sau.
+    for (i = 0; i < items.length; i++) {
+      var heading = items[i];
+      if (!heading.content || heading.level >= 10) { continue; }
+      j = i + 1;
+      var between = [];
+      while (j < items.length && !items[j].content) {
+        between.push(items[j].n);
+        j++;
+      }
+      if (j >= items.length || items[j].startPage <= heading.page) { continue; }
+      fix = between.length > 0
+        ? "delete the empty paragraph(s) " + between.join(", ") + " after it (writer.deleteParagraphs) so it stays with its text"
+        : "start it on the next page: writer.insertPageBreak {\"before\": " + heading.n + "}";
+      issues.push({ type: "heading-at-page-bottom",
+        detail: "heading '" + layoutShorten(heading.text, 50) + "' (paragraph " + heading.n + ") ends page " +
+          heading.page + " but its text starts on page " + items[j].startPage + ": " + fix,
+        paragraph: heading.n, page: heading.page });
+    }
+    for (i = 0; i < splitTables.length; i++) {
+      var t = splitTables[i];
+      issues.push({ type: "split-table",
+        detail: "table " + t + " has at most " + LAYOUT_SMALL_TABLE_ROWS + " rows but is cut across pages: keep it on one page with writer.formatTable {\"table\": " + t + ", \"keepTogether\": true}",
+        table: t });
+    }
+    // Doan trong lien tiep dung de dan trang: khoang cach nen den tu style, khong tu dong trong.
+    for (i = 0; i < items.length; i++) {
+      if (items[i].content || items[i].table > 0 || items[i].pageBreak) { continue; }
+      j = i;
+      while (j + 1 < items.length && !items[j + 1].content && items[j + 1].table === 0 && !items[j + 1].pageBreak) {
+        j++;
+      }
+      if (j > i) {
+        var run = [];
+        for (n = i; n <= j; n++) { run.push(items[n].n); }
+        issues.push({ type: "empty-paragraphs",
+          detail: run.length + " empty paragraphs in a row (" + run[0] + "-" + run[run.length - 1] + ") used as spacing: delete them with writer.deleteParagraphs",
+          paragraphs: run });
+      }
+      i = j;
+    }
+    // Dai hon so trang nguoi dung yeu cau.
+    var maxPages = paramInt(params, "maxPages", 0);
+    if (maxPages > 0 && pages > maxPages) {
+      var perPage = Math.max(1, Math.floor(words / Math.max(1, pages)));
+      issues.push({ type: "too-long",
+        detail: "the document has " + pages + " pages but the limit is " + maxPages + ": cut about " +
+          ((pages - maxPages) * perPage) + " words (~" + perPage + " words per page) - shorten long paragraphs and drop " +
+          "repeated points (writer.replaceMany / writer.deleteParagraphs), keep every required section and table",
+        pages: pages, maxPages: maxPages });
+    }
+    var headings = [];
+    for (i = 0; i < items.length && headings.length < LAYOUT_HEADING_LIMIT; i++) {
+      if (items[i].content && items[i].level < 10) {
+        headings.push({ n: items[i].n, level: items[i].level, page: items[i].startPage,
+          t: layoutShorten(items[i].text, 60) });
+      }
+    }
+    var result = {
+      pages: pages, words: words, paragraphs: total, tables: tables.length,
+      headings: headings, issueCount: issues.length, issues: issues
+    };
+    if (total > LAYOUT_PARAGRAPH_LIMIT) { result.checkedParagraphs = LAYOUT_PARAGRAPH_LIMIT; }
+    return result;
+  }
+
+  // Xoa mot doan; tra chu da xoa (null = khong xoa duoc). Ban Windows con nhanh n == 1 rieng; WPS do duoc
+  // Range.Delete() tren doan cuoi nen bo nhanh do: doan cuoi bai -> Range.Delete(), tru khi doan truoc nam trong
+  // bang (WPS luon giu mot doan sau bang: chi xoa chu).
+  function layoutDeleteParagraph(doc, n) {
+    var paragraph = doc.Paragraphs.Item(n);
+    var text = layoutPlainText(paragraph.Range.Text);
+    var total = Number(doc.Paragraphs.Count);
+    if (n < total) {
+      paragraph.Range.Delete();
+      return text;
+    }
+    if (n > 1) {
+      var previous = doc.Paragraphs.Item(n - 1);
+      if (previous.Range.Information(12)) {
+        var body = paragraph.Range;
+        body.MoveEnd(1, -1);
+        body.Delete();
+        return text.length > 0 ? text : null;
+      }
+    }
+    paragraph.Range.Delete();
+    return text;
+  }
+
+  function cmdWriterDeleteParagraphs(app, params) {
+    var doc = app.ActiveDocument;
+    var numbers = paramIntList(params, "paragraphs");
+    var unique = [], seen = {}, k;
+    for (k = 0; k < numbers.length; k++) {
+      if (!seen[numbers[k]]) {
+        seen[numbers[k]] = true;
+        unique.push(numbers[k]);
+      }
+    }
+    unique.sort(function (a, b) { return b - a; });
+    if (unique.length === 0) {
+      throw new Error("'paragraphs' must list paragraph numbers from writer.outline / writer.checkLayout");
+    }
+    var total = Number(doc.Paragraphs.Count);
+    var n, start;
+    // Kiem HET truoc khi xoa: WPS chua do Undo(1) de lui giua chung, mot loi giua chung de lai nua bai.
+    for (k = 0; k < unique.length; k++) {
+      n = unique[k];
+      if (n < 1 || n > total) {
+        throw new Error("paragraph " + n + " does not exist (the document has " + total + ")");
+      }
+      if (doc.Paragraphs.Item(n).Range.Information(12)) {
+        throw new Error("paragraph " + n + " is inside a table; edit the table instead");
+      }
+      start = Number(doc.Paragraphs.Item(n).Range.Start);
+      if (layoutInsideToc(doc, start)) {
+        throw new Error("paragraph " + n + " is part of the table of contents; it cannot be edited by hand - " +
+          "call writer.insertToc again to refresh it");
+      }
+    }
+    var deleted = [];
+    for (k = 0; k < unique.length; k++) {
+      var text = layoutDeleteParagraph(doc, unique[k]);
+      if (text !== null) { deleted.push(layoutShorten(text, 60)); }
+    }
+    return { deleted: deleted.length, texts: deleted, paragraphs: Number(doc.Paragraphs.Count) };
+  }
+
   function cmdSelection(app) {
     var sel = app.Selection;
     return { text: strProp(sel, "Text"), start: numProp(sel, "Start"), end: numProp(sel, "End") };
@@ -2865,7 +3107,8 @@
     "writer.lockSelection": true,
     "writer.unlockSelection": true,
     "writer.listRevisions": true,
-    "writer.listComments": true
+    "writer.listComments": true,
+    "writer.checkLayout": true
   };
 
   // Lenh luon cham ra ngoai vung chon: tu choi truoc, noi ro vi sao. Giu du ca cac lenh add-in Windows
@@ -2878,6 +3121,7 @@
     "writer.newDocument": "creates another document",
     "writer.open": "opens another document",
     "writer.closeAll": "closes the documents",
+    "writer.deleteParagraphs": "deletes paragraphs by number anywhere in the document",
     // InsertBreak THAY ca vung chon bang dau ngat: khoa vung luon co vung chon nen lenh nay xoa ca doan
     // da boi den. Muon ngat trang thi bo boi den roi yeu cau.
     "writer.insertPageBreak": "replaces the whole selected passage with a page break"
@@ -5339,6 +5583,8 @@
     "writer.writeContent": cmdWriterWriteContent,
     "writer.insertLayoutTable": cmdWriterInsertLayoutTable,
     "writer.checkTables": cmdWriterCheckTables,
+    "writer.checkLayout": cmdWriterCheckLayout,
+    "writer.deleteParagraphs": cmdWriterDeleteParagraphs,
     "writer.replaceAll": cmdReplaceAll,
     "writer.replaceMany": cmdWriterReplaceMany,
     "writer.undo": cmdUndo,

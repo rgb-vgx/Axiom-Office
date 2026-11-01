@@ -193,16 +193,14 @@ Spreadsheets cùng lúc thì `/health` đảo app sau mỗi lần poll và agent
 
 <!-- BEGIN SINH TU DONG (scripts/generate_wps_gaps.py) - KHONG SUA TAY -->
 
-Registry có **115** lệnh; add-in WPS có handler cho **78**, còn **37** chưa có. Add-in chỉ khai với Core những lệnh có handler (`filterRunnable` trong `main.js`), nên agent **không** được mời gọi lệnh chưa có.
+Registry có **115** lệnh; add-in WPS có handler cho **80**, còn **35** chưa có. Add-in chỉ khai với Core những lệnh có handler (`filterRunnable` trong `main.js`), nên agent **không** được mời gọi lệnh chưa có.
 
-**Writer (`writer.*`) — 14 lệnh**
+**Writer (`writer.*`) — 12 lệnh**
 
 | Lệnh | Cho agent | Lý do (từ `CHUA_CO_HANDLER`) |
 |---|---|---|
 | `writer.addTableRows` | có | chi co trong add-in Windows (plan 21 P2); WPS de sau |
-| `writer.checkLayout` | có | chi co trong add-in Windows (plan 21 P2); WPS de sau |
 | `writer.closeAll` | không | chua co handler trong add-in |
-| `writer.deleteParagraphs` | có | chi co trong add-in Windows (plan 21 P2); WPS de sau |
 | `writer.editCommentScope` | có | chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc |
 | `writer.insertBlocks` | không | chi co trong add-in Windows (lenh thiet ke, doc_design); WPS JS chua viet handler |
 | `writer.insertHyperlink` | có | chua co handler trong add-in (agent=true) |
@@ -257,7 +255,6 @@ Registry có **115** lệnh; add-in WPS có handler cho **78**, còn **37** chư
 | Tool | Lệnh bắt buộc WPS chưa có |
 |---|---|
 | `doc_design` | `writer.restyle`, `writer.insertBlocks` |
-| `doc_from_brief` | `writer.checkLayout` |
 | `look_at_document` | `app.screenshot` |
 | `slides_from_template` | `wpp.sourceManifest`, `wpp.addSlideFromTemplate`, `wpp.setShapeText`, `wpp.deleteShapes`, `wpp.copyPicture`, `wpp.deleteTagged` |
 
