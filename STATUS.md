@@ -1,10 +1,10 @@
 ﻿# Tình trạng dự án Axiom Office
 
-Cập nhật: **31/10/2026** · nhánh `main` · đợt 31/10 (§2.16: WPS nhiều app cùng mở, hợp đồng lệnh của tool, đóng băng
-LibreOffice) **chưa commit**.
+Cập nhật: **10/11/2026** · nhánh `main` · đã hợp nhất nhánh WPS Linux 16/10–01/11 với các tính năng local 17–18/10
+(§2.17); **chưa push** remote.
 Số liệu kiểm chứng ở §2.4 là lượt đo **01/10/2026**; số mới của đợt WPS ở §2.6, lượt đo lại toàn bộ ở §2.7, lượt đo
-lại job Windows ở §2.8, đợt Office x64 + sửa định dạng văn bản ở §2.9, ba đợt 25/10 ở §2.10–2.12, đợt 27–28/10 ở §2.15
-và đợt 31/10 ở §2.16.
+lại job Windows ở §2.8, đợt Office x64 + sửa định dạng văn bản ở §2.9, ba đợt 25/10 ở §2.10–2.12, đợt 27–28/10 ở §2.15,
+đợt 31/10 ở §2.16 và đợt hợp nhất 10/11 ở §2.17.
 
 Tài liệu này là ảnh chụp nhanh "đã làm được gì / chưa làm được gì". Chi tiết thiết kế nằm ở
 [docs/architecture/core.md](docs/architecture/core.md) (Core + add-in), [docs/architecture/wps-bridge.md](docs/architecture/wps-bridge.md) (WPS Linux) và
@@ -356,6 +356,23 @@ mở thành hai phiên, `/health` mỗi cổng không còn đảo app; lượt a
 ~50 giây; WPS chết giữa lệnh thì `/cmd` báo lỗi sau ~1 giây thay vì 300 giây (`wpsoffice` — máy chủ CEF của add-in — thoát
 theo app cuối). Phát hiện phụ: `oem.ini` của bản này không có `JsApiPlugin=true` mà add-in vẫn nạp (chỉ hỏi tin cậy lần đầu).
 
+### 2.17 Đợt 10/11/2026: hợp nhất nhánh local (17–18/10) với nhánh WPS (16/10–01/11)
+
+Checkout trên máy Windows dừng ở 18/10 trong khi `origin/main` đã tới 01/11 (182 commit) nên hai nhánh tách từ 16/10.
+Đợt này merge `origin/main` vào `main`, giữ cả hai phía:
+
+| Nhóm | Nội dung |
+|---|---|
+| Remote (đã có sẵn) | Cấu trúc `prepareExecution`/`buildCallbacks`/`applyResult`, quick action + `routeBoth` cho WPS, `skills.Store` (nhập thư mục/.zip, CRUD), TRACE, benchmark, WPS Linux 01/11 |
+| Local (giữ lại) | Memory `org-style`/`doc-style` theo `scope_key`, export/import, `Redact` + hạn lưu/lọc audit theo tài liệu, registry `Profile` provider, `not_for` cho skill, `language` cho câu trạng thái, nút **Nhập kỹ năng…** (Windows + LibreOffice), `ARCHITECTURE.html` + 13 sơ đồ |
+| Thích nghi | `/v1/skills/inspect` chạy trên `Store.Import(dryRun)` nhưng vẫn trả `candidates`/`errors` cho hai giao diện cũ; `/v1/skills/import` kèm `imported`/`replaced`; ba skill mới của remote được bổ sung `not_for`/`apps` |
+
+Kiểm trên máy Windows (10/11): `go test ./...` xanh, `go vet` + `gofmt` sạch; e2e Core **179/179**; `scripts\build.ps1`
+dựng được Core + `AxiomOffice.dll` + Host; `tests/lo/test_dialogs.py` **27/27**; `check-gen` khớp 4/5 — riêng
+`generate_ribbon_menus.py --check` báo lệch do file ribbon.xml trong checkout Windows dùng CRLF (nội dung sinh giống hệt,
+trên Linux/CI khớp). Nhánh `backup/local-18-10` giữ nguyên trạng thái trước merge; bản docs 18/10 chưa commit nằm ở
+`stash@{0}`.
+
 ## 3. Chưa làm / chưa kiểm chứng
 
 | Việc | Tình trạng | Ghi chú |
@@ -366,7 +383,7 @@ theo app cuối). Phát hiện phụ: `oem.ini` của bản này không có `JsA
 | Trích xuất memory với **LLM thật** | **Đã (24/10/2026)** | Lượt thật trích 1 fact (`core.log`: `1 added`) |
 | **Office 32-bit** | **Không hỗ trợ** | Add-in .NET làm Office 32-bit crash `mso98win32client.dll`; kiểm bằng add-in tối giản (§2.9) |
 | Đọc/ghi **HKCU** bằng test tự động trên Windows | Một phần | Đối chiếu tay: Core Go đọc đúng endpoint/model/token/DPAPI của bạn; test tự động hiện dùng `AXIOM_*`. Từ 24/10 test cũng **không còn ghi vào HKCU thật** (nguồn cấu hình inject file tạm — §2.8) |
-| **Push remote** | Đã push 26/10/2026 | Đợt 18–22/10 (11 commit), sửa CI Windows 24/10 (§2.7–2.8) ba đợt 25/10 — "trả token cho agent" (§2.10), slide sơ đồ (§2.11), tự đi lại dây (§2.12) — và đợt 26/10 đến `4f1b3a9` (§2.13) đều đã lên `origin/main` |
+| **Push remote** | **Chưa (10/11/2026)** | `main` đang **ahead 17** so với `origin/main`: 15 commit local 17–18/10, merge `4c435f8` và ca kiểm `/v1/skills/inspect`; chưa push theo yêu cầu |
 | CI job **windows** | **Xanh (24/10/2026)** | Trước đó đỏ ở bước `go test` (`TestWPSConfigWrite` giả định nguồn cấu hình là `config.json`, nhưng trên Windows `DefaultSource()` là HKCU) và ở bước build net48 (`}` thừa trong `AskAiPane.cs`). Đã sửa cả hai — xem §2.8 |
 | Nghiệm thu plan 20 §5.1 trên đề thật | **Đạt 26/10/2026** | 3 lượt liền (`r_e6766361`, `r_9a7512ac`, `r_fb096418`, `ocg/beam-free`) lần dựng đầu không còn `connector-*` (§2.13) |
 | Merge `feat/setup-wizard` + `feat/core-go` vào `main` | **Đã xong** | Fast-forward, lịch sử thẳng |
