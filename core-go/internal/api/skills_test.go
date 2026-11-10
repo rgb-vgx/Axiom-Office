@@ -139,3 +139,52 @@ func TestSkillImportEndpoint(t *testing.T) {
 		t.Fatalf("duong dan sai: %d %s", reply.Code, reply.Body.String())
 	}
 }
+
+// Add-in Windows + LibreOffice (chua chuyen sang Store.Import) van goi /v1/skills/inspect va doc ket qua
+// {target, candidates[], errors[]}; imported/replaced phai con trong phan hoi cua /v1/skills/import.
+func TestSkillInspectKeepsDesktopUIContract(t *testing.T) {
+	handler, user := newSkillsHandler(t)
+	pack := filepath.Join(t.TempDir(), "hop-dong")
+	if err := os.MkdirAll(pack, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	text := "---\nname: hop-dong\ndescription: Soan hop dong\nnot_for: Sua bang tinh\napps: [wps]\n---\nx\n"
+	if err := os.WriteFile(filepath.Join(pack, "SKILL.md"), []byte(text), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	body, _ := json.Marshal(map[string]any{"path": pack})
+	reply := call(handler, "POST", "/wps/v1/skills/inspect", string(body), wpsOrigin)
+	payload, _ := decode(t, reply.Body.String())["result"].(map[string]any)
+	candidates, _ := payload["candidates"].([]any)
+	if reply.Code != 200 || payload["target"] != user || len(candidates) != 1 {
+		t.Fatalf("inspect: %d %s", reply.Code, reply.Body.String())
+	}
+	candidate := candidates[0].(map[string]any)
+	if candidate["name"] != "hop-dong" || candidate["not_for"] != "Sua bang tinh" || candidate["conflict"] != false {
+		t.Fatalf("candidate: %+v", candidate)
+	}
+
+	// Trung ten voi ban ca nhan: bao conflict + existing.source de UI canh bao truoc khi ghi de.
+	if err := os.MkdirAll(filepath.Join(user, "hop-dong"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(user, "hop-dong", "SKILL.md"),
+		[]byte("---\nname: hop-dong\ndescription: ban cu\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	reply = call(handler, "POST", "/wps/v1/skills/inspect", string(body), wpsOrigin)
+	payload, _ = decode(t, reply.Body.String())["result"].(map[string]any)
+	candidates, _ = payload["candidates"].([]any)
+	candidate = candidates[0].(map[string]any)
+	existing, _ := candidate["existing"].(map[string]any)
+	if candidate["conflict"] != true || existing["source"] != "user" {
+		t.Fatalf("trung ten: %+v", candidate)
+	}
+
+	overwrite, _ := json.Marshal(map[string]any{"path": pack, "overwrite": true})
+	reply = call(handler, "POST", "/wps/v1/skills/import", string(overwrite), wpsOrigin)
+	payload, _ = decode(t, reply.Body.String())["result"].(map[string]any)
+	if reply.Code != 200 || len(payload["imported"].([]any)) != 1 {
+		t.Fatalf("import: %d %s", reply.Code, reply.Body.String())
+	}
+}
