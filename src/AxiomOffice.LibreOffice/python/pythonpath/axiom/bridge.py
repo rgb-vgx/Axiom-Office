@@ -1,4 +1,4 @@
-"""Bridge HTTP cua LibreOffice (LibreOffice_arch.md muc 5, 6): ba listener (Writer/Calc/Impress) tren
+"""Bridge HTTP cua LibreOffice (docs/architecture/libreoffice.md muc 5, 6): ba listener (Writer/Calc/Impress) tren
 127.0.0.1, cung giao thuc voi add-in Office/WPS: /health (khong token), /commands, /cmd, /session.
 Bao ve giong HttpBridge.cs: chan Origin (403), sai token (401), body khong phai JSON (415)."""
 from __future__ import annotations
@@ -6,7 +6,6 @@ from __future__ import annotations
 import json
 import os
 import threading
-import time
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -21,35 +20,46 @@ PORT_ATTEMPTS = 5          # ban thi thu +10, +20...
 class Env:
     """Moi truong mot lenh: ctx UNO, loai app, tai lieu dich (tim khi can)."""
 
-    def __init__(self, ctx, kind: str, gate: UnoGate):
+    def __init__(self, ctx, kind: str, gate: UnoGate, params: dict | None = None):
         self.ctx = ctx
         self.kind = kind
         self.gate = gate
+        self.params = params or {}
         self._document = None
 
     @property
     def document(self):
         if self._document is None:
-            self._document = documents.active(self.ctx, self.kind)
+            target = self.params.get("presentation")
+            if target:
+                self._document = documents.find_open_path(self.ctx, self.kind, str(target))
+            else:
+                self._document = documents.active(self.ctx, self.kind)
         return self._document
 
 
 def execute(ctx, gate: UnoGate, kind: str, action: str, params: dict) -> dict:
+    """Lenh tu HTTP: qua gate khi lenh can main thread."""
+    return _invoke(ctx, gate, kind, action, params)
+
+
+def _invoke(ctx, gate: UnoGate, kind: str, action: str, params: dict, on_main: bool = False) -> dict:
     command = commands.REGISTRY.get(action)
     if command is None:
         return {"ok": False, "error": "unknown action: " + str(action)}
     if command.kind is not None and command.kind != kind:
         return {"ok": False, "error": "'%s' is not available on the %s port (use the port of app kind '%s')" % (action, kind, command.kind)}
+    params = params or {}
 
     def run():
-        env = Env(ctx, kind, gate)
+        env = Env(ctx, kind, gate, params)
         if command.undo:
             with documents.undo_step(env.document, action):
-                return command.handler(env, params or {})
-        return command.handler(env, params or {})
+                return command.handler(env, params)
+        return command.handler(env, params)
 
     try:
-        result = gate.run(run) if command.gated else run()
+        result = run() if on_main or not command.gated else gate.run(run)
         return {"ok": True, "result": result}
     except (values.ParamError, ValueError) as exc:
         return {"ok": False, "error": "ArgumentException: " + str(exc)}
@@ -226,21 +236,4 @@ def pane_target(kind: str | None = None) -> tuple[str, int]:
 
 def run_on_main(ctx, uno_gate, kind: str, action: str, params: dict) -> dict:
     """Chay mot lenh NGAY tren thread dang goi (pane da o main thread: qua gate se tu treo)."""
-    command = commands.REGISTRY.get(action)
-    if command is None:
-        return {"ok": False, "error": "unknown action: " + str(action)}
-    try:
-        env = Env(ctx, kind, uno_gate)
-        if command.undo:
-            with documents.undo_step(env.document, action):
-                return {"ok": True, "result": command.handler(env, params or {})}
-        return {"ok": True, "result": command.handler(env, params or {})}
-    except (values.ParamError, ValueError) as exc:
-        return {"ok": False, "error": "ArgumentException: " + str(exc)}
-    except Exception as exc:  # noqa: BLE001
-        log.error("Action failed (pane): %s => %s" % (action, exc))
-        return {"ok": False, "error": "%s: %s" % (type(exc).__name__, exc)}
-
-
-def uptime_started() -> float:
-    return _STATE.setdefault("t0", time.time())
+    return _invoke(ctx, uno_gate, kind, action, params, on_main=True)

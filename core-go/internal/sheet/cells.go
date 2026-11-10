@@ -79,6 +79,15 @@ func AsFloat(value any) (float64, bool) {
 	return 0, false
 }
 
+// Int doi gia tri so sang int, lam tron nhu Excel (.5 ra xa 0). Khong phai so -> 0.
+func Int(value any) int {
+	number, ok := AsFloat(value)
+	if !ok {
+		return 0
+	}
+	return int(math.Round(number))
+}
+
 // roundTripFloat64 gan dung dinh dang "R" cua .NET: chuoi ngan nhat ma doc lai van dung,
 // va dang mu dung chu E hoa voi so mu it nhat hai chu so.
 func roundTripFloat64(value float64) string {

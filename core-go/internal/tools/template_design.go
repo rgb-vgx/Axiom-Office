@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -563,7 +564,7 @@ func checkUpdate(row designRow, kind *pptx.Kind, slot int, webSource func(string
 			continue
 		}
 		domain := strings.SplitN(normalizeURL(url), "/", 2)[0]
-		if !containsString(domains, domain) {
+		if !slices.Contains(domains, domain) {
 			domains = append(domains, domain)
 		}
 	}
@@ -586,15 +587,6 @@ func checkUpdate(row designRow, kind *pptx.Kind, slot int, webSource func(string
 }
 
 const maxUpdatePoints = 6
-
-func containsString(list []string, value string) bool {
-	for _, item := range list {
-		if item == value {
-			return true
-		}
-	}
-	return false
-}
 
 // compareTextShare: cot co ca chu va anh - chu o phan tren, toi da 40% chieu cao cot.
 const compareTextShare = 0.4
@@ -822,7 +814,8 @@ func (t *SlidesFromTemplateTool) design(ctx context.Context, arguments map[strin
 		report["errors"] = errors
 		report["source"] = designView(views)
 		report["next"] = fmt.Sprintf("fix the slides listed in errors (src = slide position in your list) and call again with first=%d, last=%d and the whole list", first, last)
-		result.JSON = OKJSON(report)
+		// Bo cuc sai la lan goi hong: ok:false kem errors (truoc 26/10/2026 tra "ok":true).
+		result.OK, result.JSON = false, FailJSON(rowErrorsLine(errors), report)
 		return result
 	}
 
@@ -909,6 +902,10 @@ func (t *SlidesFromTemplateTool) design(ctx context.Context, arguments map[strin
 		report["next"] = "FINISHED: every source slide is designed, checked and saved. Answer the user now; do not re-check slide by slide."
 	}
 	result.JSON = OKJSON(report)
+	if len(errors) > 0 {
+		// Co slide dung hong (loi PowerPoint): phan con lai da dung va luu (built), nhung lan goi la that bai.
+		result.OK, result.JSON = false, FailJSON(rowErrorsLine(errors), report)
+	}
 	if all && len(errors) == 0 && (saved || built == 0) {
 		result.Final = true
 		var text strings.Builder

@@ -1,4 +1,4 @@
-// Package policy: quy tac xac nhan truoc lenh rui ro (New_arch.md muc 8.6) - ban Go cua
+// Package policy: quy tac xac nhan truoc lenh rui ro (docs/architecture/core.md muc 8.6) - ban Go cua
 // Agent/PolicyEngine.cs. Nam rieng mot goi de tools va agent cung dung ma khong vong import.
 package policy
 
@@ -58,6 +58,9 @@ var (
 	negations = set("đừng", "không", "khong", "chưa", "chua", "chẳng", "chang", "cấm", "khỏi", "khoi",
 		"not", "don't", "dont", "never", "no", "without", "avoid")
 )
+
+// resolveWords: cau lenh co yeu cau danh dau comment xong / dong comment.
+var resolveWords = regexp.MustCompile(`(?i)resolve|mark(ed)? (as )?done|đánh dấu (là )?(đã )?xong|đóng (các |những )?(comment|góp ý|bình luận)|đã xử lý xong`)
 
 func set(words ...string) map[string]bool {
 	result := make(map[string]bool, len(words))
@@ -126,8 +129,26 @@ func Evaluate(ctx context.Context, action string, params map[string]any, prompt 
 		}
 	}
 
+	// Chap nhan / tu choi thay doi duoc theo doi: dung toi chu cua nguoi khac (doi tac, dong nghiep) - luon hoi.
+	if action == "writer.reviewRevisions" {
+		verb := "Chấp nhận"
+		if value, _ := params["action"].(string); strings.EqualFold(strings.TrimSpace(value), "reject") {
+			verb = "Từ chối"
+		}
+		return Ask(verb + " thay đổi được theo dõi (track changes) trong tài liệu")
+	}
+
+	// Danh dau comment da xong: chi tu lam khi nguoi dung yeu cau; khong thi hoi (comment la cua nguoi gop y).
+	if action == "writer.resolveComment" && !resolveWords.MatchString(prompt) {
+		return Ask("Đánh dấu comment là đã xong")
+	}
+
 	if action == "wpp.deleteSlide" {
 		return Ask("Xoá slide khỏi bài thuyết trình")
+	}
+
+	if action == "et.deleteSheet" {
+		return Ask("Xoá sheet khỏi sổ tính")
 	}
 
 	if action == "wpp.deleteShapes" {
@@ -156,6 +177,64 @@ func Evaluate(ctx context.Context, action string, params map[string]any, prompt 
 }
 
 // WordLength: do dai tai lieu Word qua bridge (writer.getText maxChars=1 tra totalChars).
+// BlankSlide: slide `params.slide` (so ro rang) khong co hinh nao ngoai placeholder rong - xoa no khong mat gi cua
+// nguoi dung nen khong hoi (nguoi dung 25/10/2026: "cu mac dinh dong y xoa slide rong dau tien"; bai moi cua
+// PowerPoint luon co mot slide bia trong). Doc bang wpp.checkLayout: no bo placeholder rong, giu moi hinh khac ke ca
+// anh khong chu - slide chi co mot anh van bi coi la CO noi dung va van hoi. Loi doc / khong ro slide -> false (hoi).
+func BlankSlide(ctx context.Context, bridge *office.BridgeClient, port int, params map[string]any) bool {
+	var slide float64
+	switch value := params["slide"].(type) {
+	case float64:
+		slide = value
+	case string: // model yeu gui "1" / "1.0"
+		slide, _ = strconv.ParseFloat(strings.TrimSpace(value), 64)
+	}
+	if slide < 1 || slide != float64(int(slide)) {
+		return false
+	}
+	query := map[string]any{"slide": int(slide)}
+	if deck, ok := params["presentation"].(string); ok && strings.TrimSpace(deck) != "" {
+		query["presentation"] = deck
+	}
+	result := bridge.Command(ctx, port, "wpp.checkLayout", query)
+	if !result.OK {
+		return false
+	}
+	slides, _ := result.Result["slides"].([]any)
+	if len(slides) != 1 {
+		return false
+	}
+	entry, _ := slides[0].(map[string]any)
+	shapes, ok := entry["shapes"].([]any)
+	return ok && len(shapes) == 0
+}
+
+// EmptySheet: sheet `params.sheet` khong co o nao co du lieu (vd Sheet1 trong cua so moi) - xoa khong mat gi nen khong
+// hoi. Doc bang et.sheetInfo (co co "empty" tung sheet); loi doc / khong thay sheet -> false (hoi).
+func EmptySheet(ctx context.Context, bridge *office.BridgeClient, port int, params map[string]any) bool {
+	name, _ := params["sheet"].(string)
+	if strings.TrimSpace(name) == "" {
+		return false
+	}
+	query := map[string]any{}
+	if book, ok := params["workbook"].(string); ok && strings.TrimSpace(book) != "" {
+		query["workbook"] = book
+	}
+	result := bridge.Command(ctx, port, "et.sheetInfo", query)
+	if !result.OK {
+		return false
+	}
+	sheets, _ := result.Result["sheets"].([]any)
+	for _, item := range sheets {
+		entry, _ := item.(map[string]any)
+		if entry["name"] == name {
+			empty, _ := entry["empty"].(bool)
+			return empty
+		}
+	}
+	return false
+}
+
 func WordLength(ctx context.Context, bridge *office.BridgeClient, port int) *int {
 	result := bridge.Command(ctx, port, "writer.getText", map[string]any{"maxChars": 1})
 	if !result.OK {

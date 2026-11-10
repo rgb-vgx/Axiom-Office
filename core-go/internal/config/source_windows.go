@@ -3,6 +3,7 @@
 package config
 
 import (
+	"fmt"
 	"strconv"
 
 	"golang.org/x/sys/windows/registry"
@@ -30,6 +31,21 @@ func (r RegistrySource) String(name string) (string, bool) {
 		return strconv.FormatUint(number, 10), true
 	}
 	return "", false
+}
+
+// Set ghi mot khoa vao HKCU\Software\AxiomOffice - cung cho voi add-in .NET va extension LibreOffice
+// (hai ban kia ghi REG_SZ, nen ghi chuoi cho dong dang).
+func (r RegistrySource) Set(name string, value any) error {
+	text, ok := SettingText(value)
+	if !ok {
+		return fmt.Errorf("unsupported value type for setting %s", name)
+	}
+	key, _, err := registry.CreateKey(registry.CURRENT_USER, r.KeyPath, registry.SET_VALUE)
+	if err != nil {
+		return err
+	}
+	defer key.Close()
+	return key.SetStringValue(name, text)
 }
 
 func (r RegistrySource) Int(name string) (int, bool) {

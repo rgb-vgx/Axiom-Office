@@ -17,7 +17,8 @@ namespace AxiomOffice.Bridge
                 Command("wpp.open", "wpp", WppOpen, "Mở .pptx", Req("path")),
                 Command("wpp.listSlides", "wpp", WppListSlides, "Số slide + text từng slide", Opt("presentation", "full path of the presentation to work on; default: the active one"), Opt("detail", "true = kem layout/master/notes")).ForAgent(),
                 Command("wpp.addSlide", "wpp", WppAddSlide, "Thêm slide cuối; `layout` mặc định 12 = trống (1 = tiêu đề, 2 = tiêu đề + nội dung, 11 = chỉ tiêu đề)",
-                    Opt("layout", "number: 1 title, 2 title+content, 11 title only, 12 blank")).ForAgent(),
+                    Opt("layout", "number: 1 title, 2 title+content, 11 title only, 12 blank"),
+                    Opt("index", "position of the new slide (1 = first); default: after the last slide")).ForAgent(),
                 Command("wpp.addText", "wpp", WppAddText, "Textbox có định dạng (`color` dạng `#RRGGBB`, `align` left/center/right)",
                     Req("text"), Opt("slide"), Opt("left"), Opt("top"), Opt("width"), Opt("height"), Opt("fontSize"), Opt("bold"), Opt("color"), Opt("align"),
                     Opt("presentation", "full path of the presentation to work on; default: the active one")).ForAgent(),
@@ -50,11 +51,7 @@ namespace AxiomOffice.Bridge
                 {
                     try
                     {
-                        dynamic shape = slide.Shapes[s];
-                        if (Convert.ToInt32(shape.HasTextFrame) == -1 && Convert.ToInt32(shape.TextFrame.HasText) == -1)
-                        {
-                            texts.Add(Convert.ToString(shape.TextFrame.TextRange.Text));
-                        }
+                        AddShapeTexts(slide.Shapes[s], texts);
                     }
                     catch
                     {
@@ -97,10 +94,96 @@ namespace AxiomOffice.Bridge
             };
         }
 
+        // Chữ của một shape cho wpp.listSlides: bảng (mỗi hàng một dòng, ô cách " | "), nhóm (đệ quy), tiêu đề biểu
+        // đồ, còn lại là TextFrame. Trước 25/10/2026 chỉ đọc TextFrame nên agent không thấy bảng của chính mình và
+        // chèn lại lần hai (docs/plans/19-h0 H3). Cùng định dạng với impress.py và commands.js.
+        internal static void AddShapeTexts(dynamic shape, List<string> texts)
+        {
+            if (ComFlag(() => shape.HasTable))
+            {
+                dynamic table = shape.Table;
+                int rows = Convert.ToInt32(table.Rows.Count);
+                int cols = Convert.ToInt32(table.Columns.Count);
+                var lines = new List<string> { "[table " + rows + "x" + cols + "]" };
+                for (int r = 1; r <= rows; r++)
+                {
+                    var cells = new List<string>();
+                    for (int c = 1; c <= cols; c++)
+                    {
+                        string cell = "";
+                        try
+                        {
+                            cell = Convert.ToString(table.Cell(r, c).Shape.TextFrame.TextRange.Text);
+                        }
+                        catch
+                        {
+                        }
+                        cells.Add(cell.Replace("\r", " ").Replace("\n", " ").Trim());
+                    }
+                    lines.Add(string.Join(" | ", cells));
+                }
+                texts.Add(string.Join("\n", lines));
+                return;
+            }
+            if (ComFlag(() => Convert.ToInt32(shape.Type) == 6))
+            {
+                dynamic items = shape.GroupItems;
+                int count = Convert.ToInt32(items.Count);
+                for (int i = 1; i <= count; i++)
+                {
+                    try
+                    {
+                        AddShapeTexts(items.Item(i), texts);
+                    }
+                    catch
+                    {
+                    }
+                }
+                return;
+            }
+            if (ComFlag(() => shape.HasChart))
+            {
+                texts.Add(ChartText(shape.Chart));
+                return;
+            }
+            if (Convert.ToInt32(shape.HasTextFrame) == -1 && Convert.ToInt32(shape.TextFrame.HasText) == -1)
+            {
+                texts.Add(Convert.ToString(shape.TextFrame.TextRange.Text));
+            }
+        }
+
+        // Cờ COM (MsoTriState -1 / bool) đọc an toàn: shape nào không có thuộc tính thì coi là false, không bỏ cả shape.
+        private static bool ComFlag(Func<object> read)
+        {
+            try
+            {
+                object value = read();
+                return value is bool flag ? flag : Convert.ToInt32(value) == -1;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        // Số COM đọc an toàn: không có thuộc tính thì 0.
+        private static double ComDouble(Func<object> read)
+        {
+            try
+            {
+                return Convert.ToDouble(read());
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
         private static Dictionary<string, object> WppNewPresentation(IAppHost host, Dictionary<string, object> p)
         {
             dynamic app = host.Application;
             dynamic pres = app.Presentations.Add();
+            TrackPresentation(pres);
             return new Dictionary<string, object>
             {
                 { "name", Convert.ToString(pres.Name) }
@@ -119,7 +202,43 @@ namespace AxiomOffice.Bridge
             dynamic open = FindPresentation(app, path);
             if (open != null)
             {
-                open.Windows[1].Activate();
+                // Activate() có lúc trả về ngay mà ActivePresentation vẫn là bài khác (flake 28/10/2026: reply
+                // alreadyOpen nhưng lượt sau sửa nhầm from-template.pptx). Chờ tới khi PowerPoint đổi thật.
+                string wanted = Convert.ToString(open.FullName) ?? "";
+                for (int attempt = 0; attempt < 50; attempt++)
+                {
+                    // Bài có thể có nhiều cửa sổ (document + slide show + notes): Activate() window 1 không
+                    // chuyển ActivePresentation nếu đó không phải cửa sổ tài liệu. Kích hoạt mọi cửa sổ tài liệu.
+                    try
+                    {
+                        int windows = Convert.ToInt32(open.Windows.Count);
+                        for (int w = 1; w <= windows; w++)
+                        {
+                            dynamic window = open.Windows[w];
+                            int type = 1;
+                            try { type = Convert.ToInt32(window.Type); } catch (Exception) { }
+                            if (type == 1) // ppWindowDocument
+                            {
+                                window.Activate();
+                            }
+                        }
+                    }
+                    catch (Exception) { }
+                    try
+                    {
+                        dynamic active = app.ActivePresentation;
+                        if (active != null && string.Equals(Convert.ToString(active.FullName) ?? "", wanted,
+                                StringComparison.OrdinalIgnoreCase))
+                        {
+                            break;
+                        }
+                    }
+                    catch (Exception)
+                    {
+                    }
+                    System.Threading.Thread.Sleep(100);
+                }
+                TrackPresentation(open);
                 return new Dictionary<string, object>
                 {
                     { "name", Convert.ToString(open.Name) },
@@ -128,6 +247,7 @@ namespace AxiomOffice.Bridge
                 };
             }
             dynamic pres = app.Presentations.Open(path);
+            TrackPresentation(pres);
             return new Dictionary<string, object>
             {
                 { "name", Convert.ToString(pres.Name) },
@@ -153,8 +273,14 @@ namespace AxiomOffice.Bridge
         {
             int layout = ParamInt(p, "layout", 12);
             dynamic app = host.Application;
-            dynamic pres = app.ActivePresentation;
-            int index = Convert.ToInt32(pres.Slides.Count) + 1;
+            dynamic pres = TargetPresentation(app, p);
+            int count = Convert.ToInt32(pres.Slides.Count);
+            // index: chen vao vi tri (thay dung cho mot slide da xoa - slides_from_brief "replace"); ngoai 1..count+1 thi cuoi bai.
+            int index = ParamInt(p, "index", 0);
+            if (index < 1 || index > count + 1)
+            {
+                index = count + 1;
+            }
             pres.Slides.Add(index, layout);
             return new Dictionary<string, object> { { "slide", index }, { "layout", layout } };
         }
@@ -227,7 +353,7 @@ namespace AxiomOffice.Bridge
             int width = ParamInt(p, "width", -1);
             int height = ParamInt(p, "height", -1);
             dynamic app = host.Application;
-            dynamic pres = app.ActivePresentation;
+            dynamic pres = TargetPresentation(app, p);
             dynamic slide = WppGetSlide(pres, ParamInt(p, "slide", 0));
             // Chỉ một chiều thì co theo tỉ lệ ảnh: AddPicture coi -1 là "giữ cỡ gốc" cho TỪNG chiều, nên
             // truyền width=491, height=-1 làm ảnh 16:9 thành 491x445.5 (đo trên PowerPoint 16, 13/10/2026).
@@ -272,7 +398,7 @@ namespace AxiomOffice.Bridge
             int width = ParamInt(p, "width", 600);
             int height = ParamInt(p, "height", 200);
             dynamic app = host.Application;
-            dynamic pres = app.ActivePresentation;
+            dynamic pres = TargetPresentation(app, p);
             dynamic slide = WppGetSlide(pres, ParamInt(p, "slide", 0));
             dynamic tableShape = slide.Shapes.AddTable(rows, cols, left, top, width, height);
             dynamic table = tableShape.Table;
@@ -298,7 +424,9 @@ namespace AxiomOffice.Bridge
                 { "slide", Convert.ToInt32(slide.SlideIndex) },
                 { "rows", rows },
                 { "cols", cols },
-                { "filled", filled }
+                { "filled", filled },
+                // Tên shape: Core ghi sổ đối tượng của lượt để xoá lại không phải hỏi (docs/plans/19-h0 H4).
+                { "shape", Convert.ToString(tableShape.Name) }
             };
         }
 
@@ -355,7 +483,7 @@ namespace AxiomOffice.Bridge
         private static Dictionary<string, object> WppDeleteSlide(IAppHost host, Dictionary<string, object> p)
         {
             dynamic app = host.Application;
-            dynamic pres = app.ActivePresentation;
+            dynamic pres = TargetPresentation(app, p);
             dynamic slide = WppGetSlide(pres, ParamInt(p, "slide", 0));
             int index = Convert.ToInt32(slide.SlideIndex);
             slide.Delete();
@@ -374,7 +502,7 @@ namespace AxiomOffice.Bridge
                 throw new InvalidOperationException("'path' is required");
             }
             dynamic app = host.Application;
-            dynamic pres = app.ActivePresentation;
+            dynamic pres = TargetPresentation(app, p);
             try
             {
                 pres.ExportAsFixedFormat(path, 2);
@@ -395,7 +523,7 @@ namespace AxiomOffice.Bridge
             int width = ParamInt(p, "width", 540);
             int height = ParamInt(p, "height", 120);
             dynamic app = host.Application;
-            dynamic pres = app.ActivePresentation;
+            dynamic pres = TargetPresentation(app, p);
             int count = Convert.ToInt32(pres.Slides.Count);
             if (count == 0)
             {

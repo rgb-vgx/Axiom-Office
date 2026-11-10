@@ -1,4 +1,4 @@
-"""Dialog cua pane (LibreOffice_arch.md muc 10): Cai dat, Ghi nho, Soat tai lieu, Ky nang, Nhat ky hoat dong.
+"""Dialog cua pane (docs/architecture/libreoffice.md muc 10): Cai dat, Ghi nho, Soat tai lieu, Ky nang, Nhat ky hoat dong.
 
 Mac dinh moi dialog la mot cua so con (`awt.ChildWindow`) giua cua so tai lieu. Mo TU WIZARD thi truyen
 `floating=True` de dung cua so roi (`awt.Dialog`): wizard cung la cua so roi nen cua so con nam duoi bi che,

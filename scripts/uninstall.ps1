@@ -12,7 +12,7 @@ $currentUser = [Microsoft.Win32.Registry]::CurrentUser
 . (Join-Path $PSScriptRoot "core.ps1")
 [void](Remove-LegacyRegistration)
 
-# Tat Agent Core dang chay truoc khi go (New_arch.md muc 10).
+# Tat Agent Core dang chay truoc khi go (docs/architecture/core.md muc 10).
 [void](Stop-AgentCore)
 
 $currentUser.DeleteSubKeyTree("Software\Classes\$progId", $false)

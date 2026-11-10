@@ -1,7 +1,8 @@
-"""Tim tai lieu dich theo loai app va gom moi lenh thanh mot buoc Undo (LibreOffice_arch.md muc 5.2, LD-5)."""
+"""Tim tai lieu dich theo loai app va gom moi lenh thanh mot buoc Undo (docs/architecture/libreoffice.md muc 5.2, LD-5)."""
 from __future__ import annotations
 
 import contextlib
+import os
 
 import uno
 
@@ -97,6 +98,15 @@ def find_open(ctx, url: str):
         except Exception:  # noqa: BLE001 - component khong co URL (vd Start Center)
             continue
     return None
+
+
+def find_open_path(ctx, kind: str, path: str):
+    """Tai lieu da mo theo duong dan nguoi dung dua (`presentation` cua cac lenh wpp.*)."""
+    url = to_url(os.path.abspath(path))
+    found = find_open(ctx, url)
+    if found is None or not _is(found, kind):
+        raise NoDocumentError("no open %s at '%s' (open it in LibreOffice first)" % (NAMES[kind], path))
+    return found
 
 
 def activate(document) -> None:

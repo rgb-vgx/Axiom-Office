@@ -1,4 +1,4 @@
-// Package api: Core API v1 (New_arch.md muc 7.3) - ban Go cua Api/*.cs. Hinh dang response giong bridge:
+// Package api: Core API v1 (docs/architecture/core.md muc 7.3) - ban Go cua Api/*.cs. Hinh dang response giong bridge:
 // {"ok":true,"result":...} hoac {"ok":false,"error":"..."}.
 package api
 
@@ -43,6 +43,12 @@ type Deps struct {
 	// LoadConfig doc lai cau hinh tu nguon moi lan goi. nil = dung Config (cho test).
 	LoadConfig func() config.Config
 
+	// ConfigSource: nguon cau hinh ghi cho /wps/v1/config. nil = config.DefaultSource() (Windows:
+	// HKCU\Software\AxiomOffice, Linux: ~/.config/axiom-office/config.json). Test inject nguon tam
+	// (file trong thu muc tam) de kiem tra "ghi xong doc lai duoc" tren moi nen tang ma khong
+	// dung vao cau hinh that cua nguoi dung (Windows: HKCU that).
+	ConfigSource config.Source
+
 	Paths   config.Paths
 	Runtime *Runtime
 	HTTP    *http.Client
@@ -62,7 +68,7 @@ type Deps struct {
 	// Stop dung Core (POST /v1/admin/shutdown).
 	Stop func()
 
-	// WPS: bridge cho JS add-in WPS (docs/wps-bridge.md muc 2). nil = tat (cho test cu).
+	// WPS: bridge cho JS add-in WPS (docs/architecture/wps-bridge.md muc 2). nil = tat (cho test cu).
 	WPS *wpsbridge.Bridge
 }
 
@@ -79,7 +85,9 @@ func Handler(deps *Deps, mux *http.ServeMux) http.Handler {
 	mapCore(mux, deps)
 	mapWPS(mux, deps)
 	mapSetup(mux, deps)
+	mapLog(mux, deps)
 	mapRuns(mux, deps)
+	mapQuickActions(mux, deps)
 	if deps.Skills != nil {
 		mapSkills(mux, deps)
 	}
@@ -119,10 +127,21 @@ func Error(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, map[string]any{"ok": false, "error": message})
 }
 
+// ErrorCode: nhu Error nhung kem ma may doc duoc, de ben goi dich duoc sang tieng cua no ma khong phai
+// do chuoi tieng Anh cua Core. Dung cho cac ca pane WPS phai noi mot cau khac han nhau (xem
+// wpsadmin.go: /wps/v1/exec).
+func ErrorCode(w http.ResponseWriter, status int, code, message string) {
+	writeJSON(w, status, map[string]any{"ok": false, "error": message, "code": code})
+}
+
 // readJSON doc body; body rong -> (nil, true); JSON hong -> (nil, false).
+// maxJSONBodyBytes: cung muc 8 MB voi wpsbridge.readBody. Body lon hon -> false (handler tra 400),
+// khong de mot request giu RAM tuy y.
+const maxJSONBodyBytes = 8 << 20
+
 func readJSON(r *http.Request) (map[string]any, bool) {
-	data, err := io.ReadAll(r.Body)
-	if err != nil {
+	data, err := io.ReadAll(io.LimitReader(r.Body, maxJSONBodyBytes+1))
+	if err != nil || len(data) > maxJSONBodyBytes {
 		return nil, false
 	}
 	if strings.TrimSpace(string(data)) == "" {

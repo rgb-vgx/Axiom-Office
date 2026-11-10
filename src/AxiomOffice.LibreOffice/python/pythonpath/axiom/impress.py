@@ -1,4 +1,4 @@
-"""Lenh Impress (kind "wpp") - cung ten/ket qua voi CommandDispatcher.Presentation.cs (LibreOffice_arch.md
+"""Lenh Impress (kind "wpp") - cung ten/ket qua voi CommandDispatcher.Presentation.cs (docs/architecture/libreoffice.md
 muc 7.3). Kich thuoc trong UNO la 1/100 mm; tham so cua lenh tinh bang point (giong ban Windows)."""
 from __future__ import annotations
 
@@ -290,12 +290,6 @@ def delete_slide(env, params):
     return {"deleted": index, "slideCount": _pages(doc).getCount()}
 
 
-def check_layout(env, params):
-    from . import checks
-
-    return checks.layout_report(env, params)
-
-
 command("wpp.newPresentation", "wpp", lambda env, p: documents.open_document(env.ctx, "wpp", None), "Tạo bài trình bày mới")
 command("wpp.open", "wpp", lambda env, p: documents.open_document(env.ctx, "wpp", values.string(p, "path")), "Mở .pptx/.ppt/.odp", req("path"))
 command("wpp.listSlides", "wpp", list_slides, "Số slide + text từng slide", opt("presentation", "full path of the presentation to work on; default: the active one"), opt("detail", "true = kem master/notes"), agent=True)
@@ -319,7 +313,7 @@ command("wpp.saveAs", "wpp", lambda env, p: documents.save(env.document, "wpp", 
         "Lưu thành file mới", req("path"), agent=True)
 
 def _template_unsupported(env, params):
-    # Lam bai theo mau (docs/template-design.md muc 6) moi co tren PowerPoint (CommandDispatcher.Template.cs):
+    # Lam bai theo mau (docs/architecture/template-design.md muc 6) moi co tren PowerPoint (CommandDispatcher.Template.cs):
     # can InsertFromFile + Shape.Export cua COM. Ban LibreOffice lam o phien Linux.
     raise values.ParamError("not available on LibreOffice yet: build the slides with wpp.addSlide/wpp.addText "
                             "and wpp.addImage, using the template's colors from ppt_profile")

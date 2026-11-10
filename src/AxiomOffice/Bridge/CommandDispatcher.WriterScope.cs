@@ -29,7 +29,7 @@ namespace AxiomOffice.Bridge
         // Lệnh đọc (không đổi tài liệu) chạy như thường khi đang khoá.
         private static readonly HashSet<string> LockReadOnly = new HashSet<string>(StringComparer.Ordinal)
         {
-            "writer.getText", "writer.selection", "writer.checkTables", "writer.outline", "writer.undo",
+            "writer.getText", "writer.selection", "writer.checkTables", "writer.outline", "writer.checkLayout", "writer.undo",
             "writer.save", "writer.saveAs", "writer.exportPdf"
         };
 
@@ -44,7 +44,13 @@ namespace AxiomOffice.Bridge
             { "writer.closeAll", "closes the documents" },
             // InsertBreak của Word THAY cả vùng chọn bằng dấu ngắt: khoá vùng luôn có vùng chọn nên lệnh này
             // xoá cả đoạn đã bôi đen. Muốn ngắt trang thì bỏ bôi đen rồi yêu cầu.
-            { "writer.insertPageBreak", "replaces the whole selected passage with a page break" }
+            { "writer.insertPageBreak", "replaces the whole selected passage with a page break" },
+            { "writer.insertToc", "inserts a table of contents outside the selection" },
+            { "writer.setHeaderFooter", "changes the headers and footers of the whole document" },
+            { "writer.insertCaption", "inserts a new paragraph" },
+            { "writer.writeContent", "appends at the end of the document" },
+            { "writer.deleteParagraphs", "deletes whole paragraphs by number" },
+            { "writer.insertLayoutTable", "appends a table at the end of the document" }
         };
 
         // Lệnh THAY cả vùng chọn bằng chữ mới: vô hại với vùng chữ, nhưng nếu vùng chứa TRỌN một bảng thì bảng bị
@@ -106,8 +112,8 @@ namespace AxiomOffice.Bridge
                     Document = Convert.ToString(doc.FullName),
                     PrefixEnd = start,
                     SuffixLength = docEnd - end,
-                    Prefix = Convert.ToString(doc.Range(0, start).Text) ?? "",
-                    Suffix = Convert.ToString(doc.Range(end, docEnd).Text) ?? "",
+                    Prefix = RangeText(doc, 0, start),
+                    Suffix = RangeText(doc, end, docEnd),
                     TableCount = CountWholeTables((object)doc, start, end)
                 };
                 lock (LockSync)
@@ -231,8 +237,20 @@ namespace AxiomOffice.Bridge
             {
                 return false;
             }
-            return string.Equals(Convert.ToString(doc.Range(0, state.PrefixEnd).Text) ?? "", state.Prefix, StringComparison.Ordinal)
-                && string.Equals(Convert.ToString(doc.Range(suffixStart, docEnd).Text) ?? "", state.Suffix, StringComparison.Ordinal);
+            return string.Equals(RangeText(doc, 0, state.PrefixEnd), state.Prefix, StringComparison.Ordinal)
+                && string.Equals(RangeText(doc, suffixStart, docEnd), state.Suffix, StringComparison.Ordinal);
+        }
+
+        // Chữ của [start, end). Khoảng rỗng thì "" mà không gọi Range: Word ném "Value out of range" cho Range(n, n) tại
+        // cuối tài liệu (n = Content.End) - bôi đen cả tài liệu (Ctrl+A) rồi khoá là dính (đo 25/10/2026, Word x64).
+        private static string RangeText(object document, int start, int end)
+        {
+            if (end <= start)
+            {
+                return "";
+            }
+            dynamic doc = document;
+            return Convert.ToString(doc.Range(start, end).Text) ?? "";
         }
 
         // Đếm số bảng NẰM TRỌN trong [start, end): bảng nằm trọn mới có thể bị xoá cả khi thay vùng chọn;

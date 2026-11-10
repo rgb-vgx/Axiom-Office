@@ -5,7 +5,7 @@ awt khong ve duoc hinh bo goc hay tu dinh nghia control, nen moi thanh phan la m
 * Hop bo goc = FixedText mau nen + 4 ImageControl goc (PNG ve san trong theme.py) + 4 duong vien 1px.
 * Nut/chip/link = FixedText + XMouseListener (hover doi mau, bam = mouseReleased ben trong).
 
-Nhung dieu rut ra khi thu tren LibreOffice 26.8 (xem LibreOffice_arch.md 14.3):
+Nhung dieu rut ra khi thu tren LibreOffice 26.8 (xem docs/architecture/libreoffice.md 14.3):
 * Dieu khien them TRUOC nam TREN dieu khien them sau -> moi nhom them phan truoc (goc, chu) roi moi nen.
 * Model khong nhan toa do -> dat vi tri bang setPosSize tren view (Widget.place).
 * Chieu cao chu do bang XLayoutConstrains.calcAdjustedSize(Size(width, 0)) cua chinh FixedText.

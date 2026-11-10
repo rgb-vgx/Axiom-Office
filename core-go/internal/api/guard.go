@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// guard: cung quy tac voi bridge (New_arch.md muc 7.2) - chan request co header Origin (403), moi endpoint
+// guard: cung quy tac voi bridge (docs/architecture/core.md muc 7.2) - chan request co header Origin (403), moi endpoint
 // tru GET /health can X-Auth-Token (401) khi Token duoc cau hinh, request co body phai la application/json (415).
 func guard(token string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

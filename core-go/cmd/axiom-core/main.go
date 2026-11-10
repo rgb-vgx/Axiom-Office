@@ -81,7 +81,7 @@ func run() int {
 	}
 	corelog.Init(paths.LogFile)
 
-	// Mot Core cho moi nguoi dung: instance thu hai thoat ngay (New_arch.md muc 4.3).
+	// Mot Core cho moi nguoi dung: instance thu hai thoat ngay (docs/architecture/core.md muc 4.3).
 	if cfg.SingleInstance {
 		lock, acquired, err := instance.Acquire(cfg.MutexName)
 		if err != nil {
@@ -104,6 +104,19 @@ func run() int {
 
 	runtime := &api.Runtime{Port: port, Started: time.Now().UTC(), Version: version}
 	stores := store.OpenStores(paths.DatabaseFile)
+	// Mot Core moi nguoi dung (mutex o tren): luot 'running' con trong core.db la cua process truoc da chet giua luot. Tat
+	// SingleInstance thi co the co Core khac dang chay tren cung core.db - khong dong vao luot cua no.
+	if stores.Available && cfg.SingleInstance {
+		if interrupted := stores.Runs.MarkInterrupted(); len(interrupted) > 0 {
+			corelog.Info("startup: %d run(s) left 'running' by the previous Core marked 'interrupted'", len(interrupted))
+			// Luot sau trong cung hoi thoai thay dong nay trong "Recent turns" (Grok Build interrupted_turn.rs).
+			for _, run := range interrupted {
+				if run.ConversationID != nil {
+					stores.Convs.AppendMessage(*run.ConversationID, "tool_summary", agent.EndedEarlyNote(store.StatusInterrupted, nil))
+				}
+			}
+		}
+	}
 	httpClient := &http.Client{} // khong timeout chung: moi request tu dat han bang context
 	models := model.NewSource(httpClient, config.Load)
 	current := models.Current()
@@ -159,7 +172,7 @@ func run() int {
 		Bridge: bridge, Sessions: sessions,
 		Conversations: stores.Convs, Runs: stores.Runs,
 		Models: models, Skills: skillIndex, Memory: memoryService, MCP: mcpClient,
-		Config: config.Load, Assembler: agent.NewContextAssembler(),
+		Config: config.Load, Assembler: agent.NewContextAssembler(), BusyPort: manager.BusyPort,
 	}
 	// Kho nguon web (schema v3): nguon tai ve trong cac luot truoc - don luc khoi dong (qua han / qua tran).
 	if stores.Available {
@@ -190,7 +203,7 @@ func run() int {
 
 	server := &http.Server{ReadHeaderTimeout: 10 * time.Second}
 	var stopOnce sync.Once
-	// Bridge WPS (docs/wps-bridge.md muc 2): kenh add-in tren Core API + listener rieng + file session.
+	// Bridge WPS (docs/architecture/wps-bridge.md muc 2): kenh add-in tren Core API + listener rieng + file session.
 	exeDir := filepath.Dir(exe)
 	wps := wpsbridge.New(wpsbridge.ResolveOptions(os.Getenv, exeDir, sessionDir(cfg), cfg.Token, version, port))
 	stop := func() {

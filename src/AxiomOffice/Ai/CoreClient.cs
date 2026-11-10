@@ -10,7 +10,7 @@ using AxiomOffice.Bridge;
 
 namespace AxiomOffice.Ai
 {
-    // Mot su kien tien trinh tu Agent Core (SSE, New_arch.md muc 7.4).
+    // Mot su kien tien trinh tu Agent Core (SSE, docs/architecture/core.md muc 7.4).
     internal sealed class CoreEvent
     {
         public string Type;
@@ -39,11 +39,14 @@ namespace AxiomOffice.Ai
         public int InputTokens;
         public int OutputTokens;
         public int Round;       // run.reasoning: vòng chạy đã sinh ra phần suy luận này
+        public int UndoSteps = -1;  // sự kiện kết thúc lượt: số bước hoàn tác Word của lượt (-1 = Core không báo)
+        public int EditSteps = -1;  // sự kiện kết thúc lượt: số lệnh sửa tài liệu của lượt, mọi app (-1 = Core không báo)
+        public string UndoMode;     // sự kiện kết thúc lượt: "revisions" (lượt sửa bằng Track Changes) | "steps"
     }
 
     // Client HTTP + SSE toi AxiomOffice.Core.exe: tim Core qua core.json, khoi dong khi can (muc 7.1),
-    // chay luot agent qua Core API (7.3/7.4). Moi loi ket noi -> Run tra null de pane dung agent
-    // in-process nhu cu (du phong). Khong bao gio nem ra ngoai.
+    // chay luot agent qua Core API (7.3/7.4). Moi loi ket noi -> Run tra null de pane bao loi ro.
+    // Khong bao gio nem ra ngoai.
     // partial: phan cho wizard thiet lap nam o CoreSetup.cs (SetupWizardForm dung).
     internal sealed partial class CoreClient
     {
@@ -123,7 +126,7 @@ namespace AxiomOffice.Ai
                 {
                     _lastFailureUtc = DateTime.UtcNow;
                     _baseUrl = null;
-                    Logger.Info("CoreClient: Agent Core khong san sang (" + LastError + "); dung agent in-process");
+                    Logger.Info("CoreClient: Agent Core khong san sang (" + LastError + ")");
                     return null;
                 }
 
@@ -134,7 +137,7 @@ namespace AxiomOffice.Ai
             }
         }
 
-        // Chay mot luot qua Core. Tra null khi KHONG ket noi duoc (pane nen thu lai bang in-process);
+        // Chay mot luot qua Core. Tra null khi KHONG ket noi duoc (pane bao loi);
         // loi nghiep vu cua luot chay van tra LlmResult voi Ok=false (khong chay lai de tranh ton token).
         public LlmResult Run(Connect host, string prompt, string conversationId, Action<CoreEvent> onEvent, CancellationToken cancel)
         {
@@ -167,7 +170,7 @@ namespace AxiomOffice.Ai
             if (port <= 0)
             {
                 LastError = "khong tim thay port cua bridge trong session registry";
-                Logger.Info("CoreClient: fallback to in-process - " + LastError);
+                Logger.Info("CoreClient: run not started - " + LastError);
                 return null;
             }
 
@@ -202,19 +205,19 @@ namespace AxiomOffice.Ai
             if (responseText == null)
             {
                 LastError = error;
-                Logger.Info("CoreClient: fallback to in-process - POST /v1/runs failed: " + error);
+                Logger.Info("CoreClient: run not started - POST /v1/runs failed: " + error);
                 return null;
             }
 
             // Core boc ket qua trong {"ok":true,"result":{runId, conversationId}} (giong bridge). Truoc day doc
-            // runId o cap ngoai nen luon "khong tra runId" -> pane chay lai in-process trong khi Core van chay:
-            // moi yeu cau bi lam HAI lan.
+            // runId o cap ngoai nen luon "khong tra runId" -> pane (hoi do con agent in-process) chay lai trong khi
+            // Core van chay: moi yeu cau bi lam HAI lan.
             Dictionary<string, object> reply = RunReply(responseText);
             string runId = reply != null ? Convert.ToString(reply.ContainsKey("runId") ? reply["runId"] : null) : null;
             if (string.IsNullOrEmpty(runId))
             {
                 LastError = "Core khong tra runId: " + Truncate(responseText, 200);
-                Logger.Info("CoreClient: fallback to in-process - " + LastError);
+                Logger.Info("CoreClient: run not started - " + LastError);
                 return null;
             }
 
@@ -236,8 +239,8 @@ namespace AxiomOffice.Ai
 
             if (!result.Ok && !result.Cancelled && !result.TimedOut && !result.Stopped)
             {
-                // Da co runId thi Core co the da sua tai lieu: KHONG tra null (pane chay lai in-process se
-                // lam hai lan). Bao loi cua Core cho nguoi dung.
+                // Da co runId thi Core co the da sua tai lieu: KHONG tra null (ben goi se coi nhu Core chua
+                // nhan luot). Bao loi cua Core cho nguoi dung.
                 if (string.IsNullOrEmpty(result.Error))
                 {
                     result.Error = "khong doc duoc ket qua tu Agent Core (run " + runId + ")";
@@ -291,6 +294,29 @@ namespace AxiomOffice.Ai
 
             var first = items[0] as Dictionary<string, object>;
             return first != null && first.ContainsKey("id") ? Convert.ToString(first["id"]) : null;
+        }
+
+        // "Hoàn tác lượt này" qua Core (POST /v1/runs/{id}/undo): Core biết lượt có sửa bằng Track Changes không (từ chối
+        // đúng revision của lượt) và số bước hoàn tác chắc chắn của lượt.
+        public bool UndoRun(string runId, out string error)
+        {
+            error = null;
+            if (string.IsNullOrEmpty(runId))
+            {
+                error = "no run";
+                return false;
+            }
+            string baseUrl;
+            lock (_sync)
+            {
+                baseUrl = _baseUrl;
+            }
+            if (baseUrl == null)
+            {
+                error = "Agent Core is not running";
+                return false;
+            }
+            return PostJson(baseUrl + "/v1/runs/" + runId + "/undo", "{}", 60000, CancellationToken.None, out error) != null;
         }
 
         // Yeu cau Core dung luot chay (ngoai viec huy request SSE dang cho).
@@ -530,11 +556,20 @@ namespace AxiomOffice.Ai
                             result.ConversationId = item.ConversationId;
                         }
 
-                        onEvent(item);
+                        try
+                        {
+                            onEvent(item);
+                        }
+                        catch (Exception callbackError)
+                        {
+                            // Loi ve giao dien (pane dang dong, ...) khong duoc che loi that cua luot chay
+                            // (do 24/10/2026: mot NullReferenceException trong callback bien loi 401 thanh NRE).
+                            Logger.Error("CoreClient: onEvent failed (" + item.Type + ")", callbackError);
+                        }
                         ApplyEvent(result, item);
                         if (item.Type == "tool.finished")
                         {
-                            result.Transcript.Add((item.Action ?? "?") + (item.Ok ? " ok" : " loi"));
+                            result.Transcript.Add(ToolLine(item));
                         }
 
                         if (IsTerminal(item.Type))
@@ -553,7 +588,8 @@ namespace AxiomOffice.Ai
                 }
 
                 result.Error = ex is WebException ? "mat ket noi voi Agent Core: " + ex.Message : ex.GetType().Name + ": " + ex.Message;
-                Logger.Info("CoreClient: doc su kien that bai: " + result.Error);
+                // Kem stack: truoc day chi co message nen khong biet NRE nam o dau (do 24/10/2026).
+                Logger.Error("CoreClient: doc su kien that bai", ex);
             }
             finally
             {
@@ -648,6 +684,21 @@ namespace AxiomOffice.Ai
                     item.Rounds = Convert.ToInt32(data["rounds"]);
                 }
 
+                if (data.ContainsKey("undoSteps") && data["undoSteps"] != null)
+                {
+                    item.UndoSteps = Convert.ToInt32(data["undoSteps"]);
+                }
+
+                if (data.ContainsKey("editSteps") && data["editSteps"] != null)
+                {
+                    item.EditSteps = Convert.ToInt32(data["editSteps"]);
+                }
+
+                if (data.ContainsKey("undoMode") && data["undoMode"] != null)
+                {
+                    item.UndoMode = Convert.ToString(data["undoMode"]);
+                }
+
                 if (data.ContainsKey("round"))
                 {
                     item.Round = Convert.ToInt32(data["round"]);
@@ -738,13 +789,58 @@ namespace AxiomOffice.Ai
             return Convert.ToString(value);
         }
 
+        // Dong tien trinh cua mot tool.finished: dung chung cho pane (PaneControls ve tick/x + nhan theo action) va
+        // LlmResult.Transcript (ai.ask tra ve) - cung dang voi agent in-process truoc day nen ben goi doc duoc action
+        // va loi (vd "is not an available action").
+        internal static string ToolLine(CoreEvent item)
+        {
+            bool officeAction = string.IsNullOrEmpty(item.Tool) || item.Tool == "office_action";
+            string outcome = !string.IsNullOrEmpty(item.ResultPreview)
+                ? item.ResultPreview
+                : (item.Ok
+                    ? "{\"ok\":true}"
+                    : "{\"ok\":false,\"error\":\"" + (item.Error ?? "loi") + "\"}");
+            // Core báo thất bại mà preview không có "ok":false (vd {"error":"'wpp.listShapes' is not an available
+            // action…"}, lỗi MCP dạng chữ) thì ToolLine sẽ vẽ tích xanh: ép thành dòng lỗi.
+            if (!item.Ok && !outcome.Contains("\"ok\":false"))
+            {
+                string message = !string.IsNullOrEmpty(item.Error) ? item.Error : ErrorText(outcome);
+                outcome = "{\"ok\":false,\"error\":" + new System.Web.Script.Serialization.JavaScriptSerializer().Serialize(message) + "}";
+            }
+            // Dong tien trinh dang office_action {"action": ..., "params": ...} de PaneControls hien nhan
+            // tieng Viet theo action (truoc day chi co "{}").
+            string call = "{\"action\": \"" + (officeAction ? item.Action ?? "" : item.Tool) + "\""
+                + (string.IsNullOrEmpty(item.ParamsPreview) ? "" : ", \"params\": " + item.ParamsPreview)
+                + "}";
+            return "office_action " + call + " -> " + outcome;
+        }
+
+        // Câu lỗi trong preview kết quả ({"error":"…"} có thể bị cắt ở 150 ký tự); không có thì trả nguyên preview.
+        private static string ErrorText(string preview)
+        {
+            System.Text.RegularExpressions.Match match = System.Text.RegularExpressions.Regex.Match(
+                preview ?? "", "\"error\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)");
+            if (!match.Success)
+            {
+                return string.IsNullOrEmpty(preview) ? Ui.T("lỗi") : preview;
+            }
+            try
+            {
+                return System.Text.RegularExpressions.Regex.Unescape(match.Groups[1].Value);
+            }
+            catch (ArgumentException)
+            {
+                return match.Groups[1].Value;
+            }
+        }
+
         private static bool IsTerminal(string type)
         {
             return type == "run.completed" || type == "run.failed" || type == "run.cancelled"
                 || type == "run.timedout" || type == "run.stopped";
         }
 
-        // Chuyen su kien ket thuc thanh ket qua cho pane (giong LlmResult cua che do in-process).
+        // Chuyen su kien ket thuc thanh ket qua cho pane (LlmResult - cung hinh dang ai.ask tra ve).
         private static void ApplyEvent(LlmResult result, CoreEvent item)
         {
             if (item.Seconds > 0)
@@ -755,6 +851,21 @@ namespace AxiomOffice.Ai
             if (item.Rounds > 0)
             {
                 result.Rounds = item.Rounds;
+            }
+
+            if (item.UndoSteps >= 0)
+            {
+                result.UndoSteps = item.UndoSteps;
+            }
+
+            if (item.EditSteps >= 0)
+            {
+                result.EditSteps = item.EditSteps;
+            }
+
+            if (!string.IsNullOrEmpty(item.UndoMode))
+            {
+                result.UndoMode = item.UndoMode;
             }
 
             switch (item.Type)
@@ -776,6 +887,7 @@ namespace AxiomOffice.Ai
                     break;
                 case "run.failed":
                     result.Error = item.Error ?? "agent failed";
+                    result.ErrorKind = item.ErrorKind;
                     break;
             }
         }
@@ -862,7 +974,7 @@ namespace AxiomOffice.Ai
             return document;
         }
 
-        // Trả lời thẻ xác nhận của policy (New_arch.md 8.6): POST /v1/runs/{id}/confirm.
+        // Trả lời thẻ xác nhận của policy (docs/architecture/core.md 8.6): POST /v1/runs/{id}/confirm.
         public bool ConfirmRun(string runId, string confirmationId, bool approved, out string error)
         {
             var body = new Dictionary<string, object> { { "confirmationId", confirmationId }, { "approved", approved } };
@@ -880,7 +992,7 @@ namespace AxiomOffice.Ai
             return MemoryCall("POST", "/v1/runs/" + Uri.EscapeDataString(runId) + "/confirm", body, out error) != null;
         }
 
-        // ---- Memory dài hạn (New_arch.md mục 8.5.11): form "Quản lý ghi nhớ" và dòng "Đã ghi nhớ" trong pane ----
+        // ---- Memory dài hạn (docs/architecture/core.md mục 8.5.11): form "Quản lý ghi nhớ" và dòng "Đã ghi nhớ" trong pane ----
 
         // GET /v1/memory (query/runId/includeDeleted tuỳ chọn). Lỗi -> null + error.
         public List<Dictionary<string, object>> ListMemories(string query, string runId, bool includeDeleted, out string error)

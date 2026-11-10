@@ -2,6 +2,7 @@ package model
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -60,6 +61,10 @@ type AgentOptions struct {
 	FallbackModels []string
 	// OncePerReply: tool chi chay mot lan moi phan hoi cua model (vd write_todos ghi de ca danh sach).
 	OncePerReply []string
+	// RepairToolCall: sua tool call goi nham (vd ten lenh "writer.getText" dung lam ten tool) TRUOC khi ghi luot
+	// assistant vao lich su va truoc ToolStarted - lich su, su kien, audit va ket qua deu thay dung mot cuoc goi.
+	// Tra (call, false) neu khong sua. nil = khong sua (giong AI SDK experimental_repairToolCall).
+	RepairToolCall func(call ToolCall) (ToolCall, bool)
 }
 
 // FitWindow: chinh nguong theo cua so ngu canh cua model (LangChain trigger ("fraction", x)). Nguong don giu
@@ -125,6 +130,17 @@ type AgentCallbacks struct {
 	// AskContinue: hoi nguoi dung co cho luot chay tiep khi vuot nguong (17-R0).
 	// Tra true = chay tiep, false/nil = dung luot. Nhan (vong, billableTokens, lyDo).
 	AskContinue func(round, billable int, reason string) bool
+	// RoundFinished: so lieu mot vong goi model (token, so tool call, loai vong) - de do truc tiep ngu canh gui lai.
+	RoundFinished func(stat RoundStat)
+	// Trace: su kien chi tiet de soi loi (round, tool, guard, state) voi DAY DU noi dung - chi gan khi bat DebugTrace.
+	Trace func(event string, fields map[string]any)
+}
+
+// RoundStat: mot vong goi model. Kind: "tools" (co tool call), "final" (cau tra loi cuoi), "nudge:<guard>" (guard nhac
+// lam tiep, vd nudge:verify), "end:<guard>" (guard ket thuc luot), "error" (goi model hong).
+type RoundStat struct {
+	Round, InputTokens, CachedTokens, OutputTokens, ToolCalls int
+	Kind                                                      string
 }
 
 type AgentResult struct {
@@ -144,8 +160,12 @@ type AgentResult struct {
 	ToolsDisabled bool
 	// Verified: luot nay co sua tai lieu nen da duoc yeu cau tu kiem chung truoc khi tra loi.
 	Verified bool
+	// RoundStats: tung vong goi model (cung noi dung RoundFinished).
+	RoundStats []RoundStat
 	// Model: model tra loi cuoi cung (khac Client.Model khi da chuyen sang model du phong).
 	Model string
+	// RepairedToolCalls: so tool call da duoc AgentOptions.RepairToolCall sua. Cao = tin hieu chinh prompt/schema.
+	RepairedToolCalls int
 }
 
 // BillableTokens: so token phai tra that, tuc la phan nha cung cap THAT SU phai tinh.
@@ -214,7 +234,7 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 
 	options = options.FitWindow()
 	loop := &agentLoop{client: c, options: options, callbacks: callbacks, result: &result, systemPrompt: systemPrompt,
-		toolsEnabled: len(tools) > 0, model: c.Model, addLine: addLine}
+		toolsEnabled: len(tools) > 0, model: c.Model, addLine: addLine, verifiedAt: -1, reads: map[string]int{}}
 	loop.turns = make([]Message, 0, len(prior)+1)
 	for _, turn := range prior {
 		loop.turns = append(loop.turns, map[string]any{"role": turn.Role, "content": turn.Content})
@@ -236,10 +256,21 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 		}
 
 		turn, failure := loop.ask(runCtx, ctx, tools)
+		stat := RoundStat{Round: result.Rounds, Kind: "error"}
+		report := func(kind string) {
+			stat.Kind = kind
+			result.RoundStats = append(result.RoundStats, stat)
+			if callbacks.RoundFinished != nil {
+				callbacks.RoundFinished(stat)
+			}
+		}
 		if failure == nil {
 			result.InputTokens += turn.InputTokens
 			result.OutputTokens += turn.OutputTokens
 			result.CachedTokens += turn.CachedTokens
+			stat.InputTokens, stat.CachedTokens, stat.OutputTokens = turn.InputTokens, turn.CachedTokens, turn.OutputTokens
+			stat.ToolCalls = len(turn.ToolCalls)
+			loop.traceRound(turn)
 			if turn.Reasoning != "" && callbacks.Reasoning != nil {
 				callbacks.Reasoning(result.Rounds, turn.Reasoning)
 			}
@@ -247,18 +278,25 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 				reply := StripThoughts(turn.Text)
 				decision := guards.onReply(loop, turn, reply)
 				if decision == nil {
+					report("final")
 					return done(true, reply, "", "")
 				}
+				loop.trace("guard", map[string]any{"round": result.Rounds, "by": decision.by, "next": decision.next,
+					"end": decision.end, "error": decision.err})
 				if decision.next {
+					report("nudge:" + decision.by)
 					continue
 				}
 				if decision.failure == nil {
+					report("end:" + decision.by)
 					return finish(decision)
 				}
 				failure = decision.failure
 			}
 		}
 		if failure != nil {
+			report("error")
+			loop.trace("round.error", map[string]any{"round": result.Rounds, "detail": failure.detail})
 			if runCtx.Err() != nil {
 				return stopped()
 			}
@@ -268,6 +306,11 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 			return done(false, "", failure.detail, "provider")
 		}
 
+		invalidArguments := dropInvalidArguments(turn)
+		if options.RepairToolCall != nil {
+			result.RepairedToolCalls += repairTurnToolCalls(turn, options.RepairToolCall)
+		}
+		report("tools")
 		loop.turns = c.Codec.AppendAssistant(loop.turns, turn)
 		results := make([]ToolResult, 0, len(turn.ToolCalls))
 		for _, call := range turn.ToolCalls {
@@ -279,8 +322,11 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 			}
 			toolStarted := time.Now()
 			var toolResult ToolResult
-			if replaced := guards.beforeCall(loop, call); replaced != nil {
-				toolResult = *replaced
+			replacedBy := ""
+			if original, invalid := invalidArguments[call.ID]; invalid {
+				toolResult, replacedBy = invalidArgumentsResult(call, original), "invalid-arguments"
+			} else if replaced, by := guards.beforeCall(loop, call); replaced != nil {
+				toolResult, replacedBy = *replaced, by
 			} else {
 				toolResult = safeExecute(runCtx, execute, call)
 			}
@@ -290,9 +336,20 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 				callbacks.ToolFinished(toolResult)
 			}
 			addLine(call.Name + " " + Truncate(call.Arguments, 150) + " -> " + Truncate(toolResult.ResultJSON, 150))
+			loop.trace("tool", map[string]any{"round": result.Rounds, "id": call.ID, "name": call.Name, "args": call.Arguments,
+				"ok": toolResult.OK, "ms": toolResult.Ms, "mutating": toolResult.Mutating, "verifies": toolResult.Verifies,
+				"final": toolResult.Final, "replacedBy": replacedBy, "resultChars": len(toolResult.ResultJSON),
+				"result": toolResult.ResultJSON})
 		}
 		loop.turns = c.Codec.AppendToolResults(loop.turns, results)
-		if decision := guards.afterTools(loop, turn, results); decision != nil && decision.end {
+		decision := guards.afterTools(loop, turn, results)
+		loop.trace("state", map[string]any{"round": result.Rounds, "revision": loop.revision, "verifiedAt": loop.verifiedAt,
+			"reads": len(loop.reads), "turns": len(loop.turns)})
+		if decision != nil {
+			loop.trace("guard", map[string]any{"round": result.Rounds, "by": decision.by, "next": decision.next,
+				"end": decision.end, "error": decision.err})
+		}
+		if decision != nil && decision.end {
 			return finish(decision)
 		}
 	}
@@ -414,4 +471,32 @@ func clearOldToolResults(turns []Message, keep, minChars int) int {
 		item.holder["content"] = clearedToolResult
 	}
 	return reclaim
+}
+
+// trace: su kien DebugTrace (AgentCallbacks.Trace) - khong lam gi khi khong bat.
+func (l *agentLoop) trace(event string, fields map[string]any) {
+	if l.callbacks.Trace != nil {
+		l.callbacks.Trace(event, fields)
+	}
+}
+
+// traceRound: mot vong goi model - kich thuoc ngu canh vua gui, cau tra loi va tool call nguyen van.
+func (l *agentLoop) traceRound(turn *Turn) {
+	if l.callbacks.Trace == nil {
+		return
+	}
+	calls := make([]map[string]any, 0, len(turn.ToolCalls))
+	for _, call := range turn.ToolCalls {
+		calls = append(calls, map[string]any{"id": call.ID, "name": call.Name, "args": call.Arguments})
+	}
+	contextChars := len(l.systemPrompt)
+	for _, message := range l.turns {
+		if raw, err := json.Marshal(message); err == nil {
+			contextChars += len(raw)
+		}
+	}
+	l.trace("round", map[string]any{"round": l.result.Rounds, "model": l.model, "input": turn.InputTokens,
+		"cached": turn.CachedTokens, "output": turn.OutputTokens, "finish": turn.FinishReason, "text": turn.Text,
+		"reasoningChars": len(turn.Reasoning), "reasoning": turn.Reasoning, "toolCalls": calls,
+		"sentMessages": len(l.turns), "sentChars": contextChars})
 }

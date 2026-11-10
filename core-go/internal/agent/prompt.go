@@ -6,6 +6,7 @@ import (
 
 	"axiomoffice/core/internal/office"
 	"axiomoffice/core/internal/skills"
+	"axiomoffice/core/internal/tools"
 )
 
 // DocumentContext: ngu canh tai lieu ma pane gui kem (muc 7.3).
@@ -79,6 +80,18 @@ const CheckRule = "When you have changed the document, read the result back and 
 	"formulas really depend on existing data, read the formulas back (et.readRange with formulas:true) " +
 	"instead of changing values. "
 
+// StopRule: nua sau cua buoc doc lai sau khi sua; doc lai da cho thay dung thi DUNG. Do duoc tren 26 luot
+// that 24-25/10/2026: khoang 25% token dau vao la cac vong xac minh sau lan sua cuoi (listSlides/checkLayout
+// lap lai ca bai, moi lan 0 loi moi - bao cao "Giam ngu canh gui lai agent", muc 6). Cong thu tu ChatGPT
+// (25/10/2026): kiem lai chi khi sap ghi them, khi mot kiem tra that bai, hoac khi con phan chua kiem; viec
+// kiem lai "de dam bao" khi khong co gi sua doi khong cho ra tin nao moi, chi tieu token - phia harness da
+// chong lai bang docStateGuard (lenh doc lap lai khi tai lieu khong doi) va verifyGuard (bang chung sau lan
+// sua). Cau cuoi khuyen goi doc doc lap song song trong cung mot phan hoi.
+const StopRule = "Once a read-back of what you changed confirms it is correct, finish and reply - do not run " +
+	"any further whole-document sweeps or repeat a check that already passed on an unchanged document; " +
+	"only verify again if you are about to change something, a check failed, or you have not checked " +
+	"that part yet. Independent checks may read different places in one reply. "
+
 // PlanModeRule: che do lap ke hoach (Request.Plan). Ghi de cau "reply with a very short summary" cua Base cho
 // luot nay. Tool cua luot chi con lenh doc (NewReadOnlyOfficeActionTool, ReadOnlyMCP) nen model khong sua duoc
 // tai lieu du co muon; quy tac van noi ro de model khong mo ta nhu da lam xong.
@@ -92,16 +105,63 @@ const PlanModeRule = "PLAN MODE for this turn: the user wants to approve a plan 
 	"not add new slides/sheets unless asked). Do not claim that anything was changed, and do not ask for " +
 	"permission inside the steps: the user will reply to run the plan."
 
+// PlanCapabilities: o lap ke hoach tool chi con lenh doc, nen model khong biet buoc thuc hien se co lenh gi (luot that
+// 25/10/2026: de 10 slide kien truc, ke hoach ve so do bang chu vi khong thay wpp.addShape/addConnector va
+// slides_from_brief). Liet ke lenh ghi + mo ta tool chi co khi chay - CHI de len ke hoach, khong goi duoc luc nay.
+func PlanCapabilities(full *tools.OfficeActionTool, act []tools.Tool) string {
+	writes := []string{}
+	for _, name := range full.AllowedActions() {
+		if !tools.ReadOnly(name) {
+			writes = append(writes, name)
+		}
+	}
+	extra := []string{}
+	for _, tool := range act {
+		if tool.Name() == tools.TodoToolName {
+			continue
+		}
+		extra = append(extra, tool.Name()+": "+tool.Description())
+	}
+	if len(writes) == 0 && len(extra) == 0 {
+		return ""
+	}
+	text := " WHEN THE USER RUNS THE PLAN you will also have the following (do not call them now; plan with them and " +
+		"prefer the most fitting one - e.g. real shapes, connectors and charts over text that only describes a diagram)."
+	if len(writes) > 0 {
+		text += " office_action write actions: " + strings.Join(writes, ", ") + "."
+	}
+	for _, line := range extra {
+		text += " Tool " + line
+	}
+	return text
+}
+
 // Base: phan 1 cua system prompt - vai tro va quy tac chung (giu hanh vi da kiem chung tren Office that).
 func Base(appName string) string {
 	return "You are an AI assistant embedded inside " + appName + ", working on the document that is currently open. " +
 		"Use the office_action tool for EVERY document change so the user sees it happen live on screen, " +
 		"and also for reading the document when needed (for example read the open file before answering questions about it). " +
+		"Document commands such as writer.getText or et.writeRange are values of office_action's `action` argument, never tool names. " +
 		"Prefer a few well-chosen actions over many tiny ones. Write all generated content (letters, reports, slide contents, tables) in the user's language. " +
-		ReconRule + PlanRule + CheckRule +
+		ReconRule + PlanRule + CheckRule + StopRule +
 		"Do not save the file (save, saveAs) or export it (exportPdf) unless the user explicitly asks for it: your changes are already visible in the open document and the user decides when and where to save. " +
 		InjectionRule +
 		"After finishing, reply with a very short summary (1-2 sentences). Never invent tool results."
+}
+
+// CitationRule: trich dan cho nguoi dung bam de nhay toi cho do (pane goi writer.goto / et.goto / wpp.goto). Co dinh theo
+// app nen khong pha cache tien to. Chi trich so/o model THAY trong ket qua lenh doc - trich sai thi bam nhay sai cho.
+func CitationRule(appKind string) string {
+	switch appKind {
+	case "et":
+		return "Citations: when your answer points to specific cells, cite them as [Sheet!A1] or [Sheet!A1:B5] (the user " +
+			"can click them to jump there). Cite only cells you actually read."
+	case "wpp":
+		return "Citations: when your answer points to a specific slide, cite it as [slide n] (the user can click it to jump " +
+			"there). Cite only slides you actually read."
+	}
+	return "Citations: when your answer points to specific places in the document, cite them as [§n], where n is the " +
+		"paragraph number (field \"n\") from writer.outline; the user can click it to jump there. Cite only numbers you saw."
 }
 
 func AppName(appKind string) string {
@@ -168,7 +228,7 @@ func ViewSection(document *DocumentContext) string {
 
 // skillDescriptionLimit: so ky tu cua description lot vao chi muc tang 1 (SkillsSection). Dai hon thi
 // bi cat duoi, va vi day la thu DUY NHAT model thay khi chon skill, tu khoa dinh tuyen phai nam trong
-// han muc nay (docs/skills-review.md muc 4.9).
+// han muc nay (docs/research/skills-review.md muc 4.9).
 const skillDescriptionLimit = 300
 
 // skillNotForLimit: `not_for` hien o dong rieng ngay duoi (P2-01) - khong tinh vao ngan sach description o tren.
@@ -236,7 +296,7 @@ func ConversationSection(summary string, recentLines []string) string {
 // Build: ghep system prompt theo thu tu on dinh de cache duoc (muc 8.8).
 func Build(appKind string, session *office.Session, document *DocumentContext, appSkills []skills.Definition,
 	memories []string, orgLines []string, summary string, recentLines []string) string {
-	sections := []string{Base(AppName(appKind)), DocumentSection(session, document)}
+	sections := []string{Base(AppName(appKind)), CitationRule(appKind), DocumentSection(session, document)}
 	for _, section := range []string{
 		SkillsSection(appSkills),
 		OrgStyleSection(orgLines),

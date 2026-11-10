@@ -2,6 +2,10 @@
 
 > Cùng hợp đồng bridge, cùng tên lệnh. Core, skill, test dùng lại.
 
+> **31/10/2026:** phần **LibreOffice** của plan này **đóng băng** (dừng phát triển 25/10/2026, ra khỏi `make test`/CI) —
+> không làm các mục LibreOffice bên dưới. Phần **WPS Linux** vẫn là việc chính; danh sách lệnh/tool WPS còn thiếu đã
+> chuyển sang bảng sinh tự động ở `docs/architecture/wps-bridge.md` §6 (số trong plan này là số cũ, đừng dùng).
+
 ## 1. Đã có (đối chiếu code 16/10/2026, STATUS.md)
 
 - Extension Python UNO (`src/AxiomOffice.LibreOffice/`): bridge Writer/Calc/Impress trên cổng 47851/47852/47853,

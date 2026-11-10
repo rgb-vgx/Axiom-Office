@@ -1,4 +1,4 @@
-// Spec add-in WPS cho 15 lenh wpp.* (Presentation) — T8 trong docs/wps-bridge.md muc 5.
+// Spec add-in WPS cho 15 lenh wpp.* (Presentation) — T8 trong docs/architecture/wps-bridge.md muc 5.
 // Chay offline: nap add-in trong vm voi object model WPS gia (addin_fake.mjs), doi chieu metadata
 // voi registry LibreOffice (lo_catalog.py qua addin_harness.mjs).
 //
@@ -28,7 +28,7 @@
 // "presentation has no slides; call wpp.addSlide first" (giong `_page` cua ban LibreOffice).
 // `align` nhan left/center/right -> WPS ParagraphFormat.Alignment 1/2/3.
 //
-// Khac ban LibreOffice (do tren WPS that 11/10/2026, xem docs/wps-bridge.md muc 6 va REFERENCE.md):
+// Khac ban LibreOffice (do tren WPS that 11/10/2026, xem docs/architecture/wps-bridge.md muc 6 va REFERENCE.md):
 // - `addSlide`: layout la so kieu PowerPoint va WPS dung dung cac hang so nay
 //   (ppLayoutTitle=1, ppLayoutText=2, ppLayoutTitleOnly=11, ppLayoutBlank=12). Layout sai bi tu choi
 //   TRUOC khi chen, nen bai khong bi de lai slide rac.
@@ -37,9 +37,9 @@
 //   do tren WPS that co 2 placeholder: 1 = so trang, 2 = ghi chu).
 // - `exportPdf`: API goc (ExportAsFixedFormat/SaveAs .pdf) bao thanh cong ma KHONG ghi file, nen add-in
 //   kiem bang FileSystem.existsSync roi tu dung PDF. Ket qua phai la file "%PDF" that.
-// - `checkLayout`: khong bao `overflow` (can chieu cao chu that, object model WPS khong do duoc);
-//   bon loai issue con lai (offslide, small-font, overlap, dense) lam duoc, nguong giong ban LibreOffice
-//   (sai so 2pt, chu nho nhat 12pt, 600 ky tu/slide).
+// - `checkLayout`: offslide, small-font, overlap, dense nguong giong ban LibreOffice (sai so 2pt, chu nho nhat
+//   12pt, 600 ky tu/slide). `overflow` (TextRange.BoundHeight, do duoc tu 01/11/2026) spec o test_addin_shapes.mjs
+//   vi fake o day khong mo phong chieu cao chu.
 // - Registry KHONG co `wpp.undo` (khac `et.undo`) va WPP khong co UndoRecord: khong lenh nao cua add-in
 //   duoc mo UndoRecord.
 // - Tham so `text` cua addText/addTextBox/setNotes: metadata ghi required nhung ban LibreOffice van chay
@@ -54,7 +54,7 @@ import { addinCatalog, assertFails, assertKindRefused, assertMetadata, loadAddin
 const WPP_COMMANDS = [
   "wpp.newPresentation", "wpp.open", "wpp.listSlides", "wpp.addSlide", "wpp.addText", "wpp.addTextBox",
   "wpp.addImage", "wpp.addTable", "wpp.setNotes", "wpp.deleteSlide", "wpp.exportPdf", "wpp.save",
-  "wpp.saveAs", "wpp.closeAll", "wpp.checkLayout",
+  "wpp.saveAs", "wpp.closeAll", "wpp.checkLayout", "wpp.goto",
 ];
 
 const MUTATING = ["wpp.addSlide", "wpp.addText", "wpp.addTextBox", "wpp.addImage", "wpp.addTable",
@@ -70,8 +70,10 @@ function slideOf(app, index) {
 
 // Lenh lam bai theo mau + sap xep bai (compose): chi co handler tren PowerPoint/LibreOffice/Windows
 // (CHUA_CO_HANDLER cua test_addin.mjs); add-in WPS JS chua viet.
+// Hinh khoi + duong noi (slides_from_brief, docs/plans/18-s0 P2): cung chi co tren PowerPoint, WPS la to-do.
 const TEMPLATE_COMMANDS = ["wpp.newFromTemplate", "wpp.addSlideFromTemplate", "wpp.sourceManifest", "wpp.setShapeText",
-  "wpp.deleteShapes", "wpp.copyPicture", "wpp.addParagraphs", "wpp.addGrid", "wpp.deleteTagged"];
+  "wpp.deleteShapes", "wpp.copyPicture", "wpp.addParagraphs", "wpp.addGrid", "wpp.deleteTagged", "wpp.addShape",
+  "wpp.addConnector", "wpp.renderSlide", "wpp.addChart"];
 
 test("registry: du 15 lenh wpp.*, metadata giong het registry LibreOffice", () => {
   const ctx = loadAddin();
@@ -312,8 +314,15 @@ test("wpp.save / wpp.saveAs / wpp.closeAll", () => {
   assert.equal(closed.rescued.length, 1, "chi bai chua luu moi duoc cuu");
   assert.match(closed.rescued[0], /rescued/);
   const log = callsOf(two);
+  assert.ok(log.includes('FileSystem.Mkdir(/tmp/rescued)'), "phai tao thu muc cuu truoc khi SaveAs: " + log.slice(-8).join(" | "));
   assert.ok(log.some((line) => line.indexOf("SaveAs(") === 0 && line.indexOf("rescued") > 0),
     "phai SaveAs ban cuu ho truoc khi Close: " + log.slice(-6).join(" | "));
+
+  // Bai khong co ten (Name rong): ten mac dinh phai duoc dung, khong duoc thanh "/tmp/rescued/".
+  const unnamed = makeWppApp({ presentationName: "", slides: 1 });
+  unnamed.ActivePresentation.Saved = false;
+  const rescued = run(ctx, unnamed, "wpp.closeAll").rescued;
+  assert.deepEqual(rescued, ["/tmp/rescued/presentation.pptx"]);
 });
 
 test("wpp.checkLayout: soat bo cuc slide (ra ngoai, chu nho, chong nhau, qua nhieu chu)", () => {

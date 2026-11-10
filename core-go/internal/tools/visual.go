@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"axiomoffice/core/internal/model"
+	"axiomoffice/core/internal/office"
 )
 
 // VisualTool: look_at_document - lay anh trang/slide hien tai (bridge app.screenshot) va gui ANH cho model de
@@ -26,17 +28,31 @@ func (t *VisualTool) Name() string { return VisualToolName }
 func (t *VisualTool) Description() string {
 	return "Look at an image of the page or slide currently shown in the document window, to check the visual " +
 		"layout (text overflowing, overlapping shapes, alignment, contrast) after creating or redesigning slides, " +
-		"tables or pages. It shows ONLY the current page/slide (the result says which slide). " +
+		"tables or pages. It shows the current page/slide (the result says which slide); in a presentation pass " +
+		"`slide` to look at that slide instead. " +
 		"It costs many tokens: call it at most once or twice per task, after the structural checks."
 }
 
 func (t *VisualTool) Parameters() json.RawMessage {
 	return json.RawMessage(`{"type":"object","properties":{` +
-		`"reason":{"type":"string","description":"What you want to check"}}}`)
+		`"reason":{"type":"string","description":"What you want to check"},` +
+		`"slide":{"type":"integer","description":"presentation only: slide number to look at (default: the slide shown)"}}}`)
 }
 
 func (t *VisualTool) Invoke(ctx context.Context, arguments map[string]any, run *RunContext) Result {
-	shot := run.Bridge.Command(ctx, run.Office.Port, "app.screenshot", map[string]any{"maxWidth": VisualMaxWidth})
+	// Slide theo so (docs/plans/18-s0 P3): wpp.renderSlide xuat dung slide do ma khong doi cua so nguoi dung dang xem;
+	// bridge chua co lenh nay (WPS, ban cu) thi quay ve chup slide dang hien.
+	var shot office.BridgeResult
+	if slide := asInt(arguments["slide"]); slide > 0 && run.Office.App == "wpp" {
+		params := map[string]any{"slide": slide, "maxWidth": VisualMaxWidth}
+		if strings.TrimSpace(run.TargetDocument) != "" {
+			params["presentation"] = run.TargetDocument
+		}
+		shot = run.Bridge.Command(ctx, run.Office.Port, "wpp.renderSlide", params)
+	}
+	if !shot.OK {
+		shot = run.Bridge.Command(ctx, run.Office.Port, "app.screenshot", map[string]any{"maxWidth": VisualMaxWidth})
+	}
 	base64, _ := shot.Result["base64"].(string)
 	if !shot.OK || base64 == "" {
 		return Result{JSON: ErrorJSON("screenshot unavailable: " + firstNonEmptyText(shot.Error, "no image")), Action: VisualToolName}

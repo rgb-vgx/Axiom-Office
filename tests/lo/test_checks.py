@@ -206,7 +206,7 @@ class LayoutTableTests(unittest.TestCase):
         self.assertIn("long-header-cell", issue_types(result, 1))
         self.assertNotIn("empty-cells", issue_types(result, 1), "bang dan trang van duoc mien empty-cells")
 
-    # Muc 4.7 docs/skills-review.md: nguong "3 x trung vi(do dai o tieu de)" voi bang 2 cot lay trung vi cua
+    # Muc 4.7 docs/research/skills-review.md: nguong "3 x trung vi(do dai o tieu de)" voi bang 2 cot lay trung vi cua
     # CHINH HAI O do, tuc la o dai hon -> o dai nhat luon co len == typical nen khong bao gio vuot 3 x typical.
     # Hai bang cua van-ban-hanh-chinh deu 2 cot, nen loi hua "khong duoc co long-header-cell" cua no khong the
     # sai. Nay moi o so voi trung vi cac o tieu de CON LAI (leave-one-out).

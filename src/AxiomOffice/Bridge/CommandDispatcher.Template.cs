@@ -10,7 +10,7 @@ using System.Web.Script.Serialization;
 
 namespace AxiomOffice.Bridge
 {
-    // Làm bài theo MẪU đính kèm (docs/template-design.md mục 6). Thí nghiệm 13/10/2026 trên PowerPoint 16 với mẫu
+    // Làm bài theo MẪU đính kèm (docs/architecture/template-design.md mục 6). Thí nghiệm 13/10/2026 trên PowerPoint 16 với mẫu
     // của trường: master/layout là Office mặc định, logo + dải màu nằm trong ẢNH NỀN trên từng slide, chữ là
     // textbox tự vẽ. Vì vậy:
     //   - AddSlide theo CustomLayout của slide mẫu ra slide TRẮNG -> nhân bản slide mẫu bằng InsertFromFile
@@ -112,14 +112,55 @@ namespace AxiomOffice.Bridge
                 throw new ArgumentException("'path' already exists: " + path + " - choose another file name (never overwrite)");
             }
             dynamic app = host.Application;
-            // Untitled: mở BẢN SAO của mẫu, tệp mẫu không bị sửa; .potx cũng mở được như vậy.
-            dynamic pres = app.Presentations.Open(template, 0, -1, -1);
-            int templateSlides = Convert.ToInt32(pres.Slides.Count);
-            for (int i = templateSlides; i >= 1; i--)
+            // Mẫu ĐANG MỞ thì Presentations.Open (kể cả Untitled) trả về chính bài đang mở: trước đây lệnh này xoá hết
+            // slide của bài đó rồi SaveAs sang `path` - cửa sổ của người dùng thành bài mới rỗng, thay đổi chưa lưu mất
+            // (đo 25/10/2026, PowerPoint x64). Khi đó mở một bản chép tạm của tệp mẫu.
+            string source = template;
+            string copy = null;
+            if (FindPresentation(app, template) != null)
             {
-                pres.Slides[i].Delete();
+                copy = Path.Combine(Path.GetTempPath(), "axiom-template-" + Guid.NewGuid().ToString("N") + Path.GetExtension(template));
+                File.Copy(template, copy);
+                source = copy;
             }
-            pres.SaveAs(path, 24);
+            dynamic pres;
+            int templateSlides;
+            try
+            {
+                // Untitled: mở BẢN SAO của mẫu, tệp mẫu không bị sửa; .potx cũng mở được như vậy.
+                pres = app.Presentations.Open(source, 0, -1, -1);
+                templateSlides = Convert.ToInt32(pres.Slides.Count);
+                for (int i = templateSlides; i >= 1; i--)
+                {
+                    pres.Slides[i].Delete();
+                }
+                pres.SaveAs(path, 24);
+                TrackPresentation(pres);
+                // Mở qua COM thì cửa sổ mới KHÔNG tự thành cửa sổ hoạt động: không kích hoạt thì các lệnh sau (không
+                // truyền `presentation`) rơi vào bài cũ của người dùng (đo 25/10/2026).
+                try
+                {
+                    pres.Windows[1].Activate();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Info("wpp.newFromTemplate: could not activate the new window (" + ex.Message + ")");
+                }
+            }
+            finally
+            {
+                if (copy != null)
+                {
+                    try
+                    {
+                        File.Delete(copy);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Info("wpp.newFromTemplate: temp copy not deleted (" + ex.Message + ")");
+                    }
+                }
+            }
             return new Dictionary<string, object>
             {
                 { "path", Convert.ToString(pres.FullName) },
@@ -354,6 +395,19 @@ namespace AxiomOffice.Bridge
             catch (Exception ex)
             {
                 throw new ArgumentException("cannot insert slide " + kind + " of the template (does it have that many slides? see kinds of ppt_profile): " + ex.Message);
+            }
+            finally
+            {
+                // Mẫu ĐANG MỞ thì InsertFromFile đẩy cửa sổ của mẫu lên làm cửa sổ hoạt động: các lệnh sau (không truyền
+                // `presentation`) sửa nhầm bài mẫu của người dùng (đo 25/10/2026, PowerPoint x64). Trả quyền cho bài đích.
+                try
+                {
+                    pres.Windows[1].Activate();
+                }
+                catch (Exception activateError)
+                {
+                    Logger.Info("wpp.addSlideFromTemplate: could not re-activate the target window (" + activateError.Message + ")");
+                }
             }
             dynamic inserted = null;
             foreach (dynamic candidate in pres.Slides)
@@ -1224,12 +1278,80 @@ namespace AxiomOffice.Bridge
         // Bài để làm việc: `presentation` (đường dẫn) nếu có, không thì bài đang hoạt động. Lượt thật 13/10/2026 17:04: khung
         // Axiom gắn vào cửa sổ bài CŨ; giữa lô người dùng bấm vào đó -> "bài đang hoạt động" thành bài cũ, các lệnh sau
         // trúng bài cũ (chặn được nhờ RequireSameSize). Dựng theo mẫu luôn chỉ đích danh bài mới.
+        // Bài đang làm của bridge này. PowerPoint 16 từ chối đổi ActivePresentation khi cửa sổ bài không
+        // phải cửa sổ nổi (đo 28/10/2026: wpp.open trả alreadyOpen nhưng ActivePresentation vẫn là bài cũ,
+        // cả Window.Activate lẫn Application.ActiveWindow đều không đổi). Ghi nhớ bài vừa mở/tạo để lệnh
+        // không truyền `presentation` vẫn làm đúng bài, thay vì tin ActivePresentation.
+        // Không giữ mãi: người dùng tự chuyển sang bài khác thì "bài này" là bài họ đang xem. Nhớ thêm bài đang hoạt động
+        // lúc ghi nhớ (_activeWhenTracked); về sau ActivePresentation khác cả hai thì người dùng đã chuyển - bỏ bài đã nhớ.
+        private static string _trackedPresentation;
+        private static string _activeWhenTracked;
+
+        internal static void TrackPresentation(dynamic pres)
+        {
+            try
+            {
+                _trackedPresentation = Convert.ToString(pres.FullName);
+            }
+            catch (Exception)
+            {
+                _trackedPresentation = null;
+            }
+            try
+            {
+                _activeWhenTracked = ActivePresentationName(pres.Application);
+            }
+            catch (Exception)
+            {
+                _activeWhenTracked = null;
+            }
+        }
+
+        private static string ActivePresentationName(dynamic app)
+        {
+            try
+            {
+                return Convert.ToString(app.ActivePresentation.FullName);
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
+        internal static dynamic CurrentPresentation(dynamic app)
+        {
+            if (!string.IsNullOrWhiteSpace(_trackedPresentation))
+            {
+                string active = ActivePresentationName(app);
+                bool switched = !string.IsNullOrEmpty(active) &&
+                    !string.Equals(active, _activeWhenTracked, StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(active, _trackedPresentation, StringComparison.OrdinalIgnoreCase);
+                if (switched)
+                {
+                    Logger.Info("PowerPoint: active presentation changed to '" + active + "' - no longer targeting '" +
+                        _trackedPresentation + "'");
+                    _trackedPresentation = null;
+                    _activeWhenTracked = null;
+                }
+                else
+                {
+                    dynamic found = FindPresentation(app, _trackedPresentation);
+                    if (found != null)
+                    {
+                        return found;
+                    }
+                }
+            }
+            return app.ActivePresentation;
+        }
+
         internal static dynamic TargetPresentation(dynamic app, Dictionary<string, object> p)
         {
             string path = ParamString(p, "presentation", null);
             if (string.IsNullOrWhiteSpace(path))
             {
-                return app.ActivePresentation;
+                return CurrentPresentation(app);
             }
             dynamic found = FindPresentation(app, path.Trim());
             if (found == null)
@@ -1250,7 +1372,7 @@ namespace AxiomOffice.Bridge
             dynamic target = null;
             try
             {
-                target = app.ActivePresentation;
+                target = CurrentPresentation(app);
             }
             catch
             {
@@ -1415,12 +1537,20 @@ namespace AxiomOffice.Bridge
                 throw new ArgumentException("shape '" + name + "' cannot hold text; text shapes: " + ShapeNames(slide, true));
             }
             dynamic range = shape.TextFrame.TextRange;
-            range.Text = text.Replace("\r\n", "\n").Replace("\n", "\r");
+            string wanted = text.Replace("\r\n", "\n").Replace("\n", "\r");
+            // Chu y het chu dang co: khong ghi, bao changed=false de Core khong coi tai lieu da doi (luot that 26/10/2026:
+            // model ghi lai dung chu cu roi phai doc lai ca bai vi revision tang).
+            bool changed = !string.Equals(Convert.ToString(range.Text), wanted, StringComparison.Ordinal);
+            if (changed)
+            {
+                range.Text = wanted;
+            }
             var result = new Dictionary<string, object>
             {
                 { "slide", index },
                 { "shape", Convert.ToString(shape.Name) },
-                { "chars", text.Length }
+                { "chars", text.Length },
+                { "changed", changed }
             };
             bool grew = false;
             try

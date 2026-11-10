@@ -1,4 +1,4 @@
-"""Spec T1 (docs/wps-bridge.md muc 2): Agent Core lam bridge cho JS add-in WPS - test hop den.
+"""Spec T1 (docs/architecture/wps-bridge.md muc 2): Agent Core lam bridge cho JS add-in WPS - test hop den.
 
 Build va chay Core THAT (go build, hoac AXIOM_E2E_CORE_EXE), dong vai add-in bang HTTP (poll/result), kiem:
 phuc vu file add-in, xac thuc theo Origin cua chinh Core, bridge WPS tren cong rieng (health/commands/session/cmd)

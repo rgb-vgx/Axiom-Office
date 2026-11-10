@@ -1,0 +1,42 @@
+{
+  "client": "wps-jsaddon",
+  "clientId": "client-et",
+  "app": "et",
+  "version": "<version>",
+  "document": {
+    "name": "ban-hang.xlsx",
+    "fullName": "/home/u/ban-hang.xlsx"
+  },
+  "commands": [
+    {
+      "name": "app.info",
+      "kind": null,
+      "agent": false,
+      "undo": false,
+      "summary": "Tên/version app, tài liệu đang mở, `state` (tài liệu, cửa sổ, visible)",
+      "params": []
+    },
+    {
+      "name": "et.newWorkbook",
+      "kind": "et",
+      "agent": false,
+      "undo": false,
+      "summary": "Tạo sổ tính mới",
+      "params": []
+    },
+    {
+      "name": "et.open",
+      "kind": "et",
+      "agent": false,
+      "undo": false,
+      "summary": "Mở .xlsx/.xls/.ods/.csv",
+      "params": [
+        {
+          "name": "path",
+          "required": true,
+          "hint": null
+        }
+      ]
+    }
+  ]
+}

@@ -34,6 +34,27 @@ func ReadOnlyMCP(list []mcp.ServerTool) []mcp.ServerTool {
 	return kept
 }
 
+// AppMCP: cong cu MCP cho mot lan chay that - server built-in "office" chi con tool CUA app dang lam (doc_
+// cho wps, excel_ cho et, ppt_ cho wpp - doc va ghi deu giu) cong lenh DOC FILE cua app khac (doc file
+// .xlsx doi chieu so lieu trong bai Word, doc file .docx trich doan van trong bai Excel); lenh GHI cua app
+// khac thi bo - luot nay khong bao gio dung chung, ma moi dinh nghia tool gui lai moi vong deu la tien to
+// phai tra (~8k ky tu - bao cao "Giam ngu canh gui lai agent", muc 3). Server nguoi dung giu nguyen (khong
+// du doan cong cu nao ghi cua ho). Thu tu giu nguyen - bo loc khong lam doi thu tu tool nen bo hop tool co
+// dinh theo app, khong pha cache (bai hoc Claude Code: khong thay doi bo tool giua mot phien).
+func AppMCP(list []mcp.ServerTool, appKind string) []mcp.ServerTool {
+	kept := []mcp.ServerTool{}
+	for _, item := range list {
+		if item.Server == nil || item.Server.Config.Name != "office" {
+			kept = append(kept, item)
+			continue
+		}
+		if mcp.FileToolApp(item.Tool.Name) == appKind || mcp.OfficeReadOnlyTools[item.Tool.Name] {
+			kept = append(kept, item)
+		}
+	}
+	return kept
+}
+
 func (t *MCPTool) Name() string { return t.bound.Name() }
 
 func (t *MCPTool) Description() string { return t.bound.Description() }
@@ -63,7 +84,17 @@ func (t *MCPTool) Invoke(ctx context.Context, arguments map[string]any, run *Run
 		}
 	}
 	return Result{JSON: mcp.ResultJSON(text, ok), OK: ok, Action: name,
-		Mutating: ok && MCPChangesState(name)}
+		Mutating: ok && mcpToolChangesState(t.bound)}
+}
+
+// mcpToolChangesState: name() la ten day du "mcp__office__ppt_profile" - danh sach chi doc ghi ten tool tran cua
+// server built-in, tra theo ten day du thi khong bao gio khop (26/10/2026: ppt_profile luc lap ke hoach bi tinh la
+// lenh ghi, tang revision).
+func mcpToolChangesState(bound mcp.ServerTool) bool {
+	if bound.Server != nil && bound.Server.Config.BuiltIn {
+		return MCPChangesState(bound.Tool.Name)
+	}
+	return MCPChangesState(bound.Name())
 }
 
 // mcpReadOnly: cac tool MCP chi doc trang thai, khong ghi file nao. Danh sach nay gom dung cac tool

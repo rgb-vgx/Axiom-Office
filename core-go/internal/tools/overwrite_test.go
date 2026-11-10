@@ -217,6 +217,38 @@ func TestNoQuestionForEmptyCellsSameValuesOrOwnSheets(t *testing.T) {
 	}
 }
 
+// O do chinh luot vua ghi thi ghi de khong hoi (so tam -> cong thuc); o co tu truoc luot van hoi. Bo do Excel 26/10/2026:
+// model ghi so cung roi thay bang cong thuc bi hoi tung lan - ai.ask tu choi het, luot dung sau 57 vong.
+func TestNoQuestionForCellsWrittenByThisRun(t *testing.T) {
+	book := newBook()
+	server, port := book.serve(t)
+	defer server.Close()
+	yes := true
+	var log []asked
+	run := overwriteRun(port, server, &yes, &log)
+	tool := NewOfficeActionTool(calcCatalog(), "et")
+
+	invoke(tool, run, "et.writeRange", map[string]any{"range": "B10", "sheet": "ADT", "values": []any{[]any{1600000000, 0}, []any{5, 6}}})
+	invoke(tool, run, "et.writeRanges", map[string]any{"sheet": "ADT", "writes": []any{map[string]any{"range": "E1", "values": []any{[]any{"x"}}}}})
+	invoke(tool, run, "et.fillRange", map[string]any{"range": "F1:F3", "sheet": "ADT", "formula": "=1"})
+	// Bridge gia khong luu gia tri: dat tay nhu sau khi ghi that.
+	for cell, value := range map[string]any{"B10": 1600000000.0, "C10": 0.0, "C11": 6.0, "E1": "x", "F2": 1.0} {
+		book.sheets["ADT"][cell] = value
+	}
+	invoke(tool, run, "et.writeRange", map[string]any{"range": "B10", "sheet": "ADT", "values": []any{[]any{"=SUM(B1:B9)", "=B10-1"}}})
+	invoke(tool, run, "et.writeRanges", map[string]any{"writes": []any{map[string]any{"range": "C11", "sheet": "ADT", "values": []any{[]any{"=C10"}}},
+		map[string]any{"range": "E1", "sheet": "ADT", "values": []any{[]any{"y"}}}}})
+	invoke(tool, run, "et.fillRange", map[string]any{"range": "F2", "sheet": "ADT", "formula": "=2"})
+	if len(log) != 0 {
+		t.Fatalf("ghi de o do luot vua ghi thi khong hoi: %v", log)
+	}
+	invoke(tool, run, "et.writeRange", map[string]any{"range": "B10:B11", "sheet": "ADT", "values": []any{[]any{1}, []any{2}}})
+	invoke(tool, run, "et.writeRange", map[string]any{"range": "Q4", "sheet": "ADT", "values": []any{[]any{"=1"}}})
+	if len(log) != 1 || !strings.Contains(log[0].reason, "Q4") {
+		t.Fatalf("o co tu truoc luot (Q4) van phai hoi dung 1 lan: %v", log)
+	}
+}
+
 func TestWriteRangesAndFillRangeAreChecked(t *testing.T) {
 	book := newBook()
 	server, port := book.serve(t)

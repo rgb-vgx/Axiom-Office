@@ -60,3 +60,33 @@ func TestReadOnlyMCPKeepsOnlyOfficeReaders(t *testing.T) {
 		t.Fatalf("plan mode MCP = %q", got)
 	}
 }
+
+// TestAppMCPFilterByApp (muc 3 bao cao "Giam ngu canh gui lai agent"): lan file office chi con cua app dang
+// lam + lenh DOC cua app khac; lenh GHI cua app khac bi bo de khong noi dinh nghia tool vo ich vao tien to
+// moi vong. Thu tu giu nguyen; server nguoi dung thuong giu nguyen.
+func TestAppMCPFilterByApp(t *testing.T) {
+	officeServer := &mcp.Server{Config: mcp.ServerConfig{Name: "office"}}
+	other := &mcp.Server{Config: mcp.ServerConfig{Name: "github"}}
+	tools := []mcp.ServerTool{
+		{Server: officeServer, Tool: mcp.ToolInfo{Name: "doc_get_text"}},
+		{Server: officeServer, Tool: mcp.ToolInfo{Name: "doc_create"}},
+		{Server: officeServer, Tool: mcp.ToolInfo{Name: "excel_read"}},
+		{Server: officeServer, Tool: mcp.ToolInfo{Name: "excel_write"}},
+		{Server: officeServer, Tool: mcp.ToolInfo{Name: "ppt_get_text"}},
+		{Server: officeServer, Tool: mcp.ToolInfo{Name: "ppt_create"}},
+		{Server: other, Tool: mcp.ToolInfo{Name: "issue_read"}},
+	}
+	for appKind, want := range map[string]string{
+		"wps": "doc_get_text,doc_create,excel_read,ppt_get_text,issue_read",
+		"et":  "doc_get_text,excel_read,excel_write,ppt_get_text,issue_read",
+		"wpp": "doc_get_text,excel_read,ppt_get_text,ppt_create,issue_read",
+	} {
+		names := []string{}
+		for _, item := range AppMCP(tools, appKind) {
+			names = append(names, item.Tool.Name)
+		}
+		if got := strings.Join(names, ","); got != want {
+			t.Fatalf("MCP cho %s = %q (muon %q)", appKind, got, want)
+		}
+	}
+}

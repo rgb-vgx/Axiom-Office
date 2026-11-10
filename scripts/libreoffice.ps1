@@ -13,7 +13,7 @@ param(
     [string]$SoPath = "C:\Program Files\LibreOffice"
 )
 
-# Extension bridge LibreOffice (LibreOffice_arch.md muc 10, giai doan L1): dong goi .oxt, cai bang unopkg,
+# Extension bridge LibreOffice (docs/architecture/libreoffice.md muc 10, giai doan L1): dong goi .oxt, cai bang unopkg,
 # xem log. Khong bao gio tat LibreOffice cua nguoi dung - chi bao neu dang chay.
 
 $ErrorActionPreference = "Stop"

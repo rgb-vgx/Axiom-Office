@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// ConversationRow: mot hoi thoai gan voi tai lieu (New_arch.md muc 8.5.9).
+// ConversationRow: mot hoi thoai gan voi tai lieu (docs/architecture/core.md muc 8.5.9).
 type ConversationRow struct {
 	ID           string
 	DocumentKey  *string

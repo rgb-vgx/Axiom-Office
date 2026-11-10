@@ -3,10 +3,12 @@ package tools
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 	"unicode"
 
+	"axiomoffice/core/internal/corelog"
 	"axiomoffice/core/internal/model"
 	"axiomoffice/core/internal/office"
 	"axiomoffice/core/internal/policy"
@@ -77,7 +79,11 @@ func NewReadOnlyOfficeActionTool(catalog *office.CommandCatalog, appKind string)
 
 func signature(command office.Command) string {
 	params := make([]string, 0, len(command.Params))
+	hidden := targetParam(command.Name)
 	for _, param := range command.Params {
+		if param.Name == hidden {
+			continue // Core tu gan tai lieu cua luot (target.go): model khong can doc tham so nay
+		}
 		if param.Hint == "" {
 			params = append(params, param.Name)
 			continue
@@ -109,22 +115,55 @@ func (t *OfficeActionTool) Description() string {
 	if _, ok := t.allowed["writer.replaceMany"]; ok {
 		batch = BatchEditRule
 	}
+	// Cau dau noi RO "lenh la gia tri cua action, khong phai tool": luot that 24/10/2026 (ocg/beam-free) goi
+	// thang writer.getText nhu mot tool rieng -> "unknown tool", mat mot vong. Danh sach chu ky "ten {tham so}"
+	// o cuoi mo ta trong giong mot loat ham, nen phai noi truoc.
 	return "Read and modify the LIVE document that is currently open in the office application. " +
+		"Every document command below (writer.*, et.*, wpp.*, app.*) is a value of this tool's `action` argument, " +
+		"not a separate tool: call office_action {\"action\": \"writer.getText\", \"params\": {...}}. " +
 		"Call this for every document change the user asks for so it happens immediately on screen. " +
 		"Array params such as values must be real JSON arrays of rows, not objects. " +
 		UndoRule + " " + ChunkRule + SheetRefRule + batch + TruncationContract +
 		"Available actions (with params): " + t.signatures
 }
 
+// Parameters: `action` la enum dung danh sach lenh duoc phep - chuan JSON Schema cho gia tri dong (nhu web_sources,
+// write_todos): model thay ro day la GIA TRI cua tham so, va nha cung cap co constrained decoding chan luon ten
+// sai. Mo ta tool van giu chu ky "ten {tham so}" vi enum khong mang tham so cua tung lenh.
 func (t *OfficeActionTool) Parameters() json.RawMessage {
-	return json.RawMessage(`{"type":"object","properties":{` +
-		`"action":{"type":"string","description":"Action name, e.g. writer.insertStyledText or wpp.addSlide"},` +
-		`"params":{"type":"object","description":"Action parameters as an object (may be omitted)"}},` +
-		`"required":["action"]}`)
+	action := map[string]any{"type": "string",
+		"description": "Document command to run, e.g. writer.insertStyledText or wpp.addSlide (one of the listed values)"}
+	if len(t.names) > 0 {
+		action["enum"] = t.names
+	}
+	schema := map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"action": action,
+			"params": map[string]any{"type": "object", "description": "Action parameters as an object (may be omitted)"},
+		},
+		"required": []string{"action"},
+	}
+	raw, err := json.Marshal(schema)
+	if err != nil {
+		return json.RawMessage(`{"type":"object","properties":{"action":{"type":"string"},"params":{"type":"object"}},"required":["action"]}`)
+	}
+	return raw
 }
 
 // AllowedActions: danh sach lenh duoc phep (test dung).
 func (t *OfficeActionTool) AllowedActions() []string { return t.names }
+
+// ResolveAction: `name` (sau CanonicalAction: khac hoa/thuong, "et_writeRange") co phai mot lenh duoc phep khong.
+// Dung de sua tool call goi nham ten lenh lam ten tool (agent/repair.go) - CHI khop chinh xac, khong doan gan dung.
+func (t *OfficeActionTool) ResolveAction(name string) (string, bool) {
+	action := CanonicalAction(name, t.names)
+	_, ok := t.allowed[action]
+	return action, ok
+}
+
+// AvailableLine: cau liet ke lenh con lai (cung nhom voi `action` neu co) - xem availableLine.
+func (t *OfficeActionTool) AvailableLine(action string) string { return t.availableLine(action) }
 
 // availableLine: cau noi ro con nhung lenh nao. Cung nhom (cung tien to "et."/"writer."/"wpp.") thi chi
 // liet ke nhom do - model go sai tien to thi can biet ca nhom con lai; go sai giua chung thi can thay het.
@@ -172,8 +211,18 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 		return Result{JSON: ErrorJSON(problem), Action: action}
 	}
 	params = aliasParams(t.allowed[action], params)
+	params = withTarget(t.allowed[action], action, params, run.TargetDocument)
 	if problem := loneSymbolFind(action, params); problem != "" {
 		return Result{JSON: ErrorJSON(problem), Action: action}
+	}
+	if problem := run.checkUncertainRetry(action, params); problem != "" {
+		return Result{JSON: ErrorJSON(problem), Action: action}
+	}
+	if isUndo(action) {
+		var problem string
+		if params, problem = limitUndo(run, action, params); problem != "" {
+			return Result{JSON: ErrorJSON(problem), Action: action}
+		}
 	}
 
 	// Guard chong ghi de (log 11/10/2026): lenh ghi o vao sheet co tu truoc ma dung vao o
@@ -190,11 +239,36 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 		rememberOverwriteApproval(run, sheets)
 	}
 
+	// Sap xep: doi vi tri du lieu, Excel khong hoan tac duoc qua COM - hoi khi dung du lieu co san hoac co cong thuc se
+	// tro nham hang (sort_guard.go).
+	if action == "et.sort" {
+		if reason := sortGuardReason(ctx, run, params); reason != "" {
+			preview := model.Truncate(model.MarshalRelaxed(params), 200)
+			approved, err := run.ConfirmOrDecline(action, reason, preview)
+			if err != nil || !approved {
+				return Result{JSON: ErrorJSON("user declined: " + reason), Action: action}
+			}
+		}
+	}
+
 	// Policy xac nhan (muc 8.6): hoi nguoi dung truoc lenh rui ro.
 	decision := policy.Evaluate(ctx, action, params, run.Prompt, func(inner context.Context) *int {
 		return policy.WordLength(inner, run.Bridge, run.Office.Port)
 	})
-	if decision.NeedsConfirmation {
+	if decision.NeedsConfirmation && run.ownedObjects().covers(action, params) {
+		// Agent sua lai chinh thu no vua dung trong luot: khong hoi (owned.go). Ghi log de soat lai duoc.
+		corelog.Info("run %s: %s khong can xac nhan - chi dung toi doi tuong do luot tao (%s)", run.RunID, action,
+			model.Truncate(model.MarshalRelaxed(params), 200))
+	} else if decision.NeedsConfirmation && action == "et.deleteSheet" && (run.CreatedSheets[overwriteStringParam(params, "sheet")] ||
+		policy.EmptySheet(ctx, run.Bridge, run.Office.Port, params)) {
+		// Sheet do luot tao (dung sai, dung lai) hoac sheet trong (Sheet1 cua so moi): xoa khong mat gi cua nguoi dung.
+		corelog.Info("run %s: et.deleteSheet khong can xac nhan - sheet do luot tao hoac trong (%s)", run.RunID,
+			model.Truncate(model.MarshalRelaxed(params), 200))
+	} else if decision.NeedsConfirmation && action == "wpp.deleteSlide" &&
+		policy.BlankSlide(ctx, run.Bridge, run.Office.Port, params) {
+		corelog.Info("run %s: wpp.deleteSlide khong can xac nhan - slide trong (%s)", run.RunID,
+			model.Truncate(model.MarshalRelaxed(params), 200))
+	} else if decision.NeedsConfirmation {
 		preview := model.Truncate(model.MarshalRelaxed(params), 200)
 		if preview == "null" {
 			preview = "{}"
@@ -210,18 +284,105 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 	if result.OK && action == "et.addSheet" {
 		rememberCreatedSheet(run, params)
 	}
+	// PivotTable luon nam tren sheet moi do luot tao (ten that bridge tra ve, co the da them so).
+	if sheet, _ := result.Result["sheet"].(string); result.OK && action == "et.pivot" && sheet != "" {
+		rememberCreatedSheet(run, map[string]any{"name": sheet})
+	}
+	if result.OK {
+		rememberWrittenCells(run, action, params, result.Result)
+	}
+	if result.OK && action == "wpp.checkLayout" {
+		// Loi bo cuc vao core.log (chi loai + ten hinh): soat lai duoc model da thay gi truoc khi sua.
+		slides, _ := result.Result["slides"].([]any)
+		for _, item := range slides {
+			entry, _ := item.(map[string]any)
+			issues, _ := entry["issues"].([]any)
+			logIssues(run.RunID, action, asInt(entry["index"]), issues)
+		}
+	}
+	if result.OK {
+		run.ownedObjects().record(action, params, result.Result)
+		if opensDocument(action) {
+			if opened := openedDocument(params, result.Result); opened != "" {
+				run.TargetDocument = opened
+			}
+		}
+		if renamed := savedDocument(action, params, result.Result, run.TargetDocument); renamed != "" {
+			run.TargetDocument = renamed
+		}
+	}
 	// Buoc 2 roadmap: cat response doc lon TRUOC khi vao turns (chi thanh cong moi cat;
 	// loi van tra nguyen van de model doc thong diep loi day du) - xem truncate.go.
 	raw := result.RawJSON
 	if result.OK {
 		raw = TruncateBridgeResult(action, result.Result, raw, run.FocusSlide)
 	}
-	// Lenh that bai thi tai lieu khong doi -> khong tinh la da sua.
-	output := Result{JSON: raw, OK: result.OK, Action: action, Mutating: result.OK && ChangesDocument(action)}
+	if result.OK && batchHints[action].batch != "" {
+		if run.singleCalls == nil {
+			run.singleCalls = map[string]int{}
+		}
+		run.singleCalls[action]++
+		raw = batchHint(raw, action, run.singleCalls[action])
+	}
+	// Lenh that bai thi tai lieu khong doi -> khong tinh la da sua. Lenh ghi tu bao "changed": false (vd wpp.setShapeText
+	// y het chu dang co) cung vay: revision giu nguyen nen lenh doc truoc do van dung (docStateGuard).
+	unchanged := false
+	if flag, ok := result.Result["changed"].(bool); ok && !flag {
+		unchanged = true
+	}
+	output := Result{JSON: raw, OK: result.OK, Action: action, Mutating: result.OK && ChangesDocument(action) && !unchanged,
+		Verifies: result.OK && Verifies(action)}
+	countUndoable(run, action, output.Mutating, result.Result)
 	if !result.OK && AppGone(result.Error) {
 		output.Abort = appGoneMessage
 	}
+	switch {
+	case result.OK && ReadOnly(action):
+		run.forgetUncertain()
+	case !result.OK && mayChangeDocument(action) && (uncertainOutcome(result.Error) || cancelledInFlight(ctx, result.Error)):
+		// Ket qua khong ro (uncertain.go): coi nhu CO sua - docStateGuard tang revision nen lenh doc truoc do khong con
+		// duoc coi la "khong doi", va bat buoc kiem chung truoc khi tra loi. Khong dem buoc hoan tac (khong biet co hay
+		// khong) - undo.go chi lui so buoc chac chan cua luot.
+		run.rememberUncertain(action, params)
+		output.Mutating = true
+		output.JSON = model.ErrorJSON(result.Error + " - " + uncertainNote)
+		corelog.Info("run %s: %s result unknown (%s) - treated as possibly applied", run.RunID, action,
+			model.Truncate(result.Error, 160))
+	}
 	return output
+}
+
+// batchHints: lenh mot vung -> lenh gom nhieu vung; tu lan goi thu `from` trong luot, ket qua nhac gom phan con lai.
+// Bo do 27/10/2026 ca B: 19 lan et.formatRange, 26 lan et.readRange (moi lan mot vung, moi vong mot lenh) -> het 60 vong.
+var batchHints = map[string]struct {
+	batch, example string
+	from           int
+}{
+	"et.formatRange": {"et.formatRanges", "{formats: [{sheet, range, bold?, fillColor?, numFmt?, ...}, ...]}", 3},
+	"et.readRange":   {"et.readRanges", "{reads: [{range: \"Sheet!A1:D10\", formulas?}, ...]}", 4},
+}
+
+func batchHint(raw, action string, calls int) string {
+	hint := batchHints[action]
+	if calls < hint.from {
+		return raw
+	}
+	var body map[string]any
+	if json.Unmarshal([]byte(raw), &body) != nil || body == nil {
+		return raw
+	}
+	text := fmt.Sprintf("this is %s call #%d in this request: put ALL the remaining ones (any sheet) in ONE %s %s",
+		action, calls, hint.batch, hint.example)
+	// Ket qua doc lon da co hint cua buoc cat (con bao nhieu dong) - noi them, khong de mat.
+	if previous, ok := body["hint"].(string); ok && previous != "" {
+		text = previous + " | " + text
+	}
+	body["hint"] = text
+	data, err := json.Marshal(body)
+	if err != nil {
+		return raw
+	}
+	return string(data)
 }
 
 // loneSymbolFind: luot that deepseek 15/10/2026 thay "/" -> "" tren ca giao an de xoa dong "/" ma (thuc ra la

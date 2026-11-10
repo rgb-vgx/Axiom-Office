@@ -1,27 +1,38 @@
-# Tình trạng dự án Axiom Office
+﻿# Tình trạng dự án Axiom Office
 
-Cập nhật: **03/10/2026** · nhánh `main` · cây làm việc sạch · **7 commit chưa push remote**
-(chỉ commit, không push — theo yêu cầu của bạn)
+Cập nhật: **31/10/2026** · nhánh `main` · đợt 31/10 (§2.16: WPS nhiều app cùng mở, hợp đồng lệnh của tool, đóng băng
+LibreOffice) **chưa commit**.
+Số liệu kiểm chứng ở §2.4 là lượt đo **01/10/2026**; số mới của đợt WPS ở §2.6, lượt đo lại toàn bộ ở §2.7, lượt đo
+lại job Windows ở §2.8, đợt Office x64 + sửa định dạng văn bản ở §2.9, ba đợt 25/10 ở §2.10–2.12, đợt 27–28/10 ở §2.15
+và đợt 31/10 ở §2.16.
 
 Tài liệu này là ảnh chụp nhanh "đã làm được gì / chưa làm được gì". Chi tiết thiết kế nằm ở
-[New_arch.md](New_arch.md) (Core + add-in) và [LibreOffice_arch.md](LibreOffice_arch.md) (LibreOffice);
+[docs/architecture/core.md](docs/architecture/core.md) (Core + add-in), [docs/architecture/wps-bridge.md](docs/architecture/wps-bridge.md) (WPS Linux) và
+[docs/architecture/libreoffice.md](docs/architecture/libreoffice.md) (LibreOffice, đóng băng); người mới đọc
+[docs/onboarding/intern-guide.md](docs/onboarding/intern-guide.md) trước;
 hướng dẫn dùng ở [README.md](README.md); lịch sử thay đổi ở [CHANGELOG.md](CHANGELOG.md).
 
-## 1. Bốn thành phần và trạng thái
+## 1. Năm thành phần và trạng thái
 
 | Thành phần | Nền tảng | Trạng thái |
 |---|---|---|
-| **Add-in COM** (`src/AxiomOffice`, net48) | Word/Excel/PowerPoint + WPS, Windows | Chạy được; đã kiểm chứng trên Office/WPS thật ở các đợt trước. Đợt này **chưa** chạy lại làn `--office` |
+| **Add-in COM** (`src/AxiomOffice`, net48) | Word/Excel/PowerPoint + WPS, Windows | Chạy trên **Office 2019 x64** (24/10: Word đủ lifecycle, Excel e2e 6/6, LLM thật — §2.9). **Không hỗ trợ Office 32-bit**: mọi add-in .NET làm Office 32-bit crash (§2.9) |
 | **Agent Core** (`core-go/`, Go) | Windows + Linux | **Đã thay bản .NET làm bản phát hành** (G1–G10), qua toàn bộ e2e của bản .NET |
 | **MCP server** (`core-go/internal/mcpserver`, Go) | Windows + Linux | **Một bản duy nhất**, chạy bằng `AxiomOffice.Core.exe mcp`; 61/61 trên cả hai nền tảng (và 103/103 ở bộ parity sâu). Bản C# đã xoá; `AxiomOffice.Host.exe mcp` còn 232 dòng **chuyển tiếp byte** sang Core nên cấu hình cũ không phải đổi |
-| **Extension LibreOffice** (Python UNO) | Linux (LibreOffice) | Chạy được; 281/281 trên LibreOffice thật + wizard 20/20 với Core Go |
-| **Wizard thiết lập** | Windows (WinForms) + Linux (awt) | Bản Linux đã chạy thật (20/20); **bản Windows mới chỉ biên dịch sạch, chưa bấm tay trong Office** |
+| **Extension LibreOffice** (Python UNO) | Windows + Linux (LibreOffice) | **Đóng băng** (dừng phát triển 25/10/2026; ra khỏi `make test` và CI 31/10/2026 — `make test-lo` chạy tay). Lần đo cuối: 281/281 trên LibreOffice thật + wizard 20/20 với Core Go (01/10). Mã nguồn và `.oxt` trong gói giữ cho người đang dùng; `install.sh` chỉ cài khi máy có LibreOffice + Python UNO. Gỡ hẳn là quyết định riêng |
+| **Add-in WPS Linux** (`src/AxiomOffice.WPS`, JS ES5; Core phục vụ + bridge cổng 47861) | Linux (WPS 12) | Chạy trên WPS thật; số lệnh có handler và tool bị ẩn: xem dòng sinh tự động dưới bảng; ribbon 4 nhóm có icon; khung chat với menu ⋯ và 8 màn hình phụ; menu chuột phải *Sửa bằng AI* + khung chat mini (§2.6) |
+| **Wizard thiết lập** | Windows (WinForms) + Linux (awt) | Bản Linux đã chạy thật (20/20); **bản Windows đã dùng thật trong Word** (24/10: lưu cấu hình + `Thử ngay` OK — §2.9) |
+
+**WPS Linux (sinh tự động từ code, không sửa tay):**
+<!-- BEGIN SINH TU DONG (scripts/generate_wps_gaps.py) - KHONG SUA TAY -->
+80/115 lệnh registry có handler trên WPS (35 chưa có); tool Core bị ẩn trên WPS vì thiếu lệnh: `doc_design`, `look_at_document`, `slides_from_template`. Bảng đầy đủ: `docs/architecture/wps-bridge.md` §6.
+<!-- END SINH TU DONG -->
 
 ## 2. Đã làm được
 
 ### 2.1 Agent Core viết lại bằng Go (`core-go/`) — G1 → G10
 
-Bản Go dùng **chung hợp đồng** với bản .NET: cùng Core API v1, cùng `core.json`, cùng `core.db` (schema 2),
+Bản Go dùng **chung hợp đồng** với bản .NET: cùng Core API v1, cùng `core.json`, cùng `core.db` (schema 4,
 cùng nguồn cấu hình (`AXIOM_*` → HKCU/DPAPI hoặc `~/.config/axiom-office/config.json` + libsecret), cùng tên
 mutex một-phiên-bản. Nhờ vậy add-in/extension/MCP không phải đổi gì.
 
@@ -72,7 +83,7 @@ Cả hai đều nằm trong hợp đồng mà bộ parity kiểm tra, nên sửa
 - Câu chữ + preset nằm ở một nguồn `catalog/setup.json` → sinh ra `SetupCatalog.cs` (C#, dùng chung add-in và
   Core), `axiom/setup_catalog.py` (Python) và `core-go/internal/setup/catalog_gen.go` (Go); CI kiểm tra không lệch.
 
-### 2.4 Kiểm chứng (số liệu mới nhất, 01/10/2026)
+### 2.4 Kiểm chứng (số liệu 01/10/2026 — chưa đo lại; đợt WPS ở §2.6)
 
 | Bộ kiểm thử | Kết quả |
 |---|---|
@@ -93,26 +104,280 @@ Cả hai đều nằm trong hợp đồng mà bộ parity kiểm tra, nên sửa
 | `systemd --user` (Linux) | `enabled` + `active`, `/health` OK, đúng port 47840 |
 | Đóng gói | Windows: `bin\Release` có Core Go 1.0.0 + DLL + Host + skills; Linux: tar.gz 39 MB với `core/AxiomOffice.Core` là ELF chạy độc lập |
 
-### 2.5 CI
+### 2.5 CI (cập nhật 20/10/2026)
 
 `.github/workflows/ci.yml`: job **linux** không còn cài .NET — chạy unit test extension, kiểm ba file sinh
-không lệch nguồn, `go vet`/`go test`, e2e **14 phần** (đã gồm `mcp`, vì Core tự làm MCP server), bộ MCP
-portable nhắm vào binary Go, rồi cài LibreOffice chạy bộ live + wizard và đóng gói tarball. Job **windows**
+không lệch nguồn, `go vet`/`go test`, e2e **15 phần** (đã gồm `mcp`, vì Core tự làm MCP server, và `verify`), unit
+test add-in WPS (Node), e2e kênh WPS + pane (`make test-wps-e2e`), bộ MCP portable nhắm vào binary Go, trình cài
+`install.sh`, rồi cài LibreOffice chạy bộ live + wizard và đóng gói tarball. Job **windows**
 chạy unit test, `go test`, build net48, **toàn bộ e2e của bản Go** (kèm `AxiomOffice.Host.exe` như gói phát
-hành) và bộ MCP portable nhắm vào `AxiomOffice.Host.exe mcp`.
+hành) và bộ MCP portable nhắm vào `AxiomOffice.Host.exe mcp`. Cả hai job **xanh** (đợt 24/10 — §2.8).
+
+### 2.6 Đợt 18–20/10/2026: WPS Office for Linux
+
+- **Khoá vùng bôi đen** (`writer.lockSelection`/`unlockSelection`): bôi đen rồi hỏi thì AI chỉ sửa trong đoạn đó;
+  Core khoá trước mỗi lượt, mở khoá ở `finish()`.
+- **Ribbon và khung chat đủ chức năng như bản Windows**: kênh `/wps/v1/*` (`routeBoth` cho setup, llm, skills,
+  memory, audit, conversations; riêng WPS: status, exec, config, log), các màn hình phụ của pane, ba nút *Soát*.
+- **Trông giống MS Word**: bảng màu Fluent `#0F6CBD` cho cả ba nền tảng; trả lời AI không bong bóng; menu ⋯; màn
+  hình *Hội thoại trước…*; icon ribbon là tệp SVG (data URI làm WPS vẽ dấu `?`).
+- **Sửa bằng AI**: 9 mục câu lệnh nằm trong Core (`agent/quickactions.go`, `GET /v1/quick-actions`,
+  `POST /v1/runs {quickAction}`); menu chuột phải trên WPS mở **khung chat mini** (`mini.html`,
+  `Application.ShowDialog`); `options.requireSelection`; `QuickEditRule` (sửa ngay, không hỏi lại).
+- **Đã thử trên WPS thật**: icon ribbon, menu chuột phải (chạy trọn tới Core), khung chat mini (người dùng: "khá ổn").
+- **Số liệu 20/10/2026**: `make test-wps` 181 · `make test-wps-e2e` 94 · bridge e2e 36 · Core e2e 169 · `go test` xanh.
+  (Đo lại 22/10: `make test-wps` **189**, xem §2.7.)
+
+### 2.7 Đợt 20–22/10/2026: sửa lỗi, refactor và đo lại
+
+**Sửa lỗi (20/10)** — chi tiết ở `CHANGELOG.md`:
+
+- WPS: ngăn undo của ET và kho định dạng điều kiện khoá theo **workbook + sheet** thay vì tên sheet trần (`Sheet1`
+  lặp lại ở mọi sổ); `closeAll` tạo thư mục cứu hộ trước khi ghi, `exportPdf` báo lỗi khi không có `FileSystem`.
+- LibreOffice: `Env` nhận `params` và chọn đúng tài liệu qua `documents.find_open_path` (trước đây luôn lấy tài liệu
+  active); client Core gom về `core.call`, `wait_for_run` có `timeout` và **huỷ lượt** khi hết giờ.
+- Core: `AddBatch` dùng `SAVEPOINT` từng mục (trước đây mục lỗi giữa lô vẫn để lại các mục trước); `readJSON` chặn
+  8 MB; `round1` dùng `math.Round` (số âm trước đây làm tròn sai).
+- CI: job Windows hết vỡ console cp1252 khi in tên lệnh tiếng Việt; job Linux cài `requirements.txt` cho oracle.
+
+**Refactor (20/10)**: `Execute` tách `prepareExecution`/`buildCallbacks`/`applyResult`; `wpsbridge.go` tách
+`auth.go`/`http.go`/`session.go`; CSS/JS pane và mini WPS tách khỏi HTML, helper DOM dùng chung `pane-dom.js`;
+LibreOffice đi một đường chạy lệnh duy nhất, bỏ mã chết.
+
+**Đo lại toàn bộ tại máy (22/10/2026)**:
+
+| Bộ | Kết quả |
+|---|---|
+| `tests/lo` (`make test-lo`) | **225 ok**, 1 skip |
+| `make test-wps` | **189 pass** |
+| `make test-core` — e2e Core Go | **169 passed, 0 failed** |
+| `go test ./...` (core-go) | 24 gói ok (4 gói không có test) |
+| `make check-gen` | ba file sinh khớp nguồn, `VERSION` khớp 4 chỗ, i18n 0 thiếu/thừa |
+| `gofmt` + `go vet` + `ruff` + `eslint` | sạch |
+| `tests/lo/test_impress_checks.py` (mới) | **8/8**; trên `checks.py` trước bản vá 13/10: 4/8 đỏ |
+| `tests/lo/test_bridge_env.py` (sửa 22/10) | **3/3**; trước khi sửa: đỏ khi mô phỏng `ntpath` (Windows) |
+
+### 2.8 Đợt 24/10/2026: sửa CI Windows
+
+Job `windows` trước đó đỏ ở **hai** chỗ (đều do nguyên nhân riêng, không liên quan đến nhau):
+
+- **`go test ./...` đỏ**: `TestWPSConfigWrite` giả định nguồn cấu hình là file `config.json`, nhưng
+  `config.DefaultSource()` trên Windows là **HKCU** → handler `POST /wps/v1/config` ghi registry nên không có
+  file để đọc lại. Sửa: `api.Deps.ConfigSource` (nil = `DefaultSource()` như production) + test inject
+  `config.JSONSource` trỏ file tạm → test chạy giống nhau trên hai nền tảng; **test cũ còn ghi đè cấu hình thật
+  của máy dev trong registry** (`LlmModel`, `VisualQaEnabled`) — nay không còn; kiểm tra quyền `0600` chỉ áp
+  dụng cho non-Windows.
+- **Build net48 đỏ**: `src/AxiomOffice/Ai/AskAiPane.cs` có một dấu `}` thừa (dòng 1128, sót từ lần thay khối
+  `switch` ở commit `d808b28`) khiến class `AskAiPane` đóng sớm (`CS1519/CS1513/CS1022`) — add-in Windows
+  **không biên dịch được** (kể cả `build.ps1` local). Đã bỏ dấu `}` thừa.
+
+**Đo lại job `windows` tại máy (24/10/2026, cùng lệnh với CI)**:
+
+| Bước CI | Kết quả |
+|---|---|
+| Unit test extension LibreOffice | **225 ok**, 1 skip |
+| `go test ./...` (core-go) | xanh (trước đây đỏ 1 test) |
+| Build add-in + Host (net48) | OK (trước đây lỗi cú pháp C#) |
+| e2e Core (binary Go) | **169 passed, 0 failed** |
+| `test_mcp_portable.py` (binary Go) | **61 passed, 0 failed** |
+| `scripts/generate_mcp_commands.py --check` | khớp (khối sinh tự động trong `AskAiPane.cs` không đổi) |
+
+~~Còn thiếu: job `windows` chưa chạy `make lint` / `make check-gen` / test WPS (Node).~~ Đã thêm ngày
+24/10/2026 (§2.9): job `windows` gọi `build.ps1`, chạy check-gen + i18n + ESLint + test WPS (Node). Ruff/gofmt/
+staticcheck vẫn chỉ ở job `linux` (không phụ thuộc nền tảng).
+
+### 2.9 Đợt 24/10/2026 (tiếp): Office x64, LLM thật và sửa định dạng văn bản
+
+- **Office 32-bit: không hỗ trợ.** Add-in tối giản chỉ có `IDTExtensibility2` (build cả AnyCPU lẫn x86)
+  cũng làm Word/Excel/PowerPoint crash trong `mso98win32client.dll` (`0xc0000005`, offset `0x002152ad`)
+  ngay sau `OnAddInsUpdate`; Office tự đưa add-in vào `Resiliency\DisabledItems`. Đã bỏ các thay đổi
+  32-bit (`Wow6432Node`, `-Platform anycpu`); README vẫn yêu cầu Office x64.
+- **Office x64 (2019, 16.0.14026.20302):** Word nạp đủ lifecycle (`OnConnection → OnAddInsUpdate →
+  CTPFactoryAvailable → GetCustomUI → OnRibbonLoad → OnStartupComplete`), không crash; Excel e2e
+  `--office` **6/6**; tài liệu thật đổi đúng.
+- **LLM thật** (endpoint LAN + `ocg/beam-free` qua wizard): 3 lượt *"Soạn đơn xin việc vị trí kế toán"*
+  hoàn tất (lượt cuối 36,3 s, 12 vòng, 10 tool, tự kiểm chứng); memory trích 1 fact.
+- **Sửa lỗi định dạng** (phát hiện từ `Đơn xin.docx`: 1 đoạn, toàn bộ bold + gạch chân + xanh, căn giữa):
+  - `writer.insertStyledText` (C#/WPS/LO): `\n` = đoạn thật; **reset tường minh** bold/italic/underline/
+    màu; thêm `alignment` áp từng đoạn; khối có `alignment` tự ngắt đoạn sau (`break`).
+  - `writer.appendText`: cùng reset/alignment, tự mở đoạn mới khi đoạn cuối có chữ.
+  - Skill `van-ban-hanh-chinh`/`the-thuc-van-ban`: bỏ `setParagraphAlignment` sau từng dòng, dặn `\n`
+    và không gõ dòng trống.
+  - `CoreClient`: lỗi callback không còn che lỗi lượt chạy; log kèm stack.
+- **Đo lại:** `make test-wps` **201**; `tests/lo` **225 OK**; `go test ./...` xanh; `check-gen` + i18n
+  khớp; e2e Excel **6/6**. Test định dạng tất định trên Word: 12 đoạn, đúng căn lề, 0 màu, 0 đoạn rỗng.
+- **Bảng dàn trang + `restyle` (Word):** `formatTable {borders:false}` bản C# nay đặt tem `AxiomLayout`
+  (`Table.Title`) như LibreOffice/WPS; `checkTables` trả `layout` và miễn `empty-cells`. `restyle` nhận văn
+  bản hành chính (có quốc hiệu): chữ đen, giữ khoảng trống ký, không kẻ khung bảng dàn trang.
+  `tests/live/test_writer_format.py` **19/19**.
+- **CI Windows** gọi `build.ps1` (bỏ lệnh `csc` chép tay), thêm check-gen/i18n/ESLint/test WPS (Node); test
+  LibreOffice chạy sau build nên đối chiếu registry C# không còn bị skip.
+- **Còn lại:** model vẫn có thể tự dùng dòng trống (`\n\n`) — tạo đoạn rỗng (lượt thật cuối: 14 đoạn);
+  nội dung và định dạng đúng, chỉ là khoảng cách. Live suite còn check *"mọi lệnh trong registry đều có
+  test"* fail **từ trước**: 24 lệnh (`et.addChart`, `wpp.addGrid`, `writer.restyle`…) chưa có ca live.
+
+### 2.10 Đợt 25/10/2026: trả token cho agent — bớt vòng thừa, bớt tool không dùng, đánh dấu cache
+
+Nguồn: báo cáo đo 26 lượt thật (24–25/10, PowerPoint, `ocg/beam-free`, 212 vòng, 1.541.217 token đầu vào) —
+~71% đầu vào là tiền tố cố định (tools + system prompt), ~25% là các vòng sau lần sửa tài liệu cuối; chỉ dẫn
+đầy đủ ở `docs/research/giam-ngu-canh-gui-lai-agent.md`. Chi tiết kỹ thuật từng mục: `CHANGELOG.md` (Unreleased).
+
+| Việc | Nội dung |
+|---|---|
+| `docStateGuard` | Lệnh đọc y hệt khi tài liệu chưa đổi → Core không chạy lại tool, trả `"unchanged": true` ("kết quả ở trên vẫn đúng"); revision tăng mỗi khi ghi thành công, kết quả đọc gắn với revision lúc đọc |
+| `verifyGuard` | Đã có bằng chứng sau lần sửa cuối (lệnh đọc/kiểm ở phiên bản hiện tại, hoặc lệnh ghi tự báo `Verifies`) → lượt tính `Verified` ngay, không thêm vòng nhắc; ghi mới sau đó thì được nhắc như thường |
+| `AppMCP` | Server built-in `office` lọc theo app: `doc_*` cho Word, `excel_*` cho Sheets, `ppt_*` cho Slides + 8 lệnh đọc của app khác; lệnh ghi của app khác bị bỏ (~8k ký tự tiền tố/vòng — mục 3 báo cáo); server `mcp.json` của người dùng giữ nguyên, thứ tự tool giữ nguyên |
+| Anthropic cache | `cache_control: ephemeral` ở khối system cuối (tools + system thành một tiền tố cố định) và cấp request (`automatic` — tự đánh dấu phần đuôi mới nhất mỗi vòng); các nhà kiểu OpenAI tự cache nên phần đó không đổi |
+| `reasoning_content` | Non-stream (`Parse`) tách `turn.Reasoning` rồi cắt khỏi `Raw` (DeepSeek trả 400 nếu gửi lại; đường streaming vốn không kèm) |
+| `StopRule` | System prompt thêm quy tắc dừng: đọc lại đã đúng thì trả lời và kết thúc; không quét lại cả bài khi tài liệu không đổi, không lặp phép kiểm đã qua; chỉ kiểm lại khi sắp ghi thêm, một phép kiểm vừa thất bại, hoặc phần đó chưa từng kiểm (công thức tư vấn ChatGPT 25/10/2026) |
+| Đo từng vòng | `RoundStat` + `AgentCallbacks.RoundFinished`; core.db **schema 4** (`tool_calls.result_chars`, `runs.cached_tokens`, bảng `run_rounds`); dòng finish thêm `no-tool rounds: ...` |
+| Bench "cài sẵn lỗi" | `s25-loi-cai-san` (`tests/bench/slides/briefs.json` version 2): `seed` chạy lệnh bridge cài số sai trên bài mới trước lượt, `mustRemove` chấm khoá cụm lỗi phải biến mất — đo việc model đọc tài liệu có sẵn để sửa |
+
+**Kiểm** (25/10/2026): `go test ./...` 24 gói xanh; **e2e Core 170 passed, 0 failed** (đợt §2.9 là 169 — tăng
+1 phép kiểm `cache_control`; cập nhật 2 phép characterization: system Anthropic thành block có `cache_control`
+và ca MCP chạy phiên Word vì `doc_` giờ là tool của Word); bench slides **9/9**; `make check-gen` khớp;
+`gofmt` + `go vet` + `ruff` sạch.
+
+### 2.11 Đợt 25/10/2026 (tiếp): slide sơ đồ trên đề thật
+
+Đề "Thiết kế hệ thống AI Agent cho ngân hàng" (10 slide, `tests/live/tasks/ngan-hang-ai-agent.md`) chạy bằng
+`tests/live/run_ai_task.py`: 20 → 42 → **30 vòng** qua các lần sửa; bản cuối 10 slide, `checkLayout` 0 lỗi, sơ đồ kiến
+trúc không dây cắt hộp. Sửa: sơ đồ lồng trong khoá `diagram`, `replace: N` sửa đúng slide lỗi, đường nối tránh tiêu
+đề/chú thích, `SAME_SPEC_SAME_ISSUES`, lỗi bố cục vào `core.log`, xoá slide trống không hỏi, nhãn lỗi của khung chat.
+**Bàn giao chi tiết + việc tiếp: `docs/plans/20-c0-ngu-canh-va-slide.md`.**
+
+### 2.12 Đợt 25/10/2026 (tiếp): sơ đồ tự đi lại dây
+
+- **`slides_from_brief` tự sửa lỗi đi dây**: giữ tên từng đường nối theo cạnh; sau `wpp.checkLayout` của slide, lỗi
+  `connector-crossing`/`connector-overlap` thuộc đường do tool vẽ → vẽ đường mới bằng ứng viên kế tiếp
+  (`slidelayout.DiagramAlternatives`, tăng `offset` với đường vòng, bỏ qua đường đã thử), xoá đường cũ, kiểm lại;
+  tối đa **2 lần mỗi đường**. Kết quả trả `connectorsRerouted` để model không dựng lại slide.
+- **Đoạn nguồn là vật cản** của dây vòng (trước đây dây dưới hàng cuối có thể cắt qua dòng nguồn).
+- **Kiểm:** `TestDiagramAlternativesSkipCurrentAndTried`, `TestSlidesFromBriefReroutesConnectorPowerPointDrawsAcrossBox`,
+  `TestSlidesFromBriefStopsReroutingAfterTwoAttempts`; `go test ./...` 24 gói xanh; `go vet ./...` sạch.
+- **Tài liệu:** mô tả `wpp.checkLayout` thêm `connector-*` (catalog, README, kiến trúc); WPS ghi rõ không có hai
+  loại này; skill `trinh-bay-chuyen-nghiep` nhắc tool tự vẽ lại dây.
+- **Còn:** chưa chạy đề ngân hàng 3 lần trên PowerPoint thật để đạt tiêu chí của plan 20 §5.1 (máy đã cài PowerPoint
+  nhưng chưa cấu hình LLM/Core để chạy lượt thật).
+
+### 2.13 Đợt 26/10/2026: debug trace, slide sơ đồ trên đề thật bằng `ocg/beam-free`
+
+- **DebugTrace** (`AXIOM_DEBUG_TRACE=1` hoặc HKCU): mỗi lượt ghi `traces/<run id>.jsonl` — prompt, từng vòng, tham số
+  và kết quả tool nguyên văn, guard, đi lại dây. Mọi sửa đổi dưới đây đều tìm ra từ trace lượt thật.
+- **Slide**: đi lại dây làm tệ hơn thì trả về tuyến cũ; kết quả có `next` (chỉ sửa slide lỗi); dải `span` cho thành
+  phần xuyên suốt (Observability), viền nét đứt; bìa có điểm nhấn; `timeline` có `points`; `SAME_SPEC_SAME_ISSUES` bắt
+  sơ đồ gửi lại chỉ đổi tiêu đề; dựng lại slide đã sạch quá 2 lần thì từ chối; lỗi đầu lượt có `max`/cách gộp tầng.
+- **Core**: chặn lệnh lặp y hệt không chặn lệnh đọc khi tài liệu đã đổi; `wpp.setShapeText` chữ y hệt → `changed:false`
+  (không tính là sửa); kiểm kết nối LLM với model suy luận không còn "Không rõ lỗi".
+- **Skill** `trinh-bay-chuyen-nghiep` tách phần tự vẽ ra `references/tu-ve-bang-wpp.md` (13,9k → 8,4k ký tự).
+- **Đo đề ngân hàng 10 slide** (`tests/live/run_ai_task.py`, `ocg/beam-free`):
+
+  | Lượt | Vòng | Token vào | Thời gian | Ghi chú |
+  |---|---|---|---|---|
+  | `r_f78df99d` (đầu ngày) | 45 | 1,30M | 478 s | sơ đồ mất Observability; "kiểm Scotch" |
+  | `r_e6766361` | 12 | 191k | 583 s | dải `span`, lần dựng đầu 0 lỗi |
+  | `r_9a7512ac` | 41 | 1,18M | 973 s | **hỏng**: model không gõ được "kiểm soát" ("Sudan"), sửa ~20 lần → nay bị chặn |
+  | `r_fb096418` | 17 | 413k | 203 s | đạt mốc §5.1 (3 lượt liền không `connector-*`) |
+  | `r_e0c9405c` (cuối ngày) | **11** | **156k** | **128 s** | skill ngắn, bìa + timeline mới |
+- **Còn:** model `beam-free` đôi khi viết sai "kiểm soát" (lỗi sinh chữ, tool không kiểm chính tả); chặn dựng lại slide
+  sạch chưa bật ở lượt thật nào; kiểm qua khung chat (plan 20 §5.5) cần người bấm.
+- **`s26` (lỗi cài sẵn, đề không nói chỗ):** 3/3 đạt (`s26-beam-free-2026-10-26`) — cả 3 lượt tự thấy tổng 1.450 sai,
+  sửa thành 1.550 (1.240 + 310) và gỡ chồng chữ; 6–10 vòng, ~17 s, 0 lỗi lệnh. `score.py` nay lấy nguồn số từ cả
+  `seed` + `derived` (trước chỉ prompt nên báo nhầm `unsourced` = 4).
+
+### 2.14 Đợt 26/10/2026: bộ đo Word/Excel và baseline
+
+- Bộ đo `tests/bench/office` (22 ca: 10 Word, 10 Excel, đề A báo cáo 6–8 trang, đề B workbook 4 sheet), chấm bằng XML
+  + Word/Excel COM (phân trang, đổi đầu vào xem tổng hợp đổi theo). Chi tiết, capability matrix và kế hoạch:
+  `docs/plans/21-v0-word-excel-chat-luong.md`.
+- **Baseline `ocg/beam-free`: đạt 13/22** (Word 6/11, Excel 7/11). Critical: `writer.undo` lùi quá phần việc của lượt
+  (mất toàn bộ nội dung ca `w08`); `et.save` sổ mới đổi tên làm Core mất tài liệu đích (`x06`). Thiếu lệnh: mục lục,
+  header/footer/số trang, caption, gán style cho đoạn có sẵn; Table/bộ lọc, freeze, validation, biểu đồ lấy sheet khác.
+  Chặn lệnh lặp chặn nhầm `insertPageBreak`; Word mỗi đoạn một lệnh (tờ trình nửa trang 33 vòng).
+- **P0 xong** (plan 21 §5.1): undo không lùi quá việc của lượt, theo dõi tài liệu khi lưu đổi tên, chặn lặp chỉ khi
+  lặp liền, ghi đè ô do lượt ghi không hỏi, `doc_design` từ chối tài liệu gần trống. Đo lại 8 ca: hết lỗi critical
+  (`w08` không còn mất chữ, `x06` không còn `DOCUMENT_CLOSED`), `x01`/`x04` 0 xác nhận và số vòng giảm một nửa.
+- **P1 xong** (plan 21 §5.2): 7 lệnh mới - Word `setStyle`, `insertToc`, `setHeaderFooter`, `insertCaption`; Excel
+  `createTable`, `freezePanes`, `setValidation` - và `addChart` lấy vùng sheet khác; `appendText`/`heading`/`insertTable`
+  viết nối tiếp đúng thứ tự; `insertTable` từ chối ô công thức. Đo lại 9 ca P1: **6/9** (trước 0/9), đề B đạt lần đầu.
+  Live: `test_office_structure.py` 14/14, `test_live_commands.py --apps word,excel` 211/211.
+- **P2 xong** (plan 21 §5.3): Word `writeContent` (cả mục một lệnh: tiêu đề, đoạn, danh sách thật, bảng + chú thích,
+  ngắt trang), `checkLayout {maxPages}` (trang trắng, tiêu đề cuối trang, bảng nhỏ bị cắt, đoạn trống, quá dài),
+  `deleteParagraphs`, `addTableRows`; bảng nhỏ tự giữ trên một trang; Excel `checkRange` không range soát ô lỗi mọi
+  sheet. Đo 6 ca: **6/6** - đề A đạt lần đầu (18 vòng, 8 trang; trước 60 vòng, 11 trang), `w09` 15 vòng (trước 81),
+  `w02` hết trang trắng. `test_writer_format.py` 19/19 (lỗi "căn đều" là lỗi của test: style Normal đã căn đều).
+- **P3 xong** (plan 21 §5.4): tool `doc_from_brief` (tờ trình, công văn, thông báo, biên bản, báo cáo, kế hoạch đúng thể
+  thức NĐ 30; lệnh nền `writer.insertLayoutTable`), tool `dashboard_from_data` (KPI là công thức đọc sheet dữ liệu, biểu
+  đồ đọc thẳng), `et.setConditionalFormat` kiểu trực quan (thang màu, thanh dữ liệu, biểu tượng, top/bottom...),
+  `et.deleteSheet`; Core không gửi lại đối số JSON hỏng (trước đó HTTP 400 hỏng cả lượt). Bộ đo 26 ca (+4 ca P3); đo 7
+  ca: **6/7** - `w01` 2 vòng (trước 15), đề B còn hết 60 vòng (định dạng từng ô).
+- **Định dạng nhiều vùng một lệnh** (plan 21 §5.5): `et.formatRanges {formats: [{sheet, range, ...}]}` (kiểm hết trước,
+  một mục sai thì không vùng nào đổi); kết quả `et.formatRange` từ lần thứ 3 trong lượt nhắc gom vào `formatRanges`;
+  `et.createTable` từ chối hàng tiêu đề có ô trống; `et.checkRange` lấy định dạng của ô số lẻ thật. Đề B: định dạng còn
+  10 lần gọi (trước 19) và hết vòng lặp ghi `B1` (Excel tự điền `Column1`), nhưng **vẫn hết 60 vòng** (KPI từng ô bằng
+  `fillRange`, bước đổi giả định để thử, model gần như một lệnh mỗi vòng); chỉ còn 1 lỗi nhỏ (trước 4).
+- **Đề B ít vòng hơn** (plan 21 §5.6): soát cả sổ một lệnh (`et.checkRange {}` có `workbook`, sheet chia khối soát theo
+  khối, `outside-table` thành `notes`), `et.readRanges`, `et.whatIf` (thử ô điều khiển rồi tự trả lại); `writeRange` báo
+  `changed: false` và Core chặn ghi lặp vô ích; `setConditionalFormat` nhận `greaterThan`/`value1`; gợi ý `readRanges`
+  từ lần `readRange` thứ 4; sửa `writeRanges` bỏ qua `sheet` ngoài; soát khối biểu mẫu không báo nhầm; `formatRanges` thử
+  `numFmt` trước; `whatIf` phân biệt ô ngưỡng (`usedBy`). Đo đề B: **9/17 lần đạt** qua các bước sửa (18-52 vòng; trước
+  0/3), bản gần cuối 2/3 (37, 46 vòng).
+
+### 2.15 Đợt 27–28/10/2026: tính năng theo Claude for M365, ba lượt kiểm thử Windows, hai lượt WPS
+
+- **Tính năng** (`docs/research/tinh-nang-con-thieu-so-voi-claude-m365.md` §6, chi tiết ở CHANGELOG 27/10): comment và
+  redline trong Word (đọc/thêm/trả lời/đánh dấu xong, chấp nhận/từ chối), chế độ Track Changes cho lượt AI, tool
+  `other_document` (làm việc với tài liệu Office khác đang mở), PivotTable và xuất biểu đồ Excel sang PowerPoint/Word,
+  `et.sort`/`et.filter` (Core hỏi trước khi sắp xếp dữ liệu có sẵn), trích dẫn bấm được (`[§n]`, `[Sheet!A1]`).
+- **Kiểm thử Windows Office** ba lượt 28/10 (`docs/audits/windows-office-live-test-2026-10-28*.md`): sửa Track
+  Changes (`replaceAll` lặp, chữ đã xoá lẫn vào `getText`/`outline`/`goto`), `saveAs` không ghi đè im lặng, PowerPoint
+  giữ đúng bài đích, `et.exportChart` ghi PNG rỗng, số đoạn của comment lệch 1.
+- **Kiểm thử WPS 12.1.2 trên Linux** hai lượt 28/10 (`docs/audits/wps-linux-live-test-2026-10-28*.md`): `ribbon.xml`
+  có `&` trần làm WPS bỏ cả add-in, nhận app `WPS Sheets`, `et.readRanges`, handler `et.sort`/`et.filter`, cache
+  `/commands` theo app. Phát hiện lỗi Writer + Spreadsheets cùng mở (sửa ở §2.16).
+
+### 2.16 Đợt 31/10/2026: WPS nhiều app cùng mở, hợp đồng lệnh của tool, đóng băng LibreOffice
+
+| Việc | Nội dung | Kiểm chứng |
+|---|---|---|
+| Mỗi tiến trình WPS một phiên | `wpsbridge`: client theo `clientId`, client đầu giữ cổng 47861, client sau cổng + file session riêng; pane/mini/ribbon gửi `{client, app}`; relay chuột phải theo client (`docs/architecture/wps-bridge.md` §2.4) | `go test -race ./internal/wpsbridge` (6 ca mới, cổng thật); `test_wps_multiapp_e2e.py` **13/13** (Core cũ đỏ ngay ca đầu); **WPS thật** (dưới bảng) |
+| WPS đóng giữa lệnh | Không còn tiến trình WPS (`/proc`) thì lệnh đang chạy báo lỗi trong vài giây thay vì 300 giây | `TestInFlightCommandFailsFastWhenWPSIsGone`, `...WaitsWhileWPSIsRunning` |
+| Hợp đồng lệnh của tool | `tools/needs.go`: `Required`/`Optional`; Core ẩn tool thiếu lệnh `Required` (cả ở chế độ lập kế hoạch) | `needs_test.go` (thử đột biến: bỏ khai một lệnh thì đỏ); `plan_capabilities_test.go` thêm ca `doc_design` thiếu `writer.restyle` |
+| Số liệu WPS sinh từ code | `scripts/generate_wps_gaps.py` → `wps-bridge.md` §6 và dòng dưới bảng §1 | `make check-gen` |
+| Đóng băng LibreOffice | Ra khỏi `make test` và CI; `install.sh` không còn đòi LibreOffice/UNO (máy chỉ có WPS trước đây không cài được) | `test_install_sh.py` **11/11** (+3 ca), `make test-package` |
+| Dọn | Bỏ mã chết U1000; `make lint` sạch | `make lint` |
+
+Số đo sau đợt (máy dev Ubuntu 24.04): `make test-core` **179/179**, `make test-wps` **217**, `make test-wps-e2e` 36 + 94 + 13,
+`make test-mcp` **61/61**, `go test -race ./...` xanh, `make lint` sạch, `make check-gen` khớp.
+
+**Đo trên WPS 12.1.2 thật** (31/10/2026, Xvfb + HOME tạm, chi tiết `tests/wps/REFERENCE.md` mục cuối): Writer + Sheets cùng
+mở thành hai phiên, `/health` mỗi cổng không còn đảo app; lượt agent từ pane Writer chỉ chạm Writer (model thấy 17 lệnh
+`writer.*`), từ pane Sheets chỉ chạm Sheets (23 lệnh `et.*`); đóng Sheets thì cổng + file session của nó được dọn sau
+~50 giây; WPS chết giữa lệnh thì `/cmd` báo lỗi sau ~1 giây thay vì 300 giây (`wpsoffice` — máy chủ CEF của add-in — thoát
+theo app cuối). Phát hiện phụ: `oem.ini` của bản này không có `JsApiPlugin=true` mà add-in vẫn nạp (chỉ hỏi tin cậy lần đầu).
 
 ## 3. Chưa làm / chưa kiểm chứng
 
 | Việc | Tình trạng | Ghi chú |
 |---|---|---|
-| **Wizard Windows bấm tay trong Word/Excel/WPS** | Chưa | Đã biên dịch sạch và dựng vào `bin\Release`; cần bạn mở app bấm thử (máy này không chạy Office) |
-| e2e `--office` (Office thật + add-in, `test_office`) | Chưa chạy trong đợt này | Cần mở Excel thật; đã có từ các đợt trước |
-| Trích xuất memory với **LLM thật** | Chưa | Đã kiểm bằng LLM giả (e2e) và unit test `ParseFacts`; chưa chạy model thật |
-| Đọc/ghi **HKCU** bằng test tự động trên Windows | Một phần | Đối chiếu tay: Core Go đọc đúng endpoint/model/token/DPAPI của bạn; test tự động hiện dùng `AXIOM_*` |
-| **Push remote** | Chưa | Bạn yêu cầu chỉ commit |
+| **Đo lại trọn bộ 26 ca Word/Excel** (plan 21 §1: 22 ca + 4 ca P3) sau P0–P3 | **Chưa (để sau)** | Mới đo từng nhóm ca, mỗi ca 1 lần (§5.1–5.4); cần một lượt đủ 26 ca, mỗi ca 3 lần, `ocg/beam-free`, so với baseline 13/22 (`results/baseline-beam-free-2026-10-26/`) |
+| **Wizard Windows bấm tay trong Word/Excel/WPS** | **Đã (24/10/2026, trong Word x64)** | Lưu cấu hình + `Thử ngay` OK (§2.9) |
+| e2e `--office` (Office thật + add-in, `test_office`) | **Đã chạy 24/10/2026** | Excel x64: 6/6 (§2.9) |
+| Trích xuất memory với **LLM thật** | **Đã (24/10/2026)** | Lượt thật trích 1 fact (`core.log`: `1 added`) |
+| **Office 32-bit** | **Không hỗ trợ** | Add-in .NET làm Office 32-bit crash `mso98win32client.dll`; kiểm bằng add-in tối giản (§2.9) |
+| Đọc/ghi **HKCU** bằng test tự động trên Windows | Một phần | Đối chiếu tay: Core Go đọc đúng endpoint/model/token/DPAPI của bạn; test tự động hiện dùng `AXIOM_*`. Từ 24/10 test cũng **không còn ghi vào HKCU thật** (nguồn cấu hình inject file tạm — §2.8) |
+| **Push remote** | Đã push 26/10/2026 | Đợt 18–22/10 (11 commit), sửa CI Windows 24/10 (§2.7–2.8) ba đợt 25/10 — "trả token cho agent" (§2.10), slide sơ đồ (§2.11), tự đi lại dây (§2.12) — và đợt 26/10 đến `4f1b3a9` (§2.13) đều đã lên `origin/main` |
+| CI job **windows** | **Xanh (24/10/2026)** | Trước đó đỏ ở bước `go test` (`TestWPSConfigWrite` giả định nguồn cấu hình là `config.json`, nhưng trên Windows `DefaultSource()` là HKCU) và ở bước build net48 (`}` thừa trong `AskAiPane.cs`). Đã sửa cả hai — xem §2.8 |
+| Nghiệm thu plan 20 §5.1 trên đề thật | **Đạt 26/10/2026** | 3 lượt liền (`r_e6766361`, `r_9a7512ac`, `r_fb096418`, `ocg/beam-free`) lần dựng đầu không còn `connector-*` (§2.13) |
 | Merge `feat/setup-wizard` + `feat/core-go` vào `main` | **Đã xong** | Fast-forward, lịch sử thẳng |
 | Nền tảng khác | Chưa | Chỉ build được Windows (amd64) và Linux (amd64/arm64); chưa có macOS hay Windows ARM |
 | Embedding với máy chủ thật | Chưa | Chỉ kiểm bằng máy chủ giả trả vector điều khiển được |
+| Lỗi `install.sh` xoá `core.db` | **Đã sửa 20/10/2026** | Cài lại / nâng cấp chuyển `core.db*` sang bản mới; `--uninstall` không `--purge` giữ lại; `tests/linux/test_install_sh.py` +2 ca (đỏ trước khi sửa). Gói phát hành trước ngày này vẫn mang `install.sh` cũ |
+| *Sửa bằng AI* / khung chat mini trên Windows và LibreOffice | Chưa | Mới có trên WPS Linux; Core đã sẵn. LibreOffice cần **khoá vùng bôi đen** trước (chưa có) |
+| Add-in WPS: lệnh registry chưa có handler | Chưa | Số liệu sinh tự động ở §1 (dưới bảng) và bảng đầy đủ ở `docs/architecture/wps-bridge.md` §6; Core ẩn tool thiếu lệnh bắt buộc thay vì để tool hỏng giữa chừng |
+| Bộ nhớ AI trên WPS: sửa / ghim / đặt hạn | Chưa | Màn hình WPS có xoá tạm, khôi phục, xoá vĩnh viễn, lọc phạm vi |
+| Bấm từng nút ribbon WPS trên WPS thật | Chưa | Mới đo qua Core thật + add-in giả; menu chuột phải và khung mini đã thử thật |
+| *Sửa bằng AI* với model thật trên nhiều trường hợp | **Đã chạy 3 lượt thật (24/10/2026)** | Soạn đơn xin việc: 36,3 s / 12 vòng / 10 tool, tự kiểm chứng; đã sửa lỗi định dạng phát hiện từ file kết quả (§2.9). Vị trí cửa sổ `ShowDialog` vẫn không chỉnh được |
 
 ## 4. Ghi chú hành vi (khác bản .NET đã bỏ ngày 01/10/2026)
 
@@ -126,6 +391,9 @@ Ghi ở [core-go/README.md](core-go/README.md); tóm tắt:
 4. `conversationId` gửi kèm khoảng trắng được cắt bỏ (bản .NET coi là hội thoại mới).
 5. `Normalize` của memory dùng bảng bỏ dấu tiếng Việt tường minh (giống bản .NET); chữ Latin có dấu khác chỉ
    được bỏ dấu nếu văn bản đã ở dạng phân rã sẵn.
+6. **Không còn agent in-process** (bỏ 25/10/2026, trước đó là opt-in `LegacyAgent=1`): đường này bỏ qua
+   policy/xác nhận/audit/memory của Core. Core lỗi thì pane báo lỗi; `ai.ask` ở chế độ companion
+   (`Host.exe word|excel|...`) trả `ok:false` vì Core chỉ chạy lượt từ add-in.
 
 ## 5. Lệnh hay dùng
 
@@ -138,7 +406,9 @@ scripts\package.ps1               # zip phát hành
 ```bash
 cd core-go && go test ./... && go build -o axiom-core.exe ./cmd/axiom-core     # Core Go
 AXIOM_E2E_CORE_EXE=<binary> python tests/core/test_core_e2e.py [--only <phần,...>]
-bash scripts/linux/package.sh     # gói Linux (Core Go + .oxt; MCP nằm trong Core)
+bash scripts/linux/package.sh     # gói Linux (Core Go + add-in WPS + .oxt đóng băng; MCP nằm trong Core)
+make check-gen                    # file sinh (catalog, setup, bảng WPS §1) không lệch nguồn
+make test-lo                      # extension LibreOffice đóng băng - chạy tay, không có trong `make test`/CI
 
 # MCP server (cả hai nền tảng; Host.exe mcp chỉ chuyển tiếp sang Core):
 AXIOM_MCP_ARGS="mcp all" python tests/mcp-host/test_mcp_portable.py <binary>
@@ -146,7 +416,7 @@ python tests/mcp-host/oracle_diff.py    # đối chiếu Go ↔ C# trên cùng k
 ```
 
 Các phần e2e chạy riêng được: `fake_bridge`, `guards`, `skills`, `memory`, `confirm`, `mcp`, `visual`,
-`setup`, `shutdown`, `anthropic`, `embeddings`, `summarize`, `cancel`, `mcp_http`.
+`setup`, `shutdown`, `anthropic`, `embeddings`, `summarize`, `cancel`, `mcp_http`, `verify`.
 
 ## 6. Việc nên làm tiếp (đề xuất)
 
@@ -155,8 +425,16 @@ Các phần e2e chạy riêng được: `fake_bridge`, `guards`, `skills`, `memo
 3. Chạy `test_mcp_host.py` (parity sâu) **trên Linux** — đợt này mới chạy được trên Windows; máy Linux
    không kết nối được lúc kiểm. Trên Linux cần venv có `mcp`/`python-docx`/`openpyxl`/`python-pptx`
    (xem ghi chú máy kiểm chứng) và đặt `AXIOM_MCP_NO_CATALOG=1`.
-4. Nhánh C# đã đóng băng (không sửa `src/AxiomOffice/**` và `src/AxiomOffice.Host/**`);
-   `Host.exe mcp` chỉ là shim chuyển tiếp byte sang Core Go (`src/AxiomOffice.Host/Mcp/McpHost.cs`).
+4. Nhánh C# **không còn đóng băng**: từ 04/10 add-in Windows có thêm ribbon đủ nhóm (Trợ lý / Tìm web / Kiểm tra /
+   Quản lý / Hệ thống), chọn ngôn ngữ hiển thị, khoá vùng chọn trong Word, dialog *Công cụ ngoài…*, màu Fluent. `Host.exe mcp` vẫn chỉ là
+   shim chuyển tiếp byte sang Core Go (`src/AxiomOffice.Host/Mcp/McpHost.cs`).
+5. Phát hành gói Linux mới: `install.sh` đã sửa (giữ `core.db`, không còn đòi LibreOffice) và Core có phiên riêng cho
+   từng app WPS (§2.16).
+6. Chạy đề ngân hàng **3 lần trên PowerPoint thật** để nghiệm thu 5.1 (tool tự đi lại dây — code + test đã xong, xem
+   §2.12); sau đó làm 5.2–5.3 trong `docs/plans/20-c0-ngu-canh-va-slide.md` §5.
+7. **WPS Linux** (trọng tâm): đo thêm máy khác xem `JsApiPlugin=true` còn cần không (máy dev 31/10 không cần — nếu đúng
+   thì bỏ gợi ý `sudo` của `install.sh` và bước kiểm của `test_wps_bridge_live.py`); viết handler cho các lệnh mà lượt spike 28/10 đã chứng minh WPS có API (`writer.setTracking`, comment/revision,
+   `et.pivot`, `et.exportChart`) — bảng còn thiếu sinh tự động ở §1.
 
 ## 7. Đối chiếu benchmark & lộ trình hiệu năng (02–03/10/2026)
 

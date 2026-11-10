@@ -4,7 +4,7 @@
 bang ten); `ChildWindow` la Container nen trang vien mong dung cho dialog Cai dat/Ghi nho (dialogs.py).
 
 `Dialog` boc `com.sun.star.awt.UnoControlDialog` - cua so ROI (peer rieng, co thanh tieu de). Cua so con VCL
-nhung trong vung tai lieu khong bam duoc tren LibreOffice 26.8 (LibreOffice_arch.md 14.2), nen wizard thiet
+nhung trong vung tai lieu khong bam duoc tren LibreOffice 26.8 (docs/architecture/libreoffice.md 14.2), nen wizard thiet
 lap va dialog mo TU wizard dung `Dialog`; dialog mo tu pane van dung `ChildWindow` cho quen mat.
 Pane Ask AI dung widgets.py (ve theo toa do, khong theo ten).
 

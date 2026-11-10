@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Pane "Ask AI" trong sidebar (LibreOffice_arch.md muc 10): mot deck "Axiom Office" voi mot panel, hien o
+<!-- Pane "Ask AI" trong sidebar (docs/architecture/libreoffice.md muc 10): mot deck "Axiom Office" voi mot panel, hien o
      ca Writer/Calc/Impress (ContextList "any, any, visible"). Sidebar tao panel qua ImplementationURL ->
      factory dang ky trong khoi Factories ben duoi. -->
 <oor:component-data xmlns:oor="http://openoffice.org/2001/registry"

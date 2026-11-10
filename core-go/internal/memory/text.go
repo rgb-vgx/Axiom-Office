@@ -1,4 +1,4 @@
-// Package memory: ghi nho dai han (New_arch.md muc 8.5) - ban Go cua Memory/*.cs.
+// Package memory: ghi nho dai han (docs/architecture/core.md muc 8.5) - ban Go cua Memory/*.cs.
 package memory
 
 import (

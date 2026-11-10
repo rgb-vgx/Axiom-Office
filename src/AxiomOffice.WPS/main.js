@@ -14,43 +14,97 @@
   var CLIENT = "wps-jsaddon";
   var RETRY_MS = 2000;
 
-  var running = false;
-  var taskPane = null;
+  // CLIENT_ID: dinh danh ban add-in nay (moi tien trinh WPS - Writer, Spreadsheets, Presentation - nap mot ban rieng).
+  // Core cap cho moi client mot phien bridge (cong + file session) rieng, nen mo ca Writer va ET cung luc thi agent
+  // van lam dung app (core-go/internal/wpsbridge). Gui kem moi poll va truyen cho pane/khung chat mini qua ?client=.
+  var CLIENT_ID = newClientId();
 
-  function paneUrl() {
+  function newClientId() {
+    var random = "";
+    try { random = Math.random().toString(36).substring(2, 10); } catch (e) { random = "0"; }
+    var stamp = "";
+    try { stamp = new Date().getTime().toString(36); } catch (e2) { stamp = "0"; }
+    return "c" + stamp + random;
+  }
+
+  var running = false;
+
+  // Mot task pane cho MOI man hinh (khoa la ten man hinh, "" = khung chat). Khung chat phai dung lai
+  // pane cu, neu khong moi lan bam Ask AI la mat doan hoi thoai dang do; cac man hinh phu thi moi man
+  // hinh mot pane rieng de bam qua lai giua chung khong phai nap lai trang.
+  //
+  // Duong vao mot man hinh phu: ?view=<ten> (pane.html doc tham so nay luc nap - xem pane.html: VIEW).
+  // Du lieu cua man hinh phu co the cu sau mot thoi gian: moi man hinh deu co nut "Tai lai" rieng, va
+  // do la cach duy nhat - tu ribbon khong co kenh nao noi vao trang dang mo trong CEF (xem
+  // docs/architecture/ribbon-ui.md muc 7).
+  var panes = {};
+
+  function paneUrl(view, check, action) {
+    var kind = "wps";
+    try { kind = currentAppKind() || "wps"; } catch (eK) { kind = "wps"; }
+    var suffix = "";
+    if (view) {
+      suffix = "&view=" + view;
+      // Man hinh "Soat ..." can biet DUNG lenh nao: ba nut soat la ba lenh khac nhau, moi lenh mot app.
+      if (check) { suffix += "&check=" + check; }
+      // Viec man hinh phai lam ngay khi mo (vi du "Kiem tra mo hinh" tren ribbon: bam la chay luon,
+      // giong ban Windows chu khong phai mo man hinh roi bat nguoi dung bam them mot lan nua).
+      if (action) { suffix += "&do=" + action; }
+    }
     try {
-      var kind = "wps";
-      try { kind = currentAppKind() || "wps"; } catch (eK) { kind = "wps"; }
       var href = "";
       try { href = (window.location && window.location.href) || ""; } catch (e) { href = ""; }
       var clean = String(href).split("#")[0].split("?")[0];
       var idx = clean.lastIndexOf("/");
       if (idx >= 0) {
-        return clean.substring(0, idx + 1) + "pane.html?app=" + kind;
+        return clean.substring(0, idx + 1) + "pane.html?app=" + kind + "&client=" + CLIENT_ID + suffix;
       }
     } catch (e2) {}
-    var fallback = "wps";
-    try { fallback = currentAppKind() || "wps"; } catch (e3) { fallback = "wps"; }
-    return "pane.html?app=" + fallback;
+    return "pane.html?app=" + kind + "&client=" + CLIENT_ID + suffix;
   }
 
-  function openPane() {
+  // An moi pane khac: nguoi dung chi lam viec voi mot man hinh mot luc, va mot pane bi bo quen ma van
+  // hien thi thi khong con la "khung chat ben canh tai lieu" nua.
+  function showOnly(key) {
+    var names = [];
+    for (var name in panes) {
+      if (Object.prototype.hasOwnProperty.call(panes, name)) { names.push(name); }
+    }
+    for (var i = 0; i < names.length; i++) {
+      if (names[i] === key) { continue; }
+      try { panes[names[i]].Visible = false; } catch (e) {}
+    }
+  }
+
+  function openPane(view, check, action) {
     try {
       var app = getApp();
       if (!app) { return false; }
-      if (taskPane) {
-        try { taskPane.Visible = true; } catch (e) {}
+      // Khoa gom ca ten lenh soat: neu WPS bo qua getVisible thi ca ba nut soat cung hien, va moi nut
+      // phai giu dung lenh cua no chu khong dung lai pane cua nut vua bam.
+      var key = view ? (check ? view + ":" + check : view) : "";
+      var known = null;
+      try { known = panes[key] || null; } catch (e0) { known = null; }
+      // Nut mang theo viec-phai-lam (?do=) thi KHONG dung lai pane cu: "Kiem tra mo hinh" bam lan hai
+      // phai chay lai that, khong phai mo lai ket qua cu. Pane cu duoc an di truoc khi thay.
+      if (known && !action) {
+        try { known.Visible = true; } catch (e) {}
+        showOnly(key);
         return true;
+      }
+      if (known) {
+        try { known.Visible = false; } catch (e1) {}
       }
       var pane = null;
       try {
-        pane = app.CreateTaskPane(paneUrl());
+        pane = app.CreateTaskPane(paneUrl(view, check, action));
       } catch (e2) {
         return false;
       }
       if (!pane) { return false; }
-      taskPane = pane;
-      try { taskPane.Visible = true; } catch (e3) {}
+      panes[key] = pane;
+      try { pane.Visible = true; } catch (e3) {}
+      showOnly(key);
       return true;
     } catch (e4) {
       return false;
@@ -284,6 +338,7 @@
     try {
       body = {
         client: CLIENT,
+        clientId: CLIENT_ID,
         app: currentAppKind(),
         version: VERSION,
         document: currentDocument(),
@@ -335,21 +390,248 @@
     return true;
   }
 
+  // Nut nao mo man hinh nao (tag trong ribbon.xml -> tham so ?view= cua pane.html). Nut khong co o
+  // day (vi du mot id la do WPS truyen xuong) thi chi mo khung chat - khong im lang bo qua.
+  var VIEWS = {
+    askAi: "",
+    memory: "memory",
+    skills: "skills",
+    setup: "setup",
+    status: "status",
+    openLog: "log",
+    checkLayout: "check",
+    checkTables: "check",
+    checkRange: "check",
+    testModel: "status",
+    copyUrl: "status"
+  };
+
+  // Viec man hinh phai lam ngay khi vua mo (gui qua ?do=): hai muc trong menu "Khac" khong phai la
+  // "mo mot man hinh" ma la "lam mot viec roi cho xem ket qua" - giong ban Windows.
+  var DO = { testModel: "testModel", copyUrl: "copyUrl" };
+
+  // Id -> tag: dung khi host chi tra ve Id (mot so ban WPS khong dien control.Tag).
+  var TAGS_BY_ID = {
+    axiomAskAI: "askAi",
+    axiomCheckLayout: "checkLayout",
+    axiomCheckTables: "checkTables",
+    axiomProofread: "doc:proofread",
+    axiomTableTidy: "doc:tableTidy",
+    axiomSmartCreate: "doc:smartCreate",
+    axiomSlidesFromDoc: "doc:slidesFromDoc",
+    axiomRbTone: "toneMenu",
+    axiomSmartEdit: "doc:smartEdit",
+    axiomSummarizeDoc: "doc:summarizeDoc",
+    axiomTranslateDoc: "doc:translateDoc",
+    axiomCheckRange: "checkRange",
+    axiomMemory: "memory",
+    axiomSkills: "skills",
+    axiomSetup: "setup",
+    axiomStatus: "status",
+    axiomLog: "openLog",
+    axiomTestModel: "testModel",
+    axiomCopyUrl: "copyUrl",
+    axiomMoreMenu: "more",
+    // Menu chuot phai (contextMenus trong ribbon.xml; hau to _t = tren chu, _l = tren dong danh sach).
+    axiomCtxAsk_t: "askAi",
+    axiomCtxAsk_l: "askAi",
+    axiomCtxQuick_t: "quickMenu",
+    axiomCtxQuick_l: "quickMenu"
+  };
+
+  // Muc "Sua bang AI" trong menu chuot phai: id = axiomQuick_<muc>_<t|l>, tag = "quick:<muc>". Khong liet ke tung
+  // muc vao TAGS_BY_ID - danh sach muc la cua Core (agent/quickactions.go), them muc thi chi phai sua ribbon.xml.
+  var QUICK_ID = /^axiomQuick_([a-z]+)_[tl]$/;
+  // Nut "Viet voi AI" tren ribbon: id = axiomRb_<muc>, tag = "quick:<muc>" (cung tag voi menu chuot phai).
+  var RIBBON_QUICK_ID = /^axiomRb_([a-z]+)$/;
+  var QUICK_TAG = "quick:";
+  // Lenh ca tai lieu (nut "Kiem tra tai lieu" cua Writer): tag = "doc:<id>", luon chay trong khung chat LON.
+  var DOC_TAG = "doc:";
+
+  // Nut "Soat ..." nao ung voi lenh nao: pane nhan ten tag qua ?check= roi tra cuu o day, de mot nut
+  // bam sai app van chay DUNG lenh cua no (add-in tra loi ro "lenh nay can ung dung kia").
+  var CHECK_COMMANDS = {
+    checkLayout: "wpp.checkLayout",
+    checkTables: "writer.checkTables",
+    checkRange: "et.checkRange"
+  };
+
+  // Kieu app ma moi nut soat thuoc ve (giong GetVisible cua ban Windows: tag -> Kind).
+  var CHECK_KINDS = { checkLayout: "wpp", checkTables: "wps", checkRange: "et" };
+
+  // ---------------------------------------------------------------- icon
+  //
+  // Nut tren RIBBON dung imageMso trong ribbon.xml (bo icon co san cua WPS - do tren WPS that 20/10/2026), nen
+  // khong qua day. Day chi con lo icon cua MENU CHUOT PHAI (getImage="ribbon.OnGetImage"): imageMso trong menu
+  // ngu canh chua thu tren WPS, con duong getImage + tep SVG thi da chay.
+  //
+  // getImage cua WPS KHONG nhan data URI: phai tra DUONG DAN TEP tuong doi so voi goc add-in - cach cua SDK chinh
+  // thuc (@wps-jsapi/wps/js/ribbon.js: `return "images/1.svg"`). Goc add-in o day la <core>/wps/addin/ (publish.xml:
+  // jspluginonline url=...), nen "images/askAi.svg" thanh <core>/wps/addin/images/askAi.svg - Core phuc vu bang
+  // ServeAddin (ContentTypeFor co nhanh .svg -> image/svg+xml).
+  //
+  // Tep anh nam o src/AxiomOffice.WPS/images/<tag>.svg, ten tep CHINH LA tag. tests/wps/test_pane.mjs doi chieu hai
+  // ben: control co getImage ma thieu tep anh, hoac tep anh khong control nao dung, deu la spec do.
+  // MAU: ACCENT cua he thiet ke pane (theme.py ACCENT = 0x0F6CBD) - doi mau thi sua tung tep trong images/.
+  var ICON_DIR = "images/";
+  // Tag co tep anh that trong images/ - spec test ghim khop dung danh sach tep. Tag khac (vd nut ribbon da chuyen
+  // sang imageMso) thi OnGetImage tra chuoi rong: tra duong dan khong ton tai la WPS ve dau "?".
+  var ICON_FILES = { askAi: true, doc_slidesFromDoc: true, doc_smartCreate: true,
+    quick_bilingual: true, quick_continue: true, quick_expand: true, quick_explain: true,
+    quick_fix: true, quickMenu: true, quick_polish: true, quick_rewrite: true, quick_shorten: true,
+    quick_summarize: true, quick_translate: true, toneMenu: true,
+    doc_smartEdit: true, doc_summarizeDoc: true, doc_translateDoc: true };
+
+  function tagOf(control) {
+    var tag = "";
+    try { tag = (control && control.Tag) || ""; } catch (e) { tag = ""; }
+    if (tag !== "") { return String(tag); }
+    var id = "";
+    try { id = (control && control.Id) || ""; } catch (e2) { id = ""; }
+    id = String(id);
+    if (Object.prototype.hasOwnProperty.call(TAGS_BY_ID, id)) { return TAGS_BY_ID[id]; }
+    var quick = QUICK_ID.exec(id);
+    if (quick) { return QUICK_TAG + quick[1]; }
+    var ribbonQuick = RIBBON_QUICK_ID.exec(id);
+    if (ribbonQuick) { return QUICK_TAG + ribbonQuick[1]; }
+    return "";
+  }
+
+  // "Hoi AI ve doan nay" trong menu chuot phai: cung tag "askAi" voi nut Ask AI tren ribbon (de dung chung icon), nen
+  // phan biet bang id. WPS khong dien Id thi coi nhu nut Ask AI - mo khung chat lon, van dung viec.
+  function isContextAsk(control) {
+    var id = "";
+    try { id = String((control && control.Id) || ""); } catch (e) { id = ""; }
+    return id.indexOf("axiomCtxAsk_") === 0;
+  }
+
+  // ---- Khung chat mini canh doan boi den (mini.html) ----
+  // Menu chuot phai mo khung nay bang Application.ShowDialog (SDK chinh thuc cua WPS: @wps-jsapi/*/js/ribbon.js goi
+  // ShowDialog(url, tieu de, rong * devicePixelRatio, cao * devicePixelRatio, modal)). KHONG modal: nguoi dung van
+  // nhin va cuon tai lieu trong luc AI sua. ShowDialog khong nhan toa do, nen WPS tu dat cua so.
+  var MINI_W = 440;
+  var MINI_H = 380;
+
+  function miniUrl(quick) {
+    var page = paneUrl("", "", "").replace("pane.html", "mini.html");
+    return quick ? page + "&quick=" + quick : page;
+  }
+
+  // openMini: true khi da mo duoc. Ban WPS khong co ShowDialog (hoac goi loi) -> false, ben goi quay ve khung chat lon.
+  function openMini(quick) {
+    try {
+      var app = getApp();
+      if (!app || typeof app.ShowDialog !== "function") { return false; }
+      var ratio = 1;
+      try { ratio = Number(window.devicePixelRatio) || 1; } catch (e) { ratio = 1; }
+      app.ShowDialog(miniUrl(quick), "Sửa bằng AI", Math.round(MINI_W * ratio), Math.round(MINI_H * ratio), false);
+      return true;
+    } catch (e2) {
+      return false;
+    }
+  }
+
+  // runQuick: duong DU PHONG khi khong mo duoc khung chat mini - muc "Sua bang AI" chay trong khung chat lon. Ribbon KHONG dua duoc gi vao khung chat dang mo (muc 7 cua
+  // docs/architecture/ribbon-ui.md), nen: hien khung chat (dung lai cai dang mo - giu nguyen hoi thoai), roi nho Core chuyen muc
+  // nay toi no (api/wpspane.go). Khung chat nghe SSE /wps/v1/pane/events va tu chay trong hoi thoai cua no; khung
+  // chat vua tao thi Core giu yeu cau vai giay cho trang nap xong.
+  function runQuick(quickAction) {
+    openPane("", "", "");
+    try {
+      postJson(endpoint("pane/request"), { quickAction: quickAction, client: CLIENT_ID }).then(null, function () { return null; });
+    } catch (e) {}
+  }
+
+  function checkCommandOf(tag) {
+    if (Object.prototype.hasOwnProperty.call(CHECK_COMMANDS, tag)) { return CHECK_COMMANDS[tag]; }
+    return "";
+  }
+
+  // getVisible: an hai nut soat khong dung cho app dang mo. Chi de DON DEP - WPS co the khong goi
+  // callback nay, nen moi ket qua sai o day khong duoc lam nut bien mat oan: khong nhan ra app thi
+  // tra true (hien het), va bam sai app thi da co thong bao ro rang tu add-in.
+  function OnGetVisible(control) {
+    try {
+      var tag = tagOf(control);
+      // Lenh ca tai lieu: cac lenh doc:<id> chi o Writer; "Tao slide tu tai lieu" o Presentation VA Writer (bam o Writer
+      // thi Core chuyen luot sang phien Presentation dang mo - QuickAction.ShownIn).
+      if (tag.indexOf(DOC_TAG) === 0) {
+        var docKind = "";
+        try { docKind = currentAppKind() || ""; } catch (eD) { docKind = ""; }
+        if (docKind === "" || docKind === "unknown") { return true; }
+        if (tag.substring(DOC_TAG.length) === "slidesFromDoc") { return docKind === "wpp" || docKind === "wps"; }
+        return docKind === "wps";
+      }
+      // Nut "Viet voi AI" tren ribbon va menu Doi giong chi co o Writer.
+      if (tag.indexOf(QUICK_TAG) === 0 || tag === "toneMenu") {
+        var writeKind = "";
+        try { writeKind = currentAppKind() || ""; } catch (eW) { writeKind = ""; }
+        if (writeKind === "" || writeKind === "unknown") { return true; }
+        return writeKind === "wps";
+      }
+      if (!Object.prototype.hasOwnProperty.call(CHECK_KINDS, tag)) { return true; }
+      var kind = "";
+      try { kind = currentAppKind() || ""; } catch (eK) { kind = ""; }
+      if (kind === "" || kind === "unknown") { return true; }
+      return kind === CHECK_KINDS[tag];
+    } catch (e) {
+      return true;
+    }
+  }
+
+  // getImage: WPS hoi anh cho tung control co getImage= trong ribbon.xml (nay chi con menu chuot phai), va doi
+  // mot DUONG DAN tuong doi (khong phai data URI - xem chu thich o dau muc "icon"). Ten tep chinh la tag.
+  //
+  // Tag khong co tep thi tra chuoi rong: WPS ve control khong co anh. Tra ve mot duong dan khong ton tai thi con
+  // te hon - WPS ve dau "?" (dung cai da gap khi tra data URI).
+  function OnGetImage(control) {
+    try {
+      var tag = tagOf(control);
+      // Ten tep = tag voi ':' thanh '_' ("quick:polish" -> images/quick_polish.svg).
+      var name = tag.replace(/:/g, "_");
+      if (Object.prototype.hasOwnProperty.call(ICON_FILES, name)) { return ICON_DIR + name + ".svg"; }
+    } catch (e) {}
+    return "";
+  }
+
   function OnAction(control) {
     try {
-      var id = "";
-      try { id = (control && control.Id) || ""; } catch (e) { id = ""; }
-      if (id === "axiomAskAI") {
-        openPane();
-        try { start(); } catch (e2) {}
+      var tag = tagOf(control);
+      // Lenh ca tai lieu: luon mo khung chat LON (khong dung khung mini canh doan boi den).
+      if (tag.indexOf(DOC_TAG) === 0) {
+        runQuick(tag.substring(DOC_TAG.length));
+        try { start(); } catch (eDoc) {}
         return;
       }
-      start();
+      // Menu chuot phai: mo khung chat mini canh doan boi den. Khong mo duoc thi quay ve khung chat lon.
+      if (tag.indexOf(QUICK_TAG) === 0) {
+        var quick = tag.substring(QUICK_TAG.length);
+        if (!openMini(quick)) { runQuick(quick); }
+        // Khung chat (mini hay lon) goi Core chay luot - Core can add-in dang poll de khoa vung boi den va sua.
+        try { start(); } catch (eQ) {}
+        return;
+      }
+      if (isContextAsk(control)) {
+        if (!openMini("")) { openPane("", "", ""); }
+        try { start(); } catch (eA) {}
+        return;
+      }
+      // Bam vao mot id la: coi nhu mo khung chat, dung hanh vi cu.
+      if (!Object.prototype.hasOwnProperty.call(VIEWS, tag)) {
+        openPane("", "", "");
+        try { start(); } catch (e0) {}
+        return;
+      }
+      openPane(VIEWS[tag], checkCommandOf(tag), DO[tag] || "");
+      // Pane can add-in dang poll moi goi duoc /wps/v1/exec (nut Soat, Hoan tac, Chen) - mo pane thi
+      // bao dam vong poll dang chay, ke ca khi OnAddinLoad da chay truoc do.
+      try { start(); } catch (e2) {}
     } catch (e3) {}
   }
 
   try {
-    window.ribbon = { OnAddinLoad: OnAddinLoad, OnAction: OnAction };
+    window.ribbon = { OnAddinLoad: OnAddinLoad, OnAction: OnAction, OnGetVisible: OnGetVisible,
+      OnGetImage: OnGetImage };
   } catch (e) {}
   try {
     window.AxiomBridge = { start: start, stop: stop };

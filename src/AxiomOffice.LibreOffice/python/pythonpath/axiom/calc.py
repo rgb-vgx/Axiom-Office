@@ -1,4 +1,4 @@
-"""Lenh Calc (kind "et") - cung ten/ket qua voi CommandDispatcher.Spreadsheet.cs (LibreOffice_arch.md muc 7.2).
+"""Lenh Calc (kind "et") - cung ten/ket qua voi CommandDispatcher.Spreadsheet.cs (docs/architecture/libreoffice.md muc 7.2).
 
 Khac Excel mot diem: LibreOffice hoan tac duoc bang undo manager nen et.undo la undo that.
 """
@@ -1039,12 +1039,6 @@ def list_conditional_formats(env, params):
 
 def undo(env, params):
     return documents.undo(env.document, values.integer(params, "count", 1))
-
-
-def check_range(env, params):
-    from . import checks
-
-    return checks.range_report(env, params)
 
 
 command("et.newWorkbook", "et", lambda env, p: documents.open_document(env.ctx, "et", None), "Tạo sổ tính mới")

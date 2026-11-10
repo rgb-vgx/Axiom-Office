@@ -107,7 +107,8 @@ function strict(path, spec) {
   if (spec.call) {
     handler.apply = (_t, _thisArg, args) => spec.call.apply(null, args);
   }
-  const proxy = new Proxy({}, handler);
+  // Target phai la function khi spec.call co: Proxy tren {} khong goi duoc (typeof "object").
+  const proxy = new Proxy(spec.call ? function () {} : {}, handler);
   LABELS.set(proxy, path);
   if (state) APPS.set(proxy, state);
   return proxy;
@@ -253,7 +254,7 @@ function translateFormula(formula, dRow, dCol) {
 // LUU Y (lech da do, chua mo phong): WPS ET EP KIEU chuoi trong nhu so / nhu ngay khi gan vao `Value2`
 // ("42" -> 42, "01/01" -> ngay kieu d-mmm; do tren WPS that 11/10/2026). Fake giu nguyen chuoi, nen mot lenh
 // GHI chuoi trong nhu so se ra ket qua khac WPS that. Duong DOC thi dung: mot o da co chu trong file (seed o
-// day, hoac file nguoi dung mo) van la chu that. Xem docs/wps-bridge.md muc 6.
+// day, hoac file nguoi dung mo) van la chu that. Xem docs/architecture/wps-bridge.md muc 6.
 function setCellScalar(sheet, r, c, value) {
   const key = cellKey(r, c);
   if (value === null || value === undefined || value === "") {
@@ -636,6 +637,11 @@ function makeRange(state, sheet, box, labelPath) {
       push(state, prefix + ".Merge()");
     },
     AutoFit: () => push(state, prefix + ".AutoFit()"),
+    // Loc (et.filter): WPS 12.1.2 co Range.AutoFilter(field, criteria|values, operator) - da do that.
+    AutoFilter: (...args) => {
+      sheet.filterMode = true;
+      push(state, prefix + ".AutoFilter(" + fmtArgs(args) + ")");
+    },
     Select: () => push(state, prefix + ".Select()"),
     AutoFill: (...args) => push(state, prefix + ".AutoFill(" + fmtArgs(args) + ")"),
   };
@@ -797,6 +803,11 @@ function makeWorksheet(state, wb, sheet, labelPath) {
     Rows: { get: () => makeCountCollection(state, SHEET_MAX_ROW, (n) => makeRange(state, sheet, { r1: n, c1: 1, r2: n, c2: SHEET_MAX_COL }, prefix + ".Rows.Item(" + n + ")"), prefix + ".Rows") },
     Columns: { get: () => makeCountCollection(state, SHEET_MAX_COL, (n) => makeRange(state, sheet, { r1: 1, c1: n, r2: SHEET_MAX_ROW, c2: n }, prefix + ".Columns.Item(" + n + ")"), prefix + ".Columns") },
     Shapes: { get: () => makeShapesEt(state, sheet) },
+    FilterMode: { get: () => !!sheet.filterMode },
+    AutoFilterMode: {
+      get: () => !!sheet.autoFilterMode,
+      set: (v) => { sheet.autoFilterMode = !!v; push(state, prefix + ".AutoFilterMode=" + fmt(v)); },
+    },
   };
 
   const methods = {
@@ -806,6 +817,10 @@ function makeWorksheet(state, wb, sheet, labelPath) {
       return makeRange(state, sheet, box, "Range(" + normalizeAddr(addr) + ")");
     },
     ChartObjects: () => makeChartObjects(state, sheet),
+    ShowAllData: () => {
+      sheet.filterMode = false;
+      push(state, prefix + ".ShowAllData()");
+    },
     Delete: () => {
       const i = wb.sheets.indexOf(sheet);
       if (i >= 0) wb.sheets.splice(i, 1);
@@ -957,7 +972,7 @@ function makeWorkbook(state, wb, labelPath) {
 
 function newWorkbook({ name, fullPath }) {
   return {
-    name: name || "Book1",
+    name: name !== undefined ? name : "Book1",
     fullPath: fullPath || ("/tmp/" + (name || "Book1")),
     saved: true,
     closed: false,
@@ -1069,7 +1084,8 @@ function makeFileSystem(state) {
     methods: {
       Exists: (...args) => {
         push(state, prefix + ".Exists(" + fmtArgs(args) + ")");
-        return known(String(args[0]));
+        const p = String(args[0]);
+        return known(p) || !!(state.dirs && state.dirs[p]);
       },
       existsSync: (...args) => {
         push(state, prefix + ".existsSync(" + fmtArgs(args) + ")");
@@ -1094,6 +1110,17 @@ function makeFileSystem(state) {
       writeAsBinaryString: (...args) => {
         push(state, prefix + ".writeAsBinaryString(" + fmtArgs(args) + ")");
         state.files[String(args[0])] = binaryStringBytes(args[1]);
+      },
+      Mkdir: (...args) => {
+        push(state, prefix + ".Mkdir(" + fmtArgs(args) + ")");
+        if (args.length !== 1) throw new Error("参数太多.");
+        const p = String(args[0]);
+        const parent = splitPath(p).dir;
+        if (!state.dirs) state.dirs = {};
+        // WPS chi tao duoc mot cap: thu muc cha phai co san (do tren WPS that, xem REFERENCE.md).
+        if (parent && parent !== "/" && !state.dirs[parent]) throw new Error('"Wrong path!"');
+        state.dirs[p] = true;
+        return true;
       },
       tmpdir: () => {
         push(state, prefix + ".tmpdir()");
@@ -1203,7 +1230,7 @@ function applyInitialCell(sheet, addr, value) {
 }
 
 export function makeEtApp(options = {}) {
-  const workbookName = options.workbookName || "blank.xlsx";
+  const workbookName = options.workbookName !== undefined ? String(options.workbookName) : "blank.xlsx";
   const fullPath = options.path || ("/tmp/" + workbookName);
   const sheetDefs = Array.isArray(options.sheets) && options.sheets.length > 0
     ? options.sheets
@@ -1712,7 +1739,7 @@ function makePresentation(state, pres) {
 
 function newPresentation({ name, fullPath }) {
   return {
-    name: name || "Presentation1",
+    name: name !== undefined ? name : "Presentation1",
     fullPath: fullPath || ("/tmp/" + (name || "Presentation1")),
     saved: true,
     closed: false,
@@ -1784,7 +1811,7 @@ function makeActiveWindow(state) {
 // ---------------------------------------------------------------------------------------------
 
 export function makeWppApp(options = {}) {
-  const presentationName = options.presentationName || "blank.pptx";
+  const presentationName = options.presentationName !== undefined ? String(options.presentationName) : "blank.pptx";
   const fullPath = options.path || ("/tmp/" + presentationName);
 
   const state = {
@@ -1832,6 +1859,673 @@ export function makeWppApp(options = {}) {
   const app = strict("app", { state, props, methods: {}, allowed: APP_OPTIONAL_UNDEFINED });
   APPS.set(app, state);
   return app;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Writer (van ban)
+// ---------------------------------------------------------------------------------------------
+//
+// Mo hinh chu: tai lieu la mot chuoi `text`; ky tu chiem nua khoang [0, text.length) va
+// doc.Content.End === text.length. Day dung la quy uoc `commands.js` dung de tinh vung khoa:
+// prefix = Range(0, start).Text, suffix = Range(end, docEnd).Text, suffixLength = docEnd - end.
+// (WPS that tra Range.Text la CHUOI, khong phai ham - do o cmdSelection/cmdGetText.)
+//
+// `tables` la danh sach { start, end } - Range cua tung bang, y nhu WPS tra ve qua
+// doc.Tables.Item(i).Range. Bang NAM TRON trong vung bi thay bang chu thi mat (dung nhu Word/WPS
+// xoa bang khi vung chon bi de bang chu thuong) - do la truong hop ma luoi an toan cua khoa vung
+// phai bat. Bang nam MOT PHAN trong vung (con tro trong o) thi song, chi dich vi tri theo.
+//
+// Hai truong TUY CHON nua cua mot bang, chi can khi lenh DOC noi dung bang (writer.checkTables):
+//   cells: [[...], ...]  luoi o theo hang roi cot, moi o la CHUOI da sach (khong co ky tu ket o).
+//                        WPS that tra ve `Cell(r, c).Range.Text` KEM "\r\x07" o cuoi; fake tra dung
+//                        nhu vay (`rawCell` ben duoi) de handler phai tu boc - do la phep do cho
+//                        tableCellText() cua commands.js.
+//   title: ten bang. LibreOffice danh dau bang dan trang bang ten "AxiomLayout" (writer.formatTable
+//          {borders:false}); WPS chua co lenh do nen hom nay khong bang nao bi danh dau, nhung fake
+//          phai dung duoc ten that de phep mien tru `layout` kiem duoc.
+// Bang khong khai `cells` duoc coi la bang MOT O: o (1,1) chinh la chu nam trong Range cua bang.
+// Do la dang ma cac phep kiem khoa vung dang dung (chung chi quan tam { start, end }).
+//
+// KHONG mo phong `doc.Tables.Add` va `app.Selection.Range`: `writer.insertTable` vi vay KHONG chay
+// duoc tren fake (no goi tableAnchor -> app.Selection.Range). Duong chen bang da co phep do THAT
+// tren WPS (tests/wps/test_wps_bridge_live.py, writer.insertTable roi writer.checkTables doc lai
+// dung luoi) - o day khong dung lai bang API doan.
+//
+// Hoan tac: WPS Writer CO UndoRecord (khac ET/WPP - xem REFERENCE.md). `StartCustomRecord` mo mot
+// nhom; ca nhom thanh MOT buoc; `doc.Undo(1)` tra ve nguyen trang thai truoc nhom. Nho vay luoi an
+// toan cua khoa vung (goi doc.Undo(1) sau khi lenh chay) kiem duoc that, khong chi "khong nem loi".
+//
+// options:
+//   text, documentName, path, tables: trang thai dau (xem `tables` o khoi tren)
+//   selection: { start, end }        vi tri con tro/vung chon cua nguoi dung
+//   selectionLockable: false         mo phong ban WPS khong keo duoc con tro: Selection khong co
+//                                    SetRange va Start/End chi doc. Dung de kiem LUOI AN TOAN (con
+//                                    tro ngoai vung khoa -> lenh chay o cho khac -> phai hoan tac).
+//   selectionPositions: false        ban WPS khong tra Selection.Start/End (khong co vung de khoa)
+//   range: false                     ban WPS khong co doc.Range (khong doc duoc phan truoc/sau ->
+//                                    khong the khoa: thieu luoi an toan thi khong khoa)
+// `tables` cua makeWriterApp: giu nguyen { start, end }, va giu them `cells`/`title` neu co.
+function normalizeTable(t) {
+  const out = { start: t.start, end: t.end, cells: null, title: t.title === undefined ? "" : String(t.title) };
+  if (t.cells) {
+    out.cells = t.cells.map((row) => row.map((cell) => String(cell === undefined || cell === null ? "" : cell)));
+  }
+  return out;
+}
+
+function cloneTables(list) {
+  return list.map((t) => ({
+    start: t.start,
+    end: t.end,
+    title: t.title,
+    cells: t.cells ? t.cells.map((row) => row.slice()) : null,
+  }));
+}
+
+export function makeWriterApp(options = {}) {
+  const documentName = options.documentName !== undefined ? String(options.documentName) : "blank.docx";
+  const fullPath = options.path !== undefined ? String(options.path) : ("/tmp/" + documentName);
+  const lockable = options.selectionLockable !== false;
+  const hasPositions = options.selectionPositions !== false;
+  const hasRange = options.range !== false;
+
+  const state = {
+    app: "wps",
+    calls: [],
+    files: filesWithBytes(options.files),
+    dirs: {},
+    documentName: documentName,
+    fullPath: fullPath,
+    saved: true,
+    text: options.text !== undefined ? String(options.text) : "",
+    tables: (options.tables || []).map(normalizeTable),
+    selection: {
+      start: options.selection ? options.selection.start : 0,
+      end: options.selection ? options.selection.end : 0,
+    },
+    style: "",
+    undoStack: [],
+    group: null,
+    // Theo doi thay doi + comment (do tren WPS 12.1.2 that 31/10/2026 - tests/wps/REFERENCE.md):
+    // - tac gia revision/comment = app.UserName LUC sua/them (doi UserName giua chung thi tac gia doi theo);
+    // - moi cho thay khi TrackRevisions=true sinh HAI revision: Type 2 (xoa, chu cu) roi Type 1 (chen, chu moi);
+    // - Content.Text / Paragraph.Range.Text KHONG chua chu da xoa (khac Word Windows);
+    // - nhieu lan thay trong MOT UndoRecord: doc.Undo(1) go ca nhom, ke ca revision;
+    // - Revision.Date / Comment.Date la doi tuong Date; Revision.Range.StoryType = 1 (than van ban);
+    // - Comment.Range.Text ket bang "\r"; Comment.Scope = Range duoc neo; Replies.Count; Ancestor = null (comment goc).
+    userName: options.userName !== undefined ? String(options.userName) : "thuyetmt",
+    userInitials: options.userInitials !== undefined ? String(options.userInitials) : "t",
+    track: !!options.trackRevisions,
+    revisions: [],
+    comments: [],
+    // Revision.Date / Comment.Date cua WPS that la Date mang GIO DIA PHUONG gan nhan UTC (do 31/10/2026 o +07: luc
+    // 18:30 thi toISOString() ra "...T18:30:00.000Z"). Fake giu y nhu vay: dong ho 09:00 tren may = Date.UTC(..., 9, 0).
+    clock: Date.UTC(2026, 9, 31, 9, 0, 0),
+  };
+
+  const snapshot = () => ({
+    text: state.text, tables: cloneTables(state.tables),
+    revisions: state.revisions.map((r) => Object.assign({}, r)),
+    comments: state.comments.map((c) => Object.assign({}, c)),
+  });
+  const same = (a, b) => a.text === b.text && JSON.stringify(a.tables) === JSON.stringify(b.tables) &&
+    JSON.stringify(a.revisions) === JSON.stringify(b.revisions) && JSON.stringify(a.comments) === JSON.stringify(b.comments);
+  const nextDate = () => { state.clock += 1000; return new Date(state.clock); };
+
+  // Thay doi ngoai mot nhom UndoRecord thi tu no la mot buoc hoan tac; trong nhom thi de nhom lo.
+  function beforeChange() {
+    if (state.group === null) { state.undoStack.push(snapshot()); }
+  }
+
+  // Thay [from, to) bang `replacement`, roi dich vi tri cac bang con lai.
+  function applyEdit(from, to, replacement) {
+    state.text = state.text.slice(0, from) + replacement + state.text.slice(to);
+    const delta = replacement.length - (to - from);
+    const next = [];
+    for (const t of state.tables) {
+      if (t.start >= from && t.end <= to) { continue; }   // bang nam tron trong vung bi thay -> mat
+      next.push({
+        start: t.start >= to ? t.start + delta : t.start,
+        end: t.end >= to ? t.end + delta : t.end,
+        cells: t.cells,
+        title: t.title,
+      });
+    }
+    state.tables = next;
+    for (const item of state.revisions.concat(state.comments)) {
+      if (item.start >= to) { item.start += delta; }
+      if (item.end >= to) { item.end += delta; }
+    }
+  }
+
+  // Range gia -> vi tri hien tai (Comments.Add nhan lai mot Range do chinh fake tao ra).
+  const rangeBounds = new WeakMap();
+
+  function makeRange(from, to, label) {
+    let f = Number(from);
+    let t = Number(to);
+    if (!Number.isFinite(f) || !Number.isFinite(t)) { throw new Error("Range: tham so khong phai so"); }
+    if (f < 0 || t < f || t > state.text.length) {
+      throw new Error("Range(" + f + "," + t + ") ngoai tai lieu (dai " + state.text.length + ")");
+    }
+    const path = label + "(" + f + "," + t + ")";
+    // Find.Execute KHONG thay (Replace khac 2) tim thay thi co Range ve dung cho khop - nhu WPS that.
+    const narrow = (a, b) => { f = a; t = b; };
+    // Dinh dang cua mot Range: appendText dat lai Font/ParagraphFormat tren doan vua noi vao
+    // (khong ke thua bold/can le cua doan cuoi). Fake chi can nhan setter, khong mo phong tung ky tu.
+    const rangeFont = () => strict(path + ".Font", {
+      state,
+      props: {
+        Bold: { get: () => 0, set: () => {} },
+        Italic: { get: () => 0, set: () => {} },
+        Underline: { get: () => 0, set: () => {} },
+        Size: { get: () => 12, set: () => {} },
+        Name: { get: () => "", set: () => {} },
+        Color: { get: () => 0, set: () => {} },
+      },
+      allowed: [],
+    });
+    const rangeParagraph = () => strict(path + ".ParagraphFormat", {
+      state,
+      props: { Alignment: { get: () => 0, set: () => {} } },
+      allowed: [],
+    });
+    const range = strict(path, {
+      state,
+      props: {
+        Start: { get: () => f },
+        End: { get: () => t },
+        Text: { get: () => state.text.slice(f, t) },
+        Find: { get: () => makeFind(f, t, path, narrow) },
+        Font: { get: rangeFont },
+        ParagraphFormat: { get: rangeParagraph },
+      },
+      methods: {
+        // Chen ngay SAU ky tu cuoi cua Range. Voi doc.Content (Range(0, docEnd)) tuc la chen o
+        // cuoi tai lieu - dung duong ma `writer.appendText` di.
+        InsertAfter: (s) => {
+          const value = String(s);
+          push(state, path + ".InsertAfter(" + fmt(value) + ")");
+          beforeChange();
+          applyEdit(t, t, value);
+        },
+      },
+    });
+    rangeBounds.set(range, () => [f, t]);
+    return range;
+  }
+
+  // Find.Execute(FindText, ..., Forward, Wrap, Format, ReplaceWith, Replace=2): thay trong [f, t).
+  function makeFind(from, to, path, narrow) {
+    let found = false;
+    return strict(path + ".Find", {
+      state,
+      props: { Found: { get: () => found } },
+      methods: {
+        Execute: function (findText) {
+          const args = Array.prototype.slice.call(arguments);
+          const replaceWith = args.length > 9 ? args[9] : "";
+          const replaceMode = args.length > 10 ? Number(args[10]) : 0;
+          push(state, "Find.Execute(" + fmtArgs(args) + ")");
+          const needle = String(findText);
+          if (needle === "") { return false; }
+          if (replaceMode !== 2) {
+            const at = state.text.slice(from, to).toLowerCase().indexOf(needle.toLowerCase());
+            found = at >= 0;
+            if (found && narrow) { narrow(from + at, from + at + needle.length); }
+            return found;
+          }
+          const hay = state.text.slice(from, to);
+          const lower = hay.toLowerCase();
+          const target = needle.toLowerCase();
+          const parts = [];
+          let pos = 0, idx = lower.indexOf(target, pos), hits = 0;
+          while (idx >= 0) {
+            parts.push(hay.slice(pos, idx));
+            parts.push(String(replaceWith));
+            pos = idx + needle.length;
+            hits++;
+            idx = lower.indexOf(target, pos);
+          }
+          if (hits === 0) { return false; }
+          parts.push(hay.slice(pos));
+          beforeChange();
+          if (state.track) {
+            // Tung cho mot, tu sau ra truoc de vi tri cac cho phia truoc khong doi.
+            const spots = [];
+            let p = lower.indexOf(target, 0);
+            while (p >= 0) { spots.push(p); p = lower.indexOf(target, p + needle.length); }
+            const added = [];
+            for (let k = spots.length - 1; k >= 0; k--) {
+              const at = from + spots[k];
+              const old = state.text.slice(at, at + needle.length);
+              const value = String(replaceWith);
+              applyEdit(at, at + needle.length, value);
+              const when = nextDate();
+              added.unshift(
+                { type: 2, author: state.userName, date: when.getTime(), start: at, end: at, text: old },
+                { type: 1, author: state.userName, date: when.getTime(), start: at, end: at + value.length, text: value });
+            }
+            state.revisions = state.revisions.concat(added).sort((a, b) => a.start - b.start || b.type - a.type);
+            found = true;
+            return true;
+          }
+          applyEdit(from, to, parts.join(""));
+          found = true;
+          return true;
+        },
+      },
+    });
+  }
+
+  // Luoi o cua mot bang: `cells` neu bang co khai, khong thi bang MOT O - o (1,1) chinh la chu nam
+  // trong Range cua bang. WPS that tra `Cell(r, c).Range.Text` KEM "\r\x07" o cuoi moi o (ky tu ket
+  // o cua Word), nen fake tra dung nhu vay; handler phai tu boc lay.
+  function tableGrid(t) {
+    if (t.cells) { return t.cells; }
+    return [[state.text.slice(t.start, t.end)]];
+  }
+
+  function rawCell(t, r, c) {
+    const grid = tableGrid(t);
+    const row = grid[r - 1];
+    if (!row || c < 1 || c > row.length) { throw new Error("Cell(" + r + "," + c + ") ngoai luoi bang"); }
+    return row[c - 1] + "\r\x07";
+  }
+
+  function makeCell(t, path, r, c) {
+    return strict(path, {
+      state,
+      props: {
+        // WPS that dat chu vao o qua Range.Text; chuoi ghi vao khong kem ky tu ket o (xem
+        // cmdInsertTable) - nen fake cung nhan chu thuong va tu them lai.
+        Range: { get: () => makeCellRange(t, path + ".Range", r, c) },
+      },
+      methods: {},
+    });
+  }
+
+  // Chi mo phong `Text` cua Range trong o: do la thu duy nhat cac handler dang dung
+  // (writer.insertTable ghi, writer.checkTables doc). Start/End cua mot o la vi tri that trong tai
+  // lieu, ma fake khong mo phong bang trong `text` - khong bia ra so do.
+  function makeCellRange(t, path, r, c) {
+    return strict(path, {
+      state,
+      props: {
+        Text: {
+          get: () => rawCell(t, r, c),
+          set: (v) => {
+            const grid = tableGrid(t);
+            if (!t.cells) { t.cells = grid; }
+            grid[r - 1][c - 1] = String(v === undefined || v === null ? "" : v);
+          },
+        },
+      },
+      methods: {},
+    });
+  }
+
+  function makeTable(idx) {
+    const t = state.tables[idx - 1];
+    const path = "doc.Tables.Item(" + idx + ")";
+    return strict(path, {
+      state,
+      props: {
+        Range: { get: () => makeRange(t.start, t.end, path + ".Range") },
+        Rows: { get: () => strict(path + ".Rows", { state, props: { Count: { get: () => tableGrid(t).length } }, methods: {} }) },
+        Columns: {
+          get: () => strict(path + ".Columns", {
+            state,
+            props: { Count: { get: () => tableGrid(t)[0].length } },
+            methods: {},
+          }),
+        },
+        // WPS: bang dan trang cua LibreOffice duoc danh dau bang ten "AxiomLayout". WPS chua co lenh
+        // dan trang nen hom nay luon rong - fake van tra ten that de phep mien tru kiem duoc.
+        Title: { get: () => t.title },
+        Name: { get: () => t.title },
+      },
+      methods: {
+        Cell: (r, c) => {
+          const row = Number(r), col = Number(c);
+          if (!Number.isInteger(row) || !Number.isInteger(col) || row < 1 || col < 1) {
+            throw new Error("Cell: chi so phai la so nguyen >= 1");
+          }
+          rawCell(t, row, col);   // nem ngay neu ngoai luoi, giong WPS that
+          return makeCell(t, path + ".Cell(" + row + "," + col + ")", row, col);
+        },
+      },
+    });
+  }
+
+  function makeTables() {
+    return strict("doc.Tables", {
+      state,
+      props: { Count: { get: () => state.tables.length } },
+      methods: {
+        Item: (i) => {
+          const idx = Number(i);
+          if (!Number.isInteger(idx) || idx < 1 || idx > state.tables.length) { throw new Error("index out of range"); }
+          return makeTable(idx);
+        },
+      },
+    });
+  }
+
+  function makeSelection() {
+    const path = "app.Selection";
+    const props = {
+      Text: { get: () => state.text.slice(state.selection.start, state.selection.end) },
+      Style: { get: () => state.style, set: (v) => { state.style = String(v); } },
+    };
+    if (hasPositions) {
+      if (lockable) {
+        props.Start = { get: () => state.selection.start, set: (v) => { state.selection.start = Number(v); } };
+        props.End = { get: () => state.selection.end, set: (v) => { state.selection.end = Number(v); } };
+      } else {
+        props.Start = { get: () => state.selection.start };
+        props.End = { get: () => state.selection.end };
+      }
+    }
+    const methods = {
+      TypeText: (t) => {
+        const s = String(t);
+        push(state, "Selection.TypeText(" + fmt(s) + ")");
+        beforeChange();
+        const from = state.selection.start;
+        applyEdit(from, state.selection.end, s);
+        state.selection = { start: from + s.length, end: from + s.length };
+      },
+      TypeParagraph: () => {
+        push(state, "Selection.TypeParagraph()");
+        beforeChange();
+        const from = state.selection.start;
+        applyEdit(from, state.selection.end, "\n");
+        state.selection = { start: from + 1, end: from + 1 };
+      },
+      set_Style: (name) => { push(state, "Selection.set_Style(" + fmt(name) + ")"); state.style = String(name); },
+    };
+    if (lockable) {
+      methods.SetRange = (a, b) => {
+        push(state, "Selection.SetRange(" + fmt(a) + "," + fmt(b) + ")");
+        const from = Number(a), to = Number(b);
+        if (!Number.isFinite(from) || !Number.isFinite(to) || from < 0 || to < from || to > state.text.length) {
+          throw new Error("SetRange(" + from + "," + to + ") ngoai tai lieu");
+        }
+        state.selection = { start: from, end: to };
+      };
+    }
+    return strict(path, { state, props, methods });
+  }
+
+  function makeUndoRecord() {
+    return strict("app.UndoRecord", {
+      state,
+      methods: {
+        StartCustomRecord: (title) => {
+          push(state, "UndoRecord.StartCustomRecord(" + fmt(title) + ")");
+          state.group = snapshot();
+        },
+        EndCustomRecord: () => {
+          push(state, "UndoRecord.EndCustomRecord()");
+          // Nhom khong doi gi thi khong tao buoc hoan tac (dung nhu WPS: lenh khong doi gi thi
+          // Ctrl+Z khong tra ve no).
+          if (state.group !== null && !same(state.group, snapshot())) { state.undoStack.push(state.group); }
+          state.group = null;
+        },
+      },
+    });
+  }
+
+  function makeDocument() {
+    const methods = {
+      Save: () => {
+        push(state, "doc.Save()");
+        state.saved = true;
+      },
+      SaveAs: (...args) => {
+        const path = args[0];
+        push(state, "doc.SaveAs(" + fmtArgs(args) + ")");
+        if (path !== undefined && path !== null) {
+          state.fullPath = String(path);
+          state.documentName = splitPath(state.fullPath).base;
+        }
+        state.saved = true;
+      },
+      SaveAs2: (...args) => {
+        const path = args[0];
+        push(state, "doc.SaveAs2(" + fmtArgs(args) + ")");
+        if (path !== undefined && path !== null) {
+          state.fullPath = String(path);
+          state.documentName = splitPath(state.fullPath).base;
+        }
+        state.saved = true;
+      },
+      // Writer: API goc cung KHONG ghi file (giong ET/WPP da do); add-in phai tu kiem file.
+      ExportAsFixedFormat: (...args) => push(state, "doc.ExportAsFixedFormat(" + fmtArgs(args) + ")"),
+      Undo: (n) => {
+        const steps = Number(n) || 1;
+        push(state, "doc.Undo(" + steps + ")");
+        let done = 0;
+        for (let i = 0; i < steps; i++) {
+          const prev = state.undoStack.pop();
+          if (!prev) { break; }
+          state.text = prev.text;
+          state.tables = cloneTables(prev.tables);
+          state.revisions = prev.revisions;
+          state.comments = prev.comments;
+          done++;
+        }
+        return done;
+      },
+    };
+    if (hasRange) { methods.Range = (from, to) => makeRange(from, to, "doc.Range"); }
+    // Paragraphs bat rieng (options.paragraphs): cac test cu duoc viet cho fake khong co Paragraphs va mot so
+    // handler re nhanh khi thay no; test lenh comment/revision can no de doi vi tri -> so doan theo writer.outline.
+    const docProps = {};
+    if (options.paragraphs) { docProps.Paragraphs = { get: () => makeParagraphs() }; }
+    return strict("app.ActiveDocument", {
+      state,
+      props: Object.assign(docProps, {
+        Name: { get: () => state.documentName },
+        FullName: { get: () => state.fullPath },
+        Path: { get: () => splitPath(state.fullPath).dir },
+        Saved: { get: () => state.saved, set: (v) => { state.saved = !!v; } },
+        Content: { get: () => makeRange(0, state.text.length, "doc.Content") },
+        Tables: { get: () => makeTables() },
+        TrackRevisions: { get: () => state.track, set: (v) => { push(state, "doc.TrackRevisions=" + fmt(!!v)); state.track = !!v; } },
+        Revisions: { get: () => makeRevisions() },
+        Comments: { get: () => makeComments() },
+      }),
+      methods,
+    });
+  }
+
+  // Doan = khoang ket thuc bang "\r" (WPS) hoac "\n" (cach fake ghi khi TypeParagraph); doan cuoi khong can dau ket.
+  function paragraphBounds() {
+    const out = [];
+    let start = 0;
+    for (let i = 0; i < state.text.length; i++) {
+      const ch = state.text[i];
+      if (ch === "\r" || ch === "\n") { out.push([start, i + 1]); start = i + 1; }
+    }
+    if (start < state.text.length || out.length === 0) { out.push([start, state.text.length]); }
+    return out;
+  }
+
+  function makeParagraphs() {
+    const bounds = paragraphBounds();
+    return strict("doc.Paragraphs", {
+      state,
+      props: { Count: { get: () => bounds.length } },
+      methods: {
+        Item: (i) => {
+          const idx = Number(i);
+          if (!Number.isInteger(idx) || idx < 1 || idx > bounds.length) { throw new Error("Paragraphs.Item ngoai tai lieu"); }
+          const b = bounds[idx - 1];
+          return strict("doc.Paragraphs.Item(" + idx + ")", {
+            state,
+            props: { Range: { get: () => makeRange(b[0], b[1], "doc.Paragraphs.Item(" + idx + ").Range") } },
+            methods: {},
+          });
+        },
+      },
+    });
+  }
+
+  function makeRevisions() {
+    return strict("doc.Revisions", {
+      state,
+      props: { Count: { get: () => state.revisions.length } },
+      methods: {
+        Item: (i) => {
+          const idx = Number(i);
+          if (!Number.isInteger(idx) || idx < 1 || idx > state.revisions.length) { throw new Error("Revisions.Item ngoai pham vi"); }
+          const r = state.revisions[idx - 1];
+          const path = "doc.Revisions.Item(" + idx + ")";
+          return strict(path, {
+            state,
+            props: {
+              Type: { get: () => r.type },
+              Author: { get: () => r.author },
+              Date: { get: () => new Date(r.date) },
+              Range: {
+                get: () => strict(path + ".Range", {
+                  state,
+                  props: { Start: { get: () => r.start }, End: { get: () => r.end }, Text: { get: () => r.text },
+                    StoryType: { get: () => 1 } },
+                  methods: {},
+                }),
+              },
+            },
+            // Do tren WPS 12.1.2 that (01/11/2026): Accept/Reject la function; tu choi revision chen thi chu mat, tu
+            // choi revision xoa thi chu cu tro lai; ca hai bo revision khoi danh sach. Chi da do KHI TAT theo doi (ban
+            // C# cung tat truoc) - dang theo doi thi fake tu choi han de handler khong dua vao hanh vi chua do.
+            methods: {
+              Accept: () => settleRevision(r, "Accept"),
+              Reject: () => settleRevision(r, "Reject"),
+            },
+          });
+        },
+      },
+    });
+  }
+
+  function settleRevision(r, how) {
+    if (!state.revisions.includes(r)) { throw new Error("Revision." + how + ": revision da duoc xu ly"); }
+    if (state.track) { throw new Error("Revision." + how + " khi dang TrackRevisions: chua do tren WPS that - tat theo doi truoc"); }
+    push(state, "Revision." + how + "(" + r.type + "," + fmt(r.text) + ")");
+    beforeChange();
+    state.revisions = state.revisions.filter((x) => x !== r);
+    if (how === "Reject" && r.type === 1) { applyEdit(r.start, r.end, ""); }
+    if (how === "Reject" && r.type === 2) { applyEdit(r.start, r.start, r.text); }
+  }
+
+  function makeComments() {
+    return strict("doc.Comments", {
+      state,
+      props: { Count: { get: () => state.comments.length } },
+      methods: {
+        Add: (range, text) => {
+          const bounds = rangeBounds.get(range);
+          if (!bounds) { throw new Error("Comments.Add: tham so dau phai la Range cua tai lieu"); }
+          const [a, b] = bounds();
+          push(state, "doc.Comments.Add(" + a + "," + b + "," + fmt(String(text)) + ")");
+          beforeChange();
+          state.comments.push({ start: a, end: b, text: String(text), author: state.userName,
+            initial: state.userInitials, done: false, date: nextDate().getTime() });
+          state.comments.sort((x, y) => x.start - y.start);
+          return makeComment(state.comments.findIndex((c) => c.start === a && c.text === String(text)) + 1);
+        },
+        Item: (i) => {
+          const idx = Number(i);
+          if (!Number.isInteger(idx) || idx < 1 || idx > state.comments.length) { throw new Error("Comments.Item ngoai pham vi"); }
+          return makeComment(idx);
+        },
+      },
+    });
+  }
+
+  function makeComment(idx) {
+    const c = state.comments[idx - 1];
+    const path = "doc.Comments.Item(" + idx + ")";
+    return strict(path, {
+      state,
+      props: {
+        Author: { get: () => c.author },
+        Initial: { get: () => c.initial },
+        Index: { get: () => idx },
+        Done: { get: () => c.done, set: (v) => { beforeChange(); c.done = !!v; } },
+        Date: { get: () => new Date(c.date) },
+        Range: { get: () => strict(path + ".Range", { state, props: { Text: { get: () => c.text + "\r" } }, methods: {} }) },
+        Scope: { get: () => makeRange(c.start, c.end, path + ".Scope") },
+        Replies: { get: () => strict(path + ".Replies", { state, props: { Count: { get: () => 0 } }, methods: {} }) },
+        Ancestor: { get: () => null },
+      },
+      methods: {},
+    });
+  }
+
+  const props = {
+    Name: { get: () => "WPS Writer" },
+    Version: { get: () => "12.0" },
+    Build: { get: () => "fake" },
+    ActiveDocument: { get: () => makeDocument() },
+    Selection: { get: () => makeSelection() },
+    UndoRecord: { get: () => makeUndoRecord() },
+    UserName: { get: () => state.userName, set: (v) => { push(state, "app.UserName=" + fmt(String(v))); state.userName = String(v); } },
+    UserInitials: { get: () => state.userInitials, set: (v) => { state.userInitials = String(v); } },
+  };
+  // Ban WPS Writer cu/khac co the khong co FileSystem: writer.exportPdf phai bao loi, khong duoc bao da ghi.
+  if (options.fileSystem !== false) { props.FileSystem = { get: () => makeFileSystem(state) }; }
+
+  const app = strict("app", { state, props, methods: {} });
+  APPS.set(app, state);
+  return app;
+}
+
+// Nguoi dung doi con tro/vung chon (bam sang cho khac, keo chuot...). Can cho cac phep kiem "khoa
+// vung": luc khoa thi vung chon CHINH LA vung khoa, nen muon con tro ra ngoai thi phai doi SAU khi khoa.
+export function writerSelect(app, start, end) {
+  const state = APPS.get(app);
+  if (!state || state.app !== "wps") throw new Error("writerSelect: doi tuong khong phai app Writer gia");
+  const from = Number(start);
+  const to = end === undefined ? from : Number(end);
+  if (!Number.isFinite(from) || !Number.isFinite(to) || from < 0 || to < from || to > state.text.length) {
+    throw new Error("writerSelect(" + start + "," + end + ") ngoai tai lieu (dai " + state.text.length + ")");
+  }
+  state.selection = { start: from, end: to };
+}
+
+// Trang thai hien tai cua tai lieu gia (de kiem SAU khi lenh chay, khong phai doan tu ket qua tra ve).
+export function writerStateOf(app) {
+  const state = APPS.get(app);
+  if (!state || state.app !== "wps") throw new Error("writerStateOf: doi tuong khong phai app Writer gia");
+  return {
+    text: state.text,
+    tables: state.tables.map((t) => ({ start: t.start, end: t.end })),
+    selection: { start: state.selection.start, end: state.selection.end },
+    style: state.style,
+  };
+}
+
+// Track Changes + comment cua tai lieu gia (rieng khoi writerStateOf de cac phep so nguyen trang thai cu khong doi).
+export function writerReviewOf(app) {
+  const state = APPS.get(app);
+  if (!state || state.app !== "wps") throw new Error("writerReviewOf: doi tuong khong phai app Writer gia");
+  return {
+    track: state.track,
+    userName: state.userName,
+    revisions: state.revisions.map((r) => ({ type: r.type, author: r.author, text: r.text })),
+    comments: state.comments.map((c) => ({ author: c.author, text: c.text, anchor: state.text.slice(c.start, c.end), done: c.done })),
+  };
+}
+
+// Dong ho cua fake (gio tren may, gan nhan UTC nhu Revision.Date cua WPS) tien them `ms`: tach revision cua hai luot.
+export function writerAdvanceClock(app, ms) {
+  const state = APPS.get(app);
+  if (!state || state.app !== "wps") throw new Error("writerAdvanceClock: doi tuong khong phai app Writer gia");
+  state.clock += ms;
 }
 
 // ---------------------------------------------------------------------------------------------

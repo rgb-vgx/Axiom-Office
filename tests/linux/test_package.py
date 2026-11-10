@@ -40,6 +40,7 @@ class PackageTests(unittest.TestCase):
 
     def test_installer_script_shipped(self):
         self.assertTrue(self.has("/wps/install_jsaddon.py"), "thieu wps/install_jsaddon.py")
+        self.assertTrue(self.has("/lo-common.sh"), "thieu lo-common.sh (install.sh source no)")
 
     def test_readme_mentions_wps(self):
         self.assertIn("WPS", self.readme)

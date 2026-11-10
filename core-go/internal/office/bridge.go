@@ -86,11 +86,20 @@ type BridgeClient struct {
 	// 330s vi lenh ai.ask co the chay toi 5 phut.
 	CommandTimeout time.Duration
 	mu             sync.Mutex
-	cache          map[int]cachedCatalog
+	// cache khoa theo "port|app" chu khong chi port: bridge WPS dung MOT port (47861) cho ca
+	// Writer/Spreadsheets/Presentation, nen cache chi theo port se tra catalog cua app vua dong
+	// cho app dang mo (28/10/2026: doi Writer -> ET trong 5 phut, agent nhan danh sach lenh rong
+	// va goan ten lenh tu nghi ra).
+	cache map[string]cachedCatalog
 }
 
 func NewBridgeClient(httpClient *http.Client, token string) *BridgeClient {
-	return &BridgeClient{http: httpClient, token: token, cache: map[int]cachedCatalog{}}
+	return &BridgeClient{http: httpClient, token: token, cache: map[string]cachedCatalog{}}
+}
+
+// catalogKey: mot app tren mot port la mot catalog rieng.
+func catalogKey(port int, appKind string) string {
+	return fmt.Sprintf("%d|%s", port, appKind)
 }
 
 func (b *BridgeClient) commandTimeout() time.Duration {
@@ -124,6 +133,29 @@ func (b *BridgeClient) Health(ctx context.Context, port int) map[string]any {
 	return result.Result
 }
 
+// LiveSession doc GET /session (live=true trong add-in: doc lai ActiveDocument va ghi file registry).
+// Dung khi can biet NGAY tai lieu dang mo: file session chi duoc heartbeat lam moi 25 giay, nen tai lieu
+// vua mo/vua luu xong van con ten cu (other_document bo sot - do 28/10/2026).
+func (b *BridgeClient) LiveSession(ctx context.Context, port int) *Session {
+	result := b.send(ctx, port, "/session", nil, HealthTimeout)
+	if !result.OK {
+		return nil
+	}
+	document, _ := result.Result["document"].(string)
+	documentPath, _ := result.Result["documentPath"].(string)
+	// Bridge WPS tra `document` la object {name, fullName} (LibreOffice/Windows: chuoi + documentPath).
+	if object, ok := result.Result["document"].(map[string]any); ok {
+		document, _ = object["name"].(string)
+		documentPath, _ = object["fullName"].(string)
+	}
+	app, _ := result.Result["app"].(string)
+	family, _ := result.Result["family"].(string)
+	return &Session{
+		Pid: intValue(result.Result["pid"]), App: app, Family: family, Port: port,
+		Document: strings.TrimSpace(document), DocumentPath: strings.TrimSpace(documentPath),
+	}
+}
+
 func commandBody(action string, params any) map[string]any {
 	body := map[string]any{"action": action}
 	if params == nil {
@@ -134,10 +166,22 @@ func commandBody(action string, params any) map[string]any {
 	return body
 }
 
-// GetCommands bo lenh cua DLL dang chay, cache theo port (muc 7.5).
+// GetCommands bo lenh cua DLL dang chay, cache theo port (muc 7.5). Dung khi khong biet app nao
+// dang chay; cho luot agent thi dung GetCommandsFor de cache tach theo app.
 func (b *BridgeClient) GetCommands(ctx context.Context, port int, force bool) *CommandCatalog {
+	return b.getCommands(ctx, port, "", force)
+}
+
+// GetCommandsFor nhu GetCommands nhung cache tach theo app dang mo. Bridge WPS dung chung mot port
+// cho ca ba app, nen catalog cua Writer khong duoc dung cho ET (va nguoc lai).
+func (b *BridgeClient) GetCommandsFor(ctx context.Context, port int, appKind string, force bool) *CommandCatalog {
+	return b.getCommands(ctx, port, appKind, force)
+}
+
+func (b *BridgeClient) getCommands(ctx context.Context, port int, appKind string, force bool) *CommandCatalog {
+	key := catalogKey(port, appKind)
 	b.mu.Lock()
-	cached, found := b.cache[port]
+	cached, found := b.cache[key]
 	b.mu.Unlock()
 	if !force && found && time.Since(cached.fetchedAt) < catalogTTL {
 		return cached.catalog
@@ -178,7 +222,7 @@ func (b *BridgeClient) GetCommands(ctx context.Context, port int, force bool) *C
 	}
 
 	b.mu.Lock()
-	b.cache[port] = cachedCatalog{catalog: catalog, fetchedAt: time.Now()}
+	b.cache[key] = cachedCatalog{catalog: catalog, fetchedAt: time.Now()}
 	b.mu.Unlock()
 	return catalog
 }

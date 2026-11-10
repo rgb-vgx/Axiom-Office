@@ -7,7 +7,7 @@ using System.Text.RegularExpressions;
 
 namespace AxiomOffice.Ribbon
 {
-    // Ba nút "Soát" trên ribbon (docs/ribbon-ui.md, đợt 1): gọi thẳng lệnh soát chỉ đọc của bridge rồi
+    // Ba nút "Soát" trên ribbon (docs/architecture/ribbon-ui.md, đợt 1): gọi thẳng lệnh soát chỉ đọc của bridge rồi
     // diễn giải kết quả cho người dùng. Không qua model, không cần Core: 0 token, kết quả tức thì.
     // Chi tiết trong kết quả lệnh viết cho model (tiếng Anh), nên ở đây dựng lại câu tiếng Việt theo loại lỗi.
     internal static class RibbonChecks

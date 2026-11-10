@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// Tool ma model duoc thay trong mot luot chay (New_arch.md muc 8.3).
+// Tool ma model duoc thay trong mot luot chay (docs/architecture/core.md muc 8.3).
 type Tool struct {
 	Name        string
 	Description string
@@ -35,6 +35,10 @@ type ToolResult struct {
 	// Mutating: tool nay co lam THAY DOI tai lieu khong. Chi luot co thay doi moi can tu kiem chung
 	// truoc khi tra loi, nen day la dau vao cua buoc kiem chung (xem AgentOptions.Verify).
 	Mutating bool
+	// Verifies: ket qua nay la BANG CHUNG kiem tra tai lieu o phien ban hien tai - lenh doc/kiem (wpp.checkLayout,
+	// writer.getText...) hoac tool ghi tu kiem sau khi ghi (slides_from_brief chay checkLayout tung slide). Co bang
+	// chung sau lan sua cuoi thi verifyGuard khong bat them mot vong doc lai.
+	Verifies bool
 	// Final: tool da hoan tat CA viec nguoi dung yeu cau va tu kiem chung (vd slides_from_template dung xong ca bai,
 	// da luu): vong lap ket thuc ngay voi FinalText, khong goi model them. Luot that 13/10/2026: viec xong o vong 5,
 	// model con chay 25 vong kiem lai roi het ngan sach.

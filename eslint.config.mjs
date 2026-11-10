@@ -28,6 +28,8 @@ export default [
         ...globals.browser,
         wps: "readonly", // API host WPS do CEF tiem vao
         AxiomCommands: "writable", // do chinh commands.js dat len root, main.js/pane-core.js doc lai
+        AxiomPaneCore: "readonly", // pane-core.js dat len root, pane.js/mini.js doc lai
+        AxiomPaneDom: "readonly", // pane-dom.js dat len root, pane.js/mini.js doc lai
         Promise: "readonly",
         globalThis: "readonly",
         module: "writable", // duong CommonJS cho node --test, luon nam trong guard typeof

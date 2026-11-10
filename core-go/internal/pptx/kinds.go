@@ -17,7 +17,7 @@ import (
 	"axiomoffice/core/internal/textutil"
 )
 
-// "Kieu slide" cua tep mau cho ppt_profile (docs/template-design.md muc 6.2). Thi nghiem 13/10/2026 tren mau cua
+// "Kieu slide" cua tep mau cho ppt_profile (docs/architecture/template-design.md muc 6.2). Thi nghiem 13/10/2026 tren mau cua
 // truong: master/layout la Office mac dinh, nhan dien (logo, dai mau) nam trong ANH NEN phu kin tren tung slide,
 // chu la textbox tu ve. Mau nhu vay dung bang cach nhan ban slide mau (wpp.addSlideFromTemplate) roi thay chu
 // theo TEN shape (wpp.setShapeText) - nen o day ke ten tung o chu, suc chua, cac muc lap va vung an toan de

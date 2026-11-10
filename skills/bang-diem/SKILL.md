@@ -32,7 +32,7 @@ Người dùng không cho tên/điểm thì dùng dữ liệu mẫu hợp lý v�
       qua câu trả lời thay vì ghi đè.
 - [ ] Một lệnh `et.writeRange {range: "A1", values: [...]}` gồm tiêu đề, dữ liệu (điểm là số), công thức,
       hàng trung bình lớp.
-- [ ] `et.formatRange`: hàng 1 theo `spreadsheet.header`; các cột điểm + trung bình `numFmt: "0.0"`,
+- [ ] Một `et.formatRanges`: hàng 1 theo `spreadsheet.header`; các cột điểm + trung bình `numFmt: "0.0"`,
       `horizontal: "center"`; hàng trung bình lớp theo `spreadsheet.totalRow`.
-- [ ] **Soát** `et.checkRange` (không truyền range) → `issueCount` phải = 0, đặc biệt không có
-      `outside-table`. Đọc lại `et.readRange` vùng bảng để chắc công thức ra số.
+- [ ] **Soát** `et.checkRange` (không truyền range) → `issueCount` phải = 0; bảng điểm một khối thì
+      `notes` cũng không nên có `outside-table` (ô lạc ngoài bảng). Đọc lại `et.readRange` vùng bảng để chắc công thức ra số.

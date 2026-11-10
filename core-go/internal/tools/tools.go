@@ -21,6 +21,9 @@ type Result struct {
 	// kiem chung truoc khi tra loi (model.AgentOptions.Verify) - luot chi doc ma bat doc lai thi chi
 	// ton them mot vong vo ich.
 	Mutating bool
+	// Verifies: ket qua la bang chung kiem tra tai lieu (lenh doc/kiem, hoac tool ghi tu kiem sau khi ghi) -
+	// model.ToolResult.Verifies.
+	Verifies bool
 	// Final / FinalText: tool da xong CA viec nguoi dung yeu cau (va tu kiem chung) - luot ket thuc voi FinalText,
 	// khong goi model them (model.ToolResult.Final).
 	Final     bool
@@ -38,11 +41,22 @@ type Result struct {
 var noDocumentChange = map[string]bool{
 	"app.info": true, "app.screenshot": true,
 	"et.readRange": true, "et.checkRange": true, "et.listSheets": true,
+	// et.whatIf ghi tam mot o roi tu tra lai (ket qua = bang chung kiem tra, tai lieu khong doi).
+	"et.readRanges": true, "et.whatIf": true,
 	"et.save": true, "et.saveAs": true, "et.exportPdf": true,
 	"writer.getText": true, "writer.selection": true, "writer.checkTables": true, "writer.outline": true,
-	"writer.save": true, "writer.saveAs": true, "writer.exportPdf": true,
+	"writer.checkLayout": true,
+	"writer.save":        true, "writer.saveAs": true, "writer.exportPdf": true,
 	"wpp.listSlides": true, "wpp.checkLayout": true,
 	"wpp.save": true, "wpp.saveAs": true, "wpp.exportPdf": true,
+	// Nhay toi cho duoc trich dan (pane goi khi nguoi dung bam): chi chon + cuon.
+	"writer.goto": true, "et.goto": true, "wpp.goto": true,
+	// Loc chi an hang (khong doi noi dung): ket qua doc sau do van dung.
+	"et.filter":           true,
+	"writer.listComments": true, "writer.listRevisions": true,
+	// Bat/tat theo doi thay doi (Core goi dau/cuoi luot): khong doi noi dung.
+	"writer.setTracking": true,
+	"et.exportChart":     true,
 }
 
 // ChangesDocument: lenh nay co lam doi noi dung tai lieu dang mo khong.
@@ -54,12 +68,20 @@ func ChangesDocument(action string) bool { return !noDocumentChange[action] }
 var readOnly = map[string]bool{
 	"app.info": true, "app.screenshot": true,
 	"et.readRange": true, "et.checkRange": true, "et.listSheets": true,
+	// et.whatIf ghi tam mot o roi tu tra lai (ket qua = bang chung kiem tra, tai lieu khong doi).
+	"et.readRanges": true, "et.whatIf": true,
 	"writer.getText": true, "writer.selection": true, "writer.checkTables": true, "writer.outline": true,
+	"writer.checkLayout": true, "writer.listComments": true, "writer.listRevisions": true,
 	"wpp.listSlides": true, "wpp.checkLayout": true,
+	"et.exportChart": true,
 }
 
 // ReadOnly: lenh nay chi doc tai lieu, khong sua va khong ghi file.
 func ReadOnly(action string) bool { return readOnly[action] }
+
+// Verifies: lenh doc noi dung / kiem tai lieu - ket qua thanh cong la bang chung kiem tra o phien ban hien tai
+// (app.info chi la thong tin ung dung, khong tinh).
+func Verifies(action string) bool { return readOnly[action] && action != "app.info" }
 
 // RunContext: trang thai cua mot luot chay ma tool can (muc 8.3).
 type RunContext struct {
@@ -82,8 +104,26 @@ type RunContext struct {
 	// OverwriteApproved: sheet da duoc nguoi dung dong y ghi de trong luot nay - da dong y mot
 	// lan thi cac lenh sau tren cung sheet trong cung luot khong hoi lai.
 	OverwriteApproved map[string]bool
+	// WrittenCells: o do chinh luot nay vua ghi (sheet -> dia chi): ghi de len chung khong hoi - bo do Excel 26/10/2026,
+	// model ghi so tam roi thay bang cong thuc bi hoi tung lan (khung chat) hoac bi tu choi het (ai.ask, luot hong).
+	WrittenCells map[string]map[string]bool
+	// undoable: so buoc hoan tac do CHINH luot nay tao, theo app ("writer", "et", "wpp") - undo.go.
+	undoable map[string]int
+	// TargetDocument: tai lieu cua luot - Core tu gan vao lenh writer.*/et.*/wpp.* model khong chon tai lieu (target.go).
+	// Doi theo lenh tao/mo tai lieu thanh cong trong luot.
+	TargetDocument string
+	// owned: slide/shape do chinh luot nay tao - xoa chung khong can hoi (owned.go).
+	owned *ownedObjects
+	// briefSpecs: mo ta slide (JSON) da dung qua slides_from_brief trong luot -> so loi bo cuc cua lan dung do.
+	briefSpecs map[string]int
+	// slideIssues: slide do slides_from_brief dung trong luot -> so loi bo cuc lan dung gan nhat; cleanRebuilds: so lan
+	// goi da dung lai slide sach (checkCleanRebuilds).
+	slideIssues   map[int]int
+	cleanRebuilds int
 	// FocusSlide: slide nguoi dung dang mo (pane gui document.view) - ket qua doc ca bai giu nguyen slide nay.
 	FocusSlide int
+	// Trace: su kien DebugTrace tu ben trong tool (vd slides_from_brief di lai day) - nil khi tat; goi qua run.trace.
+	Trace func(event string, fields map[string]any)
 	// Todos: danh sach viec model ghi gan nhat (write_todos).
 	Todos []Todo
 	// lastTemplate, lastSource, lastTarget: tham so slides_from_template lan truoc trong luot (model hay bo o lan sau).
@@ -96,6 +136,10 @@ type RunContext struct {
 	WebSources WebSourceSaver
 	// calls: so lan goi tung tool/lenh trong luot (CallLimit).
 	calls map[string]int
+	// uncertain: lenh ghi co ket qua khong ro (action + params) - goi lai y het bi chan toi khi doc lai (uncertain.go).
+	uncertain map[string]bool
+	// singleCalls: so lan lenh mot vung (et.formatRange, et.readRange) thanh cong trong luot (batchHint).
+	singleCalls map[string]int
 	// templateBuilt: so slide slides_from_template da dung trong CA luot (cac lo truoc + lo nay) - cau tra loi cuoi
 	// tach "dung trong lan nay" voi "co tu luot truoc".
 	templateBuilt int
@@ -167,6 +211,19 @@ func (r *Registry) ModelTools() []model.Tool {
 // ErrorJSON: {"ok":false,"error":"..."} khong escape ky tu (thong bao doc duoc nguyen van).
 func ErrorJSON(message string) string { return model.ErrorJSON(message) }
 
+// FailJSON: {"ok":false,"error":"...", ...chi tiet} - tool that bai nhung co them du lieu de model sua (vd danh sach loi
+// tung truong). Truoc 26/10/2026 slides_from_brief tu choi bang {"ok":true,"result":{"built":0,"errors":...}}: model
+// va khung chat thay "ok":true trong mot lan goi hong.
+func FailJSON(message string, details map[string]any) string {
+	body := map[string]any{"ok": false, "error": message}
+	for key, value := range details {
+		if key != "ok" && key != "error" {
+			body[key] = value
+		}
+	}
+	return model.MarshalRelaxed(body)
+}
+
 // OKJSON: {"ok":true,"result":...}; tra nguyen van neu phan result khong marshal duoc.
 func OKJSON(result any) string {
 	return model.MarshalRelaxed(map[string]any{"ok": true, "result": result})
@@ -219,4 +276,11 @@ func normalizeURL(url string) string {
 	url = strings.TrimPrefix(strings.TrimPrefix(url, "https://"), "http://")
 	url = strings.TrimPrefix(url, "www.")
 	return strings.TrimRight(url, "/")
+}
+
+// trace: su kien DebugTrace cua tool (khong lam gi khi tat).
+func (r *RunContext) trace(event string, fields map[string]any) {
+	if r != nil && r.Trace != nil {
+		r.Trace(event, fields)
+	}
 }

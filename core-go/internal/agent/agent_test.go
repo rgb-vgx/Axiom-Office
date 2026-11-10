@@ -503,3 +503,27 @@ func TestConversationKeyOnlyForSavedDocuments(t *testing.T) {
 		}
 	}
 }
+
+func TestEndedEarlyNoteNamesUncertainEdits(t *testing.T) {
+	note := EndedEarlyNote(StatusCancelled, []string{"writer.appendText", "writer.insertTable"})
+	for _, part := range []string{"ended before finishing: cancelled", "writer.appendText, writer.insertTable", "read the affected part"} {
+		if !strings.Contains(note, part) {
+			t.Fatalf("thieu %q trong %q", part, note)
+		}
+	}
+	if note := EndedEarlyNote("interrupted", nil); strings.Contains(note, "partly applied") {
+		t.Fatalf("khong co lenh nao do dang thi khong ke ten lenh: %q", note)
+	}
+}
+
+func TestCitationRuleIsPerAppAndInPrompt(t *testing.T) {
+	for app, mark := range map[string]string{"wps": "[§n]", "et": "[Sheet!A1]", "wpp": "[slide n]"} {
+		if !strings.Contains(CitationRule(app), mark) {
+			t.Fatalf("%s: thieu dang trich dan %s", app, mark)
+		}
+		prompt := Build(app, &office.Session{App: app}, nil, nil, nil, nil, "", nil)
+		if !strings.Contains(prompt, CitationRule(app)) {
+			t.Fatalf("%s: system prompt thieu quy tac trich dan", app)
+		}
+	}
+}

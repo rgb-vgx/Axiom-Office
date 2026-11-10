@@ -121,6 +121,18 @@ func (d *Directory) Find(port int) *Session {
 	return nil
 }
 
+// FindWoken: session qua han tren cong nay ma bridge van tra loi /health dung pid cua no - may vua thuc day sau khi
+// ngu, heartbeat (25 s) chua kip lam moi. Luot 25/10/2026: may ngu 1,5 gio, thuc day la ca bo benchmark bao "office
+// session not found" trong khi PowerPoint van chay (docs/plans/19-h0 H2). healthPid chi goi khi co ung vien.
+func (d *Directory) FindWoken(port int, healthPid func() int) *Session {
+	for _, session := range d.List(true) {
+		if session.Port == port && session.AgeSeconds > StaleSeconds && healthPid() == session.Pid {
+			return &session
+		}
+	}
+	return nil
+}
+
 // DocumentKey chuan hoa duong dan tai lieu (muc 8.5.1): Windows chu thuong + '\'; tai lieu chua luu -> "".
 func DocumentKey(fullName string) string {
 	value := strings.TrimSpace(fullName)

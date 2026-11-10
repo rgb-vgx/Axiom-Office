@@ -24,8 +24,14 @@ const (
 // RetentionMinutes: giu ket qua 30 phut sau khi xong de client doc ket qua va SSE ket noi lai.
 const RetentionMinutes = 30
 
-// Run: trang thai mot luot chay (New_arch.md muc 7.3, 8.1).
+// Run: trang thai mot luot chay (docs/architecture/core.md muc 7.3, 8.1).
+//
+// Execute ghi cac truong tren goroutine rieng trong khi API (GET /v1/runs/{id}, cho conversationId, huy) va
+// Manager doc cung luc: moi lan ghi tu Execute di qua update/appendTranscript, moi lan doc tu goroutine khac
+// di qua JSON/CurrentStatus/StatusAndConversation (giu mu). Doc tren chinh goroutine Execute khong can khoa.
 type Run struct {
+	mu sync.Mutex
+
 	ID             string
 	Port           int
 	ConversationID string
@@ -41,10 +47,29 @@ type Run struct {
 	// CachedTokens: phan InputTokens doc tu cache cua nha cung cap - do cache co trung khong, khong
 	// phai tham so. 0 khi nha cung cap khong cache hoac khong bao.
 	CachedTokens int
+	// RoundKinds: vong khong goi tool theo ly do ("final 1, nudge:verify 1") - chi de log.
+	RoundKinds string
 	// Verified: luot nay co sua tai lieu nen da duoc yeu cau doc lai truoc khi tra loi.
-	Verified      bool
+	Verified bool
+	// SelectionLock: luot nay da khoa vung boi den cua tai lieu dang mo (chi WPS). finish() mo khoa -
+	// moc duy nhat moi duong di (thanh cong, loi, huy) deu di qua, nen khoa khong bi treo lai.
+	SelectionLock bool
 	Seconds       float64
 	ToolCalls     int
+	// UndoSteps: so buoc hoan tac Word (writer.*) chac chan cua luot khi ket thuc - nut "Hoan tac luot nay" cua pane lui
+	// dung chung nay buoc (tools.RunContext.UndoSteps).
+	UndoSteps int
+	// EditSteps: so lenh sua chac chan cua luot tren moi app (tools.RunContext.EditSteps).
+	EditSteps int
+	// Tracking: luot sua bang Track Changes (tracking.go) - tac gia, thoi diem bat, trang thai theo doi truoc luot, tai lieu.
+	Tracking         bool
+	TrackingPrevious bool
+	TrackingAuthor   string
+	TrackingSince    time.Time
+	TargetDocument   string
+	trackingStopped  bool
+	// undone: "Hoan tac luot nay" da chay (POST /v1/runs/{id}/undo) - khong cho lan hai.
+	undone        bool
 	Transcript    []string
 	Events        *EventStream
 	Confirmations *Confirmations
@@ -74,8 +99,47 @@ func (r *Run) finishedText() any {
 	return r.Finished.UTC().Format("2006-01-02T15:04:05.000Z")
 }
 
+// update: doi trang thai luot duoi khoa (goi tu goroutine Execute).
+func (r *Run) update(change func()) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	change()
+}
+
+func (r *Run) appendTranscript(line string) {
+	r.update(func() { r.Transcript = append(r.Transcript, line) })
+}
+
+func (r *Run) transcriptLen() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.Transcript)
+}
+
+// CurrentStatus: trang thai hien tai, doc an toan tu goroutine khac goroutine chay luot.
+func (r *Run) CurrentStatus() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.Status
+}
+
+// StatusAndConversation: trang thai + hoi thoai cua luot, doc an toan tu goroutine khac.
+func (r *Run) StatusAndConversation() (string, string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.Status, r.ConversationID
+}
+
+func (r *Run) expiredBefore(cutoff time.Time) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.Status != StatusRunning && r.Finished != nil && r.Finished.Before(cutoff)
+}
+
 // JSON: hinh dang GET /v1/runs/{id}.
 func (r *Run) JSON() map[string]any {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	transcript := make([]string, len(r.Transcript))
 	copy(transcript, r.Transcript)
 	payload := map[string]any{
@@ -83,7 +147,7 @@ func (r *Run) JSON() map[string]any {
 		"conversationId": nilIfEmpty(r.ConversationID),
 		"port":           r.Port,
 		"status":         r.Status,
-		"started":        r.Started.Format("2006-01-02T15:04:05.000Z"),
+		"started":        r.Started.UTC().Format("2006-01-02T15:04:05.000Z"),
 		"finished":       r.finishedText(),
 		"reply":          nilIfEmpty(r.Reply),
 		"error":          nilIfEmpty(r.Error),
@@ -95,6 +159,10 @@ func (r *Run) JSON() map[string]any {
 		"verified":       r.Verified,
 		"seconds":        round2(r.Seconds),
 		"toolCalls":      r.ToolCalls,
+		"undoSteps":      r.UndoSteps,
+		"editSteps":      r.EditSteps,
+		"undoMode":       r.undoMode(),
+		"tracking":       r.Tracking,
 		"lastEvent":      r.Events.LastSeq(),
 		"transcript":     transcript,
 	}
@@ -114,7 +182,7 @@ func (m *Manager) TryStart(port int) (*Run, string) {
 	defer m.mu.Unlock()
 	m.cleanup()
 	for _, existing := range m.runs {
-		if existing.Port == port && existing.Status == StatusRunning {
+		if existing.Port == port && existing.CurrentStatus() == StatusRunning {
 			return nil, "busy: a run is already in progress on port " + strconv.Itoa(port) + " (run " + existing.ID + ")"
 		}
 	}
@@ -133,7 +201,7 @@ func (m *Manager) Cancel(id string) bool {
 	m.mu.Lock()
 	run, found := m.runs[id]
 	m.mu.Unlock()
-	if !found || run.Status != StatusRunning {
+	if !found || run.CurrentStatus() != StatusRunning {
 		return false
 	}
 	run.Cancel()
@@ -146,7 +214,7 @@ func (m *Manager) CancelRunning() int {
 	m.mu.Lock()
 	list := make([]*Run, 0, len(m.runs))
 	for _, run := range m.runs {
-		if run.Status == StatusRunning {
+		if run.CurrentStatus() == StatusRunning {
 			list = append(list, run)
 		}
 	}
@@ -163,13 +231,25 @@ func (m *Manager) CancelRunning() int {
 	return cancelled
 }
 
+// BusyPort: co luot dang chay tren office port nay khong.
+func (m *Manager) BusyPort(port int) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, run := range m.runs {
+		if run.Port == port && run.CurrentStatus() == StatusRunning {
+			return true
+		}
+	}
+	return false
+}
+
 // Running: so luot con dang chay (Core cho chung dung han truoc khi thoat).
 func (m *Manager) Running() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	count := 0
 	for _, run := range m.runs {
-		if run.Status == StatusRunning {
+		if run.CurrentStatus() == StatusRunning {
 			count++
 		}
 	}
@@ -190,7 +270,7 @@ func (m *Manager) List() []*Run {
 func (m *Manager) cleanup() {
 	cutoff := time.Now().UTC().Add(-RetentionMinutes * time.Minute)
 	for id, run := range m.runs {
-		if run.Status != StatusRunning && run.Finished != nil && run.Finished.Before(cutoff) {
+		if run.expiredBefore(cutoff) {
 			delete(m.runs, id)
 		}
 	}

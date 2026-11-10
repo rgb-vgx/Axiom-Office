@@ -2,6 +2,7 @@ package wpsbridge
 
 import (
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -13,14 +14,25 @@ import (
 
 func testBridge(t *testing.T, mutate func(*Options)) *Bridge {
 	t.Helper()
+	// Cong trong cua he dieu hanh, KHONG de 0: New() doi 0 thanh 47861, ma may dev co Core that giu cong do - bridge cua
+	// test khong mo duoc cong, van bao 47861 cho add-in, va test goi nham sang Core that ma van xanh (do 01/11/2026).
+	probe, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("khong lay duoc cong trong: %v", err)
+	}
+	port := probe.Addr().(*net.TCPAddr).Port
+	_ = probe.Close()
 	opts := Options{
-		AddinDir: t.TempDir(), BridgePort: 0, PollSeconds: 1, DisconnectSeconds: 2,
+		AddinDir: t.TempDir(), BridgePort: port, PollSeconds: 1, DisconnectSeconds: 2,
 		SessionDir: t.TempDir(), Token: "tok", Version: "9.9.9", CorePort: 47840,
 	}
 	if mutate != nil {
 		mutate(&opts)
 	}
-	return New(opts)
+	b := New(opts)
+	// Test khong nhin /proc that (may chay test co the khong mo WPS): mac dinh "khong biet".
+	b.appAlive = func(string) (bool, bool) { return false, false }
+	return b
 }
 
 // Quyet dinh xac thuc kenh add-in: Origin dung cua Core thi qua, Origin la thi 403, khong Origin
@@ -203,8 +215,8 @@ func TestEnqueueFailsFastWhenAddinDisconnects(t *testing.T) {
 	if waited > 5*time.Second {
 		t.Fatalf("phai bao loi trong vai giay sau khi mat ket noi, cho %v", waited)
 	}
-	if len(bridge.waiting) != 0 || len(bridge.queue) != 0 {
-		t.Fatalf("job phai bi bo khoi hang doi: waiting=%d queue=%d", len(bridge.waiting), len(bridge.queue))
+	if len(bridge.primary.waiting) != 0 || len(bridge.primary.queue) != 0 {
+		t.Fatalf("job phai bi bo khoi hang doi: waiting=%d queue=%d", len(bridge.primary.waiting), len(bridge.primary.queue))
 	}
 }
 
@@ -294,7 +306,7 @@ func takeJobsWithin(t *testing.T, b *Bridge, limit time.Duration) []*Job {
 	return nil
 }
 
-// T6 (docs/wps-bridge.md muc 5): WPS nap CUNG mot add-in trong ca ba app (publish.xml type="wps,et,wpp"),
+// T6 (docs/architecture/wps-bridge.md muc 5): WPS nap CUNG mot add-in trong ca ba app (publish.xml type="wps,et,wpp"),
 // nen app cua phien phai theo app ma add-in bao trong poll, khong duoc hard-code "wps".
 // Core loc lenh theo session.App (tools/office_action.go), sai app thi et.*/wpp.* bi bo im lang.
 func TestAppFollowsAddinPoll(t *testing.T) {
@@ -316,23 +328,23 @@ func TestAppFollowsAddinPoll(t *testing.T) {
 	}
 
 	// Chua poll lan nao: khong biet app nao -> mac dinh "wps" (Writer) de khong doi hanh vi cu.
-	if got := getJSON(b.serveBridgeHealth, "/health"); got["app"] != "wps" {
+	if got := getJSON(b.primary.serveBridgeHealth, "/health"); got["app"] != "wps" {
 		t.Fatalf("chua poll -> app 'wps', duoc %v", got["app"])
 	}
 
 	b.recordPoll(map[string]any{"app": "et", "document": map[string]any{"name": "ban-hang.xlsx"}})
-	if got := getJSON(b.serveBridgeHealth, "/health"); got["app"] != "et" {
+	if got := getJSON(b.primary.serveBridgeHealth, "/health"); got["app"] != "et" {
 		t.Fatalf("/health phai bao app cua add-in: %v", got["app"])
 	}
-	if got := getJSON(b.serveBridgeSession, "/session"); got["app"] != "et" {
+	if got := getJSON(b.primary.serveBridgeSession, "/session"); got["app"] != "et" {
 		t.Fatalf("/session phai bao app cua add-in: %v", got["app"])
 	}
-	if got := getJSON(b.serveBridgeSession, "/session"); got["family"] != "wps-linux" {
+	if got := getJSON(b.primary.serveBridgeSession, "/session"); got["family"] != "wps-linux" {
 		t.Fatalf("family van la wps-linux: %v", got["family"])
 	}
 
 	b.writeSession()
-	raw, err := os.ReadFile(b.sessionPath)
+	raw, err := os.ReadFile(b.primary.sessionPath)
 	if err != nil {
 		t.Fatalf("doc file session: %v", err)
 	}
@@ -346,17 +358,17 @@ func TestAppFollowsAddinPoll(t *testing.T) {
 
 	// Add-in cu (khong gui app) va gia tri la: giu nguyen app dang biet, khong doan bua.
 	b.recordPoll(map[string]any{"document": map[string]any{"name": "khac.xlsx"}})
-	if got := getJSON(b.serveBridgeHealth, "/health"); got["app"] != "et" {
+	if got := getJSON(b.primary.serveBridgeHealth, "/health"); got["app"] != "et" {
 		t.Fatalf("poll khong co app -> giu app cu: %v", got["app"])
 	}
 	b.recordPoll(map[string]any{"app": "khong-phai-app", "document": map[string]any{"name": "khac.xlsx"}})
-	if got := getJSON(b.serveBridgeHealth, "/health"); got["app"] != "et" {
+	if got := getJSON(b.primary.serveBridgeHealth, "/health"); got["app"] != "et" {
 		t.Fatalf("app la -> giu app cu: %v", got["app"])
 	}
 
 	// Doi sang WPP khi nguoi dung lam viec trong Presentation.
 	b.recordPoll(map[string]any{"app": "wpp", "document": map[string]any{"name": "bao-cao.pptx"}})
-	if got := getJSON(b.serveBridgeSession, "/session"); got["app"] != "wpp" {
+	if got := getJSON(b.primary.serveBridgeSession, "/session"); got["app"] != "wpp" {
 		t.Fatalf("doi app theo poll moi: %v", got["app"])
 	}
 }

@@ -13,16 +13,26 @@ $stage = Join-Path $out ".stage"
 $coreExe = Join-Path $out "AxiomOffice.Core.exe"
 $skillsDir = Join-Path $root "skills"
 $fw = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319"
-$csc = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin\Roslyn\csc.exe"
 
 . (Join-Path $PSScriptRoot "core.ps1")
 
-if (-not (Test-Path -LiteralPath $csc)) {
-    $csc = "$fw\csc.exe"
-    if (-not (Test-Path -LiteralPath $csc)) {
-        throw "No C# compiler found. Install Visual Studio Build Tools or .NET Framework."
-    }
+# csc: Roslyn cua Visual Studio / Build Tools. Duong dan hard-code (VS 2022 BuildTools) khong con tren
+# moi image Windows (VS doi ten thu muc) - tim bang vswhere nhu CI, roi moi fallback ve csc cua
+# .NET Framework (C# 5: khong du cho /langversion:7.3 nen canh bao).
+$vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+$csc = $null
+# AXIOM_CSC: may khong co Visual Studio - tro toi csc.exe cua goi NuGet Microsoft.Net.Compilers.Toolset (tasks\net472).
+if ($env:AXIOM_CSC) {
+    $csc = $env:AXIOM_CSC
+} elseif (Test-Path -LiteralPath $vswhere) {
+    $csc = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -find "MSBuild\**\Bin\Roslyn\csc.exe" |
+        Select-Object -First 1
 }
+if (-not $csc -or -not (Test-Path -LiteralPath $csc)) {
+    # csc cua .NET Framework chi la C# 5 va tu choi /langversion:7.3 -> khong the la fallback.
+    throw "Khong tim thay Roslyn csc.exe. Cai Visual Studio Build Tools (MSBuild + C#) - build can /langversion:7.3."
+}
+Write-Host "csc: $csc"
 
 # Build khi host con giu DLL tung lam DLL bien mat (csc doi ten file dang bi lock roi ghi hong).
 # Hoi Windows Restart Manager xem chinh xac tien trinh nao dang lock DLL/EXE dau ra
@@ -65,7 +75,7 @@ public static class FileLockers {
 }
 "@
 }
-# Agent Core dang chay giu AxiomOffice.Core.exe: tat em truoc khi ghi de (New_arch.md muc 10).
+# Agent Core dang chay giu AxiomOffice.Core.exe: tat em truoc khi ghi de (docs/architecture/core.md muc 10).
 # Core la tien trinh cua chinh du an nen tat bang API shutdown, khong can -Kill (khac Word/Excel cua nguoi dung).
 [void](Stop-AgentCore)
 
@@ -131,7 +141,7 @@ $stagedExe = Join-Path $stage "AxiomOffice.Host.exe"
 & $csc @commonArgs @hostArgs /target:exe "/out:$stagedExe" $hostSources
 if ($LASTEXITCODE -ne 0) { throw "Host build failed with exit code $LASTEXITCODE" }
 
-# Agent Core (Go): version lay tu DLL add-in vua build de /health cua Core khop version bridge (New_arch.md muc 10).
+# Agent Core (Go): version lay tu DLL add-in vua build de /health cua Core khop version bridge (docs/architecture/core.md muc 10).
 # Mot binary, khong can .NET runtime tren may nguoi dung (core-go/README.md).
 $coreVersion = [System.Reflection.AssemblyName]::GetAssemblyName($stagedDll).Version.ToString(3)
 $go = Get-Command go -ErrorAction SilentlyContinue
@@ -156,7 +166,7 @@ foreach ($file in @($stagedDll, $stagedExe)) {
 }
 Remove-Item -LiteralPath $stage -Recurse -Force
 
-# Skill dung san (New_arch.md muc 8.4): chep canh exe de Core doc duoc luc chay.
+# Skill dung san (docs/architecture/core.md muc 8.4): chep canh exe de Core doc duoc luc chay.
 if (Test-Path -LiteralPath $skillsDir) {
     # Xoa ban cu TRUOC khi chep: Copy-Item mot thu muc vao dich DA TON TAI se chep long vao trong
     # (skills\skills) chu khong lam moi - do duoc 04/10/2026: 4/8 skill canh Core release cu hon repo

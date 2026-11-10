@@ -102,6 +102,15 @@ func Describe(errorText, providerID, endpoint, model string) LlmError {
 			"Kiểm tra mạng/VPN và địa chỉ máy chủ. Máy chủ nội bộ chỉ truy cập được khi đang trong mạng công ty.", detail}
 	}
 
+	if strings.Contains(lower, "no answer text") {
+		if strings.Contains(lower, `finish_reason="length"`) {
+			return LlmError{"reply", "Model dùng hết số token cho phép khi đang suy nghĩ nên chưa kịp trả lời.",
+				"Đây thường là model suy luận (reasoning). Thử lại; nếu vẫn lỗi, chọn model khác hoặc báo quản trị viên.", detail}
+		}
+		return LlmError{"reply", "Model trả lời rỗng.",
+			"Thử lại; nếu vẫn lỗi, chọn model khác hoặc kiểm tra lại nhà cung cấp (OpenAI-compatible hay Anthropic).", detail}
+	}
+
 	if strings.Contains(lower, "empty reply") || strings.Contains(lower, "invalid provider response") ||
 		strings.Contains(lower, "unexpected provider response") {
 		return LlmError{"reply", "Máy chủ trả lời nhưng không giống một máy chủ chat.",

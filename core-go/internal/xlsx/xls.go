@@ -40,7 +40,7 @@ func ReadXLS(path, target string, allSheets bool) ([]*Grid, error) {
 	return readViaLibreOffice(path, target, allSheets, direct)
 }
 
-// readViaLibreOffice: nho soffice doi sang .xlsx roi doc nhu file thuong (LibreOffice_arch.md muc 11).
+// readViaLibreOffice: nho soffice doi sang .xlsx roi doc nhu file thuong (docs/architecture/libreoffice.md muc 11).
 // direct la loi cua duong doc thang (neu co) - bao ca hai de nguoi doc biet vi sao.
 func readViaLibreOffice(path, target string, allSheets bool, direct error) ([]*Grid, error) {
 	converted, directory, err := convertToXLSX(path)

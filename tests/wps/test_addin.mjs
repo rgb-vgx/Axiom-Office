@@ -1,5 +1,5 @@
-// Spec T2 (docs/wps-bridge.md muc 3): registry lenh + vong poll cua JS add-in WPS, khong can WPS.
-// Spec T6 (docs/wps-bridge.md muc 5): add-in nhan biet app dang chay (Writer/Spreadsheets/Presentation).
+// Spec T2 (docs/architecture/wps-bridge.md muc 3): registry lenh + vong poll cua JS add-in WPS, khong can WPS.
+// Spec T6 (docs/architecture/wps-bridge.md muc 5): add-in nhan biet app dang chay (Writer/Spreadsheets/Presentation).
 // Spec registry ⊆ handler: moi lenh trong registry LibreOffice (nguon sinh tool cho agent) phai co
 // handler trong add-in, hoac nam trong CHUA_CO_HANDLER kem ly do - de lenh registry khong am tham
 // thanh "unknown action" khi may dang chay WPS.
@@ -77,6 +77,30 @@ test("lenh chi doc khong mo UndoRecord", () => {
     ctx.AxiomCommands.execute(mockApp(log), action, {});
     assert.ok(!log.some((entry) => entry.startsWith("start:")), action + " khong duoc mo UndoRecord");
   }
+});
+
+// Loi 24/10/2026: model goi insertStyledText cho tung dong, khong co paragraph break -> ca la don thanh
+// mot doan, lan can le cuoi cung de len tat ca. Nay '\n' phai tao doan that.
+test("writer.insertStyledText: '\\n' tach doan (TypeParagraph), mot UndoRecord cho ca khoi", () => {
+  const ctx = loadAddin();
+  const log = [];
+  const reply = run(ctx, mockApp(log), "writer.insertStyledText", {
+    text: "Dòng 1\nDòng 2\nDòng 3", font: "Times New Roman", size: 13, alignment: "center",
+  });
+  assert.equal(reply.paragraphs, 3);
+  assert.equal(reply.inserted, "Dòng 1\nDòng 2\nDòng 3".length);
+  assert.equal(log.filter((entry) => entry === "call:app.Selection.TypeText").length, 3, "moi dong mot lan TypeText");
+  // 2 lan giua 3 dong + 1 lan sau khoi (alignment => block, tu ngat doan).
+  assert.equal(log.filter((entry) => entry === "call:app.Selection.TypeParagraph").length, 3,
+    "alignment = khoi: ngat sau moi dong va sau ca khoi");
+  assert.deepEqual(log.filter((entry) => entry.startsWith("start:") || entry === "end"),
+    ["start:AI: writer.insertStyledText", "end"], "ca khoi chi mot buoc Undo");
+
+  // Khong alignment = chen inline: khong tu ngat doan (giu nguyen hanh vi cu).
+  const inline = [];
+  run(ctx, mockApp(inline), "writer.insertStyledText", { text: "chen giua cau" });
+  assert.equal(inline.filter((entry) => entry === "call:app.Selection.TypeParagraph").length, 0,
+    "inline khong duoc ngat doan");
 });
 
 test("execute khong bao gio throw: loi object model -> ok:false + error, End van duoc goi", () => {
@@ -165,7 +189,7 @@ test("main.js: ribbon.OnAddinLoad tra true va bat vong poll; job -> result dung 
   assert.ok(polls.length <= after + 1, "stop() phai dung vong poll");
 });
 
-// ---- T6: add-in nhan biet app dang chay (docs/wps-bridge.md muc 5) ----
+// ---- T6: add-in nhan biet app dang chay (docs/architecture/wps-bridge.md muc 5) ----
 //
 // WPS nap cung mot add-in trong ca ba app (publish.xml: type="wps,et,wpp"). Ten app that do duoc:
 // "WPS Writer" (Writer), "WPS Spreadsheets" (ET), "WPS Presentation" (WPP).
@@ -209,6 +233,11 @@ test("appKind: doc dung app dang chay tu Application.Name", () => {
   assert.equal(kindOf(etApp()), "et");
   assert.equal(kindOf(wppApp()), "wpp");
   assert.equal(kindOf(writerApp()), "wps");
+  // Ten that theo build: 12.1.2.29182.AK.preread (28/10/2026) bao ET la "WPS Sheets",
+  // khong phai "WPS Spreadsheets" — truoc fix thu vi nhat app bi do nham thanh "wps"
+  // (thay su that: bridge /cmd bao "\"et.readRange\" cannot run in \"WPS Sheets\"").
+  assert.equal(kindOf({ Name: "WPS Sheets" }), "et");
+  assert.equal(kindOf({ Name: "WPS Presentation" }), "wpp");
   // Ten la (WPS Office, ban cu) hoac khong doc duoc -> coi la Writer (app kind "wps" la mac dinh).
   assert.equal(kindOf({ Name: "WPS Office" }), "wps");
   assert.equal(kindOf({}), "wps");
@@ -248,28 +277,44 @@ test("catalogFor(kind): chi tra lenh dung app do; catalog() van la registry day 
 //
 // Danh sach nay chi duoc PHEP ngan di: moi lenh o day ma sau nay co handler thi test ben duoi bat phai bo ra.
 const CHUA_CO_HANDLER = {
-  // Bon lenh kind rong (agent=false): khong phai lenh cua app van phong - Core/pane/MCP xu ly, add-in
-  // khong bao gio nhan. Chung nam trong registry vi registry dung chung cho moi nen tang.
-  "ai.ask": "Core xu ly (khong phai lenh cua app van phong)",
-  "ui.askpane": "Core/pane xu ly",
-  "ui.setup": "Core/pane xu ly",
-  "app.screenshot": "Core chup cua so (phan visual), add-in khong nhan lenh nay",
-  // Bay lenh writer.* (docs/wps-bridge.md muc 3): backlog - chua viet handler cho WPS.
+  // Tinh nang theo Claude for M365 (docs/research/tinh-nang-con-thieu-so-voi-claude-m365.md, 27/10/2026): moi co o add-in
+  // Windows; WPS de sau khi do duoc API tren may Linux.
+  "et.pivot": "chi co trong add-in Windows (X3, PivotCaches); can do API PivotTable cua WPS JS",
+  "et.exportChart": "chi co trong add-in Windows (P2, Chart.Export); can do API xuat anh bieu do cua WPS JS",
+  "writer.replyComment": "chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc",
+  "writer.resolveComment": "chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc",
+  "writer.editCommentScope": "chi co trong add-in Windows (W2/W3); can do API Comments/Revisions cua WPS JS tren may that truoc",
+  // Bon lenh kind rong (agent=false) nam trong registry vi registry dung chung cho moi nen tang.
+  // Ca bon DEU la lenh cua add-in o ban Windows (CommandDispatcher.cs: app.info, ai.ask, ui.askpane,
+  // app.screenshot) - khong phai "Core tu lam roi add-in khong bao gio nhan". O add-in WPS chi
+  // `app.info` co handler; ba lenh kia khong co, nen Core goi chung qua bridge se nhan
+  // `unknown action`. (ui.setup la duong rieng cua LibreOffice, khong co o CommandDispatcher.)
+  "ai.ask": "chua co handler trong add-in WPS (ban Windows: AiAsk trong CommandDispatcher.cs)",
+  "ui.askpane": "chua co handler trong add-in WPS (ban Windows: UiAskPane)",
+  "ui.setup": "duong cua LibreOffice (setupwizard.py); ban Windows/WPS khong co lenh nay",
+  "app.screenshot": "chua co handler trong add-in WPS (ban Windows: AppScreenshot) - day la ly do nut 'Nhin tai lieu' chua len duoc ribbon WPS, xem docs/architecture/ribbon-ui.md muc 5.1",
+  // Bay lenh writer.* (docs/architecture/wps-bridge.md muc 3): backlog - chua viet handler cho WPS.
   "writer.newDocument": "chua co handler trong add-in",
   "writer.open": "chua co handler trong add-in",
   "writer.closeAll": "chua co handler trong add-in",
-  "writer.formatTable": "chua co handler trong add-in (agent=true: tool nay se loi khi may dang la WPS)",
   "writer.insertImage": "chua co handler trong add-in (agent=true)",
   "writer.insertHyperlink": "chua co handler trong add-in (agent=true)",
-  "writer.checkTables": "chua co handler trong add-in (agent=true)",
-  "writer.replaceMany": "chua co handler trong add-in (agent=true: tool nay se loi khi may dang la WPS)",
-  // Ba lenh thiet ke + khoa vung boi den: chi co o add-in Windows (COM); LibreOffice bao not supported.
+  // Hai lenh thiet ke: chi co o add-in Windows (COM); LibreOffice bao not supported.
   // (writer.outline da co handler trong WPS JS tu commit P0-03 nen khong con o day.)
   "writer.restyle": "chi co trong add-in Windows (lenh thiet ke, doc_design); WPS JS chua viet handler",
   "writer.insertBlocks": "chi co trong add-in Windows (lenh thiet ke, doc_design); WPS JS chua viet handler",
-  "writer.lockSelection": "khoa vung boi den moi co o add-in Windows (COM); WPS JS chua viet handler",
-  "writer.unlockSelection": "khoa vung boi den moi co o add-in Windows (COM); WPS JS chua viet handler",
-  // Nam lenh lam bai theo mau (docs/template-design.md muc 6.3): moi co tren PowerPoint (COM InsertFromFile,
+  // Lenh cau truc Word/Excel (docs/plans/21-v0 P1, 26/10/2026): moi co o add-in Windows; WPS de sau (may Linux).
+  "writer.setHeaderFooter": "chi co trong add-in Windows (plan 21 P1); WPS de sau",
+  "writer.addTableRows": "chi co trong add-in Windows (plan 21 P2); WPS de sau",
+  "et.createTable": "chi co trong add-in Windows (plan 21 P1); WPS de sau",
+  "et.freezePanes": "chi co trong add-in Windows (plan 21 P1); WPS de sau",
+  "et.setValidation": "chi co trong add-in Windows (plan 21 P1); WPS de sau",
+  "et.deleteSheet": "chi co trong add-in Windows (plan 21 P3); WPS de sau",
+  "et.formatRanges": "chi co trong add-in Windows (plan 21 P3); WPS de sau",
+  // et.readRanges DA CO handler trong add-in WPS JS (28/10/2026): duong data cho tool trace_formula cua Core
+  // (orchestrator_execution.go voi boi Catalog.Has("et.readRanges") && Catalog.Has("et.sheetInfo")).
+  "et.whatIf": "chi co trong add-in Windows (plan 21 P3); WPS de sau",
+  // Nam lenh lam bai theo mau (docs/architecture/template-design.md muc 6.3): moi co tren PowerPoint (COM InsertFromFile,
   // Shape.Export); WPP chua kiem.
   "wpp.newFromTemplate": "chua co handler trong add-in (chi PowerPoint)",
   "wpp.addSlideFromTemplate": "chua co handler trong add-in (chi PowerPoint)",
@@ -278,9 +323,13 @@ const CHUA_CO_HANDLER = {
   "wpp.deleteShapes": "chua co handler trong add-in (chi PowerPoint)",
   "wpp.copyPicture": "chua co handler trong add-in (chi PowerPoint)",
   // Ba lenh sap xep bai (compose) cua duong tao slide tu mau: PowerPoint + LibreOffice compose.
-  "wpp.addParagraphs": "sap xep bai (compose) - chi PowerPoint/LibreOffice; WPS JS chua viet handler",
   "wpp.addGrid": "sap xep bai (compose) - chi PowerPoint/LibreOffice; WPS JS chua viet handler",
   "wpp.deleteTagged": "sap xep bai (compose) - chi PowerPoint/LibreOffice; WPS JS chua viet handler",
+  // Hinh khoi va duong noi cua slides_from_brief (docs/plans/18-s0 P2): moi co tren PowerPoint; WPS la to-do khi sang
+  // host Linux (docs/plans/19-h0 muc "To-do WPS").
+  "wpp.addConnector": "duong noi (slides_from_brief) - chi PowerPoint; WPS JS chua viet handler",
+  "wpp.addChart": "bieu do goc (slides_from_brief) - chi PowerPoint; WPS JS chua viet handler",
+  "wpp.renderSlide": "anh mot slide theo so (look_at_document, benchmark) - chi PowerPoint; WPS JS chua viet handler",
 };
 
 test("registry LibreOffice: moi lenh deu co handler, hoac nam trong danh sach chua lam (co ly do)", () => {

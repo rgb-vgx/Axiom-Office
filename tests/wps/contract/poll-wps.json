@@ -1,0 +1,53 @@
+{
+  "client": "wps-jsaddon",
+  "clientId": "client-wps",
+  "app": "wps",
+  "version": "<version>",
+  "document": {
+    "name": "hop-dong.docx",
+    "fullName": "/home/u/hop-dong.docx"
+  },
+  "commands": [
+    {
+      "name": "app.info",
+      "kind": null,
+      "agent": false,
+      "undo": false,
+      "summary": "Tên/version app, tài liệu đang mở, `state` (tài liệu, cửa sổ, visible)",
+      "params": []
+    },
+    {
+      "name": "writer.getText",
+      "kind": "wps",
+      "agent": true,
+      "undo": false,
+      "summary": "Đọc toàn bộ text",
+      "params": [
+        {
+          "name": "maxChars",
+          "required": false,
+          "hint": null
+        },
+        {
+          "name": "document",
+          "required": false,
+          "hint": "full path of the document to work on; default: the active one"
+        }
+      ]
+    },
+    {
+      "name": "writer.selection",
+      "kind": "wps",
+      "agent": true,
+      "undo": false,
+      "summary": "Text + vị trí đang chọn",
+      "params": [
+        {
+          "name": "document",
+          "required": false,
+          "hint": "full path of the document to work on; default: the active one"
+        }
+      ]
+    }
+  ]
+}

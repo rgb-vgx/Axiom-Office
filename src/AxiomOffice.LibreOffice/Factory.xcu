@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Dang ky factory tao panel cho sidebar (LibreOffice_arch.md muc 10). Sidebar tim factory theo
+<!-- Dang ky factory tao panel cho sidebar (docs/architecture/libreoffice.md muc 10). Sidebar tim factory theo
      ImplementationURL trong Sidebar.xcu: private:resource/toolpanel/<Name>/<PanelId>, roi tao
      implementation org.axiomoffice.bridge.PanelFactory (xem python/axiom_panel.py). -->
 <oor:component-data xmlns:oor="http://openoffice.org/2001/registry"

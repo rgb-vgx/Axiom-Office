@@ -81,3 +81,16 @@ func TestFitCardsShrinksToContent(t *testing.T) {
 		t.Fatalf("luoi 2x2 = %v", four)
 	}
 }
+
+func TestRound1RoundsNegativeNumbers(t *testing.T) {
+	cases := map[float64]float64{
+		1.24: 1.2, 1.25: 1.3, 1.26: 1.3,
+		-1.21: -1.2, -1.24: -1.2, -1.25: -1.3, -1.26: -1.3,
+		-0.04: 0, -0.05: -0.1,
+	}
+	for in, want := range cases {
+		if got := round1(in); got != want {
+			t.Errorf("round1(%v) = %v, want %v", in, got, want)
+		}
+	}
+}

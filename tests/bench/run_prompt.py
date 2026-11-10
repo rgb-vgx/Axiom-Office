@@ -26,7 +26,7 @@ TERMINAL = ("run.completed", "run.failed", "run.cancelled", "run.timedout", "run
 def post(url: str, body: dict, token: str) -> dict:
     request = urllib.request.Request(url, data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
                                      method="POST")
-    request.add_header("Content-Type", "application/json")
+    request.add_header("Content-Type", "application/json; charset=utf-8")
     if token:
         request.add_header("X-Auth-Token", token)
     with urllib.request.urlopen(request, timeout=60) as response:
@@ -39,7 +39,7 @@ def save_document(bridge_port: str, token: str, path: str) -> str:
     body = {"action": "et.saveAs", "params": {"path": path}}
     request = urllib.request.Request("http://127.0.0.1:%s/cmd" % bridge_port,
                                      data=json.dumps(body, ensure_ascii=False).encode("utf-8"), method="POST")
-    request.add_header("Content-Type", "application/json")
+    request.add_header("Content-Type", "application/json; charset=utf-8")
     if token:
         request.add_header("X-Auth-Token", token)
     try:

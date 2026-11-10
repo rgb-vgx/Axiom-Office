@@ -1,6 +1,10 @@
 package model
 
-import "testing"
+import (
+	"encoding/json"
+	"strings"
+	"testing"
+)
 
 // Proxy 9router (gap that ngay 01/10/2026) tra mot JSON hoan chinh roi noi them `data: [DONE]` cua
 // SSE vao cuoi body. Truoc day Parse dung json.Unmarshal ca body nen bao
@@ -64,5 +68,28 @@ func TestParseCarriesFinishReason(t *testing.T) {
 func TestParseStillRejectsGarbage(t *testing.T) {
 	if _, errText := (openAICodec{}).Parse([]byte("day khong phai JSON")); errText == "" {
 		t.Fatal("body khong phai JSON phai bao loi")
+	}
+}
+
+// Duong non-stream cua OpenAI (Parse) phai CAT reasoning_content khoi Raw nhu duong streaming: Raw quay lai
+// lich su o vong sau, con thinking thi khong duoc gui lai go nha cung cap (DeepSeek tra 400; con lai chi ton
+// token voi noi dung model da nghi xong). Reasoning van duoc trich ra cho tu sua so lieu giao dien.
+func TestParseDropsReasoningContentFromRaw(t *testing.T) {
+	body := `{"choices":[{"message":{"role":"assistant","content":"dung roi","reasoning_content":"nghi truoc"},` +
+		`"finish_reason":"stop"}],"usage":{"prompt_tokens":10,"completion_tokens":2}}`
+	turn, errText := (openAICodec{}).Parse([]byte(body))
+	if errText != "" {
+		t.Fatalf("Parse: %s", errText)
+	}
+	if turn.Text != "dung roi" || turn.Reasoning != "nghi truoc" {
+		t.Fatalf("turn = %+v", turn)
+	}
+	turns := (openAICodec{}).AppendAssistant(nil, turn)
+	out, _ := json.Marshal(turns)
+	if strings.Contains(string(out), "reasoning_content") {
+		t.Fatalf("reasoning_content bi gui lai: %s", out)
+	}
+	if !strings.Contains(string(out), `"content":"dung roi"`) {
+		t.Fatalf("mat content trong Raw: %s", out)
 	}
 }

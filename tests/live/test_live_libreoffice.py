@@ -1,4 +1,4 @@
-"""Test làn live LibreOffice (LibreOffice_arch.md mục 10, giai đoạn L1): mọi lệnh bridge trên Writer/Calc/Impress thật.
+"""Test làn live LibreOffice (docs/architecture/libreoffice.md mục 10, giai đoạn L1): mọi lệnh bridge trên Writer/Calc/Impress thật.
 
 Khác bản Office: bridge nằm trong extension Python UNO (src\\AxiomOffice.LibreOffice), phải cài trước
 (powershell -File scripts\\libreoffice.ps1 -Install) và LibreOffice phải được tắt khi cài.

@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// Kenh add-in WPS (docs/wps-bridge.md 2.1-2.2, muc 7): phuc vu file tinh, /wps/v1/poll + /wps/v1/result
+// Kenh add-in WPS (docs/architecture/wps-bridge.md 2.1-2.2, muc 7): phuc vu file tinh, /wps/v1/poll + /wps/v1/result
 // va luot chay agent cho pane Ask AI (/wps/v1/runs...).
 // Xac thuc rieng (Origin dung bang origin cua Core hoac token khi khong Origin) nen di thang vao
 // mux, khong qua guard chung (guard chung chan moi Origin).
@@ -32,6 +32,8 @@ func mapWPS(mux *http.ServeMux, deps *Deps) {
 		deps.WPS.ServeResult(w, r)
 	})
 	mapWPSRuns(mux, deps)
+	mapWPSAdmin(mux, deps)
+	mapWPSPane(mux, deps)
 	// Duong dan la duoi /wps/* (vd ".." da duoc server chuan hoa): tra 404 truc tiep, khong lo
 	// vo guard 401. /wps/v1/* la van ap dung xac thuc kenh (Origin la -> 403).
 	mux.HandleFunc("/wps/v1/", func(w http.ResponseWriter, r *http.Request) {
@@ -42,20 +44,16 @@ func mapWPS(mux *http.ServeMux, deps *Deps) {
 	})
 }
 
-// mapWPSRuns: luot chay agent cho pane Ask AI (docs/wps-bridge.md muc 7) - cung hanh vi va response
+// mapWPSRuns: luot chay agent cho pane Ask AI (docs/architecture/wps-bridge.md muc 7) - cung hanh vi va response
 // nhu /v1/runs, nhung Core tu gan office (bridge WPS) va document (lan poll gan nhat cua add-in).
 // Xac thuc kenh add-in (DecideWPSAuth + doi body JSON); /v1/runs giu guard cu.
 func mapWPSRuns(mux *http.ServeMux, deps *Deps) {
 	mux.HandleFunc("POST /wps/v1/runs", func(w http.ResponseWriter, r *http.Request) {
-		if !checkWPSRunAuth(w, r, deps) {
+		if !checkWPSAuth(w, r, deps) {
 			return
 		}
 		if !deps.Stores.Available {
 			Error(w, http.StatusServiceUnavailable, "memory unavailable: "+deps.Stores.Error)
-			return
-		}
-		if !deps.WPS.Connected() {
-			Error(w, http.StatusConflict, "WPS add-in is not connected: open a document in WPS to connect the add-in")
 			return
 		}
 		body, parsed := readJSON(r)
@@ -66,13 +64,32 @@ func mapWPSRuns(mux *http.ServeMux, deps *Deps) {
 		if body == nil {
 			body = map[string]any{}
 		}
+		// Pane/khung chat mini gui client id + app cua chinh no: luot chay tren DUNG app do khi WPS mo nhieu app.
+		client := wpsClientOf(deps, body)
+		if !client.Connected() {
+			Error(w, http.StatusConflict, "WPS add-in is not connected: open a document in WPS to connect the add-in")
+			return
+		}
+		// Lenh ca tai lieu bam o ung dung khac noi no chay (Tao slide tu tai lieu o Writer): luot chay tren phien cua
+		// ung dung dich dang mo, khong co thi noi nguoi dung mo.
+		if action, ok := agent.FindQuickAction(strings.TrimSpace(textOf(body["quickAction"]))); ok {
+			if target := action.RunsIn(client.App()); target != "" {
+				other := deps.WPS.Resolve("", target)
+				if other == nil || other.App() != target || !other.Connected() {
+					Error(w, http.StatusConflict, "\""+action.Label+"\" runs in "+wpsAppName(target)+": open a "+
+						wpsDocumentWord(target)+" in "+wpsAppName(target)+" (a blank one is fine), then press the button again")
+					return
+				}
+				client = other
+			}
+		}
 		// Office do Core tu gan (giong /health, /session cua bridge WPS); pane khong gui office.
 		body["office"] = map[string]any{
-			"port": float64(deps.WPS.ActualBridgePort()), "pid": float64(pid()),
-			"app": "wps", "family": "wps-linux",
+			"port": float64(client.Port()), "pid": float64(pid()),
+			"app": client.App(), "family": "wps-linux",
 		}
-		// Tai lieu do add-in bao trong lan poll gan nhat.
-		if doc, _, _, _ := deps.WPS.Snapshot(); len(doc) > 0 {
+		// Tai lieu do add-in cua client do bao trong lan poll gan nhat.
+		if doc, _, _, _ := client.Snapshot(); len(doc) > 0 {
 			body["document"] = doc
 		}
 		request, problem := agent.ParseRequest(body)
@@ -85,45 +102,44 @@ func mapWPSRuns(mux *http.ServeMux, deps *Deps) {
 		}
 		serveStartRun(w, deps, request)
 	})
-
-	mux.HandleFunc("GET /wps/v1/runs/{runId}", func(w http.ResponseWriter, r *http.Request) {
-		if !checkWPSRunAuth(w, r, deps) {
-			return
-		}
-		serveGetRun(w, deps, r.PathValue("runId"))
-	})
-
-	mux.HandleFunc("GET /wps/v1/runs/{runId}/events", func(w http.ResponseWriter, r *http.Request) {
-		if !checkWPSRunAuth(w, r, deps) {
-			return
-		}
-		serveRunEvents(w, r, deps, r.PathValue("runId"))
-	})
-
-	mux.HandleFunc("POST /wps/v1/runs/{runId}/cancel", func(w http.ResponseWriter, r *http.Request) {
-		if !checkWPSRunAuth(w, r, deps) {
-			return
-		}
-		serveCancelRun(w, deps, r.PathValue("runId"))
-	})
-
-	mux.HandleFunc("POST /wps/v1/runs/{runId}/confirm", func(w http.ResponseWriter, r *http.Request) {
-		if !checkWPSRunAuth(w, r, deps) {
-			return
-		}
-		body, parsed := readJSON(r)
-		if !parsed {
-			body = nil
-		}
-		serveConfirmRun(w, deps, r.PathValue("runId"), body)
-	})
+	// GET runs/{id}, events, cancel, confirm: dang ky mot lan cho ca /v1 va /wps/v1 bang routeBoth (runs.go).
 }
 
-// checkWPSRunAuth: xac thuc kenh add-in cho /wps/v1/runs (giong wpsbridge.checkWPSAuth: Origin dung
+func wpsAppName(app string) string {
+	switch app {
+	case "wpp":
+		return "WPS Presentation"
+	case "et":
+		return "WPS Spreadsheets"
+	}
+	return "WPS Writer"
+}
+
+func wpsDocumentWord(app string) string {
+	switch app {
+	case "wpp":
+		return "presentation"
+	case "et":
+		return "spreadsheet"
+	}
+	return "document"
+}
+
+// wpsClientOf: client WPS ma yeu cau cua pane nham toi - truong "client" (id add-in gui qua URL pane) va "app"
+// trong body, bo ra khoi body truoc khi body di tiep (agent.ParseRequest khong biet hai truong nay).
+func wpsClientOf(deps *Deps, body map[string]any) *wpsbridge.Client {
+	clientID := strings.TrimSpace(textOf(body["client"]))
+	app := strings.TrimSpace(textOf(body["app"]))
+	delete(body, "client")
+	delete(body, "app")
+	return deps.WPS.Resolve(clientID, app)
+}
+
+// checkWPSAuth: xac thuc kenh add-in cho moi endpoint /wps/v1/* (giong wpsbridge.checkWPSAuth: Origin dung
 // bang origin cua Core thi qua, Origin la -> 403, khong Origin thi doi token -> 401, body JSON -> 415).
 // Trinh duyet khong gui Origin cho GET cung origin nen EventSource cua pane bi 401 (11/10/2026):
 // GET/HEAD khong Origin ma co Sec-Fetch-Site: same-origin thi cho qua; POST van doi token.
-func checkWPSRunAuth(w http.ResponseWriter, r *http.Request, deps *Deps) bool {
+func checkWPSAuth(w http.ResponseWriter, r *http.Request, deps *Deps) bool {
 	if code, ok := wpsbridge.DecideWPSAuth(r.Header.Get("Origin"), r.Header.Get("X-Auth-Token"), deps.Config.Token, deps.Runtime.Port, r.Method, r.Header.Get("Sec-Fetch-Site")); !ok {
 		if code == http.StatusForbidden {
 			Error(w, code, "requests with an Origin header are not allowed")

@@ -17,10 +17,10 @@ const (
 	ssePingEvery          = 15 * time.Second
 )
 
-// Endpoint cua luot chay va hoi thoai (New_arch.md muc 7.3, 7.4):
+// Endpoint cua luot chay va hoi thoai (docs/architecture/core.md muc 7.3, 7.4):
 // POST /v1/runs, GET /v1/runs/{id}, GET /v1/runs/{id}/events (SSE), POST /v1/runs/{id}/cancel,
 // POST /v1/runs/{id}/confirm, GET /v1/audit, GET/DELETE /v1/conversations...
-// Cac ham serve* dung chung cho /v1/runs va kenh add-in /wps/v1/runs (docs/wps-bridge.md muc 7).
+// Cac ham serve* dung chung cho /v1/runs va kenh add-in /wps/v1/runs (docs/architecture/wps-bridge.md muc 7).
 func mapRuns(mux *http.ServeMux, deps *Deps) {
 	mux.HandleFunc("POST /v1/runs", func(w http.ResponseWriter, r *http.Request) {
 		if !deps.Stores.Available {
@@ -44,16 +44,22 @@ func mapRuns(mux *http.ServeMux, deps *Deps) {
 		serveStartRun(w, deps, request)
 	})
 
-	mux.HandleFunc("GET /v1/runs/{runId}", func(w http.ResponseWriter, r *http.Request) {
+	routeBoth(mux, deps, "GET /v1/runs/{runId}", func(w http.ResponseWriter, r *http.Request) {
 		serveGetRun(w, deps, r.PathValue("runId"))
 	})
 
-	mux.HandleFunc("POST /v1/runs/{runId}/cancel", func(w http.ResponseWriter, r *http.Request) {
+	routeBoth(mux, deps, "POST /v1/runs/{runId}/cancel", func(w http.ResponseWriter, r *http.Request) {
 		serveCancelRun(w, deps, r.PathValue("runId"))
 	})
 
+	// "Hoan tac luot nay" (agent/tracking.go UndoRun): luot co Track Changes thi tu choi revision cua luot, khong thi lui
+	// dung so buoc cua luot. Pane goi day thay vi tu dem buoc (audit F02/F03).
+	routeBoth(mux, deps, "POST /v1/runs/{runId}/undo", func(w http.ResponseWriter, r *http.Request) {
+		serveUndoRun(w, r, deps, r.PathValue("runId"))
+	})
+
 	// Tra loi yeu cau xac nhan cua policy (muc 7.3, 8.6): {"confirmationId", "approved": true|false}.
-	mux.HandleFunc("POST /v1/runs/{runId}/confirm", func(w http.ResponseWriter, r *http.Request) {
+	routeBoth(mux, deps, "POST /v1/runs/{runId}/confirm", func(w http.ResponseWriter, r *http.Request) {
 		body, parsed := readJSON(r)
 		if !parsed {
 			body = nil
@@ -61,7 +67,7 @@ func mapRuns(mux *http.ServeMux, deps *Deps) {
 		serveConfirmRun(w, deps, r.PathValue("runId"), body)
 	})
 
-	mux.HandleFunc("GET /v1/audit", func(w http.ResponseWriter, r *http.Request) {
+	routeBoth(mux, deps, "GET /v1/audit", func(w http.ResponseWriter, r *http.Request) {
 		runID := strings.TrimSpace(r.URL.Query().Get("runId"))
 		documentKey := strings.TrimSpace(r.URL.Query().Get("documentKey"))
 		limit := clampLimit(r.URL.Query().Get("limit"), 100)
@@ -85,11 +91,11 @@ func mapRuns(mux *http.ServeMux, deps *Deps) {
 		OK(w, map[string]any{"calls": calls})
 	})
 
-	mux.HandleFunc("GET /v1/runs/{runId}/events", func(w http.ResponseWriter, r *http.Request) {
+	routeBoth(mux, deps, "GET /v1/runs/{runId}/events", func(w http.ResponseWriter, r *http.Request) {
 		serveRunEvents(w, r, deps, r.PathValue("runId"))
 	})
 
-	mux.HandleFunc("GET /v1/conversations", func(w http.ResponseWriter, r *http.Request) {
+	routeBoth(mux, deps, "GET /v1/conversations", func(w http.ResponseWriter, r *http.Request) {
 		documentKey := strings.TrimSpace(r.URL.Query().Get("documentKey"))
 		limit := clampLimit(r.URL.Query().Get("limit"), 20)
 		var key *string
@@ -103,7 +109,7 @@ func mapRuns(mux *http.ServeMux, deps *Deps) {
 		OK(w, map[string]any{"conversations": list})
 	})
 
-	mux.HandleFunc("GET /v1/conversations/{id}", func(w http.ResponseWriter, r *http.Request) {
+	routeBoth(mux, deps, "GET /v1/conversations/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
 		row := deps.Stores.Convs.Get(id)
 		if row == nil {
@@ -121,7 +127,7 @@ func mapRuns(mux *http.ServeMux, deps *Deps) {
 		OK(w, payload)
 	})
 
-	mux.HandleFunc("DELETE /v1/conversations/{id}", func(w http.ResponseWriter, r *http.Request) {
+	routeBoth(mux, deps, "DELETE /v1/conversations/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("id")
 		if !deps.Stores.Convs.Delete(id) {
 			Error(w, http.StatusNotFound, "unknown conversation: "+id)
@@ -145,11 +151,13 @@ func serveStartRun(w http.ResponseWriter, deps *Deps, request *agent.Request) {
 
 	// Hoi thoai duoc tao ngay dau luot chay: cho toi da 10s de tra ve conversationId nhu tai lieu.
 	deadline := time.Now().Add(conversationWaitLimit)
-	for run.ConversationID == "" && run.Status == agent.StatusRunning && time.Now().Before(deadline) {
+	status, conversationID := run.StatusAndConversation()
+	for conversationID == "" && status == agent.StatusRunning && time.Now().Before(deadline) {
 		time.Sleep(25 * time.Millisecond)
+		status, conversationID = run.StatusAndConversation()
 	}
 	OK(w, map[string]any{
-		"runId": run.ID, "conversationId": nilIfEmpty(run.ConversationID), "status": run.Status,
+		"runId": run.ID, "conversationId": nilIfEmpty(conversationID), "status": status,
 	})
 }
 
@@ -157,10 +165,33 @@ func serveStartRun(w http.ResponseWriter, deps *Deps, request *agent.Request) {
 func serveGetRun(w http.ResponseWriter, deps *Deps, runID string) {
 	run := deps.Manager.Get(runID)
 	if run == nil {
+		// Khong con trong RAM (Core khoi dong lai, hoac qua RetentionMinutes): tra trang thai da luu trong core.db de pane
+		// ket noi lai thay luot da ket thuc the nao (Grok Build: su kien ket thuc luot duoc luu va phat lai), thay vi 404.
+		if stored := storedRunJSON(deps, runID); stored != nil {
+			OK(w, stored)
+			return
+		}
 		Error(w, http.StatusNotFound, "unknown run: "+runID)
 		return
 	}
 	OK(w, run.JSON())
+}
+
+// storedRunJSON: hinh dang GET /v1/runs/{id} dung tu dong runs trong core.db (khong co reply/transcript - chi luu trong RAM).
+// "stored": true de ben goi biet day la ban luu, khong phai luot dang song.
+func storedRunJSON(deps *Deps, runID string) map[string]any {
+	if deps.Stores == nil || !deps.Stores.Available || deps.Stores.Runs == nil {
+		return nil
+	}
+	row := deps.Stores.Runs.Get(runID)
+	if row == nil {
+		return nil
+	}
+	return map[string]any{
+		"runId": row.ID, "conversationId": row.ConversationID, "status": row.Status, "started": row.StartedAt,
+		"finished": row.FinishedAt, "reply": nil, "error": row.Error, "rounds": row.Rounds,
+		"inputTokens": row.InputTokens, "outputTokens": row.OutputTokens, "model": row.Model, "stored": true,
+	}
 }
 
 // serveCancelRun: huy luot dang chay (dung chung cho /v1 va /wps).
@@ -171,10 +202,29 @@ func serveCancelRun(w http.ResponseWriter, deps *Deps, runID string) {
 		return
 	}
 	if !deps.Manager.Cancel(run.ID) {
-		Error(w, http.StatusConflict, "run is not running (status "+run.Status+")")
+		Error(w, http.StatusConflict, "run is not running (status "+run.CurrentStatus()+")")
 		return
 	}
-	OK(w, map[string]any{"cancelled": true, "status": run.Status})
+	OK(w, map[string]any{"cancelled": true, "status": run.CurrentStatus()})
+}
+
+// serveUndoRun: hoan tac ca luot (dung chung cho /v1 va /wps). Luot khac dang chay tren cung cong thi 409.
+func serveUndoRun(w http.ResponseWriter, r *http.Request, deps *Deps, runID string) {
+	run := deps.Manager.Get(runID)
+	if run == nil {
+		Error(w, http.StatusNotFound, "unknown run: "+runID)
+		return
+	}
+	if deps.Manager.BusyPort(run.Port) {
+		Error(w, http.StatusConflict, "a run is in progress on this document: wait for it to finish")
+		return
+	}
+	result, problem := deps.Orchestrator.UndoRun(r.Context(), run)
+	if problem != "" {
+		Error(w, http.StatusConflict, problem)
+		return
+	}
+	OK(w, result)
 }
 
 // serveConfirmRun: tra loi yeu cau xac nhan cua policy (dung chung cho /v1 va /wps).

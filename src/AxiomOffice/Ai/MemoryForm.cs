@@ -6,7 +6,7 @@ using System.Windows.Forms;
 
 namespace AxiomOffice.Ai
 {
-    // "Quản lý ghi nhớ…" (New_arch.md mục 8.5.10, 9.4): người dùng xem, thêm, sửa, ghim, đặt hạn dùng, xoá,
+    // "Quản lý ghi nhớ…" (docs/architecture/core.md mục 8.5.10, 9.4): người dùng xem, thêm, sửa, ghim, đặt hạn dùng, xoá,
     // khôi phục, xem lịch sử từng ghi nhớ và xoá toàn bộ (hỏi lại). Mọi thao tác qua Core API /v1/memory.
     internal sealed class MemoryForm : Form
     {

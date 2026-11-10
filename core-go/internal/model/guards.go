@@ -2,6 +2,7 @@ package model
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -42,6 +43,7 @@ type verdict struct {
 	text    string
 	err     string
 	kind    string
+	by      string // ten guard ra quyet dinh (verify, empty...) - loai vong trong RoundStat
 }
 
 // modelFailure: mot lan goi model khong dung duoc. status = 0 khi loi mang/het gio/tra loi rong.
@@ -64,7 +66,16 @@ type agentLoop struct {
 	// model: model dang goi - doi sang model du phong khi model chinh hong (fallbackGuard).
 	model   string
 	addLine func(string)
+	// Trang thai tai lieu do HARNESS giu (khong de model tu nho - tu van ChatGPT 25/10/2026): revision tang moi lan
+	// tool ghi thanh cong; verifiedAt = revision luc co bang chung kiem tra gan nhat (-1 = chua co); reads = lenh doc
+	// thanh cong (chu ky tool + doi so) -> revision luc doc. docStateGuard cap nhat, verifyGuard va lenh doc trung doc.
+	revision   int
+	verifiedAt int
+	reads      map[string]int
 }
+
+// forgetReads: ket qua tool cu vua bi don khoi ngu canh - "ket qua o tren van dung" khong con dung nua.
+func (l *agentLoop) forgetReads() { l.reads = map[string]int{} }
 
 // say: them mot tin nhan user (loi nhac cua Core) vao ngu canh.
 func (l *agentLoop) say(content string) {
@@ -90,6 +101,8 @@ func newGuards(options AgentOptions) guardChain {
 	if len(options.OncePerReply) > 0 {
 		chain = append(chain, &oncePerReplyGuard{names: options.OncePerReply})
 	}
+	// Sau cac guard dem/chan: lan doc lap lai van duoc dem (lan thu 5 y het van bi chan), roi moi thay bang "khong doi".
+	chain = append(chain, &docStateGuard{calls: map[string]string{}})
 	chain = append(chain, finalGuard{}, abortGuard{})
 	if options.ContextClearAt > 0 {
 		chain = append(chain, contextClearGuard{})
@@ -112,6 +125,9 @@ func (c guardChain) onReply(loop *agentLoop, turn *Turn, reply string) *verdict 
 	for _, item := range c {
 		if guard, ok := item.(replyGuard); ok {
 			if decision := guard.onReply(loop, turn, reply); decision != nil {
+				if decision.by == "" {
+					decision.by = guardName(item)
+				}
 				return decision
 			}
 		}
@@ -119,15 +135,23 @@ func (c guardChain) onReply(loop *agentLoop, turn *Turn, reply string) *verdict 
 	return nil
 }
 
-func (c guardChain) beforeCall(loop *agentLoop, call ToolCall) *ToolResult {
+// guardName: "*model.verifyGuard" -> "verify".
+func guardName(item any) string {
+	name := fmt.Sprintf("%T", item)
+	name = name[strings.LastIndex(name, ".")+1:]
+	return strings.TrimSuffix(name, "Guard")
+}
+
+// beforeCall: ket qua thay the (nil = chay tool that) va ten guard da thay.
+func (c guardChain) beforeCall(loop *agentLoop, call ToolCall) (*ToolResult, string) {
 	for _, item := range c {
 		if guard, ok := item.(callGuard); ok {
 			if replaced := guard.beforeCall(loop, call); replaced != nil {
-				return replaced
+				return replaced, guardName(item)
 			}
 		}
 	}
-	return nil
+	return nil, ""
 }
 
 func (c guardChain) afterTools(loop *agentLoop, turn *Turn, results []ToolResult) *verdict {
@@ -188,21 +212,27 @@ func (g *emptyReplyGuard) onReply(loop *agentLoop, turn *Turn, reply string) *ve
 
 // verifyGuard (AgentOptions.Verify): luot da sua tai lieu ma model dinh tra loi -> bat doc lai mot lan truoc khi
 // ket thuc. Cau tra loi hien tai giu lai lam ban nhap de model doi chieu.
-type verifyGuard struct{ mutated, asked bool }
-
-func (g *verifyGuard) afterTools(_ *agentLoop, _ *Turn, results []ToolResult) *verdict {
-	for _, result := range results {
-		if result.Mutating {
-			g.mutated = true
-		}
-	}
-	return nil
-}
+//
+// Chi nhac khi CHUA co bang chung kiem tra o phien ban tai lieu hien tai (docStateGuard): model da doc lai sau lan sua
+// cuoi, hoac tool ghi tu kiem (Verifies) thi vong nhac chi lap lai viec da lam. Do 26 luot that 24-25/10/2026: cac
+// vong sau lan sua cuoi chiem ~25% dau vao (bao cao "Giam ngu canh gui lai agent").
+type verifyGuard struct{ asked bool }
 
 func (g *verifyGuard) onReply(loop *agentLoop, turn *Turn, _ string) *verdict {
 	// Tool da tat (het ngan sach, provider khong ho tro tool): khong doc lai duoc - nhac kiem chung chi lam model viet
 	// "khong the kiem tra" (luot that 14/10/2026).
-	if !g.mutated || g.asked || !loop.toolsEnabled {
+	if loop.revision == 0 || g.asked || !loop.toolsEnabled {
+		return nil
+	}
+	loop.trace("verify", map[string]any{"round": loop.result.Rounds, "revision": loop.revision,
+		"verifiedAt": loop.verifiedAt, "nudge": loop.verifiedAt != loop.revision})
+	if loop.verifiedAt == loop.revision {
+		// Co bang chung o phien ban hien tai (lenh doc/kiem sau lan sua cuoi, hoac tool ghi tu kiem): luot da
+		// tu kiem truoc khi tra loi - danh dau Verified nhu khi duoc nhac, nhung KHONG vat them mot vong doc
+		// lai. Khong gan g.asked o day: neu sau do co lan ghi moi chua co bang chung (verifiedAt < revision)
+		// thi van duoc nhac nhu thong thuong.
+		loop.addLine("(da co ket qua kiem tra sau lan sua cuoi - khong bat doc lai them)")
+		loop.result.Verified = true
 		return nil
 	}
 	g.asked, loop.result.Verified = true, true
@@ -212,15 +242,99 @@ func (g *verifyGuard) onReply(loop *agentLoop, turn *Turn, _ string) *verdict {
 	return &verdict{next: true}
 }
 
-// identicalCallGuard (MaxIdenticalCalls): lan goi thu (n+1) Y HET (cung tool, cung doi so) trong luot bi chan -
-// tai lieu khong doi tu lan truoc thi ket qua cung khong doi.
-type identicalCallGuard struct {
-	limit  int
-	counts map[string]int
+// docStateGuard: revision tai lieu va bang chung kiem tra (agentLoop.revision/verifiedAt), va chan lenh doc lap lai khi
+// tai lieu CHUA doi tu lan doc truoc: tra mot dong "khong doi" thay vi chay lai va nhoi lai ca ket qua vao ngu canh
+// (luot that 25/10/2026: wpp.checkLayout ca bai 3 lan, lan nao cung 0 loi). Ket qua cu van nam trong ngu canh (don
+// ngu canh thi forgetReads), nen model khong mat bang chung. Chi biet thay doi do CHINH luot nay ghi - nguoi dung sua
+// tay giua luot thi khong thay (gioi han da biet).
+type docStateGuard struct {
+	calls map[string]string // CallID -> chu ky (tool + doi so) cua vong dang chay
 }
 
-func (g *identicalCallGuard) beforeCall(_ *agentLoop, call ToolCall) *ToolResult {
+func (g *docStateGuard) beforeCall(loop *agentLoop, call ToolCall) *ToolResult {
 	signature := call.Name + " " + call.Arguments
+	g.calls[call.ID] = signature
+	if loop.reads == nil {
+		loop.reads = map[string]int{}
+	}
+	at, seen := loop.reads[signature]
+	if !seen || at != loop.revision {
+		return nil
+	}
+	note, _ := json.Marshal(map[string]any{"ok": true, "result": map[string]any{"unchanged": true,
+		"note": "the document has not changed since this exact call earlier in this request, so its earlier result above " +
+			"still holds - do not repeat it; continue with what is still missing or answer the user"}})
+	return &ToolResult{CallID: call.ID, Name: call.Name, ResultJSON: string(note), OK: true, Verifies: true}
+}
+
+func (g *docStateGuard) afterTools(loop *agentLoop, _ *Turn, results []ToolResult) *verdict {
+	if loop.reads == nil {
+		loop.reads = map[string]int{}
+	}
+	for _, result := range results {
+		// Lan goi hong nhung DA ghi mot phan (slides_from_brief/template_design dung do roi loi: ok:false + Mutating)
+		// van lam tai lieu doi - khong tang revision thi lenh doc lap lai bi coi la "chua doi" (26/10/2026).
+		if !result.OK {
+			if result.Mutating {
+				loop.revision++
+			}
+			continue
+		}
+		if result.Mutating {
+			loop.revision++
+		} else if signature, ok := g.calls[result.CallID]; ok {
+			loop.reads[signature] = loop.revision
+		}
+		if result.Verifies {
+			loop.verifiedAt = loop.revision
+		}
+	}
+	g.calls = map[string]string{}
+	return nil
+}
+
+// identicalCallGuard (MaxIdenticalCalls): lan goi thu (n+1) Y HET (cung tool, cung doi so) trong luot bi chan -
+// tai lieu khong doi tu lan truoc thi ket qua cung khong doi.
+//
+// Lenh DOC (khong sua tai lieu) duoc dem lai tu dau khi tai lieu da doi tu lan doc truoc: luot that 26/10/2026
+// (r_f78df99d, beam-free) - wpp.checkLayout ca bai sau moi lan dung lai bi chan o lan thu 5 du bai da khac, model
+// phai kiem tung slide mot, mat 12 vong.
+//
+// Lenh GHI y het chi bi dem don khi cac lan goi NOI LIEN (giua hai lan khong co lenh ghi nao khac): bo do Word/Excel
+// 26/10/2026 - writer.insertPageBreak (khong tham so) bi chan tu lan 5 khi viet bao cao nhieu chuong, du giua cac lan
+// la ca mot chuong moi. Moi lan ghi lam revision tang 1, nen "noi lien" = revision luc goi lai dung bang revision sau
+// lan ghi truoc.
+type identicalCallGuard struct {
+	limit   int
+	counts  map[string]int
+	readAt  map[string]int    // chu ky lenh doc -> revision luc goi gan nhat
+	writeAt map[string]int    // chu ky lenh ghi -> revision luc goi gan nhat (truoc khi ghi)
+	pending map[string]string // CallID -> chu ky cua vong dang chay
+	at      map[string]int    // CallID -> revision luc goi
+	// unchangedAt: lenh ghi bao "changed": false (o da mang dung gia tri do) -> revision luc do. Goi lai Y HET khi tai
+	// lieu chua doi tu do thi chan ngay: bo do 27/10/2026 ca B ghi "P02" vao A12 roi doc lai, lap 5 lan (doc xen giua
+	// nen khong phai "noi lien").
+	unchangedAt map[string]int
+}
+
+func (g *identicalCallGuard) beforeCall(loop *agentLoop, call ToolCall) *ToolResult {
+	signature := call.Name + " " + call.Arguments
+	if g.pending == nil {
+		g.readAt, g.writeAt, g.pending, g.at = map[string]int{}, map[string]int{}, map[string]string{}, map[string]int{}
+		g.unchangedAt = map[string]int{}
+	}
+	if at, same := g.unchangedAt[signature]; same && at == loop.revision {
+		return &ToolResult{CallID: call.ID, Name: call.Name, ResultJSON: ErrorJSON(
+			"blocked: this exact write already ran and changed nothing - the cells already hold these values. " +
+				"Do not write it again; move on to the next step or answer the user")}
+	}
+	if at, read := g.readAt[signature]; read && at != loop.revision {
+		g.counts[signature] = 0
+	}
+	if at, wrote := g.writeAt[signature]; wrote && loop.revision > at+1 {
+		g.counts[signature] = 0
+	}
+	g.pending[call.ID], g.at[call.ID] = signature, loop.revision
 	g.counts[signature]++
 	if g.counts[signature] <= g.limit {
 		return nil
@@ -228,6 +342,25 @@ func (g *identicalCallGuard) beforeCall(_ *agentLoop, call ToolCall) *ToolResult
 	return &ToolResult{CallID: call.ID, Name: call.Name, ResultJSON: ErrorJSON(fmt.Sprintf(
 		"blocked: this exact call (same tool, same arguments) already ran %d times in this request; "+
 			"use the earlier result, change the arguments, or answer the user", g.limit))}
+}
+
+// afterTools: ghi nhan lenh doc (chay thanh cong, khong sua tai lieu) cung revision luc goi. Chay truoc
+// docStateGuard.afterTools nen loop.revision chua tang o day - dung revision luc goi da luu.
+func (g *identicalCallGuard) afterTools(_ *agentLoop, _ *Turn, results []ToolResult) *verdict {
+	for _, result := range results {
+		signature, ok := g.pending[result.CallID]
+		if ok && result.OK && !result.Mutating {
+			g.readAt[signature] = g.at[result.CallID]
+			if unchangedWrite(result.ResultJSON) {
+				g.unchangedAt[signature] = g.at[result.CallID]
+			}
+		} else if ok && result.Mutating {
+			delete(g.readAt, signature)
+			g.writeAt[signature] = g.at[result.CallID]
+		}
+	}
+	g.pending, g.at = map[string]string{}, map[string]int{}
+	return nil
 }
 
 // sameTaskGuard (MaxSameTaskCalls): chan vong lap "lam cung mot viec, khac tham so" (17-R0 muc 3.3).
@@ -265,6 +398,7 @@ var sameTaskExempt = map[string]bool{
 	"office_action writer.insertText":          true,
 	"office_action writer.insertStyledText":    true,
 	"office_action writer.insertTable":         true,
+	"office_action writer.writeContent":        true,
 	"office_action writer.insertBlocks format": true,
 	"office_action wpp.addSlide":               true,
 	"office_action wpp.addSlideFromTemplate":   true,
@@ -300,7 +434,7 @@ func officeActionTask(arguments string) (string, string) {
 	case strings.HasSuffix(action, ".replaceAll") || strings.HasSuffix(action, ".replaceMany") ||
 		strings.HasSuffix(action, ".replace"):
 		verb = "replace"
-	case strings.HasSuffix(action, ".readRange") || strings.HasSuffix(action, ".getText") ||
+	case strings.HasSuffix(action, ".readRange") || strings.HasSuffix(action, ".readRanges") || strings.HasSuffix(action, ".getText") ||
 		strings.HasSuffix(action, ".listSlides") || strings.HasSuffix(action, ".outline") ||
 		strings.HasSuffix(action, ".checkRange") || strings.HasSuffix(action, ".checkTables") ||
 		strings.HasSuffix(action, ".checkLayout") || strings.HasSuffix(action, ".listSheets"):
@@ -419,6 +553,7 @@ func (contextClearGuard) afterTools(loop *agentLoop, turn *Turn, _ []ToolResult)
 		return nil
 	}
 	if cleared := clearOldToolResults(loop.turns, loop.options.ContextKeepResults, contextClearMinChars); cleared > 0 {
+		loop.forgetReads()
 		loop.addLine(fmt.Sprintf("(ngu canh %d token - don ket qua tool cu, thu hoi %d ky tu)", turn.InputTokens, cleared))
 	}
 	return nil
@@ -539,6 +674,7 @@ func (g *contextOverflowGuard) recover(loop *agentLoop, failure *modelFailure) b
 		return false
 	}
 	cleared := clearOldToolResults(loop.turns, 1, 0)
+	loop.forgetReads()
 	if cleared <= 0 {
 		return false
 	}
@@ -610,4 +746,21 @@ func (f *modelFailure) switchable() bool {
 		return true
 	}
 	return IsContextOverflow(f.status, f.errText)
+}
+
+// unchangedWrite: ket qua lenh ghi bao "changed": false o CAP TREN CUNG ({"changed":false} hoac {"ok":true,"result":
+// {"changed":false}}) - khong tinh truong long ben trong (vd tung vung theo doi cua et.whatIf).
+func unchangedWrite(raw string) bool {
+	if !strings.Contains(raw, `"changed":false`) {
+		return false
+	}
+	var body map[string]any
+	if json.Unmarshal([]byte(raw), &body) != nil {
+		return false
+	}
+	if inner, ok := body["result"].(map[string]any); ok {
+		body = inner
+	}
+	changed, ok := body["changed"].(bool)
+	return ok && !changed
 }

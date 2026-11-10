@@ -5,7 +5,7 @@
  * execute(app, action, params) }.
  * CATALOG la ban SINH TU DONG tu registry Python (axiom.commands) bang
  * scripts/generate_mcp_commands.py - KHONG sua tay (vung giua hai moc BEGIN/END SINH TU DONG).
- * HANDLERS + MUTATING viet tay.
+ * HANDLERS viet tay; MUTATING suy ra tu co `undo` cua CATALOG.
  * Port of src/AxiomOffice/Bridge/CommandDispatcher.Writer.cs (+ app.info) with the
  * same parameter names and result shapes as the LibreOffice handlers in
  * src/AxiomOffice.LibreOffice/python/pythonpath/axiom/writer.py.
@@ -16,55 +16,50 @@
 (function (root) {
   "use strict";
 
-  var MUTATING = {
-    "writer.typeText": true,
-    "writer.appendText": true,
-    "writer.insertStyledText": true,
-    "writer.heading": true,
-    "writer.formatSelection": true,
-    "writer.setParagraphAlignment": true,
-    "writer.insertTable": true,
-    "writer.insertPageBreak": true,
-    "writer.replaceAll": true
-  };
+  // Lenh Writer mo UndoRecord = lenh co `undo` trong registry (CATALOG ben duoi): moi lenh = dung mot buoc
+  // Undo, khop voi so pane dem (pane-core.js EDIT_ACTIONS). Dien sau khi CATALOG co.
+  var MUTATING = {};
 
   // --- BEGIN SINH TU DONG (scripts/generate_mcp_commands.py) - KHONG SUA TAY ---
   var CATALOG = [
-    { name: "app.info", kind: null, agent: false,
+    { name: "app.info", kind: null, agent: false, undo: false,
       summary: "Tên/version app, tài liệu đang mở, `state` (tài liệu, cửa sổ, visible)",
       params: [] },
-    { name: "ai.ask", kind: null, agent: false,
+    { name: "ai.ask", kind: null, agent: false, undo: false,
       summary: "Chạy AI agent trên tài liệu đang mở; trả `reply`, `transcript`, `seconds`, `rounds`",
       params: [{ name: "prompt", required: true, hint: null }] },
-    { name: "ui.askpane", kind: null, agent: false,
+    { name: "ui.askpane", kind: null, agent: false, undo: false,
       summary: "Mở panel Ask AI trong sidebar",
       params: [] },
-    { name: "ui.setup", kind: null, agent: false,
+    { name: "ui.setup", kind: null, agent: false, undo: false,
       summary: "Mở wizard thiết lập (nhập máy chủ AI, model, kiểm tra kết nối)",
       params: [] },
-    { name: "app.screenshot", kind: null, agent: false,
+    { name: "app.screenshot", kind: null, agent: false, undo: false,
       summary: "Ảnh chụp trang/slide hiện tại (PNG base64, thu nhỏ theo `maxWidth`, mặc định 1280)",
       params: [{ name: "maxWidth", required: false, hint: null }] },
-    { name: "writer.newDocument", kind: "wps", agent: false,
+    { name: "writer.newDocument", kind: "wps", agent: false, undo: false,
       summary: "Tạo tài liệu mới",
       params: [] },
-    { name: "writer.open", kind: "wps", agent: false,
+    { name: "writer.open", kind: "wps", agent: false, undo: false,
       summary: "Mở .docx/.doc/.odt",
       params: [{ name: "path", required: true, hint: null }] },
-    { name: "writer.getText", kind: "wps", agent: true,
+    { name: "writer.getText", kind: "wps", agent: true, undo: false,
       summary: "Đọc toàn bộ text",
-      params: [{ name: "maxChars", required: false, hint: null }] },
-    { name: "writer.selection", kind: "wps", agent: true,
+      params: [
+        { name: "maxChars", required: false, hint: null },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "writer.selection", kind: "wps", agent: true, undo: false,
       summary: "Text + vị trí đang chọn",
-      params: [] },
-    { name: "writer.typeText", kind: "wps", agent: true,
+      params: [{ name: "document", required: false, hint: "full path of the document to work on; default: the active one" }] },
+    { name: "writer.typeText", kind: "wps", agent: true, undo: true,
       summary: "Gõ tại con trỏ",
-      params: [{ name: "text", required: true, hint: null }] },
-    { name: "writer.appendText", kind: "wps", agent: true,
-      summary: "Nối vào cuối tài liệu",
-      params: [{ name: "text", required: true, hint: null }] },
-    { name: "writer.insertStyledText", kind: "wps", agent: true,
-      summary: "Chèn text có định dạng tại con trỏ (`color` dạng `#RRGGBB`)",
+      params: [
+        { name: "text", required: true, hint: null },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "writer.appendText", kind: "wps", agent: true, undo: true,
+      summary: "Nối một KHỐI đoạn văn vào cuối tài liệu; `\\n` tách đoạn, tự đặt lại định dạng (không kế thừa), `alignment` mặc định left",
       params: [
         { name: "text", required: true, hint: null },
         { name: "bold", required: false, hint: null },
@@ -72,16 +67,33 @@
         { name: "underline", required: false, hint: null },
         { name: "size", required: false, hint: null },
         { name: "color", required: false, hint: null },
-        { name: "font", required: false, hint: null }
+        { name: "font", required: false, hint: null },
+        { name: "alignment", required: false, hint: "left/center/right/justify; mặc định left" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
       ] },
-    { name: "writer.heading", kind: "wps", agent: true,
+    { name: "writer.insertStyledText", kind: "wps", agent: true, undo: true,
+      summary: "Chèn text có định dạng tại con trỏ; `\\n` tách đoạn, `alignment` áp cho từng đoạn (`color` dạng `#RRGGBB`)",
+      params: [
+        { name: "text", required: true, hint: null },
+        { name: "bold", required: false, hint: null },
+        { name: "italic", required: false, hint: null },
+        { name: "underline", required: false, hint: null },
+        { name: "size", required: false, hint: null },
+        { name: "color", required: false, hint: null },
+        { name: "font", required: false, hint: null },
+        { name: "alignment", required: false, hint: "left/center/right/justify; áp cho từng đoạn vừa chèn" },
+        { name: "break", required: false, hint: "ngắt đoạn sau khối; mặc định true khi có `alignment`" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "writer.heading", kind: "wps", agent: true, undo: true,
       summary: "Heading 1-9 (`level`, mặc định 1) + tự xuống dòng (`break`, mặc định true)",
       params: [
         { name: "text", required: false, hint: null },
         { name: "level", required: false, hint: null },
-        { name: "break", required: false, hint: null }
+        { name: "break", required: false, hint: null },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
       ] },
-    { name: "writer.formatSelection", kind: "wps", agent: true,
+    { name: "writer.formatSelection", kind: "wps", agent: true, undo: true,
       summary: "Định dạng vùng chọn",
       params: [
         { name: "bold", required: false, hint: null },
@@ -90,20 +102,25 @@
         { name: "size", required: false, hint: null },
         { name: "color", required: false, hint: null },
         { name: "font", required: false, hint: null },
-        { name: "alignment", required: false, hint: null }
+        { name: "alignment", required: false, hint: null },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
       ] },
-    { name: "writer.setParagraphAlignment", kind: "wps", agent: true,
+    { name: "writer.setParagraphAlignment", kind: "wps", agent: true, undo: true,
       summary: "Căn đoạn: left/center/right/justify",
-      params: [{ name: "alignment", required: true, hint: null }] },
-    { name: "writer.insertTable", kind: "wps", agent: true,
+      params: [
+        { name: "alignment", required: true, hint: null },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "writer.insertTable", kind: "wps", agent: true, undo: true,
       summary: "Chèn bảng; `rows`/`cols` tự suy ra/nới theo `values`",
       params: [
         { name: "rows", required: false, hint: null },
         { name: "cols", required: false, hint: null },
         { name: "values", required: false, hint: "2D array of rows" },
-        { name: "style", required: false, hint: null }
+        { name: "style", required: false, hint: null },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
       ] },
-    { name: "writer.formatTable", kind: "wps", agent: true,
+    { name: "writer.formatTable", kind: "wps", agent: true, undo: true,
       summary: "Định dạng bảng CÓ SẴN (không tạo lại): kiểu, font, màu hàng tiêu đề, màu sọc, viền, căn lề, co giãn",
       params: [
         { name: "table", required: false, hint: "1-based index; default: table at cursor, else last table" },
@@ -118,136 +135,255 @@
         { name: "borderColor", required: false, hint: "#RRGGBB" },
         { name: "borders", required: false, hint: "false = no borders (layout tables)" },
         { name: "alignment", required: false, hint: "left/center/right" },
-        { name: "autoFit", required: false, hint: "content/window" }
+        { name: "autoFit", required: false, hint: "content/window" },
+        { name: "keepTogether", required: false, hint: "true = keep the whole table on one page" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
       ] },
-    { name: "writer.insertPageBreak", kind: "wps", agent: true,
-      summary: "Ngắt trang",
-      params: [] },
-    { name: "writer.insertImage", kind: "wps", agent: true,
+    { name: "writer.insertPageBreak", kind: "wps", agent: true, undo: true,
+      summary: "Ngắt trang tại con trỏ, hoặc ngay trước đoạn `before`",
+      params: [
+        { name: "before", required: false, hint: "paragraph number from writer.outline / writer.checkLayout; default: at the cursor" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "writer.insertImage", kind: "wps", agent: true, undo: true,
       summary: "Chèn ảnh tại con trỏ (kích thước theo point)",
       params: [
         { name: "path", required: true, hint: null },
         { name: "width", required: false, hint: null },
-        { name: "height", required: false, hint: null }
+        { name: "height", required: false, hint: null },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
       ] },
-    { name: "writer.insertHyperlink", kind: "wps", agent: true,
+    { name: "writer.insertHyperlink", kind: "wps", agent: true, undo: true,
       summary: "Chèn liên kết",
       params: [
         { name: "url", required: true, hint: null },
-        { name: "text", required: false, hint: null }
+        { name: "text", required: false, hint: null },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
       ] },
-    { name: "writer.replaceAll", kind: "wps", agent: true,
+    { name: "writer.replaceAll", kind: "wps", agent: true, undo: true,
       summary: "Tìm và thay toàn bộ",
       params: [
         { name: "find", required: true, hint: null },
-        { name: "replace", required: false, hint: null }
+        { name: "replace", required: false, hint: null },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
       ] },
-    { name: "writer.replaceMany", kind: "wps", agent: true,
+    { name: "writer.replaceMany", kind: "wps", agent: true, undo: true,
       summary: "Thay NHIỀU chỗ trong một lần: `edits` = [{find, replace}] theo thứ tự (mỗi cặp thay mọi chỗ khớp) - dùng thay cho nhiều lần writer.replaceAll; trả số chỗ đã thay của từng cặp",
-      params: [{ name: "edits", required: true, hint: "array of {find, replace}; up to 200" }] },
-    { name: "writer.lockSelection", kind: "wps", agent: false,
+      params: [
+        { name: "edits", required: true, hint: "array of {find, replace}; up to 200" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "writer.lockSelection", kind: "wps", agent: false, undo: false,
       summary: "Khoá vùng đang bôi đen: tới khi mở khoá, lệnh writer.* chỉ được đổi chữ trong vùng đó (chars = 0: không bôi đen, không khoá)",
-      params: [] },
-    { name: "writer.unlockSelection", kind: "wps", agent: false,
+      params: [{ name: "document", required: false, hint: "full path of the document to work on; default: the active one" }] },
+    { name: "writer.unlockSelection", kind: "wps", agent: false, undo: false,
       summary: "Mở khoá vùng bôi đen",
-      params: [] },
-    { name: "writer.outline", kind: "wps", agent: true,
+      params: [{ name: "document", required: false, hint: "full path of the document to work on; default: the active one" }] },
+    { name: "writer.outline", kind: "wps", agent: true, undo: false,
       summary: "Dàn bài tài liệu: các đoạn (số thứ tự toàn tài liệu, chữ rút gọn, số tự động) và bảng (số hàng, cột, hàng tiêu đề)",
-      params: [{ name: "maxChars", required: false, hint: "characters per paragraph (default 160)" }] },
-    { name: "writer.restyle", kind: "wps", agent: false,
+      params: [
+        { name: "maxChars", required: false, hint: "characters per paragraph (default 160)" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "writer.restyle", kind: "wps", agent: false, undo: true,
       summary: "Trình bày lại nền chung KHÔNG đổi chữ: tiêu đề mục (I., A., *), tiêu đề con (1.), nhãn (a. ...:), gạch đầu dòng hai cấp, bỏ dòng trống thừa, bảng (viền mảnh, hàng tiêu đề nhạt lặp lại), lề trang, số trang",
       params: [
         { name: "accent", required: false, hint: "#RRGGBB headings (default #2E5C8A)" },
         { name: "font", required: false, hint: "default Times New Roman" },
-        { name: "size", required: false, hint: "body size (default 13)" }
+        { name: "size", required: false, hint: "body size (default 13)" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
       ] },
-    { name: "writer.insertBlocks", kind: "wps", agent: false,
+    { name: "writer.insertBlocks", kind: "wps", agent: false, undo: true,
       summary: "Chèn khối bo tròn nền nhạt (ô ghi chú, cảnh báo, thẻ cạnh nhau) - thay các đoạn [replaceFrom, replaceTo] hoặc chèn trước đoạn `before`",
       params: [
         { name: "blocks", required: true, hint: "array of {before | replaceFrom, replaceTo, kind: box|row, gap, after, cells: [{tone, lines: [{k: title|bullet|text|small|center, t, size, bold}]}]}" },
         { name: "accent", required: false, hint: null },
-        { name: "font", required: false, hint: null }
+        { name: "font", required: false, hint: null },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
       ] },
-    { name: "writer.undo", kind: "wps", agent: true,
+    { name: "writer.setStyle", kind: "wps", agent: true, undo: true,
+      summary: "Gán style cho đoạn CÓ SẴN (không đổi chữ): `paragraphs` = số đoạn theo writer.outline; bỏ trống = các đoạn đang chọn. Style: Heading 1-9, Normal, Title, Subtitle, List Bullet, List Number, Caption, Quote",
+      params: [
+        { name: "style", required: true, hint: "e.g. 'Heading 2', 'Normal', 'List Bullet'" },
+        { name: "paragraphs", required: false, hint: "array of paragraph numbers from writer.outline (n); default: the selected paragraphs" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "writer.insertToc", kind: "wps", agent: true, undo: true,
+      summary: "Mục lục tự động từ các Heading: chưa có thì chèn tại con trỏ (hoặc trước đoạn `before`), đã có thì cập nhật số trang - gọi lại sau khi viết xong",
+      params: [
+        { name: "levels", required: false, hint: "heading levels 1-9, default 3" },
+        { name: "before", required: false, hint: "paragraph number from writer.outline to insert before; default: at the cursor" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "writer.setHeaderFooter", kind: "wps", agent: true, undo: true,
+      summary: "Đầu trang / chân trang cho mọi section (thay nội dung cũ) và số trang tự động",
+      params: [
+        { name: "header", required: false, hint: "header text; \"\" clears it" },
+        { name: "footer", required: false, hint: "footer text; \"\" clears it" },
+        { name: "pageNumber", required: false, hint: "true or left/center/right: page number field in the footer (after footer text)" },
+        { name: "align", required: false, hint: "left/center/right for header and footer text, default center" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "writer.insertCaption", kind: "wps", agent: true, undo: true,
+      summary: "Chú thích có đánh số tự động (style Caption + trường SEQ) \"Bảng 1. ...\": mặc định ở CUỐI bài - gọi ngay trước writer.insertTable; `before` = số đoạn/bảng theo writer.outline để chú thích bảng có sẵn",
+      params: [
+        { name: "text", required: true, hint: "caption text without the number, e.g. 'Kết quả tuyển sinh 2024-2026'" },
+        { name: "label", required: false, hint: "Bảng (default) / Hình / Biểu đồ..." },
+        { name: "before", required: false, hint: "paragraph/table number from writer.outline to caption; default: end of the document" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "writer.writeContent", kind: "wps", agent: true, undo: true,
+      summary: "Viết NHIỀU khối nối tiếp vào CUỐI bài trong MỘT lệnh (một bước hoàn tác) - dùng thay cho mỗi đoạn một lệnh: tiêu đề, đoạn văn, gạch đầu dòng, danh sách số, bảng kèm chú thích, ngắt trang",
+      params: [
+        { name: "blocks", required: true, hint: "array, in order, of {heading, level} | {text} ('\\n' = new paragraph; optional alignment, bold, italic, size) | {bullets: [..]} | {numbers: [..]} | {table: 2D array, caption, style} | {pageBreak: true}" },
+        { name: "alignment", required: false, hint: "alignment of {text} blocks: justify (default) / left / center / right" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "writer.addTableRows", kind: "wps", agent: true, undo: true,
+      summary: "Thêm hàng vào bảng CÓ SẴN (giữ định dạng của bảng, không dựng lại bảng): mặc định nối cuối bảng, `before` = số hàng để chèn vào giữa (1 = hàng tiêu đề)",
+      params: [
+        { name: "rows", required: true, hint: "2D array, one inner array of cell texts per new row" },
+        { name: "table", required: false, hint: "table number (1 = first, as in writer.checkTables); default: table at cursor, else the last table" },
+        { name: "before", required: false, hint: "row number to insert before; default: after the last row" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "writer.deleteParagraphs", kind: "wps", agent: true, undo: true,
+      summary: "Xoá các đoạn theo số của writer.outline / writer.checkLayout (đoạn trống thừa, đoạn chỉ có dấu ngắt trang, đoạn viết thừa); không xoá được đoạn trong bảng",
+      params: [
+        { name: "paragraphs", required: true, hint: "array of paragraph numbers" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "writer.insertLayoutTable", kind: "wps", agent: true, undo: true,
+      summary: "Bảng dàn trang KHÔNG viền ở CUỐI bài, định dạng từng dòng trong ô - phần đầu văn bản hành chính (cơ quan | quốc hiệu, tiêu ngữ, ngày tháng) và phần ký (nơi nhận | chức vụ, họ tên)",
+      params: [
+        { name: "rows", required: true, hint: "2D array of cells; a cell is a string ('\\n' = new line) or {lines: [string | {t, bold, italic, underline, size, upper}], align: center|left|right}" },
+        { name: "widths", required: false, hint: "column widths in percent, e.g. [40, 60]; default equal" },
+        { name: "font", required: false, hint: "default Times New Roman" },
+        { name: "size", required: false, hint: "default 13" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "writer.undo", kind: "wps", agent: true, undo: false,
       summary: "Hoàn tác (mỗi thao tác AI = 1 bước)",
-      params: [{ name: "count", required: false, hint: null }] },
-    { name: "writer.exportPdf", kind: "wps", agent: true,
+      params: [
+        { name: "count", required: false, hint: null },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "writer.exportPdf", kind: "wps", agent: true, undo: false,
       summary: "Xuất PDF",
-      params: [{ name: "path", required: true, hint: null }] },
-    { name: "writer.save", kind: "wps", agent: true,
+      params: [
+        { name: "path", required: true, hint: null },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "writer.save", kind: "wps", agent: true, undo: false,
       summary: "Lưu",
-      params: [] },
-    { name: "writer.saveAs", kind: "wps", agent: true,
+      params: [{ name: "document", required: false, hint: "full path of the document to work on; default: the active one" }] },
+    { name: "writer.saveAs", kind: "wps", agent: true, undo: false,
       summary: "Lưu thành file mới",
-      params: [{ name: "path", required: true, hint: null }] },
-    { name: "writer.closeAll", kind: "wps", agent: false,
+      params: [
+        { name: "path", required: true, hint: null },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "writer.closeAll", kind: "wps", agent: false, undo: false,
       summary: "**Đóng mọi tài liệu, không lưu**",
       params: [] },
-    { name: "et.newWorkbook", kind: "et", agent: false,
+    { name: "et.newWorkbook", kind: "et", agent: false, undo: false,
       summary: "Tạo sổ tính mới",
       params: [] },
-    { name: "et.open", kind: "et", agent: false,
+    { name: "et.open", kind: "et", agent: false, undo: false,
       summary: "Mở .xlsx/.xls/.ods/.csv",
       params: [{ name: "path", required: true, hint: null }] },
-    { name: "et.listSheets", kind: "et", agent: true,
+    { name: "et.listSheets", kind: "et", agent: true, undo: false,
       summary: "Danh sách sheet + sheet đang active",
-      params: [] },
-    { name: "et.sheetInfo", kind: "et", agent: true,
+      params: [{ name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }] },
+    { name: "et.sheetInfo", kind: "et", agent: true, undo: false,
       summary: "Kích thước dùng thật của TỪNG sheet trong một lời gọi (`usedRange`/`rows`/`cols`/`empty`) — dùng để soát sheet nào thực sự có nội dung, không chỉ có tên",
-      params: [] },
-    { name: "et.addSheet", kind: "et", agent: true,
+      params: [{ name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }] },
+    { name: "et.addSheet", kind: "et", agent: true, undo: true,
       summary: "Thêm sheet mới (bỏ trống `name` thì đặt tên Sheet1, Sheet2...)",
       params: [
         { name: "name", required: false, hint: null },
-        { name: "index", required: false, hint: "0-based, default: append" }
+        { name: "index", required: false, hint: "0-based, default: append" },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
       ] },
-    { name: "et.renameSheet", kind: "et", agent: true,
+    { name: "et.renameSheet", kind: "et", agent: true, undo: true,
       summary: "Đổi tên sheet",
       params: [
         { name: "sheet", required: true, hint: null },
-        { name: "name", required: true, hint: null }
+        { name: "name", required: true, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
       ] },
-    { name: "et.activateSheet", kind: "et", agent: true,
+    { name: "et.deleteSheet", kind: "et", agent: true, undo: false,
+      summary: "Xoá một sheet (sheet thừa như Sheet1 của sổ mới, sheet chính lượt này dựng sai); không xoá được sheet cuối cùng",
+      params: [
+        { name: "sheet", required: true, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
+      ] },
+    { name: "et.activateSheet", kind: "et", agent: true, undo: false,
       summary: "Chuyển sheet",
-      params: [{ name: "sheet", required: true, hint: null }] },
-    { name: "et.readRange", kind: "et", agent: true,
+      params: [
+        { name: "sheet", required: true, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
+      ] },
+    { name: "et.readRange", kind: "et", agent: true, undo: false,
       summary: "Đọc vùng, ví dụ `A1:C10`; `formulas=true` trả về công thức (ô không có công thức = null)",
       params: [
         { name: "range", required: true, hint: null },
         { name: "sheet", required: false, hint: null },
-        { name: "formulas", required: false, hint: "true = trả mảng `formulas` thay cho `values`" }
+        { name: "formulas", required: false, hint: "true = trả mảng `formulas` thay cho `values`" },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
       ] },
-    { name: "et.writeRange", kind: "et", agent: true,
+    { name: "et.readRanges", kind: "et", agent: true, undo: false,
+      summary: "Đọc NHIỀU vùng (nhiều sheet) trong MỘT lời gọi: `reads` là mảng {range, sheet?, formulas?}; `range` nhận cả 'Sheet!A1:B6'. Dùng thay cho nhiều lần et.readRange khi soát lại (tối đa 4000 ô mỗi lần)",
+      params: [
+        { name: "reads", required: true, hint: "array of {range, sheet?, formulas?}" },
+        { name: "sheet", required: false, hint: "default sheet for items without one" },
+        { name: "formulas", required: false, hint: "true = formulas for every item" },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
+      ] },
+    { name: "et.whatIf", kind: "et", agent: true, undo: false,
+      summary: "Thử ô điều khiển SỐNG hay CHẾT trong MỘT lời gọi (chỉ đọc): đổi tạm ô giả định `cell` thành `value`, tính lại, đọc các vùng `watch` trước/sau, rồi TỰ TRẢ LẠI giá trị cũ. `unchanged` = vùng không đổi theo (công thức không đọc ô đó). Thay cho tự ghi giá trị thử -> đọc -> ghi lại",
+      params: [
+        { name: "cell", required: true, hint: "one input cell e.g. 'Config!B2'" },
+        { name: "value", required: true, hint: "test value e.g. 0.95" },
+        { name: "watch", required: true, hint: "ranges that should follow e.g. ['Dashboard!B3:B6']" },
+        { name: "sheet", required: false, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
+      ] },
+    { name: "et.writeRange", kind: "et", agent: true, undo: true,
       summary: "Ghi vùng từ ô góc trên-trái; `values` là mảng 2 chiều. Công thức viết theo cú pháp en-US (dấu phẩy); nếu máy dùng dấu chấm phẩy thì tự đổi. Công thức còn lỗi trả về ở `formulaErrors`",
       params: [
         { name: "range", required: true, hint: "top-left cell e.g. 'A1'" },
         { name: "values", required: true, hint: "2D array of rows e.g. [[\"Tên\",\"Điểm\"],[\"An\",9.5]]" },
-        { name: "sheet", required: false, hint: null }
+        { name: "sheet", required: false, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
       ] },
-    { name: "et.importCsv", kind: "et", agent: true,
+    { name: "et.importCsv", kind: "et", agent: true, undo: true,
       summary: "Nạp một file CSV vào sổ: không có `range` thì tạo sheet mới đặt tên theo tên file, có `range` thì ghi vào ô góc đó. Ô trông như số thì thành số, còn lại là chuỗi; ngày để nguyên chuỗi",
       params: [
         { name: "path", required: true, hint: "e.g. 'D:\\data\\raw.csv'" },
         { name: "range", required: false, hint: "top-left cell; bỏ trống thì tạo sheet mới" },
         { name: "sheet", required: false, hint: null },
         { name: "delimiter", required: false, hint: "một ký tự, mặc định ','" },
-        { name: "encoding", required: false, hint: "mặc định utf-8-sig" }
+        { name: "encoding", required: false, hint: "mặc định utf-8-sig" },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
       ] },
-    { name: "et.writeRanges", kind: "et", agent: true,
+    { name: "et.writeRanges", kind: "et", agent: true, undo: true,
       summary: "Ghi NHIỀU vùng trong MỘT lời gọi: `writes` là mảng {range, values, sheet?}. Dùng khi cần viết nhiều khối trong cùng một phản hồi (bớt vòng qua bridge); công thức vẫn theo cú pháp en-US và lỗi công thức gom ở `formulaErrors`. Kiểm hết tham số trước khi ghi: một vùng sai thì không vùng nào được ghi",
       params: [
         { name: "writes", required: true, hint: "array of {range, values, sheet?}" },
-        { name: "sheet", required: false, hint: null }
+        { name: "sheet", required: false, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
       ] },
-    { name: "et.fillRange", kind: "et", agent: true,
+    { name: "et.fillRange", kind: "et", agent: true, undo: true,
       summary: "Viết MỘT công thức vào ô góc trên-trái của `range` rồi điền ra cả vùng, tham chiếu tương đối tự dịch (dùng cho bảng nghìn dòng: đừng gửi từng ô)",
       params: [
         { name: "range", required: true, hint: "the whole area e.g. 'B2:H1000'" },
         { name: "formula", required: false, hint: "written to the top-left cell first" },
-        { name: "sheet", required: false, hint: null }
+        { name: "sheet", required: false, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
       ] },
-    { name: "et.formatRange", kind: "et", agent: true,
-      summary: "Định dạng vùng",
+    { name: "et.formatRange", kind: "et", agent: true, undo: true,
+      summary: "Định dạng MỘT vùng (màu dạng `#RRGGBB`, `horizontal` left/center/right); nhiều vùng thì dùng et.formatRanges",
       params: [
         { name: "range", required: true, hint: null },
         { name: "bold", required: false, hint: null },
@@ -258,22 +394,33 @@
         { name: "numFmt", required: false, hint: null },
         { name: "horizontal", required: false, hint: null },
         { name: "wrap", required: false, hint: null },
-        { name: "sheet", required: false, hint: null }
+        { name: "columnWidth", required: false, hint: "width of the range's columns in characters, e.g. 20" },
+        { name: "sheet", required: false, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
       ] },
-    { name: "et.setConditionalFormat", kind: "et", agent: true,
-      summary: "Đặt định dạng điều kiện cho vùng: `rules` là mảng rule, mỗi rule có operator (less/lessEqual/greater/greaterEqual/equal/notEqual/between/notBetween/formula), formula1, formula2 (chỉ between), và styleName có sẵn (Good/Bad/Neutral/Warning/Error/...) hoặc bold/italic/fontColor/fillColor/numFmt. Gọi lại trên cùng vùng thì THAY rule cũ của vùng đó, nên nhiều rule trên một vùng phải để trong MỘT lần gọi",
+    { name: "et.formatRanges", kind: "et", agent: true, undo: true,
+      summary: "Định dạng NHIỀU vùng trong MỘT lời gọi: `formats` là mảng {range, sheet?, bold, italic, fontSize, fontColor, fillColor, numFmt, horizontal, wrap, columnWidth} (cùng thuộc tính như et.formatRange). Dùng thay cho nhiều lần et.formatRange (tiêu đề, ô nhập liệu, định dạng số của mọi sheet trong một lần). Kiểm hết trước khi định dạng: một mục sai thì không vùng nào bị đổi",
+      params: [
+        { name: "formats", required: true, hint: "array of {range, sheet?, ...format}" },
+        { name: "sheet", required: false, hint: "default sheet for items without one" },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
+      ] },
+    { name: "et.setConditionalFormat", kind: "et", agent: true, undo: true,
+      summary: "Đặt định dạng điều kiện cho vùng: `rules` là mảng rule, mỗi rule có operator (less/lessEqual/greater/greaterEqual/equal/notEqual/between/notBetween/formula), formula1, formula2 (chỉ between), và bold/italic/fontColor/fillColor; HOẶC `type` trực quan: colorScale {colors: 2-3 màu thấp→cao}, dataBar {color}, iconSet {icons: 3arrows/3traffic/3flags/3symbols/4arrows/5arrows}, top/bottom {rank, percent} + màu, aboveAverage/belowAverage + màu, duplicate/unique + màu. Gọi lại trên cùng vùng thì THAY rule cũ của vùng đó, nên nhiều rule trên một vùng phải để trong MỘT lần gọi",
       params: [
         { name: "range", required: true, hint: null },
         { name: "rules", required: true, hint: "array of rule objects" },
-        { name: "sheet", required: false, hint: null }
+        { name: "sheet", required: false, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
       ] },
-    { name: "et.listConditionalFormats", kind: "et", agent: true,
+    { name: "et.listConditionalFormats", kind: "et", agent: true, undo: false,
       summary: "Liệt kê định dạng điều kiện đang có (đọc lại để tự kiểm); bỏ trống `range` thì cả sheet",
       params: [
         { name: "range", required: false, hint: "chỉ xem một vùng" },
-        { name: "sheet", required: false, hint: null }
+        { name: "sheet", required: false, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
       ] },
-    { name: "et.addChart", kind: "et", agent: true,
+    { name: "et.addChart", kind: "et", agent: true, undo: true,
       summary: "Chèn biểu đồ từ vùng dữ liệu; `type` column/bar/line/pie/area/scatter, `width`/`height` tính bằng cm",
       params: [
         { name: "range", required: true, hint: "source data e.g. 'A1:B13'" },
@@ -283,42 +430,89 @@
         { name: "anchor", required: false, hint: "top-left cell, default 'A1'" },
         { name: "width", required: false, hint: "cm, default 12" },
         { name: "height", required: false, hint: "cm, default 7" },
-        { name: "sheet", required: false, hint: null }
+        { name: "sheet", required: false, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
       ] },
-    { name: "et.listCharts", kind: "et", agent: true,
+    { name: "et.listCharts", kind: "et", agent: true, undo: false,
       summary: "Danh sách biểu đồ trên sheet",
-      params: [{ name: "sheet", required: false, hint: null }] },
-    { name: "et.undo", kind: "et", agent: true,
+      params: [
+        { name: "sheet", required: false, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
+      ] },
+    { name: "et.createTable", kind: "et", agent: true, undo: true,
+      summary: "Biến vùng dữ liệu (hàng đầu là tiêu đề) thành Excel Table: có nút lọc, tự mở rộng, công thức theo cột",
+      params: [
+        { name: "range", required: true, hint: "data incl. header row, e.g. 'A1:I4'" },
+        { name: "sheet", required: false, hint: null },
+        { name: "name", required: false, hint: "table name, e.g. 'tblProjects'" },
+        { name: "style", required: false, hint: "e.g. 'TableStyleMedium2' (default)" },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
+      ] },
+    { name: "et.freezePanes", kind: "et", agent: true, undo: true,
+      summary: "Cố định hàng/cột tiêu đề khi cuộn (rows = số hàng trên cùng, cols = số cột bên trái; 0/0 = bỏ cố định)",
+      params: [
+        { name: "rows", required: false, hint: "top rows to keep visible, default 1" },
+        { name: "cols", required: false, hint: "left columns to keep visible, default 0" },
+        { name: "sheet", required: false, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
+      ] },
+    { name: "et.setValidation", kind: "et", agent: true, undo: true,
+      summary: "Kiểm tra dữ liệu nhập cho vùng: danh sách chọn (`list` hoặc `source` là vùng chứa danh sách) hoặc số/ngày trong khoảng (`type` + min/max); thay quy tắc cũ của vùng",
+      params: [
+        { name: "range", required: true, hint: null },
+        { name: "list", required: false, hint: "array of allowed values" },
+        { name: "source", required: false, hint: "range holding the allowed values, e.g. 'Config!$B$2:$B$5'" },
+        { name: "type", required: false, hint: "list (default when list/source) / whole / decimal / date" },
+        { name: "min", required: false, hint: null },
+        { name: "max", required: false, hint: null },
+        { name: "message", required: false, hint: "error message shown on invalid input" },
+        { name: "sheet", required: false, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
+      ] },
+    { name: "et.undo", kind: "et", agent: true, undo: false,
       summary: "Hoàn tác",
-      params: [{ name: "count", required: false, hint: null }] },
-    { name: "et.exportPdf", kind: "et", agent: true,
+      params: [
+        { name: "count", required: false, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
+      ] },
+    { name: "et.exportPdf", kind: "et", agent: true, undo: false,
       summary: "Xuất PDF",
-      params: [{ name: "path", required: true, hint: null }] },
-    { name: "et.save", kind: "et", agent: true,
+      params: [
+        { name: "path", required: true, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
+      ] },
+    { name: "et.save", kind: "et", agent: true, undo: false,
       summary: "Lưu",
-      params: [] },
-    { name: "et.saveAs", kind: "et", agent: true,
+      params: [{ name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }] },
+    { name: "et.saveAs", kind: "et", agent: true, undo: false,
       summary: "Lưu thành file mới",
-      params: [{ name: "path", required: true, hint: null }] },
-    { name: "et.closeAll", kind: "et", agent: false,
+      params: [
+        { name: "path", required: true, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
+      ] },
+    { name: "et.closeAll", kind: "et", agent: false, undo: false,
       summary: "**Đóng mọi sổ, không lưu**",
       params: [] },
-    { name: "wpp.newPresentation", kind: "wpp", agent: false,
+    { name: "wpp.newPresentation", kind: "wpp", agent: false, undo: false,
       summary: "Tạo bài trình bày mới",
       params: [] },
-    { name: "wpp.open", kind: "wpp", agent: false,
+    { name: "wpp.open", kind: "wpp", agent: false, undo: false,
       summary: "Mở .pptx/.ppt/.odp",
       params: [{ name: "path", required: true, hint: null }] },
-    { name: "wpp.listSlides", kind: "wpp", agent: true,
+    { name: "wpp.listSlides", kind: "wpp", agent: true, undo: false,
       summary: "Số slide + text từng slide",
       params: [
         { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" },
         { name: "detail", required: false, hint: "true = kem master/notes" }
       ] },
-    { name: "wpp.addSlide", kind: "wpp", agent: true,
+    { name: "wpp.addSlide", kind: "wpp", agent: true, undo: true,
       summary: "Thêm slide cuối; `layout` mặc định 12 = trống (1 = tiêu đề, 2 = tiêu đề + nội dung, 11 = chỉ tiêu đề)",
-      params: [{ name: "layout", required: false, hint: "number: 1 title, 2 title+content, 11 title only, 12 blank" }] },
-    { name: "wpp.addText", kind: "wpp", agent: true,
+      params: [
+        { name: "layout", required: false, hint: "number: 1 title, 2 title+content, 11 title only, 12 blank" },
+        { name: "index", required: false, hint: "position of the new slide (1 = first); default: after the last slide" },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
+      ] },
+    { name: "wpp.addText", kind: "wpp", agent: true, undo: true,
       summary: "Textbox có định dạng (`color` dạng `#RRGGBB`, `align` left/center/right)",
       params: [
         { name: "text", required: true, hint: null },
@@ -333,7 +527,7 @@
         { name: "align", required: false, hint: null },
         { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
       ] },
-    { name: "wpp.addTextBox", kind: "wpp", agent: false,
+    { name: "wpp.addTextBox", kind: "wpp", agent: false, undo: true,
       summary: "Textbox",
       params: [
         { name: "text", required: true, hint: null },
@@ -341,9 +535,10 @@
         { name: "left", required: false, hint: null },
         { name: "top", required: false, hint: null },
         { name: "width", required: false, hint: null },
-        { name: "height", required: false, hint: null }
+        { name: "height", required: false, hint: null },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
       ] },
-    { name: "wpp.addImage", kind: "wpp", agent: true,
+    { name: "wpp.addImage", kind: "wpp", agent: true, undo: true,
       summary: "Chèn ảnh (kích thước gốc nếu bỏ trống `width`/`height`)",
       params: [
         { name: "path", required: true, hint: null },
@@ -351,9 +546,10 @@
         { name: "left", required: false, hint: null },
         { name: "top", required: false, hint: null },
         { name: "width", required: false, hint: null },
-        { name: "height", required: false, hint: null }
+        { name: "height", required: false, hint: null },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
       ] },
-    { name: "wpp.addTable", kind: "wpp", agent: true,
+    { name: "wpp.addTable", kind: "wpp", agent: true, undo: true,
       summary: "Bảng; `rows`/`cols` tự suy ra/nới theo `values`",
       params: [
         { name: "rows", required: false, hint: null },
@@ -363,34 +559,44 @@
         { name: "left", required: false, hint: null },
         { name: "top", required: false, hint: null },
         { name: "width", required: false, hint: null },
-        { name: "height", required: false, hint: null }
+        { name: "height", required: false, hint: null },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
       ] },
-    { name: "wpp.setNotes", kind: "wpp", agent: true,
+    { name: "wpp.setNotes", kind: "wpp", agent: true, undo: true,
       summary: "Ghi chú thuyết trình",
       params: [
         { name: "text", required: true, hint: null },
         { name: "slide", required: false, hint: null },
         { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
       ] },
-    { name: "wpp.deleteSlide", kind: "wpp", agent: true,
+    { name: "wpp.deleteSlide", kind: "wpp", agent: true, undo: true,
       summary: "Xoá slide (mặc định slide cuối)",
-      params: [{ name: "slide", required: false, hint: null }] },
-    { name: "wpp.exportPdf", kind: "wpp", agent: true,
+      params: [
+        { name: "slide", required: false, hint: null },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
+      ] },
+    { name: "wpp.exportPdf", kind: "wpp", agent: true, undo: false,
       summary: "Xuất PDF",
-      params: [{ name: "path", required: true, hint: null }] },
-    { name: "wpp.save", kind: "wpp", agent: true,
+      params: [
+        { name: "path", required: true, hint: null },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
+      ] },
+    { name: "wpp.save", kind: "wpp", agent: true, undo: false,
       summary: "Lưu",
       params: [{ name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }] },
-    { name: "wpp.saveAs", kind: "wpp", agent: true,
+    { name: "wpp.saveAs", kind: "wpp", agent: true, undo: false,
       summary: "Lưu thành file mới",
-      params: [{ name: "path", required: true, hint: null }] },
-    { name: "wpp.newFromTemplate", kind: "wpp", agent: true,
+      params: [
+        { name: "path", required: true, hint: null },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
+      ] },
+    { name: "wpp.newFromTemplate", kind: "wpp", agent: true, undo: false,
       summary: "Tạo bài MỚI từ tệp mẫu (.pptx/.potx): giữ khổ + master, bỏ hết slide mẫu, lưu ở `path` và mở ra",
       params: [
         { name: "template", required: true, hint: "path of the template file" },
         { name: "path", required: true, hint: "new .pptx to create; must not exist" }
       ] },
-    { name: "wpp.addSlideFromTemplate", kind: "wpp", agent: true,
+    { name: "wpp.addSlideFromTemplate", kind: "wpp", agent: true, undo: true,
       summary: "Chèn bản sao slide số `kind` của tệp mẫu (giữ ảnh nền, khung chữ, định dạng); trả tên các khung chữ",
       params: [
         { name: "template", required: true, hint: null },
@@ -400,14 +606,15 @@
         { name: "expect", required: false, hint: "shape name the inserted slide must have (checks it is the template slide)" },
         { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
       ] },
-    { name: "wpp.sourceManifest", kind: "wpp", agent: true,
+    { name: "wpp.sourceManifest", kind: "wpp", agent: true, undo: false,
       summary: "Đọc bài nguồn (vd bài cũ .ppt) theo slide: tiêu đề, chữ, danh sách ảnh - để dựng lại theo mẫu",
       params: [
         { name: "from", required: true, hint: "path of the source presentation" },
         { name: "first", required: false, hint: null },
-        { name: "last", required: false, hint: null }
+        { name: "last", required: false, hint: null },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
       ] },
-    { name: "wpp.setShapeText", kind: "wpp", agent: true,
+    { name: "wpp.setShapeText", kind: "wpp", agent: true, undo: true,
       summary: "Thay chữ của một khung theo TÊN shape, giữ định dạng của khung (font, cỡ, màu)",
       params: [
         { name: "shape", required: true, hint: "shape name, e.g. 'TextBox 2'" },
@@ -415,7 +622,7 @@
         { name: "slide", required: false, hint: null },
         { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
       ] },
-    { name: "wpp.deleteShapes", kind: "wpp", agent: true,
+    { name: "wpp.deleteShapes", kind: "wpp", agent: true, undo: true,
       summary: "Xoá các shape theo tên (mục lặp thừa của slide mẫu); không xoá ảnh nền",
       params: [
         { name: "shapes", required: false, hint: "array of shape names" },
@@ -423,7 +630,7 @@
         { name: "emptyPlaceholders", required: false, hint: "true: also delete every placeholder without text (the 'Click to add text' boxes)" },
         { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
       ] },
-    { name: "wpp.copyPicture", kind: "wpp", agent: true,
+    { name: "wpp.copyPicture", kind: "wpp", agent: true, undo: true,
       summary: "Chép ảnh từ slide của bài khác (vd bài cũ) vào slide của bài đang làm, co vừa khung, giữ tỉ lệ",
       params: [
         { name: "from", required: true, hint: "path of the source presentation" },
@@ -439,7 +646,7 @@
         { name: "region", required: false, hint: "[left, top, width, height] of the source slide to copy as one picture (a diagram or table drawn with shapes); replaces shape" },
         { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
       ] },
-    { name: "wpp.addParagraphs", kind: "wpp", agent: false,
+    { name: "wpp.addParagraphs", kind: "wpp", agent: false, undo: true,
       summary: "Khung chữ nhiều đoạn giữ phân cấp (cấp thụt lề, đậm, nghiêng, số thứ tự, gạch đầu dòng); tự chọn cỡ chữ lớn nhất vừa khung",
       params: [
         { name: "paragraphs", required: true, hint: "array of {t: text, l: level 1-5, b: bold, i: italic, n: number prefix like '1.', u: bullet}" },
@@ -460,7 +667,7 @@
         { name: "highlight", required: false, hint: "#RRGGBB colour of **emphasised** words (default: accent)" },
         { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
       ] },
-    { name: "wpp.addGrid", kind: "wpp", agent: false,
+    { name: "wpp.addGrid", kind: "wpp", agent: false, undo: true,
       summary: "Bảng có định dạng: dòng đầu là tiêu đề (nền màu, chữ trắng đậm), dòng xen kẽ nền nhạt, cột rộng theo nội dung, tự chọn cỡ chữ vừa khung",
       params: [
         { name: "values", required: true, hint: "2D array; first row = header" },
@@ -477,33 +684,226 @@
         { name: "font", required: false, hint: "font name" },
         { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
       ] },
-    { name: "wpp.deleteTagged", kind: "wpp", agent: false,
+    { name: "wpp.deleteTagged", kind: "wpp", agent: false, undo: true,
       summary: "Xoá các slide do công cụ dựng (có tag nguồn) mà tag bắt đầu trong [first, last] - dựng lại một lô theo bố cục mới",
       params: [
         { name: "first", required: true, hint: null },
         { name: "last", required: true, hint: null },
         { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
       ] },
-    { name: "wpp.closeAll", kind: "wpp", agent: false,
+    { name: "wpp.addShape", kind: "wpp", agent: false, undo: true,
+      summary: "Hình khối có chữ (chữ nhật, bo góc, tròn, mũi tên chevron) - nền, viền, cỡ chữ, màu chữ",
+      params: [
+        { name: "slide", required: false, hint: null },
+        { name: "left", required: false, hint: null },
+        { name: "top", required: false, hint: null },
+        { name: "width", required: false, hint: null },
+        { name: "height", required: false, hint: null },
+        { name: "shape", required: false, hint: "rect, rounded, oval, chevron, line (default rect)" },
+        { name: "text", required: false, hint: null },
+        { name: "fontSize", required: false, hint: null },
+        { name: "bold", required: false, hint: null },
+        { name: "boldFirst", required: false, hint: "true = only the first line bold (heading of the box)" },
+        { name: "color", required: false, hint: "#RRGGBB text" },
+        { name: "fill", required: false, hint: "#RRGGBB fill; empty = none" },
+        { name: "line", required: false, hint: "#RRGGBB outline; empty = none" },
+        { name: "dash", required: false, hint: "true = dashed outline" },
+        { name: "font", required: false, hint: "font name" },
+        { name: "anchor", required: false, hint: "top or middle (default)" },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
+      ] },
+    { name: "wpp.renderSlide", kind: "wpp", agent: false, undo: false,
+      summary: "Ảnh PNG của một slide theo số (soát bằng mắt, benchmark) - base64, không đổi cửa sổ đang xem",
+      params: [
+        { name: "slide", required: true, hint: null },
+        { name: "maxWidth", required: false, hint: "pixels (default 1280)" },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
+      ] },
+    { name: "wpp.addConnector", kind: "wpp", agent: false, undo: true,
+      summary: "Đường nối có mũi tên giữa hai hình (bám theo hình khi kéo)",
+      params: [
+        { name: "from", required: true, hint: "shape name" },
+        { name: "to", required: true, hint: "shape name" },
+        { name: "slide", required: false, hint: null },
+        { name: "elbow", required: false, hint: "true = elbow connector (default straight)" },
+        { name: "direction", required: false, hint: "down, up, right or left: leave 'from' on that side and enter 'to' on the opposite side; default: nearest sides" },
+        { name: "fromSide", required: false, hint: "top, bottom, left or right side of 'from' (overrides direction)" },
+        { name: "toSide", required: false, hint: "top, bottom, left or right side of 'to' (overrides direction); same side as fromSide + elbow = a loop around the row" },
+        { name: "offset", required: false, hint: "loop only: how far (pt) the loop goes beyond the farther end (default: PowerPoint's choice)" },
+        { name: "color", required: false, hint: "#RRGGBB" },
+        { name: "weight", required: false, hint: "points" },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
+      ] },
+    { name: "wpp.addChart", kind: "wpp", agent: false, undo: true,
+      summary: "Biểu đồ gốc (cột, thanh, đường, tròn) từ danh mục và chuỗi số - có nhãn số liệu, sửa được bằng Edit Data",
+      params: [
+        { name: "categories", required: true, hint: "array of labels" },
+        { name: "series", required: true, hint: "array of {name, values: [numbers]}; pie: one series" },
+        { name: "type", required: false, hint: "column (default), bar, line, pie" },
+        { name: "unit", required: false, hint: "suffix of value labels, e.g. '%' or ' tỷ'" },
+        { name: "slide", required: false, hint: null },
+        { name: "left", required: false, hint: null },
+        { name: "top", required: false, hint: null },
+        { name: "width", required: false, hint: null },
+        { name: "height", required: false, hint: null },
+        { name: "colors", required: false, hint: "array of #RRGGBB, one per series (pie: per slice)" },
+        { name: "font", required: false, hint: "font name" },
+        { name: "fontSize", required: false, hint: "points (default 16)" },
+        { name: "color", required: false, hint: "#RRGGBB text" },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
+      ] },
+    { name: "wpp.closeAll", kind: "wpp", agent: false, undo: false,
       summary: "**Đóng mọi bài trình bày, không lưu**",
       params: [] },
-    { name: "writer.checkTables", kind: "wps", agent: true,
+    { name: "writer.checkTables", kind: "wps", agent: true, undo: false,
       summary: "Soát các bảng (chỉ đọc): số dòng/cột, ô trống, ô tiêu đề lẫn đoạn văn. Bảng dàn trang — bảng đã gọi writer.formatTable với borders:false — được đánh dấu layout và KHÔNG báo empty-cells (ô trống ở đó là cố ý: khoảng trống ký, ô chờ điền)",
-      params: [] },
-    { name: "et.checkRange", kind: "et", agent: true,
-      summary: "Soát bảng dữ liệu (chỉ đọc): tiêu đề trống, kiểu lẫn lộn, số dạng chữ, number format, dữ liệu lạc ngoài bảng (chỉ khi không truyền range)",
+      params: [{ name: "document", required: false, hint: "full path of the document to work on; default: the active one" }] },
+    { name: "writer.checkLayout", kind: "wps", agent: true, undo: false,
+      summary: "Soát phân trang (chỉ đọc): số trang, số chữ, trang trắng, tiêu đề nằm cuối trang tách khỏi nội dung, bảng nhỏ bị cắt sang trang, đoạn trống liên tiếp; trang của từng tiêu đề - gọi sau khi viết xong, trước khi trả lời",
+      params: [
+        { name: "maxPages", required: false, hint: "page limit the user asked for (e.g. 8 for '6-8 pages'): longer = issue too-long with how much to cut" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "et.checkRange", kind: "et", agent: true, undo: false,
+      summary: "Soát bảng dữ liệu (chỉ đọc): tiêu đề trống, kiểu lẫn lộn, số dạng chữ, number format, công thức trỏ ô trống; KHÔNG truyền range/sheet = soát CẢ SỔ trong một lần: `workbook` mỗi sheet một dòng (vùng dùng, số ô, công thức, biểu đồ, bảng, validation, định dạng điều kiện, loại lỗi; sheet rỗng = empty-sheet), lỗi mọi sheet gộp ở `issues` kèm `sheet`, ô lỗi (#DIV/0!, #REF!...) ở MỌI sheet. Sheet chia khối bằng hàng trống (Dashboard, Config) được soát theo TỪNG khối; `notes` (outside-table) là ghi chú, không tính vào issueCount",
       params: [
         { name: "range", required: false, hint: "default: the used range" },
-        { name: "sheet", required: false, hint: null }
+        { name: "sheet", required: false, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
       ] },
-    { name: "wpp.checkLayout", kind: "wpp", agent: true,
-      summary: "Soát bố cục slide (chỉ đọc): chữ tràn khung, shape ra ngoài slide, shape chồng nhau, chữ quá nhỏ",
+    { name: "wpp.checkLayout", kind: "wpp", agent: true, undo: false,
+      summary: "Soát bố cục slide (chỉ đọc): chữ tràn khung, shape ra ngoài slide, shape chồng nhau, chữ quá nhỏ, đường nối cắt qua hộp khác hoặc chồng lên đường nối khác",
       params: [
         { name: "slide", required: false, hint: "slide number; default: every slide" },
         { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
       ] },
+    { name: "writer.goto", kind: "wps", agent: false, undo: false,
+      summary: "Chọn và cuộn tới một đoạn theo số của writer.outline (trích dẫn [§n] trong câu trả lời)",
+      params: [
+        { name: "paragraph", required: true, hint: "paragraph number from writer.outline" },
+        { name: "text", required: false, hint: "first words of the paragraph, to find it if numbering moved" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "et.goto", kind: "et", agent: false, undo: false,
+      summary: "Chọn và cuộn tới một ô/vùng (trích dẫn [Sheet!A1] trong câu trả lời)",
+      params: [
+        { name: "range", required: true, hint: "e.g. 'C42' or 'Data!C42'" },
+        { name: "sheet", required: false, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
+      ] },
+    { name: "wpp.goto", kind: "wpp", agent: false, undo: false,
+      summary: "Chuyển tới một slide (trích dẫn [slide n] trong câu trả lời)",
+      params: [
+        { name: "slide", required: true, hint: "slide number" },
+        { name: "presentation", required: false, hint: "full path of the presentation to work on; default: the active one" }
+      ] },
+    { name: "et.sort", kind: "et", agent: true, undo: true,
+      summary: "Sắp xếp các hàng của một vùng theo 1-3 cột (`keys`: [{column: chữ tiêu đề hoặc chữ cột, order: asc|desc}]); mặc định hàng đầu là tiêu đề, không bị sắp xếp",
+      params: [
+        { name: "range", required: true, hint: "data incl. header row, e.g. 'A1:F200'" },
+        { name: "keys", required: true, hint: "[{column: 'Doanh thu' or 'C', order: 'asc'|'desc'}], 1-3 keys" },
+        { name: "header", required: false, hint: "true (default): first row is the header" },
+        { name: "sheet", required: false, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
+      ] },
+    { name: "et.filter", kind: "et", agent: true, undo: false,
+      summary: "Lọc hàng (AutoFilter) theo một cột: `values` = danh sách giá trị giữ lại, hoặc `criteria` như '>100'; `clear: true` bỏ mọi bộ lọc của sheet. Chỉ ẩn hàng, không xoá dữ liệu",
+      params: [
+        { name: "range", required: false, hint: "data incl. header row; default: the sheet's used range" },
+        { name: "column", required: false, hint: "header text or column letter" },
+        { name: "values", required: false, hint: "array of values to keep" },
+        { name: "criteria", required: false, hint: "e.g. '>100', '<>0', '=Hà Nội'" },
+        { name: "clear", required: false, hint: "true = remove all filters" },
+        { name: "sheet", required: false, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
+      ] },
+    { name: "et.pivot", kind: "et", agent: true, undo: true,
+      summary: "Tạo PivotTable trên sheet MỚI từ vùng dữ liệu có hàng tiêu đề: `rows`/`columns` = cột nhóm, `values` = [{column, function: sum|count|average|max|min}]",
+      params: [
+        { name: "range", required: true, hint: "data incl. header row, e.g. 'A1:F500'" },
+        { name: "rows", required: true, hint: "array of header texts or column letters to group rows by" },
+        { name: "values", required: true, hint: "[{column: 'Doanh thu', function: 'sum'}]; function default sum" },
+        { name: "columns", required: false, hint: "array of header texts/column letters to spread across columns" },
+        { name: "name", required: false, hint: "new sheet name, default 'Pivot'" },
+        { name: "sheet", required: false, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
+      ] },
+    { name: "et.exportChart", kind: "et", agent: true, undo: false,
+      summary: "Xuất một biểu đồ thành ảnh PNG (thư mục tạm) - trả `path` để chèn sang PowerPoint/Word bằng wpp.addImage / writer.insertImage",
+      params: [
+        { name: "chart", required: false, hint: "chart name from et.listCharts or 1-based index; default: the only chart" },
+        { name: "sheet", required: false, hint: null },
+        { name: "workbook", required: false, hint: "full path of the workbook to work on; default: the active one" }
+      ] },
+    { name: "writer.listComments", kind: "wps", agent: true, undo: false,
+      summary: "Đọc comment của tài liệu: id, tác giả, nội dung, chữ được neo (anchor), số đoạn theo writer.outline, đã xong chưa, các trả lời",
+      params: [
+        { name: "includeDone", required: false, hint: "true = include resolved comments (default false)" },
+        { name: "max", required: false, hint: "default 100" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "writer.addComment", kind: "wps", agent: true, undo: true,
+      summary: "Thêm comment vào một đoạn (`paragraph` theo writer.outline) hoặc vào chỗ có chữ `find` (lần xuất hiện đầu)",
+      params: [
+        { name: "text", required: true, hint: null },
+        { name: "paragraph", required: false, hint: null },
+        { name: "find", required: false, hint: "exact text to anchor the comment to" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "writer.replyComment", kind: "wps", agent: true, undo: true,
+      summary: "Trả lời trong luồng của một comment (id theo writer.listComments); nội dung tự thêm tiền tố \"AI: \"",
+      params: [
+        { name: "comment", required: true, hint: "comment id from writer.listComments" },
+        { name: "text", required: true, hint: null },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "writer.resolveComment", kind: "wps", agent: true, undo: true,
+      summary: "Đánh dấu một comment là đã xong (`done: false` để mở lại)",
+      params: [
+        { name: "comment", required: true, hint: "comment id from writer.listComments" },
+        { name: "done", required: false, hint: "default true" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "writer.editCommentScope", kind: "wps", agent: true, undo: true,
+      summary: "Thay chữ ĐƯỢC NEO bởi một comment (sửa đúng chỗ người góp ý chỉ ra), giữ định dạng của ký tự đầu",
+      params: [
+        { name: "comment", required: true, hint: "comment id from writer.listComments" },
+        { name: "text", required: true, hint: "new text for the anchored passage" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "writer.listRevisions", kind: "wps", agent: true, undo: false,
+      summary: "Đọc các thay đổi được theo dõi (redline) - cả header/footer/chú thích: id, loại, tác giả, thời điểm, chữ, số đoạn",
+      params: [
+        { name: "author", required: false, hint: "only revisions by this author" },
+        { name: "max", required: false, hint: "default 200" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "writer.reviewRevisions", kind: "wps", agent: true, undo: true,
+      summary: "Chấp nhận hoặc từ chối thay đổi được theo dõi: theo `ids` (từ writer.listRevisions), theo `author`, hoặc `all: true`",
+      params: [
+        { name: "action", required: true, hint: "accept | reject" },
+        { name: "ids", required: false, hint: "array of revision ids" },
+        { name: "author", required: false, hint: null },
+        { name: "all", required: false, hint: "true = every revision" },
+        { name: "since", required: false, hint: "only revisions made at or after this time (ISO 8601), with author" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
+    { name: "writer.setTracking", kind: "wps", agent: false, undo: false,
+      summary: "Bật/tắt theo dõi thay đổi; `author` = tên tác giả của các thay đổi trong lúc bật, `restoreAuthor` trả lại tên cũ",
+      params: [
+        { name: "on", required: true, hint: "true/false: Document.TrackRevisions" },
+        { name: "author", required: false, hint: null },
+        { name: "restoreAuthor", required: false, hint: "true = put back the user's name" },
+        { name: "document", required: false, hint: "full path of the document to work on; default: the active one" }
+      ] },
   ];
   // --- END SINH TU DONG ---
+
+  (function () {
+    for (var i = 0; i < CATALOG.length; i++) {
+      if (CATALOG[i].undo && CATALOG[i].kind === "wps") { MUTATING[CATALOG[i].name] = true; }
+    }
+  })();
 
   function errMessage(err) {
     try {
@@ -736,6 +1136,21 @@
     return String(v);
   }
 
+  // Doc mot thuoc ti so tu object model WPS. Tra null khi khong doc duoc (khong nem): object model WPS co
+  // the tra ve ham thay vi gia tri, hoac nem loi tren mot so phien ban. Dung cho moi vi tri ky tu
+  // (Selection.Start, Content.End...), la nhung thu KHONG the doan truoc giua cac ban WPS.
+  function numProp(obj, name) {
+    try {
+      var v = obj[name];
+      if (typeof v === "function") { v = v.call(obj); }
+      if (v === undefined || v === null) { return null; }
+      var n = Number(v);
+      return isNaN(n) ? null : n;
+    } catch (e) {
+      return null;
+    }
+  }
+
   function applyFont(font, params) {
     if (hasParam(params, "bold")) { font.Bold = paramBool(params, "bold", false) ? -1 : 0; }
     if (hasParam(params, "italic")) { font.Italic = paramBool(params, "italic", false) ? -1 : 0; }
@@ -754,9 +1169,8 @@
     try { version = strProp(app, "Version"); } catch (e2) { version = ""; }
     if (!version) {
       try {
-        var build = app.Build;
-        if (typeof build === "function") { try { build = build.call(app); } catch (e3) {} }
-        if (build !== undefined && build !== null && String(build) !== "") { version = String(build); }
+        var build = strProp(app, "Build");
+        if (build !== "") { version = build; }
       } catch (e4) {}
     }
     try {
@@ -832,30 +1246,328 @@
     return { paragraphs: index, items: items };
   }
 
+  // Soat bang (chi doc) - cung quy tac voi checks.writer_check_tables cua LibreOffice
+  // (src/AxiomOffice.LibreOffice/python/pythonpath/axiom/checks.py): o trong, va o tieu de lan doan van.
+  // Nguong va cach tinh trung vi phai giu GIONG ban LibreOffice, neu khong cung mot tai lieu lai ra hai
+  // ket qua khac nhau tuy ung dung - day la cung mot lenh trong cung mot hop dong.
+  var LONG_HEADER_CHARS = 40;
+  var LAYOUT_TABLE_NAME = "AxiomLayout";
+
+  function tableCellText(raw) {
+    // \r va \x07 la ky tu ket o cua Word/WPS: bo truoc khi do do dai, khong thi o trong bi tinh la co chu.
+    // eslint-disable-next-line no-control-regex -- \x07 la ky tu nghiep vu cua Word, khong phai loi
+    return String(raw === undefined || raw === null ? "" : raw).replace(/\r/g, "").replace(/\x07/g, "").trim();
+  }
+
+  // Bang dan trang: LibreOffice danh dau bang ten "AxiomLayout" (writer.formatTable {borders:false}).
+  // WPS chua co writer.formatTable nen hom nay khong bang nao duoc danh dau - van doc ten de khi lenh do
+  // duoc viet thi mien tru chay dung, va de truong `layout` trong bao cao noi that chu khong doan.
+  function isLayoutTable(table) {
+    var name = "";
+    try { name = strProp(table, "Title"); } catch (e) { name = ""; }
+    if (name === "") { try { name = strProp(table, "Name"); } catch (e2) { name = ""; } }
+    return name.indexOf(LAYOUT_TABLE_NAME) === 0;
+  }
+
+  function cmdWriterCheckTables(app) {
+    var doc = app.ActiveDocument;
+    var tables = doc.Tables;
+    var count = Number(tables.Count);
+    if (isNaN(count)) { count = 0; }
+    var issues = [], report = [], index, r, c, at, k;
+    for (index = 1; index <= count; index++) {
+      var table = tables.Item(index);
+      var rows = Number(table.Rows.Count);
+      var cols = Number(table.Columns.Count);
+      var empty = 0, header = [];
+      for (r = 1; r <= rows; r++) {
+        for (c = 1; c <= cols; c++) {
+          var text;
+          // O bi gop: WPS nem loi khi hoi mot o khong ton tai - bo qua, giong ban LibreOffice.
+          try { text = tableCellText(table.Cell(r, c).Range.Text); } catch (eCell) { continue; }
+          if (text === "") { empty++; }
+          if (r === 1) { header.push(text); }
+        }
+      }
+      var layout = isLayoutTable(table);
+      // O trong o bang dan trang la CO Y (khoang trong ky, o cho dien) nen khong bao; so lieu van de trong
+      // report de agent thay. "long-header-cell" thi bao cho moi bang: voi bang dan trang do cung la loi that.
+      if (empty > 0 && !layout) {
+        issues.push({ type: "empty-cells", detail: "table " + index + " has " + empty + " empty cell(s)",
+          table: index });
+      }
+      // Moi o tieu de so voi trung vi cac o tieu de CON LAI (leave-one-out), khong so voi trung vi ca nhom:
+      // voi bang 2 cot, trung vi ca nhom chinh la o dai hon nen nguong "3 x trung vi" khong bao gio voi toi.
+      // Bang 1 cot khong co nhom de so nen khong bao (xem docs/research/skills-review.md muc 4.7).
+      for (at = 0; at < header.length; at++) {
+        var others = [];
+        for (k = 0; k < header.length; k++) { if (k !== at) { others.push(header[k].length); } }
+        if (others.length === 0) { continue; }
+        others.sort(function (a, b) { return a - b; });
+        var typical = others[Math.floor(others.length / 2)];
+        if (header[at].length > LONG_HEADER_CHARS && header[at].length > 3 * Math.max(1, typical)) {
+          issues.push({ type: "long-header-cell",
+            detail: "table " + index + " has a header cell with " + header[at].length + " characters ('" +
+              header[at].substring(0, LONG_HEADER_CHARS) +
+              "'): text that should be outside the table may have been typed into it",
+            table: index });
+        }
+      }
+      report.push({ index: index, rows: rows, cols: cols, emptyCells: empty, header: header, layout: layout });
+    }
+    return { tableCount: count, tables: report, issueCount: issues.length, issues: issues };
+  }
+
+  // Soat phan trang (chi doc) - port WriterCheckLayout cua ban Windows. Chup bo cuc sau Repaginate: moi doan mang
+  // san trang cua no. WPS khac Word: Information(12) tra boolean, Paragraphs gom ca doan "dau cuoi hang" cua bang
+  // (mot bang van chi tinh mot muc), va muc luc dung Start <= vi tri < End.
+  var LAYOUT_PARAGRAPH_LIMIT = 5000;
+  var LAYOUT_HEADING_LIMIT = 80;
+  var LAYOUT_SMALL_TABLE_ROWS = 15;
+
+  function layoutShorten(text, max) {
+    return text.length <= max ? text : text.substring(0, max) + "...";
+  }
+
+  function layoutPlainText(raw) {
+    // \r va \x07 la ky tu ket doan/ket o cua Word: bo o cuoi doan truoc khi trim.
+    // eslint-disable-next-line no-control-regex -- \x07 la ky tu nghiep vu cua Word, khong phai loi
+    return String(raw === undefined || raw === null ? "" : raw).replace(/\f/g, "").replace(/[\r\x07]+$/, "").trim();
+  }
+
+  // Vi tri moi bang doc MOT lan: tim bang chua doan duyet tren mang so, khong goi lai Range cua tung bang cho tung doan
+  // (bai 5000 doan x 50 bang = nua trieu lan goi object model).
+  function layoutTables(doc) {
+    var out = [];
+    var count = Number(doc.Tables.Count);
+    if (isNaN(count)) { count = 0; }
+    for (var i = 1; i <= count; i++) {
+      var table = doc.Tables.Item(i);
+      var range = table.Range;
+      out.push({ table: table, start: Number(range.Start), end: Number(range.End) });
+    }
+    return out;
+  }
+
+  function layoutTableAt(tables, position) {
+    for (var i = 0; i < tables.length; i++) {
+      if (position >= tables[i].start && position < tables[i].end) { return i; }
+    }
+    return -1;
+  }
+
+  function layoutInsideToc(doc, position) {
+    try {
+      var tocs = doc.TablesOfContents;
+      var count = Number(tocs.Count);
+      for (var i = 1; i <= count; i++) {
+        var range = tocs.Item(i).Range;
+        // Khac ban Windows: doan NGAY SAU muc luc (position === End) khong phai doan cua muc luc.
+        if (position >= Number(range.Start) && position < Number(range.End)) { return true; }
+      }
+    } catch (e) {}
+    return false;
+  }
+
+  function cmdWriterCheckLayout(app, params) {
+    var doc = app.ActiveDocument;
+    doc.Repaginate();
+    var pages = Number(doc.ComputeStatistics(2));
+    var words = Number(doc.ComputeStatistics(0));
+    var tables = layoutTables(doc);
+    var total = Number(doc.Paragraphs.Count);
+    var items = [];
+    var contentPages = {};
+    var tableSeen = {};
+    var splitTables = [];
+    var n, i, j, page;
+    var limit = total < LAYOUT_PARAGRAPH_LIMIT ? total : LAYOUT_PARAGRAPH_LIMIT;
+    for (n = 1; n <= limit; n++) {
+      var paragraph = doc.Paragraphs.Item(n);
+      var range = paragraph.Range;
+      var start = Number(range.Start);
+      var tableIndex = layoutTableAt(tables, start);
+      if (tableIndex >= 0) {
+        // Bang: mot muc cho ca bang (o cua bang 200 dong la hang tram doan - khong hoi trang tung o).
+        if (!tableSeen[tableIndex]) {
+          tableSeen[tableIndex] = true;
+          var table = tables[tableIndex].table;
+          var first = Number(table.Range.Characters.First.Information(3));
+          var last = Number(table.Range.Characters.Last.Information(3));
+          for (page = first; page <= last; page++) { contentPages[page] = true; }
+          if (last > first && Number(table.Rows.Count) <= LAYOUT_SMALL_TABLE_ROWS && !isLayoutTable(table)) {
+            splitTables.push(tableIndex + 1);
+          }
+          items.push({ n: n, text: "", content: true, pageBreak: false,
+            level: 10, startPage: first, page: last, table: tableIndex + 1 });
+        }
+        continue;
+      }
+      var raw = String(range.Text === undefined || range.Text === null ? "" : range.Text);
+      var item = { n: n, text: layoutPlainText(raw), content: false,
+        pageBreak: raw.indexOf("\f") >= 0, level: 10, startPage: 0, page: 0, table: 0 };
+      var shape = false;
+      try { shape = Number(range.InlineShapes.Count) > 0; } catch (eShape) { shape = false; }
+      // Doan cua muc luc (truong TOC) tu cap nhat, khong sua/xoa tay duoc: coi la co noi dung.
+      item.content = item.text.length > 0 || shape || layoutInsideToc(doc, start);
+      item.page = Number(range.Information(3));
+      item.startPage = item.page;
+      if (item.content) {
+        item.startPage = Number(doc.Range(start, start).Information(3));
+        for (page = item.startPage; page <= item.page; page++) { contentPages[page] = true; }
+        try { item.level = Number(paragraph.OutlineLevel); } catch (eLevel) { item.level = 10; }
+      }
+      items.push(item);
+    }
+
+    var issues = [];
+    // Trang trang: khong co chu, anh hay bang - chi doan trong / dau ngat trang.
+    for (page = 1; page <= pages; page++) {
+      if (contentPages[page]) { continue; }
+      var empties = [];
+      for (i = 0; i < items.length; i++) {
+        if (!items[i].content && items[i].table === 0 && items[i].page === page) {
+          empties.push(items[i].n);
+        }
+      }
+      var fix = empties.length > 0
+        ? "delete the empty paragraph(s) / page break(s) " + empties.join(", ") + " with writer.deleteParagraphs {\"paragraphs\": [" + empties.join(", ") + "]}"
+        : "remove the extra page break or empty paragraphs around it";
+      issues.push({ type: "blank-page", detail: "page " + page + " of " + pages + " is blank: " + fix,
+        page: page, paragraphs: empties });
+    }
+    // Tieu de la thu cuoi cung tren trang, noi dung cua no sang trang sau.
+    for (i = 0; i < items.length; i++) {
+      var heading = items[i];
+      if (!heading.content || heading.level >= 10) { continue; }
+      j = i + 1;
+      var between = [];
+      while (j < items.length && !items[j].content) {
+        between.push(items[j].n);
+        j++;
+      }
+      if (j >= items.length || items[j].startPage <= heading.page) { continue; }
+      fix = between.length > 0
+        ? "delete the empty paragraph(s) " + between.join(", ") + " after it (writer.deleteParagraphs) so it stays with its text"
+        : "start it on the next page: writer.insertPageBreak {\"before\": " + heading.n + "}";
+      issues.push({ type: "heading-at-page-bottom",
+        detail: "heading '" + layoutShorten(heading.text, 50) + "' (paragraph " + heading.n + ") ends page " +
+          heading.page + " but its text starts on page " + items[j].startPage + ": " + fix,
+        paragraph: heading.n, page: heading.page });
+    }
+    for (i = 0; i < splitTables.length; i++) {
+      var t = splitTables[i];
+      issues.push({ type: "split-table",
+        detail: "table " + t + " has at most " + LAYOUT_SMALL_TABLE_ROWS + " rows but is cut across pages: keep it on one page with writer.formatTable {\"table\": " + t + ", \"keepTogether\": true}",
+        table: t });
+    }
+    // Doan trong lien tiep dung de dan trang: khoang cach nen den tu style, khong tu dong trong.
+    for (i = 0; i < items.length; i++) {
+      if (items[i].content || items[i].table > 0 || items[i].pageBreak) { continue; }
+      j = i;
+      while (j + 1 < items.length && !items[j + 1].content && items[j + 1].table === 0 && !items[j + 1].pageBreak) {
+        j++;
+      }
+      if (j > i) {
+        var run = [];
+        for (n = i; n <= j; n++) { run.push(items[n].n); }
+        issues.push({ type: "empty-paragraphs",
+          detail: run.length + " empty paragraphs in a row (" + run[0] + "-" + run[run.length - 1] + ") used as spacing: delete them with writer.deleteParagraphs",
+          paragraphs: run });
+      }
+      i = j;
+    }
+    // Dai hon so trang nguoi dung yeu cau.
+    var maxPages = paramInt(params, "maxPages", 0);
+    if (maxPages > 0 && pages > maxPages) {
+      var perPage = Math.max(1, Math.floor(words / Math.max(1, pages)));
+      issues.push({ type: "too-long",
+        detail: "the document has " + pages + " pages but the limit is " + maxPages + ": cut about " +
+          ((pages - maxPages) * perPage) + " words (~" + perPage + " words per page) - shorten long paragraphs and drop " +
+          "repeated points (writer.replaceMany / writer.deleteParagraphs), keep every required section and table",
+        pages: pages, maxPages: maxPages });
+    }
+    var headings = [];
+    for (i = 0; i < items.length && headings.length < LAYOUT_HEADING_LIMIT; i++) {
+      if (items[i].content && items[i].level < 10) {
+        headings.push({ n: items[i].n, level: items[i].level, page: items[i].startPage,
+          t: layoutShorten(items[i].text, 60) });
+      }
+    }
+    var result = {
+      pages: pages, words: words, paragraphs: total, tables: tables.length,
+      headings: headings, issueCount: issues.length, issues: issues
+    };
+    if (total > LAYOUT_PARAGRAPH_LIMIT) { result.checkedParagraphs = LAYOUT_PARAGRAPH_LIMIT; }
+    return result;
+  }
+
+  // Xoa mot doan; tra chu da xoa (null = khong xoa duoc). Ban Windows con nhanh n == 1 rieng; WPS do duoc
+  // Range.Delete() tren doan cuoi nen bo nhanh do: doan cuoi bai -> Range.Delete(), tru khi doan truoc nam trong
+  // bang (WPS luon giu mot doan sau bang: chi xoa chu).
+  function layoutDeleteParagraph(doc, n) {
+    var paragraph = doc.Paragraphs.Item(n);
+    var text = layoutPlainText(paragraph.Range.Text);
+    var total = Number(doc.Paragraphs.Count);
+    if (n < total) {
+      paragraph.Range.Delete();
+      return text;
+    }
+    if (n > 1) {
+      var previous = doc.Paragraphs.Item(n - 1);
+      if (previous.Range.Information(12)) {
+        var body = paragraph.Range;
+        body.MoveEnd(1, -1);
+        body.Delete();
+        return text.length > 0 ? text : null;
+      }
+    }
+    paragraph.Range.Delete();
+    return text;
+  }
+
+  function cmdWriterDeleteParagraphs(app, params) {
+    var doc = app.ActiveDocument;
+    var numbers = paramIntList(params, "paragraphs");
+    var unique = [], seen = {}, k;
+    for (k = 0; k < numbers.length; k++) {
+      if (!seen[numbers[k]]) {
+        seen[numbers[k]] = true;
+        unique.push(numbers[k]);
+      }
+    }
+    unique.sort(function (a, b) { return b - a; });
+    if (unique.length === 0) {
+      throw new Error("'paragraphs' must list paragraph numbers from writer.outline / writer.checkLayout");
+    }
+    var total = Number(doc.Paragraphs.Count);
+    var n, start;
+    // Kiem HET truoc khi xoa: WPS chua do Undo(1) de lui giua chung, mot loi giua chung de lai nua bai.
+    for (k = 0; k < unique.length; k++) {
+      n = unique[k];
+      if (n < 1 || n > total) {
+        throw new Error("paragraph " + n + " does not exist (the document has " + total + ")");
+      }
+      if (doc.Paragraphs.Item(n).Range.Information(12)) {
+        throw new Error("paragraph " + n + " is inside a table; edit the table instead");
+      }
+      start = Number(doc.Paragraphs.Item(n).Range.Start);
+      if (layoutInsideToc(doc, start)) {
+        throw new Error("paragraph " + n + " is part of the table of contents; it cannot be edited by hand - " +
+          "call writer.insertToc again to refresh it");
+      }
+    }
+    var deleted = [];
+    for (k = 0; k < unique.length; k++) {
+      var text = layoutDeleteParagraph(doc, unique[k]);
+      if (text !== null) { deleted.push(layoutShorten(text, 60)); }
+    }
+    return { deleted: deleted.length, texts: deleted, paragraphs: Number(doc.Paragraphs.Count) };
+  }
+
   function cmdSelection(app) {
     var sel = app.Selection;
-    var text = "";
-    var raw = sel.Text;
-    if (typeof raw === "function") { raw = raw.call(sel); }
-    text = (raw === undefined || raw === null) ? "" : String(raw);
-    var start = null, end = null;
-    try {
-      var s = sel.Start;
-      if (typeof s === "function") { s = s.call(sel); }
-      if (s !== undefined && s !== null) {
-        var n = Number(s);
-        if (!isNaN(n)) { start = n; }
-      }
-    } catch (e2) {}
-    try {
-      var en = sel.End;
-      if (typeof en === "function") { en = en.call(sel); }
-      if (en !== undefined && en !== null) {
-        var m = Number(en);
-        if (!isNaN(m)) { end = m; }
-      }
-    } catch (e3) {}
-    return { text: text, start: start, end: end };
+    return { text: strProp(sel, "Text"), start: numProp(sel, "Start"), end: numProp(sel, "End") };
   }
 
   function cmdTypeText(app, params) {
@@ -867,18 +1579,73 @@
 
   function cmdAppendText(app, params) {
     var text = paramString(params, "text", null);
-    if (text === null || text === undefined) { return { appended: 0 }; }
+    if (text === null || text === undefined || text === "") { return { appended: 0, paragraphs: 0 }; }
     var doc = app.ActiveDocument;
-    doc.Content.InsertAfter(text);
-    return { appended: text.length };
+    var alignment = paramString(params, "alignment", "left");
+    // '\n' dau chuoi chi la y dinh "mo doan": bo di, de chi con MOT lan ngat doan do needBreak quyet dinh
+    // (tranh them doan rong khi caller da gui "\r...", va tranh Range bat dau tren paragraph mark cua doan cu).
+    var normalized = String(text).replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/^\n+/, "");
+    if (!normalized.length) { return { appended: 0, paragraphs: 0 }; }
+    var needBreak = false;
+    try {
+      var docParagraphs = doc.Paragraphs;
+      var count = numProp(docParagraphs, "Count");
+      if (count > 0) {
+        var lastText = String(docParagraphs.Item(count).Range.Text)
+          .replace(/\r/g, "").split("\u0007").join("").replace(/^\s+|\s+$/g, "");
+        needBreak = lastText.length > 0;
+      }
+    } catch (eBreak) { needBreak = false; }
+    var content = doc.Content;
+    // Ngat doan TRUOC khi do vi tri bat dau: Range chi phu phan text moi, khong dat lai can le cua doan cu.
+    if (needBreak) { content.InsertAfter("\r"); }
+    var before = numProp(content, "End");
+    content.InsertAfter(normalized.replace(/\n/g, "\r"));
+    var after = numProp(content, "End");
+    if (after > before) {
+      try {
+        var inserted = doc.Range(before, after);
+        applyFontReset(inserted.Font, params);
+        if (alignment) { inserted.ParagraphFormat.Alignment = parseAlignment(alignment); }
+      } catch (eFmt) {
+        // Host thieu doc.Range (ban WPS cu): text da noi duoc, chi bo qua dat lai dinh dang.
+      }
+    }
+    return { appended: normalized.length, paragraphs: normalized.split("\n").length };
+  }
+
+  // Nhu applyFont nhung dat TUONG MINH ca thuoc tinh khong truyen: Selection giu bold/underline/mau cua lan
+  // chen truoc, nen bo qua se lam dinh dinh dang sang cac doan sau (do 24/10/2026 tren Word). Chi dung cho
+  // KHOI (append / insert co alignment); chen inline thi goi applyFont de giu dinh dang xung quanh.
+  function applyFontReset(font, params) {
+    font.Bold = hasParam(params, "bold") && paramBool(params, "bold", false) ? -1 : 0;
+    font.Italic = hasParam(params, "italic") && paramBool(params, "italic", false) ? -1 : 0;
+    font.Underline = hasParam(params, "underline") && paramBool(params, "underline", false) ? 1 : 0;
+    font.Size = hasParam(params, "size") ? paramInt(params, "size", 13) : 13;
+    font.Name = hasParam(params, "font") ? paramString(params, "font", "Times New Roman") : "Times New Roman";
+    var color = parseBgrColor(hasParam(params, "color") ? paramString(params, "color", null) : null);
+    font.Color = color !== null ? color : -16777216; // wdColorAutomatic
   }
 
   function cmdInsertStyledText(app, params) {
     var text = paramString(params, "text", null);
-    if (!text) { return { inserted: 0 }; }
-    applyFont(app.Selection.Font, params);
-    app.Selection.TypeText(text);
-    return { inserted: text.length };
+    if (!text) { return { inserted: 0, paragraphs: 0 }; }
+    var alignment = paramString(params, "alignment", null);
+    // Co alignment = mot KHOI doan van: tu ngat doan sau khoi de lan goi ke tiep khong dinh vao doan nay.
+    // Khong alignment = chen inline, giu nguyen dinh dang xung quanh.
+    var block = !!alignment;
+    var breakAfter = hasParam(params, "break") ? paramBool(params, "break", true) : block;
+    // '\n' (hoac '\r') = doan moi: model gui ca khoi van ban mot lan thay vi moi dong mot lenh.
+    var lines = String(text).replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+    var sel = app.Selection;
+    for (var i = 0; i < lines.length; i++) {
+      if (block) { applyFontReset(sel.Font, params); } else { applyFont(sel.Font, params); }
+      if (block) { sel.ParagraphFormat.Alignment = parseAlignment(alignment); }
+      if (lines[i].length) { sel.TypeText(lines[i]); }
+      if (i < lines.length - 1) { sel.TypeParagraph(); }
+    }
+    if (breakAfter && lines[lines.length - 1].length) { sel.TypeParagraph(); }
+    return { inserted: text.length, paragraphs: lines.length };
   }
 
   function cmdHeading(app, params) {
@@ -912,6 +1679,317 @@
     var alignment = paramString(params, "alignment", "left");
     app.Selection.ParagraphFormat.Alignment = parseAlignment(alignment);
     return { alignment: alignment };
+  }
+
+  // Style dung san cua Word theo hang WdBuiltinStyle: ten style bi dich theo ngon ngu giao dien ("Heading 1"
+  // co the la "De muc 1"), hang so thi khong.
+  var BUILTIN_STYLES = {
+    "normal": -1, "heading 1": -2, "heading 2": -3, "heading 3": -4, "heading 4": -5,
+    "heading 5": -6, "heading 6": -7, "heading 7": -8, "heading 8": -9, "heading 9": -10,
+    "caption": -35, "list bullet": -49, "list number": -50, "title": -63, "subtitle": -75,
+    "quote": -181
+  };
+
+  // WPS tra NULL (khong nem loi) khi khong co style, va gan ten la thi am tham thanh Normal: phai kiem
+  // TRUOC khi gan de khong doi doan nao.
+  function builtinStyle(doc, name) {
+    var trimmed = String(name === undefined || name === null ? "" : name).replace(/^\s+|\s+$/g, "");
+    var key = trimmed.toLowerCase();
+    var style = null;
+    try {
+      if (Object.prototype.hasOwnProperty.call(BUILTIN_STYLES, key)) {
+        style = doc.Styles.Item(BUILTIN_STYLES[key]);
+      } else {
+        style = doc.Styles.Item(trimmed);
+      }
+    } catch (e) {
+      style = null;
+    }
+    if (style === null || style === undefined) {
+      throw new Error("unknown style '" + name + "'; use Heading 1-9, Normal, Title, Subtitle, List Bullet, List Number, Caption or Quote");
+    }
+    return style;
+  }
+
+  function paramIntList(params, name) {
+    var out = [];
+    if (!hasParam(params, name)) { return out; }
+    var raw = unwrapScalar(params[name]);
+    if (raw === undefined || raw === null) { return out; }
+    var list = Array.isArray(raw) ? raw : [raw];
+    for (var i = 0; i < list.length; i++) {
+      var item = unwrapScalar(list[i]);
+      if (item === undefined || item === null) { continue; }
+      var n = Number(item);
+      if (!isNaN(n) && isFinite(n)) { out.push(Math.round(n)); }
+    }
+    return out;
+  }
+
+  // Chu cua doan de bao lai: bo dau xuong dong cuoi doan, cat 60 ky tu.
+  function paragraphText(paragraph) {
+    var text = "";
+    try { text = strProp(paragraph.Range, "Text"); } catch (e) { text = ""; }
+    text = text.replace(/^\s+|\s+$/g, "");
+    return text.length > 60 ? text.substring(0, 60) + "…" : text;
+  }
+
+  function cmdWriterSetStyle(app, params) {
+    var styleName = paramString(params, "style", null);
+    if (!styleName) {
+      throw new Error("'style' is required, e.g. 'Heading 2'");
+    }
+    var numbers = paramIntList(params, "paragraphs");
+    if (numbers.length > 0 && selectionLock !== null) {
+      throw new Error("the user's selection is locked: call writer.setStyle without 'paragraphs' to style the selected paragraphs only");
+    }
+    var doc = app.ActiveDocument;
+    // Kiem style va moi so doan TRUOC khi doi doan nao.
+    var style = builtinStyle(doc, styleName);
+    var total = Number(doc.Paragraphs.Count);
+    var applied = [];
+    var i, paragraph;
+    if (numbers.length === 0) {
+      var selected = app.Selection.Paragraphs;
+      var count = Number(selected.Count);
+      for (i = 1; i <= count; i++) {
+        paragraph = selected.Item(i);
+        paragraph.Style = style;
+        applied.push(paragraphText(paragraph));
+      }
+    } else {
+      for (i = 0; i < numbers.length; i++) {
+        if (numbers[i] < 1 || numbers[i] > total) {
+          throw new Error("paragraph " + numbers[i] + " does not exist (the document has " + total + "; numbers come from writer.outline)");
+        }
+      }
+      for (i = 0; i < numbers.length; i++) {
+        paragraph = doc.Paragraphs.Item(numbers[i]);
+        paragraph.Style = style;
+        applied.push(paragraphText(paragraph));
+      }
+    }
+    return { style: String(style.NameLocal), paragraphs: applied.length, texts: applied };
+  }
+
+  function tocEntries(doc) {
+    try {
+      return Number(doc.TablesOfContents.Item(1).Range.Paragraphs.Count);
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  function cmdWriterInsertToc(app, params) {
+    var doc = app.ActiveDocument;
+    var levels = paramInt(params, "levels", 3);
+    levels = Math.max(1, Math.min(9, levels));
+    var existing = Number(doc.TablesOfContents.Count);
+    if (existing > 0) {
+      for (var i = 1; i <= existing; i++) {
+        doc.TablesOfContents.Item(i).Update();
+      }
+      return { updated: existing, entries: tocEntries(doc) };
+    }
+    var before = paramInt(params, "before", 0);
+    var where;
+    if (before > 0) {
+      var total = Number(doc.Paragraphs.Count);
+      if (before > total) {
+        throw new Error("paragraph " + before + " does not exist (the document has " + total + ")");
+      }
+      doc.Paragraphs.Item(before).Range.InsertParagraphBefore();
+      // Doan moi mang style cua doan dich (thuong la Heading): dat Normal de khong thanh tieu de trong.
+      doc.Paragraphs.Item(before).Style = builtinStyle(doc, "normal");
+      where = doc.Paragraphs.Item(before).Range;
+      where.Collapse(1);
+    } else {
+      where = app.Selection.Range;
+      where.Collapse(1);
+    }
+    // UseHeadingStyles = true, UpperHeadingLevel 1, LowerHeadingLevel = levels.
+    var created = doc.TablesOfContents.Add(where, true, 1, levels);
+    created.Update();
+    // Con tro ra doan SAU muc luc (o cuoi bai thi them doan trong de viet tiep); loi o day khong lam hong lenh.
+    try {
+      var last = created.Range.Paragraphs.Last;
+      var next = last.Next();
+      if (next === null || next === undefined) {
+        last.Range.InsertParagraphAfter();
+        next = last.Next();
+        next.Style = builtinStyle(doc, "normal");
+      }
+      var cursor = next.Range;
+      cursor.Collapse(1);
+      cursor.Select();
+      if (before > 0) {
+        app.Selection.EndKey(6);
+      }
+    } catch (e) {}
+    return { inserted: true, levels: levels, entries: tocEntries(doc) };
+  }
+
+  // Bang theo `table` (so thu tu, 1 = dau tien); khong truyen = bang chua con tro, khong co thi bang cuoi.
+  // index = so da dung (0 = bang tai con tro).
+  function targetTable(app, params) {
+    var doc = app.ActiveDocument;
+    var count = Number(doc.Tables.Count);
+    if (count === 0) {
+      throw new Error("the document has no table - use writer.insertTable first");
+    }
+    var index = paramInt(params, "table", 0);
+    var table = null;
+    if (index === 0) {
+      try {
+        if (app.Selection.Information(12)) {
+          table = app.Selection.Tables.Item(1);
+        }
+      } catch (eSel) {
+        table = null;
+      }
+      if (table === null) {
+        index = count;
+      }
+    }
+    if (table === null) {
+      if (index < 1 || index > count) {
+        throw new Error("'table' must be between 1 and " + count + ", got " + index);
+      }
+      table = doc.Tables.Item(index);
+    }
+    return { table: table, index: index };
+  }
+
+  // Dinh dang bang da co. Moi phan boc try rieng: phan host khong ho tro (WPS) vao "skipped" thay vi
+  // lam hong ca lenh. WPS 12.1.2: bang chen vao doan Heading thi chu trong o mang style Heading, va bo
+  // qua mau nen hang - ca hai deu do lai o day.
+  function cmdWriterFormatTable(app, params) {
+    var target = targetTable(app, params);
+    var table = target.table;
+    var index = target.index;
+    var doc = app.ActiveDocument;
+    var applied = [];
+    var skipped = [];
+    var rowCount = Number(table.Rows.Count);
+    var colCount = Number(table.Columns.Count);
+    var hasHeading = false;
+    var r, c, level, color, borderColor, bandFill, headerFill, headerColor, headerBold, borders, fit;
+    function step(name, fn) {
+      try {
+        fn();
+        applied.push(name);
+      } catch (e) {
+        skipped.push(name + ": " + errMessage(e));
+      }
+    }
+    // Bang dan trang: bo khung thi danh tem trong Table.Title (Word 2010+); co khung thi bo tem.
+    function markLayout(layout) {
+      var current = "";
+      try { current = String(table.Title || ""); } catch (eTitle) { current = ""; }
+      if (layout) {
+        table.Title = LAYOUT_TABLE_NAME;
+      } else if (current.indexOf(LAYOUT_TABLE_NAME) === 0) {
+        table.Title = "AxiomTable";
+      }
+    }
+    // Phai chay TRUOC tien: dat lai style cua bang tren WPS cung xoa dam va font.
+    for (r = 1; r <= rowCount && !hasHeading; r++) {
+      for (c = 1; c <= colCount; c++) {
+        try {
+          level = Number(table.Cell(r, c).Range.ParagraphFormat.OutlineLevel);
+          if (level >= 1 && level <= 9) { hasHeading = true; break; }
+        } catch (eCell) {}
+      }
+    }
+    if (hasHeading) {
+      step("bodyStyle", function () { table.Range.Style = builtinStyle(doc, "normal"); });
+    }
+    if (hasParam(params, "style")) {
+      step("style", function () { table.Style = paramString(params, "style", "Table Grid"); });
+    }
+    if (hasParam(params, "font")) {
+      step("font", function () { table.Range.Font.Name = paramString(params, "font", null); });
+    }
+    if (hasParam(params, "size")) {
+      step("size", function () { table.Range.Font.Size = paramInt(params, "size", 11); });
+    }
+    color = parseBgrColor(paramString(params, "color", null));
+    if (color !== null) {
+      step("color", function () { table.Range.Font.Color = color; });
+    }
+    if (hasParam(params, "alignment")) {
+      step("alignment", function () { table.Range.ParagraphFormat.Alignment = parseAlignment(paramString(params, "alignment", "left")); });
+    }
+    if (paramBool(params, "keepTogether", false)) {
+      step("keepTogether", function () {
+        table.Rows.AllowBreakAcrossPages = 0;
+        if (rowCount > 1) {
+          var range = table.Range.Document.Range(table.Rows.Item(1).Range.Start, table.Rows.Item(rowCount - 1).Range.End);
+          range.ParagraphFormat.KeepWithNext = -1;
+        }
+      });
+    }
+    if (hasParam(params, "borders")) {
+      borders = paramBool(params, "borders", true);
+      step("borders", function () {
+        table.Borders.Enable = borders ? 1 : 0;
+        markLayout(!borders);
+      });
+      if (!borders) {
+        step("layout-table", function () {
+          if (!isLayoutTable(table)) {
+            throw new Error("could not mark the table as a layout table (Table.Title)");
+          }
+        });
+      }
+    }
+    borderColor = parseBgrColor(paramString(params, "borderColor", null));
+    if (borderColor !== null) {
+      step("borderColor", function () {
+        table.Borders.Enable = 1;
+        table.Borders.OutsideColor = borderColor;
+        table.Borders.InsideColor = borderColor;
+        markLayout(false);
+      });
+    }
+    bandFill = parseBgrColor(paramString(params, "bandFill", null));
+    if (bandFill !== null) {
+      step("bandFill", function () {
+        for (var br = 3; br <= rowCount; br += 2) {
+          table.Rows.Item(br).Shading.BackgroundPatternColor = bandFill;
+          if (Number(table.Rows.Item(br).Shading.BackgroundPatternColor) !== bandFill) {
+            throw new Error("WPS ignored the row color");
+          }
+        }
+      });
+    }
+    headerFill = parseBgrColor(paramString(params, "headerFill", null));
+    headerColor = parseBgrColor(paramString(params, "headerColor", null));
+    headerBold = paramBool(params, "headerBold", headerFill !== null || headerColor !== null);
+    if (headerFill !== null) {
+      step("headerFill", function () {
+        table.Rows.Item(1).Shading.BackgroundPatternColor = headerFill;
+        if (Number(table.Rows.Item(1).Shading.BackgroundPatternColor) !== headerFill) {
+          throw new Error("WPS ignored the row color");
+        }
+      });
+    }
+    if (headerColor !== null) {
+      step("headerColor", function () { table.Rows.Item(1).Range.Font.Color = headerColor; });
+    }
+    if (hasParam(params, "headerBold") || headerFill !== null || headerColor !== null) {
+      step("headerBold", function () {
+        table.Rows.Item(1).Range.Font.Bold = headerBold ? -1 : 0;
+        table.Rows.Item(1).HeadingFormat = -1;
+      });
+    }
+    if (hasParam(params, "autoFit")) {
+      fit = String(paramString(params, "autoFit", "content") || "content").replace(/^\s+|\s+$/g, "").toLowerCase();
+      step("autoFit", function () { table.AutoFitBehavior(fit === "window" ? 2 : 1); });
+    }
+    var result = { table: index === 0 ? "at cursor" : index, rows: rowCount, cols: colCount, applied: applied };
+    if (skipped.length > 0) { result.skipped = skipped; }
+    return result;
   }
 
   function tableAnchor(app) {
@@ -988,6 +2066,363 @@
     return { inserted: true };
   }
 
+  // ---- writeContent / insertCaption / insertLayoutTable (port cua ban Windows) ----
+
+  // Bang Word khong tinh cong thuc: "=SUM(A1:A2)" hien nguyen chu. Tu choi TRUOC khi chen.
+  function rejectFormulaCells(rows) {
+    for (var r = 0; r < rows.length; r++) {
+      var row = rows[r] || [];
+      for (var c = 0; c < row.length; c++) {
+        var text = cellText(row[c]);
+        if (/^=\s*[A-Za-z(]/.test(text.replace(/^\s+|\s+$/g, ""))) {
+          throw new Error("Word tables do not calculate formulas: cell '" + text.replace(/^\s+|\s+$/g, "") +
+            "' would be shown as text. Compute the value yourself and write the number (e.g. 96%)");
+        }
+      }
+    }
+  }
+
+  function paramBlocks(params, name) {
+    var raw = params ? params[name] : undefined;
+    if (raw === undefined || raw === null || typeof raw === "string" || !Array.isArray(raw)) {
+      throw new Error("'" + name + "' must be an array of blocks, e.g. [{\"heading\": \"1. Mo dau\", \"level\": 1}, {\"text\": \"...\"}]");
+    }
+    var blocks = [];
+    for (var i = 0; i < raw.length; i++) {
+      var block = raw[i];
+      if (block === null || typeof block !== "object" || Array.isArray(block)) {
+        throw new Error("block " + (i + 1) + " is not an object");
+      }
+      blocks.push(block);
+    }
+    if (blocks.length === 0) { throw new Error("'" + name + "' is empty"); }
+    return blocks;
+  }
+
+  // Khoa dau tien co mat quyet dinh loai khoi (cung thu tu voi ban Windows).
+  function blockKind(block, index) {
+    var kinds = ["heading", "text", "bullets", "numbers", "table", "pageBreak"];
+    for (var i = 0; i < kinds.length; i++) {
+      if (Object.prototype.hasOwnProperty.call(block, kinds[i]) || block[kinds[i]] !== undefined) {
+        return kinds[i];
+      }
+    }
+    throw new Error("block " + index + " has none of heading, text, bullets, numbers, table, pageBreak (keys: " +
+      Object.keys(block).join(", ") + ")");
+  }
+
+  // Dong cua khoi danh sach: chuoi co '\n' tach dong, mang thi tung phan tu; bo dong trong.
+  function blockLines(block, key) {
+    var lines = [];
+    var raw = block[key];
+    if (raw === undefined || raw === null) { return lines; }
+    raw = unwrapScalar(raw);
+    if (typeof raw === "string") {
+      var parts = raw.replace(/\r\n/g, "\n").split("\n");
+      for (var i = 0; i < parts.length; i++) { lines.push(parts[i]); }
+    } else if (Array.isArray(raw)) {
+      for (var j = 0; j < raw.length; j++) { lines.push(cellText(unwrapScalar(raw[j]))); }
+    }
+    var out = [];
+    for (var k = 0; k < lines.length; k++) {
+      var text = String(lines[k] === undefined || lines[k] === null ? "" : lines[k]).replace(/^\s+|\s+$/g, "");
+      if (text.length > 0) { out.push(text); }
+    }
+    return out;
+  }
+
+  // Danh sach that (gach dau dong / so tu dong), khong phai dau "-" go tay. Doan sau danh sach la
+  // doan thuong: ngat tu muc cuoi thi WPS keo danh sach sang doan ke.
+  function appendList(app, doc, lines, numbered) {
+    cmdAppendText(app, { text: lines.join("\n"), alignment: "left" });
+    var total = Number(doc.Paragraphs.Count);
+    var range = doc.Range(doc.Paragraphs.Item(total - lines.length + 1).Range.Start, doc.Paragraphs.Item(total).Range.End);
+    // wdBulletGallery = 1, wdNumberGallery = 2; ContinuePreviousList = false: moi danh sach so bat dau lai tu 1.
+    var template = app.ListGalleries.Item(numbered ? 2 : 1).ListTemplates.Item(1);
+    range.ListFormat.ApplyListTemplate(template, false);
+    doc.Content.InsertParagraphAfter();
+    var next = doc.Paragraphs.Last;
+    next.Range.ListFormat.RemoveNumbers();
+    next.Style = builtinStyle(doc, "normal");
+    var cursor = next.Range;
+    cursor.Collapse(1);
+    cursor.Select();
+  }
+
+  // Ngat trang o cuoi bai, tren mot doan rieng (khong dinh vao doan chu truoc).
+  function appendPageBreak(app, doc) {
+    var last = doc.Paragraphs.Last;
+    var text = "";
+    try { text = String(last.Range.Text); } catch (eText) { text = ""; }
+    var inTable = false;
+    try { inTable = !!last.Range.Information(12); } catch (eInfo) { inTable = false; }
+    if (text.replace(/^\s+|\s+$/g, "").length > 0 || inTable) { doc.Content.InsertParagraphAfter(); }
+    app.Selection.EndKey(6);
+    app.Selection.InsertBreak(7);
+  }
+
+  function cmdWriterWriteContent(app, params) {
+    var blocks = paramBlocks(params, "blocks");
+    var bodyAlignment = paramString(params, "alignment", "justify");
+    // Soat HET truoc khi ghi: loi giua chung de lai nua bai.
+    var kinds = [];
+    var i;
+    for (i = 0; i < blocks.length; i++) {
+      var kind = blockKind(blocks[i], i + 1);
+      kinds.push(kind);
+      if (kind === "table") {
+        var values = null;
+        try { values = paramMatrix(blocks[i], "table", false); } catch (eTable) { values = null; }
+        if (values === null || values.length === 0) {
+          throw new Error("block " + (i + 1) + ": 'table' must be a 2D array of rows");
+        }
+        rejectFormulaCells(values);
+      } else if ((kind === "bullets" || kind === "numbers") && blockLines(blocks[i], kind).length === 0) {
+        throw new Error("block " + (i + 1) + ": '" + kind + "' must be a non-empty array of items");
+      } else if (kind === "heading" && paramString(blocks[i], "heading", "").replace(/^\s+|\s+$/g, "") === "") {
+        throw new Error("block " + (i + 1) + ": 'heading' is empty");
+      }
+    }
+    var doc = app.ActiveDocument;
+    var counts = {};
+    // Viet noi tiep o CUOI bai (nhu appendText), khong theo con tro nguoi dung dang de.
+    app.Selection.EndKey(6);
+    for (i = 0; i < blocks.length; i++) {
+      var block = blocks[i];
+      kind = kinds[i];
+      counts[kind] = (counts[kind] || 0) + 1;
+      if (kind === "heading") {
+        app.Selection.EndKey(6);
+        // Con tro o cuoi doan co chu (vd sau writer.appendText): sang doan moi, khong bien doan do
+        // thanh tieu de (giong WriterHeading cua ban Windows).
+        var lastPara = doc.Paragraphs.Last;
+        var lastParaText = "";
+        try { lastParaText = String(lastPara.Range.Text); } catch (eLast) { lastParaText = ""; }
+        if (lastParaText.replace(/^\s+|\s+$/g, "").length > 0) { app.Selection.TypeParagraph(); }
+        cmdHeading(app, { text: paramString(block, "heading", "").replace(/^\s+|\s+$/g, ""), level: paramInt(block, "level", 1) });
+      } else if (kind === "text") {
+        var textParams = {};
+        for (var key in block) {
+          if (Object.prototype.hasOwnProperty.call(block, key)) { textParams[key] = block[key]; }
+        }
+        textParams.alignment = hasParam(block, "alignment") ? paramString(block, "alignment", bodyAlignment) : bodyAlignment;
+        cmdAppendText(app, textParams);
+      } else if (kind === "bullets" || kind === "numbers") {
+        appendList(app, doc, blockLines(block, kind), kind === "numbers");
+      } else if (kind === "table") {
+        var caption = paramString(block, "caption", null);
+        var hasCaption = caption !== null && caption !== undefined && String(caption).replace(/^\s+|\s+$/g, "") !== "";
+        if (hasCaption) {
+          var captionParams = { text: String(caption).replace(/^\s+|\s+$/g, "") };
+          if (hasParam(block, "label")) { captionParams.label = paramString(block, "label", "Bảng"); }
+          cmdWriterInsertCaption(app, captionParams);
+        } else {
+          // WPS GOP bang moi vao bang ngay truoc: hai khoi bang lien nhau phai co mot doan ngan giua.
+          if (i > 0 && kinds[i - 1] === "table") { doc.Content.InsertParagraphAfter(); }
+          app.Selection.EndKey(6);
+        }
+        var tableParams = { values: block.table };
+        if (hasParam(block, "style")) { tableParams.style = block.style; }
+        cmdInsertTable(app, tableParams);
+      } else if (kind === "pageBreak") {
+        if (paramBool(block, "pageBreak", true)) { appendPageBreak(app, doc); }
+      }
+    }
+    counts.blocks = blocks.length;
+    counts.paragraphs = Number(doc.Paragraphs.Count);
+    return counts;
+  }
+
+  function cmdWriterInsertCaption(app, params) {
+    var text = paramString(params, "text", null);
+    if (text === null || text === undefined || text === "") { throw new Error("'text' is required"); }
+    var label = paramString(params, "label", "Bảng");
+    if (label === null || label === undefined) { label = "Bảng"; }
+    label = String(label).replace(/^\s+|\s+$/g, "");
+    if (label === "") { label = "Bảng"; }
+    var before = paramInt(params, "before", 0);
+    // Ban Windows con chen truoc doan/bang co san; WPS chua do duoc API do nen tu choi ro rang.
+    if (before > 0) { throw new Error("'before' is not supported in WPS: the caption is inserted at the end of the document only"); }
+    var doc = app.ActiveDocument;
+    var target = doc.Paragraphs.Last;
+    var lastText = "";
+    try { lastText = String(target.Range.Text); } catch (eText) { lastText = ""; }
+    var inTable = false;
+    try { inTable = !!target.Range.Information(12); } catch (eInfo) { inTable = false; }
+    if (lastText.replace(/^\s+|\s+$/g, "").length > 0 || inTable) {
+      doc.Content.InsertParagraphAfter();
+      target = doc.Paragraphs.Last;
+    }
+    target.Style = builtinStyle(doc, "caption");
+    // Chu thich di lien voi bang/hinh ngay duoi, khong nam le cuoi trang.
+    target.KeepWithNext = -1;
+    // Dung bang Range (khong go theo con tro): "Nhan #. chu" roi thay "#" bang truong SEQ - dem theo nhan.
+    // wdFieldEmpty = -1, PreserveFormatting = false.
+    var body = target.Range;
+    body.MoveEnd(1, -1);
+    body.Text = label + " #. " + text;
+    var hash = Number(body.Start) + label.length + 1;
+    var slot = doc.Range(hash, hash + 1);
+    var field = doc.Fields.Add(slot, -1, "SEQ " + label.split(" ").join("_") + " \\* ARABIC", false);
+    field.Update();
+    var number = String(field.Result.Text);
+    // Cuoi bai: them doan Normal sau chu thich, con tro o do - bang/hinh chen tiep nam ngay duoi.
+    doc.Content.InsertParagraphAfter();
+    var next = doc.Paragraphs.Last;
+    next.Style = builtinStyle(doc, "normal");
+    var cursor = next.Range;
+    cursor.Collapse(1);
+    cursor.Select();
+    return { caption: label + " " + number + ". " + text, number: number };
+  }
+
+  // Can le cua o bang dan trang: mac dinh giua, khong ro thi giua (giong AlignmentOf cua ban Windows).
+  function layoutAlign(value) {
+    var key = (value === undefined || value === null) ? "" : String(value).replace(/^\s+|\s+$/g, "").toLowerCase();
+    if (key === "left") { return 0; }
+    if (key === "right") { return 2; }
+    if (key === "center" || key === "centre") { return 1; }
+    return 1;
+  }
+
+  function parseLayoutLine(raw, size) {
+    raw = unwrapScalar(raw);
+    var entry = (raw !== null && typeof raw === "object" && !Array.isArray(raw)) ? raw : null;
+    if (entry === null) {
+      return { text: cellText(raw), bold: false, italic: false, underline: false, size: size };
+    }
+    var text = paramString(entry, "t", null);
+    if (text === null || text === undefined) { text = paramString(entry, "text", ""); }
+    if (text === null || text === undefined) { text = ""; }
+    if (paramBool(entry, "upper", false)) { text = text.toLocaleUpperCase("vi-VN"); }
+    return {
+      text: text,
+      bold: paramBool(entry, "bold", false),
+      italic: paramBool(entry, "italic", false),
+      underline: paramBool(entry, "underline", false),
+      size: paramInt(entry, "size", size)
+    };
+  }
+
+  function parseLayoutCell(raw, size) {
+    raw = unwrapScalar(raw);
+    var cell = { lines: [], align: 1 };
+    var entry = (raw !== null && typeof raw === "object" && !Array.isArray(raw)) ? raw : null;
+    var lines;
+    if (entry !== null) {
+      cell.align = layoutAlign(paramString(entry, "align", "center"));
+      if (hasParam(entry, "lines")) {
+        // Giu nguyen mang (ke ca mang mot phan tu): unwrapScalar se go mang 1 phan tu thanh chinh phan tu.
+        var value = entry.lines;
+        if (Array.isArray(value)) {
+          lines = value;
+        } else {
+          value = unwrapScalar(value);
+          if (Array.isArray(value)) {
+            lines = value;
+          } else {
+            lines = String(value === undefined || value === null ? "" : value).replace(/\r\n/g, "\n").split("\n");
+          }
+        }
+      } else {
+        lines = [""];
+      }
+    } else if (Array.isArray(raw)) {
+      lines = raw;
+    } else {
+      lines = String(raw === undefined || raw === null ? "" : raw).replace(/\r\n/g, "\n").split("\n");
+    }
+    for (var i = 0; i < lines.length; i++) { cell.lines.push(parseLayoutLine(lines[i], size)); }
+    if (cell.lines.length === 0) {
+      cell.lines.push({ text: "", bold: false, italic: false, underline: false, size: size });
+    }
+    return cell;
+  }
+
+  function cmdWriterInsertLayoutTable(app, params) {
+    // Khong unwrap mang ngoai: bang mot hang [[a, b]] se bi go thanh [a, b] (o thanh hang).
+    var raw = params ? params.rows : undefined;
+    if (raw === undefined || raw === null || typeof raw === "string" || !Array.isArray(raw)) {
+      throw new Error("'rows' must be a 2D array of cells, e.g. [[\"TRUONG THPT A\", \"CONG HOA XA HOI CHU NGHIA VIET NAM\"]]");
+    }
+    var size = paramInt(params, "size", 13);
+    var font = paramString(params, "font", "Times New Roman");
+    var grid = [];
+    var r, c, i;
+    for (r = 0; r < raw.length; r++) {
+      var cells = raw[r];
+      if (!Array.isArray(cells) || typeof cells === "string") {
+        throw new Error("row " + (grid.length + 1) + " must be an array of cells");
+      }
+      var row = [];
+      for (c = 0; c < cells.length; c++) { row.push(parseLayoutCell(cells[c], size)); }
+      grid.push(row);
+    }
+    var rows = grid.length;
+    var cols = 0;
+    for (r = 0; r < rows; r++) { if (grid[r].length > cols) { cols = grid[r].length; } }
+    if (rows === 0 || cols === 0) { throw new Error("'rows' is empty"); }
+    var widths = paramIntList(params, "widths");
+    if (widths.length > 0) {
+      var bad = widths.length !== cols;
+      for (i = 0; i < widths.length; i++) { if (widths[i] <= 0) { bad = true; } }
+      if (bad) {
+        throw new Error("'widths' needs " + cols + " positive percentages, got [" + widths.join(", ") + "]");
+      }
+    }
+    var doc = app.ActiveDocument;
+    app.Selection.EndKey(6);
+    var table = doc.Tables.Add(tableAnchor(app), rows, cols);
+    table.Borders.Enable = 0;
+    // Bang dan trang: cung tem voi writer.formatTable {borders:false}.
+    table.Title = LAYOUT_TABLE_NAME;
+    table.Range.Font.Name = font;
+    table.Range.ParagraphFormat.SpaceBefore = 0;
+    table.Range.ParagraphFormat.SpaceAfter = 0;
+    // wdLineSpaceSingle = 0.
+    table.Range.ParagraphFormat.LineSpacingRule = 0;
+    if (widths.length > 0) {
+      // wdPreferredWidthPercent = 2.
+      table.PreferredWidthType = 2;
+      table.PreferredWidth = 100;
+      var total = 0;
+      for (i = 0; i < widths.length; i++) { total += widths[i]; }
+      for (c = 0; c < cols; c++) {
+        var column = table.Columns.Item(c + 1);
+        column.PreferredWidthType = 2;
+        column.PreferredWidth = 100 * widths[c] / total;
+      }
+    }
+    for (r = 0; r < rows; r++) {
+      for (c = 0; c < cols; c++) {
+        var cell = c < grid[r].length ? grid[r][c]
+          : { lines: [{ text: "", bold: false, italic: false, underline: false, size: size }], align: 1 };
+        var range = table.Cell(r + 1, c + 1).Range;
+        var parts = [];
+        for (i = 0; i < cell.lines.length; i++) { parts.push(cell.lines[i].text); }
+        range.Text = parts.join("\r");
+        var paragraphs = table.Cell(r + 1, c + 1).Range.Paragraphs;
+        var count = Number(paragraphs.Count);
+        for (i = 0; i < cell.lines.length && i < count; i++) {
+          var line = cell.lines[i];
+          var paragraph = paragraphs.Item(i + 1);
+          paragraph.Alignment = cell.align;
+          var text = paragraph.Range;
+          text.Font.Bold = line.bold ? -1 : 0;
+          text.Font.Italic = line.italic ? -1 : 0;
+          text.Font.Underline = line.underline ? 1 : 0;
+          text.Font.Size = line.size;
+        }
+      }
+    }
+    var index = Number(doc.Range(0, table.Range.End).Tables.Count);
+    // Con tro ra sau bang: phan viet tiep (writeContent, appendText) nam duoi bang.
+    var after = table.Range;
+    after.Collapse(0);
+    after.Select();
+    return { table: index, rows: rows, cols: cols, layout: true };
+  }
+
   function countOccurrences(haystack, needle) {
     if (needle === undefined || needle === null) { return 0; }
     var h = String(haystack === undefined || haystack === null ? "" : haystack);
@@ -1009,16 +2444,25 @@
     return c;
   }
 
-  function cmdReplaceAll(app, params) {
-    var find = paramString(params, "find", null);
-    var replace = paramString(params, "replace", "");
-    if (replace === null || replace === undefined) { replace = ""; }
-    if (!find) { return { replaced: false, count: 0 }; }
+  // Thay mot cap find/replace: dem so cho khop TRUOC khi thay, roi thay mot lan duy nhat. Dung chung cho
+  // writer.replaceAll va writer.replaceMany (moi cap mot loi goi).
+  function writerReplaceAllIn(app, find, replace) {
     var doc = app.ActiveDocument;
     var content = doc.Content;
+    // Dang khoa vung boi den: chi tim trong vung khoa (giong ban Windows), khong quet ca tai lieu. Khong
+    // lay duoc Range thi tu choi han - tim ca tai lieu roi bi luoi an toan hoan tac chi lam loi kho hieu.
+    if (selectionLock !== null) {
+      var lockRange = lockBounds(app, selectionLock);
+      if (lockRange !== null) {
+        try {
+          content = doc.Range(lockRange.start, lockRange.end);
+        } catch (eLockRange) {
+          throw new Error("cannot search inside the selection on this WPS build (Range.Find is unavailable)");
+        }
+      }
+    }
     var findText = toWordFindText(find);
     var replaceText = toWordFindText(replace);
-    // Dem truoc khi thay (khong tim lai chuoi vua thay) roi thay mot lan duy nhat.
     var count = 0;
     try {
       var docText = "";
@@ -1036,7 +2480,45 @@
       count = countOccurrences(docText, find);
     } catch (e3) { count = 0; }
     content.Find.Execute(findText, false, false, false, false, false, true, 0, false, replaceText, 2);
+    return count;
+  }
+
+  function cmdReplaceAll(app, params) {
+    var find = paramString(params, "find", null);
+    var replace = paramString(params, "replace", "");
+    if (replace === null || replace === undefined) { replace = ""; }
+    if (!find) { return { replaced: false, count: 0 }; }
+    var count = writerReplaceAllIn(app, find, replace);
     return { replaced: count > 0, count: count };
+  }
+
+  // Nhieu cap tim/thay trong MOT lenh (mot buoc hoan tac) - giong WriterReplaceMany cua ban Windows.
+  function cmdWriterReplaceMany(app, params) {
+    var edits = params ? params.edits : undefined;
+    if (!Array.isArray(edits) || edits.length === 0) {
+      throw new Error("'edits' must be a non-empty array of {find, replace}");
+    }
+    if (edits.length > 200) {
+      throw new Error("'edits' has " + edits.length + " items; send at most 200 per call");
+    }
+    var counts = [];
+    var notFound = [];
+    var replaced = 0;
+    for (var i = 0; i < edits.length; i++) {
+      var item = edits[i];
+      // Bo qua cap thieu/khong phai find chuoi; replace thieu coi nhu "".
+      var find = item && typeof item === "object" ? item.find : undefined;
+      if (typeof find !== "string" || find === "") { continue; }
+      var replace = item.replace;
+      if (replace === undefined || replace === null) { replace = ""; }
+      var count = writerReplaceAllIn(app, find, replace);
+      counts.push(count);
+      replaced += count;
+      if (count === 0) { notFound.push(find); }
+    }
+    var result = { edits: counts.length, replaced: replaced, counts: counts };
+    if (notFound.length > 0) { result.notFound = notFound; }
+    return result;
   }
 
   function cmdUndo(app, params) {
@@ -1046,10 +2528,14 @@
     var doc = app.ActiveDocument;
     var undone = 0;
     for (var i = 0; i < count; i++) {
+      var stepped = null;
       try {
-        doc.Undo(1);
-        undone++;
+        stepped = doc.Undo(1);
       } catch (e) { break; }
+      // WPS that tra false/0 khi khong con gi de hoan tac (ban C# thi nem COMException): dung lai tai do,
+      // khong dem thanh buoc da hoan tac (lenh khong doi chu/revision nao khong duoc tinh la hoan tac).
+      if (stepped === false || stepped === 0) { break; }
+      undone++;
     }
     return { undone: undone };
   }
@@ -1075,6 +2561,337 @@
     try { fullName = strProp(doc, "FullName"); } catch (e2) {}
     if (!fullName) { fullName = path; }
     return { saved: true, fullName: fullName };
+  }
+
+  // ---- Track Changes + redline (port cua CommandDispatcher.WriterReview.cs) -----------------------
+  //
+  // Tac gia revision = app.UserName LUC sua (do tren WPS 12.1.2 that 31/10/2026 - tests/wps/REFERENCE.md
+  // "Track Changes va comment"). Ban Windows dat ten moi truoc MOI lenh (RunWithTrackingAuthor), ban
+  // WPS dat luon trong writer.setTracking va giu; ten cu cua nguoi dung duoc luu o day (giong
+  // _savedUserName cua C#) de restoreAuthor tra lai.
+  var savedTrackingUserName = null;
+  var savedTrackingUserInitials = null;
+
+  function cmdWriterSetTracking(app, params) {
+    var on = paramBool(params, "on", true);
+    var author = paramString(params, "author", null);
+    if (author === null) { author = ""; }
+    author = author.replace(/^\s+|\s+$/g, "");
+    var restore = paramBool(params, "restoreAuthor", false);
+    var doc = app.ActiveDocument;
+    var previous = !!doc.TrackRevisions;
+    if (author.length > 0) {
+      // Lan DAU doi ten moi luu ten cu (nhieu lenh author lien tiep khong de ten "Axiom AI" lam ten cu).
+      if (savedTrackingUserName === null) {
+        savedTrackingUserName = strProp(app, "UserName");
+        savedTrackingUserInitials = strProp(app, "UserInitials");
+      }
+      app.UserName = author;
+    }
+    // restoreAuthor khi chua tung doi ten: khong doi gi, khong loi (giong ban C#).
+    if (restore && savedTrackingUserName !== null) {
+      app.UserName = savedTrackingUserName;
+      try { app.UserInitials = savedTrackingUserInitials; } catch (e) {}
+      savedTrackingUserName = null;
+      savedTrackingUserInitials = null;
+    }
+    doc.TrackRevisions = on;
+    return { tracking: !!doc.TrackRevisions, previous: previous, author: strProp(app, "UserName") };
+  }
+
+  // Loai revision - copy RevisionTypeName cua ban C# (so wdRevisionType cua Word).
+  function revisionTypeName(type) {
+    switch (Number(type)) {
+      case 1: return "insert";
+      case 2: return "delete";
+      case 3: return "format";
+      case 4: return "numbering";
+      case 8: return "style";
+      case 10: return "paragraphFormat";
+      case 11: return "tableFormat";
+      case 12: return "sectionFormat";
+      case 14: return "movedFrom";
+      case 15: return "movedTo";
+      case 16: return "cellInsert";
+      case 17: return "cellDelete";
+      default: return "other";
+    }
+  }
+
+  // Ten story - copy StoryName cua ban C# (ban WPS JS add-in chi doc duoc than van ban = 1).
+  function storyName(storyType) {
+    switch (Number(storyType)) {
+      case 1: return "main";
+      case 2: return "footnotes";
+      case 3: return "endnotes";
+      case 4: return "comments";
+      case 5: return "textFrame";
+      case 6:
+      case 7:
+      case 10: return "header";
+      case 8:
+      case 9:
+      case 11: return "footer";
+      default: return "other";
+    }
+  }
+
+  // Revision.Date cua WPS la doi tuong Date JS: format GIO DIA PHUONG "yyyy-MM-dd HH:mm" giong
+  // Convert.ToDateTime(...).ToString("yyyy-MM-dd HH:mm") cua ban Windows. Tra null = khong doc duoc.
+  function formatRevisionDate(value) {
+    try {
+      if (!value || typeof value.getFullYear !== "function") { return null; }
+      var pad = function (n) { return (n < 10 ? "0" : "") + n; };
+      // WPS tra Date mang GIO DIA PHUONG gan nhan UTC (do tren WPS 12.1.2 that, may +07): doc getUTC* moi
+      // ra dung gio tren may; getHours() cong them mui gio lan nua.
+      return value.getUTCFullYear() + "-" + pad(value.getUTCMonth() + 1) + "-" + pad(value.getUTCDate()) +
+        " " + pad(value.getUTCHours()) + ":" + pad(value.getUTCMinutes());
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Chu cua mot Revision.Range giong RangeText cua ban C#: bo ky tu ket doan/o, cat toi `max`.
+  function revisionRangeText(range, max) {
+    var text = "";
+    try {
+      var raw = range.Text;
+      if (typeof raw === "function") { raw = raw.call(range); }
+      text = raw === undefined || raw === null ? "" : String(raw);
+    } catch (e) {
+      text = "";
+    }
+    text = text.split("\r").join(" ").split("\x07").join(" ").replace(/^\s+|\s+$/g, "");
+    return text.length > max ? text.substring(0, max) : text;
+  }
+
+  // So doan (1-based theo writer.outline / writer.goto) cua vi tri `position`: doan nao chua vi tri do.
+  // Khac ban C# (doc.Range(0, position+1).Paragraphs.Count): duyet thu cong doc.Paragraphs de chay duoc
+  // tren ban WPS khong co doc.Range; khong doc duoc thi tra 0 (giong catch cua ban C#).
+  function writerParagraphNumberAt(doc, position) {
+    try {
+      var paras = doc.Paragraphs;
+      var count = Number(paras.Count);
+      if (isNaN(count) || count < 1) { return 0; }
+      var pos = Number(position);
+      if (isNaN(pos)) { return 0; }
+      for (var k = 1; k <= count; k++) {
+        var range = paras.Item(k).Range;
+        var start = numProp(range, "Start");
+        var end = numProp(range, "End");
+        if (start === null || end === null) { return 0; }
+        if (pos >= start && pos < end) { return k; }
+      }
+      // Vi tri o dung sau ky tu cuoi tai lieu (revision xoa chu sau cung): gan doan cuoi cung.
+      return count;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  function cmdWriterListRevisions(app, params) {
+    var author = paramString(params, "author", null);
+    if (author === null) { author = ""; }
+    author = author.replace(/^\s+|\s+$/g, "");
+    var max = paramInt(params, "max", 200);
+    if (isNaN(max)) { max = 200; }
+    max = Math.max(1, max);
+    var doc = app.ActiveDocument;
+    var revisions = doc.Revisions;
+    var count = Number(revisions.Count);
+    if (isNaN(count)) { count = 0; }
+    var authorFilter = author.toLowerCase();
+    var items = [], authors = {}, total = 0;
+    for (var i = 1; i <= count; i++) {
+      var revision = revisions.Item(i);
+      var who = strProp(revision, "Author");
+      // authors dem MOI revision TRUOC khi loc theo `author` (khong bi `max` cat).
+      authors[who] = Object.prototype.hasOwnProperty.call(authors, who) ? authors[who] + 1 : 1;
+      if (authorFilter !== "" && who.toLowerCase() !== authorFilter) { continue; }
+      total++;
+      if (items.length >= max) { continue; }
+      var range = revision.Range;
+      var storyType = 1;
+      try { storyType = Number(range.StoryType); } catch (eStory) { storyType = 1; }
+      if (isNaN(storyType)) { storyType = 1; }
+      // id "<storyIndex>:<chi so>": WPS JS add-in chi doc duoc than van ban nen storyIndex luon 1.
+      var entry = {
+        id: "1:" + i,
+        type: revisionTypeName(revision.Type),
+        author: who,
+        text: revisionRangeText(range, 200),
+        story: storyName(storyType)
+      };
+      var when = null;
+      try { when = formatRevisionDate(revision.Date); } catch (eDate) { when = null; }
+      if (when !== null) { entry.date = when; }
+      if (storyType === 1) {
+        entry.paragraph = writerParagraphNumberAt(doc, numProp(range, "Start"));
+      }
+      items.push(entry);
+    }
+    return { revisions: items, total: total, authors: authors, tracking: !!doc.TrackRevisions };
+  }
+
+  // Duyet thay doi (port WriterReviewRevisions cua CommandDispatcher.WriterReview.cs): "Hoan tac luot nay" cua Core goi
+  // {action: "reject", author: "Axiom AI", since}. Do tren WPS 12.1.2 that: Accept/Reject chay khi TAT theo doi; Date
+  // mang gio dia phuong gan nhan UTC nen doi ve UTC that (getTimezoneOffset) truoc khi so voi `since`.
+  function cmdWriterReviewRevisions(app, params) {
+    var action = paramString(params, "action", "");
+    action = (action === null ? "" : action).replace(/^\s+|\s+$/g, "").toLowerCase();
+    if (action !== "accept" && action !== "reject") {
+      throw new Error("'action' must be 'accept' or 'reject'");
+    }
+    var ids = [];
+    if (params && Array.isArray(params.ids)) {
+      for (var n = 0; n < params.ids.length; n++) {
+        if (params.ids[n] !== null && params.ids[n] !== undefined) { ids.push(String(params.ids[n]).replace(/^\s+|\s+$/g, "")); }
+      }
+    }
+    var author = paramString(params, "author", "");
+    author = (author === null ? "" : author).replace(/^\s+|\s+$/g, "").toLowerCase();
+    var all = paramBool(params, "all", false);
+    var since = null;
+    var sinceText = paramString(params, "since", null);
+    if (sinceText !== null && sinceText !== "") {
+      since = Date.parse(sinceText);
+      if (isNaN(since)) { throw new Error("'since' must be an ISO 8601 time, e.g. 2026-10-27T08:30:00Z"); }
+      since -= 60000;   // lui mot phut cho chac (giong C#)
+    }
+    if (ids.length === 0 && author === "" && !all) {
+      throw new Error("give 'ids' (from writer.listRevisions), 'author', or 'all': true");
+    }
+    var doc = app.ActiveDocument;
+    var revisions = doc.Revisions;
+    var count = Number(revisions.Count);
+    if (isNaN(count)) { count = 0; }
+    var targets = [], found = {};
+    for (var i = 1; i <= count; i++) {
+      var revision = revisions.Item(i);
+      var id = "1:" + i;   // cung cach danh so voi writer.listRevisions
+      var byAuthor = author !== "" && strProp(revision, "Author").toLowerCase() === author;
+      if (byAuthor && since !== null) {
+        var when = null;
+        try {
+          var date = revision.Date;
+          when = date.getTime() + date.getTimezoneOffset() * 60000;
+        } catch (eDate) { when = null; }
+        byAuthor = when !== null && when >= since;
+      }
+      var byId = ids.indexOf(id) >= 0;
+      if (byId) { found[id] = true; }
+      if (all || byId || byAuthor) { targets.push(revision); }
+    }
+    var missing = [];
+    for (var k = 0; k < ids.length; k++) {
+      if (!found[ids[k]]) { missing.push(ids[k]); }
+    }
+    if (missing.length > 0 && !all) {
+      throw new Error("unknown revision ids: " + missing.join(", ") + " (read them again with writer.listRevisions)");
+    }
+    // Dang theo doi thi chap nhan/tu choi khong duoc tao them revision; duyet NGUOC de chi so phia truoc khong doi.
+    var tracking = !!doc.TrackRevisions;
+    doc.TrackRevisions = false;
+    var done = 0;
+    try {
+      for (var t = targets.length - 1; t >= 0; t--) {
+        if (action === "accept") { targets[t].Accept(); } else { targets[t].Reject(); }
+        done++;
+      }
+    } finally {
+      doc.TrackRevisions = tracking;
+    }
+    return { action: action, count: done };
+  }
+
+  // Them comment (port WriterAddComment cua CommandDispatcher.WriterReview.cs). Tac gia = app.UserName
+  // LUC them (do tren WPS that): writer.setTracking da dat ten nen lenh nay khong doi UserName.
+  function cmdWriterAddComment(app, params) {
+    var text = paramString(params, "text", null);
+    if (text === null) { text = ""; }
+    text = text.replace(/^\s+|\s+$/g, "");
+    if (text.length === 0) { throw new Error("'text' is required"); }
+    var doc = app.ActiveDocument;
+    var find = paramString(params, "find", null);
+    var paragraph = paramInt(params, "paragraph", 0);
+    var anchor = null;
+    if (find !== null && find !== "") {
+      anchor = doc.Content;
+      // Find.Execute khong thay thi tra false; tim THANG (khong replace) thi WPS hep Range ve cho khop
+      // (do tren WPS 12.1.2 that) - dung chinh Range do lam chu neo cho comment.
+      if (find.length > 255 || !anchor.Find.Execute(find)) {
+        throw new Error("'find' text was not found (max 255 characters, exact match)");
+      }
+    } else if (paragraph > 0) {
+      var count = Number(doc.Paragraphs.Count);
+      if (isNaN(count)) { count = 0; }
+      if (paragraph > count) {
+        throw new Error("'paragraph' must be between 1 and " + count);
+      }
+      anchor = doc.Paragraphs.Item(paragraph).Range;
+    } else {
+      throw new Error("give 'paragraph' (from writer.outline) or 'find' (text to anchor the comment to)");
+    }
+    var added = doc.Comments.Add(anchor, text);
+    // So comment = Index cua comment vua tra ve; khong doc duoc Index thi so luong hien tai (giong C#).
+    var number = numProp(added, "Index");
+    if (number === null || !(number > 0)) { number = numProp(doc.Comments, "Count"); }
+    return { comment: number, paragraph: writerParagraphNumberAt(doc, numProp(anchor, "Start")) };
+  }
+
+  // Doc comment (port WriterListComments cua CommandDispatcher.WriterReview.cs): comment goc thi day du
+  // (id/tac gia/noi dung/cat 500/da xong/ngay/chu neo/cat 200/so doan/tra loi), tra loi ghep vao comment
+  // goc theo vi tri neo (Ancestor khong doc duoc thi coi nhu comment goc).
+  function cmdWriterListComments(app, params) {
+    var includeDone = paramBool(params, "includeDone", false);
+    var max = paramInt(params, "max", 100);
+    if (isNaN(max)) { max = 100; }
+    max = Math.max(1, max);
+    var doc = app.ActiveDocument;
+    var comments = doc.Comments;
+    var count = Number(comments.Count);
+    if (isNaN(count)) { count = 0; }
+    var items = [], roots = [], pending = [], open = 0;
+    for (var i = 1; i <= count; i++) {
+      var comment = comments.Item(i);
+      var done = false;
+      try { done = !!comment.Done; } catch (eDone) {}
+      var entry = {
+        id: i,
+        author: strProp(comment, "Author"),
+        text: revisionRangeText(comment.Range, 500),
+        done: done
+      };
+      var when = null;
+      try { when = formatRevisionDate(comment.Date); } catch (eDate) {}
+      if (when !== null) { entry.date = when; }
+      var ancestor = null;
+      try { ancestor = comment.Ancestor; } catch (eAncestor) {}
+      if (ancestor !== null && ancestor !== undefined) {
+        pending.push({ ancestor: ancestor, entry: entry });
+        continue;
+      }
+      var scope = comment.Scope;
+      entry.anchor = revisionRangeText(scope, 200);
+      entry.paragraph = writerParagraphNumberAt(doc, numProp(scope, "Start"));
+      entry.replies = [];
+      roots.push({ start: numProp(scope, "Start"), entry: entry });
+      if (!done) { open++; }
+      if ((includeDone || !done) && items.length < max) { items.push(entry); }
+    }
+    // Ghep tra loi vao comment goc: Ancestor la mot Comment (khong co chi so truc tiep) nen so sanh
+    // theo vi tri Scope.Start cua comment goc, giong ban C#.
+    for (var k = 0; k < pending.length; k++) {
+      var parentStart = null;
+      try { parentStart = numProp(pending[k].ancestor.Scope, "Start"); } catch (eScope) {}
+      for (var m = 0; m < roots.length; m++) {
+        if (parentStart !== null && roots[m].start === parentStart) {
+          roots[m].entry.replies.push(pending[k].entry);
+          break;
+        }
+      }
+    }
+    return { comments: items, open: open, total: count - pending.length };
   }
 
   function pdfHex4(n) {
@@ -1223,6 +3040,33 @@
     return false;
   }
 
+  // Noi dung PDF (chi toan byte ASCII) -> chuoi nhi phan ma FileSystem.writeAsBinaryString nhan.
+  function pdfBinaryString(pdf) {
+    var codes = [];
+    for (var i = 0; i < pdf.length; i++) { codes.push(pdf.charCodeAt(i) & 0xFF); }
+    try {
+      var parts = [];
+      for (var k = 0; k < codes.length; k += 4096) {
+        parts.push(String.fromCharCode.apply(null, codes.slice(k, k + 4096)));
+      }
+      return parts.join("");
+    } catch (e) {
+      var data = "";
+      for (var m = 0; m < pdf.length; m++) { data += String.fromCharCode(pdf.charCodeAt(m) & 0xFF); }
+      return data;
+    }
+  }
+
+  // Duong du phong dung chung cho Writer/ET/WPP: tu dung PDF tu text roi ghi that, kiem tra lai file.
+  function writePdf(fs, path, text, appLabel) {
+    if (!fs || typeof fs.writeAsBinaryString !== "function") {
+      throw new Error("WPS " + appLabel + " does not expose app.FileSystem, so the PDF could not be written or verified");
+    }
+    fs.writeAsBinaryString(path, pdfBinaryString(buildPdf(text)));
+    if (!fsExists(fs, path)) { throw new Error("could not write PDF to '" + path + "'"); }
+    return { exported: path };
+  }
+
   function cmdExportPdf(app, params) {
     var path = paramString(params, "path", null);
     if (!path) { throw new Error("'path' is required"); }
@@ -1232,33 +3076,258 @@
     try { doc.ExportAsFixedFormat(path, 17); } catch (e0) {}
     var wfs = null;
     try { wfs = app.FileSystem; } catch (e1) { wfs = null; }
-    if (wfs !== undefined && wfs !== null) {
-      if (fsExists(wfs, path)) { return { exported: path }; }
-      var text = "";
-      try {
-        var raw = doc.Content.Text;
-        if (typeof raw === "function") { raw = raw.call(doc.Content); }
-        if (raw !== undefined && raw !== null) { text = String(raw); }
-      } catch (e2) {}
-      var pdf = buildPdf(text);
-      var codes = [];
-      for (var i = 0; i < pdf.length; i++) { codes.push(pdf.charCodeAt(i) & 0xFF); }
-      var data = "";
-      try {
-        var parts = [];
-        for (var k = 0; k < codes.length; k += 4096) {
-          parts.push(String.fromCharCode.apply(null, codes.slice(k, k + 4096)));
-        }
-        data = parts.join("");
-      } catch (e3) {
-        data = "";
-        for (var m = 0; m < pdf.length; m++) { data += String.fromCharCode(pdf.charCodeAt(m) & 0xFF); }
-      }
-      wfs.writeAsBinaryString(path, data);
-      if (!fsExists(wfs, path)) { throw new Error("could not write PDF to '" + path + "'"); }
-      return { exported: path };
+    if (wfs === undefined || wfs === null) {
+      // Khong co FileSystem thi khong kiem duoc file, cung khong tu dung duoc PDF: bao loi ro rang
+      // thay vi tra {exported} trong khi tren dia khong co gi (ET/WPP cung nem o nhanh nay).
+      throw new Error("WPS Writer does not expose app.FileSystem, so the PDF could not be written or verified");
     }
-    return { exported: path };
+    if (fsExists(wfs, path)) { return { exported: path }; }
+    var text = "";
+    try { text = strProp(doc.Content, "Text"); } catch (e2) {}
+    return writePdf(wfs, path, text, "Writer");
+  }
+
+  // ---- Khoa vung boi den (port cua CommandDispatcher.WriterScope.cs ben C#) --------------------
+  //
+  // Nguoi dung boi den roi hoi thi chi vung boi den duoc doi. Vung khoa nho bang phan chu TRUOC va SAU
+  // no, khong bang mot Range: AI viet lai ca doan da chon thi Range cu co the ve mot diem, con "giua
+  // phan truoc va phan sau" van dung du chua ben trong dai ra hay ngan di.
+  //
+  // `selectionLock` la trang thai cua CA add-in (mot tien trinh WPS = mot add-in), giong `_selectionLock`
+  // ben C#. Vong doi: Core goi writer.lockSelection truoc luot chay va writer.unlockSelection khi luot
+  // xong - Core giu bridge nen pane khong phai biet gi.
+  var selectionLock = null;
+
+  // Lenh chay nhu thuong khi dang khoa: lenh doc (khong doi tai lieu), writer.undo (hoan tac la viec
+  // nguoi dung goi), va chinh hai lenh khoa - neu khong, lockBegin se keo con tro ve vung khoa CU truoc
+  // khi cmdLockSelection kip doc vung nguoi dung vua boi den.
+  var LOCK_READ_ONLY = {
+    "writer.getText": true,
+    "writer.selection": true,
+    "writer.outline": true,
+    "writer.undo": true,
+    "writer.save": true,
+    "writer.saveAs": true,
+    "writer.exportPdf": true,
+    "writer.lockSelection": true,
+    "writer.unlockSelection": true,
+    "writer.listRevisions": true,
+    "writer.listComments": true,
+    "writer.checkLayout": true
+  };
+
+  // Lenh luon cham ra ngoai vung chon: tu choi truoc, noi ro vi sao. Giu du ca cac lenh add-in Windows
+  // co ma WPS chua viet handler (newDocument/open/closeAll/restyle/insertBlocks): khi nao co handler thi
+  // khoa phai tu choi chung, va danh sach nay la cho ghi dieu do.
+  var LOCK_REFUSED = {
+    "writer.appendText": "appends at the end of the document",
+    "writer.restyle": "restyles the whole document",
+    "writer.insertBlocks": "inserts blocks across the document",
+    "writer.newDocument": "creates another document",
+    "writer.open": "opens another document",
+    "writer.closeAll": "closes the documents",
+    "writer.deleteParagraphs": "deletes paragraphs by number anywhere in the document",
+    // InsertBreak THAY ca vung chon bang dau ngat: khoa vung luon co vung chon nen lenh nay xoa ca doan
+    // da boi den. Muon ngat trang thi bo boi den roi yeu cau.
+    "writer.insertPageBreak": "replaces the whole selected passage with a page break"
+  };
+
+  // Lenh THAY ca vung chon bang chu moi: vo hai voi vung chu, nhung lam MAT bang nam tron trong vung.
+  // Luoi an toan sau khi chay (so bang truoc/sau) bat not cac lenh khong nam trong danh sach nay.
+  var LOCK_TABLE_REFUSED = {
+    "writer.typeText": "it would replace the table with plain text",
+    "writer.insertStyledText": "it would replace the table with plain text",
+    "writer.heading": "it would replace or restyle the table as a heading",
+    "writer.insertHyperlink": "it would replace the table with the link text"
+  };
+
+  function lockMessage(problem) {
+    return "Refused: the user selected part of the document, so only the selected text may change (" + problem +
+      "). Edit inside the selection: writer.replaceAll searches only the selection, writer.typeText replaces it, " +
+      "writer.formatSelection formats it. If the request really needs other parts, stop and tell the user to " +
+      "clear the selection and ask again.";
+  }
+
+  function tableLockMessage(problem) {
+    return "Refused: the selection contains a whole table; " + problem + ". The table is protected: edit text " +
+      "in its cells with writer.replaceAll (it searches only inside the selection) and restyle with " +
+      "writer.formatSelection. If the user really wants the table removed or its rows changed, stop and tell " +
+      "them to clear the selection and ask again.";
+  }
+
+  // Chu cua doan [from, to) trong tai lieu. null = khong doc duoc (khac "" la doan rong).
+  function docRangeText(doc, from, to) {
+    try {
+      var range = doc.Range(from, to);
+      var raw = range.Text;
+      if (typeof raw === "function") { raw = raw.call(range); }
+      if (raw === undefined || raw === null) { return null; }
+      return String(raw);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Cac bang cua tai lieu dang o [start, end) nao. known=false: build WPS nay khong doc duoc Tables.
+  function lockTableRanges(doc) {
+    var out = [];
+    try {
+      var tables = doc.Tables;
+      var count = Number(tables.Count);
+      if (isNaN(count)) { return null; }
+      for (var i = 1; i <= count; i++) {
+        var item = tables.Item(i);
+        var range = item.Range;
+        var s = numProp(range, "Start");
+        var e = numProp(range, "End");
+        if (s === null || e === null) { return null; }
+        out.push([s, e]);
+      }
+      return out;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  // So bang NAM TRON trong [start, end): bang nam tron moi co the bi xoa ca khi thay vung chon; bang nam
+  // mot phan (con tro trong o) van sua chu binh thuong duoc.
+  function countWholeTables(ranges, start, end) {
+    if (ranges === null) { return 0; }
+    var whole = 0;
+    for (var i = 0; i < ranges.length; i++) {
+      if (ranges[i][0] >= start && ranges[i][1] <= end) { whole++; }
+    }
+    return whole;
+  }
+
+  // Vi tri dau/cuoi HIEN TAI cua vung khoa. null = khoa khong ap cho tai lieu nay (khac tai lieu thi
+  // khoa coi nhu khong co, dung nhu C#: doi tai lieu thi khoa cu vo hieu).
+  function lockBounds(app, state) {
+    var doc = null;
+    try { doc = app.ActiveDocument; } catch (eDoc) { return null; }
+    if (doc === undefined || doc === null) { return null; }
+    if (strProp(doc, "FullName") !== state.document) { return null; }
+    var docEnd = numProp(doc.Content, "End");
+    if (docEnd === null) { return null; }
+    var end = docEnd - state.suffixLength;
+    if (end < state.prefixEnd) { end = state.prefixEnd; }
+    return { doc: doc, start: state.prefixEnd, end: end };
+  }
+
+  // Keo con tro/vung chon ve trong vung khoa truoc khi chay lenh theo con tro (typeText, heading...).
+  // Khong keo duoc thi van chay: luoi an toan sau khi chay se hoan tac neu chu roi ra ngoai.
+  function pullCursorInto(app, start, end) {
+    try {
+      var sel = app.Selection;
+      var s = numProp(sel, "Start");
+      var e = numProp(sel, "End");
+      if (s === null || e === null) { return false; }
+      if (s >= start && e <= end) { return true; }
+      try { sel.SetRange(start, end); return true; } catch (eSet) {}
+      try { sel.Start = start; sel.End = end; return true; } catch (eProp) {}
+    } catch (e) {}
+    return false;
+  }
+
+  // Phan NGOAI vung khoa con nguyen khong (so chu truoc + sau voi luc khoa).
+  function lockOutsideUnchanged(bounds, state) {
+    var docEnd = numProp(bounds.doc.Content, "End");
+    if (docEnd === null) { return false; }
+    var suffixStart = docEnd - state.suffixLength;
+    if (suffixStart < state.prefixEnd) { return false; }
+    var pre = docRangeText(bounds.doc, 0, state.prefixEnd);
+    var suf = docRangeText(bounds.doc, suffixStart, docEnd);
+    if (pre === null || suf === null) { return false; }
+    return pre === state.prefix && suf === state.suffix;
+  }
+
+  // Chuan bi chay mot lenh trong vung khoa. Tra null (khong khoa / lenh doc / khac tai lieu) hoac
+  // {app, doc, start, end}. NEM Error khi lenh bi tu choi truoc - execute() doi thanh {ok:false, error}.
+  function lockBegin(app, action) {
+    var state = selectionLock;
+    if (state === null || action.indexOf("writer.") !== 0 || LOCK_READ_ONLY[action]) { return null; }
+    var bounds = lockBounds(app, state);
+    if (bounds === null) { return null; }
+    var reason = LOCK_REFUSED[action];
+    if (reason) { throw new Error(lockMessage(action + " " + reason)); }
+    if (state.tables > 0 && LOCK_TABLE_REFUSED[action]) {
+      throw new Error(tableLockMessage(LOCK_TABLE_REFUSED[action]));
+    }
+    pullCursorInto(app, bounds.start, bounds.end);
+    return { app: app, doc: bounds.doc, start: bounds.start, end: bounds.end };
+  }
+
+  // Sau khi lenh chay xong (va buoc hoan tac da dong): phan ngoai vung doi thi hoan tac ngay va bao loi;
+  // lenh nao lam mat mot bang nam tron trong vung thi cung vay (bat ca lenh khong nam trong danh sach chan).
+  function lockVerify(lock, action) {
+    var state = selectionLock;
+    if (state === null) { return; }
+    if (!lockOutsideUnchanged(lock, state)) {
+      undoOneStep(lock.doc);
+      throw new Error(lockMessage(action + " changed text outside the selection, so it was undone"));
+    }
+    if (state.tables > 0) {
+      var now = lockBounds(lock.app, state);
+      if (now !== null && countWholeTables(lockTableRanges(now.doc), now.start, now.end) < state.tables) {
+        undoOneStep(lock.doc);
+        throw new Error(tableLockMessage(action + " changed the table structure, so it was undone"));
+      }
+    }
+  }
+
+  function undoOneStep(doc) {
+    try { doc.Undo(1); } catch (e) {}
+  }
+
+  function cmdLockSelection(app) {
+    selectionLock = null;
+    var sel = app.Selection;
+    var start = numProp(sel, "Start");
+    var end = numProp(sel, "End");
+    var text = strProp(sel, "Text");
+    // Con tro dung yen (Word/WPS tra 1 ky tu) hoac chi boi khoang trang: khong phai vung chon.
+    if (start === null || end === null) {
+      return { chars: 0, reason: "this WPS build does not report Selection.Start/End" };
+    }
+    if (end - start < 2 || text.trim().length < 2) {
+      return { chars: 0, reason: "nothing selected" };
+    }
+    var doc = null;
+    try { doc = app.ActiveDocument; } catch (eDoc) { doc = null; }
+    if (doc === undefined || doc === null) { return { chars: 0, reason: "no document open" }; }
+    var docEnd = numProp(doc.Content, "End");
+    if (docEnd === null) {
+      return { chars: 0, reason: "this WPS build does not report Content.End" };
+    }
+    var prefix = docRangeText(doc, 0, start);
+    var suffix = docRangeText(doc, end, docEnd);
+    // Khong doc duoc phan truoc/sau thi KHONG khoa: thieu chung thi sau nay khong co cach nao biet
+    // mot lenh co lam doi phan ngoai vung hay khong, tuc luoi an toan khong ton tai.
+    if (prefix === null || suffix === null) {
+      return { chars: 0, reason: "this WPS build cannot read a document range (Range(from, to).Text)" };
+    }
+    var ranges = lockTableRanges(doc);
+    selectionLock = {
+      document: strProp(doc, "FullName"),
+      prefixEnd: start,
+      suffixLength: docEnd - end,
+      prefix: prefix,
+      suffix: suffix,
+      tables: countWholeTables(ranges, start, end)
+    };
+    return {
+      chars: end - start,
+      start: start,
+      end: end,
+      docEnd: docEnd,
+      tables: selectionLock.tables,
+      tablesKnown: ranges !== null
+    };
+  }
+
+  function cmdUnlockSelection() {
+    selectionLock = null;
+    return { locked: false };
   }
 
   // ---- ET (Spreadsheets): undo tu quan ly trong phien add-in (ET khong co UndoRecord).
@@ -1316,29 +3385,60 @@
     return wb;
   }
 
+  // Khoa cua mot workbook: duong dan day du la dinh danh on dinh nhat (hai so cung ten "Book1" van khac nhau);
+  // so chua luu lan nao thi dung ten. Ngan undo va kho dinh dang dieu kien deu theo khoa nay, khong theo
+  // ten sheet tran - ten sheet lap lai o moi workbook.
+  function etWbKey(wb) {
+    var full = "";
+    try { full = strProp(wb, "FullName"); } catch (e) {}
+    if (full) { return "f:" + full; }
+    var name = "";
+    try { name = strProp(wb, "Name"); } catch (e2) {}
+    return "n:" + name;
+  }
+
+  function etSheetKey(wb, sheetName) {
+    return etWbKey(wb) + "\n" + String(sheetName);
+  }
+
+  function etFindWbByKey(app, key) {
+    var col = app.Workbooks;
+    var n = Number(col.Count);
+    for (var i = 1; i <= n; i++) {
+      var wb = col.Item(i);
+      if (etWbKey(wb) === key) { return wb; }
+    }
+    return null;
+  }
+
+  // Doi ten sheet: buoc undo va kho dinh dang dieu kien cua sheet do phai di theo ten moi.
+  function etRenameUndoSheet(list, bookKey, oldName, newName) {
+    for (var i = 0; i < list.length; i++) {
+      var e = list[i];
+      if (e.kind === "group") {
+        etRenameUndoSheet(e.entries, bookKey, oldName, newName);
+      } else if (e.book === bookKey && e.sheet === oldName) {
+        e.sheet = newName;
+      }
+    }
+  }
+
   function etSheetNames(wb) {
     var names = [];
     var col = wb.Worksheets;
-    var n = col.Count;
-    if (typeof n === "function") { n = n.call(col); }
-    n = Number(n);
+    var n = Number(numProp(col, "Count"));
     for (var i = 1; i <= n; i++) {
-      var ws = col.Item(i);
-      var nm = ws.Name;
-      if (typeof nm === "function") { nm = nm.call(ws); }
-      names.push(String(nm));
+      names.push(strProp(col.Item(i), "Name"));
     }
     return names;
   }
 
   function etFindSheet(wb, name) {
     var col = wb.Worksheets;
-    var n = Number(col.Count);
+    var n = Number(numProp(col, "Count"));
     for (var i = 1; i <= n; i++) {
       var ws = col.Item(i);
-      var nm = ws.Name;
-      if (typeof nm === "function") { nm = nm.call(ws); }
-      if (String(nm) === String(name)) { return ws; }
+      if (strProp(ws, "Name") === String(name)) { return ws; }
     }
     return null;
   }
@@ -1354,16 +3454,11 @@
     }
     var active = app.ActiveSheet;
     if (active === undefined || active === null) { throw new Error("no active sheet (open one in WPS Spreadsheets first)"); }
-    var aname = active.Name;
-    if (typeof aname === "function") { aname = aname.call(active); }
-    return { wb: wb, ws: active, name: String(aname) };
+    return { wb: wb, ws: active, name: strProp(active, "Name") };
   }
 
   function etRangeAddrOf(ws) {
-    var ur = ws.UsedRange;
-    var fn = ur.Address;
-    var abs = (typeof fn === "function") ? fn.call(ur) : fn;
-    return etNormAddr(String(abs));
+    return etNormAddr(strProp(ws.UsedRange, "Address"));
   }
 
   function etStrictMatrix(raw) {
@@ -1433,25 +3528,18 @@
     }
   }
 
-  function etPushCells(sheetName, addrStr, snaps) {
-    etUndoStack.push({ kind: "cells", sheet: sheetName, range: addrStr, snaps: snaps });
+  function etPushCells(wb, sheetName, addrStr, snaps) {
+    etUndoStack.push({ kind: "cells", book: etWbKey(wb), sheet: sheetName, range: addrStr, snaps: snaps });
   }
 
   function etActiveSheetName(app) {
-    var s = app.ActiveSheet;
-    var n = s.Name;
-    if (typeof n === "function") { n = n.call(s); }
-    return String(n);
+    return strProp(app.ActiveSheet, "Name");
   }
 
   function etDocInfo(wb) {
-    var name = wb.Name;
-    if (typeof name === "function") { name = name.call(wb); }
-    var full = wb.FullName;
-    if (typeof full === "function") { full = full.call(wb); }
     var saved = wb.Saved;
     if (typeof saved === "function") { saved = saved.call(wb); }
-    return { name: String(name), fullName: String(full), saved: !!saved };
+    return { name: strProp(wb, "Name"), fullName: strProp(wb, "FullName"), saved: !!saved };
   }
 
   function cmdEtNewWorkbook(app) {
@@ -1544,7 +3632,7 @@
     }
     ws.Name = name;
     try { ws.Activate(); } catch (e) {}
-    etUndoStack.push({ kind: "addSheet", sheet: name });
+    etUndoStack.push({ kind: "addSheet", book: etWbKey(wb), sheet: name });
     return { sheet: name, sheets: etSheetNames(wb) };
   }
 
@@ -1563,6 +3651,14 @@
     }
     var ws = etFindSheet(wb, old);
     ws.Name = name;
+    var bookKey = etWbKey(wb);
+    etRenameUndoSheet(etUndoStack, bookKey, old, name);
+    var oldKey = bookKey + "\n" + old;
+    var newKey = bookKey + "\n" + name;
+    if (etCondStore[oldKey]) {
+      etCondStore[newKey] = etCondStore[oldKey];
+      delete etCondStore[oldKey];
+    }
     return { sheet: name, sheets: etSheetNames(wb) };
   }
 
@@ -1649,7 +3745,133 @@
     return { sheet: r.name, range: etAddrStr(box.r1, box.c1, box.r2, box.c2), values: out };
   }
 
-  function etDoWriteCells(ws, sheetName, topAddr, rows) {
+  // "Data!A1:C5", "'Kế hoạch'!B2" hoặc "A1:C5" (sheet = fallback, rỗng = sheet đang mở) - mirror SheetRange
+  // của contract C# CommandDispatcher.SpreadsheetBatch.cs: lấy dấu `!` CUỐI, gạch quote đầu/cuối tên sheet,
+  // đổi "''" thành "'" (tên chứa dấu nháy đơn).
+  function etRangeWithSheet(app, wb, fallback, text, label) {
+    var sheetName = (fallback === undefined || fallback === null) ? "" : String(fallback);
+    var local = String(text).trim();
+    var bang = local.lastIndexOf("!");
+    if (bang > 0) {
+      sheetName = local.substring(0, bang).trim().replace(/^'+|'+$/g, "").replace(/''/g, "'");
+      local = local.substring(bang + 1).trim();
+    }
+    var box;
+    try { box = etParseAddr(local); } catch (eAddr) {
+      throw new Error(label + ": '" + text + "' is not a range address");
+    }
+    if (sheetName === "") {
+      var r = etResolveSheet(app, {});
+      return { wb: r.wb, ws: r.ws, name: r.name, box: box };
+    }
+    var ws = etFindSheet(wb, sheetName);
+    if (ws === null) {
+      throw new Error(label + ": no sheet named '" + sheetName + "' (sheets: " + etSheetNames(wb).join(", ") + ")");
+    }
+    return { wb: wb, ws: ws, name: sheetName, box: box };
+  }
+
+  // Ma trận công thức: chỉ giữ ô bắt đầu "=", còn lại null (đúng shape et.readRange formulas=true).
+  function etFormulaMatrix(rng, box) {
+    var f = rng.Formula;
+    if (typeof f === "function") { f = f.call(rng); }
+    var fm = f;
+    if (box.r1 === box.r2 && box.c1 === box.c2) { fm = etWrapSingle(f); }
+    else if (!Array.isArray(fm)) { fm = etWrapSingle(fm); }
+    var out = [];
+    var i, j;
+    for (i = 0; i < fm.length; i++) {
+      var row = [];
+      var src = Array.isArray(fm[i]) ? fm[i] : [fm[i]];
+      for (j = 0; j < src.length; j++) {
+        var cell = src[j];
+        row.push((typeof cell === "string" && cell.charAt(0) === "=") ? cell : null);
+      }
+      out.push(row);
+    }
+    return out;
+  }
+
+  // Ma trận giá trị: Value2 cả vùng, undefined -> null.
+  function etValueMatrix(rng, box) {
+    var v = rng.Value2;
+    if (typeof v === "function") { v = v.call(rng); }
+    var vals = v;
+    if (box.r1 === box.r2 && box.c1 === box.c2) { vals = etWrapSingle(v); }
+    else if (!Array.isArray(vals)) { vals = etWrapSingle(vals); }
+    var out = [];
+    var a, b;
+    for (a = 0; a < vals.length; a++) {
+      var line = [];
+      var srow = Array.isArray(vals[a]) ? vals[a] : [vals[a]];
+      for (b = 0; b < srow.length; b++) {
+        var cv = srow[b];
+        line.push((cv === undefined ? null : cv));
+      }
+      out.push(line);
+    }
+    return out;
+  }
+
+  // et.readRanges: đọc NHIỀU vùng (nhiều sheet) trong MỘT lời gọi - mirror EtReadRanges của
+  // CommandDispatcher.SpreadsheetBatch.cs: `reads` là mảng {range, sheet?, formulas?}; `sheet`/`formulas`
+  // top-level làm mặc định cho các mục thiếu; range nhận "Sheet!A1:B6"; kiểm trả HẾT trước khi đọc,
+  //giới hạn 4000 ô mỗi lần gọi.
+  function cmdEtReadRanges(app, params) {
+    var reads = params.reads;
+    if (reads !== null && typeof reads === "object" && !Array.isArray(reads)) {
+      var inner = null, kk;
+      var keys = ["items", "item", "value"];
+      for (kk = 0; kk < keys.length; kk++) {
+        if (reads[keys[kk]] !== undefined) { inner = reads[keys[kk]]; break; }
+      }
+      reads = (inner !== null) ? inner : [reads];
+    }
+    if (!Array.isArray(reads) || reads.length === 0) {
+      throw new Error("'reads' is required: a list of {range, sheet?, formulas?}, e.g. " +
+        "[{\"sheet\": \"Dashboard\", \"range\": \"A1:B6\"}, {\"range\": \"Config!B2:B5\"}]");
+    }
+    var dfltSheet = paramString(params, "sheet", null);
+    var dfltFormulas = paramBool(params, "formulas", false);
+    var wb = etWb(app);
+    var plans = [];
+    var cells = 0;
+    var i, item;
+    for (i = 0; i < reads.length; i++) {
+      item = reads[i];
+      if (item === null || typeof item !== "object" || Array.isArray(item)) {
+        throw new Error("reads[" + i + "] must be an object like {range, sheet?, formulas?}, got " + describeValue(item));
+      }
+      var label = "'reads[" + i + "]'";
+      var text = (item.range !== undefined && item.range !== null) ? String(item.range) : "";
+      if (text === "") { throw new Error(label + " needs 'range', e.g. 'A1:C10'"); }
+      var fallback = (item.sheet !== undefined && item.sheet !== null) ? String(item.sheet) : dfltSheet;
+      var rr = etRangeWithSheet(app, wb, fallback, text, label);
+      cells += (rr.box.r2 - rr.box.r1 + 1) * (rr.box.c2 - rr.box.c1 + 1);
+      plans.push({ item: item, rr: rr });
+    }
+    if (cells > 4000) {
+      throw new Error("the ranges hold " + cells + " cells (limit 4000 per call): read only the cells you " +
+        "need, or use et.readRange for one large area");
+    }
+    var results = [];
+    for (i = 0; i < plans.length; i++) {
+      var plan = plans[i];
+      var box = plan.rr.box;
+      var addrStr = etAddrStr(box.r1, box.c1, box.r2, box.c2);
+      var rng = plan.rr.ws.Range(addrStr);
+      var out = { sheet: plan.rr.name, range: addrStr };
+      if (paramBool(plan.item, "formulas", dfltFormulas)) {
+        out.formulas = etFormulaMatrix(rng, box);
+      } else {
+        out.values = etValueMatrix(rng, box);
+      }
+      results.push(out);
+    }
+    return { reads: results, cells: cells };
+  }
+
+  function etDoWriteCells(wb, ws, sheetName, topAddr, rows) {
     var top = etParseAddr(topAddr);
     var r0 = top.r1, c0 = top.c1;
     var width = 1, i;
@@ -1669,7 +3891,7 @@
     var addrStr = etAddrStr(r0, c0, r0 + norm.length - 1, c0 + width - 1);
     var rng = ws.Range(addrStr);
     rng.Value2 = norm;
-    etPushCells(sheetName, addrStr, snaps);
+    etPushCells(wb, sheetName, addrStr, snaps);
     return { written: norm.length * width, range: addrStr };
   }
 
@@ -1683,7 +3905,7 @@
     var top = etTopLeft(addr);
     etParseAddr(top);
     var r = etResolveSheet(app, params);
-    var res = etDoWriteCells(r.ws, r.name, top, rows);
+    var res = etDoWriteCells(r.wb, r.ws, r.name, top, rows);
     return { written: res.written, sheet: r.name };
   }
 
@@ -1728,7 +3950,7 @@
       var rr = etResolveSheet(app, px.sheet ? px : {});
       // item co sheet rieng thi uu tien item
       if (p.sheet) { rr = etResolveSheet(app, { sheet: p.sheet }); }
-      var out = etDoWriteCells(rr.ws, rr.name, p.top, p.rows);
+      var out = etDoWriteCells(rr.wb, rr.ws, rr.name, p.top, p.rows);
       written += out.written;
       if (sheets.indexOf(rr.name) < 0) { sheets.push(rr.name); }
     }
@@ -1816,7 +4038,7 @@
       sheetName = nm;
       topAddr = "A1";
     }
-    var res = etDoWriteCells(ws, sheetName, topAddr, rows);
+    var res = etDoWriteCells(wb, ws, sheetName, topAddr, rows);
     void res;
     return { path: path, sheet: sheetName, range: topAddr, rows: rows.length, columns: width, cells: rows.length * width };
   }
@@ -1845,7 +4067,7 @@
       var rng = r.ws.Range(addrStr);
       rng.Formula = formula;
     }
-    etUndoStack.push({ kind: "cells", sheet: r.name, range: addrStr, snaps: snaps });
+    etUndoStack.push({ kind: "cells", book: etWbKey(r.wb), sheet: r.name, range: addrStr, snaps: snaps });
     var got = r.ws.Range(addrStr).Formula;
     if (typeof got === "function") { got = got.call(r.ws.Range(addrStr)); }
     var mat = got;
@@ -1992,8 +4214,9 @@
       if (hasParam(rule, "italic")) { fc.Font.Italic = paramBool(rule, "italic", false); }
       written.push({ operator: p.input, formula1: p.formula1, formula2: p.formula2 || null });
     }
-    if (!etCondStore[r.name]) { etCondStore[r.name] = []; }
-    var bucket = etCondStore[r.name];
+    var cfKey = etSheetKey(r.wb, r.name);
+    if (!etCondStore[cfKey]) { etCondStore[cfKey] = []; }
+    var bucket = etCondStore[cfKey];
     var bi;
     for (bi = bucket.length - 1; bi >= 0; bi--) {
       if (bucket[bi].range === addrStr) { bucket.splice(bi, 1); }
@@ -2004,7 +4227,7 @@
 
   function cmdEtListCondFormats(app, params) {
     var r = etResolveSheet(app, params);
-    var bucket = etCondStore[r.name] || [];
+    var bucket = etCondStore[etSheetKey(r.wb, r.name)] || [];
     var addr = paramString(params, "range", null);
     if (addr) {
       var box = etParseAddr(etNormAddr(addr));
@@ -2019,11 +4242,11 @@
       var rng = r.ws.Range(want);
       var fcCol = rng.FormatConditions;
       var n = Number(fcCol.Count);
+      if (n === 0) { return { sheet: r.name, formats: [] }; }
       var rules = [];
       for (i = 1; i <= n; i++) {
         var fc = fcCol.Item(i);
-        var op = fc.Operator;
-        if (typeof op === "function") { op = op.call(fc); }
+        var op = numProp(fc, "Operator");
         var f1 = fc.Formula1;
         if (typeof f1 === "function") { f1 = f1.call(fc); }
         var f2 = fc.Formula2;
@@ -2051,10 +4274,8 @@
             var k;
             for (k = 1; k <= cnt; k++) {
               var f = col2.Item(k);
-              var t = f.Type;
-              if (typeof t === "function") { t = t.call(f); }
-              var o = f.Operator;
-              if (typeof o === "function") { o = o.call(f); }
+              var t = numProp(f, "Type");
+              var o = numProp(f, "Operator");
               var a1 = f.Formula1;
               if (typeof a1 === "function") { a1 = a1.call(f); }
               var a2 = f.Formula2;
@@ -2098,9 +4319,7 @@
     if (isNaN(h)) { h = 7; }
     var ptsW = w * 28.3465, ptsH = h * 28.3465;
     var cell = r.ws.Range(anchorStr);
-    var left = cell.Left, top = cell.Top;
-    if (typeof left === "function") { left = left.call(cell); }
-    if (typeof top === "function") { top = top.call(cell); }
+    var left = numProp(cell, "Left"), top = numProp(cell, "Top");
     var objs = r.ws.ChartObjects();
     var obj = objs.Add(Number(left), Number(top), ptsW, ptsH);
     var chart = obj.Chart;
@@ -2115,12 +4334,10 @@
         titleApplied = true;
       } catch (e2) { titleApplied = false; }
     }
-    var nm = obj.Name;
-    if (typeof nm === "function") { nm = nm.call(obj); }
-    var actual = ET_CHART_BACK[Number(chart.ChartType)] || kind;
+    var nm = strProp(obj, "Name");
+    var actual = ET_CHART_BACK[Number(numProp(chart, "ChartType"))] || kind;
     if (typeof actual === "string") {
-      var chk = obj.Chart.ChartType;
-      if (typeof chk === "function") { chk = chk.call(obj.Chart); }
+      var chk = numProp(obj.Chart, "ChartType");
       actual = ET_CHART_BACK[Number(chk)] || kind;
     }
     return { chart: String(nm), sheet: r.name, type: kind, diagram: actual, typeApplied: (actual === kind), titleApplied: titleApplied, range: addrStr, anchor: anchorStr };
@@ -2129,81 +4346,139 @@
   function cmdEtListCharts(app, params) {
     var r = etResolveSheet(app, params);
     var objs = r.ws.ChartObjects();
-    var n = Number(objs.Count);
+    var n = Number(numProp(objs, "Count"));
     var charts = [], i;
     for (i = 1; i <= n; i++) {
       var o = objs.Item(i);
-      var nm = o.Name;
-      if (typeof nm === "function") { nm = nm.call(o); }
-      var ct = o.Chart.ChartType;
-      if (typeof ct === "function") { ct = ct.call(o.Chart); }
-      charts.push({ name: String(nm), diagram: ET_CHART_BACK[Number(ct)] || "" });
+      charts.push({ name: strProp(o, "Name"), diagram: ET_CHART_BACK[Number(numProp(o.Chart, "ChartType"))] || "" });
     }
     var shapes = [];
     try {
       var sh = r.ws.Shapes;
-      var cnt = Number(sh.Count);
+      var cnt = Number(numProp(sh, "Count"));
       for (i = 1; i <= cnt; i++) {
-        var s = sh.Item(i);
-        var label = null;
-        try { label = s.Name; if (typeof label === "function") { label = label.call(s); } } catch (e) {}
-        shapes.push(label === undefined || label === null ? "" : String(label));
+        shapes.push(strProp(sh.Item(i), "Name"));
       }
     } catch (e2) {}
     return { sheet: r.name, charts: charts, shapes: shapes };
+  }
+
+  // Hop dong voi pane: moi lenh et.* co `undo` trong registry = DUNG MOT muc tren etUndoStack (pane dem so lenh
+  // nhu vay roi gui et.undo {count}). Lenh day nhieu muc (writeRanges) gop thanh mot; lenh khong day muc nao
+  // (dinh dang, bieu do... WPS chua hoan tac duoc) giu cho bang muc "none" - neu khong, count lech va
+  // "Hoan tac luot nay" go mat buoc cua luot truoc. Lenh loi: bo cac muc vua day (pane khong dem lenh loi).
+  function etUndoMark(kind, entry) {
+    return (kind === "et" && entry !== null && entry.undo) ? etUndoStack.length : -1;
+  }
+
+  function etUndoSeal(mark, action, ok) {
+    if (mark < 0) { return; }
+    var added = etUndoStack.splice(mark, etUndoStack.length - mark);
+    if (!ok) { return; }
+    if (added.length === 0) {
+      etUndoStack.push({ kind: "none", action: action });
+    } else if (added.length === 1) {
+      etUndoStack.push(added[0]);
+    } else {
+      etUndoStack.push({ kind: "group", entries: added });
+    }
+  }
+
+  // Go mot muc; tra false khi khong khoi phuc duoc gi.
+  function etUndoEntry(app, entry, restored, skipped) {
+    var k;
+    if (entry.kind === "none") {
+      skipped.push(entry.action);
+      return false;
+    }
+    if (entry.kind === "group") {
+      var any = false;
+      for (k = entry.entries.length - 1; k >= 0; k--) {
+        if (etUndoEntry(app, entry.entries[k], restored, skipped)) { any = true; }
+      }
+      return any;
+    }
+    if (entry.kind === "addSheet") {
+      try {
+        var wbAdd = etFindWbByKey(app, entry.book);
+        var ws = wbAdd ? etFindSheet(wbAdd, entry.sheet) : null;
+        if (ws) { ws.Delete(); }
+      } catch (e) {}
+      // Xoa ca ghi nhan dinh dang co dieu kien cua sheet do
+      try { delete etCondStore[entry.book + "\n" + entry.sheet]; } catch (e2) {}
+      restored.push({ sheet: entry.sheet, deleted: true });
+      return true;
+    }
+    try {
+      var wb2 = etFindWbByKey(app, entry.book);
+      // Workbook da dong (hoac doi duong dan): bo qua, KHONG khoi phuc vao tai lieu dang mo.
+      if (!wb2) { return false; }
+      var ws2 = etFindSheet(wb2, entry.sheet);
+      // Sheet da bi xoa/doi ten ngoai add-in: bo qua, KHONG lui ve sheet dang active.
+      if (!ws2) { return false; }
+      etRestoreCells(ws2, entry.snaps);
+      restored.push({ sheet: entry.sheet, range: entry.range, cells: entry.snaps.length });
+      return true;
+    } catch (e3) {
+      return false;
+    }
   }
 
   function cmdEtUndo(app, params) {
     var count = paramInt(params, "count", 1);
     if (isNaN(count)) { count = 1; }
     count = Math.max(1, count);
-    var restored = [], undone = 0, k;
+    var restored = [], skipped = [], undone = 0, k;
     for (k = 0; k < count; k++) {
       if (etUndoStack.length === 0) { break; }
-      var entry = etUndoStack.pop();
-      if (entry.kind === "addSheet") {
-        try {
-          var wb = etWb(app);
-          var ws = etFindSheet(wb, entry.sheet);
-          if (ws) { ws.Delete(); }
-        } catch (e) {}
-        // Xoa ca ghi nhan dinh dang co dieu kien cua sheet do
-        try { delete etCondStore[entry.sheet]; } catch (e2) {}
-        restored.push({ sheet: entry.sheet, deleted: true });
-        undone++;
-      } else {
-        try {
-          var wb2 = etWb(app);
-          var ws2 = etFindSheet(wb2, entry.sheet);
-          if (!ws2) {
-            // Sheet bi doi ten/xoa: thu sheet dang active
-            ws2 = app.ActiveSheet;
-          }
-          etRestoreCells(ws2, entry.snaps);
-          var cells = entry.snaps.length;
-          restored.push({ sheet: entry.sheet, range: entry.range, cells: cells });
-          undone++;
-        } catch (e3) {}
-      }
+      if (etUndoEntry(app, etUndoStack.pop(), restored, skipped)) { undone++; }
     }
-    return { undone: undone, restored: restored };
+    var out = { undone: undone, restored: restored };
+    if (skipped.length > 0) { out.skipped = skipped; }
+    return out;
   }
 
-  function etPdfWrite(fs, path, pdf) {
-    var codes = [];
-    for (var i = 0; i < pdf.length; i++) { codes.push(pdf.charCodeAt(i) & 0xFF); }
-    var data = "";
+  // Thu muc cuu ban chua luu: <tmpdir>/rescued. WPS Mkdir chi tao duoc MOT cap, ma tmpdir da ton tai
+  // nen tao thang "/tmp/rescued" la du. Loi tao thu muc khong chan viec dong tai lieu.
+  function rescueDir(app) {
+    var tmp = "/tmp";
+    var fs = null;
     try {
-      var parts = [];
-      for (var q = 0; q < codes.length; q += 4096) {
-        parts.push(String.fromCharCode.apply(null, codes.slice(q, q + 4096)));
+      fs = app.FileSystem;
+      tmp = strProp(fs, "tmpdir") || "/tmp";
+    } catch (e) {}
+    var dir = tmp.replace(/[/\\]+$/, "") + "/rescued";
+    try {
+      if (fs && !fsExists(fs, dir) && typeof fs.Mkdir === "function") { fs.Mkdir(dir); }
+    } catch (e2) {}
+    return dir;
+  }
+
+  function rescueName(obj, fallback) {
+    var nm = "";
+    try { nm = strProp(obj, "Name"); } catch (e) {}
+    return nm || fallback;
+  }
+
+  // Dong ca bo tai lieu dang mo: cuu ban CHUA LUU vao <tmpdir>/rescued truoc, roi dong tung cai.
+  // closeDoc khac nhau giua ET (Close(false)) va WPP (Close() khong tham so) nen do ben goi truyen vao.
+  function closeAllDocuments(app, collection, fallbackName, closeDoc) {
+    var n = Number(collection.Count);
+    var items = [], i;
+    for (i = 1; i <= n; i++) { items.push(collection.Item(i)); }
+    var dir = rescueDir(app);
+    var rescued = [], closed = 0;
+    for (i = 0; i < items.length; i++) {
+      var doc = items[i];
+      var saved = doc.Saved;
+      if (typeof saved === "function") { saved = saved.call(doc); }
+      if (!saved) {
+        var rp = dir + "/" + rescueName(doc, fallbackName);
+        try { doc.SaveAs(rp); rescued.push(rp); } catch (e2) {}
       }
-      data = parts.join("");
-    } catch (e) {
-      data = "";
-      for (var m = 0; m < pdf.length; m++) { data += String.fromCharCode(pdf.charCodeAt(m) & 0xFF); }
+      try { closeDoc(doc); closed++; } catch (e3) {}
     }
-    fs.writeAsBinaryString(path, data);
+    return { closed: closed, rescued: rescued };
   }
 
   function cmdEtExportPdf(app, params) {
@@ -2226,10 +4501,7 @@
         for (rr = box.r1; rr <= box.r2; rr++) {
           var rowVals = [];
           for (cc = box.c1; cc <= box.c2; cc++) {
-            var cell = ws.Cells.Item(rr, cc);
-            var t = cell.Text;
-            if (typeof t === "function") { t = t.call(cell); }
-            rowVals.push(t === undefined || t === null ? "" : String(t));
+            rowVals.push(strProp(ws.Cells.Item(rr, cc), "Text"));
           }
           lines.push(rowVals.join("\t"));
         }
@@ -2237,16 +4509,12 @@
       }
       text = lines.join("\n");
     } catch (e2) {}
-    var pdf = buildPdf(text);
-    etPdfWrite(fs, path, pdf);
-    if (!fsExists(fs, path)) { throw new Error("could not write PDF to '" + path + "'"); }
-    return { exported: path };
+    return writePdf(fs, path, text, "Spreadsheets");
   }
 
   function cmdEtSave(app) {
     var wb = etWb(app);
-    var p = wb.Path;
-    if (typeof p === "function") { p = p.call(wb); }
+    var p = strProp(wb, "Path");
     if (!p) { throw new Error("the document has never been saved - use saveAs with a 'path'"); }
     wb.Save();
     var info = etDocInfo(wb);
@@ -2263,32 +4531,7 @@
   }
 
   function cmdEtCloseAll(app) {
-    var wbs = app.Workbooks;
-    var n = Number(wbs.Count);
-    var items = [], i;
-    for (i = 1; i <= n; i++) { items.push(wbs.Item(i)); }
-    var tmp = "/tmp";
-    try {
-      var fs = app.FileSystem;
-      var t = fs.tmpdir();
-      if (typeof t === "function") { t = t.call(fs); }
-      if (t) { tmp = String(t); }
-    } catch (e) {}
-    var rescued = [], closed = 0;
-    for (i = 0; i < items.length; i++) {
-      var wb = items[i];
-      var saved = wb.Saved;
-      if (typeof saved === "function") { saved = saved.call(wb); }
-      if (!saved) {
-        var nm = wb.Name;
-        if (typeof nm === "function") { nm = nm.call(wb); }
-        nm = String(nm) || "workbook.xlsx";
-        var rp = tmp + "/rescued/" + nm;
-        try { wb.SaveAs(rp); rescued.push(rp); } catch (e2) {}
-      }
-      try { wb.Close(false); closed++; } catch (e3) {}
-    }
-    return { closed: closed, rescued: rescued };
+    return closeAllDocuments(app, app.Workbooks, "workbook.xlsx", function (wb) { wb.Close(false); });
   }
 
   var ET_ERR_TEXT = ["#DIV/0!", "#REF!", "#NAME?", "#NUM!", "#NULL!", "#VALUE!", "#N/A", "#ERR:", "Err:"];
@@ -2315,15 +4558,10 @@
     if (typeof v === "function") { v = v.call(cell); }
     var f = cell.Formula;
     if (typeof f === "function") { f = f.call(cell); }
-    var t = cell.Text;
-    if (typeof t === "function") { t = t.call(cell); }
-    var nf = cell.NumberFormat;
-    if (typeof nf === "function") { nf = nf.call(cell); }
     if (Array.isArray(v)) { v = null; }
     if (Array.isArray(f)) { f = null; }
     return { v: (v === undefined ? null : v), f: (f === undefined ? null : f),
-      t: (t === undefined || t === null ? "" : String(t)),
-      nf: (nf === undefined || nf === null ? "General" : String(nf)) };
+      t: strProp(cell, "Text"), nf: strProp(cell, "NumberFormat") || "General" };
   }
 
   function cmdEtCheckRange(app, params) {
@@ -2484,6 +4722,226 @@
   }
 
   // ---- WPP (Presentation): khong co UndoRecord, khong lenh nao mo UndoRecord.
+  // ---- Nhay toi cho duoc trich dan (pane goi khi nguoi dung bam [§12] / [Data!C42] / [slide 3]) - chi chon + cuon.
+  function cmdWriterGoto(app, params) {
+    var doc = app.ActiveDocument;
+    var paras = doc.Paragraphs;
+    var count = Number(numProp(paras, "Count"));
+    var index = paramInt(params, "paragraph", 0);
+    if (index < 1 || index > count) { throw new Error("'paragraph' must be between 1 and " + count); }
+    var hint = String(paramString(params, "text", "") || "").replace(/^\s+|\s+$/g, "").substring(0, 30).toLowerCase();
+    var startsWith = function (i) {
+      var t = "";
+      try { t = String(paras.Item(i).Range.Text || "").replace(/^\s+/, "").toLowerCase(); } catch (e) {}
+      return t.indexOf(hint) === 0;
+    };
+    // Tai lieu da doi sau cau tra loi: so doan lech - co chu dau doan thi do quanh do (+-40 doan).
+    if (hint && !startsWith(index)) {
+      for (var offset = 1; offset <= 40; offset++) {
+        if (index - offset >= 1 && startsWith(index - offset)) { index -= offset; break; }
+        if (index + offset <= count && startsWith(index + offset)) { index += offset; break; }
+      }
+    }
+    var range = paras.Item(index).Range;
+    range.Select();
+    try { app.ActiveWindow.ScrollIntoView(range, true); } catch (eScroll) {}
+    var text = "";
+    try { text = String(range.Text || "").replace(/\r/g, "").replace(/^\s+|\s+$/g, ""); } catch (eText) {}
+    return { paragraph: index, text: text.length > 120 ? text.substring(0, 120) + "..." : text };
+  }
+
+  // --- Sap xep / loc (et.sort, et.filter) - bam contract C# CommandDispatcher.SpreadsheetSort.cs ---
+  //
+  // WPS JS co Range.Sort (toi da 3 khoa, tham so theo vi tri) va Range.AutoFilter - da do tren WPS
+  // 12.1.2 (docs/audits/wps-linux-live-test-2026-10-28.md, muc spike API). Khong co Worksheet.Sort
+  // nhu Excel 2007+, nen chi dung Range.Sort.
+
+  function etSortKeys(params) {
+    var raw = params ? params.keys : null;
+    if (typeof raw === "string") {
+      var t = raw.replace(/^\s+|\s+$/g, "");
+      try { raw = JSON.parse(t); } catch (e) {
+        throw new Error("'keys' must hold 1-3 items like [{\"column\": \"Doanh thu\", \"order\": \"desc\"}]");
+      }
+    }
+    if (!Array.isArray(raw) || raw.length === 0 || raw.length > 3) {
+      throw new Error("'keys' must hold 1-3 items like [{\"column\": \"Doanh thu\", \"order\": \"desc\"}]");
+    }
+    var out = [];
+    for (var i = 0; i < raw.length; i++) {
+      var item = raw[i];
+      if (item === null || typeof item !== "object" || Array.isArray(item)) {
+        throw new Error("'keys' must hold 1-3 items like [{\"column\": \"Doanh thu\", \"order\": \"desc\"}]");
+      }
+      var column = paramString(item, "column", null);
+      if (column === null || String(column).replace(/^\s+|\s+$/g, "") === "") {
+        throw new Error("'keys' must hold 1-3 items like [{\"column\": \"Doanh thu\", \"order\": \"desc\"}]");
+      }
+      var order = String(paramString(item, "order", "asc") || "asc").replace(/^\s+|\s+$/g, "").toLowerCase();
+      out.push({ column: String(column), desc: order.indexOf("desc") === 0 || order === "z-a" });
+    }
+    return out;
+  }
+
+  // Cot trong vung: chu tieu de (hang dau, khong phan biet hoa thuong) hoac chu cot ("C") -> 1..n.
+  function etColumnInRange(rng, column, header) {
+    var wanted = String(column === null || column === undefined ? "" : column).replace(/^\s+|\s+$/g, "");
+    if (wanted === "") {
+      throw new Error("'column' is required: header text or column letter");
+    }
+    var first = Number(numProp(rng, "Column"));
+    var cols = Number(numProp(rng.Columns, "Count"));
+    var c;
+    if (header) {
+      for (c = 1; c <= cols; c++) {
+        var text = String(strProp(rng.Cells.Item(1, c), "Text") || "").replace(/^\s+|\s+$/g, "");
+        if (text.toLowerCase() === wanted.toLowerCase()) { return c; }
+      }
+    }
+    if (wanted.length <= 3 && /^[A-Za-z]+$/.test(wanted)) {
+      var index = etColToNum(wanted.toUpperCase()) - first + 1;
+      if (index >= 1 && index <= cols) { return index; }
+    }
+    var headers = [];
+    if (header) {
+      for (c = 1; c <= cols; c++) {
+        headers.push(String(strProp(rng.Cells.Item(1, c), "Text") || "").replace(/^\s+|\s+$/g, ""));
+      }
+    }
+    throw new Error("column '" + wanted + "' is not in the range" +
+      (headers.length > 0 ? " (headers: " + headers.join(", ") + ")" : ""));
+  }
+
+  function cmdEtSort(app, params) {
+    var address = paramString(params, "range", null);
+    if (address === null || String(address).replace(/^\s+|\s+$/g, "") === "") {
+      throw new Error("'range' is required: the data incl. header row, e.g. 'A1:F200'");
+    }
+    var keys = etSortKeys(params);
+    var header = paramBool(params, "header", true);
+    var wb = etWb(app);
+    var r = etRangeWithSheet(app, wb, paramString(params, "sheet", null),
+      String(address).replace(/^\s+|\s+$/g, ""), "'range'");
+    var rng = r.ws.Range(etAddrStr(r.box.r1, r.box.c1, r.box.r2, r.box.c2));
+    var rows = Number(numProp(rng.Rows, "Count"));
+    if (rows < (header ? 3 : 2)) {
+      throw new Error("the range has too few rows to sort");
+    }
+    var columns = [], orders = [], report = [], i;
+    for (i = 0; i < keys.length; i++) {
+      var col = etColumnInRange(rng, keys[i].column, header);
+      columns.push(col);
+      orders.push(keys[i].desc ? 2 : 1);   // xlDescending = 2, xlAscending = 1
+      report.push({ column: col, order: keys[i].desc ? "desc" : "asc" });
+    }
+    // Range.Sort(Key1, Order1, Key2, Order2, Key3, Order3, Header) - tham so theo vi tri (VBA).
+    rng.Sort(
+      rng.Columns.Item(columns[0]), orders[0],
+      columns.length > 1 ? rng.Columns.Item(columns[1]) : undefined,
+      columns.length > 1 ? orders[1] : undefined,
+      columns.length > 2 ? rng.Columns.Item(columns[2]) : undefined,
+      columns.length > 2 ? orders[2] : undefined,
+      header ? 1 : 2                    // xlYes = 1, xlNo = 2
+    );
+    return {
+      sheet: r.name, range: etAddrStr(r.box.r1, r.box.c1, r.box.r2, r.box.c2),
+      rows: header ? rows - 1 : rows, keys: report
+    };
+  }
+
+  function etFilterValues(params) {
+    var raw = params ? params.values : null;
+    if (typeof raw === "string") {
+      var t = raw.replace(/^\s+|\s+$/g, "");
+      if (t.charAt(0) === "[" || t.charAt(0) === "{") {
+        try { raw = JSON.parse(t); } catch (e) { raw = null; }
+      }
+    }
+    if (!Array.isArray(raw)) { return null; }
+    var out = [];
+    for (var i = 0; i < raw.length; i++) {
+      var v = raw[i];
+      // WPS ET doi gia tri loc dang CHUOI: AutoFilter(2, [7], 7) loc ra 0 dong, [“7”] moi dung
+      // (do tren WPS 12.1.2, 28/10/2026). Ep String de `values: [7]` chay nhu nguoi dung mong doi.
+      if (v === null || v === undefined) { v = ""; } else if (typeof v !== "string") { v = String(v); }
+      out.push(v);
+    }
+    return out;
+  }
+
+  function cmdEtFilter(app, params) {
+    var wb = etWb(app);
+    var ws, rng, name;
+    var address = paramString(params, "range", null);
+    if (address === null || String(address).replace(/^\s+|\s+$/g, "") === "") {
+      var act = etResolveSheet(app, params);
+      ws = act.ws; name = act.name;
+      rng = ws.UsedRange;
+    } else {
+      var r = etRangeWithSheet(app, wb, paramString(params, "sheet", null),
+        String(address).replace(/^\s+|\s+$/g, ""), "'range'");
+      ws = r.ws; name = r.name;
+      rng = ws.Range(etAddrStr(r.box.r1, r.box.c1, r.box.r2, r.box.c2));
+    }
+    var box = etParseAddr(etNormAddr(strProp(rng, "Address")));
+    if (paramBool(params, "clear", false)) {
+      try { if (ws.FilterMode) { ws.ShowAllData(); } } catch (eShow) {}
+      try { if (ws.AutoFilterMode) { ws.AutoFilterMode = false; } } catch (eMode) {}
+      return { sheet: name, cleared: true };
+    }
+    var field = etColumnInRange(rng, paramString(params, "column", null), true);
+    var values = etFilterValues(params);
+    var criteria = paramString(params, "criteria", null);
+    if ((values === null || values.length === 0) &&
+        (criteria === null || String(criteria).replace(/^\s+|\s+$/g, "") === "")) {
+      throw new Error("give 'values' (values to keep) or 'criteria' (e.g. '>100'), or 'clear': true");
+    }
+    if (values !== null && values.length > 0) {
+      rng.AutoFilter(field, values, 7);            // xlFilterValues = 7
+    } else {
+      rng.AutoFilter(field, String(criteria).replace(/^\s+|\s+$/g, ""));
+    }
+    var result = {
+      sheet: name, range: etAddrStr(box.r1, box.c1, box.r2, box.c2), column: field
+    };
+    try {
+      var vis = rng.Columns.Item(1).SpecialCells(12);   // xlCellTypeVisible = 12
+      var n = Number(numProp(vis, "Count")) - 1;
+      if (n >= 0) { result.visibleRows = n; }
+    } catch (eVis) {}
+    return result;
+  }
+
+  function cmdEtGoto(app, params) {
+    var address = String(paramString(params, "range", "") || "").replace(/^\s+|\s+$/g, "");
+    if (!address) { throw new Error("'range' is required, e.g. 'C42' or 'Data!C42'"); }
+    var sheetParams = { sheet: paramString(params, "sheet", null) };
+    var bang = address.lastIndexOf("!");
+    if (bang > 0) {
+      sheetParams.sheet = address.substring(0, bang).replace(/^'|'$/g, "").replace(/''/g, "'");
+      address = address.substring(bang + 1);
+    }
+    var box = etParseAddr(address);
+    var r = etResolveSheet(app, sheetParams);
+    try { r.ws.Activate(); } catch (eAct) {}
+    var rng = r.ws.Range(etAddrStr(box.r1, box.c1, box.r2, box.c2));
+    rng.Select();
+    return { sheet: r.name, range: etAddrStr(box.r1, box.c1, box.r2, box.c2) };
+  }
+
+  function cmdWppGoto(app, params) {
+    var pres = wppPres(app);
+    var count = Number(numProp(pres.Slides, "Count"));
+    var slide = paramInt(params, "slide", 0);
+    if (slide < 1 || slide > count) { throw new Error("'slide' must be between 1 and " + count); }
+    try {
+      app.ActiveWindow.View.GotoSlide(slide);
+    } catch (eGo) {
+      pres.Slides.Item(slide).Select();
+    }
+    return { slide: slide };
+  }
+
   function wppPres(app) {
     var p = app.ActivePresentation;
     if (p === undefined || p === null) {
@@ -2493,13 +4951,9 @@
   }
 
   function wppDocInfo(pres) {
-    var name = pres.Name;
-    if (typeof name === "function") { name = name.call(pres); }
-    var full = pres.FullName;
-    if (typeof full === "function") { full = full.call(pres); }
     var saved = pres.Saved;
     if (typeof saved === "function") { saved = saved.call(pres); }
-    return { name: String(name), fullName: String(full), saved: !!saved };
+    return { name: strProp(pres, "Name"), fullName: strProp(pres, "FullName"), saved: !!saved };
   }
 
   function wppNumber(params, name, dflt) {
@@ -2515,7 +4969,7 @@
   // Slide can thao tac: bo trong hoac ngoai khoang = slide CUOI (giong _page LibreOffice).
   function wppSlide(app, params) {
     var pres = wppPres(app);
-    var count = Number(pres.Slides.Count);
+    var count = Number(numProp(pres.Slides, "Count"));
     if (!(count > 0)) {
       throw new Error("presentation has no slides; call wpp.addSlide first");
     }
@@ -2547,32 +5001,29 @@
 
   function cmdWppListSlides(app, params) {
     var pres = wppPres(app);
-    var count = Number(pres.Slides.Count);
+    var count = Number(numProp(pres.Slides, "Count"));
     var slides = [], i, j;
     for (i = 1; i <= count; i++) {
       var slide = pres.Slides.Item(i);
-      var layout = slide.Layout;
-      if (typeof layout === "function") { layout = layout.call(slide); }
+      var layout = numProp(slide, "Layout");
       var texts = [];
-      var n = Number(slide.Shapes.Count);
+      var n = Number(numProp(slide.Shapes, "Count"));
       for (j = 1; j <= n; j++) {
         var t = wppShapeText(slide.Shapes.Item(j));
         if (t) { texts.push(t); }
       }
       var entry = { index: i, layout: Number(layout), shapeTexts: texts };
       if (paramBool(params, "detail", false)) {
-        try { var mn = slide.Master.Name; if (typeof mn === "function") { mn = mn.call(slide.Master); } entry.master = String(mn || ""); } catch (eM) {}
+        try { entry.master = strProp(slide.Master, "Name") || ""; } catch (eM) {}
         try {
-          var nn = []; var ns = slide.NotesPage.Shapes; var nc = Number(ns.Count);
+          var nn = []; var ns = slide.NotesPage.Shapes; var nc = Number(numProp(ns, "Count"));
           for (var k = 1; k <= nc; k++) { var nt = wppShapeText(ns.Item(k)); if (nt) { nn.push(nt); } }
           if (nn.length > 0) { entry.notes = nn; }
         } catch (eN) {}
       }
       slides.push(entry);
     }
-    var pname = pres.Name;
-    if (typeof pname === "function") { pname = pname.call(pres); }
-    return { presentation: String(pname), slideCount: count, slides: slides };
+    return { presentation: strProp(pres, "Name"), slideCount: count, slides: slides };
   }
 
   function cmdWppAddTable(app, params) {
@@ -2605,8 +5056,7 @@
         }
       }
     }
-    var nm = shape.Name;
-    if (typeof nm === "function") { nm = nm.call(shape); }
+    var nm = strProp(shape, "Name");
     return { slide: r.index, rows: rows, cols: cols, filled: filled, shape: String(nm) };
   }
 
@@ -2642,15 +5092,12 @@
     if (fsExists(fs, path)) { return { exported: path }; }
     var text = "";
     try { text = wppSlideTexts(pres); } catch (e1) {}
-    etPdfWrite(fs, path, buildPdf(text));
-    if (!fsExists(fs, path)) { throw new Error("could not write PDF to '" + path + "'"); }
-    return { exported: path };
+    return writePdf(fs, path, text, "Presentation");
   }
 
   function cmdWppSave(app) {
     var pres = wppPres(app);
-    var p = pres.Path;
-    if (typeof p === "function") { p = p.call(pres); }
+    var p = strProp(pres, "Path");
     if (!p) { throw new Error("the document has never been saved - use saveAs with a 'path'"); }
     pres.Save();
     var info = wppDocInfo(pres);
@@ -2668,41 +5115,20 @@
   }
 
   function cmdWppCloseAll(app) {
-    var col = app.Presentations;
-    var n = Number(col.Count);
-    var items = [], i;
-    for (i = 1; i <= n; i++) { items.push(col.Item(i)); }
-    var tmp = "/tmp";
-    try {
-      var fs = app.FileSystem;
-      var t = fs.tmpdir();
-      if (typeof t === "function") { t = t.call(fs); }
-      if (t) { tmp = String(t); }
-    } catch (e) {}
-    var rescued = [], closed = 0;
-    for (i = 0; i < items.length; i++) {
-      var pres = items[i];
-      var saved = pres.Saved;
-      if (typeof saved === "function") { saved = saved.call(pres); }
-      if (!saved) {
-        var nm = pres.Name;
-        if (typeof nm === "function") { nm = nm.call(pres); }
-        nm = String(nm) || "presentation.pptx";
-        var rp = tmp + "/rescued/" + nm;
-        try { pres.SaveAs(rp); rescued.push(rp); } catch (e2) {}
-      }
-      // WPP KHONG nhan tham so cho `Presentation.Close`: `Close(false)` bi tu choi bang "参数太多.", va vi loi
-      // bi nuot ngay day nen lenh truoc kia bao "thanh cong" ma khong dong bai nao (do 12/10/2026: hai bai dang
-      // mo ma `closed` = 0). Goi khong tham so moi dung: do duoc la dong that, `Presentations.Count` ve 0. Nhanh
-      // du phong cho ban WPS khac chi nhan dang co tham so — ET thi `Workbook.Close(false)` chay duoc.
-      // Do tren hai bai DA LUU (`Saved` = -1); duong cuu bai chua luu o tren giu cho Close() khong gap bai ban.
-      try { pres.Close(); closed++; }
-      catch (e3) { try { pres.Close(false); closed++; } catch (e4) {} }
-    }
-    return { closed: closed, rescued: rescued };
+    // WPP KHONG nhan tham so cho `Presentation.Close`: `Close(false)` bi tu choi bang "参数太多.", va vi loi
+    // bi nuot ngay day nen lenh truoc kia bao "thanh cong" ma khong dong bai nao (do 12/10/2026: hai bai dang
+    // mo ma `closed` = 0). Goi khong tham so moi dung: do duoc la dong that, `Presentations.Count` ve 0. Nhanh
+    // du phong cho ban WPS khac chi nhan dang co tham so — ET thi `Workbook.Close(false)` chay duoc.
+    // Do tren hai bai DA LUU (`Saved` = -1); duong cuu bai chua luu o tren giu cho Close() khong gap bai ban.
+    return closeAllDocuments(app, app.Presentations, "presentation.pptx", function (pres) {
+      try { pres.Close(); }
+      catch (e3) { pres.Close(false); }
+    });
   }
 
-  // Soat bo cuc: khong bao `overflow` (WPS khong do duoc chieu cao chu that).
+  // Soat bo cuc nhu ban Windows (CommandDispatcher.Checks.cs LayoutIssues). `overflow` dung TextRange.BoundHeight - do
+  // duoc tren WPS 12.1.2 (01/11/2026; khung khong tu gian nen chu tran thi BoundHeight > Height). Khong co
+  // connector-crossing/connector-overlap (chi ban Microsoft Office).
   function cmdWppCheckLayout(app, params) {
     var pres = wppPres(app);
     var count = Number(pres.Slides.Count);
@@ -2721,20 +5147,28 @@
       var boxes = [];
       for (j = 1; j <= n; j++) {
         var shape = slide.Shapes.Item(j);
-        var nm = shape.Name;
-        if (typeof nm === "function") { nm = nm.call(shape); }
+        var nm = strProp(shape, "Name");
         var t = wppShapeText(shape);
-        var size = 0;
+        var size = 0, textHeight = 0;
         if (t) {
           try { size = Number(shape.TextFrame.TextRange.Font.Size) || 0; } catch (e) { size = 0; }
+          try { textHeight = Number(shape.TextFrame.TextRange.BoundHeight) || 0; } catch (e2) { textHeight = 0; }
         }
         boxes.push({ name: String(nm), left: Number(shape.Left), top: Number(shape.Top),
-          width: Number(shape.Width), height: Number(shape.Height), chars: t.length, minFont: size });
+          width: Number(shape.Width), height: Number(shape.Height), chars: t.length, minFont: size,
+          textHeight: textHeight });
       }
       var issues = [], total = 0;
       for (j = 0; j < boxes.length; j++) {
         var b = boxes[j];
         total += b.chars;
+        if (b.chars && b.textHeight > b.height + 2) {
+          issues.push({ type: "overflow",
+            detail: "text of '" + b.name + "' needs " + Math.round(b.textHeight) + "pt height but the box is " +
+              Math.round(b.height) + "pt: shorten the text, move details to notes (wpp.setNotes) or split into two " +
+              "slides; keep fontSize at the design size",
+            shapes: [b.name] });
+        }
         if (b.left < -2 || b.top < -2 ||
             b.left + b.width > slideWidth + 2 || b.top + b.height > slideHeight + 2) {
           issues.push({ type: "offslide",
@@ -2795,6 +5229,259 @@
     throw new Error("'align' must be left/center/right, got '" + String(raw) + "'");
   }
 
+  function wppRound1(value) {
+    return Math.round(value * 10) / 10;
+  }
+
+  function cmdWppAddShape(app, params) {
+    var r = wppSlide(app, params);
+    // MsoAutoShapeType: 1 chu nhat, 5 bo goc, 9 elip, 52 chevron.
+    var kind = paramString(params, "shape", "rect");
+    var type;
+    switch (kind) {
+      case "rounded": type = 5; break;
+      case "oval": type = 9; break;
+      case "chevron": type = 52; break;
+      case "rect":
+      case "line": type = 1; break;
+      default: throw new Error("'shape' must be rect, rounded, oval, chevron or line, got " + kind);
+    }
+    var shape = r.slide.Shapes.AddShape(type, wppNumber(params, "left", 40), wppNumber(params, "top", 130),
+      wppNumber(params, "width", 200), wppNumber(params, "height", 80));
+    var fill = parseBgrColor(paramString(params, "fill", null));
+    if (fill !== null) {
+      shape.Fill.Visible = -1;
+      // Hinh moi cua WPS mang nen gradient: phai Solid() roi moi gan mau.
+      shape.Fill.Solid();
+      shape.Fill.ForeColor.RGB = fill;
+    } else {
+      shape.Fill.Visible = 0;
+    }
+    var line = parseBgrColor(paramString(params, "line", null));
+    if (line !== null) {
+      shape.Line.Visible = -1;
+      shape.Line.ForeColor.RGB = line;
+      shape.Line.Weight = 1.25;
+      if (paramBool(params, "dash", false)) { shape.Line.DashStyle = 4; }
+    } else {
+      shape.Line.Visible = 0;
+    }
+    // AutoShape cua WPS co bong san - tat cho moi hinh hai lenh nay ve.
+    shape.Shadow.Visible = 0;
+    var text = paramString(params, "text", null);
+    if (text !== null && text !== undefined && text !== "") {
+      var frame = shape.TextFrame;
+      frame.WordWrap = -1;
+      frame.AutoSize = 0;
+      frame.MarginLeft = 6;
+      frame.MarginRight = 6;
+      frame.VerticalAnchor = String(paramString(params, "anchor", "middle")).toLowerCase() === "top" ? 1 : 3;
+      var range = frame.TextRange;
+      // "\n" cua PowerPoint la ngat dong trong doan; moi dong mot doan ("\r").
+      range.Text = text.replace(/\r\n/g, "\r").replace(/\n/g, "\r");
+      range.ParagraphFormat.Alignment = 2;
+      range.Font.Size = wppNumber(params, "fontSize", 18);
+      range.Font.Bold = paramBool(params, "bold", false) ? -1 : 0;
+      if (paramBool(params, "boldFirst", false)) { range.Paragraphs(1).Font.Bold = -1; }
+      var font = paramString(params, "font", null);
+      if (font !== null && String(font).replace(/^\s+|\s+$/g, "") !== "") { range.Font.Name = font; }
+      var color = parseBgrColor(paramString(params, "color", "#262626"));
+      if (color !== null) { range.Font.Color.RGB = color; }
+      // Chu cua hinh WPS co bong san - tat khi ghi chu.
+      range.Font.Shadow = 0;
+    }
+    return { slide: r.index, shape: String(strProp(shape, "Name")) };
+  }
+
+  function cmdWppAddParagraphs(app, params) {
+    var raw = params ? params.paragraphs : null;
+    var items = [], i;
+    if (typeof raw === "string") {
+      var trimmed = raw.replace(/^\s+/, "");
+      if (trimmed.charAt(0) === "[" || trimmed.charAt(0) === "{") {
+        try { raw = JSON.parse(raw); } catch (eParse) {}
+      }
+    }
+    if (Array.isArray(raw)) {
+      for (i = 0; i < raw.length; i++) {
+        var entry = raw[i];
+        if (entry === null || typeof entry !== "object" || Array.isArray(entry)) { continue; }
+        var rawText = entry.t === undefined || entry.t === null ? "" : String(entry.t);
+        if (rawText.replace(/^\s+|\s+$/g, "").length > 0) { items.push(entry); }
+      }
+    }
+    if (items.length === 0) {
+      throw new Error("'paragraphs' must be a non-empty array of {t, l, b, i, n, u}");
+    }
+    var left = wppNumber(params, "left", 60);
+    var top = wppNumber(params, "top", 60);
+    var width = wppNumber(params, "width", 540);
+    var height = wppNumber(params, "height", 300);
+    var maxSize = Math.max(8, paramInt(params, "fontSize", 24));
+    var minSize = Math.max(8, Math.min(maxSize, paramInt(params, "minFontSize", 16)));
+    var r = wppSlide(app, params);
+    // The / o luu y: hinh chu nhat (bo goc) co nen thay cho khung chu tron.
+    var box = paramString(params, "box", "");
+    var fill = parseBgrColor(paramString(params, "fill", null));
+    var line = parseBgrColor(paramString(params, "line", null));
+    var boxed = box === "rounded" || box === "rect" || fill !== null;
+    var shape = boxed
+      ? r.slide.Shapes.AddShape(box === "rect" ? 1 : 5, left, top, width, height)
+      : r.slide.Shapes.AddTextbox(1, left, top, width, height);
+    if (boxed) {
+      if (fill !== null) {
+        shape.Fill.Visible = -1;
+        shape.Fill.Solid();
+        shape.Fill.ForeColor.RGB = fill;
+      } else {
+        shape.Fill.Visible = 0;
+      }
+      if (line !== null) {
+        shape.Line.Visible = -1;
+        shape.Line.ForeColor.RGB = line;
+        shape.Line.Weight = 1;
+      } else {
+        shape.Line.Visible = 0;
+      }
+      // WPS khong gan duoc Adjustments (bo goc) - chi tat bong.
+      shape.Shadow.Visible = 0;
+    }
+    var frame = shape.TextFrame;
+    if (boxed) {
+      frame.MarginLeft = 10;
+      frame.MarginRight = 10;
+      frame.MarginTop = 8;
+      frame.MarginBottom = 8;
+    }
+    try { frame.AutoSize = 0; } catch (eAuto) {}
+    frame.WordWrap = -1;
+    frame.VerticalAnchor = String(paramString(params, "anchor", "top")).toLowerCase() === "middle" ? 3 : 1;
+
+    function flag(item, key) { return item[key] === true; }
+    function levelOf(item) {
+      var value = item.l;
+      if (value === undefined || value === null) { return 1; }
+      var level = Math.round(Number(value));
+      if (isNaN(level)) { return 1; }
+      return Math.max(1, Math.min(5, level));
+    }
+
+    var lines = [];
+    // Tu khoa **...**: bo dau, nho vi tri (doan, vi tri 1-based trong doan, do dai) de in dam + to mau sau.
+    var emphasis = [];
+    for (i = 0; i < items.length; i++) {
+      var item = items[i];
+      var prefix = item.n === undefined || item.n === null ? "" : String(item.n).replace(/^\s+|\s+$/g, "");
+      var body = String(item.t).replace(/^\s+|\s+$/g, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n/g, "\v");
+      var head = prefix.length > 0 ? prefix + " " : "";
+      var plain = head;
+      var cursor = 0;
+      while (true) {
+        var open = body.indexOf("**", cursor);
+        var close = open < 0 ? -1 : body.indexOf("**", open + 2);
+        if (open < 0 || close < 0) {
+          plain += body.substring(cursor);
+          break;
+        }
+        plain += body.substring(cursor, open);
+        var word = body.substring(open + 2, close);
+        if (word.length > 0) {
+          emphasis.push([i + 1, plain.length + 1, word.length]);
+        }
+        plain += word;
+        cursor = close + 2;
+      }
+      lines.push(plain);
+    }
+
+    var range = frame.TextRange;
+    range.Text = lines.join("\r");
+    var font = paramString(params, "font", null);
+    if (font !== null && String(font).replace(/^\s+|\s+$/g, "") !== "") { range.Font.Name = font; }
+    var color = parseBgrColor(paramString(params, "color", null));
+    var accent = parseBgrColor(paramString(params, "accent", null));
+    if (color !== null) {
+      range.Font.Color.RGB = color;
+    } else if (boxed) {
+      // Hinh khoi cua WPS mac dinh chu trang: chu tren nen nhat phai toi.
+      range.Font.Color.RGB = 0x262626;
+    }
+    range.Font.Bold = 0;
+    range.Font.Italic = 0;
+    // Chu cua hinh WPS co bong san - tat khi ghi chu.
+    range.Font.Shadow = 0;
+    range.ParagraphFormat.Alignment = 1;
+
+    for (i = 0; i < items.length; i++) {
+      item = items[i];
+      var paragraph = range.Paragraphs(i + 1);
+      var level = levelOf(item);
+      paragraph.IndentLevel = level;
+      if (flag(item, "b")) {
+        paragraph.Font.Bold = -1;
+        if (accent !== null) { paragraph.Font.Color.RGB = accent; }
+      }
+      if (flag(item, "i")) { paragraph.Font.Italic = -1; }
+      var align = item.a;
+      if (align !== undefined && align !== null && String(align).toLowerCase() === "center") {
+        paragraph.ParagraphFormat.Alignment = 2;
+      }
+      var bullet = paragraph.ParagraphFormat.Bullet;
+      if (flag(item, "u")) {
+        bullet.Visible = -1;
+        // WPS: Visible = -1 khong kem Type la danh so; Type 1 + Character 8226 moi la dau cham.
+        bullet.Type = 1;
+        bullet.Character = 8226;
+      } else {
+        bullet.Visible = 0;
+      }
+    }
+
+    var highlight = parseBgrColor(paramString(params, "highlight", null));
+    if (highlight === null) { highlight = accent; }
+    for (i = 0; i < emphasis.length; i++) {
+      try {
+        var run = range.Paragraphs(emphasis[i][0]).Characters(emphasis[i][1], emphasis[i][2]);
+        run.Font.Bold = -1;
+        if (highlight !== null) { run.Font.Color.RGB = highlight; }
+      } catch (eRun) {}
+    }
+
+    var inner = Number(frame.MarginTop) + Number(frame.MarginBottom);
+    var chosen = minSize;
+    var overflow = true;
+    var range2 = shape.TextFrame2.TextRange;
+    for (var size = maxSize; size >= minSize; size--) {
+      range.Font.Size = size;
+      for (i = 0; i < items.length; i++) {
+        item = items[i];
+        // Thut le dat tren TUNG doan (TextFrame2); moi cap 1,2 em; doan co gach dau dong treo 0,9 em.
+        var lvl = levelOf(item);
+        var hang = flag(item, "u") ? wppRound1(0.9 * size) : 0;
+        var format2 = range2.Paragraphs(i + 1).ParagraphFormat;
+        format2.LeftIndent = wppRound1((lvl - 1) * 1.2 * size + hang);
+        format2.FirstLineIndent = -hang;
+        var format = range.Paragraphs(i + 1).ParagraphFormat;
+        format.LineRuleBefore = 0;
+        // Cach nhom: doan cap 1 (tru doan dau) cach tren 0,35 em; doan con dinh voi doan cha.
+        format.SpaceBefore = i > 0 && lvl === 1 ? wppRound1(0.35 * size) : 0;
+      }
+      if (Number(range.BoundHeight) <= height - inner + 1) {
+        chosen = size;
+        overflow = false;
+        break;
+      }
+    }
+    shape.Height = height;
+    return {
+      slide: r.index,
+      shape: String(strProp(shape, "Name")),
+      fontSize: chosen,
+      textHeight: wppRound1(Number(range.BoundHeight)),
+      overflow: overflow
+    };
+  }
+
   function cmdWppAddText(app, params) {
     var text = paramString(params, "text", "");
     if (text === null || text === undefined) { text = ""; }
@@ -2818,8 +5505,7 @@
       if (bgr !== null) { shape.TextFrame.TextRange.Font.Color.RGB = bgr; }
     }
     if (wantAlign) { shape.TextFrame.TextRange.ParagraphFormat.Alignment = align; }
-    var nm = shape.Name;
-    if (typeof nm === "function") { nm = nm.call(shape); }
+    var nm = strProp(shape, "Name");
     return { slide: r.index, shape: String(nm) };
   }
 
@@ -2833,8 +5519,7 @@
     var r = wppSlide(app, params);
     var shape = r.slide.Shapes.AddTextbox(1, left, top, width, height);
     shape.TextFrame.TextRange.Text = text;
-    var nm = shape.Name;
-    if (typeof nm === "function") { nm = nm.call(shape); }
+    var nm = strProp(shape, "Name");
     return { slide: r.index, shape: String(nm) };
   }
 
@@ -2866,8 +5551,7 @@
       shape.Height = h;
       if (origW && origH) { shape.Width = origW * h / origH; }
     }
-    var nm = shape.Name;
-    if (typeof nm === "function") { nm = nm.call(shape); }
+    var nm = strProp(shape, "Name");
     return { slide: r.index, shape: String(nm) };
   }
 
@@ -2895,13 +5579,30 @@
     "writer.heading": cmdHeading,
     "writer.formatSelection": cmdFormatSelection,
     "writer.setParagraphAlignment": cmdSetParagraphAlignment,
+    "writer.setStyle": cmdWriterSetStyle,
+    "writer.insertToc": cmdWriterInsertToc,
+    "writer.formatTable": cmdWriterFormatTable,
     "writer.insertTable": cmdInsertTable,
     "writer.insertPageBreak": cmdInsertPageBreak,
+    "writer.insertCaption": cmdWriterInsertCaption,
+    "writer.writeContent": cmdWriterWriteContent,
+    "writer.insertLayoutTable": cmdWriterInsertLayoutTable,
+    "writer.checkTables": cmdWriterCheckTables,
+    "writer.checkLayout": cmdWriterCheckLayout,
+    "writer.deleteParagraphs": cmdWriterDeleteParagraphs,
     "writer.replaceAll": cmdReplaceAll,
+    "writer.replaceMany": cmdWriterReplaceMany,
     "writer.undo": cmdUndo,
     "writer.save": cmdSave,
     "writer.saveAs": cmdSaveAs,
     "writer.exportPdf": cmdExportPdf,
+    "writer.lockSelection": cmdLockSelection,
+    "writer.unlockSelection": cmdUnlockSelection,
+    "writer.setTracking": cmdWriterSetTracking,
+    "writer.listRevisions": cmdWriterListRevisions,
+    "writer.reviewRevisions": cmdWriterReviewRevisions,
+    "writer.addComment": cmdWriterAddComment,
+    "writer.listComments": cmdWriterListComments,
     "et.newWorkbook": cmdEtNewWorkbook,
     "et.open": cmdEtOpen,
     "et.listSheets": cmdEtListSheets,
@@ -2910,6 +5611,7 @@
     "et.renameSheet": cmdEtRenameSheet,
     "et.activateSheet": cmdEtActivateSheet,
     "et.readRange": cmdEtReadRange,
+    "et.readRanges": cmdEtReadRanges,
     "et.writeRange": cmdEtWriteRange,
     "et.writeRanges": cmdEtWriteRanges,
     "et.importCsv": cmdEtImportCsv,
@@ -2925,11 +5627,18 @@
     "et.saveAs": cmdEtSaveAs,
     "et.closeAll": cmdEtCloseAll,
     "et.checkRange": cmdEtCheckRange,
+    "writer.goto": cmdWriterGoto,
+    "et.goto": cmdEtGoto,
+    "et.sort": cmdEtSort,
+    "et.filter": cmdEtFilter,
+    "wpp.goto": cmdWppGoto,
     "wpp.newPresentation": cmdWppNewPresentation,
     "wpp.open": cmdWppOpen,
     "wpp.listSlides": cmdWppListSlides,
     "wpp.addSlide": cmdWppAddSlide,
     "wpp.addText": cmdWppAddText,
+    "wpp.addShape": cmdWppAddShape,
+    "wpp.addParagraphs": cmdWppAddParagraphs,
     "wpp.addTextBox": cmdWppAddTextBox,
     "wpp.addImage": cmdWppAddImage,
     "wpp.addTable": cmdWppAddTable,
@@ -2950,7 +5659,7 @@
       for (var j = 0; j < c.params.length; j++) {
         params.push({ name: c.params[j].name, required: c.params[j].required, hint: c.params[j].hint });
       }
-      out.push({ name: c.name, kind: c.kind, agent: c.agent, summary: c.summary, params: params });
+      out.push({ name: c.name, kind: c.kind, agent: c.agent, undo: c.undo, summary: c.summary, params: params });
     }
     return out;
   }
@@ -2959,6 +5668,9 @@
   // Cung mot add-in nap trong ca ba app (publish.xml type="wps,et,wpp") nen phai doc
   // app.Name dang chay. KHONG BAO GIO throw: app la/thieu Name/Name khong phai string
   // hay doc Name loi deu tra "wps".
+  // Ten app khac nhau theo build WPS: "WPS Spreadsheets" (REFERENCE.md) hay "WPS Sheets"
+  // (that 12.1.2.29182.AK.preread, do ngay 28/10/2026 - appInfo tra name "WPS Sheets");
+  // "sheet" cung khop ca "Spreadsheet" nen mot dong che ca hai ten.
   function appKind(app) {
     try {
       if (app === undefined || app === null) { return "wps"; }
@@ -2967,8 +5679,9 @@
         try { name = name.call(app); } catch (e) { return "wps"; }
       }
       if (typeof name !== "string") { return "wps"; }
-      if (/spreadsheet/i.test(name)) { return "et"; }
+      if (/spreadsheet|sheet/i.test(name)) { return "et"; }
       if (/presentation|slide/i.test(name)) { return "wpp"; }
+      if (/writer|word|office/i.test(name)) { return "wps"; }
       return "wps";
     } catch (e2) {
       return "wps";
@@ -2986,7 +5699,7 @@
         for (var j = 0; j < c.params.length; j++) {
           params.push({ name: c.params[j].name, required: c.params[j].required, hint: c.params[j].hint });
         }
-        out.push({ name: c.name, kind: c.kind, agent: c.agent, summary: c.summary, params: params });
+        out.push({ name: c.name, kind: c.kind, agent: c.agent, undo: c.undo, summary: c.summary, params: params });
       }
     }
     return out;
@@ -3026,6 +5739,14 @@
       }
       var p = params;
       if (p === undefined || p === null) { p = {}; }
+      // Vung khoa: chuan bi TRUOC khi chay (co the tu choi), kiem SAU khi buoc hoan tac da dong - dung thu
+      // tu cua ban Windows (RunInSelectionLock): handler trong UndoRecordScope, dong scope, roi moi kiem.
+      var lock = null;
+      try {
+        lock = lockBegin(app, action);
+      } catch (lockErr) {
+        return { ok: false, error: errMessage(lockErr) };
+      }
       if (MUTATING[action]) {
         var undo = null;
         try { undo = app.UndoRecord; } catch (e) { undo = null; }
@@ -3036,23 +5757,34 @@
             started = true;
           } catch (e2) { started = false; }
         }
+        var outcome;
         try {
-          var result = handler(app, p);
-          return { ok: true, result: result };
+          outcome = { ok: true, result: handler(app, p) };
         } catch (err) {
-          return { ok: false, error: errMessage(err) };
+          outcome = { ok: false, error: errMessage(err) };
         } finally {
           if (started) {
             try { undo.EndCustomRecord(); } catch (e3) {}
           }
         }
-      } else {
-        try {
-          var res = handler(app, p);
-          return { ok: true, result: res };
-        } catch (err2) {
-          return { ok: false, error: errMessage(err2) };
+        if (outcome.ok && lock !== null) {
+          try {
+            lockVerify(lock, action);
+          } catch (lockErr2) {
+            return { ok: false, error: errMessage(lockErr2) };
+          }
         }
+        return outcome;
+      }
+      var etMark = etUndoMark(kind, entry);
+      try {
+        var res = handler(app, p);
+        if (lock !== null) { lockVerify(lock, action); }
+        etUndoSeal(etMark, action, true);
+        return { ok: true, result: res };
+      } catch (err2) {
+        etUndoSeal(etMark, action, false);
+        return { ok: false, error: errMessage(err2) };
       }
     } catch (fatal) {
       try {

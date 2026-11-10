@@ -57,7 +57,9 @@ namespace AxiomOffice.Ai
         private EmptyState _empty;
         private string _conversationId;              // hoi thoai ben Agent Core, theo tai lieu dang mo
         private bool _freshConversation;             // nguoi dung vua bam "Cuoc tro chuyen moi"
-        private bool _lastRunViaCore;                // luot vua roi chay qua Core hay in-process
+        private bool _lastRunViaCore;                // luot vua roi da chay qua Core
+        private string _lastRunId;                   // luot vua roi ben Core (POST /v1/runs/{id}/undo)
+        private string _lastUndoMode;                // "revisions" = luot sua bang Track Changes
         private string _lastReply = "";
         private string _lastPrompt = "";
         private string _blockedReason;
@@ -158,10 +160,10 @@ namespace AxiomOffice.Ai
             _headerSubtitle.AutoEllipsis = true;
             _settingsLink = PaneTheme.MakeLink(Ui.T("Thiết lập"), PaneTheme.Caption);
             _settingsLink.AccessibleName = Ui.T("Mở wizard thiết lập Axiom Office");
-            // New_arch.md mục 9.2: link ở header (trước đây ở footer, người dùng không thấy trong Word).
+            // docs/architecture/core.md mục 9.2: link ở header (trước đây ở footer, người dùng không thấy trong Word).
             _newChatLink = PaneTheme.MakeLink(Ui.T("Trò chuyện mới"), PaneTheme.Caption);
             _newChatLink.AccessibleName = Ui.T("Bắt đầu cuộc trò chuyện mới cho tài liệu này");
-            // Hội thoại trước / nhật ký hoạt động: thuộc về khung chat, không đặt trên ribbon (docs/ribbon-ui.md).
+            // Hội thoại trước / nhật ký hoạt động: thuộc về khung chat, không đặt trên ribbon (docs/architecture/ribbon-ui.md).
             _moreLink = PaneTheme.MakeLink("⋯", PaneTheme.Caption);
             _moreLink.AccessibleName = Ui.T("Hội thoại trước và nhật ký hoạt động");
             header.Controls.Add(dot);
@@ -194,6 +196,7 @@ namespace AxiomOffice.Ai
             _attachLink.LinkClicked += delegate { PickAttachments(); };
             _promptTip.SetToolTip(_prompt, Ui.T("Enter để gửi · Shift+Enter xuống dòng"));
             Ui.Changed += OnUiLanguageChanged;
+            ChatBubble.CitationClicked += OnCitationClicked;
             SetPlanMode(false);
             _moreLink.LinkClicked += delegate { ShowMoreMenu(); };
             _composer.Resize += delegate { LayoutComposer(); };
@@ -215,6 +218,7 @@ namespace AxiomOffice.Ai
             if (disposing)
             {
                 Ui.Changed -= OnUiLanguageChanged;
+                ChatBubble.CitationClicked -= OnCitationClicked;
                 CommandDispatcher.UnlockSelection();
             }
             if (disposing && _run != null)
@@ -222,6 +226,53 @@ namespace AxiomOffice.Ai
                 _run.Cancel();
             }
             base.Dispose(disposing);
+        }
+
+        // Bấm trích dẫn trong câu trả lời ([§12], [Data!C42], [slide 3]): chọn + cuộn tới chỗ đó (writer.goto / et.goto /
+        // wpp.goto - chỉ đọc, gọi thẳng bridge như "Hoàn tác lượt này"). Event là static: chỉ nhận bong bóng của pane này.
+        private void OnCitationClicked(ChatBubble bubble, string target)
+        {
+            Connect host = CurrentHost;
+            if (host == null || _busy || bubble == null || !_chat.Contains(bubble) || string.IsNullOrWhiteSpace(target))
+            {
+                return;
+            }
+            string text = target.Trim();
+            string action;
+            var parameters = new Dictionary<string, object>();
+            int number;
+            if (text.StartsWith("§", StringComparison.Ordinal))
+            {
+                if (!int.TryParse(text.Substring(1).Trim(), out number))
+                {
+                    return;
+                }
+                action = "writer.goto";
+                parameters["paragraph"] = number;
+            }
+            else if (text.StartsWith("slide", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!int.TryParse(text.Substring(5).Trim(), out number))
+                {
+                    return;
+                }
+                action = "wpp.goto";
+                parameters["slide"] = number;
+            }
+            else
+            {
+                action = "et.goto";
+                parameters["range"] = text;
+            }
+            try
+            {
+                object reply = CommandDispatcher.Execute(host, action, parameters);
+                Logger.Info("AskAiPane: citation " + text + " -> " + action + " " + Truncate(new System.Web.Script.Serialization.JavaScriptSerializer().Serialize(reply), 160));
+            }
+            catch (Exception ex)
+            {
+                Logger.Error("AskAiPane: citation " + text + " failed", ex);
+            }
         }
 
         private readonly ToolTip _promptTip = new ToolTip();
@@ -636,26 +687,14 @@ namespace AxiomOffice.Ai
                 LlmResult result;
                 try
                 {
-                    // Uu tien Agent Core (New_arch.md muc 9); Core khong dung duoc thi chay trong add-in
-                    // nhu cu de pane khong bao gio bi khoa vi Core.
+                    // Moi luot chay qua Agent Core (docs/architecture/core.md muc 9); Core khong dung duoc thi bao loi ro.
+                    // Khong co agent thu hai trong add-in: moi luot phai qua policy/xac nhan/audit/memory cua Core.
                     result = RunViaCore(host, corePrompt, run, progress, plan);
-                    if (result == null && files.Count > 0)
+                    if (result == null)
                     {
-                        // Agent trong add-in không đọc được tệp ngoài: báo rõ thay vì trả lời như không có tệp.
                         result = new LlmResult();
-                        result.Error = Ui.T("Đọc tệp đính kèm cần Agent Core, mà Core đang không chạy được (")
+                        result.Error = Ui.T("Agent Core không chạy được (")
                             + (CoreClient.Instance.LastError ?? Ui.T("không rõ lý do")) + ").";
-                    }
-                    else if (result == null && plan)
-                    {
-                        // Agent trong add-in không có chế độ chỉ đọc: không được chạy thay (nó sẽ sửa tài liệu).
-                        result = new LlmResult();
-                        result.Error = Ui.T("Lập kế hoạch cần Agent Core, mà Core đang không chạy được (")
-                            + (CoreClient.Instance.LastError ?? Ui.T("không rõ lý do")) + Ui.T("). Tắt \"Lập kế hoạch trước\" để AI làm ngay.");
-                    }
-                    else if (result == null)
-                    {
-                        result = AiAgent.Run(host, promptText, progress, run.Token);
                     }
                 }
                 catch (Exception ex)
@@ -684,7 +723,7 @@ namespace AxiomOffice.Ai
             });
         }
 
-        // Chay mot luot qua Agent Core. Tra null khi Core khong dung duoc (pane se chay in-process).
+        // Chay mot luot qua Agent Core. Tra null khi Core khong dung duoc (pane bao loi).
         private LlmResult RunViaCore(Connect host, string promptText, CancellationTokenSource run, Action<string> progress, bool plan)
         {
             CoreClient core = CoreClient.Instance;
@@ -782,7 +821,7 @@ namespace AxiomOffice.Ai
 
             if (item.Type == "skill.loaded")
             {
-                // Dòng thông tin (không có " -> ") - New_arch.md mục 7.4.
+                // Dòng thông tin (không có " -> ") - docs/architecture/core.md mục 7.4.
                 return Ui.T("(Dùng kỹ năng: ") + (item.Name ?? "?") + ")";
             }
 
@@ -797,25 +836,7 @@ namespace AxiomOffice.Ai
 
             if (item.Type == "tool.finished")
             {
-                bool officeAction = string.IsNullOrEmpty(item.Tool) || item.Tool == "office_action";
-                string outcome = !string.IsNullOrEmpty(item.ResultPreview)
-                    ? item.ResultPreview
-                    : (item.Ok
-                        ? "{\"ok\":true}"
-                        : "{\"ok\":false,\"error\":\"" + (item.Error ?? "loi") + "\"}");
-                // Core báo thất bại mà preview không có "ok":false (vd {"error":"'wpp.listShapes' is not an available
-                // action…"}, lỗi MCP dạng chữ) thì ToolLine sẽ vẽ tích xanh: ép thành dòng lỗi.
-                if (!item.Ok && !outcome.Contains("\"ok\":false"))
-                {
-                    string message = !string.IsNullOrEmpty(item.Error) ? item.Error : ErrorText(outcome);
-                    outcome = "{\"ok\":false,\"error\":" + new System.Web.Script.Serialization.JavaScriptSerializer().Serialize(message) + "}";
-                }
-                // Cung dinh dang dong tien trinh cua che do in-process ({"action": ..., "params": ...}) de
-                // PaneControls hien nhan tieng Viet theo action (truoc day chi co "{}").
-                string call = "{\"action\": \"" + (officeAction ? item.Action ?? "" : item.Tool) + "\""
-                    + (string.IsNullOrEmpty(item.ParamsPreview) ? "" : ", \"params\": " + item.ParamsPreview)
-                    + "}";
-                return "office_action " + call + " -> " + outcome;
+                return CoreClient.ToolLine(item);
             }
 
             if (item.Type == "run.failed")
@@ -824,25 +845,6 @@ namespace AxiomOffice.Ai
             }
 
             return null;
-        }
-
-        // Câu lỗi trong preview kết quả ({"error":"…"} có thể bị cắt ở 150 ký tự); không có thì trả nguyên preview.
-        private static string ErrorText(string preview)
-        {
-            System.Text.RegularExpressions.Match match = System.Text.RegularExpressions.Regex.Match(
-                preview ?? "", "\"error\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)");
-            if (!match.Success)
-            {
-                return string.IsNullOrEmpty(preview) ? Ui.T("lỗi") : preview;
-            }
-            try
-            {
-                return System.Text.RegularExpressions.Regex.Unescape(match.Groups[1].Value);
-            }
-            catch (ArgumentException)
-            {
-                return match.Groups[1].Value;
-            }
         }
 
         // Duong dan tai lieu chuan hoa (giong Orchestrator.DocumentKey ben Core) de tra hoi thoai cu.
@@ -1020,7 +1022,7 @@ namespace AxiomOffice.Ai
             _chat.AddBlock(note);
         }
 
-        // Trích xuất memory chạy nền sau lượt (New_arch.md 8.5.4): hỏi lại sau ít giây để hiện "Đã ghi nhớ".
+        // Trích xuất memory chạy nền sau lượt (docs/architecture/core.md 8.5.4): hỏi lại sau ít giây để hiện "Đã ghi nhớ".
         private void PollExtractedMemories(string runId)
         {
             if (string.IsNullOrEmpty(runId))
@@ -1097,29 +1099,49 @@ namespace AxiomOffice.Ai
             }
         }
 
-        // Lệnh writer.* có sửa tài liệu (mỗi lệnh = 1 bước Undo nhờ UndoRecordScope); lệnh đọc/soát/lưu không tính.
+        // --- BEGIN SINH TU DONG (scripts/generate_mcp_commands.py) - KHONG SUA TAY ---
+        // Lenh writer.* co `undo` trong catalog = dung mot buoc Undo (UndoRecordScope).
+        private static readonly HashSet<string> WordEditActions = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "writer.addComment",
+            "writer.addTableRows",
+            "writer.appendText",
+            "writer.deleteParagraphs",
+            "writer.editCommentScope",
+            "writer.formatSelection",
+            "writer.formatTable",
+            "writer.heading",
+            "writer.insertBlocks",
+            "writer.insertCaption",
+            "writer.insertHyperlink",
+            "writer.insertImage",
+            "writer.insertLayoutTable",
+            "writer.insertPageBreak",
+            "writer.insertStyledText",
+            "writer.insertTable",
+            "writer.insertToc",
+            "writer.replaceAll",
+            "writer.replaceMany",
+            "writer.replyComment",
+            "writer.resolveComment",
+            "writer.restyle",
+            "writer.reviewRevisions",
+            "writer.setHeaderFooter",
+            "writer.setParagraphAlignment",
+            "writer.setStyle",
+            "writer.typeText",
+            "writer.writeContent",
+        };
+        // --- END SINH TU DONG ---
+
+        // Lệnh writer.* có sửa tài liệu = lệnh có `undo` trong registry (WordEditActions sinh tự động ở trên):
+        // mỗi lệnh = 1 bước Undo nhờ UndoRecordScope; lệnh đọc/mở/soát/lưu không tính.
         internal static bool IsWordEdit(string action)
         {
-            if (string.IsNullOrEmpty(action) || !action.StartsWith("writer.", StringComparison.Ordinal))
-            {
-                return false;
-            }
-            switch (action)
-            {
-                case "writer.getText":
-                case "writer.selection":
-                case "writer.checkTables":
-                case "writer.save":
-                case "writer.saveAs":
-                case "writer.exportPdf":
-                case "writer.undo":
-                    return false;
-                default:
-                    return true;
-            }
+            return !string.IsNullOrEmpty(action) && WordEditActions.Contains(action);
         }
 
-        // "Hoàn tác lượt này" (New_arch.md mục 9.2, chỉ Word): writer.undo {count: số thao tác sửa của lượt}.
+        // "Hoàn tác lượt này" (docs/architecture/core.md mục 9.2, chỉ Word): writer.undo {count: số thao tác sửa của lượt}.
         // Excel/PowerPoint không hoàn tác được thay đổi qua COM nên không có nút.
         private void UndoLastRun()
         {
@@ -1127,6 +1149,29 @@ namespace AxiomOffice.Ai
             if (host == null || _busy || _lastRunEdits <= 0)
             {
                 return;
+            }
+            // Qua Core trước: Core biết lượt có sửa bằng Track Changes (từ chối đúng revision của lượt, không đụng chữ người
+            // dùng gõ xen giữa) và số bước chắc chắn của lượt. Lượt Track Changes mà Core lỗi thì KHÔNG lùi bằng Ctrl+Z.
+            if (_lastRunViaCore && !string.IsNullOrEmpty(_lastRunId))
+            {
+                string coreError;
+                if (CoreClient.Instance.UndoRun(_lastRunId, out coreError))
+                {
+                    Logger.Info("AskAiPane: undo last run via Core (" + (_lastUndoMode ?? "steps") + ")");
+                    _chat.AddInfo(_lastUndoMode == "revisions"
+                        ? Ui.T("Đã từ chối các thay đổi của AI trong lượt vừa rồi.")
+                        : Ui.T("Đã hoàn tác ") + _lastRunEdits + Ui.T(" thao tác của lượt vừa rồi."));
+                    _undoLink.Visible = false;
+                    _lastRunEdits = 0;
+                    _lastRunId = null;
+                    return;
+                }
+                Logger.Info("AskAiPane: undo via Core failed: " + coreError);
+                if (_lastUndoMode == "revisions")
+                {
+                    _chat.AddInfo(Ui.T("Không hoàn tác được: ") + Truncate(coreError ?? "", 120));
+                    return;
+                }
             }
             try
             {
@@ -1166,8 +1211,18 @@ namespace AxiomOffice.Ai
             _busyDot.Visible = false;
             _chat.RemoveTyping();
             _lastRunViaCore = result.ViaCore;
-            _lastRunEdits = _runEdits;
-            _undoLink.Visible = host.AppKind == "wps" && _runEdits > 0;
+            _lastRunId = result.ViaCore ? result.RunId : null;
+            _lastUndoMode = result.UndoMode;
+            // Core biet chinh xac so buoc hoan tac con lai cua luot (da tru lan agent tu writer.undo); tu dem tool.finished
+            // thi khong tru duoc va nut nay lui vao noi dung co tu truoc luot (audit agent runtime F02).
+            _lastRunEdits = result.UndoSteps >= 0 ? result.UndoSteps : _runEdits;
+            _undoLink.Visible = host.AppKind == "wps" && _lastRunEdits > 0;
+            // Excel/PowerPoint cua Microsoft: thay doi qua COM khong vao ngan hoan tac (khong co nut "Hoan tac luot nay") - noi
+            // ro pham vi thay vi de nguoi dung tuong Ctrl+Z se lay lai duoc (Claude Code /rewind bao ro cai gi khong khoi phuc).
+            if (host.IsOfficeHost && (host.AppKind == "et" || host.AppKind == "wpp") && result.EditSteps > 0)
+            {
+                _chat.AddInfo(Ui.T("Lưu ý: Excel/PowerPoint không hoàn tác được bằng Ctrl+Z các thay đổi AI vừa làm. Nếu cần quay lại, hãy đóng tài liệu không lưu hoặc mở bản đã lưu trước đó."));
+            }
             if (result.ViaCore && result.Ok)
             {
                 PollExtractedMemories(result.RunId);
@@ -1254,15 +1309,11 @@ namespace AxiomOffice.Ai
             string message;
             if (result.TimedOut)
             {
-                message = Ui.T("AI chưa xong sau ") + (LlmClient.AgentTimeoutMs / 60000) + Ui.T(" phút nên đã dừng.");
+                message = Ui.T("AI không phản hồi kịp nên lượt chạy đã dừng.");
             }
             else if (result.Stopped)
             {
                 message = Ui.T("AI đã dùng hết ngân sách token cho lượt này nên dừng lại.");
-            }
-            else if (result.StepLimitReached)
-            {
-                message = Ui.T("AI chưa xong sau ") + result.Rounds + Ui.T(" vòng nên đã dừng.");
             }
             else if (lower.Contains("timed out"))
             {
@@ -1275,6 +1326,17 @@ namespace AxiomOffice.Ai
             else if (lower.Contains("unable to connect") || lower.Contains("actively refused") || lower.Contains("remote name could not be resolved"))
             {
                 message = Ui.T("Không kết nối được máy chủ AI (") + (Config.LlmEndpoint ?? "") + ").";
+            }
+            else if (lower.Contains("repeated the same failing call"))
+            {
+                // Core chu dong dung (repeatedFailureGuard), khong phai may chu AI loi - luot that 25/10/2026 nguoi dung
+                // doc "May chu AI bao loi" va tuong AI hong.
+                message = Ui.T("AI gọi lại cùng một lệnh bị lỗi nhiều lần nên Axiom đã dừng lượt này (máy chủ AI không lỗi). Chi tiết: ")
+                    + Truncate(error, 300);
+            }
+            else if (!string.IsNullOrEmpty(result.ErrorKind) && result.ErrorKind != "provider" && result.ErrorKind != "config")
+            {
+                message = Ui.T("Axiom đã dừng lượt chạy: ") + Truncate(error, 300);
             }
             else
             {

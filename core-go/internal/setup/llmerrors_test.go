@@ -22,10 +22,11 @@ func TestDescribeKinds(t *testing.T) {
 		"request timed out after 30s":        "timeout",
 		"HttpRequestException: dial tcp: lookup nope.invalid: no such host":                                                                  "dns",
 		"HttpRequestException: dial tcp 127.0.0.1:1: connectex: No connection could be made because the target machine actively refused it.": "network",
-		"provider returned an empty reply": "reply",
-		"invalid provider response: bad":   "reply",
-		"cancelled":                        "cancelled",
-		"something odd":                    "internal",
+		"provider returned an empty reply":                                              "reply",
+		"invalid provider response: bad":                                                "reply",
+		`provider returned no answer text (finish_reason="length", reasoning 95 chars)`: "reply",
+		"cancelled":     "cancelled",
+		"something odd": "internal",
 	}
 	for input, want := range cases {
 		if got := Describe(input, "openai", "", "").Kind; got != want {

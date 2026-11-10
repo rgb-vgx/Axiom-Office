@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Khoi dong bridge khi LibreOffice mo (LibreOffice_arch.md muc 5.2). OnStartApp chay ca khi headless;
+<!-- Khoi dong bridge khi LibreOffice mo (docs/architecture/libreoffice.md muc 5.2). OnStartApp chay ca khi headless;
      onFirstVisibleTask la du phong neu OnStartApp bi bo qua. Job tu bo qua neu bridge da chay. -->
 <oor:component-data xmlns:oor="http://openoffice.org/2001/registry"
                     xmlns:xs="http://www.w3.org/2001/XMLSchema"

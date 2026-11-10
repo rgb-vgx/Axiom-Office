@@ -22,7 +22,8 @@ func TestRunAgentEndsWhenToolReportsFinal(t *testing.T) {
 	}
 }
 
-// Lan goi y het thu 5 bi chan (khong chay tool), model nhan loi va doi cach.
+// Lan goi y het thu 5 bi chan (khong chay tool), model nhan loi va doi cach. Lenh doc (khong sua tai lieu) lap lai khi
+// tai lieu chua doi thi tu lan 2 da khong chay ma tra "khong doi" (docStateGuard) - nhung van duoc dem.
 func TestRunAgentBlocksIdenticalCalls(t *testing.T) {
 	server, _ := verifyServer(t, []string{replyToolCall})
 	client := NewClient(server.Client(), "openai", server.URL, "", "m")
@@ -40,8 +41,208 @@ func TestRunAgentBlocksIdenticalCalls(t *testing.T) {
 				blocked = result.ResultJSON
 			}
 		}})
-	if executed != DefaultMaxIdenticalCalls || blocked == "" {
-		t.Fatalf("chay %d lan (muon %d), loi chan: %q", executed, DefaultMaxIdenticalCalls, blocked)
+	if executed != 1 || blocked == "" {
+		t.Fatalf("chay %d lan (muon 1 - cac lan sau la 'khong doi'), loi chan: %q", executed, blocked)
+	}
+}
+
+// Lenh doc y het xen giua cac lan ghi (tai lieu da doi) khong bi chan du vuot han muc: luot that 26/10/2026 -
+// wpp.checkLayout ca bai sau moi lan dung lai bi chan o lan thu 5, model phai kiem tung slide mot.
+func TestRunAgentIdenticalReadAfterWriteNotBlocked(t *testing.T) {
+	replies := []string{}
+	for i := 1; i <= 6; i++ {
+		replies = append(replies, fmt.Sprintf(replyToolCallArgs, fmt.Sprintf("r%d", i), `{"doc":"check"}`))
+		if i < 6 {
+			replies = append(replies, fmt.Sprintf(replyToolCallArgs, fmt.Sprintf("w%d", i), fmt.Sprintf(`{"write":%d}`, i)))
+		}
+	}
+	server, _ := verifyServer(t, append(replies, fmt.Sprintf(replyText, "xong")))
+	client := NewClient(server.Client(), "openai", server.URL, "", "m")
+	reads, blocked := 0, 0
+	options := DefaultAgentOptions()
+	options.Verify = false
+	result := client.RunAgent(context.Background(), "s", nil, "u", mutatingTools(),
+		func(ctx context.Context, call ToolCall) ToolResult {
+			write := strings.Contains(call.Arguments, "write")
+			if !write {
+				reads++
+			}
+			return ToolResult{CallID: call.ID, Name: call.Name, OK: true, Mutating: write, ResultJSON: `{"ok":true}`}
+		}, options, AgentCallbacks{ToolFinished: func(result ToolResult) {
+			if strings.Contains(result.ResultJSON, "blocked") {
+				blocked++
+			}
+		}})
+	if !result.OK || reads != 6 || blocked != 0 {
+		t.Fatalf("6 lan doc xen 5 lan ghi phai chay het: doc %d, chan %d, %+v", reads, blocked, result)
+	}
+}
+
+// Lan goi hong nhung DA ghi mot phan (slides_from_brief dung 3 slide roi loi: ok:false + Mutating) van lam tai lieu
+// doi: lenh doc y het sau do phai chay that, khong duoc tra "unchanged" (26/10/2026).
+func TestRunAgentFailedPartialWriteCountsAsChange(t *testing.T) {
+	server, _ := verifyServer(t, []string{
+		fmt.Sprintf(replyToolCallArgs, "r1", `{"doc":"list"}`),
+		fmt.Sprintf(replyToolCallArgs, "w1", `{"write":1}`),
+		fmt.Sprintf(replyToolCallArgs, "r2", `{"doc":"list"}`),
+		fmt.Sprintf(replyText, "xong"),
+	})
+	client := NewClient(server.Client(), "openai", server.URL, "", "m")
+	reads := 0
+	options := DefaultAgentOptions()
+	options.Verify = false
+	result := client.RunAgent(context.Background(), "s", nil, "u", mutatingTools(),
+		func(ctx context.Context, call ToolCall) ToolResult {
+			if strings.Contains(call.Arguments, "write") {
+				return ToolResult{CallID: call.ID, Name: call.Name, OK: false, Mutating: true,
+					ResultJSON: `{"ok":false,"error":"slide 4 failed","built":3}`}
+			}
+			reads++
+			return ToolResult{CallID: call.ID, Name: call.Name, OK: true, ResultJSON: `{"ok":true}`}
+		}, options, AgentCallbacks{})
+	if !result.OK || reads != 2 {
+		t.Fatalf("lenh doc sau lan ghi hong mot phan phai chay lai: doc %d, %+v", reads, result)
+	}
+}
+
+// Lenh ghi y het XEN lenh ghi khac (ngat trang sau moi chuong) khong bi chan; lap LIEN thi van bi chan (bo do Word
+// 26/10/2026: writer.insertPageBreak bi chan tu lan 5 khi viet bao cao nhieu chuong).
+func TestRunAgentIdenticalWriteBetweenOtherWritesNotBlocked(t *testing.T) {
+	run := func(replies []string) (int, int) {
+		server, _ := verifyServer(t, append(replies, fmt.Sprintf(replyText, "xong")))
+		client := NewClient(server.Client(), "openai", server.URL, "", "m")
+		breaks, blocked := 0, 0
+		options := DefaultAgentOptions()
+		options.Verify = false
+		client.RunAgent(context.Background(), "s", nil, "u", mutatingTools(),
+			func(ctx context.Context, call ToolCall) ToolResult {
+				if strings.Contains(call.Arguments, "break") {
+					breaks++
+				}
+				return ToolResult{CallID: call.ID, Name: call.Name, OK: true, Mutating: true, ResultJSON: `{"ok":true}`}
+			}, options, AgentCallbacks{ToolFinished: func(result ToolResult) {
+				if strings.Contains(result.ResultJSON, "blocked") {
+					blocked++
+				}
+			}})
+		return breaks, blocked
+	}
+	interleaved := []string{}
+	for i := 1; i <= 6; i++ {
+		interleaved = append(interleaved, fmt.Sprintf(replyToolCallArgs, fmt.Sprintf("t%d", i), fmt.Sprintf(`{"text":"chuong %d"}`, i)),
+			fmt.Sprintf(replyToolCallArgs, fmt.Sprintf("b%d", i), `{"break":true}`))
+	}
+	if breaks, blocked := run(interleaved); breaks != 6 || blocked != 0 {
+		t.Fatalf("6 lan ngat trang xen 6 doan chu phai chay het: chay %d, chan %d", breaks, blocked)
+	}
+	repeated := []string{}
+	for i := 1; i <= 6; i++ {
+		repeated = append(repeated, fmt.Sprintf(replyToolCallArgs, fmt.Sprintf("b%d", i), `{"break":true}`))
+	}
+	if breaks, blocked := run(repeated); breaks != 4 || blocked == 0 {
+		t.Fatalf("ngat trang lap lien phai bi chan sau 4 lan: chay %d, chan %d", breaks, blocked)
+	}
+}
+
+// replyToolCallArgs: tool call voi id va doi so tuy bien (doc roi doc lai, hay roi ghi roi doc).
+const replyToolCallArgs = `{"choices":[{"message":{"role":"assistant","content":null,` +
+	`"tool_calls":[{"id":"%s","function":{"name":"t","arguments":%q}}]}}],` +
+	`"usage":{"prompt_tokens":10,"completion_tokens":1}}`
+
+// Lenh doc Y HET lap lai khi tai lieu khong doi (khong co lenh ghi o giua): lan sau khong chay lai tool, thay
+// bang ket qua "unchanged"; ket qua dau van nam lai trong ngu canh cho model (docStateGuard khong tao ra lich
+// su dang ra lai khac), nhung van duoc dem de chong trung lap hang loat.
+func TestRunAgentDocStateGuardSkipsIdenticalRead(t *testing.T) {
+	server, bodies := verifyServer(t, []string{
+		fmt.Sprintf(replyToolCallArgs, "r1", `{"doc":"list"}`),
+		fmt.Sprintf(replyToolCallArgs, "r2", `{"doc":"list"}`),
+		fmt.Sprintf(replyText, "khong co gi moi"),
+	})
+	client := NewClient(server.Client(), "openai", server.URL, "", "m")
+	executed := 0
+	results := []string{}
+	result := client.RunAgent(context.Background(), "s", nil, "u", mutatingTools(),
+		func(ctx context.Context, call ToolCall) ToolResult {
+			executed++
+			return ToolResult{CallID: call.ID, Name: call.Name, OK: true,
+				ResultJSON: `{"ok":true,"result":"3 slide, 0 loi bo cuc"}`}
+		}, DefaultAgentOptions(), AgentCallbacks{ToolFinished: func(call ToolResult) {
+			results = append(results, call.ResultJSON)
+		}})
+	if !result.OK || result.Text != "khong co gi moi" || result.Rounds != 3 || len(bodies()) != 3 {
+		t.Fatalf("luot phai di 3 vong (doc, doc lai, tra loi): %+v (%d request)", result, len(bodies()))
+	}
+	if executed != 1 {
+		t.Fatalf("lan doc lap lai phai KHONG chay lai tool: thuc chay %d lan", executed)
+	}
+	if len(results) != 2 || !strings.Contains(results[1], "unchanged") {
+		t.Fatalf("lan hai phai nhan ket qua thay the 'khong doi': %v", results)
+	}
+	// Ket qua thay the di vao hoi thoai lan goi thu 3 (tin `tool` cho r2), thay cho ban ket qua tang dai kha.
+	// Lan goi thu 2 VAN giu ket qua dau (no la bang chung cho doi chieu).
+	sent := bodies()
+	if !strings.Contains(sent[1], `3 slide, 0 loi bo cuc`) || strings.Contains(sent[1], "unchanged") {
+		t.Fatalf("request vong 2 phai giu ket qua doc dau: %.500s", sent[1])
+	}
+	if !strings.Contains(sent[2], "unchanged") {
+		t.Fatalf("request vong 3 phai chua ket qua 'unchanged' thay cho doc lap lai: %.500s", sent[2])
+	}
+}
+
+// Doc lai sau khi SUA ma ket qua doc la suon chung kiem tra (Verifies): verifyGuard khong bat them mot vong
+// doc lai nua - luot tra loi o vong thu 3 thay vi thu 4.
+func TestRunAgentEvidenceReadAfterWriteSkipsVerifyNudge(t *testing.T) {
+	server, bodies := verifyServer(t, []string{
+		fmt.Sprintf(replyToolCallArgs, "w1", `{"step":"write"}`),
+		fmt.Sprintf(replyToolCallArgs, "r1", `{"step":"read"}`),
+		fmt.Sprintf(replyText, "da kiem tra, dung"),
+	})
+	client := NewClient(server.Client(), "openai", server.URL, "", "m")
+	result := client.RunAgent(context.Background(), "s", nil, "u", mutatingTools(),
+		func(ctx context.Context, call ToolCall) ToolResult {
+			if strings.Contains(call.Arguments, `"step":"write"`) {
+				return ToolResult{CallID: call.ID, Name: call.Name, OK: true, Mutating: true, ResultJSON: `{"ok":true}`}
+			}
+			// Lenh doc kiem tra: bang chung kiem tra tai lieu o phien ban hien tai.
+			return ToolResult{CallID: call.ID, Name: call.Name, OK: true, Verifies: true,
+				ResultJSON: `{"ok":true,"checked":"doc moi giong gi da ghi"}`}
+		}, DefaultAgentOptions(), AgentCallbacks{})
+	if !result.OK || result.Text != "da kiem tra, dung" || result.Rounds != 3 {
+		t.Fatalf("phai ket thuc o vong 3 (doc la ban chung, khong can nhac): %+v", result)
+	}
+	if !result.Verified {
+		t.Fatal("da doc lai sau khi sua phai tinh la luot da tu kiem chung (Verified)")
+	}
+	sent := bodies()
+	if len(sent) != 3 || strings.Contains(sent[2], "check the work you just did") {
+		t.Fatalf("vong dung phai khong mang loi nhac kiem chung: %d request, %.200s", len(sent), sent[2])
+	}
+}
+
+// Doc lai TRUOC khi sua thi khong tinh la bang chung o phien ban moi: sau lan sua cuoi khong co doc lai thi
+// verifyGuard van bat doc lai mot lan truoc khi tra loi (ket thuc o vong 4 thay vi vong 3).
+func TestRunAgentReadBeforeWriteIsNotEvidence(t *testing.T) {
+	server, bodies := verifyServer(t, []string{
+		fmt.Sprintf(replyToolCallArgs, "r1", `{"step":"read"}`),
+		fmt.Sprintf(replyToolCallArgs, "w1", `{"step":"write"}`),
+		fmt.Sprintf(replyText, "ban nhap"),
+		fmt.Sprintf(replyText, "ket qua cuoi"),
+	})
+	client := NewClient(server.Client(), "openai", server.URL, "", "m")
+	result := client.RunAgent(context.Background(), "s", nil, "u", mutatingTools(),
+		func(ctx context.Context, call ToolCall) ToolResult {
+			if strings.Contains(call.Arguments, `"step":"write"`) {
+				return ToolResult{CallID: call.ID, Name: call.Name, OK: true, Mutating: true, ResultJSON: `{"ok":true}`}
+			}
+			return ToolResult{CallID: call.ID, Name: call.Name, OK: true, Verifies: true,
+				ResultJSON: `{"ok":true,"checked":"tai lieu truoc khi sua"}`}
+		}, DefaultAgentOptions(), AgentCallbacks{})
+	if !result.OK || result.Text != "ket qua cuoi" || result.Rounds != 4 || !result.Verified {
+		t.Fatalf("doc truoc sua khong tinh bang chung, phai co vong nhac: %+v", result)
+	}
+	sent := bodies()
+	if !strings.Contains(sent[3], "check the work you just did") {
+		t.Fatalf("request cuoi phai mang loi nhac kiem chung: %.200s", sent[3])
 	}
 }
 
@@ -107,5 +308,50 @@ func TestRunAgentStopsWhenOfficeAppIsGone(t *testing.T) {
 		}, DefaultAgentOptions(), AgentCallbacks{})
 	if result.OK || result.ErrorKind != "office" || result.Error != "Word đã đóng" || len(bodies()) != 1 {
 		t.Fatalf("phai dung sau vong 1: %+v (%d request)", result, len(bodies()))
+	}
+}
+
+// Lenh ghi bao "changed": false (o da mang dung gia tri) roi doc xen giua: lan ghi Y HET tiep theo bi chan ngay khi tai
+// lieu chua doi (bo do 27/10/2026 ca B: ghi "P02" vao A12 roi doc lai, lap 5 lan).
+func TestRunAgentBlocksRepeatOfUnchangedWrite(t *testing.T) {
+	replies := []string{}
+	for i := 1; i <= 3; i++ {
+		replies = append(replies, fmt.Sprintf(replyToolCallArgs, fmt.Sprintf("w%d", i), `{"write":"A12"}`),
+			fmt.Sprintf(replyToolCallArgs, fmt.Sprintf("r%d", i), fmt.Sprintf(`{"read":%d}`, i)))
+	}
+	server, _ := verifyServer(t, append(replies, fmt.Sprintf(replyText, "xong")))
+	client := NewClient(server.Client(), "openai", server.URL, "", "m")
+	writes, blocked := 0, ""
+	options := DefaultAgentOptions()
+	options.Verify = false
+	client.RunAgent(context.Background(), "s", nil, "u", mutatingTools(),
+		func(ctx context.Context, call ToolCall) ToolResult {
+			if strings.Contains(call.Arguments, "write") {
+				writes++
+				return ToolResult{CallID: call.ID, Name: call.Name, OK: true, ResultJSON: `{"ok":true,"result":{"changed":false}}`}
+			}
+			return ToolResult{CallID: call.ID, Name: call.Name, OK: true, ResultJSON: `{"ok":true}`}
+		}, options, AgentCallbacks{ToolFinished: func(result ToolResult) {
+			if strings.Contains(result.ResultJSON, "changed nothing") {
+				blocked = result.ResultJSON
+			}
+		}})
+	if writes != 1 || blocked == "" {
+		t.Fatalf("ghi khong doi gi chi chay 1 lan, lan sau bi chan: chay %d, loi %q", writes, blocked)
+	}
+}
+
+// "changed": false nam LONG ben trong ket qua (tung vung theo doi cua et.whatIf) khong phai lenh ghi khong doi gi:
+// khong bi chan nham (bo do 27/10/2026 ca B, lan p3i).
+func TestUnchangedWriteOnlyTopLevel(t *testing.T) {
+	for raw, want := range map[string]bool{
+		`{"ok":true,"result":{"changed":false,"written":1}}`: true,
+		`{"changed":false}`: true,
+		`{"ok":true,"result":{"moved":0,"watch":[{"range":"A1","changed":false}]}}`: false,
+		`{"ok":true,"result":{"written":1}}`:                                        false,
+	} {
+		if unchangedWrite(raw) != want {
+			t.Fatalf("%s: muon %v", raw, want)
+		}
 	}
 }

@@ -52,7 +52,7 @@ const (
 		"now: say what was done, what (if anything) is still missing, and how to continue."
 	VerifyWorkNudge = "Before you finish: check the work you just did. Read the document back with the " +
 		"actions available to you (for example et.readRange or et.checkRange, et.listSheets, writer.getText " +
-		"or writer.checkTables, wpp.listSlides or wpp.checkLayout) and compare what is really there with what " +
+		"or writer.checkTables and writer.checkLayout, wpp.listSlides or wpp.checkLayout) and compare what is really there with what " +
 		"the user asked for: values, ranges, cell types, sheet or slide names, headings and formatting. " +
 		// Doc lai chi bat duoc o trong; no KHONG bat duoc mot o dieu khien khong noi vao dau. Do ngay
 		// 02/10/2026: mot workbook 10.000 duong Monte Carlo co o "Seed Value [change to re-run]" o
@@ -184,7 +184,10 @@ func (c *Client) Chat(ctx context.Context, systemPrompt, userPrompt string, maxT
 		return "", parseError, false
 	}
 	if !turn.HasText {
-		return "", "", false
+		// Model reasoning het ngan sach giua phan suy nghi: content rong, finish_reason = "length".
+		// Truoc day tra loi rong -> wizard chi bao "Khong ro loi" (ocg/beam-free, 26/10/2026).
+		return "", fmt.Sprintf("provider returned no answer text (finish_reason=%q, reasoning %d chars)",
+			turn.FinishReason, len(turn.Reasoning)), false
 	}
 	return StripThoughts(turn.Text), "", true
 }
@@ -279,6 +282,9 @@ func (c *Client) postOnce(ctx, userCtx context.Context, payload []byte, live *li
 	// Ket noi treo bi chan bang watchdog "khong nhan duoc byte nao" ben duoi.
 	requestCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	// Ca luc cho header lan luc doc than: may ngu roi thuc thi huy va thu lai (resume.go).
+	resume := watchResume(cancel)
+	defer resume.stop()
 	request, err := http.NewRequestWithContext(requestCtx, http.MethodPost, BuildURL(c.endpoint, c.Codec.Path()), bytes.NewReader(payload))
 	if err != nil {
 		return nil, "HttpRequestException: " + err.Error(), 0, 0
@@ -287,6 +293,9 @@ func (c *Client) postOnce(ctx, userCtx context.Context, payload []byte, live *li
 	ApplyAuth(request, c.Codec.Name(), c.apiKey)
 	response, err := c.http.Do(request)
 	if err != nil {
+		if resume.Resumed() && ctx.Err() == nil {
+			return nil, resumedError, 0, 0
+		}
 		return nil, transportError(err, ctx, userCtx, c.IdleTimeout), 0, 0
 	}
 	defer response.Body.Close()
@@ -297,6 +306,9 @@ func (c *Client) postOnce(ctx, userCtx context.Context, payload []byte, live *li
 	}
 	text, err := io.ReadAll(source)
 	if err != nil {
+		if resume.Resumed() && ctx.Err() == nil {
+			return nil, resumedError, 0, 0
+		}
 		if reader.Stalled() {
 			return nil, fmt.Sprintf("provider sent nothing for %ds", int(c.IdleTimeout.Seconds())), 0, 0
 		}

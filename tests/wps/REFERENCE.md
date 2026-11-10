@@ -1,6 +1,7 @@
 # WPS Office for Linux — JS add-in: những gì đã biết (tài liệu tham khảo cho spike)
 
-Máy dev: WPS Office for Linux **11.1.0.11723**, cài ở `/opt/kingsoft/wps-office` (launcher `/usr/bin/wps`).
+Máy dev: WPS Office for Linux **11.1.0.11723** lúc đo 08–12/10/2026; từ 19/10/2026 là **12.1.2.29182** (các mục ghi
+ngày 19–20/10 đo trên bản này). Cài ở `/opt/kingsoft/wps-office` (launcher `/usr/bin/wps`).
 Không cần (và agent trong worktree không được phép) đọc `/opt` — mọi thứ cần biết đã chép ở đây.
 
 ## Đã xác minh trên WPS thật (08/10/2026, chạy add-in dưới Xvfb)
@@ -53,10 +54,12 @@ Ba biến thể đã thử, **chỉ biến thể A nạp được add-in trong c
 | C | ba entry, cùng `name`, ba `type` | chỉ entry đầu có hiệu lực |
 
 Vậy `type` nhận **danh sách ngăn bằng dấu phẩy** và một add-in phục vụ cả ba app. Hệ quả: add-in phải tự biết
-app nào đang chạy (`Application.Name`) và chỉ khai báo lệnh của app đó — xem `docs/wps-bridge.md` mục 5.
+app nào đang chạy (`Application.Name`) và chỉ khai báo lệnh của app đó — xem `docs/architecture/wps-bridge.md` mục 3.
 
 - `GET` mà WPS gọi khi nạp add-in: `ribbon.xml`, `index.html`, rồi script trong `index.html` — y hệt bản một app.
-- Tên app đo được (`Application.Name`): `WPS Writer`, `WPS Spreadsheets` (ET), `WPS Presentation` (WPP).
+- Tên app đo được (`Application.Name`): `WPS Writer`, `WPS Spreadsheets` (ET), `WPS Presentation` (WPP),
+  nhưng **tùy build**: bản `12.1.2.29182.AK.preread` (28/10/2026) báo ET là `WPS Sheets` — `appKind`
+  (commands.js) phải khớp cả hai, đừng viết Regex chỉ trông vào một tên duy nhất.
   `Application.Version` = `12.0` cả ba; `Application.Build` = `11723` (WPP trả `11.1.0.11723`).
 - `Application` trong cả ba app đều có `CommandBars.ExecuteMso`, `CreateTaskPane`, `FileSystem`
   (`existsSync`/`ReadFile`/`WriteFile`/... — dùng được để tự kiểm file xuất ra).
@@ -67,8 +70,9 @@ app nào đang chạy (`Application.Name`) và chỉ khai báo lệnh của app 
   `An signal occurred during the jsapi EXECUTE call.`; đặt `Visible` bằng **chuỗi** ném `参数类型错误(第0个).`
   ⇒ lỗi `Error: arguments error` khi bấm nút Ask AI **không** đến từ lời gọi này.
 - Pane do `CreateTaskPane` tạo **có** nạp trang (CEF GET trang pane, 200) nhưng script trong trang pane **không báo
-  về** server probe — chưa rõ nguyên nhân, cần đo tiếp (nghi: script trong pane không chạy, hoặc pane không được
-  render dưới Xvfb).
+  về** server probe — **dưới Xvfb**. Trên màn hình thật script của pane chạy được: ngày 11/10/2026 chính script đó gọi
+  `EventSource` và lộ ra lỗi 401 (`docs/architecture/wps-bridge.md` mục 7). Vậy đây là chuyện của lượt đo dưới Xvfb, chưa đo
+  riêng nguyên nhân.
 - Danh sách key liên quan task pane trên `Application`: `CreateTaskPane`, `GetTaskPane`,
   `DisplayDocumentActionTaskPane`, `DisplayXMLSourcePane`, `DisplayDocumentInformationPanel`. `window.wps` **chính là**
   `window.Application` (`wpsIsApplication` = true), `IsSandboxed` = `false`.
@@ -195,11 +199,11 @@ Gán chuỗi trông-như-số (`"42"`) hoặc trông-như-ngày (`"01/01"`) vào
 ## Bridge: vòng poll, và vì sao một lệnh dài làm bridge báo "mất kết nối" oan (đo 12/10/2026)
 
 Add-in **không listen được** (CEF Chrome 87), nên Core giữ bridge còn add-in **poll**: mỗi lời gọi
-`/wps/poll` là một request dài mà Core giữ tới **20 giây** nếu chưa có lệnh (`DefaultPollSeconds`,
+`/wps/v1/poll` là một request dài mà Core giữ tới **20 giây** nếu chưa có lệnh (`DefaultPollSeconds`,
 `wpsbridge.go:30`). "Còn sống" vì thế là một phép đo **thời gian**, không phải một kết nối:
 
 ```
-Connected() = busyLocked() || (everPoll && now - lastPoll <= DisconnectSeconds)   // wpsbridge.go:312-322
+Connected() = busyLocked() || (everPoll && now - lastPoll <= DisconnectSeconds)   // wpsbridge.go: Connected()
 ```
 
 - `DisconnectSeconds` mặc định của sản phẩm là **45** (`wpsbridge.go:32`); tầng e2e dùng 4 giây
@@ -210,19 +214,136 @@ Connected() = busyLocked() || (everPoll && now - lastPoll <= DisconnectSeconds) 
 **Hệ quả đo được**: add-in **đơn luồng** — trong lúc nó đang chạy một lệnh thì nó **không poll được**. Với
 `et.exportPdf` đo được **11 giây** (16:40:11 → 16:40:22), `lastPoll` đã cũ hơn ngưỡng 4 giây ngay khi lệnh
 xong, nên lệnh kế bị từ chối **trước khi gửi**:
-`WPS add-in is not connected: open a document in WPS to connect the add-in` (`wpsbridge.go:859-861`).
+`WPS add-in is not connected: open a document in WPS to connect the add-in` (`wpsbridge.go`, `writeErr` khi `!Connected()`).
 Lượt đo có probe theo dõi tiến trình cho thấy ET **ALIVE liên tục** trong suốt thời gian đó — app không hề chết.
 
 Đây là **cấu hình quá chặt của tầng test**, không phải lỗi app: tầng live nay truyền ngưỡng mặc định của sản
 phẩm (45 giây) qua `extra_env`. Nhưng phép đo **cũng phơi ra một lỗi thật**: với ngưỡng 45 giây, một lệnh chạy
 quá 45 giây vẫn làm mọi người gọi khác thấy bridge mất kết nối, và vì `StartSessionLoop` **xoá file session**
-khi `!Connected()` (`wpsbridge.go:984`), pane giữa chừng báo "chưa mở tài liệu" rồi lại thấy lại. Hướng sửa:
-coi "add-in vừa trả kết quả" là bằng chứng còn sống (làm mới mốc hoạt động khi giao kết quả) — đã ghi thành
-việc riêng (T8b trong hàng đợi tái cấu trúc).
+khi `!Connected()` (`removeSession`), pane giữa chừng báo "chưa mở tài liệu" rồi lại thấy lại. **Đã sửa (T8b)**
+đúng theo hướng này: `Bridge.Complete` coi "add-in vừa trả kết quả" là bằng chứng còn sống và làm mới `lastPoll`
+ngay khi bỏ job khỏi `waiting`; cùng với `busyLocked` (job đã giao còn trong `AXIOM_WPS_CMD_WAIT_SECONDS` được tính
+là còn kết nối) — xem `docs/architecture/wps-bridge.md` mục 6.
 
 Bài học cho người viết test live: một phép kiểm *mong đợi thất bại* sẽ xanh **kể cả khi** bridge đã mất kết
 nối. Sau mỗi lệnh dài phải có một phép kiểm **khẳng định bridge còn sống**, và phép kiểm lệnh sai phải đòi
 lỗi vì **tên lệnh sai**, không phải vì mất kết nối.
+
+## Khóa vùng bôi đen trên WPS thật (đo 18/10/2026)
+
+Bản WPS của `CommandDispatcher.WriterScope.cs` (add-in Windows). Vùng khóa **không** nhớ bằng một `Range`
+(một lệnh AI viết lại là `Range` sập) mà bằng **phần chữ trước và sau** nó; trạng thái nằm trong biến module
+`selectionLock` của `commands.js` — add-in là tiến trình duy nhất thấy mọi lệnh.
+
+**Bốn API mà thiết kế dựa vào đều có trên WPS 11.1.0.11723** (đo bằng cách bôi đen thật rồi gọi
+`writer.lockSelection`; handler **từ chối khóa** và trả `reason` nếu thiếu bất kỳ API nào, nên `chars > 0`
+là bằng chứng cả bốn đều đọc được):
+
+| Bôi đen | `writer.lockSelection` trả về |
+|---|---|
+| `Ctrl+A` (cả tài liệu, có 1 bảng đã chèn trước đó) | `{chars: 68, start: 0, end: 68, docEnd: 68, tables: 1, tablesKnown: true}` |
+| `Ctrl+Home` rồi `Shift+Right` × 5 | `{chars: 5, start: 0, end: 5, docEnd: 68, tables: 0, tablesKnown: true}` |
+
+- `Selection.Start/End`, `Content.End`, `Range(from, to).Text`, `Tables.Count` + `Tables.Item(i).Range.Start/End`
+  đều đọc được. `tablesKnown: true` quan trọng: `false` nghĩa là `doc.Tables` không đọc được và **lưới an toàn
+  mất phần bảng** trong im lặng.
+- Chọn cả tài liệu thì `Selection.End == Content.End` (68 = 68) — không lệch 1 như Word; đây là số đo, đừng
+  dựa vào nó như một quy luật.
+- **`Selection.SetRange` kéo con trỏ được**: đặt con trỏ ra cuối tài liệu (`Ctrl+End`) rồi `writer.typeText`
+  trong lúc khóa → chữ **rơi vào vùng khóa** (`Selection.SetRange(0,5)`), không phải chỗ con trỏ đang đứng.
+  Nghĩa là trên bản WPS này lưới an toàn (hoàn tác + báo lỗi) là lưới **thứ hai**, không phải đường chính.
+- Từ chối **trước** khi chạm tài liệu đúng như thiết kế: `writer.appendText` (ghi ra ngoài vùng) trả
+  `ok:false` kèm `Refused: the user selected part...`, và tài liệu **không đổi một ký tự**.
+- `writer.unlockSelection` mở khóa xong thì lệnh ghi cả tài liệu chạy lại bình thường.
+
+**Bôi đen thật trong test live**: `xdotool` (XTEST) — `tests/wps/test_wps_bridge_live.py` đọc `DISPLAY`/
+`XAUTHORITY` từ `/proc/<pid>/environ` của tiến trình WPS vì `xvfb-run -a` cấp số hiển thị động. Dưới Xvfb
+**không có window manager**, nên `xdotool windowactivate` báo `_NET_ACTIVE_WINDOW` và hỏng; `windowfocus`
+(XSetInputFocus) là đủ. Đã kiểm chứng đường này trước khi viết vào test: `Ctrl+A` rồi gõ `ZZZ` rồi `Ctrl+S`
+làm `blank.docx` chỉ còn `ZZZ`.
+
+Bẫy nhỏ khi viết test sau: **`xdotool key` thành công mà không in gì ra stdout** — phán "gửi được phím" bằng
+`bool(stdout)` là luôn sai (đã mắc, 3 phép kiểm đỏ oan trong khi vùng chọn đã đổi thật); phải xét mã thoát.
+
+**Một khóa cho mỗi bridge, không phải một khóa cho mỗi lượt chạy**: `selectionLock` là biến module của
+add-in, giống `_selectionLock` bên C#. Hai lượt chạy cùng lúc trên một WPS sẽ giành khóa của nhau — nhưng
+`POST /v1/runs` và `POST /wps/v1/runs` đều đi qua `Manager.TryStart(port)` (`api/runs.go:129`), mà port là
+port của bridge WPS, nên mỗi bridge chỉ có **một** lượt chạy. Không cần khóa theo lượt.
+
+## Ba đường mới của pane/ribbon trên Core thật (đo 19/10/2026, KHÔNG cần WPS)
+
+`tests/wps/test_wps_pane_e2e.py` (chạy bằng `make test-wps-e2e`: Core thật + add-in giả poll qua HTTP) nay đo
+luôn ba đường mà nút trên ribbon/pane gọi — trước đây chúng chỉ có unit test Go và test DOM giả, chưa lần nào
+chạy trên Core thật. Kết quả lượt đo: **68 phép kiểm pass** (thêm 18 so với trước), bridge e2e 36 pass.
+(20/10/2026, sau lệnh nhanh và khung chat mini: **94** phép kiểm.)
+
+### `GET /wps/v1/status` — một lời gọi, hai tầng
+
+- Trả `{addin: <Bridge.Status()>, core: <coreStatus>}`. Tầng add-in đo được: `connected:true`, `app:"wps"`,
+  `document.name` = tên tài liệu của **lần poll gần nhất** (add-in giả khai `bao-cao-tuan.docx`),
+  `addinVersion:"0.1.0"` (bản add-in khai trong poll, không phải bản Core), `everPoll:true`, `queued:0`,
+  `waiting:0`. Tầng Core: `port` khớp cổng thật của tiến trình, `pid` thật, `uptimeSeconds ≥ 0`,
+  `dataDir` = `AXIOM_CORE_DATA_DIR`, `logFile` = `<dataDir>/core.log`, `model:"fake-model"` và
+  `configured:true` (env có endpoint + model) — pane dựa vào `configured` để nút "Kiểm tra mô hình" biết đã
+  chọn AI chưa, thay vì đoán.
+- `Origin` lạ → 403 (đo được, không chỉ suy từ `checkWPSAuth`).
+
+### Địa chỉ nút "Sao chép API URL" — và cái bẫy hình dạng JSON
+
+Pane sao chép `http://127.0.0.1:<bridgePort>/health` (lấy `bridgePort` từ chính `/wps/v1/status`). Đo trên
+Core thật: dán địa chỉ đó vào trình duyệt (không Origin, không token) → **200**, `connected:true`,
+`port` khớp. Đúng như `DecideBridgeAuth` hứa: chỉ `GET /health` của bridge được miễn token.
+
+**Bẫy đã mắc khi viết phép đo**: `/health` của bridge trả **phong bì** `{"ok":true,"result":{...}}`, không
+phải object trần — phép kiểm đầu tiên đọc thẳng `.connected` nên đỏ oan trong khi đường vẫn chạy đúng. Ai
+viết tiếp cái gì đọc `/health` của bridge thì nhớ bóc `result`.
+
+### `GET /wps/v1/log` — phần cuối nhật ký
+
+- Đọc đúng tệp Core đang ghi (`<dataDir>/core.log`), `exists:true`, `count == len(lines) ≤ 200`, có dòng
+  `Agent Core starting` thật của lượt khởi động.
+- Ngữ nghĩa `lines` đo được: `?lines=2` trả **đúng hai dòng cuối** và `truncated:true` (còn dòng phía trên);
+  `?lines=1` trả dòng cuối cùng. `truncated` = "có dòng bị bỏ", không phải "tệp hỏng" — pane dựa vào đó để
+  hiện nút "Xem thêm".
+- **Tệp chưa có → 200 `exists:false`, `lines:[]`**, không phải lỗi (đo bằng cách đổi tên tệp log sang
+  `.bak` rồi trả lại ngay; `corelog` giữ tệp mở nên Linux ghi tiếp theo inode, không hỏng gì).
+- `/v1/log` giữ guard cũ: không token → 401/403; có token → cùng tệp.
+- Ghi chú về phép đo: để khẳng định "hai dòng cuối" một cách tất định, test **tự ghi thêm hai dòng mốc** vào
+  chính tệp log đó rồi đọc lại (lúc ấy chưa có lượt chạy nào nên Core không ghi xen vào). Đó là phép đo
+  `lines`/phần-cuối, không phải phép đo nội dung log.
+
+### `POST /wps/v1/exec` — lệnh trực tiếp, và hai mã 409
+
+- Kết quả add-in trả về đi qua **nguyên vẹn**: báo cáo `writer.checkTables` giữ đúng
+  `tableCount/issueCount/issues[].type` (`empty-cells`, `long-header-cell`) và tiếng Việt có dấu trong
+  `header` (không bị ép ASCII). Pane dịch `issues[].type` sang nhãn tiếng Việt bằng chính khoá đó
+  (`ISSUE_LABELS`, khớp `checks.py`) — đổi tên khoá là pane hiện nhãn rỗng/sai.
+- Lệnh add-in **không có** → HTTP **200** kèm `{ok:false, error:"unknown action: ..."}`, đúng như
+  `commands.js execute()`. Pane phải đọc `ok` chứ không đọc mã HTTP, nếu không nút "Soát bảng" sẽ hiện một
+  báo cáo rỗng như thể đã soát xong.
+- Hai ca 409 mang **mã máy đọc được**, đo trên HTTP thật: `addin-disconnected` (chưa mở tài liệu) và
+  `run-in-progress` (đang có lượt AI chạy — bắn trong lúc lượt 2 đang chạy). Pane dịch mã sang câu tiếng
+  Việt riêng, nên phép đo phải bám `code`; bám chuỗi tiếng Anh của Core là mong manh.
+
+## Ribbon, menu chuột phải, hộp thoại — đo trên WPS thật (19–20/10/2026, WPS 12.1.2.29182)
+
+- **`getImage` nhận ĐƯỜNG DẪN, không nhận data URI.** Trả `data:image/svg+xml,…` thì WPS vẽ dấu `?` ở chỗ icon:
+  nó **có** gọi callback, nhưng đem chuỗi trả về phân giải như một đường dẫn tương đối so với gốc add-in. Trả
+  `"images/<tag>.svg"` (cách của SDK chính thức `@wps-jsapi/wps/js/ribbon.js`) thì hiện đủ icon. Tệp SVG chỉ có
+  `viewBox`, không `width`/`height`.
+- **`imageMso` được nhận — icon có sẵn của WPS.** WPS ánh xạ tên kiểu Office sang icon riêng qua bảng lệnh
+  `/opt/kingsoft/wps-office/office6/res/commands/<wps|et|wpp>/ongmani/*.kuip` (`idMso="…"` + `icon="…_kd"`; 965 tên
+  khác nhau, chỉ 82 tên có ở cả ba app). Đặt `imageMso` = một tên có trong bảng thì ribbon hiện đúng icon WPS (người
+  dùng xác nhận 20/10/2026; chưa nhìn riêng từng app). Năm tên bản Windows dùng (`RecordsSaveRecord`, `ControlWizards`, `Info`,
+  `PropertySheet`, `AcceptInvitation`) không có trong bảng; `TableInsert` chỉ có ở trình chiếu. Bảng tên đang dùng:
+  `docs/architecture/ribbon-ui.md` §5.3.
+- **`<contextMenus>` được nhận.** `<contextMenu idMso="ContextMenuText">` / `"ContextMenuList"` với `<menu>`, `<button>`,
+  `<menuSeparator>`, `insertBeforeMso="Cut"` — menu hiện khi chuột phải trên đoạn bôi đen, `onAction` gọi được
+  `ribbon.OnAction`. (Ghi chú trong `RibbonUi.cs` của bản Windows rằng WPS "không nhận chắc" không đúng với WPS
+  Linux.) Tên `idMso` của menu ngữ cảnh có trong bảng lệnh của Writer: `/opt/kingsoft/wps-office/office6/res/commands/wps`.
+- **`Application.ShowDialog(url, title, width, height, modal)`** mở được trang add-in (`mini.html`) thành một cửa sổ
+  riêng, không modal. Gọi y như SDK (kích thước × `devicePixelRatio`). Hàm **không nhận toạ độ** — chưa đo vị trí
+  cửa sổ so với đoạn bôi đen.
 
 ## Theo công cụ `wpsjs` của WPS (bản online chưa thử)
 
@@ -246,3 +367,169 @@ lỗi vì **tên lệnh sai**, không phải vì mất kết nối.
   nhỏ do trình cài khởi động KHÔNG được (trình cài phải thoát); cân nhắc bản offline, hoặc ghi rõ nếu online là
   cách duy nhất chạy được.
 - `authwebsite.xml` (cùng thư mục `jsaddons`) có thể dùng để cấp quyền cho origin gọi API.
+
+## Nạp add-in trên WPS 12.1.2.29182 (đo 28/10/2026) — thứ tự request và hai cái bẫy
+
+Thứ tự request khi mở tài liệu (đo bằng log HTTP của Core):
+
+1. `GET <url>manifest.xml` — **không bắt buộc**: Core không có file này (404) thì WPS vẫn đi tiếp.
+2. `GET <url>ribbon.xml` — **bắt buộc 200**. Thiếu/404 là WPS dừng im lặng: không request `index.html`,
+   không nạp script, không poll, không hiện tab, không báo lỗi.
+3. `GET <url>index.html` → `probe.js`, `commands.js`, `main.js` → `POST /wps/v1/poll`.
+
+Hai cái bẫy đã dính:
+
+- **Core phục vụ add-in từ `exeDir/wps-addin`** (`wpsbridge.ResolveOptions`; `AXIOM_WPS_ADDIN_DIR` ghi đè).
+  Chạy bản Core build tay ở thư mục khác (ví dụ `/tmp/opencode/axiom-core-new`) thì `AddinDir` thành
+  `/tmp/opencode/wps-addin` — không tồn tại, mọi file 404, WPS dừng ở bước 2. Bản cài đặt thật
+  (`<dataDir>/core/AxiomOffice.Core` + `<dataDir>/core/wps-addin/`) không dính. Khi test bằng binary ngoài
+  thư mục cài đặt **phải** đặt `AXIOM_WPS_ADDIN_DIR=<dataDir>/core/wps-addin`.
+- Triệu chứng dễ đọc sai: app đang mở từ trước vẫn "chạy được" vì JS đã nạp từ Core cũ và chỉ poll tiếp
+  sang Core mới; restart WPS sạch mới lộ 404.
+
+`jsaddins/jsaddinblockhost.ini`: danh sách chặn do **chính WPS ghi** (cơ chế giống Windows: add-in làm chậm
+khởi động bị tự động tắt). Không xóa/sửa file này để "lách"; cách đúng là giữ add-in khởi động nhanh
+(script nhỏ, không làm việc nặng ở top-level). File này không liên quan lỗi 404 ở trên — nó vẫn tồn tại
+trong suốt các lần nạp thành công.
+
+## Nhiều app cùng mở, tiến trình WPS, WPS chết giữa lệnh (đo 31/10/2026, WPS 12.1.2.29182, Ubuntu 24.04)
+
+Máy dev, Xvfb `:99` (`xvfb-run -a`), HOME tạm (`install_jsaddon.py --test-profile`), Core build từ cây làm việc (cổng
+bridge chính 47961 để không đụng Core thật), LLM giả (`tests/core/fake_llm.py`). Kiểm cho
+`docs/architecture/wps-bridge.md` §2.4.
+
+- **`oem.ini` của bản cài này ở dạng mã hoá** (khoá/giá trị đã băm, mục `[support]` chữ thường) và **không có**
+  `JsApiPlugin=true` — vậy mà add-in vẫn nạp: mỗi app hỏi một lần *"Addin "axiomoffice" on "http://127.0.0.1:<cổng>/wps/addin"
+  is loaded for the first time, trust or not?"* (nút OK ở toạ độ 696,461 trên màn 1280x900). Mục 1 ở đầu tệp (đo 08/10 trên
+  bản cũ) và bước kiểm đầu vào của `test_wps_bridge_live.py` giả định cần dòng đó — **chưa đổi**, vì mới đo trên một
+  máy. Từ 01/11/2026 `install.sh` chỉ in gợi ý `sudo` khi `oem.ini` ở dạng thường (có `[Support]`); với file mã hoá
+  lệnh `sed '/^\[Support\]/a …'` của gợi ý không khớp dòng nào, nên nó chỉ nhắc bấm OK hộp thoại tin cậy.
+- **Mỗi app là một tiến trình riêng**: Writer = `/opt/kingsoft/wps-office/office6/wps`, Spreadsheets = `office6/et`.
+  `/usr/bin/wps` là script bash, tiến trình của nó cũng có `comm` = `wps` (cha của binary thật).
+- **`wpsoffice`** (`office6/wpsoffice Run -Entry=EntryPoint .../addons/kcef/libjsapibrowser.so --server`) là máy chủ CEF
+  dùng chung cho JS add-in (kèm nhiều `promecefpluginh`), cha là tiến trình hệ thống (không thuộc cây của app). Nó **tự
+  thoát khi app WPS cuối cùng thoát** — nên "không còn tiến trình WPS nào" (`wpsbridge/process.go`) là tín hiệu dùng được.
+- Hai bản add-in sinh **hai `clientId` khác nhau**; Writer mở trước giữ cổng chính, Sheets nhận cổng riêng + file
+  `<pid>-wps-<cổng>.json`. 10 mẫu `/health` trong 30 giây: mỗi cổng luôn đúng app (trước đây đảo liên tục).
+  `/commands` cổng Sheets: 28 lệnh, chỉ `app.*`/`et.*`.
+- **Khởi động lại Core**: add-in tự nối lại sau vài giây với **cùng `clientId`** (trang add-in sống trong WPS, không nạp lại).
+- Lượt agent từ pane Writer (`{client, app:"wps"}`) chạy trên phiên Writer, `writer.getText` trả nội dung `bao-cao.docx`,
+  model chỉ thấy 17 lệnh `writer.*`; lượt từ pane Sheets chạy trên phiên Sheets, `et.readRange A1:C3` trả dữ liệu thật,
+  model chỉ thấy 23 lệnh `et.*`. `/wps/v1/exec` và `/wps/v1/status?app=&client=` đi đúng app.
+- **Đóng Sheets** (SIGTERM `et`): sau ~50 giây (ngưỡng 45 giây) cổng của nó đóng, file session bị xoá; Writer không ảnh hưởng.
+- **WPS chết giữa lệnh**: `SIGSTOP` Writer, gửi `writer.getText` (add-in nhận job, gọi vào Writer thì treo → `running=true`),
+  rồi `SIGKILL` Writer: `wpsoffice` thoát theo, `/cmd` trả *"WPS closed while running the command; the command may have
+  been applied…"* khoảng 1 giây sau (trước đây treo tới 300 giây). File session cổng chính xoá sau ngưỡng mất kết nối.
+
+## Màn hình Kỹ năng: sửa / nhập trên WPS thật (đo 31/10/2026, WPS 12.1.2.29182)
+
+- `window.confirm` trong pane hiện **hộp thoại gốc của WPS** (biểu tượng ⓘ, nút OK/Cancel), trả đúng true/false.
+- `<textarea>` dùng font đơn cách (`ui-monospace`, `DejaVu Sans Mono`…) thì CEF vẽ **dấu tiếng Việt lệch ra ngoài chữ**
+  ("Thê`thức"); dùng font của `.field` thì đúng — `pane.css` `.fieldArea` không đặt `font-family`.
+- **Gõ phím bằng `xdotool` dưới Xvfb đi qua bộ gõ của người dùng**: WPS kế thừa `XMODIFIERS=@im=fcitx`,
+  `QT_IM_MODULE=fcitx`… từ phiên làm việc, Telex biến `dist` thành `dít` và `ff` thành `f`. Mở WPS test bằng
+  `env -u XMODIFIERS -u QT_IM_MODULE -u GTK_IM_MODULE -u SDL_IM_MODULE -u CLUTTER_IM_MODULE`.
+- Trang pane đang mở **không nạp lại** khi bấm lại nút ribbon (dùng lại pane cũ): sửa CSS/JS xong phải mở lại WPS.
+
+## Menu chuột phải lồng nhau và chèn thêm trong vùng khoá (đo 31/10/2026, WPS 12.1.2.29182)
+
+- `<menu>` **lồng trong** `<menu>` của `<contextMenu idMso="ContextMenuText">` hiện đúng (mũi tên mở cấp 3) và nút bên trong
+  gọi `ribbon.OnAction` như nút thường — menu con *Đổi giọng ▸* của P1-4 (`axiomCtxTone_<t|l>`).
+- WPS tự thêm mục **"Full Processing(Q) ▸ Parallel Translate"** vào menu chuột phải khi có vùng chọn (của WPS AI), đẩy
+  *Sửa bằng AI* xuống một dòng — toạ độ bấm trong test xdotool phải lấy lại từ ảnh chụp.
+- Khi `writer.lockSelection` đang khoá: `writer.replaceAll` với `\n` trong chuỗi thay **tạo đoạn mới** ngay trong vùng
+  khoá, giữ định dạng đoạn gốc, `writer.undo {count:1}` gỡ được; `replaceAll` chỉ tìm **trong vùng khoá** (chuỗi xuất
+  hiện hai lần trong tài liệu, chỉ chỗ trong vùng bị sửa). `writer.insertStyledText` thay **cả vùng**, và `*chữ*` được in
+  nguyên dấu sao (lệnh áp một kiểu chữ cho cả khối, không hiểu cú pháp nghiêng).
+- WPS bị dừng bằng `kill` thì lần mở sau hiện dải "The file was not closed properly…" ở đầu trang, đẩy văn bản xuống một
+  dòng; tắt WPS test bằng cách đóng cửa sổ, hoặc lấy lại toạ độ sau khi mở.
+
+## Track Changes và comment (đo 31/10/2026, WPS 12.1.2.29182)
+
+Đo bằng handler tạm `debug.eval` trong bản add-in ở scratchpad (không commit), gọi qua `POST /cmd`. Là nền của P1-1
+(`docs/research/doi-chieu-wps-ai.md`) và của fake `tests/wps/addin_fake.mjs` (`writerReviewOf`).
+
+| API | Kết quả đo |
+|---|---|
+| `app.UserName`, `app.UserInitials` | đọc + ghi được; **tác giả revision và comment = `UserName` lúc sửa/thêm** (đổi giữa chừng thì tác giả đổi theo). Giá trị **được lưu ngay vào `~/.config/Kingsoft/Office.conf`** — đặt "Axiom AI" mà không trả lại thì người dùng mang tên đó mãi |
+| `doc.TrackRevisions` | đọc + ghi (`boolean`) |
+| `Content.Find.Execute(…, ReplaceWith, 2)` khi đang theo dõi | mỗi chỗ thay sinh **hai** revision: `Type 2` (xoá, chữ cũ) rồi `Type 1` (chèn, chữ mới) |
+| `Content.Text`, `Paragraph.Range.Text` khi có chữ đã xoá | **không** chứa chữ đã xoá (khác Word trên Windows - bản C# phải tự lọc) |
+| Nhiều lần thay trong **một** `UndoRecord` | `doc.Undo(1)` gỡ cả nhóm, kể cả revision |
+| `doc.Undo(1)` | trả `true` khi gỡ được một bước, `false` khi không còn gì để gỡ |
+| `Revision` | `Type`, `Author`, `Date` (đối tượng `Date` của JS, **mang giờ địa phương gắn nhãn UTC**: máy +07 lúc 18:30 thì `toISOString()` ra `…T18:30:00.000Z`, `getHours()` ra 01 hôm sau — đọc `getUTC*`; `Comment.Date` cũng vậy), `Range.Start/End/Text`, `Range.StoryType` (= 1 thân văn bản) |
+| `Range.Find.Execute(text)` (không thay) | tìm thấy thì **co `Range` về chỗ khớp** |
+| `doc.Comments.Add(range, text)` | neo đúng vào `range` (`Comment.Scope`); trả về comment mới |
+| `Comment` | `Author`, `Initial`, `Index`, `Done` (đọc/ghi), `Date` (`Date`), `Range.Text` (kết `"\r"`), `Scope`, `Replies.Count`, `Ancestor` (`null` với comment gốc); còn có `Delete`, `DeleteRecursively`, `Edit`, `Reference`, `Contact`, `IsInk`, `ShowTip` |
+
+## Duyệt thay đổi, style, mục lục, định dạng bảng, hàm ET (đo 01/11/2026, WPS 12.1.2.29182)
+
+Đo bằng handler tạm `debug.eval` (scratchpad, không commit). Là nền của `writer.reviewRevisions` (P1-1), `writer.setStyle` +
+`writer.insertToc` (P1-2), `writer.formatTable` (P1-3), skill công thức ET (P1-5) và của fake
+`tests/wps/addin_fake_structure.mjs`.
+
+| API | Kết quả đo |
+|---|---|
+| `Revision.Accept()` / `Reject()` (khi **tắt** theo dõi) | là function; từ chối revision chèn thì chữ mất, từ chối revision xoá thì chữ cũ trở lại; duyệt **ngược** theo tác giả giữ nguyên thay đổi của người khác; cả loạt trong một `UndoRecord` thì `doc.Undo(1)` gỡ lại |
+| `Revision.Date` so với giờ thật | đổi về UTC thật bằng `d.getTime() + d.getTimezoneOffset() * 60000` (lệch ~1,5 giây); chính xác tới giây |
+| `doc.Styles.Item(x)` | tên tiếng Anh (`"Heading 1"`, `"Title"`, `"Normal"`) **phân biệt hoa thường**; hằng `WdBuiltinStyle` dùng được (`-2` = Heading 1, `-63` = Title); tên không có trả **`null`**, không ném lỗi |
+| `Paragraph.Style = …` | nhận tên, hằng số, đối tượng style; **tên không có thì đoạn âm thầm thành Normal** — phải kiểm `Styles.Item` trước |
+| `writer.outline` sau khi gán | đọc đúng `style` mới; `Paragraph.OutlineLevel` = 1..9 cho Heading, 10 cho đoạn thường |
+| `doc.TablesOfContents.Add(range, true, 1, n)` | tạo mục lục từ Heading 1..n (`Range.Text` = `"tiêu đề\t1\r"` mỗi dòng); `toc.Update()` đọc lại Heading mới |
+| Bảng: `AutoFitBehavior(1\|2)`, `Rows.Item(1).HeadingFormat`, `Range.Font.Name/Size`, `Rows.Item(1).Range.Font.Bold`, `Cell(r,c).Range.ParagraphFormat.Alignment`, `Borders.Enable` | đều chạy, đọc lại đúng |
+| `table.Style = "Table Grid"` | chạy; đọc lại ra tên bản địa của WPS (`"网格型"`) |
+| `Rows.Item(n).Shading.BackgroundPatternColor = màu` | **bị bỏ qua** (đọc lại `-16777216` = auto) |
+| Bảng chèn khi con trỏ ở đoạn Heading | chữ trong ô mang style Heading (xanh, đậm, hàng cao); `Cell(r,c).Range.Style.NameLocal` và `…ParagraphFormat.OutlineLevel` đọc được; `table.Range.Style = -1` đưa cả bảng về Normal **và** xoá chữ đậm/font đã đặt — phải làm trước |
+| Hàm ET 12.1.2 | có: `XLOOKUP`, `UNIQUE`, `FILTER`, `SORT`, `SEQUENCE`, `LET`, `LAMBDA`, `MAP`, `REDUCE`, `TEXTJOIN`, `TEXTSPLIT`, `HSTACK`, `IFS`, `SWITCH`, `CONCAT`, `DATEDIF`, `YEARFRAC`, `EDATE`, `NETWORKDAYS.INTL` (chuỗi `"0000011"` và mã 11 đều đúng); `TEXT(d,"dd/mm/yyyy")` đúng. **Không** có hàm đọc số thành chữ tiếng Việt (`NUMBERSTRING` ra `#N/A`) |
+| `table.Style = "Table Grid"` rồi xuất PDF | bảng **không có đường kẻ** (khác Word); phải `Borders.Enable = 1` (`writer.formatTable {borders: true}`) |
+| `imageMso` của nút ribbon add-in | tên có trong bảng lệnh `.kuip` **vẫn có thể ra dấu "?"**. Thấy icon: `Help`, `FileOpen`, `FileSave`, `About`, `TableInsertDialogWord`, `FindDialog`, `ReviewTrackChanges`, `ReviewAcceptChange`, `FormatPainter`, `ClearFormatting`, `TableAutoFitContents`, `ConvertTextToTable`, `TableInsert`, `EmphasisMark`, `WordCount`, `TableProperties`. Ra "?": `SpellingMenu`, `TableAutoFitWindow`, `BordersAll`, `FieldCheckBox`, `FindAndReplaceDialog`, `TableBordersMenu`, `StylesPane`, `GroupStyles`, `ReviewNewComment`, `JsAddInsDialog`; riêng Presentation còn ra "?": `SlideShowFromCurrent`, `SlideShowFromBeginning`, `ViewSlideSorterView`, `SlideLayoutGallery`, `SlideNew`, `ObjectsAlignMenu`, `ViewGridlines`, `GridSettings`, `ShapesInsertGallery`. Thấy icon ở **cả ba app** (Writer, Spreadsheets, Presentation): `AddInManager`, `ReviewAcceptChange`, `VisualBasic`, `HyperlinkInsert`, `ChartInsert`, `PictureInsertFromFile`, `FindDialog`, `WordCount`; Presentation: `SelectionPane`. Chọn icon mới thì thử trên WPS thật ở từng app |
+
+
+## Soạn văn bản, hình khối slide, icon ribbon (đo 01/11/2026, WPS 12.1.2.29182)
+
+Đo bằng REPL: add-in tạm (HOME tạm + Xvfb, cổng riêng) hỏi server cục bộ `/job`, chạy đoạn JS với `Application`, gửi kết
+quả về `/result` — chạy song song với WPS đang mở của người dùng. Writer bản này báo `Application.Name` = **`WPS Docs`**.
+
+**Writer — soạn cả bài** (fake: `addin_fake_compose.mjs`):
+
+| Việc | Kết quả đo |
+|---|---|
+| Vị trí ký tự | đoạn = chữ + 1; ô bảng = chữ các đoạn trong ô + 1 (Text đọc ra `…\r\u0007`); mỗi hàng thêm 1 |
+| `doc.Content.InsertAfter(s)` | chèn **trước** dấu đoạn cuối; `Content.End` của cùng một object tự tăng theo chữ chèn |
+| `Tables.Add(Selection.Range,…)` ở cuối đoạn **có chữ** | bảng nằm **sau** đoạn đó; sau bảng luôn có một đoạn trống |
+| Chèn bảng ngay sau một bảng | WPS **gộp** vào bảng cũ (`Tables.Count` không tăng, object trả về là bảng cũ) — cần một đoạn ngăn |
+| `ListGalleries.Item(1/2).ListTemplates.Item(1)` + `ListFormat.ApplyListTemplate(t, false)` | `ListType` 2 (gạch đầu dòng) / 3 (số, `ListString` "2."); đoạn mới sau danh sách **thừa kế** danh sách, `RemoveNumbers()` gỡ được |
+| `Paragraph.Style = -35`, `KeepWithNext = -1`, `doc.Fields.Add(range, -1, "SEQ Bảng \* ARABIC", false)` | chạy; `Result.Text` = số thứ tự; `Paragraphs.Last` dùng được |
+| `Table.Title`, `Borders.Enable = 0`, `PreferredWidthType = 2` + `PreferredWidth`, `Columns.Item(c).PreferredWidth` | chạy |
+| `Repaginate`, `ComputeStatistics(2/0)`, `Range.Information(3/6/12)`, `Paragraph.OutlineLevel` | chạy (Heading 1 = 1, đoạn thường = 10) — đủ cho `writer.checkLayout` sau này |
+
+**Presentation — hình khối, đoạn chữ** (fake: `addin_fake_shapes.mjs`):
+
+- `Shapes.AddShape(type,…)`: chữ nhật 1, bo góc 5, elip 9, chevron 52. Hình mới mang style theme: **nền gradient, bóng,
+  chữ trắng có bóng, căn giữa**. `Fill.ForeColor.RGB` khi chưa `Fill.Solid()` vẫn ra gradient; `Shadow.Visible = 0`,
+  `TextRange.Font.Shadow = 0` tắt bóng. `Adjustments.Item(1) = x` không gán được.
+- `Bullet.Visible = -1` một mình ra **đánh số** ("1.", `Type` 2) — phải `Type = 1`, `Character = 8226`.
+- `TextRange.Words(n)` trả **null**; `Paragraphs(k).Characters(start, len)` dùng được.
+- **`TextRange.BoundHeight` đo được** chiều cao chữ (theo cỡ chữ, xuống dòng, `SpaceBefore`; khung không tự giãn,
+  `AutoSize` 0): rộng 300, cỡ 20 → 96; cỡ 40 → 288 — khớp mô hình số dòng × 1,2 × cỡ chữ. Ghi chú cũ "WPS không đo
+  được chiều cao chữ" không còn đúng với 12.1.2 — `wpp.checkLayout` báo `overflow` từ 01/11/2026.
+- `TextFrame2.TextRange.Paragraphs(k).ParagraphFormat.LeftIndent/FirstLineIndent`, `ParagraphFormat.SpaceBefore`,
+  `LineRuleBefore` chạy. `default.pptx` là 720×540.
+
+**Icon ribbon**: thử 32 tên `imageMso` hợp nghĩa cho nhóm AI (Writer), chỉ **`FileNew`, `FormatPainter`, `WordTools`,
+`ViewOutlineView`** hiện icon (`TranslateToSimplifiedChinese` hiện chữ Hán); còn lại ra "?" (`FileNewBlankDocument`,
+`InkDrawPen`, `FontSizeDecrease/Increase`, `ChangeCaseGallery`, `QuickStylesGallery`, `ProxyProofreadAICmd`…). Nút AI vì
+vậy dùng `getImage` + SVG riêng (viewBox 24, nét `#3B3B3B`, điểm nhấn `#0F6CBD`) — hiện đủ, đồng bộ với tab WPS AI.
+Nút nhỏ trên ribbon WPS xếp **2 hàng** mỗi cột (Office là 3), nhãn nhóm không hiện.
+
+### Writer: phân trang và xoá đoạn (đo 01/11/2026, `scripts/wps/probe`, cho `writer.checkLayout` / `writer.deleteParagraphs`)
+
+- `doc.Repaginate()`, `ComputeStatistics(2)` (số trang) / `(0)` (số chữ) chạy.
+- `doc.Paragraphs` gồm cả đoạn trong ô bảng (`Text` = `"A\r\u0007"`) **và** một đoạn "dấu cuối hàng" mỗi hàng
+  (`"\r\u0007"`). `Range.Information(12)` trả **boolean**. Chú thích `Bảng N.` của `writeContent` nằm **trước** bảng.
+- Dấu ngắt trang là **một đoạn** `Text` = `"\f\r"` nằm ở trang **trước** dấu ngắt; hai dấu ngắt liền nhau → đoạn thứ hai
+  đứng một mình trên trang trắng. `writeContent {text: ""}` không tạo đoạn trống (bị bỏ).
+- `Paragraphs.Item(n).Range.Delete()` xoá cả đoạn, kể cả đoạn `"\f\r"` (số trang 3 → 2) và đoạn trống cuối bài; số
+  đoạn sau **dồn lên** — xoá nhiều đoạn phải đi từ số lớn về số nhỏ.
+- `Application.UndoRecord.StartCustomRecord` có trong Writer; `doc.TablesOfContents.Count` = 0 khi chưa có mục lục.
+

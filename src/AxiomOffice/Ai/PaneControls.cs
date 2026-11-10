@@ -21,25 +21,25 @@ namespace AxiomOffice.Ai
         // Bubbles
         public static readonly Color AiBg = Hex(0xF9FAFB);
         public static readonly Color AiBorder = Hex(0xE5E7EB);
-        public static readonly Color UserBg = Hex(0xE0E7FF);
-        public static readonly Color UserFg = Hex(0x1E1B4B);
+        public static readonly Color UserBg = Hex(0xD6E8F7);
+        public static readonly Color UserFg = Hex(0x0C3B5E);
         // Accent / action. Accent (#6366F1) chỉ để trang trí: trắng trên nó chỉ đạt 4.47:1.
-        public static readonly Color Accent = Hex(0x6366F1);
-        public static readonly Color AccentFg = Hex(0x4F46E5);
-        public static readonly Color ActionBg = Hex(0x4F46E5);
-        public static readonly Color ActionHover = Hex(0x4338CA);
-        public static readonly Color ActionPressed = Hex(0x3730A3);
+        public static readonly Color Accent = Hex(0x0F6CBD);
+        public static readonly Color AccentFg = Hex(0x0F6CBD);
+        public static readonly Color ActionBg = Hex(0x0F6CBD);
+        public static readonly Color ActionHover = Hex(0x115EA3);
+        public static readonly Color ActionPressed = Hex(0x0C3B5E);
         public static readonly Color OnAction = Hex(0xFFFFFF);
         public static readonly Color DisabledBg = Hex(0xF3F4F6);
         public static readonly Color DisabledFg = Hex(0x9CA3AF);
         public static readonly Color InputBorder = Hex(0x8C93A0);
         public static readonly Color InputDisabled = Hex(0xF9FAFB);
-        public static readonly Color Focus = Hex(0x4F46E5);
+        public static readonly Color Focus = Hex(0x0F6CBD);
         // Chip
-        public static readonly Color ChipBorder = Hex(0xC7D2FE);
-        public static readonly Color ChipHover = Hex(0xEEF2FF);
-        public static readonly Color ChipPressed = Hex(0xE0E7FF);
-        public static readonly Color ChipFg = Hex(0x4338CA);
+        public static readonly Color ChipBorder = Hex(0xB4D6FA);
+        public static readonly Color ChipHover = Hex(0xEFF6FC);
+        public static readonly Color ChipPressed = Hex(0xD6E8F7);
+        public static readonly Color ChipFg = Hex(0x115EA3);
         // Status
         public static readonly Color Danger = Hex(0xDC2626);
         public static readonly Color DangerFg = Hex(0xB91C1C);
@@ -333,6 +333,41 @@ namespace AxiomOffice.Ai
             if (e.Button == MouseButtons.Left && !Focused)
             {
                 Focus();
+            }
+        }
+
+        // Bấm trích dẫn tài liệu ([§12], [Data!C42], [slide 3]) trong câu trả lời: pane nhảy tới chỗ đó (AskAiPane).
+        public static event Action<ChatBubble, string> CitationClicked;
+
+        private string CitationAt(Point point)
+        {
+            if (_layout == null)
+            {
+                return null;
+            }
+            int padX = PaneTheme.Px(PaneTheme.BubblePadX);
+            int padY = PaneTheme.Px(PaneTheme.BubblePadY);
+            return _layout.TargetAt(new Point(point.X - padX, point.Y - padY));
+        }
+
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            base.OnMouseMove(e);
+            Cursor = CitationAt(e.Location) != null ? Cursors.Hand : Cursors.Default;
+        }
+
+        protected override void OnMouseClick(MouseEventArgs e)
+        {
+            base.OnMouseClick(e);
+            if (e.Button != MouseButtons.Left)
+            {
+                return;
+            }
+            string target = CitationAt(e.Location);
+            Action<ChatBubble, string> handler = CitationClicked;
+            if (target != null && handler != null)
+            {
+                handler(this, target);
             }
         }
 
@@ -1256,7 +1291,7 @@ namespace AxiomOffice.Ai
         }
     }
 
-    // Thẻ xác nhận của policy (New_arch.md mục 7.4 confirm.required, 8.6): Đồng ý / Từ chối; hết giờ = từ chối.
+    // Thẻ xác nhận của policy (docs/architecture/core.md mục 7.4 confirm.required, 8.6): Đồng ý / Từ chối; hết giờ = từ chối.
     internal sealed class ConfirmCard : Panel
     {
         private readonly Label _title;
@@ -1560,7 +1595,7 @@ namespace AxiomOffice.Ai
         }
     }
 
-    // Dòng "Đã ghi nhớ: …" + link Xoá (New_arch.md mục 7.4 memory.written, 8.5.10: người dùng thấy và xoá được ngay).
+    // Dòng "Đã ghi nhớ: …" + link Xoá (docs/architecture/core.md mục 7.4 memory.written, 8.5.10: người dùng thấy và xoá được ngay).
     internal sealed class MemoryNote : Panel
     {
         private readonly Label _text;

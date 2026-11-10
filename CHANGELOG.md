@@ -5,6 +5,1063 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — WPS: soát phân trang, văn bản hành chính, "Tạo slide" ở Writer (01/11/2026)
+
+- `writer.checkLayout` + `writer.deleteParagraphs` trên WPS (TASK-000160, port bản Windows; đã chạy trên WPS thật: bắt
+  trang trắng, đoạn trống liên tiếp, quá số trang; xoá đúng đoạn, từ chối đoạn trong bảng) → tool `doc_from_brief` (soạn
+  văn bản hành chính theo mẫu) **không còn bị ẩn** trên WPS.
+- Ribbon: nhóm *Tạo mới* thành **Cả tài liệu** — gom mọi lệnh AI làm trên cả bài (Soạn văn bản, Sửa thông minh, Tóm tắt
+  cả bài, Dịch song ngữ cả bài, Tạo slide từ tài liệu); *Viết với AI* chỉ còn lệnh cho đoạn bôi đen, nên "Tóm tắt" và
+  "Tóm tắt cả bài" không còn đứng cạnh nhau.
+- **Tạo slide từ tài liệu bấm được ở Writer** (như WPS AI): Core chuyển lượt sang phiên Presentation đang mở
+  (`QuickAction.ShownIn`); chưa mở Presentation thì báo rõ cần mở.
+- Menu chuột phải sinh từ bảng lệnh của Core (`scripts/generate_ribbon_menus.py`, TASK-000159); `make check-gen` bắt lệch.
+- Test hợp đồng add-in → bridge → Core dùng chung file mẫu (`tests/wps/contract/`); test `wpsbridge` không còn gọi nhầm
+  Core thật đang chạy trên máy dev (trước dùng cổng 47861 cố định).
+- `make test-wps-live`: Core thật + add-in thật + WPS thật dưới Xvfb, tự bấm hộp thoại tin cậy; không còn đòi
+  `JsApiPlugin` khi `oem.ini` mã hoá.
+
+### Fixed — rà soát WPS Linux 01/11/2026
+
+- `wpp.checkLayout` trên WPS báo `overflow` (chữ cao hơn khung) như bản Windows. Ghi chú cũ "WPS không đo được chiều
+  cao chữ" sai với 12.1.2: `TextRange.BoundHeight` đo được, đã thử trên WPS thật (khung 200×40, 100 ký tự cỡ 18 → 108pt).
+- File session WPS: `started` của app thứ hai trở đi ghi giờ địa phương kèm hậu tố `Z` (máy +07 lệch 7 tiếng so với
+  `lastSeen`) — nay luôn là UTC.
+- `install.sh`: không in lệnh `sudo` bật `JsApiPlugin` khi `oem.ini` ở dạng mã hoá (WPS 12.x) — lệnh `sed` đó không
+  khớp dòng nào và add-in vẫn nạp sau hộp thoại tin cậy; thay bằng lời nhắc bấm OK.
+- `make test` chạy cả `check-gen` như CI.
+- `scripts/wps/probe/`: REPL đo object model WPS thật (Xvfb + HOME tạm), chạy được `commands.js` thật.
+- Tài liệu: README (ribbon, menu chuột phải 15 mục, icon SVG), đầu `ribbon.xml`, `wps-bridge.md`, `REFERENCE.md`.
+
+### Added — WPS: đủ bộ WPS AI — Sửa thông minh, Tóm tắt / Dịch song ngữ cả bài, Học thuật hơn, Lịch sử (01/11/2026)
+
+- Ribbon: **Lịch sử** (mở *Hội thoại trước*, mọi app), **Sửa thông minh** (gõ cách sửa, AI sửa cả bài thành Track
+  Changes), **Tóm tắt cả bài** (trả lời trong khung chat), **Dịch song ngữ cả bài** (bản dịch ngay dưới từng đoạn; Việt →
+  Anh, ngôn ngữ khác → Việt); **Học thuật hơn** trong *Đổi giọng* và menu chuột phải.
+- Core: lệnh cả tài liệu có quy tắc riêng (`DocumentEditRule`/`DocumentAnswerRule`) — trước đây chúng nhận nhầm quy tắc
+  của menu bôi đen ("sửa trong đoạn đang bôi đen").
+- Sửa: `other_document` không thấy tài liệu WPS khác đang mở (bridge WPS trả `document` dạng object) — làm việc xuyên ứng
+  dụng trên WPS (vd *Tạo slide từ tài liệu*) nay chạy được.
+- Đã thử với model thật (`ocg/deepseek-v4.1-flash`): Soạn văn bản, Tạo slide từ tài liệu (7 slide), Dịch song ngữ cả bài,
+  Tóm tắt cả bài, Sửa thông minh.
+
+### Added — WPS: Soạn văn bản, Tạo slide từ tài liệu, nhóm "Viết với AI" trên ribbon (01/11/2026)
+
+- Tab *Axiom Office* có thêm hai nhóm, đối chiếu tab WPS AI: **Tạo mới** — *Soạn văn bản* (Writer: gõ yêu cầu, AI soạn
+  cả bài vào cuối tài liệu, chỗ thiếu thông tin để "…" cho người dùng điền) và *Tạo slide từ tài liệu* (Presentation:
+  đọc tài liệu Writer đang mở, dựng bài trình chiếu, giữ slide cũ); **Viết với AI** — 14 mục của menu chuột phải "Sửa
+  bằng AI" (Trau chuốt, Viết lại, Viết tiếp, Mở rộng, Rút gọn, Sửa lỗi chính tả, Đổi giọng ▾, Dịch song ngữ, Dịch, Tóm
+  tắt, Giải thích) đưa lên ribbon, chỉ Writer. Icon: bộ 13 SVG riêng theo phong cách icon nét của WPS AI (`imageMso` hợp
+  nghĩa đều ra "?" trên WPS thật).
+- Khung chat: lệnh cần gõ yêu cầu hiện thẻ lệnh đang chờ (có nút huỷ) và gợi ý trong ô soạn; Presentation cũng nhận
+  lệnh từ nút ribbon.
+- Core: `QuickAction.App`/`Input`; lệnh cả tài liệu `smartCreate`, `slidesFromDoc`; `GET /v1/quick-actions` trả thêm
+  `app`/`input`.
+- Add-in WPS có thêm `writer.writeContent` (viết nhiều khối một lần: tiêu đề, đoạn, danh sách thật, bảng kèm chú thích,
+  ngắt trang), `writer.insertLayoutTable` (bảng không viền phần đầu/phần ký văn bản hành chính), `writer.insertCaption`
+  (cuối bài), `wpp.addShape`, `wpp.addParagraphs` (tự chọn cỡ chữ lớn nhất vừa khung) — `slides_from_brief` hết bị ẩn
+  trên WPS. `doc_from_brief` vẫn ẩn tới khi có `writer.checkLayout` (đã có từ đợt sau cùng ngày).
+- Đo trên WPS 12.1.2 thật (`tests/wps/REFERENCE.md`): WPS gộp hai bảng liền nhau; hình mới có nền gradient + bóng;
+  bullet bật một mình ra đánh số; `Words(n)` trả null; `TextRange.BoundHeight` đo được chiều cao chữ.
+
+### Added — WPS: soát chính tả cả bài, làm đẹp bảng, style + mục lục, công thức bảng tính (P1-1/2/3/5, 01/11/2026)
+
+- Nhóm *Kiểm tra tài liệu* của Writer có thêm hai nút dùng AI: **Soát chính tả** (sửa lỗi chính tả, dấu, gõ nhầm của cả
+  bài thành Track Changes để duyệt từng chỗ; chỗ chưa chắc thì ghi chú) và **Làm đẹp bảng** (kẻ khung, hàng tiêu đề
+  đậm và lặp lại mỗi trang, vừa lề trang, font thân bài; không đổi chữ). Core: `DocumentActions` trong
+  `agent/quickactions.go` — không cần bôi đen, không khoá vùng chọn; `GET /v1/quick-actions` trả thêm `documentActions`.
+- Add-in WPS có thêm `writer.reviewRevisions` (để *Hoàn tác lượt này* của lượt có Track Changes chạy được trên WPS:
+  từ chối đúng thay đổi của "Axiom AI" từ lúc bắt đầu lượt), `writer.setStyle`, `writer.insertToc`, `writer.formatTable`.
+- Skill mới `chinh-ta-tieng-viet` (sửa chắc chắn / chỉ ghi chú / không đụng tới, bảng lỗi hay gặp) và
+  `cong-thuc-bang-tinh` (công thức đã thử trên WPS Spreadsheets thật: đọc số tiền thành chữ tiếng Việt bằng
+  `LET`+`LAMBDA`, năm sinh/giới tính từ CCCD, thâm niên, ngày công trừ ngày lễ, đếm không trùng, tra cứu).
+- Đo trên WPS 12.1.2 thật (`tests/wps/REFERENCE.md`): gán tên style lạ thì WPS âm thầm đổi về Normal (handler kiểm
+  trước); bảng chèn trong đoạn tiêu đề mang style Heading (`formatTable` đưa về Normal); `Table Grid` không tự kẻ khung;
+  màu nền hàng bị bỏ qua (báo trong `skipped`); nhiều tên `imageMso` có trong bảng lệnh vẫn ra dấu "?".
+- Sửa icon "?" có sẵn từ trước, thử ở cả Writer, Spreadsheets, Presentation: *Kỹ năng…* → `AddInManager`, *Kiểm tra mô
+  hình* → `ReviewAcceptChange`, *Soát bố cục* (Presentation) → `SelectionPane`.
+- Chưa làm: chưa thử soát chính tả / làm đẹp bảng với model thật (máy chủ AI nội bộ tắt lúc đo).
+
+### Added — WPS: Track Changes, comment, thay hàng loạt cho agent (P1-1, phần add-in, 31/10/2026)
+
+- Add-in WPS (`src/AxiomOffice.WPS/commands.js`) có thêm `writer.setTracking` (bật/tắt theo dõi thay đổi, đặt tên tác
+  giả "Axiom AI", `restoreAuthor` trả lại tên người dùng), `writer.listRevisions`, `writer.addComment` (neo theo chữ
+  hoặc số đoạn), `writer.listComments`, `writer.replaceMany` (tối đa 200 cặp tìm/thay, một bước hoàn tác, trong vùng
+  khoá thì chỉ thay trong vùng). Port từ bản Windows (`CommandDispatcher.WriterReview.cs`).
+- Sửa khi đo trên WPS 12.1.2 thật: ngày của revision/comment lệch 7 tiếng — WPS trả giờ địa phương gắn nhãn UTC, nay
+  đọc `getUTC*`. `make test-wps` chạy cả `tests/wps/test_addin_review.mjs` (trước đây bị sót trong danh sách).
+- Chưa có: tool soát cả tài liệu và skill chính tả tiếng Việt dùng các lệnh này (`docs/research/doi-chieu-wps-ai.md` §6).
+
+### Added — Lệnh nhanh: đổi giọng văn, viết tiếp, dịch song ngữ (P1-4, 31/10/2026)
+
+- Menu chuột phải *Sửa bằng AI* có 14 mục: thêm *Ngắn gọn*, *Dễ hiểu*, *Tích cực* và gom cùng *Trang trọng* vào menu con
+  *Đổi giọng ▸*; thêm *Viết tiếp* (chèn sau vùng bôi đen) và *Dịch song ngữ* (`agent/quickactions.go`, `ribbon.xml`).
+- Skill `dich-thuat` kèm bảng thuật ngữ hành chính – văn phòng Việt/Anh.
+- Đã thử trên WPS thật (menu, menu lồng, Viết tiếp trong vùng khoá, Hoàn tác); chưa thử với model thật.
+
+### Added — Sửa, tạo, nhập kỹ năng trong khung chat WPS (31/10/2026)
+
+- Core: `core-go/internal/skills/store.go` + `GET/PUT/DELETE /v1/skills/{name}`, `GET /v1/skills/{name}/file`,
+  `POST /v1/skills`, `POST /v1/skills/import` (cả dưới `/wps/v1/*`). Chỉ ghi thư mục kỹ năng cá nhân; sửa kỹ năng sẵn có
+  thì chép thành bản riêng che bản gốc (khôi phục = xoá bản riêng); xoá = chuyển vào `skills-trash`; nhập thư mục hoặc
+  `.zip`/`.skill` có xem trước, chặn zip-slip và link, bỏ file AI không dùng được, giới hạn kích thước. `SKILL.md` ghi
+  lại giữ nguyên khoá lạ (`license`, `metadata`) và luôn nạp lại được (kiểm bằng chính bộ đọc). Lỗi trả câu tiếng Việt.
+- Pane WPS, màn hình *Kỹ năng*: nút *Sửa* / *Xoá* / *Khôi phục bản gốc* trên từng thẻ, *Tạo mới*, *Nhập kỹ năng…*; màn
+  hình sửa (mô tả, ứng dụng, nội dung Markdown, tệp tham chiếu) và màn hình nhập (xem trước, đánh dấu thay).
+- Sửa trong lúc làm: kiểm "thư mục đã có" dùng nhầm `filesafe.Exists` (chỉ nhận file) — tạo/lưu có thể ghi đè thư mục
+  hỏng cùng tên; ô đường dẫn nhập không được đọc; ô soạn dùng font đơn cách vẽ lệch dấu tiếng Việt trên WPS thật.
+- Đo trên WPS 12.1.2 thật (Xvfb, HOME tạm): nhập `.zip` (bỏ `tao.py`, giữ `license`), sửa kỹ năng sẵn có thành bản riêng
+  (bản gốc không đổi), khôi phục qua `window.confirm` (hộp thoại gốc của WPS) — đều đúng.
+
+### Fixed — WPS Linux: mở Writer và Spreadsheets cùng lúc thì agent làm nhầm app (31/10/2026)
+
+- **Mỗi tiến trình WPS một phiên bridge** (`core-go/internal/wpsbridge`): add-in gửi `clientId`; client đầu giữ cổng
+  47861 và `<pid>-wps.json`, client sau có cổng + file session riêng. Trước đây cả ba app chung một hàng đợi và `app` =
+  app poll gần nhất, nên agent của pane Writer đọc bảng tính (`docs/audits/wps-linux-live-test-2026-10-28-run2.md` §4.5).
+- Pane, khung chat mini, ribbon gửi `{client, app}` (`/wps/v1/runs`, `/exec`, `/status`, `/pane/events`); Core chọn đúng
+  client (`Bridge.Resolve`). `exec` chỉ từ chối "run-in-progress" khi lượt chạy trên cùng app; relay menu chuột phải
+  chỉ giao cho khung chat của cùng client.
+- Client chính mất kết nối: lệnh chưa giao của nó trả "not sent, safe to retry", không rơi sang app khác.
+- **WPS đóng giữa lệnh**: Core thấy không còn tiến trình WPS (`/proc`) thì báo lỗi trong vài giây thay vì chờ 300 giây.
+- Test: `wpsbridge/multiclient_test.go`, `tests/wps/test_wps_multiapp_e2e.py` (trong `make test-wps-e2e`; Core cũ đỏ).
+  Đo trên WPS 12.1.2 thật: hai app hai phiên, lượt chạy đúng app, WPS chết giữa lệnh báo lỗi sau ~1 giây
+  (`tests/wps/REFERENCE.md`).
+
+### Changed — Core ẩn tool khi bridge thiếu lệnh tool đó gọi (31/10/2026)
+
+- Hợp đồng `core-go/internal/tools/needs.go`: tool gọi lệnh bridge trực tiếp khai `Required`/`Optional`; Core bỏ tool
+  thiếu lệnh `Required` (ghi log `tools hidden for missing bridge commands`), cả trong mô tả của chế độ lập kế hoạch.
+  Trước đây chỉ kiểm một hai lệnh chọn tay (`doc_design` kiểm `writer.insertBlocks` nhưng còn gọi `writer.restyle`).
+  `look_at_document` giờ cần `app.screenshot` (WPS chưa có nên không còn hiện rồi lỗi).
+- `needs_test.go`: mọi lệnh trong mã nguồn tool phải được khai; tool mới gọi bridge trực tiếp phải có hợp đồng.
+
+### Changed — Số liệu WPS trong tài liệu sinh từ code (31/10/2026)
+
+- `scripts/generate_wps_gaps.py` (trong `make check-gen`) sinh bảng "lệnh chưa có handler ở add-in WPS" và "tool Core bị
+  ẩn trên WPS" vào `docs/architecture/wps-bridge.md` §6 và một dòng ở `STATUS.md`, từ `CHUA_CO_HANDLER`,
+  `catalog/live-commands.json` và `tools/needs.go`. Số chép tay trước đó đã lệch (ghi 26, thực tế 51).
+
+### Changed — Đóng băng extension LibreOffice (31/10/2026)
+
+- `make test` và CI Linux không còn chạy LibreOffice (`make test-lo` chạy tay); CI bỏ bước cài LibreOffice và ba bước
+  live vốn `continue-on-error`.
+- `scripts/linux/install.sh` **không còn đòi LibreOffice/Python UNO**: máy chỉ có WPS cài được (trước đây `die` trước cả
+  bước cài Core). Có LibreOffice + Python UNO thì vẫn cài bản đóng băng; `--no-libreoffice` để bỏ. Sửa lỗi thoát mã 2
+  khi gói không có `.oxt` (`pipefail`). README trong gói viết lại cho WPS.
+
+### Removed — Mã chết `estimateLines`, `cardMaxFont` (31/10/2026)
+
+- Hai lỗi staticcheck U1000 cuối cùng; `make lint` sạch.
+
+### Added — Tính năng theo Claude for Microsoft 365 (27/10/2026)
+
+Theo `docs/research/tinh-nang-con-thieu-so-voi-claude-m365.md` (trạng thái từng mục ở §6). **Lệnh C# mới chưa được
+biên dịch** trong môi trường làm việc; add-in WPS chưa có handler cho các lệnh C# mới (Core báo lệnh không có).
+
+- **Truy vết công thức** (`trace_formula`, Excel): lần ngược ô tiền lệ / hậu duệ qua nhiều sheet, chỉ ra ô lỗi gốc.
+- **Trích dẫn bấm được**: câu trả lời trích `[§12]`, `[Data!C42]`, `[slide 3]`; bấm trong khung chat thì nhảy tới đó
+  (`writer.goto`/`et.goto`/`wpp.goto`).
+- **Excel sắp xếp / lọc** (`et.sort`, `et.filter`): Core hỏi trước khi sắp xếp dữ liệu có sẵn hoặc khi có công thức sẽ
+  trỏ nhầm hàng sau khi sắp xếp.
+- **Word comment và revision**: đọc, thêm, trả lời, đóng comment; đọc và chấp nhận/từ chối revision (luôn hỏi trước).
+- **Chế độ Track Changes cho lượt AI** (`TrackChangesEnabled`, `options.trackChanges`): sửa của AI thành revision tác
+  giả "Axiom AI"; "Hoàn tác lượt này" (`POST /v1/runs/{id}/undo`) từ chối đúng các revision của lượt.
+- **Làm việc xuyên ứng dụng** (`other_document`): lượt đọc/sửa tài liệu Office khác đang mở; sửa thì hỏi một lần mỗi
+  tài liệu, tài liệu đang có lượt khác thì không sửa.
+- **PivotTable** (`et.pivot`) và **xuất biểu đồ thành ảnh** (`et.exportChart`) để chèn sang PowerPoint/Word.
+
+### Changed — Agent Core: chỉ gửi tool hiếm dùng khi lượt cần tới (27/10/2026)
+
+Progressive disclosure: định nghĩa tool chiếm ~79% tiền tố gửi lại mỗi vòng (~21–22k ký tự mỗi app).
+
+- **Tool file của server MCP built-in `office`** (`doc_*`, `excel_*`, `ppt_*`, làm trên tệp đóng) chỉ được gửi khi
+  prompt của lượt hoặc một câu người dùng trước đó trong hội thoại nhắc tới tệp Office (`.docx/.xlsx/.pptx/.xls/
+  .csv/.tsv`…); tệp đính kèm của pane luôn kèm đường dẫn đầy đủ nên vẫn đọc được. Tool của server MCP người dùng tự cấu
+  hình giữ nguyên.
+- **`web_sources`** chỉ được gửi khi lượt có tìm web (Tavily), hội thoại đã có nguồn lưu, hoặc người dùng nhắc tới
+  nguồn/web/link.
+- Bộ tool chốt một lần ở đầu lượt, không đổi giữa lượt (giữ cache tiền tố). Lượt sửa tài liệu thường gửi ít hơn
+  ~18% (Word), ~34% (Excel), ~20% (PowerPoint) ký tự định nghĩa tool + system prompt mỗi vòng.
+
+### Fixed — Agent Core: lượt dừng giữa chừng được ghi lại, phạm vi hoàn tác nói rõ (27/10/2026)
+
+Theo `docs/research/hoc-tu-agent-khac.md` (học từ Codex, Grok Build, Claude Code).
+
+- **Lượt dừng giữa chừng để lại dấu vết cho lượt sau**: lượt kết thúc `cancelled`/`timedout`/`stopped`/`failed` sau khi đã
+  gọi tool ghi một dòng vào hội thoại ("previous request ended before finishing: …"), kèm tên lệnh ghi còn kết quả không
+  rõ; lượt sau thấy dòng này trong "Recent turns" và đọc lại tài liệu trước khi sửa. Lượt bị Core đổi sang `interrupted`
+  lúc khởi động cũng được ghi như vậy vào hội thoại của nó.
+- **Bấm Dừng khi một lệnh ghi đang chạy trong Office** = kết quả không rõ (như `HOST_BUSY`): lệnh COM không huỷ được và
+  có thể vẫn chạy xong.
+- **`GET /v1/runs/{id}` đọc `core.db`** khi lượt không còn trong bộ nhớ (Core khởi động lại, quá 30 phút): trả trạng thái
+  đã lưu kèm `"stored": true` thay vì 404.
+- **Excel/PowerPoint (Microsoft Office)**: sau lượt có sửa tài liệu, khung chat nói rõ Ctrl+Z không lấy lại được thay đổi
+  của AI. Sự kiện kết thúc lượt có thêm `editSteps` (số lệnh sửa chắc chắn của lượt, mọi app).
+
+### Fixed — Agent Core: kết quả mơ hồ, hoàn tác lượt, lượt bị gián đoạn (27/10/2026)
+
+Theo `docs/audits/axiom-agent-runtime-deep-audit.md` (F01, F02, F04, F07, F08).
+
+- **Không gửi lại mù một lệnh ghi có kết quả không rõ** (`tools/uncertain.go`): bridge báo `HOST_BUSY ... still
+  running`, Core hết giờ chờ bridge, hoặc add-in WPS báo "may have been applied" thì lệnh coi như *có thể đã sửa*
+  (revision tăng, phải tự kiểm chứng), lỗi trả model kèm chỉ dẫn đọc lại, và lần gọi lại **y hệt** bị chặn cho tới khi
+  có một lệnh đọc. Trước đây Core coi đó là "không sửa gì" nên model gọi lại → nội dung xuất hiện hai lần. Lệnh chắc
+  chắn chưa chạy (`HOST_BUSY ... was not run`, WPS "not sent, safe to retry") vẫn là lỗi thường.
+- **"Hoàn tác lượt này" lùi đúng số bước của lượt**: sự kiện kết thúc lượt (`run.completed/failed/cancelled/
+  timedout/stopped`) và `GET /v1/runs/{id}` có `undoSteps` — số bước hoàn tác Word chắc chắn còn lại, đã trừ các lần
+  agent tự `writer.undo`. Pane Windows dùng số này thay vì tự đếm lệnh ghi (tự đếm thì lùi vào nội dung có từ trước
+  lượt); Core cũ không gửi trường này thì pane đếm như trước.
+- **Lượt bị gián đoạn**: Core khởi động đổi các lượt còn `running` trong `core.db` (của process trước đã chết) thành
+  `interrupted` thay vì để `running` mãi (chỉ khi bật một-Core-mỗi-người-dùng).
+- Lỗi ghi `runs`/`tool_calls`/`run_rounds` vào `core.db` được ghi `core.log` thay vì bỏ im lặng.
+- `make test-go` (`-race`) xanh trở lại: `resumeWatch.stop()` chờ goroutine theo dõi thoát hẳn.
+
+### Added — Excel: soát cả sổ, đọc nhiều vùng, thử ô điều khiển một lệnh (27/10/2026)
+
+- `et.checkRange {}` soát cả sổ (`workbook` mỗi sheet một dòng, lỗi mọi sheet gộp kèm `sheet`); sheet chia khối soát
+  theo từng khối; `outside-table` thành `notes`, không tính `issueCount`.
+- `et.readRanges` (nhiều vùng một lời gọi), `et.whatIf` (đổi tạm ô giả định, đọc vùng theo dõi, tự trả lại).
+- `et.writeRange`/`writeRanges` báo `"changed": false` khi ô đã mang đúng giá trị; Core chặn lần ghi y hệt tiếp theo.
+- `et.setConditionalFormat` nhận `greaterThan`, `greaterThanOrEqual`, `xlLessThan`, `>=`… và `value1`/`value`.
+- Core: kết quả `et.readRange` từ lần thứ 4 trong lượt nhắc dùng `et.readRanges`.
+- `et.readRange` nhận "Sheet!A1:B2"; `et.whatIf` báo `usedBy` khi ô chỉ là ngưỡng của định dạng có điều kiện / validation;
+  `et.setConditionalFormat` nhận `type: "cellIs"` / `"formula"`.
+
+### Fixed — Excel (27/10/2026, tiếp)
+
+- `et.writeRanges` bỏ qua `sheet` ngoài và ghi vào sheet đang mở.
+- `et.checkRange` báo nhầm `empty-header` / `mixed-types` trên khối biểu mẫu (tiêu đề một ô, cặp nhãn - giá trị).
+- `et.formatRanges` áp dở dang khi Excel không nhận `numFmt` (nay thử trước, từ chối cả lệnh).
+- `et.addChart` hỏng giữa chừng để lại biểu đồ rỗng.
+
+### Added — Excel: định dạng nhiều vùng một lệnh (27/10/2026)
+
+- **`et.formatRanges`**: `formats` là mảng `{range, sheet?, ...}` cùng thuộc tính như `et.formatRange`; nhiều vùng, nhiều
+  sheet trong một lời gọi; kiểm hết trước khi định dạng (một mục sai thì không vùng nào đổi).
+- Core: kết quả `et.formatRange` từ lần thứ 3 trong lượt nhắc gom phần còn lại vào `et.formatRanges`. Skill
+  `bao-cao-du-lieu`, `mo-hinh-nhieu-sheet`, `bang-diem` hướng dẫn gom định dạng một lần.
+
+### Fixed — Excel (27/10/2026)
+
+- `et.createTable` từ chối khi hàng tiêu đề có ô trống (Excel tự đặt `Column1`, ô tiêu đề bảng không xoá trắng được).
+- `et.checkRange` lấy định dạng số của ô số lẻ thật trong cột, không luôn lấy hàng 2 (báo nhầm `no-number-format`).
+
+### Added — Word/Excel P3: mẫu văn bản theo loại, dashboard, định dạng có điều kiện nâng cao (27/10/2026)
+
+- **Tool `doc_from_brief`**: văn bản mới theo loại (tờ trình, công văn, thông báo, biên bản, báo cáo, kế hoạch) đúng thể
+  thức NĐ 30/2020 - phần đầu, tên loại + trích yếu, Kính gửi, nội dung, nơi nhận, chữ ký, số trang/mục lục; chỗ thiếu
+  ghi "…" và báo `placeholders`. Lệnh nền `writer.insertLayoutTable` (bảng không viền, định dạng từng dòng).
+- **Tool `dashboard_from_data`**: sheet Dashboard với ô KPI là công thức đọc sheet dữ liệu và 1-4 biểu đồ đọc thẳng vùng
+  dữ liệu; `replace: true` dựng lại.
+- **Excel**: `et.setConditionalFormat {type}` - colorScale, dataBar, iconSet, top/bottom, aboveAverage/belowAverage,
+  duplicate/unique; `et.deleteSheet`; `et.formatRange {columnWidth}`; `et.addChart` nhận vùng rời mỗi phần có tên sheet.
+- Bộ đo `tests/bench/office` thêm 4 ca P3 (26 ca); test live `tests/live/test_office_templates.py`.
+
+### Fixed — P3 (27/10/2026)
+
+- Core: lệnh gọi có đối số không phải JSON (model cắt giữa chừng) không chạy và không gửi lại chuỗi hỏng trong lịch sử
+  (nhà cung cấp từ chối cả request, HTTP 400).
+- `et.setConditionalFormat` gọi lại chỉ thay rule có vùng áp dụng trùng khít, không xoá rule của vùng chồng một phần.
+- `et.deleteSheet` hỏi người dùng khi sheet có dữ liệu và không do lượt tạo.
+
+### Added — Word/Excel P2: tự soát phân trang, viết cả mục một lệnh (27/10/2026)
+
+- **`writer.writeContent`**: nhiều khối (tiêu đề, đoạn căn đều, gạch đầu dòng / danh sách số thật, bảng kèm chú thích,
+  ngắt trang) nối vào cuối bài trong một lệnh, một bước hoàn tác; soát hết trước khi ghi.
+- **`writer.checkLayout {maxPages}`** (chỉ đọc): số trang/chữ, trang từng tiêu đề; lỗi `blank-page`,
+  `heading-at-page-bottom`, `split-table`, `empty-paragraphs`, `too-long` kèm cách sửa.
+- **`writer.deleteParagraphs`** (tất cả hoặc không; từ chối đoạn trong bảng/mục lục), **`writer.addTableRows`** (thêm
+  hàng vào bảng có sẵn), `insertPageBreak {before}`, `formatTable {keepTogether}`.
+- **Excel**: `et.checkRange` không truyền `range`/`sheet` soát ô lỗi ở mọi sheet (`error-cells`).
+- Skill `the-thuc-van-ban`: viết cả mục một lệnh, ngân sách chữ theo số trang, soát `checkLayout` trước khi trả lời;
+  test live `tests/live/test_office_layout.py`.
+
+### Fixed — Word P2 (27/10/2026)
+
+- `insertTable` tự giữ bảng ≤ 15 hàng trên một trang; chú thích bảng đi liền bảng.
+- `insertStyledText` dạng khối sang đoạn mới khi con trỏ ở cuối đoạn có chữ (trước đó dính vào đoạn của `appendText`).
+- `tests/live/test_writer_format.py` đọc căn lề thực tế (đoạn → style): "thân bài căn đều" trượt vì style Normal đã căn
+  đều nên Word không ghi `jc` vào đoạn - lỗi của test.
+
+### Added — Word/Excel P1: lệnh cấu trúc có ngữ nghĩa (26/10/2026)
+
+- **Word**: `writer.setStyle` (gán Heading/Title/List... cho đoạn có sẵn theo số đoạn `writer.outline`, style dựng sẵn
+  theo hằng nên không phụ thuộc ngôn ngữ giao diện), `writer.insertToc` (chèn; gọi lại = cập nhật số trang),
+  `writer.setHeaderFooter` (đầu/chân trang mọi section + số trang), `writer.insertCaption` (Caption + trường SEQ, mặc
+  định cuối bài, `before` để chú thích bảng có sẵn). `insertTable` luôn lặp hàng tiêu đề và từ chối ô công thức.
+- **Excel**: `et.createTable` (Excel Table có lọc), `et.freezePanes`, `et.setValidation` (danh sách gõ thẳng, vùng ở
+  sheet khác, số/ngày trong khoảng); `et.addChart` nhận vùng nguồn ở sheet khác (`Data!A1:C7`).
+- **Viết nối tiếp đúng thứ tự**: `appendText` đưa con trỏ về cuối chữ vừa nối; `heading`/`insertTable` sang đoạn mới
+  khi con trỏ ở cuối một đoạn có chữ.
+- Skill `the-thuc-van-ban`, `bao-cao-du-lieu` hướng dẫn lệnh mới; test live `tests/live/test_office_structure.py`.
+- Bộ đo `tests/bench/office`: đọc validation trong `extLst` (x14), Dashboard chỉ có biểu đồ không bị tính là gõ cứng.
+
+### Fixed — Word/Excel P0: không mất dữ liệu, lượt không tự hỏng (26/10/2026)
+
+- **Undo chỉ lùi việc của lượt**: Core đếm bước hoàn tác do lượt tạo (theo trường `undo` của catalog), `writer.undo`/
+  `et.undo`/`wpp.undo` không lùi quá; lượt chưa sửa gì thì từ chối (ca `w08` từng xóa sạch nội dung có sẵn; Excel
+  `Undo()` còn lùi thao tác của người dùng).
+- **Lưu đổi tên tài liệu**: `save`/`saveAs` trả `fullName` mới thì tài liệu đích của lượt đổi theo (ca `x06`: sau
+  `et.save` sổ mới mọi lệnh báo `DOCUMENT_CLOSED`).
+- **Chặn lệnh lặp**: lệnh ghi y hệt chỉ bị đếm dồn khi lặp liền; xen lệnh ghi khác thì đếm lại (`insertPageBreak` sau
+  mỗi chương từng bị chặn từ lần 5).
+- **Ghi đè ô do chính lượt vừa ghi không cần xác nhận** (số tạm → công thức); ô có từ trước vẫn hỏi.
+- **`doc_design` từ chối tài liệu gần như trống** (< 400 ký tự) thay vì kết thúc lượt soạn mới bằng câu trả lời sẵn.
+
+### Added — Bộ đo Word/Excel và baseline (26/10/2026)
+
+- **`tests/bench/office`**: 22 ca (10 Word, 10 Excel, đề A báo cáo, đề B workbook 4 sheet), chạy trên Office thật
+  qua `POST /v1/runs` (tự bấm đồng ý, tài liệu dựng sẵn, nhiều lượt liên tiếp); chấm `.docx`/`.xlsx` bằng XML + Word/Excel
+  COM (phân trang; đổi đầu vào xem tổng hợp đổi theo). Baseline `ocg/beam-free` **13/22**; capability matrix, lỗi
+  theo mức độ và kế hoạch P0–P3: `docs/plans/21-v0-word-excel-chat-luong.md`.
+
+### Fixed — Tool lỗi trả `ok:false`; tên hình tiêu đề; lệnh đọc MCP không tính là ghi (26/10/2026)
+
+Từ log khung chat (plan 20-c0 §5.5, lượt `r_d820f088` lập kế hoạch → `r_9b55dd99` thực hiện, `ocg/beam-free`: 10 slide,
+10 vòng, 118k token vào, 0 lỗi bố cục):
+
+- **`slides_from_brief` từ chối / dựng dở trả `{"ok":false,"error":...}`** kèm `errors` (từng trường) và `how`, thay vì
+  `{"ok":true,"result":{"built":0,"errors":...}}` — model và khung chat từng thấy "ok":true trong một lần gọi hỏng.
+  `error` là một dòng gọn (`slide 4: TOO_LONG nodes[policy] (12/11)`), khung chat hiện thẳng (`FailJSON`).
+- **`slides_from_template` (mode design/compose) cũng vậy**: bố cục sai hoặc có slide dựng hỏng trả `ok:false` +
+  `errors` (trước là `"ok":true` kèm `errors`); phần đã dựng vẫn được lưu và báo trong `built`.
+- **Lần gọi hỏng nhưng đã ghi một phần** (`ok:false` + `Mutating`) nay tăng revision tài liệu: trước đó `docStateGuard`
+  bỏ qua mọi kết quả hỏng nên lệnh đọc y hệt sau đó bị trả "unchanged" dù bài đã đổi.
+- **Kết quả `slides_from_brief` có `titleShape`** từng slide: model đoán tên `Title` để sửa tiêu đề → lỗi + 2 vòng đọc lại.
+- **Tool đọc của server MCP built-in** (`ppt_profile`, `doc_get_text`…) không còn bị tính là lệnh ghi (tra theo tên
+  đầy đủ `mcp__office__…` nên không khớp danh sách chỉ đọc) - trước đó tăng revision của tài liệu dù chỉ đọc.
+- **`score.py`**: nguồn số của brief gồm cả `seed` + `derived` (bài sửa lỗi `s26` từng bị đếm nhầm `unsourced`).
+
+### Added / Changed — Skill slide ngắn lại; lỗi đầu lượt chỉ rõ cách sửa; bìa và lộ trình đỡ đơn điệu (26/10/2026)
+
+- **Skill `trinh-bay-chuyen-nghiep` tách đôi** (plan 20-c0 §5.3): lưới, cỡ chữ, sức chứa, giới hạn wpp và checklist tự
+  vẽ chuyển sang `references/tu-ve-bang-wpp.md` (chỉ đọc khi không có `slides_from_brief`). `SKILL.md` 13,9k → 8,4k
+  ký tự; skill và `thiet-ke-van-phong` nói rõ không cần đọc `_design/tokens.json` / `bo-cuc-slide.md` khi có tool.
+- **Lỗi đầu lượt chỉ rõ cách sửa** (cả 4 lượt trước đều mất 2–4 vòng đầu): `TOO_LONG` của chữ một đoạn có `max` (số
+  ký tự vừa, `slidelayout.MaxChars`); nút ở tầng 5+ không còn kéo theo `UNKNOWN_NODE` cho cạnh nối tới nó, và
+  `LAYER_1_TO_4` chỉ cách gộp tầng; câu "span không nhận mũi tên" chỉ hiện khi id giống tên dải; mô tả tool nói trước
+  giới hạn 4 tầng và ~16 ký tự/nút.
+- **Bìa có điểm nhấn**: dải màu chính bên trái, khối nhạt ở đáy, vạch màu nhấn giữa tên và dòng phụ
+  (`Grid.CoverDecor`, không đè vùng chữ). **`timeline`** nhận `points` mỗi mốc (mục tiêu / điều kiện / rủi ro), dòng đầu
+  đậm; skill gợi ý lộ trình → `timeline`, các bước → `process`, số → `figures`/`chart`.
+- **`wpp.addShape` nhận `dash`** (C#, catalog): dải `span` có viền nét đứt.
+- **Benchmark `s26-loi-khong-noi-cho`**: slide cài sẵn tổng sai (1.240 + 310 ≠ 1.450) và hộp chữ đè tiêu đề, đề chỉ
+  nói "soát và sửa mọi lỗi" (đo khả năng tự phát hiện); brief nhận trường `derived` cho số suy ra.
+- **Đo lại** (`r_e0c9405c…`, `ocg/beam-free`): **11 vòng, 156k token vào** (138k cache), 128 s — 1 lần bị từ chối
+  (có `max`, rút một lần là vừa), lần dựng đầu 10 slide 0 lỗi; skill nạp đầu lượt 11,8k ký tự (trước ~23k + đọc
+  `tokens.json`).
+- Kiểm: `go test ./...` xanh (+3 test tools, +1 test slidelayout); `tests/catalog` OK (Host đã build lại);
+  `tests/bench/slides` OK.
+
+### Added / Fixed — Dải "xuyên suốt" cho sơ đồ; chặn lệnh lặp không chặn nhầm lệnh đọc; bắt sơ đồ lỗi gửi lại (26/10/2026)
+
+Lượt thật đề ngân hàng bằng `ocg/beam-free` (`r_f78df99d…`, trace bật): 45 vòng, 1,30M token vào; bài cuối 0 lỗi bố
+cục nhưng sơ đồ **mất nút Observability** (model bỏ nút để hết lỗi dây) và 13 vòng cuối chỉ để kiểm từng slide.
+
+- **`identicalCallGuard`**: lệnh đọc (không sửa tài liệu) được đếm lại từ đầu khi tài liệu đã đổi kể từ lần đọc trước.
+  Trước đây `wpp.checkLayout` cả bài sau mỗi lần dựng lại bị chặn ở lần thứ 5 dù bài đã khác → model kiểm từng slide
+  một (12 vòng). Lệnh ghi lặp y hệt vẫn bị đếm suốt lượt.
+- **`SAME_SPEC_SAME_ISSUES` bắt cả sơ đồ đổi tiêu đề**: khoá so sánh bỏ `notes`; với `diagram` chỉ xét layout + `nodes` +
+  `edges` (+ `span`). Lượt trên gửi lại sơ đồ lỗi y hệt 3 lần, mỗi lần chỉ sửa chính tả tiêu đề, không bị bắt.
+- **`diagram` nhận `span: [{text}]`** (tối đa 2; nhận cả `spans` / chuỗi trần): thành phần chạy xuyên mọi tầng
+  (Observability, audit) vẽ thành dải dọc bên phải, cao bằng cả sơ đồ, không phải nút, không nhận mũi tên (mũi tên tới
+  nó → `UNKNOWN_NODE` kèm cách sửa). Dải là vật cản khi đi dây. Từ dài hơn bề rộng dải → `WORD_TOO_LONG` (PowerPoint
+  ngắt giữa từ "Observabil|ity" ở bản rộng 130 đầu tiên; nay 190). `slidelayout.DiagramWithSpans`; mô tả tool + skill
+  `trinh-bay-chuyen-nghiep` hướng dẫn dùng. Chưa có nét đứt (`wpp.addShape` chưa có `dash`).
+- **Đo lại** (cùng đề, `ocg/beam-free`): `r_e6766361…` **12 vòng, 191k token vào** (157k cache), 583 s; lần dựng đầu
+  10 slide **0 lỗi**, không phải đi lại dây; sơ đồ giữ Observability thành dải.
+  `r_9a7512ac…` (dải 190): lần dựng đầu 10 slide **0 lỗi**, chữ "Observability:" trong dải không còn bị ngắt — nhưng
+  lượt **hỏng** sau 41 vòng, 1,18M token (`finish_reason=length`, bài vẫn đủ 10 slide, 0 lỗi bố cục).
+- Chưa sửa: `beam-free` **không gõ được "kiểm soát"** — ra "kiểm Scotch" (`r_f78df99d`, 5 slide) hoặc "Kiểm Sudan"
+  (`r_9a7512ac`, 6 chỗ). Model tự thấy lỗi, dựng lại slide ~20 lần để sửa, suy luận rơi vào vòng lặp ("Kiểm Sudan →
+  Kiểm Sudan → …") tới khi hết token. Đây là phần tốn nhất của hai lượt 45 và 41 vòng.
+- **Chặn vòng sửa chữ vô ích**: `slides_from_brief` đếm số lần gọi dựng lại (qua `replace`) slide mà lần dựng trước
+  **0 lỗi bố cục**; quá 2 lần thì từ chối (`CLEAN_SLIDE_REBUILT_TOO_OFTEN`) và bảo model trả lời người dùng, nêu chữ nào
+  còn sai ở slide nào để họ sửa trong PowerPoint. Lượt `r_9a7512ac` sẽ dừng ở vòng ~15 thay vì 41 (chưa đo lượt thật);
+  lượt `r_e6766361` chỉ dựng lại slide sạch 1 lần nên không bị ảnh hưởng.
+- **Đo lại sau cả đợt** (`r_fb096418…`, `ocg/beam-free`): **17 vòng, 413k token vào** (357k cache), 203 s, xong bình
+  thường; lần dựng đầu sơ đồ 0 lỗi dây, chỉ slide 10 (thẻ) 1 lỗi → model sửa đúng slide đó bằng `replace` một lần;
+  dải Observability đúng một dòng; không còn "Sudan"/"Scotch". Ba lượt liền (`r_e6766361`, `r_9a7512ac`, `r_fb096418`)
+  lần dựng đầu không còn `connector-*` → đạt mốc plan 20-c0 §5.1. Chặn dựng lại slide sạch chưa bật ở lượt thật nào.
+- Kiểm: `go test ./...` xanh (+1 test model, +4 test tools, +1 test slidelayout).
+
+### Added / Fixed — Log debug từng lượt; đi lại dây không làm sơ đồ tệ hơn; chỉ sửa slide lỗi (26/10/2026)
+
+- **`DebugTrace`** (HKCU DWORD hoặc `AXIOM_DEBUG_TRACE=1`, mặc định tắt): mỗi lượt ghi `traces/<run id>.jsonl` cạnh
+  `core.log` — sự kiện `run` (prompt, system prompt, tool), `round` (token, `finish_reason`, câu trả lời, suy luận, tool
+  call nguyên văn, cỡ ngữ cảnh đã gửi), `tool` (tham số + kết quả nguyên văn, `mutating`/`verifies`, guard nào thay kết
+  quả), `state` (revision/verifiedAt), `guard`/`verify`, `tool.bridge` (lệnh PowerPoint bên trong `slides_from_brief`),
+  `reroute`/`reroute.reverted`, `result`. core.db chỉ giữ 200 ký tự lỗi và ~2.000 ký tự tham số nên trước đây không soi lại được.
+- Lượt thật có trace (`r_22ae8aca`, đề ngân hàng, 31 vòng, 918k token vào) chỉ ra hai lỗi:
+  - **`slides_from_brief` đi lại dây làm sơ đồ tệ hơn mà vẫn giữ**: không so số lỗi trước/sau — 11 lần đi lại đưa slide 4
+    từ 3 lên 9–12 lỗi. Nay dây mới làm tăng số lỗi `connector-*` thì vẽ lại tuyến cũ, xoá tuyến thử (không tính vào
+    `connectorsRerouted`).
+  - **Dựng xong còn lỗi mà không chỉ cách sửa**: chỉ có `issueCount`, model dựng lại cả 10 slide (bài thành 20 slide)
+    rồi mất 7 vòng xoá từng slide cũ. Nay kết quả có `next`: chỉ gửi lại slide lỗi, mỗi slide kèm `replace` và spec đã đổi.
+- Kiểm: `go test ./...` xanh (+2 test tools, +1 test trace).
+
+### Fixed — Slide bìa hiện "Slide 1 — Cover"; ghi lại chữ cũ làm đọc lại cả bài (26/10/2026)
+
+Lượt thật đề ngân hàng (`r_ab57df5f…`, 25 vòng, 469k token): model ghi `"source":"Slide 1 — Cover"` → bìa hiện dòng đó;
+model sửa `TextBox 3` qua lại 3 lần (lần cuối ghi y hệt chữ đang có), mỗi lần ghi làm revision tăng nên lại đọc cả bài.
+13 vòng sau lần dựng cuối tốn 327k token (70% lượt).
+
+- `slides_from_brief`: bìa/section không nhận `source` (`NO_SOURCE_ON_COVER`/`NO_SOURCE_ON_SECTION`); `source` dạng
+  nhãn slide (`Slide N…`, `Trang N`, `Cover`) bị từ chối (`SOURCE_IS_SLIDE_LABEL`); mô tả tool nói rõ `source` in trên slide.
+- `wpp.setShapeText` (C#): chữ y hệt thì không ghi, trả `changed: false`; `office_action` coi lệnh ghi có
+  `changed: false` là không sửa tài liệu → revision giữ nguyên, `docStateGuard` vẫn trả `unchanged` cho lệnh đọc lặp.
+- Kiểm: `go test ./...` xanh (+2 test); PowerPoint thật: ghi chữ cũ → `changed:false`, chữ mới → `true`.
+  Bản WPS (`commands.js`) chưa trả `changed` (Core coi như có đổi, như trước).
+
+### Fixed — Wizard báo "Không rõ lỗi" với model suy luận (26/10/2026)
+
+`POST /v1/llm/test` chỉ cho `max_tokens = 24`: model suy luận (`ocg/beam-free`) tiêu hết token cho phần suy nghĩ,
+`content` rỗng, `finish_reason = "length"`; `Client.Chat` lại trả lỗi rỗng nên wizard chỉ hiện "Không rõ lỗi".
+Sửa: trần phép thử nâng lên **512**; `Chat` trả `provider returned no answer text (finish_reason=…, reasoning N chars)`;
+`setup.Describe` dịch lỗi này sang kind `reply` với câu tiếng Việt rõ ràng. Kiểm: `ocg/beam-free` qua phép thử (2,3 s).
+
+### Docs — WPS còn thiếu gì so với bản Windows (26/10/2026)
+
+Đối chiếu `catalog/live-commands.json` (**84** lệnh), bảng `HANDLERS` trong `src/AxiomOffice.WPS/commands.js` và
+`CHUA_CO_HANDLER` trong `tests/wps/test_addin.mjs`: bản Windows (C#) có **81** lệnh; add-in WPS có handler cho
+**58** lệnh, trong đó `et.closeAll`/`wpp.closeAll` là hai lệnh chỉ có ở catalog LibreOffice (Windows không khai).
+Vì vậy WPS thiếu **25 lệnh Windows**; mục "26 mục registry chưa có handler" = 25 lệnh đó + `ui.setup` (đường riêng
+của LibreOffice, không có ở Windows). Đợt này **chỉ ghi tài liệu**, không viết thêm handler.
+
+**10 lệnh `agent=true` — agent gọi trên WPS sẽ nhận `unknown action`:**
+
+| Lệnh | Việc bị thiếu |
+|---|---|
+| `writer.formatTable` | định dạng bảng có sẵn: kiểu, font, màu hàng tiêu đề/sọc, viền, căn lề, co giãn |
+| `writer.insertImage` | chèn ảnh tại con trỏ |
+| `writer.insertHyperlink` | chèn liên kết |
+| `writer.replaceMany` | thay nhiều chỗ trong một lần (`edits: [{find, replace}]`) |
+| `wpp.newFromTemplate` | tạo bài mới từ `.pptx`/`.potx`, giữ khổ + master |
+| `wpp.addSlideFromTemplate` | chèn bản sao slide mẫu, giữ nền/khung/định dạng |
+| `wpp.sourceManifest` | đọc bài nguồn theo slide (tiêu đề, chữ, ảnh) để dựng lại |
+| `wpp.setShapeText` | thay chữ khung theo tên shape, giữ định dạng |
+| `wpp.deleteShapes` | xoá shape theo tên (mục lặp của slide mẫu) |
+| `wpp.copyPicture` | chép ảnh từ bài khác, co vừa khung |
+
+**15 lệnh `agent=false` — script/MCP/đường nội bộ gọi thẳng bridge sẽ lỗi:**
+
+- **Chung (3)**: `ai.ask` (agent in-process của add-in Windows), `ui.askpane` (mở pane bằng lệnh), `app.screenshot`
+  (ảnh trang/slide — thiếu lệnh này là lý do toggle *Nhìn tài liệu* chưa lên ribbon WPS).
+- **Writer (5)**: `newDocument`, `open`, `closeAll` (tạo/mở/đóng tài liệu), `restyle` (trình bày lại nền chung) và
+  `insertBlocks` (chèn khối bo tròn). Hai lệnh cuối tuy `agent=false` nhưng **`doc_design` gọi thẳng**.
+- **WPP (7)**: `addParagraphs`, `addGrid` (khung chữ nhiều đoạn, bảng có định dạng), `deleteTagged` (dựng lại một lô
+  slide), `addShape`, `addConnector`, `addChart` (hình khối, đường nối, biểu đồ gốc), `renderSlide` (ảnh một slide).
+
+**Hậu quả với các tool lớn (không chỉ là "thiếu vài lệnh lẻ"):**
+
+- **`slides_from_brief`**: mọi layout đều gọi `wpp.addParagraphs` (layout bảng gọi `wpp.addGrid`); `process`/
+  `timeline`/`diagram` gọi `wpp.addShape` + `wpp.addConnector`; `chart` gọi `wpp.addChart` → **cả tool** dừng ở
+  slide đầu trên WPS, không riêng các layout sơ đồ.
+- **`slides_from_template`**: cần `wpp.newFromTemplate`, `sourceManifest`, `addSlideFromTemplate`, `setShapeText`,
+  `deleteShapes`, `copyPicture`, `addParagraphs`, `deleteTagged` → không dựng được bài từ mẫu trên WPS.
+- **`doc_design`**: cần `writer.restyle` + `writer.insertBlocks` → không trình bày lại văn bản trên WPS Writer.
+- **QA thị giác (`look_at_document`)**: bản PowerPoint dùng `wpp.renderSlide`; không có thì rơi về `app.screenshot`.
+  WPS thiếu **cả hai**, nên model không có ảnh trang/slide để soát.
+
+**Khác biệt hành vi (cùng đích "tương đương", không phải lệnh thiếu):**
+
+- `wpp.checkLayout`: WPS thiếu `overflow` (object model không đo chiều cao chữ) và hai loại `connector-crossing`/
+  `connector-overlap`; các loại còn lại giữ ngưỡng của LibreOffice.
+- **Hoàn tác**: ET/WPP không có `UndoRecord`; `et.undo` chỉ khôi phục snapshot trong **cùng phiên add-in** (đóng WPS
+  là mất), registry **không có** `wpp.undo`; `writer.undo` gỡ N bước gần nhất và **không phân biệt** bước AI với
+  người (LibreOffice chỉ gỡ bước `AI: …`).
+- **PDF**: ET/WPP thử `ExportAsFixedFormat` nhưng WPS thường không ghi tệp; add-in tự dựng PDF tối giản **chỉ có
+  chữ**, mất định dạng và biểu đồ.
+- **Một app tại một thời điểm**: bridge WPS có một hàng đợi + một file session; mở Writer và Spreadsheets cùng lúc
+  thì chỉ app vừa poll được phục vụ.
+- **Khởi động**: phải chạy Core **trước** khi mở WPS, bật `JsApiPlugin=true`; cài/đăng ký add-in xong phải **mở
+  lại WPS**.
+- **Ghi ô ET**: `Value2` tự ép chuỗi trông-như-số/ngày thành số/ngày; `et.save`/`wpp.save` từ chối tài liệu chưa
+  lưu lần nào. `FileSystem.readFileString` bị sandbox — `et.importCsv` đã chuyển sang `FileSystem.ReadFile`.
+
+**UI/ribbon còn thiếu so với bản Windows:**
+
+- *Nhìn tài liệu* (toggle QA thị giác) — thiếu `app.screenshot`.
+- *Cài đặt nâng cao…* — pane *Thiết lập* đã có đủ trường; thêm nút mở lại đúng màn hình đó là nút giả.
+- *Tắt Agent Core…* — Core đang phục vụ pane; `/v1/admin/shutdown` cũng không có trên kênh `/wps/v1/*`.
+- *Công cụ ngoài…*/MCP, *Tìm web* — kênh `/wps/v1/*` không có route ghi `mcp.json`.
+- Menu ngôn ngữ — WPS không có `lang/*.json`.
+- *Hội thoại trước…*: WPS liệt kê 30 hội thoại gần nhất của **mọi tài liệu**, Windows lọc theo tài liệu đang mở.
+- *Bộ nhớ AI*: WPS mới **3/6** việc của nghiệm thu (xoá tạm, khôi phục, xoá vĩnh viễn) + đọc/lọc/tải lại; thiếu
+  **sửa, ghim, đặt hạn** (`PATCH /wps/v1/memory/{id}` có sẵn nhưng chưa có form).
+
+**WPS có thêm so với bản Windows:** `et.closeAll` và `wpp.closeAll` (Windows không khai trong registry), menu chuột
+phải *Sửa bằng AI* + khung chat mini. `ui.setup` là đường LibreOffice, không phải lệnh Windows.
+
+**Nguồn số liệu:** 84 lệnh trong `catalog/live-commands.json`; 81 lệnh khai bằng `Command("…")` trong
+`src/AxiomOffice/Bridge/*.cs`; 58 handler trong `HANDLERS` của `commands.js`. `node --test tests/wps/test_addin.mjs`
+ghim đúng 26 mục `CHUA_CO_HANDLER` và chiều "registry ⊆ handler". Đã cập nhật `docs/architecture/wps-bridge.md` §6
+và `STATUS.md` §1/§3 từ 22/80 lên 26/84.
+
+### Fixed — Sơ đồ tự đi lại dây khi PowerPoint vẽ lệch mô hình (25/10/2026)
+
+Lượt thật `r_894e42ac…` (đề ngân hàng, lần dựng đầu slide 4): `RouteDiagram` chọn đường "sạch" theo mô hình nhưng
+PowerPoint vẽ ra 1 `connector-crossing` + 3 `connector-overlap`; model không sửa được lỗi đi dây nên chỉ tốn vòng gửi lại.
+
+- **`slides_from_brief` tự sửa**: sau `wpp.checkLayout` của từng slide, mỗi lỗi `connector-*` thuộc đường do tool vẽ →
+  vẽ đường mới bằng ứng viên kế tiếp, xoá đường cũ (vẽ mới trước để add lỗi còn đường cũ), `checkLayout` lại; tối đa
+  **2 lần mỗi đường**. Kết quả slide có `connectorsRerouted` (tổng ở kết quả tool) để model biết tool đã sửa, không
+  dựng lại slide.
+- **`slidelayout.DiagramAlternatives`**: trả ứng viên khác cho một cạnh, bỏ qua đường hiện tại và các đường đã thử;
+  đường vòng thử `offset` lớn dần trước khi đổi phía; lọc bằng `routeClear` (không cắt hộp/không chồng dây) như
+  `RouteDiagram`.
+- **Đoạn nguồn là vật cản**: `grid.Source()` được đưa vào `obstacles` khi slide có `source` — trước đây dây vòng dưới
+  hàng cuối có thể cắt qua dòng nguồn mà mô hình không biết (checkLayout bên C# tính mọi textbox là hộp).
+- **Test**: `TestDiagramAlternativesSkipCurrentAndTried` (SL), `TestSlidesFromBriefReroutesConnectorPowerPointDrawsAcrossBox`
+  và `TestSlidesFromBriefStopsReroutingAfterTwoAttempts` (tools). `go test ./...` 24 gói xanh, `go vet ./...` sạch.
+- **Tài liệu + catalog**: `wpp.checkLayout` mô tả thêm `connector-crossing`/`connector-overlap` (catalog, README,
+  kiến trúc); `docs/architecture/wps-bridge.md` ghi rõ WPS không có hai loại này; skill `trinh-bay-chuyen-nghiep`
+  nhắc tool tự vẽ lại dây.
+- **Chưa đạt tiêu chí "xong" của plan 20 §5.1**: cần chạy đề ngân hàng 3 lần trên PowerPoint thật, lần dựng đầu không
+  còn `connector-*` trong `core.log` (máy kiểm chứng đã cài PowerPoint nhưng chưa cấu hình LLM/Core để chạy lượt thật).
+
+### Fixed — Slide sơ đồ trên đề thật: sửa đúng slide lỗi, dây tránh chú thích, xoá slide trống không hỏi (25/10/2026)
+
+Đề "Thiết kế hệ thống AI Agent cho ngân hàng" (10 slide, `tests/live/tasks/ngan-hang-ai-agent.md`, chạy bằng
+`tests/live/run_ai_task.py`, `ocg/beam-free`): 20 → 42 → 30 vòng qua các lần sửa; bản cuối 10 slide, `checkLayout` 0
+lỗi. Bàn giao chi tiết: `docs/plans/20-c0-ngu-canh-va-slide.md`.
+
+- **`slides_from_brief`**: nhận trường lồng trong khoá cùng tên layout (`{"layout":"diagram","diagram":{"nodes":…}}` —
+  lượt khung chat hỏng vì model viết kiểu này); lỗi thiếu nút/bước/mốc chỉ cách viết đúng; mô tả "không gọi
+  `wpp.addSlide` trước".
+- **`replace: N`**: gửi lại chỉ slide lỗi để dựng lại tại chỗ (chỉ slide do lượt dựng; `NOT_BUILT_IN_THIS_REQUEST`);
+  `wpp.addSlide` có `index`. Trước đó model dựng lại cả 10 slide rồi xoá bộ cũ.
+- **`SAME_SPEC_SAME_ISSUES`**: gửi lại đúng mô tả một slide đã dựng ra lỗi thì bị từ chối kèm gợi ý đổi gì (một lượt đã
+  gửi lại slide sơ đồ ~17 lần).
+- **Đường nối** tránh tiêu đề và dòng chú thích nhóm màu (`RouteDiagram` nhận vật cản; khoảng chú thích 34 → 50 pt).
+- **Lỗi bố cục vào `core.log`** (`slides_from_brief` và `wpp.checkLayout`: loại + chi tiết, không có chữ tài liệu).
+- Kết quả slide có `notes: "set"`; một nhóm màu thì không tô/không chú thích; nhóm 3 màu đậm hơn hẳn nhóm 1.
+- **Xoá slide trống không hỏi xác nhận** (`policy.BlankSlide`: không có hình nào ngoài placeholder rỗng).
+- **Khung chat** không gọi mọi lỗi là "Máy chủ AI báo lỗi": đọc `ErrorKind` của Core; lặp lệnh hỏng có câu riêng.
+
+### Changed — Trả token cho agent: bớt vòng thừa, bớt tool không dùng, đánh dấu cache (25/10/2026)
+
+Báo cáo "Giam ngu canh gui lai agent" (26 lượt thật 24–25/10, PowerPoint, `ocg/beam-free`, 212 vòng,
+1.541.217 token đầu vào): ~25% token là các vòng nằm sau lần sửa tài liệu cuối, ~71% là tiền tố cố định
+(tools + system prompt) gửi lại mỗi vòng. Đợt này sửa bằng harness, giữ nguyên hợp đồng API v1.
+
+- **Không chạy lại lệnh đọc y hệt khi tài liệu chưa đổi** (`docStateGuard`): Core giữ `revision` (tăng mỗi khi
+  lệnh ghi thành công) và ghi nhớ lệnh đọc chạy ở revision nào. Lệnh đọc trùng (chu kỳ + tham số) mà chưa có
+  lệnh ghi nào ở giữa → không chạm tool, thay kết quả bằng `"unchanged": true` ("kết quả ở trên vẫn đúng").
+  Ca cũ `TestRunAgentBlocksIdenticalCalls` nay dừng ở lần 1; thêm `TestRunAgentDocStateGuardSkipsIdenticalRead`.
+- **Không vất thêm vòng nhắc kiểm tra khi đã có bằng chứng** (`verifyGuard`): lượt có sửa tài liệu vẫn phải
+  tự kiểm trước khi trả lời, nhưng đã có lệnh đọc/kiểm ở phiên bản hiện tại sau lần sửa cuối, hoặc lệnh ghi
+  tự báo đã kiểm (`Verifies`) thì lượt tính là `Verified` ngay — không thêm vòng nhắc; sau đó có ghi mới thì
+  được nhắc như thường. Thêm `TestRunAgentEvidenceReadAfterWriteSkipsVerifyNudge`,
+  `TestRunAgentReadBeforeWriteIsNotEvidence`.
+- **Công cụ MCP được lọc theo app đang làm** (`mcp.FileToolApp` + `tools.AppMCP`): server built-in `office`
+  (20 tool `doc_*`/`excel_*`/`ppt_*`, trước đây rải đủ cho mỗi app — ~8k ký tự tiền tố mỗi vòng, mục 3 của
+  báo cáo) nay giữ tool của app phiên (Word → `doc_*`, Sheets → `excel_*`, Slides → `ppt_*`) cộng 8 lệnh đọc
+  của app còn lại; lệnh ghi của app khác bị bỏ. Server người dùng trong `mcp.json` giữ nguyên, thứ tự tool
+  giữ nguyên (không phá cache). `TestAppMCPFilterByApp`.
+- **Anthropic prompt caching** (`anthropicCodec.BuildRequest`): gắn `cache_control: ephemeral` cho khối
+  system cuối (tools + system thành một tiền tố cố định) và cấp request (`automatic` — tự đánh dấu phần đuôi
+  mới nhất mỗi vòng, xác minh dạng API 25/10/2026). Nhà cung cấp kiểu OpenAI tự cache nên phần đó không đổi.
+  `TestAnthropicPromptCachingControls`.
+- **`reasoning_content`**: đường non-stream của codec OpenAI (`Parse`) tách suy nghĩ ra `turn.Reasoning` rồi
+  cắt khỏi `Raw` — gửi lại lịch sử thì DeepSeek từ chối 400, còn nhà khác nhận thì cũng chỉ tốn token. Đường
+  streaming vốn không kèm. `TestParseDropsReasoningContentFromRaw`.
+- **Quy tắc dừng trong system prompt** (`StopRule`, nối sau `CheckRule`): đọc lại đã đúng thì trả lời và kết
+  thúc — không quét lại cả bài khi tài liệu không đổi, không lặp phép kiểm đã qua; chỉ kiểm lại khi sắp ghi
+  thêm, một phép kiểm vừa thất bại, hoặc phần đó chưa từng kiểm. Câu chữ theo tư vấn ChatGPT ngày
+  25/10/2026; phần "đọc lệnh trùng / chưa có kiểm lại" chặn bằng guard ở trên (chống giả kiểm và kiểm nông).
+- **Đo trực tiếp mỗi vòng** (schema 4): `RoundStat` (đầu vào, cached, output, số tool, loại vòng
+  `tools`/`final`/`nudge:*`/`end:*`/`error`) qua `AgentCallbacks.RoundFinished`, ghi SQLite
+  (`tool_calls.result_chars`, `runs.cached_tokens`, bảng `run_rounds`); dòng finish thêm `no-tool rounds: ...`.
+- **Bench slide "cài sẵn lỗi"** (`tests/bench/slides/briefs.json` version 2): brief mới `s25-loi-cai-san` —
+  `seed` chạy lệnh bridge cài sẵn số sai ("nhập học 205") trên bài mới trước lượt, `mustRemove` chấm khoá cụm
+  lỗi phải biến mất; đo được lượt có đọc tài liệu có sẵn để sửa (mô hình "sửa lỗi trên bài đang mở", ca khắp
+  nhất của 17-R0). `score.py` thêm cột `leftover`.
+- **Kiểm:** `go test ./...` (24 gói) xanh; e2e Core **170 passed, 0 failed** (`make test-core`, cập nhật 2
+  chỗ characterization: system Anthropic thành block + `cache_control`; ca MCP chạy phiên Word vì `doc_`
+  giờ là tool của Word — `TestAppMCPFilterByApp` riêng); bench slides 9/9; `check-gen`, `gofmt`, `go vet`,
+  `ruff` sạch.
+
+### Fixed — Sơ đồ slide: dây không cắt hộp, checkLayout thấy đường nối, nhóm màu (25/10/2026)
+
+Lượt thật (PowerPoint, `ocg/beam-free`, đề 10 slide kiến trúc AI Agent ngân hàng): sơ đồ kiến trúc có dây xuyên qua
+hai hộp, dây quay về chồng lên dây khác, mà `checkLayout` báo 0 lỗi; bìa lệch; slide quy trình không phân biệt được
+bước của AI với bước của hệ thống nghiệp vụ.
+
+- **`wpp.checkLayout`** tính đường đi THẬT của đường nối (thẳng/gấp khúc, lật, xoay, độ sâu đường vòng) và báo
+  `connector-crossing` (dây cắt qua hộp không phải đầu/cuối của nó; khung bao một đầu thì không tính) và
+  `connector-overlap` (hai dây chồng trên một quãng; toả nhánh / gom nhánh dùng chung thân thì không tính). Mỗi
+  đường nối trả thêm `path`, `from`, `to`.
+- **`wpp.addConnector`**: `fromSide` / `toSide` (top/bottom/left/right) và `offset` (độ sâu đường vòng chữ U).
+- **`slides_from_brief` / `diagram`**: dây được chọn đường (`slidelayout.RouteDiagram`) - tầng kề: đáy → đỉnh; cùng
+  hàng kề: thẳng; cùng hàng nhảy qua nút: vòng dưới (rồi trên) hàng, các vòng lệch độ sâu; vượt tầng / quay ngược:
+  vòng bên hông, ra ngoài hộp xa nhất.
+- **Nhóm màu**: `group` cho bước (`process`) và nút (`diagram`), tối đa 3 nhóm - mỗi nhóm một màu theo token và
+  một dòng chú thích ở đầu vùng nội dung.
+- **Bìa**: phụ đề căn giữa như tiêu đề.
+- Skill `trinh-bay-chuyen-nghiep`: vẽ đủ mũi tên quay về / nhảy nút, không bỏ thành phần xuyên suốt, dùng `group`.
+- Test: Go (`route_test.go` tái hiện sơ đồ hỏng; nhóm, chú thích, bìa), `test_live_slides.py` 22/22 trên PowerPoint x64.
+
+### Fixed — Lỗi tìm ra khi phủ test live cho mọi lệnh (25/10/2026)
+
+- **`wpp.newFromTemplate` khi tệp mẫu đang mở**: `Presentations.Open` trả về chính bài đang mở, nên lệnh xoá hết
+  slide của bài đó rồi đổi tên sang tệp mới (mất thay đổi chưa lưu). Nay mở một bản chép tạm của mẫu, và đưa
+  cửa sổ bài mới lên làm cửa sổ hoạt động.
+- **`wpp.addSlideFromTemplate`**: mẫu đang mở thì `InsertFromFile` đẩy cửa sổ của mẫu lên, các lệnh sau (không
+  truyền `presentation`) sửa nhầm bài mẫu. Nay trả quyền cho bài đích.
+- **`writer.lockSelection`**: bôi đen cả tài liệu (Ctrl+A) thì lỗi COM "Value out of range" (Word không nhận
+  `Range(n, n)` ở cuối tài liệu); kiểm tra sau mỗi lệnh khi đang khoá cũng dính cùng lỗi.
+- **`et.setConditionalFormat` / `et.listConditionalFormats`** (Excel): kết quả bị bọc hai lớp `{ok, result}`; trả
+  toán tử viết thường; danh sách rule phẳng. Nay cùng hình dạng LibreOffice/WPS (`formats: [{range, rules}]`,
+  ngưỡng không kèm `=`, điều kiện công thức có `operator: "formula"`).
+- `tests/live/test_live_commands.py`: test cho 24 lệnh chưa có test trên Office; `et.undo` kiểm theo ô thật
+  (Excel không hoàn tác được thay đổi qua COM); dọn A5 trước `ai.ask` của Excel; `ai.ask` của PowerPoint kiểm
+  bài đích theo đường dẫn.
+
+### Removed — Agent in-process của add-in (25/10/2026)
+
+- Bỏ `Ai/AiAgent.cs`, vòng tool-calling `LlmClient.RunAgent`, khoá `LegacyAgent`, `OfficeActionTool.Definition`
+  và `CommandCatalog.AgentActions`. Agent này bỏ qua policy/xác nhận/audit/memory của Core và có prompt riêng
+  phải sửa song song (vd quy tắc "lệnh là giá trị của `action`" vừa thêm cho Core).
+- Mọi lượt AI của pane đi qua Agent Core; Core lỗi thì pane báo lỗi (một thông báo chung, thay cho ba thông báo
+  riêng cho tệp đính kèm / lập kế hoạch / LegacyAgent).
+- **`ai.ask`**: trước đây Core không nhận lượt — và **luôn luôn** ở chế độ companion (`Host.exe word|excel|...`)
+  — thì chạy agent cũ mà **không kiểm tra `LegacyAgent`**. Nay trả `ok:false` kèm lý do; lệnh bridge từng
+  bước vẫn dùng bình thường.
+- `LlmClient` chỉ còn `Chat` (nút Test, `llm-test`). Log `CoreClient: fallback to in-process -` đổi thành
+  `CoreClient: run not started -`. Pane báo hết giờ bằng câu chung (Core không có trần 5 phút như agent cũ).
+
+### Changed — Chỉ còn hỗ trợ Microsoft Office; catalog lệnh lấy JSON làm nguồn (25/10/2026)
+
+- **LibreOffice dừng hỗ trợ.** Code và CI còn nguyên; ba test so catalog trong `tests/lo` bỏ qua kèm lý do. WPS chuyển
+  thành to-do khi sang host Linux (`docs/plans/19-h0`, mục "To-do WPS").
+- **`catalog/live-commands.json` là nguồn chuẩn** (sửa tay) thay cho registry Python của LibreOffice;
+  `scripts/generate_mcp_commands.py` sinh bản Go và WPS từ đó. `tests/catalog` (CI): định dạng, tham số chọn tài
+  liệu, khớp `AxiomOffice.Host.exe commands --json`.
+
+### Added — Slide từ brief, hình khối, nền tảng bền (25/10/2026)
+
+- **Tool `slides_from_brief`** (PowerPoint): model chọn layout và viết chữ (`cover`, `section`, `content`, `cards`,
+  `table`, `figures`, `process`, `timeline`, `diagram`); Core tính vị trí theo lưới của skill và `_design/tokens.json`,
+  kiểm hết trước khi dựng (`TOO_LONG` kèm gợi ý), không co chữ. Hình học nằm ở gói mới `core-go/internal/slidelayout`;
+  chế độ dựng theo mẫu cũng đi qua `slidelayout.Solve` (golden chuỗi lệnh bridge giữ nguyên từng byte).
+- **Lệnh C# mới (chỉ tool dùng):** `wpp.addShape`, `wpp.addConnector` (hình khối, mũi tên bám hình),
+  `wpp.renderSlide` (PNG một slide theo số). `look_at_document` nhận `slide`.
+- **Lệnh nhắm tài liệu tường minh:** mọi lệnh `writer.*`/`et.*`/`wpp.*` (trừ tạo/mở/đóng) nhận
+  `document`/`workbook`/`presentation`; bridge kích hoạt đúng tài liệu, tài liệu đã đóng thì báo `DOCUMENT_CLOSED`;
+  Core tự gắn tài liệu của lượt (benchmark: một lượt đã ghi slide vào nhầm bài).
+- **Bridge không treo vì hộp thoại:** lệnh `/cmd` chạy trên thread STA riêng, quá 120 s trả `HOST_BUSY` kèm nội dung
+  hộp thoại; lệnh còn xếp hàng bị bỏ chứ không chạy muộn. Core dùng lại session quá hạn khi bridge trả đúng `pid`
+  (máy vừa thức), model client thử lại request bị mất khi máy ngủ.
+- **`wpp.listSlides` đọc bảng, nhóm, tiêu đề biểu đồ** (trước đây agent không thấy bảng của chính mình).
+- **Không hỏi khi xoá thứ do chính lượt tạo** (sổ đối tượng của lượt); đối tượng có sẵn vẫn hỏi như cũ.
+- Skill `trinh-bay-chuyen-nghiep`: đúng số slide người dùng xin, không tự thêm bìa/mục lục/"Cảm ơn".
+- Bộ chấm benchmark: `readGap` (chữ trên slide mà `listSlides` không thấy), `unsourced` (số không có trong đề).
+- Đo lại cả bộ 24 brief × 3 bằng model yếu (`docs/plans/18-s0` mục 9.3): trên 18 brief có baseline đạt 51/54
+  (baseline 48/51); `readGap` từ 11 lượt về 0; vòng giảm 15,4 → 10,9; token giảm 76k → 55k. Còn lỗi: đường nối
+  của layout `diagram` cắt hộp (`s17`), thừa slide ở `s23`, thiếu biểu đồ gốc (`s10`).
+
+### Added — Slide: bộ đo chất lượng và thiết kế spec dùng chung (25/10/2026)
+
+- `docs/plans/18-s0-slide-do-va-spec.md`: hiện trạng hai đường tạo slide (tự do: model tự tính toạ độ; theo mẫu:
+  Go tính), bảng khoảng trống, thiết kế `SlideSpec` → `Layout` → lệnh bridge, kế hoạch tách solver có kiểm hồi quy.
+- `tests/bench/slides/`: 24 brief có sẵn số liệu, bộ chấm bằng lệnh đọc (`score.py`, không dùng LLM), bộ chạy
+  qua Core (`run.py`). `make test-bench` chạy trong CI. Baseline đầu tiên (deepseek-v4.1-flash, smoke × 3,
+  PowerPoint 2019): đạt 18/21, lỗi chung là tự thêm slide không được yêu cầu.
+- `docs/plans/19-h0-nen-tang-ben-vung.md`: plan sửa các điểm yếu lộ ra khi chạy benchmark (lệnh nhắm tài liệu
+  tường minh, bridge treo vì hộp thoại hoặc máy ngủ, `wpp.listSlides` không đọc bảng, xác nhận khi không có người).
+- `core-go/internal/tools/template_layout_test.go`: test characterization ghim số đo của `contentRegions`,
+  `cardBoxes`, `fitCards`, `pictureBoxes` và mã lỗi `checkCompose` trước khi tách solver.
+- `scripts/build.ps1`: biến `AXIOM_CSC` trỏ tới `csc.exe` khi máy không có Visual Studio (dùng `tasks\net472\csc.exe`
+  của gói NuGet `Microsoft.Net.Compilers.Toolset`).
+
+### Fixed — Word: bảng dàn trang và `writer.restyle` cho văn bản hành chính (24/10/2026)
+
+- **`writer.formatTable {borders:false}`** (C#) nay đặt tem `AxiomLayout` vào `Table.Title` (lưu theo `.docx`,
+  `tblCaption`) và có bước `layout-table` đọc lại để xác nhận; `borderColor` / `borders:true` bỏ tem. Trước đây
+  chỉ LibreOffice/WPS có tem, nên trên Word `checkTables` báo `empty-cells` ở khoảng trống ký và model điền
+  "—" vào, sai thể thức. Hai test live có sẵn cho việc này (`test_live_commands.py`) trước đây fail trên Word.
+- **`writer.checkTables`** (C#): trả `layout` cho từng bảng, không báo `empty-cells` với bảng dàn trang (cùng
+  quy tắc `checks.py`/WPS); mô tả lệnh khớp hai bản kia.
+- **`writer.restyle`**: tài liệu có quốc hiệu → chế độ `administrative`: chữ đen (không tô `#2E5C8A`), không kẻ
+  gạch dưới tiêu đề mục, **giữ dòng trống** (khoảng trống ký). Mọi tài liệu: bỏ qua bảng dàn trang (trước đây
+  kẻ khung + tô nền hàng đầu cho cả bảng phần đầu/phần ký). Kết quả có `mode` và `layoutTables`.
+- `tests/live/test_writer_format.py` thêm 9 check (checkTables layout, restyle hành chính/thiết kế,
+  bảng không viền sau restyle, giữ khoảng trống ký): **19/19** trên Word x64.
+
+### Changed — CI Windows dùng `build.ps1` và chạy thêm lint/check-gen/test WPS (24/10/2026)
+
+- Bỏ đoạn `csc` chép tay trong `ci.yml`, gọi thẳng `scripts/build.ps1` (một nguồn tham số build).
+- Thêm vào job `windows`: `check-gen` + version + i18n, ESLint, unit test add-in WPS (Node, `PYTHON=python`).
+- Unit test LibreOffice chạy **sau** build, nên `test_catalog_matches_csharp` (đối chiếu registry C#) không
+  còn bị skip trên CI.
+- `tests/wps`: harness gọi Python qua `PYTHON` (mặc định `python3`) để chạy được trên Windows.
+
+### Changed — Agent in-process thành opt-in (24/10/2026)
+
+- Trước đây Core không chạy được là pane tự chạy agent trong add-in (`AiAgent`). Đường này **bỏ qua
+  policy/xác nhận/audit/memory của Core** và có prompt riêng, nên mặc định **tắt** (`LegacyAgent=0`).
+  Core lỗi → pane báo lỗi rõ; muốn dùng lại agent cũ thì đặt
+  `HKCU\Software\AxiomOffice\LegacyAgent=1`.
+- `README.md`, `docs/architecture/core.md` §4.2/§4.3/§7.6 và `STATUS.md` §4 cập nhật theo hành vi mới.
+
+### Fixed — Định dạng văn bản Word: mỗi khối phải là đoạn riêng (24/10/2026)
+
+- **`writer.insertStyledText`** (C#/WPS/LibreOffice): `\n` (và `\r`) tách đoạn thật; **đặt lại tường minh**
+  `bold`/`italic`/`underline`/màu khi không truyền (trước đây `Selection` giữ định dạng của lần gọi trước nên
+  bold + gạch chân + màu xanh dính sang toàn bộ lá đơn); thêm `alignment` áp cho từng đoạn vừa chèn. Khối có
+  `alignment` **tự ngắt đoạn sau** (`break`, mặc định true) để lần gọi kế tiếp không dính vào đoạn này.
+- **`writer.appendText`** (C#/WPS/LibreOffice): cùng cách đặt lại định dạng + `alignment` (mặc định `left`);
+  tự mở đoạn mới khi đoạn cuối còn chữ. Trước đây nối thẳng vào cuối tài liệu nên kế thừa bold + căn giữa của
+  khối trước.
+- **Skill** `van-ban-hanh-chinh`, `the-thuc-van-ban`: bỏ lối gọi `setParagraphAlignment` sau từng dòng (mọi
+  dòng dồn vào một đoạn, lần căn cuối đè cả khối); dặn dùng `\n` giữa các đoạn và không gõ dòng trống.
+- **`CoreClient`**: lỗi trong callback UI không còn che lỗi thật của lượt chạy (trước đây một
+  `NullReferenceException` biến lỗi HTTP 401 thành NRE); log kèm stack.
+- Metadata sinh lại (`catalog/live-commands.json`, Go MCP, WPS catalog): `appendText`/`insertStyledText` có
+  thêm `alignment`/`break`.
+- **Kiểm chứng** (24/10/2026): WPS **201**; LibreOffice **225 OK**; `go test ./...` xanh; `check-gen` + i18n
+  khớp; Excel e2e **6/6**; test định dạng tất định trên Word 12 đoạn, đúng căn lề, 0 màu, 0 đoạn rỗng; 3 lượt
+  LLM thật soạn đơn xin việc hoàn tất (lượt cuối 36,3 s / 12 vòng / 10 tool, tự kiểm chứng).
+- **Office 32-bit không hỗ trợ**: add-in tối giản (AnyCPU và x86) cũng làm Office 32-bit crash
+  `mso98win32client.dll`; đã bỏ các thay đổi 32-bit. Office x64 (2019, 16.0.14026.20302) chạy đủ lifecycle.
+
+### Fixed — CI Windows: hai lỗi làm job `windows` đỏ (24/10/2026)
+
+- **`TestWPSConfigWrite` đỏ trên Windows**: test giả định nguồn cấu hình là file `config.json`, nhưng
+  `config.DefaultSource()` trên Windows là **HKCU** (`HKCU\Software\AxiomOffice`) — nên handler
+  `POST /wps/v1/config` ghi vào registry, không có file để đọc lại. Nay `api.Deps` có thêm
+  `ConfigSource` (nil = `DefaultSource()` như production); test inject `config.JSONSource` trỏ file trong
+  thư mục tạm nên **chạy giống nhau trên cả hai nền tảng**. Hệ quả có lợi: test cũ ghi đè cấu hình thật
+  của máy dev trong registry (`LlmModel`, `VisualQaEnabled`) — nay không còn; kiểm tra quyền `0600` chỉ áp
+  dụng cho non-Windows (Windows dùng ACL).
+- **Add-in Windows không biên dịch được**: `src/AxiomOffice/Ai/AskAiPane.cs` có một dấu `}` thừa (dòng 1128,
+  còn sót từ lần thay khối `switch` ở commit `d808b28`) khiến class `AskAiPane` đóng sớm → `CS1519/CS1513/CS1022`.
+  Lỗi này chặn cả bước build net48 của CI lẫn `build.ps1` chạy local. Đã bỏ dấu `}` thừa.
+- Đã đo lại toàn bộ job `windows` tại máy (Windows, cùng lệnh với CI): unit test extension **225 ok**
+  (1 skip) · `go test ./...` **xanh** · build net48 **OK** · e2e Core **169/169** · MCP portable **61/61**.
+
+### Changed — WPS: thiết kế lại pane Ask AI, khung chat mini và ribbon (22/10/2026)
+Giữ nguyên hệ thiết kế của `theme.py` (màu, cỡ chữ, khoảng cách, chuỗi nhãn mà `test_pane_theme.mjs` đối chiếu) —
+chỉ đổi **bố cục, phân cấp và trạng thái**. Bốn bề mặt:
+
+- **Khung màn hình phụ**: mỗi màn hình (`#view`) nay có thanh tiêu đề **dính** (tiêu đề + nút × + `role=heading`,
+  `aria-label="Đóng"`), thân cuộn riêng, chân **dính** đáy. Trước đây cả màn hình cuộn chung nên tiêu đề và nút
+  "Đóng" trôi mất khi danh sách dài; Esc vẫn đóng như cũ.
+- **Bộ nhớ AI**: tách nhóm *Đang dùng (n)* / *Đã xoá tạm (n)*; bộ lọc phạm vi lên trước nội dung và báo
+  `aria-pressed`; nút *Xoá vĩnh viễn…* dùng kiểu nguy hiểm; trạng thái rỗng nói rõ theo phạm vi.
+- **Nhật ký hoạt động**: mỗi lượt gọi là một dòng (dấu ✓/✕ + nhãn + mã lệnh/ms + giờ), lỗi nằm trong khối riêng
+  dưới dòng của nó thay vì hoà vào một khối chữ mono.
+- **Trạng thái**: chia ba nhóm (Add-in của <app> / Agent Core / Đường dẫn), dòng chính đậm hơn dòng giải thích.
+  Câu chữ giữ nguyên (bản Windows/LibreOffice dùng chung).
+- **Thiết lập**: nhóm *Máy chủ AI* / *AI làm được gì*; nhãn là `<label for>` đặt **trên** ô nhập (ô rộng hết pane);
+  công tắc bọc trong `<label>` nên bấm vào chữ cũng bật/tắt; cảnh báo "WPS chưa chụp được trang" nằm ngay dưới
+  công tắc *Nhìn tài liệu*.
+- **Kỹ năng / Soát tài liệu / Hội thoại trước / Nhật ký Core**: thêm tiêu đề nhóm; thẻ lỗi có kiểu nguy hiểm; báo
+  cáo soát tách bối cảnh / tổng kết / từng vấn đề; mỗi hội thoại là nút hai tầng (tiêu đề, rồi ngày + tài liệu);
+  nhật ký nằm trong khối riêng có `role=log`.
+- **Khung chat chính**: menu "…" có tiêu đề nhóm + `role=menu/menuitem`; gợi ý ở màn hình trống nói rõ bấm là
+  **điền vào ô soạn** (mũi tên, tooltip); nút *Dừng* thành nút có viền; footer có `role=status`.
+- **Khung chat mini**: tiêu đề hai tầng (tên việc · "đoạn đang bôi đen"), nút × đóng ở góc phải, chip có phản hồi
+  khi bấm.
+- **Ribbon**: nhóm lại theo việc người dùng làm — *Trợ lý* → *Kiểm tra tài liệu* (ba nút soát) → *Bộ nhớ & kỹ năng*
+  → *Hệ thống* (đẩy về cuối); screentip/supertip nói rõ "chỉ đọc, không sửa tài liệu và không dùng AI" và nêu đúng
+  đối tượng của từng nút soát. Danh sách id/`imageMso` không đổi.
+
+Test mới trong `tests/wps/test_pane_view.mjs` (11 ca) ghim cấu trúc vừa đổi; `make test-wps` 200 ca xanh.
+
+### Fixed — CI Windows: `test_bridge_env` ghim đường dẫn POSIX nên đỏ trên Windows (22/10/2026)
+- Test dựng tài liệu giả bằng `file:///tmp/hai.odp` nhưng production (`documents.find_open_path`) dựng URL từ
+  `os.path.abspath`, nên trên Windows ra `D:\...` và không khớp — job **windows** đỏ ở bước unit test extension
+  (Linux vẫn xanh, nên chỉ thấy khi push). Nay test dựng cả đường dẫn lẫn URL bằng chính hàm production
+  (`os.path` + `documents.to_url`). Đã kiểm bằng cách mô phỏng ngữ nghĩa `ntpath`: test cũ đỏ, test mới xanh.
+
+### Added — Spec ghim hành vi `checkLayout` của LibreOffice: gọi lại cho cùng kết quả (22/10/2026)
+- `tests/lo/test_impress_checks.py` (8 ca) ghim hành vi đã sửa ngày 13/10: `checks._shape_text_height` bật
+  `TextAutoGrowHeight` để đo nhưng phải trả lại **cả tham số lẫn hình học**, vì autogrow chỉ lớn ra chứ không
+  tự nhỏ lại. Fake mô phỏng đúng ba điều đo được trên LibreOffice thật: autogrow chỉ lớn, bị chặn ở 900pt, và
+  tắt autogrow không trả chiều cao về cũ. Chạy spec này với `checks.py` trước bản vá: 4/8 đỏ; với mã hiện tại: 8/8 xanh.
+
+### Fixed — CI Windows: tên lệnh tiếng Việt làm vỡ console cp1252 (20/10/2026)
+- `tests/wps/lo_catalog.py` in catalog bằng `json.dump(ensure_ascii=False)`; trên Windows stdout của tiến trình con là
+  cp1252 nên gặp tên lệnh tiếng Việt là `UnicodeEncodeError`, job đỏ trước khi vào test. Nay script tự
+  `reconfigure(encoding="utf-8")` khi stdout hỗ trợ.
+- `tests/lo/test_chat.py` nay bắt `stderr` của tiến trình con (trước đây `check=True` nuốt mất, chỉ thấy "exit 1"),
+  và thêm ca hồi quy chạy với `PYTHONIOENCODING=cp1252` — đỏ trên script cũ, xanh sau khi sửa.
+
+### Fixed — CI Linux: job oracle thiếu phụ thuộc Python (20/10/2026)
+- `make test-oracle` chạy ba bộ `tests/oracle/*-mcp` nhưng CI chưa cài `requirements.txt` của chúng, nên job đỏ vì
+  thiếu gói. Thêm bước `pip install` cả ba trước `make test-oracle`; chạy lại tại máy với venv riêng: 34 test xanh.
+
+### Fixed — WPS: hoàn tác bảng tính và định dạng điều kiện theo nhầm workbook (20/10/2026)
+- Ngăn undo của ET và kho định dạng điều kiện trước đây khoá theo **tên sheet trần**, mà `Sheet1` lặp lại ở mọi
+  workbook: hoàn tác một sổ có thể gỡ bước của sổ khác, hoặc rơi vào `ActiveSheet` khi sheet đích đã đóng. Nay khoá
+  theo định danh workbook (`FullName`, chưa lưu thì `Name`) **cộng** tên sheet; không còn đường dự phòng về sheet đang mở.
+- `et.renameSheet` chuyển cả bước undo lẫn định dạng điều kiện sang tên mới; workbook/sheet không còn mở thì bỏ qua thay
+  vì ghi nhầm. Test mới: hai workbook cùng tên sheet, đổi tên sheet, và migration kho định dạng điều kiện.
+
+### Fixed — WPS: `closeAll` và `exportPdf` báo sai khi thiếu thư mục/FileSystem (20/10/2026)
+- `closeAll` (ET/WPP) cứu bản chưa lưu vào `<tmpdir>/rescued` nhưng chưa tạo thư mục, và lấy tên tài liệu có thể rỗng.
+  Nay tạo thư mục bằng `FileSystem.Mkdir`, dùng chung `rescueDir`/`rescueName`, tên rỗng có tên dự phòng; lỗi tạo thư
+  mục không chặn việc đóng tài liệu.
+- `writer.exportPdf` trước đây trả "đã xuất" dù `app.FileSystem` không có (không có tệp nào được ghi). Nay ném lỗi rõ
+  ràng; fake add-in được mở rộng `Save`/`SaveAs`/`SaveAs2`/`ExportAsFixedFormat`/`FileSystem` để test cả đường thành công.
+
+### Fixed — LibreOffice: bỏ qua `presentation`, lỗi Core khó đọc và lượt chạy bị bỏ mặc (20/10/2026)
+- Nhiều lệnh `wpp.*` khai báo `presentation` nhưng `bridge.Env` luôn lấy tài liệu đang active. Nay `Env` nhận `params`
+  và chọn đúng tài liệu qua `documents.find_open_path`; test mới `tests/lo/test_bridge_env.py`.
+- Client Core của extension gom về `core.call`: body lỗi không phải JSON (proxy trả HTML) và `URLError` đều thành
+  `CoreError` có nội dung đọc được. `core.wait_for_run` thêm `timeout` và **huỷ lượt** khi hết giờ; `ai.ask` dùng
+  `start_run`/`wait_for_run` thay vì tự gọi HTTP, nên không còn bỏ mặc lượt chạy trên Core.
+
+### Fixed — Core: ghi memory theo lô để lại bản ghi dở; API đọc JSON không giới hạn, làm tròn số âm sai (20/10/2026)
+- `AddBatch` ghi từng mục trong một transaction chung: mục thứ N lỗi thì các mục trước đã vào DB dù lượt gọi trả lỗi.
+  Nay mỗi mục có `SAVEPOINT memory_item` riêng qua helper `insertMemory`; lỗi ở đâu rollback/release đúng đó.
+- `readJSON` của API không giới hạn kích thước body; nay chặn 8 MB. `round1` dùng `int(x*10+0.5)` nên làm tròn sai số
+  âm (`-1.24` thành `-1.1`); nay dùng `math.Round`.
+
+### Changed — Pane/mini WPS tách tệp, dùng chung helper DOM (20/10/2026)
+- CSS/JS của pane và khung chat mini tách khỏi HTML thành `pane.css`/`pane.js` và `mini.css`/`mini.js`; helper DOM dùng
+  chung nằm ở `pane-dom.js` (`$`, `textOf`, `trimText`, `clearNode`, `addText`, `make`, `baseUrl`, `actOf`).
+- `onAction` của pane thay chuỗi `if` bằng bảng tra `ACTIONS` cộng `withCtl`/`reloadList`; test đọc tệp ngoài theo đúng
+  thứ tự script trong HTML.
+
+### Changed — `commands.js`: gom xuất PDF/đóng tất cả, đọc thuộc tính có kiểu (20/10/2026)
+- Ba nhánh xuất PDF dùng chung `pdfBinaryString`/`writePdf`; ba nhánh đóng tất cả dùng chung `closeAllDocuments`.
+- Các chỗ đọc thuộc tính thô chuyển sang `strProp`/`numProp` khi ngữ nghĩa tương đương; sửa escape thừa trong regex.
+
+### Changed — Core Go: tách luồng `Execute` và bridge, gom helper số/chuỗi (20/10/2026)
+- `Execute` tách thành `prepareExecution`, `buildCallbacks`, `applyResult` (tệp mới `orchestrator_execution.go`);
+  `wpsbridge.go` tách phần xác thực/HTTP/session sang `auth.go`, `http.go`, `session.go`.
+- Thêm `sheet.Int` (làm tròn .5 ra xa 0) thay hai bản `asInt` trùng ở `xlsx`/`pptx`; hai helper `containsString` thay
+  bằng `slices.Contains`. Các `asInt`/`textOf`/`stringList` khác nghĩa ở package khác được giữ nguyên.
+
+### Changed — LibreOffice: một đường chạy lệnh, dùng chung client Core, bỏ mã chết (20/10/2026)
+- `bridge.execute` và `bridge.run_on_main` gom về một `_invoke` (tham số `on_main` quyết định có qua gate); lỗi của
+  pane nay cũng có traceback và kiểm đúng `kind` như đường HTTP.
+- `general.py` dùng `core.call`/`core.start_run`/`core.wait_for_run` thay client HTTP riêng; xoá `calc.check_range`,
+  `impress.check_layout` (đã có `checks.range_report`/`layout_report` đăng ký) và `bridge.uptime_started` (không dùng).
+- Stub UNO trong `test_bridge_env.py` trả mọi tên nên không còn rò sang `test_dialogs.py` khi chạy cả bộ `make test-lo`.
+
+### Fixed — Data race trên trạng thái lượt chạy của Core (20/10/2026)
+- `Execute` ghi `Status`, `Error`, `Finished`, `Transcript`… của `agent.Run` trên goroutine riêng, không khoá, trong
+  khi `GET /v1/runs/{id}`, vòng chờ `conversationId` của `POST /v1/runs`, nút Huỷ và `Manager` (`Running`,
+  `TryStart`, dọn lượt cũ) đọc cùng lúc. Mutex của `Manager` chỉ giữ map, không giữ từng lượt.
+- `Run` nay có khoá riêng: ghi qua `update`/`appendTranscript`, đọc từ goroutine khác qua `JSON`,
+  `CurrentStatus`, `StatusAndConversation`. Test mới `TestRunReadableWhileExecuteWrites` báo 4 `DATA RACE` trên mã
+  cũ; `make test-go` nay chạy `go test -race` (~15 s).
+
+### Fixed — `install.sh` chọn sai `.oxt`, từ chối máy dùng venv; CI bỏ sót test (20/10/2026)
+- `install.sh` chọn `.oxt` bằng `sort | tail -1` (xếp theo chữ: 0.10.0 đứng trước 0.9.0 → cài nhầm bản cũ); nay
+  `sort -V`. Kiểm Python UNO chỉ bằng `python3 -c 'import uno'` nên từ chối máy có venv/pyenv đầu PATH dù
+  LibreOffice vẫn nạp được extension; nay dùng chung cách kiểm của `scripts/libreoffice.sh` (loader
+  `pythonloader.py` cạnh `soffice`, rồi `/usr/bin/python3`) qua tệp mới `scripts/linux/lo-common.sh` (gói tarball
+  mang theo). Hai test mới trong `tests/linux/test_install_sh.py`, đỏ trên script cũ.
+- CI chép tay danh sách test và bỏ sót `test_pane_view.mjs`, `test_mini_view.mjs`; nay mọi bước gọi đích Makefile.
+  Thêm vào CI/`make test` các bộ trước đây không nơi nào chạy: `test-package` (mới), `test-oracle`,
+  `check_i18n.py` (trong `check-gen`).
+
+### Fixed — "Hoàn tác lượt này" gỡ quá tay (20/10/2026)
+- Ba pane (LibreOffice, WPS, Windows) đếm "thao tác sửa" bằng danh sách lệnh **chỉ đọc chép tay** — lệnh nào
+  không có trong danh sách thì bị tính là sửa. 18 lệnh không tạo bước Undo (vd `writer.outline` mà prompt bảo
+  model đọc trước, `et.sheetInfo`, `et.listCharts`, `*.open`, `*.closeAll`, `writer.lockSelection`) bị đếm, nên
+  nút hoàn tác gửi `count` lớn hơn thật và gỡ cả bước của lượt **trước**.
+- Nay **một nguồn**: cờ `undo` của registry Python (lệnh có cờ = đúng một bước Undo). `catalog()` xuất cờ này;
+  `scripts/generate_mcp_commands.py` sinh `EDIT_ACTIONS` vào `pane-core.js`, `axiom/chat.py` và `WordEditActions`
+  vào `AskAiPane.cs`; `check-gen` canh. `MUTATING` của `commands.js` (lệnh Writer mở `UndoRecord`) suy ra từ cờ.
+- WPS bảng tính tự giữ ngăn Undo: nay **mỗi lệnh có cờ = đúng một mục** — `et.writeRanges` (nhiều vùng) gộp
+  thành một, lệnh WPS chưa hoàn tác được (`formatRange`, `setConditionalFormat`, `addChart`, `renameSheet`) giữ
+  chỗ bằng mục rỗng và `et.undo` trả `skipped`; pane nói rõ "N thao tác chưa hoàn tác được" thay vì im lặng.
+
+### Docs — Sắp xếp lại thư mục `docs/` (20/10/2026)
+- Mục lục mới **[docs/README.md](docs/README.md)**, chia theo người đọc. Gốc repo chỉ còn `README.md`, `CHANGELOG.md`,
+  `STATUS.md`.
+- `docs/user/` (hướng dẫn sử dụng) · `docs/architecture/` (thiết kế) · `docs/research/` (spike, review) · `docs/plans/`
+  (giữ nguyên). Đổi chỗ: `ARCHITECTURE.MD` → `docs/architecture/README.md`, `New_arch.md` → `docs/architecture/core.md`,
+  `LibreOffice_arch.md` → `docs/architecture/libreoffice.md`, `docs/{wps-bridge,ribbon-ui,template-design}.md` →
+  `docs/architecture/`, `docs/{wps-spike,skills-review}.md` → `docs/research/`, `docs/user-manual.md` → `docs/user/`,
+  hai trang `docs/architecture-{hld,for-interns}.html` → `docs/architecture/{hld,for-interns}.html`.
+- Mọi chỗ trỏ tới (~300 chỗ trong ~120 tệp, phần lớn là chú thích trong mã) sửa bằng script: liên kết Markdown/HTML
+  tính lại đường dẫn tương đối theo chỗ mới của cả hai đầu, chữ thường đổi sang đường dẫn tính từ gốc repo. Kiểm: không
+  còn tên cũ nào; 91 liên kết tương đối đều tới được tệp (trừ một liên kết chết có chủ đích trong `skills-review.md`);
+  test + lint + `check-gen` xanh. `git mv` nên lịch sử từng tệp được giữ.
+- `tests/wps/REFERENCE.md` để nguyên cạnh test của add-in WPS (số đo gắn với bộ test).
+- Hai trang `architecture/hld.html` và `architecture/for-interns.html` (viết 12/10, trước đây chưa commit) **rà lại với
+  mã** và sửa: **hai câu sai về an ninh** — "client MCP đi qua đủ bảy bước, kể cả hỏi người dùng" (thật ra tool live
+  của MCP gọi thẳng bridge, không allowlist, không xác nhận) và "không có token thì không gửi được lệnh" (kênh
+  `/wps/v1/*` nhận request mang `Origin` của Core mà không cần token); cùng các câu cũ: 65 → 80 lệnh, trần 200.000
+  token (nay không đặt trần), khoá API "chỉ trong keyring", "kết nối ra ngoài duy nhất là LLM", add-in Windows "tụt
+  hậu / bảo trì", màu indigo → `#0F6CBD`. Thêm phần WPS (kênh pane, ribbon `imageMso`, menu chuột phải, khung chat
+  mini, lệnh nhanh), lớp an toàn *khoá vùng bôi đen*, luồng *sửa nhanh bằng chuột phải*. Bỏ số dòng mã (đã trôi).
+- `architecture/README.md` (AD-15): memory nay viết bằng Go, không còn là C#.
+
+### Changed — Icon ribbon WPS dùng bộ icon có sẵn của WPS (`imageMso`) (20/10/2026)
+- Như bản Windows dùng icon của Office: 12 nút ribbon WPS nay mang `imageMso` thay cho SVG tự vẽ. WPS ánh xạ tên
+  kiểu Office sang icon của nó qua bảng lệnh `res/commands/<app>/ongmani/*.kuip`; chỉ dùng tên có trong bảng (nút
+  dùng chung: tên có ở cả ba app). Năm tên Windows không có trong WPS được thay — bảng ở `docs/architecture/ribbon-ui.md` §5.3.
+  Đã thử trên WPS thật: hiện đúng icon.
+- Menu chuột phải vẫn dùng `getImage` + `images/askAi.svg`, `images/quickMenu.svg`; xoá 11 tệp SVG không còn dùng.
+  `OnGetImage` chỉ trả đường dẫn cho tag có tệp, tag khác trả rỗng (tránh dấu `?`).
+
+### Fixed — `install.sh` (Linux) làm mất hội thoại và Bộ nhớ AI (20/10/2026)
+- Core lưu `core.db` (+ `-wal`, `-shm`) ngay trong `~/.local/share/axiom-office/core/` — chính thư mục `install.sh`
+  thay khi cài. Trước bản sửa, **cài lại / nâng cấp** và cả **`--uninstall` không `--purge`** đều `rm -rf` cả thư
+  mục: mất hội thoại, Bộ nhớ AI, nhật ký, nguồn web; khi gỡ script còn in "Giữ … dữ liệu".
+- Nay cài lại chuyển ba tệp đó sang bản Core mới rồi mới xoá bản cũ (tệp cũ không còn trong gói vẫn được dọn);
+  gỡ không `--purge` xoá Core nhưng giữ ba tệp; `--purge` vẫn xoá sạch. Danh sách tệp ở `CORE_DATA` đầu script.
+- Spec `tests/linux/test_install_sh.py` +2 ca (cài lại giữ dữ liệu; gỡ giữ dữ liệu, cài lại vẫn còn, `--purge`
+  xoá) — cả hai **đỏ trên script cũ** (`core.db bi xoa`), xanh sau khi sửa.
+
+### Docs — Hướng dẫn sử dụng + rà tài liệu theo mã (20/10/2026)
+- **Mới: [docs/user/user-manual.md](docs/user/user-manual.md)** — hướng dẫn cho người dùng cuối: cài, thiết lập, khung chat,
+  sửa nhanh bằng chuột phải, từng nút ribbon/menu, Soát tài liệu, Bộ nhớ AI, dữ liệu, xử lý sự cố, bảng tính năng
+  theo nền tảng, gỡ cài đặt. README trỏ tới nó.
+- **Rà từng câu với mã** (README, STATUS, `docs/architecture/ribbon-ui.md`, `docs/architecture/wps-bridge.md`, `tests/wps/REFERENCE.md`,
+  `core-go/README.md`, `docs/architecture/core.md` §7): README thêm mục **WPS Office for Linux** (trước đó không nhắc gì tới add-in
+  WPS), sửa "gói cài ~250 KB", trần "5 phút" (chỉ còn ở chế độ cơ bản), memory "làm bằng C#", màu indigo, server
+  MCP `office`; `docs/architecture/core.md` §7.3 thêm 10 route và trường `quickAction` / `options.requireSelection`, §7.4 thêm
+  `run.progress`, `run.reasoning.live`, `confirm.resolved`, kind `selection*`; `docs/architecture/ribbon-ui.md` sửa bảng *Trong khung
+  chat* (menu ⋯ **không** giống nhau trên ba nền tảng; LibreOffice chưa có *Hội thoại trước…*), ghi nghiệm thu
+  trên WPS thật; `REFERENCE.md` ghi ba phép đo mới trên WPS 12.1.2.29182 (`getImage` cần đường dẫn,
+  `<contextMenus>` được nhận, `ShowDialog`) và đánh dấu T8b đã sửa.
+- README, STATUS và hướng dẫn ghi đúng hành vi giữ dữ liệu của `install.sh` sau bản sửa bên dưới.
+- `ribbon.xml`: tooltip *Bộ nhớ AI…* hứa "sửa, ghim, đặt hạn" mà màn hình WPS không có — sửa thành đúng việc nút làm.
+
+### Added — Khung chat mini cạnh đoạn bôi đen trên WPS (20/10/2026)
+- Bôi đen → chuột phải → *Sửa bằng AI ▸ <mục>* hoặc *Hỏi AI về đoạn này* mở một **khung chat mini** nổi
+  (`mini.html`, `Application.ShowDialog`, không modal). Mục *Sửa bằng AI* chạy ngay; khung có chip các mục, ô gõ
+  thêm yêu cầu cho đúng đoạn đó, và *Hoàn tác* / *Dừng* / *Đóng*.
+- Core: `options.requireSelection` — mọi lượt từ khung mini **bắt buộc** có đoạn bôi đen, nên một câu gõ tay như
+  "ngắn hơn nữa" không bao giờ sửa cả tài liệu.
+- System prompt thêm luật cho lệnh nhanh (`QuickEditRule` / `QuickAnswerRule`): lượt thật trên WPS cho thấy model tìm
+  ra lỗi rồi **hỏi** "có áp dụng không?" thay vì sửa; nay bấm lệnh là sửa ngay, hoàn tác một cú bấm.
+- WPS không có `ShowDialog` thì mục chuột phải quay về khung chat lớn (đường qua Core bên dưới).
+- **Thử trên WPS thật (20/10/2026)**: người dùng đánh giá "khá ổn". Chưa có số đo riêng về vị trí cửa sổ
+  (`ShowDialog` không nhận toạ độ) hay trường hợp gõ thêm sau khi model thay cả đoạn.
+
+### Added — Chuột phải ra thẳng "Sửa bằng AI" trên WPS (20/10/2026)
+- Bôi đen trong Writer, chuột phải: **Sửa bằng AI ▸** (cùng 9 mục với menu ở ô soạn) và **Hỏi AI về đoạn này**.
+  Chọn một mục thì khung chat hiện ra (dùng lại khung đang mở, giữ hội thoại) và chạy mục đó ngay.
+- Ribbon WPS không nói thẳng được vào khung chat đang mở, nên **Core làm trạm trung chuyển**:
+  `POST /wps/v1/pane/request` → SSE `GET /wps/v1/pane/events` (`api/wpspane.go`). Khung chat vừa tạo thì Core giữ
+  yêu cầu 20 giây cho nó kịp nối vào; đang có lượt chạy thì khung chat nói rõ đã bỏ qua mục vừa chọn.
+- Danh sách mục trong `ribbon.xml` khớp `agent/quickactions.go`, có spec ghim hai bên.
+- Menu *Sửa bằng AI* ở chân ô soạn (thêm hôm 19/10) **đã bỏ** theo yêu cầu: lối vào duy nhất là menu chuột phải.
+- **Chưa nghiệm thu trong WPS thật** — bản Windows từng ghi WPS "không nhận chắc" `contextMenus`.
+
+### Added — Menu "Sửa bằng AI" cho đoạn bôi đen trên WPS (19/10/2026)
+Phần dùng nhiều nhất của WPS AI cài sẵn là sửa vùng chọn; Axiom làm lại theo cách của mình (không lấy mã hay câu
+lệnh của Kingsoft), trên nền khoá vùng bôi đen đã có.
+- **Pane WPS (Writer)**: nút **✦ Sửa bằng AI** ở chân ô soạn, mở menu *Trau chuốt · Viết lại · Rút gọn · Mở rộng ·
+  Sửa lỗi chính tả · Trang trọng hơn* │ *Tóm tắt · Giải thích · Dịch*. Chọn một mục là chạy ngay **trong đoạn hội
+  thoại đang mở**, khung chat hiện nhãn của mục. Đặt ở ô soạn chứ không ở ribbon vì ribbon WPS không nói được vào
+  pane đang mở (`docs/architecture/ribbon-ui.md` §7) — đặt trên ribbon thì mỗi lần bấm mất đoạn chat đang dở.
+- **Core**: câu lệnh của 9 mục nằm ở `agent/quickactions.go`; `POST /v1/runs {quickAction}` lấy câu lệnh theo id
+  (ba bản ra cùng một câu), `GET /v1/quick-actions` cho pane vẽ menu. Ba mục sau vạch ngăn **chỉ trả lời**: lượt đó
+  chỉ có tool đọc, nên "không sửa tài liệu" là Core chặn thật. Chưa bôi đen gì thì lượt dừng **trước khi gọi
+  model**, pane nói "Hãy bôi đen đoạn văn cần làm trước…".
+- **Chưa có** ở Windows và LibreOffice (bản LibreOffice cần khoá vùng bôi đen trước); **chưa thử với model thật**
+  trong WPS thật.
+- Spec: e2e 84 (+16), `make test-wps` 168 (+8), Go +2 ca.
+
+### Changed — Pane và ribbon trông giống MS Word (19/10/2026)
+Yêu cầu: "thiết kế lại phần UI trên ribbon và pane Chat cho giống MS Word". Ba phần, làm cùng lúc vì bảng màu
+dùng chung cả ba nền tảng.
+- **Bảng màu Fluent.** `theme.py` (nguồn duy nhất của hệ thiết kế pane) đổi từ indigo sang **xanh `#0F6CBD`** —
+  màu Copilot/Word; `Ai/PaneControls.cs` (Windows) và `pane.html` (`:root`) đổi theo, ba bản vẫn khớp từng token.
+  `tests/wps/test_pane_theme.mjs` (9 phép kiểm) là thứ ràng buộc: mọi màu trong `theme.py` phải có token
+  `--axiom-*` **dùng thật**, không được có mã `#RRGGBB` nào ngoài khối `:root`, mọi `transition` phải 150–300ms.
+  (`DISABLED_FG`/`DISABLED_BG` = 2.31:1 vẫn dưới 4.5:1 — **giữ nguyên** như trước, WCAG 1.4.3 miễn trừ cho control
+  bị vô hiệu hoá; đã ghi lý do trong `theme.py`.)
+- **Pane giống Copilot.** Trả lời của AI **bỏ bong bóng** — chữ nằm thẳng trên nền pane, chỉ tin nhắn của người
+  dùng mới có nền; nền/viền `--axiom-ai-*` chỉ còn dùng cho `.card` (tiến trình / kết quả). Header từ dải liên
+  kết chữ thành **tiêu đề + nút ⋯** chứa *Trò chuyện mới / Hội thoại trước… / Ghi nhớ / Nhật ký / Thiết lập* —
+  đóng bằng cách bấm ra ngoài hoặc `Esc` (nghe ở `document.body`). Cố ý **không** khai `role="menu"`, vì chưa làm
+  điều hướng bằng phím mũi tên thì đừng khai ARIA của một menu thật.
+- **Màn hình *Hội thoại trước…*** (WPS, trước đây chỉ có ở Windows): danh sách `GET /wps/v1/conversations` →
+  chi tiết `GET /wps/v1/conversations/{id}` (kèm `messages[]`) → xoá có xác nhận. Đi đúng route `conversations*`
+  đã mở ở đợt A, **không** thêm đường Core nào. Xoá dùng `window.confirm` có kiểm `typeof === "function"`, nên
+  trong bộ test (confirm mặc định là **từ chối**) không có đường bấm nào xoá được dữ liệu.
+- **Icon ribbon WPS** (trước đây ribbon **chỉ có chữ**): mọi control mang `getImage="ribbon.OnGetImage"`, và
+  `main.js` trả **đường dẫn tệp tương đối** `images/<tag>.svg` — 12 tệp trong `src/AxiomOffice.WPS/images/`,
+  `viewBox 0 0 20 20`, nét 1.5, màu `#0F6CBD`. Tên tệp **chính là** `tag` trong `ribbon.xml`, nên không còn
+  bảng tra nào phải giữ cho khớp. `test_pane.mjs` ghim **hai chiều** `ribbon.xml` ↔ **tệp** `images/`: thêm nút
+  mà quên tệp ảnh, hoặc để tệp ảnh mồ côi, đều đỏ ngay; spec còn kiểm **từng tệp** (một thẻ `<svg>` khớp kín,
+  không `width`/`height` ở thẻ mở, đúng màu accent). Icon đã soi bằng mắt ở 32px và 16px (bốn icon hiển thị ở
+  16px — *Trạng thái*, *Mở nhật ký*, *Kiểm tra mô hình*, *Sao chép API URL* — đều đọc được).
+- **Sửa icon: data URI → đường dẫn tệp.** Bản đầu của mục trên trả **data URI SVG vẽ tại chỗ**; mở WPS lên thì
+  chỗ icon **toàn dấu `?`**. Điều đó trả lời luôn câu hỏi còn treo: WPS **có** gọi `getImage`, nhưng đem chuỗi
+  trả về **phân giải như một đường dẫn** — data URI không phải đường dẫn nên trượt, và nó vẽ `?`. Cách đúng có
+  sẵn trong **SDK chính thức của WPS** đã cài trên máy (`@wps-jsapi/wps/js/ribbon.js`: `return "images/1.svg"`),
+  kèm đúng những tệp đó — `<svg>` **chỉ có `viewBox`**, không `width`/`height`, để WPS tự co giãn theo cỡ nút.
+  Xoá hẳn `ICON_BODY` / `svgIcon` / `ICON_COLOR` khỏi `main.js`. **Không phải sửa Core**: `ServeAddin` vốn phục
+  vụ mọi tệp dưới gốc add-in và `ContentTypeFor` **đã có sẵn** nhánh `.svg` → `image/svg+xml` (đo: `curl` qua
+  Core đều `200  image/svg+xml`). Màu icon nay nằm ở thuộc tính `stroke` của **từng tệp**, không phải hằng số
+  trong JS — đổi bảng màu phải sửa **cả 12 tệp** (ảnh ribbon do WPS vẽ, nó không biết `var()`), và spec kiểm
+  màu từng tệp nên quên một tệp là đỏ. **Đã nghiệm thu trong WPS thật**: khởi động lại WPS, icon hiện đủ,
+  hết dấu `?` (`docs/architecture/ribbon-ui.md` §5.3).
+- **Spec**: `tests/wps/test_pane_view.mjs` 35 ca (+7 cho menu ⋯ và màn hình hội thoại), `test_pane.mjs` 23 ca
+  (+2 ghim icon), `make test-wps` **160 pass**, eslint sạch.
+
+### Added — Ribbon và khung chat WPS đủ chức năng như bản Windows (19/10/2026)
+Bốn đợt cho yêu cầu "ô thanh ribbon và khung chat WPS thiếu chức năng so với MS Word". Nguyên tắc giữ suốt:
+**không vẽ control giả** — nút chỉ lên ribbon khi có đường thật đứng sau (`docs/architecture/ribbon-ui.md`).
+- **Đợt A — Core mở đường** (`8bb558a`). `routeBoth` đăng ký **cả hai** tiền tố cho `setup`, `llm/test`,
+  `llm/models`, `skills`, `memory*`, `audit`, `conversations*`: `/v1/*` cho script/MCP (guard token cũ) và
+  `/wps/v1/*` cho pane (guard kênh add-in) — pane là trang của Core nhưng **không có token**, trước đây mọi
+  đường `/v1/*` đều 401. Thêm `config.SetValue` + `JSONSource.Set` (Linux `~/.config/axiom-office/config.json`,
+  ghi 0600, giữ nguyên khoá khác vì file dùng chung với extension LibreOffice) và `RegistrySource.Set` (Windows,
+  REG_SZ). Hai đường mới chỉ có ở kênh WPS: `POST /wps/v1/config` (danh sách trắng khoá, trả `saved` +
+  `ignored` khi bị `AXIOM_*` đè) và `POST /wps/v1/exec` (chạy thẳng một lệnh bridge, không qua agent).
+- **Đợt B — khung chat 7 màn hình.** Pane WPS từ 1 màn hình (chat) thành **7**: chat, *Bộ nhớ AI*, *Nhật ký hoạt
+  động*, *Thiết lập*, *Kỹ năng*, *Trạng thái*, *Mở nhật ký*, cộng màn hình *Soát tài liệu* gọi từ ba nút Soát.
+  Báo cáo soát do **pane tự render** bằng tiếng Việt (Core/Go không chạy được `checks.py`), giữ bảng nhãn
+  `ISSUE_LABELS` + luật dựng dòng y hệt `checks.py`, và có **spec chặn lệch**: `test_pane_view.mjs` đọc
+  `ISSUE_LABELS` từ **cả hai** tệp rồi so từng dòng hai chiều. Sửa một lỗi thật: `POST /v1/llm/test` đọc khoá
+  **chữ thường** (`providerId`/`endpoint`/`model`/`apiKey`) còn pane gửi chữ hoa — nút *Kiểm tra mô hình* chưa
+  bao giờ chạy đúng.
+- **Đợt C — ribbon đủ bộ nút.** `ribbon.xml`: nhóm *Trợ lý / Kiểm tra / Quản lý / Hệ thống* + **Khác ▸**, cùng
+  nhãn và cùng nhóm với bản Windows. Ba nút Soát mang `?check=<lệnh>`, *Trạng thái* / *Mở nhật ký* mang `?view=`,
+  *Kiểm tra mô hình* / *Sao chép API URL* mang `?do=`. **Bốn control của bản Windows không vẽ** vì không có
+  đường thật đứng sau — *Nhìn tài liệu* (thiếu handler `app.screenshot`), *Cài đặt nâng cao…*, *Tắt Agent
+  Core…*, menu ngôn ngữ — và menu *Tìm web*. Ô *Nhìn tài liệu* trong màn hình *Thiết lập* **vẫn hiện** nhưng
+  kèm câu nói thẳng rằng bật ở đây chưa có tác dụng, thay vì hứa suông.
+- **Đợt D — đo sống trên Core thật** (`make test-wps-e2e`, không cần WPS): **18 phép kiểm** mới trong
+  `tests/wps/test_wps_pane_e2e.py` cho đúng ba đường mà nút gọi — `GET /wps/v1/status` (cả hai tầng,
+  `configured`, `logFile`, `Origin` lạ → 403), `GET /wps/v1/log` (đúng tệp Core đang ghi; `?lines=2` → hai dòng
+  cuối + `truncated`; tệp chưa có → 200 `exists:false`; `/v1/log` vẫn đòi token) và `POST /wps/v1/exec` (báo
+  cáo soát đi qua nguyên vẹn; lệnh add-in không có handler → HTTP 200 + `ok:false`; hai mã 409
+  `addin-disconnected` / `run-in-progress`). Phép đo còn **kiểm chứng địa chỉ mà nút *Sao chép API URL* sao
+  chép**: dán `http://127.0.0.1:<bridgePort>/health` vào trình duyệt (không Origin, không token) → 200
+  `connected:true`. Kết quả: pane e2e **68 pass**, bridge e2e 36 pass. Số đo và một cái bẫy hình dạng JSON
+  (`/health` của bridge trả **phong bì**, phải bóc `result`) ghi ở `tests/wps/REFERENCE.md`.
+- **Tài liệu**: `docs/architecture/ribbon-ui.md` thêm §5.1–§5.4 (hai chỗ chặn còn lại, bốn đường mới của Core, phần chưa đo)
+  và cập nhật §2/§4/§7/§8; `docs/architecture/wps-bridge.md` §7 viết lại bảng đường `/wps/v1/*` cho khớp mã (bảng cũ còn
+  thiếu 12 đường) và sửa ba khẳng định đã hết đúng về pane, cùng con số registry (80 lệnh, 22 chưa có handler,
+  `CHUA_CO_HANDLER` là nguồn duy nhất).
+- **Chưa làm** (đã ghi rõ trong tài liệu, không vẽ nút): sửa/ghim/đặt hạn trong màn hình *Bộ nhớ AI*, handler
+  `app.screenshot` cho WPS, và **bấm thử nút trong WPS thật**. (*Hội thoại trước…* nằm trong danh sách này lúc
+  viết, nay đã làm — xem mục **Changed — Pane và ribbon trông giống MS Word** ở trên.)
+
+### Added — Khóa vùng bôi đen trên WPS: AI chỉ sửa trong đoạn người dùng chọn (18/10/2026)
+- Add-in WPS: hai lệnh `writer.lockSelection` / `writer.unlockSelection` (bản JS của
+  `CommandDispatcher.WriterScope.cs`). Vùng khóa nhớ bằng **phần chữ trước và sau** nó — một lệnh AI viết lại
+  làm sập `Range`, còn "giữa hai chuỗi này" thì không; con trỏ bị kéo về vùng khóa trước mỗi lệnh; sau mỗi
+  lệnh có lưới an toàn: phần ngoài vùng đổi → hoàn tác ngay + báo lỗi, mất một bảng nằm trọn trong vùng →
+  cũng vậy. Lệnh ghi chắc chắn ra ngoài (`appendText`, `insertTable`, …) bị từ chối TRƯỚC khi chạm tài liệu;
+  `replaceAll` chỉ tìm trong vùng khóa; lệnh đọc và `writer.undo` chạy như thường. Bản WPS thiếu API
+  (`Selection.Start/End`, `Content.End`, `Range(a,b).Text`) thì **từ chối khóa** kèm lý do — thiếu chúng là
+  mất lưới an toàn, khóa mà không kiểm được thì tệ hơn không khóa.
+- Core: `Orchestrator.lockSelection` hỏi add-in vùng chọn SỐNG (`writer.selection` + `writer.lockSelection`)
+  trước vòng lặp agent; `finish()` mở khóa — `finish` là mốc duy nhất mọi đường đi (xong, lỗi, hủy) đều qua
+  nên khóa không treo lại. Không tin `document` do pane gửi: `/wps/v1/runs` ghi đè nó bằng bản chụp của add-in,
+  mà bản chụp đó không có `selection`; nhờ đi thẳng xuống add-in nên khóa cũng chạy cho MCP/script, không riêng pane.
+- Test: `tests/wps/test_addin_writer.mjs` (14 phép kiểm trên mock Writer có trạng thái — chỗ quan trọng nhất là
+  lệnh ra ngoài vùng phải bị HOÀN TÁC THẬT, đọc lại tài liệu chứ không tin kết quả trả về); e2e pane kiểm khóa
+  trước / mở khóa sau, kể cả lượt bị hủy giữa chừng; **đo trên WPS thật** (`test_wps_bridge_live.py` bôi đen
+  bằng xdotool/XTEST): cả bốn API đều có, `Ctrl+A` → `{chars: 68, start: 0, end: 68, docEnd: 68, tables: 1}`,
+  con trỏ đặt ở cuối tài liệu vẫn bị kéo về vùng khóa. Chi tiết trong `tests/wps/REFERENCE.md`.
+- LibreOffice: chưa làm — bản WPS trước, như đã thống nhất.
 ### Added - nút "Nhập kỹ năng…" trong add-in (18/10/2026)
 - Windows COM: `SkillsForm` (`Ai/AdminForms.cs`) thêm nút **Nhập kỹ năng…** — chọn thư mục (`FolderBrowserDialog`),
   `POST /v1/skills/inspect` để soi trước, hộp xác nhận liệt kê kỹ năng sẽ nhập (kèm "đã có ở nguồn …" và cảnh báo
@@ -284,7 +1341,7 @@ Lượt thật Y4.5-ĐM.14 (95 slide) hết trần 200k token dù việc xong �
   giữa lô → các lệnh sau trúng bài cũ (chốt "khác khổ" đã chặn). Câu cuối đếm đúng số slide dựng trong cả lượt
 
 ### Added — Dựng lại cả bài theo mẫu, từng lô: `slides_from_template` (13/10/2026)
-Theo tư vấn ChatGPT (docs/template-design.md §6.5): model chỉ viết những slide máy không tự quyết được.
+Theo tư vấn ChatGPT (docs/architecture/template-design.md §6.5): model chỉ viết những slide máy không tự quyết được.
 - **Tool Core `slides_from_template`** (`tools/template_build.go`, chỉ PowerPoint, không có trong plan mode): tự tạo/mở
   bài đích cạnh bài cũ, đọc bài cũ một lần, dựng theo lô 25 slide bằng chuỗi lệnh bridge cố định. Tự quyết: bìa; tiêu
   đề từ khung cao nhất hoặc **mang sang từ mục đang trình bày**; đoạn mô tả giữ nguyên ở cột trái, ảnh cột phải; ảnh
@@ -304,7 +1361,7 @@ Theo tư vấn ChatGPT (docs/template-design.md §6.5): model chỉ viết nhữ
   bảo model trả lời ngay
 
 ### Added — Làm bài theo tệp mẫu đính kèm (PowerPoint, 13/10/2026)
-Thí nghiệm trên PowerPoint 16 với mẫu thật của trường (docs/template-design.md §6.1): master/layout là Office
+Thí nghiệm trên PowerPoint 16 với mẫu thật của trường (docs/architecture/template-design.md §6.1): master/layout là Office
 mặc định, logo + dải màu nằm trong **ảnh nền trên từng slide**, chữ là textbox tự vẽ — nên `AddSlide` theo layout
 ra slide trắng, `ApplyTemplate` giữ khổ 4:3 và mất logo. Cách làm được: nhân bản slide mẫu rồi thay chữ theo tên khung.
 - **Năm lệnh mới** (`CommandDispatcher.Template.cs`, ForAgent): `wpp.newFromTemplate {template, path}` (mở bản sao
@@ -324,7 +1381,7 @@ ra slide trắng, `ApplyTemplate` giữ khổ 4:3 và mất logo. Cách làm đ�
   xét mép chữ thật (`BoundLeft`) thay vì mép khung; hai hình trang trí chồng nhau hoặc khung chữ nằm gọn trong ô màu
   là chủ ý. Chữ dài làm khung giãn ra khỏi ô màu → `overflow` ("runs out of 'Rectangle 8'"). Slide mẫu: 20 → 0 lỗi
 - Skill `trinh-bay-chuyen-nghiep`: có tệp mẫu → `references/mau-dinh-kem.md` (quy trình + ví dụ), không tự vẽ mẫu
-- **Sau lượt thật với `ocg/mimo-v2.6-flash`** (docs/template-design.md §6.4): lượt 1 model không biết đường dẫn
+- **Sau lượt thật với `ocg/mimo-v2.6-flash`** (docs/architecture/template-design.md §6.4): lượt 1 model không biết đường dẫn
   bài cũ và chèn slide mẫu 16:9 thẳng vào bài cũ 4:3 → (a) prompt có *"Its full path: …"* của tài liệu đang mở
   (`DocumentSection`); (b) `wpp.addSlideFromTemplate` từ chối khi khổ bài đang mở ≠ khổ mẫu (đọc `p:sldSz` bằng
   `ZipArchive`; add-in thêm tham chiếu `System.IO.Compression`); (c) tool tệp gặp `.ppt/.doc/.xls` nhị phân thì lỗi
@@ -436,7 +1493,7 @@ sửa slide đang mở, chọn màu xanh trong khi mẫu tông đỏ đô, và t
   đang mở) và *Nhật ký hoạt động…* (`AuditForm`: 100 lệnh gần nhất, giờ máy, dòng lỗi tô đỏ)
 - Client Core mới gom ở `Ai/CoreAdmin.cs`; bỏ `PurgeMemories()` không tham số (thay bằng bản có phạm vi)
 
-### Added — Ribbon add-in COM (Windows), đợt 1 của `docs/ribbon-ui.md`: "Nhìn tài liệu" + ba nút Soát (13/10/2026)
+### Added — Ribbon add-in COM (Windows), đợt 1 của `docs/architecture/ribbon-ui.md`: "Nhìn tài liệu" + ba nút Soát (13/10/2026)
 - Tab **Axiom Office** sắp lại thành ba nhóm **Trợ lý** / **Kiểm tra** / **Truy cập nhanh**, nhãn tiếng Việt theo
   kết quả người dùng muốn; *Cài đặt nâng cao…* và *Sao chép API URL* hạ xuống nút nhỏ (chuyển sang tab
   "Axiom · Quản lý" ở đợt 3)
@@ -638,14 +1695,14 @@ sửa slide đang mở, chọn màu xanh trong khi mẫu tông đỏ đô, và t
   `layout: true`, hết `empty-cells`, `long-header-cell` vẫn còn, và kẻ khung lại thì tem mất). Đo đầu-cuối trên
   LibreOffice thật (profile tạm, chạy thẳng handler): 12/12 điểm xanh, gồm cả vòng lưu/mở lại `.odt`
 
-### Added — `docs/skills-review.md`: review 8 skill dựng sẵn + khoảng trống so với việc văn phòng
+### Added — `docs/research/skills-review.md`: review 8 skill dựng sẵn + khoảng trống so với việc văn phòng
 - Kiểm kê từng skill (app, vai trò, lệnh dùng — 23/23 lệnh nhắc trong skill đều có thật trong registry), 3 lỗi P0
   ở trên, 6 điểm P1 (lệch token ở `bo-cuc.md`, hai skill lệch nhau về số lần gọi `checkLayout`, `description` hứa
   "độ rộng bảng" mà không lệnh nào làm được…), **trần công cụ** theo từng app, 7 loại việc chưa skill nào phủ, và
   roadmap P0–P4. Kết luận: bộ skill **đủ để chứng minh cơ chế nạp 3 tầng**, **chưa đủ** cho nhân viên văn phòng —
   nhưng nút thắt là trần `office_action` và việc thiếu eval, không phải số lượng skill
 
-### Added — WPS Office for Linux: Agent Core làm bridge cho JS add-in (docs/wps-bridge.md)
+### Added — WPS Office for Linux: Agent Core làm bridge cho JS add-in (docs/architecture/wps-bridge.md)
 - **Core** phục vụ add-in ở `/wps/addin/`, kênh long-poll `/wps/v1/poll|result` chỉ nhận `Origin` của chính Core,
   và một **bridge WPS** trên cổng 47861 nói đúng giao thức bridge (`/health`, `/commands`, `/session`, `/cmd`) kèm
   file session `<pid Core>-wps.json` - agent, MCP làn live và script dùng WPS như mọi bridge khác. `/cmd` báo lỗi
@@ -673,7 +1730,7 @@ sửa slide đang mở, chọn màu xanh trong khi mẫu tông đỏ đô, và t
   (TASK-000115)
 - **38 lệnh `et.*`/`wpp.*`**: 23 lệnh Spreadsheets (TASK-000118) và 15 lệnh Presentation (TASK-000119) — metadata
   giống hệt registry LibreOffice (nguồn `tests/wps/lo_catalog.py`), tham số/kết quả/thông điệp lỗi theo bản
-  LibreOffice, trừ những chỗ object model WPS khác (mục 6 của docs/wps-bridge.md: `et.undo` tự khôi phục,
+  LibreOffice, trừ những chỗ object model WPS khác (mục 6 của docs/architecture/wps-bridge.md: `et.undo` tự khôi phục,
   `exportPdf` tự dựng PDF, `checkRange` không có `table`, `wpp.checkLayout` không có `overflow`…)
 - **Spec cho T6–T8** (viết trước, nay đã xanh): `tests/wps/test_addin.mjs` (appKind/catalogFor/cổng chặn lệnh),
   `test_addin_et.mjs` (21), `test_addin_wpp.mjs` (15), `core-go/internal/wpsbridge/wpsbridge_test.go`; dùng chung
@@ -691,7 +1748,7 @@ sửa slide đang mở, chọn màu xanh trong khi mẫu tông đỏ đô, và t
   `...before the command was sent (WPS closed?) - safe to retry` để agent biết thử lại là an toàn. Lệnh đã giao mà
   không có kết quả hết giờ theo `AXIOM_WPS_CMD_WAIT_SECONDS` (mặc định 300, trước là hằng số) với câu lỗi
   `...did not answer within Ns; the command may have been applied - check the document before retrying`
-- `docs/wps-bridge.md` mục 2.2/2.3/6: định nghĩa "đã kết nối", hai câu lỗi hết giờ, và biến môi trường mới
+- `docs/architecture/wps-bridge.md` mục 2.2/2.3/6: định nghĩa "đã kết nối", hai câu lỗi hết giờ, và biến môi trường mới
 
 ### Fixed — Add-in WPS: đọc file bằng `FileSystem.ReadFile`, không phải `readFileString` (spec viết trước)
 - **`et.importCsv` không bao giờ chạy được trên WPS thật**: nó đọc file bằng `FileSystem.readFileString`, nhưng
@@ -711,7 +1768,7 @@ sửa slide đang mở, chọn màu xanh trong khi mẫu tông đỏ đô, và t
   (`utf-8`/`utf8`/`utf-8-sig`/`utf8-sig`, chuẩn hoá `_` -> `-`, không phân biệt hoa/thường); encoding khác bị từ
   chối **trước khi ghi** kèm lý do (`ReadFile` của WPS không có tham số charset); chỉ bản `-sig` mới cắt BOM.
   Test add-in: 76 xanh
-- `docs/wps-bridge.md` mục 6 ghi thêm hai điểm đo được: sandbox của `readFileString`/`writeFileString`, và việc
+- `docs/architecture/wps-bridge.md` mục 6 ghi thêm hai điểm đo được: sandbox của `readFileString`/`writeFileString`, và việc
   ET **ép kiểu khi ghi `Value2`** (chuỗi trông-như-số thành số) nên `numbers-as-text` chỉ còn đúng với ô có sẵn
   text trong file — fake không mô phỏng việc ép kiểu này
 
@@ -748,7 +1805,7 @@ Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho th
   `Origin` của request là `file://`
 - Điều kiện nạp: `JsApiPlugin=true` trong `/opt/kingsoft/wps-office/office6/cfgs/oem.ini` (file của root —
   **cần admin một lần mỗi máy**), mở một tài liệu (trang chủ không nạp ribbon), có `index.html`, đăng ký
-  `<jsplugin>` offline trong `publish.xml`. Chi tiết: `docs/wps-spike.md`, `tests/wps/REFERENCE.md`
+  `<jsplugin>` offline trong `publish.xml`. Chi tiết: `docs/research/wps-spike.md`, `tests/wps/REFERENCE.md`
 - Test: `tests/wps/test_install_jsaddon.py` + `tests/wps/test_probe.mjs` (CI Linux);
   `tests/wps/spike_check.py [--stage load|full]` chạy WPS thật dưới Xvfb (chỉ ở máy dev)
 
@@ -1224,7 +2281,7 @@ Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho th
   CI bỏ hai bước `dotnet test tests/core/AxiomOffice.Core.Tests` và bước so sánh `prompts/extract.txt`
   (nay chỉ còn một bản, nhúng bằng `go:embed`); `catalog/setup.json` giờ chỉ sinh catalog cho add-in + extension + Go
 - Tài liệu cập nhật theo: README (cây thư mục, lệnh test, yêu cầu build), `STATUS.md`, `core-go/README.md`
-  và một ghi chú ở `New_arch.md` (phần .NET còn lại là thiết kế ban đầu)
+  và một ghi chú ở `docs/architecture/core.md` (phần .NET còn lại là thiết kế ban đầu)
 
 ### Fixed — Wizard thiết lập (Linux): nút "Quay lại" bấm không được
 - **Gốc bệnh**: ở hàng nút dưới cùng, nhãn trạng thái (`FixedText` nền trắng, rộng `WIDTH - 2*PAD -
@@ -1450,7 +2507,7 @@ Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho th
 ### Added — Nốt phần L3 cho Linux: skill trong gói, libsecret, systemd, CI
 - **Skill dựng sẵn trong gói**: `scripts/linux/package.sh` chép `skills/` (8 skill + `_design/tokens.json`)
   vào `core/skills` — Core nạp sẵn nguồn "builtin" cạnh binary, máy mới cài không cần cấu hình `SkillDirs`
-- **libsecret cho khoá API trên Linux** (`LibreOffice_arch.md` mục 9): pane **Cài đặt** lưu khoá vào keyring
+- **libsecret cho khoá API trên Linux** (`docs/architecture/libreoffice.md` mục 9): pane **Cài đặt** lưu khoá vào keyring
   qua `secret-tool` khi máy có, `config.json` chỉ giữ `libsecret:LlmApiKey`; Core (`Secrets.Unprotect`) đọc
   lại từ keyring. Máy không có `secret-tool`, keyring khoá, hoặc khoá `dpapi:` của máy Windows khác → coi
   như chưa cấu hình (không làm Core dừng), và vẫn giữ đường lưu thường trong file `0600`
@@ -1465,7 +2522,7 @@ Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho th
 - Test: `tests/lo` 56 test (thêm `SecretStoreTests` cho `protect_secret`); `tests/core` 201 test (thêm
   `Api_key_libsecret_doc_tu_keyring` dùng `secret-tool` giả trong PATH, không đụng keyring thật)
 
-### Added — MCP server đa nền tảng `axiom-office-mcp` (LibreOffice_arch.md mục 11)
+### Added — MCP server đa nền tảng `axiom-office-mcp` (docs/architecture/libreoffice.md mục 11)
 - **`src/AxiomOffice.Mcp`** (`net10.0`, `axiom-office-mcp`): MCP stdio 50 tool — 20 tool file (docx/xlsx/
   pptx/csv: đọc, tạo, sửa, format, export) + tool live gọi bridge qua HTTP + `office_sessions`. **Dùng
   chung mã nguồn** với `AxiomOffice.Host` (compile lại `src/AxiomOffice.Host/Mcp/*.cs` với ký hiệu
@@ -1490,7 +2547,7 @@ Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho th
   70/70 (LibreOffice Calc đang mở, có ghi/đọc ô thật qua bridge); bản net48 (`AxiomOffice.Host.exe`) vẫn
   biên dịch và chạy nguyên như trước
 
-### Added — LibreOffice trên Linux (LibreOffice_arch.md giai đoạn L2–L3)
+### Added — LibreOffice trên Linux (docs/architecture/libreoffice.md giai đoạn L2–L3)
 - **Agent Core chạy được trên Linux**: `TargetFramework` `net10.0` (bỏ `-windows`); cấu hình đọc từ
   `~/.config/axiom-office/config.json` (`JsonConfigSource`, cùng tên khoá với HKCU — giá trị bool ghi
   `1/0`, `SkillDirs` là mảng), khoá API để plaintext trong file `0600` (không có DPAPI), dữ liệu theo XDG
@@ -1542,7 +2599,7 @@ Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho th
   live 159/159 (thêm ca heading), cả headless lẫn có cửa sổ; đã chạy thật bằng chuột/bàn phím: chip → Gửi,
   Enter giữa câu, Hoàn tác lượt này, ✕ đóng, mở lại qua menu, phóng to cửa sổ, lượt thật trong sidebar Calc
 
-### Added — pane Ask AI trong LibreOffice (LibreOffice_arch.md mục 10, giai đoạn L2)
+### Added — pane Ask AI trong LibreOffice (docs/architecture/libreoffice.md mục 10, giai đoạn L2)
 - **Pane nói chuyện với Agent Core bằng Python** (`axiom/core.py`, `axiom/chat.py`): POST `/v1/runs` (kèm
   `office.port` của bridge), đọc SSE `/v1/runs/{id}/events`, `cancel`/`confirm`, `GET /v1/memory`; Core
   chưa chạy thì tự khởi động bằng `CoreExe` trong cấu hình. Logic hội thoại (`chat.py`) thuần Python:
@@ -1564,12 +2621,12 @@ Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho th
   SSE bằng server giả); đã chạy thật trên LibreOffice: gửi yêu cầu → Core sửa tài liệu → hiện phản hồi
   (Writer 7–10s), **Hoàn tác lượt này** trả tài liệu về nguyên trạng, **Dừng** hủy giữa lượt, thẻ xác nhận
   `wpp.deleteSlide` trên Impress (đồng ý → xoá slide thật), dialog Cài đặt/Ghi nhớ hiện đúng cấu hình
-- `LibreOffice_arch.md` mục 14.2: các khác biệt API phải xử lý khi làm pane (model điều khiển awt không
+- `docs/architecture/libreoffice.md` mục 14.2: các khác biệt API phải xử lý khi làm pane (model điều khiển awt không
   nhận toạ độ → đặt lên view; dialog rời không hiện được → cửa sổ con; sidebar của LO 26.8 không có phần
   tử layout; `XInitialization` nằm ở `com.sun.star.lang`; tên node ProtocolHandler = implementation name;
   MRO khi vừa `XDispatchProvider` vừa `XDispatchProviderInterceptor`)
 
-### Added — làn LibreOffice: extension Python UNO (LibreOffice_arch.md, giai đoạn L1)
+### Added — làn LibreOffice: extension Python UNO (docs/architecture/libreoffice.md, giai đoạn L1)
 - `src\AxiomOffice.LibreOffice`: extension `.oxt` (`org.axiomoffice.bridge`) chạy trong `soffice` — job
   `OnStartApp` bật bridge HTTP trên 47851/47852/47853 (Writer/Calc/Impress, kind `wps`/`et`/`wpp`),
   **giữ nguyên giao thức và tên lệnh** với add-in nên Agent Core, MCP (`office_sessions` + `*_command`
@@ -1596,7 +2653,7 @@ Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho th
 - Đã kiểm chứng `ai.ask` end-to-end: Core chạy agent đầy đủ (nạp skill, đọc tài liệu, chèn heading +
   bảng, tự soát bằng `writer.checkTables`) trên tài liệu LibreOffice thật
 
-### Docs — `LibreOffice_arch.md`: thiết kế tích hợp LibreOffice trên Linux
+### Docs — `docs/architecture/libreoffice.md`: thiết kế tích hợp LibreOffice trên Linux
 - Bridge là extension Python UNO (`axiom-office.oxt`) chạy trong `soffice`, **giữ nguyên giao thức bridge và tên
   lệnh** (`writer.*`/`et.*`/`wpp.*`) để Agent Core, skill, memory, test dùng lại; ba session/port như WPS
   (47851–47853); `UnoGate` đưa lệnh về main thread qua `AsyncCallback`; mỗi thao tác AI = 1 bước Undo
@@ -1605,7 +2662,7 @@ Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho th
   làn file `axiom-office-mcp`, cài không cần root (`unopkg` + tarball), kiểm thử headless + CI Ubuntu,
   giai đoạn L0–L4, rủi ro và câu hỏi mở
 
-### Added — Agent Core giai đoạn 4: Mở rộng và an toàn (New_arch.md mục 7.7, 8.6, 8.7, 8.4.6)
+### Added — Agent Core giai đoạn 4: Mở rộng và an toàn (docs/architecture/core.md mục 7.7, 8.6, 8.7, 8.4.6)
 - **Policy xác nhận** (`PolicyEngine` + `ConfirmationBroker`): hỏi trước khi model lưu/xuất file mà yêu cầu
   không nhắc tới lưu/xuất, `saveAs`/`exportPdf` ghi đè file đã có, `wpp.deleteSlide`, `writer.replaceAll` trên
   tài liệu > 20.000 ký tự, tool MCP ngoài; SSE `confirm.required` / `confirm.resolved`, `POST
@@ -1619,15 +2676,15 @@ Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho th
   xác nhận ngay); bridge xử lý `ai.ask` trên thread riêng để Core gọi ngược `/cmd` không bị kẹt
 - **QA thị giác tuỳ chọn** (`VisualQaEnabled`, tắt mặc định): lệnh bridge `app.screenshot` (PrintWindow, thu
   nhỏ), tool `look_at_document` gửi ảnh cho model (OpenAI `image_url` / Anthropic khối `image`); Cài đặt có ô bật
-- Pane (New_arch.md mục 9.2): nút **Hoàn tác lượt này** trong Word (đếm thao tác `writer.*` có sửa tài liệu
+- Pane (docs/architecture/core.md mục 9.2): nút **Hoàn tác lượt này** trong Word (đếm thao tác `writer.*` có sửa tài liệu
   của lượt, gọi `writer.undo {count: N}`; hiện cả sau khi bấm Dừng); link **Trò chuyện mới** chuyển lên header
   cạnh Cài đặt và luôn hiện khi dùng Agent Core (trước ở footer, khó thấy trong Word)
-- `ARCHITECTURE.MD`: HLD cập nhật cho Agent Core (container, khối chức năng, kịch bản K1/K6/K7, triển khai,
+- `docs/architecture/README.md`: HLD cập nhật cho Agent Core (container, khối chức năng, kịch bản K1/K6/K7, triển khai,
   NFR, AD-11…AD-17, rủi ro) + LLD mục 22 Agent Core
 - Test: 194 unit test Core; e2e 76 kiểm tra (xác nhận đồng ý/từ chối/hết giờ, MCP server mẫu Python stdlib,
   làn file office, QA thị giác, audit); `ai.ask` qua Core trên Excel thật; `app.screenshot` trên Excel thật
 
-### Added — Agent Core giai đoạn 3: Memory dài hạn (New_arch.md mục 8.5, học từ mem0 2.2.1)
+### Added — Agent Core giai đoạn 3: Memory dài hạn (docs/architecture/core.md mục 8.5, học từ mem0 2.2.1)
 - Schema 2: `memories`, `memories_fts` (FTS5, text chuẩn hoá bỏ dấu kể cả `đ`), `memory_links`,
   `memory_history`, `memory_embeddings`; `runs.memory_status`
 - `SqliteMemoryStore`: ADD theo lô trong một transaction (chống trùng hash SHA-256 trong lô + với memory cũ,
@@ -1651,7 +2708,7 @@ Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho th
 - Chuẩn hoá bỏ dấu tiếng Việt trong Core dùng bảng tường minh: Core chạy `InvariantGlobalization` nên
   `string.Normalize(FormD)` không tách dấu ("in đậm" không thành "in dam"); project test cũng chạy invariant
 
-### Added — Agent Core giai đoạn 2: Skills (New_arch.md mục 8.4)
+### Added — Agent Core giai đoạn 2: Skills (docs/architecture/core.md mục 8.4)
 - **Skill theo chuẩn Agent Skills**: `Skills/SkillLoader` (frontmatter `name`/`description` + `apps` tuỳ
   chọn; validate tên ≤ 64 ký tự `a-z0-9-`, từ cấm `anthropic`/`claude`, mô tả ≤ 1024 không thẻ XML; field
   lạ bỏ qua), `SkillIndex` (3 nguồn: `skills\` cạnh exe → `SkillDirs` → `%LOCALAPPDATA%\AxiomOffice\skills`,
@@ -1755,7 +2812,7 @@ Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho th
   Office + 6 kiểm tra `--office` trên Excel thật): thứ tự sự kiện SSE, hội thoại, audit, allowlist
   (lệnh bị chặn không xuống bridge), hủy, trần token, lỗi office, và tài liệu thật sự đổi
 
-### Docs — `New_arch.md`: tầng thiết kế cho skills (design intelligence)
+### Docs — `docs/architecture/core.md`: tầng thiết kế cho skills (design intelligence)
 - Tách design intelligence khỏi skill triển khai theo app: **token thiết kế là dữ liệu**
   (`skills/_design/tokens.json`), skill thiết kế nạp khi cần (`thiet-ke-van-phong`,
   `trinh-bay-chuyen-nghiep`, `the-thuc-van-ban`, `bao-cao-du-lieu`), skill theo app dùng giá trị cụ
@@ -1765,7 +2822,7 @@ Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho th
   chồng, số dòng/cột, number format — không cần thị giác); giai đoạn 4 mới thêm `app.screenshot` +
   model thị giác, kèm xác nhận của người dùng vì tốn token
 
-### Added — Agent Core (giai đoạn 0 của New_arch.md)
+### Added — Agent Core (giai đoạn 0 của docs/architecture/core.md)
 - `src/AxiomOffice.Core/` (.NET 10, `AxiomOffice.Core.exe`): process riêng của agent, một bản cho
   mỗi người dùng Windows (mutex `Local\AxiomOffice.Core`, instance thứ hai thoát ngay), chỉ nghe
   `127.0.0.1`. Giai đoạn 0 gồm: `GET /health` (không cần token), `POST /v1/admin/shutdown`, quy tắc
@@ -1786,7 +2843,7 @@ Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho th
 - `tests/live/test_live_commands.py`: kiểm tra `/commands` khớp registry và version Core ↔ bridge khi
   Core đang chạy
 
-### Docs — `New_arch.md`: yêu cầu triển khai Agent Core
+### Docs — `docs/architecture/core.md`: yêu cầu triển khai Agent Core
 - Bản yêu cầu cho phiên làm việc mới: tách agent ra process riêng `AxiomOffice.Core.exe` (.NET 10,
   một bản mỗi người dùng) với hội thoại liên tục, skills (`SKILL.md`), memory SQLite, policy/xác
   nhận, MCP client; add-in mỏng lại, giữ agent in-process làm dự phòng
@@ -1812,7 +2869,7 @@ Yêu cầu "Tạo Dashboard cho sheet ADT" trên `XNK ADT H1 2026 Ly.xls` cho th
   vừa rồi** trong pane (Word: đếm N lệnh đã chạy → `writer.undo {count: N}`); (4) **trần token
   mỗi run** (`maxTokens` mặc định 200k, event `run.stopped` kèm số token đã dùng)
 
-### Docs — `ARCHITECTURE.MD`: tài liệu thiết kế
+### Docs — `docs/architecture/README.md`: tài liệu thiết kế
 - Phần I, High Level Design: mục tiêu và phạm vi, bối cảnh hệ thống, container, khối chức năng,
   kịch bản chính, triển khai, yêu cầu phi chức năng, quyết định kiến trúc (AD-1..AD-10), rủi ro
 - Phần II, Low Level Design: tổ chức mã nguồn, vòng đời add-in, mô hình thread và `ComGate`, HTTP

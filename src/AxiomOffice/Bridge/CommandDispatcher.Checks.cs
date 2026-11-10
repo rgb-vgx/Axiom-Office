@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -6,7 +7,7 @@ using System.Text.RegularExpressions;
 
 namespace AxiomOffice.Bridge
 {
-    // QA cấu trúc (New_arch.md mục 8.4.6, giai đoạn 2): agent "mù", chỉ đọc được text, nên sau khi tạo
+    // QA cấu trúc (docs/architecture/core.md mục 8.4.6, giai đoạn 2): agent "mù", chỉ đọc được text, nên sau khi tạo
     // slide/bảng nó đọc lại bằng các lệnh này để tự soát lỗi trình bày bằng số - tràn chữ, shape chồng,
     // ra ngoài slide, ô trống, dữ liệu lạc ra ngoài bảng (ca Excel ghi rác sang C7), number format.
     // Chỉ đọc, không sửa tài liệu. Mỗi phần đọc COM bọc try riêng: host thiếu thuộc tính (WPS) thì bỏ qua.
@@ -17,12 +18,15 @@ namespace AxiomOffice.Bridge
             return new[]
             {
                 Command("writer.checkTables", "wps", WriterCheckTables,
-                    "Soát các bảng (chỉ đọc): số dòng/cột, ô trống, ô tiêu đề lẫn đoạn văn").ForAgent(),
+                    "Soát các bảng (chỉ đọc): số dòng/cột, ô trống, ô tiêu đề lẫn đoạn văn. Bảng dàn trang — bảng đã gọi "
+                    + "writer.formatTable với borders:false — được đánh dấu layout và KHÔNG báo empty-cells (ô trống ở đó "
+                    + "là cố ý: khoảng trống ký, ô chờ điền)").ForAgent(),
                 Command("et.checkRange", "et", EtCheckRange,
-                    "Soát bảng dữ liệu (chỉ đọc): tiêu đề trống, kiểu lẫn lộn, số dạng chữ, number format, dữ liệu lạc ngoài bảng",
+                    "Soát bảng dữ liệu (chỉ đọc): tiêu đề trống, kiểu lẫn lộn, số dạng chữ, number format, công thức trỏ ô trống; KHÔNG truyền range/sheet = soát CẢ SỔ trong một lần: `workbook` mỗi sheet một dòng (vùng dùng, số ô, công thức, biểu đồ, bảng, validation, định dạng điều kiện, loại lỗi; sheet rỗng = empty-sheet), lỗi mọi sheet gộp ở `issues` kèm `sheet`, ô lỗi (#DIV/0!, #REF!...) ở MỌI sheet. Sheet chia khối bằng hàng trống (Dashboard, Config) được soát theo TỪNG khối; `notes` (outside-table) là ghi chú, không tính vào issueCount",
                     Opt("range", "default: the used range"), Opt("sheet")).ForAgent(),
                 Command("wpp.checkLayout", "wpp", WppCheckLayout,
-                    "Soát bố cục slide (chỉ đọc): chữ tràn khung, shape ra ngoài slide, shape chồng nhau, chữ quá nhỏ",
+                    "Soát bố cục slide (chỉ đọc): chữ tràn khung, shape ra ngoài slide, shape chồng nhau, chữ quá nhỏ, "
+                    + "đường nối cắt qua hộp khác hoặc chồng lên đường nối khác",
                     Opt("slide", "slide number; default: every slide"), Opt("presentation", "full path of the presentation to work on; default: the active one")).ForAgent()
             };
         }
@@ -62,6 +66,13 @@ namespace AxiomOffice.Bridge
             // MsoShapeType (1 hình vẽ, 13 ảnh, 17 textbox...); 0 = không rõ.
             public int Type;
             public double MinFont;
+            // Đường nối (Shape.Connector): là đường, không có diện tích - khung bao của đường gấp khúc trùm lên các hộp
+            // nó nối, không phải chồng.
+            public bool Connector;
+            // Đường nối: đường đi thật (toạ độ slide) và tên hai hình nó bám vào (null = đầu tự do).
+            public List<double[]> Path;
+            public string BeginShape;
+            public string EndShape;
         }
 
         private static Dictionary<string, object> WppCheckLayout(IAppHost host, Dictionary<string, object> p)
@@ -87,15 +98,7 @@ namespace AxiomOffice.Bridge
                 slides.Add(new Dictionary<string, object>
                 {
                     { "index", i },
-                    { "shapes", boxes.Select(b => (object)new Dictionary<string, object>
-                        {
-                            { "name", b.Name },
-                            { "left", Math.Round(b.Left, 1) },
-                            { "top", Math.Round(b.Top, 1) },
-                            { "width", Math.Round(b.Width, 1) },
-                            { "height", Math.Round(b.Height, 1) },
-                            { "chars", b.Chars }
-                        }).ToList() },
+                    { "shapes", boxes.Select(b => (object)ShapeEntry(b)).ToList() },
                     { "issues", issues }
                 });
             }
@@ -106,6 +109,27 @@ namespace AxiomOffice.Bridge
                 { "issueCount", issueCount },
                 { "slides", slides }
             };
+        }
+
+        private static Dictionary<string, object> ShapeEntry(ShapeBox b)
+        {
+            var entry = new Dictionary<string, object>
+            {
+                { "name", b.Name },
+                { "left", Math.Round(b.Left, 1) },
+                { "top", Math.Round(b.Top, 1) },
+                { "width", Math.Round(b.Width, 1) },
+                { "height", Math.Round(b.Height, 1) },
+                { "chars", b.Chars }
+            };
+            // Đường nối: đường đi thật (để soát/đo) và hai hình nó nối.
+            if (b.Connector && b.Path != null)
+            {
+                entry["path"] = b.Path.Select(point => (object)new[] { Math.Round(point[0], 1), Math.Round(point[1], 1) }).ToList();
+                entry["from"] = b.BeginShape;
+                entry["to"] = b.EndShape;
+            }
+            return entry;
         }
 
         private static List<ShapeBox> ReadShapes(dynamic slide)
@@ -126,6 +150,12 @@ namespace AxiomOffice.Bridge
                         Height = Convert.ToDouble(shape.Height),
                         MinFont = 0
                     };
+                    box.Connector = ComFlag(() => shape.Connector);
+                    if (box.Connector)
+                    {
+                        ReadConnector(shape, box);
+                    }
+                    RotateBox(box, ComDouble(() => shape.Rotation));
                     try
                     {
                         if (Convert.ToInt32(shape.HasTextFrame) == -1 && Convert.ToInt32(shape.TextFrame.HasText) == -1)
@@ -227,7 +257,7 @@ namespace AxiomOffice.Bridge
             }
             // Shape nền phủ gần cả slide là chủ ý thiết kế: không tính là chồng.
             double slideArea = slideWidth * slideHeight;
-            List<ShapeBox> content = boxes.Where(b => b.Width * b.Height < slideArea * 0.9).ToList();
+            List<ShapeBox> content = boxes.Where(b => b.Width * b.Height < slideArea * 0.9 && !b.Connector).ToList();
             var spilled = new HashSet<string>();
             for (int a = 0; a < content.Count; a++)
             {
@@ -261,11 +291,29 @@ namespace AxiomOffice.Bridge
                     }
                 }
             }
+            ConnectorIssues(boxes, slideWidth, slideHeight, issues);
             if (totalChars > DenseSlideChars)
             {
                 issues.Add(Issue("dense", "the slide has " + totalChars + " characters; keep one message per slide and move details to notes (wpp.setNotes)"));
             }
             return issues;
+        }
+
+        // Left/Top/Width/Height của PowerPoint là khung TRƯỚC khi xoay: xoay 90/270 độ (đường nối gấp khúc đi xuống hay
+        // dùng) thì khung thật đổi rộng-cao quanh tâm. Góc khác: giữ nguyên (gần đúng).
+        internal static void RotateBox(ShapeBox box, double rotation)
+        {
+            double turn = ((rotation % 180) + 180) % 180;
+            if (Math.Abs(turn - 90) > 1)
+            {
+                return;
+            }
+            double centerX = box.Left + box.Width / 2, centerY = box.Top + box.Height / 2;
+            double width = box.Width;
+            box.Width = box.Height;
+            box.Height = width;
+            box.Left = centerX - box.Width / 2;
+            box.Top = centerY - box.Height / 2;
         }
 
         // Ảnh nền của mẫu (logo, dải màu) phủ gần cả slide, có thể lệch vài pt ra ngoài mép: không phải lỗi.
@@ -338,28 +386,262 @@ namespace AxiomOffice.Bridge
                 throw new InvalidOperationException("no workbook is open");
             }
             dynamic sheet = string.IsNullOrEmpty(sheetName) ? wb.ActiveSheet : wb.Worksheets[sheetName];
-            dynamic used = sheet.UsedRange;
-            dynamic range = string.IsNullOrEmpty(address) ? used : sheet.Range[address];
-            int rows = Convert.ToInt32(range.Rows.Count);
-            int cols = Convert.ToInt32(range.Columns.Count);
-            object[,] values = AsMatrix(range.Value2, rows, cols);
-            object[,] formulas = AsMatrix(range.Formula, rows, cols);
+            bool wholeBook = string.IsNullOrEmpty(address) && string.IsNullOrEmpty(sheetName);
+            Dictionary<string, object> report = CheckSheet(wb, sheet, address, wholeBook);
+            if (wholeBook)
+            {
+                AddWorkbookOverview(wb, sheet, report);
+            }
+            return report;
+        }
+
+        private const int OverviewSheetLimit = 30;
+
+        // Soát cả sổ trong MỘT lời gọi (bộ đo 27/10/2026 ca B: 26/60 vòng cuối là listSheets, listCharts, checkRange từng
+        // sheet, readRange từng vùng - mỗi vòng một lệnh). `workbook`: mỗi sheet một dòng (vùng dùng, công thức, biểu đồ,
+        // bảng, validation, định dạng điều kiện, loại lỗi); lỗi của sheet khác gộp vào `issues` kèm `sheet`.
+        private static void AddWorkbookOverview(dynamic wb, dynamic active, Dictionary<string, object> report)
+        {
+            var issues = (List<Dictionary<string, object>>)report["issues"];
+            foreach (Dictionary<string, object> issue in issues)
+            {
+                issue["sheet"] = Convert.ToString(active.Name);
+            }
+            var overview = new List<Dictionary<string, object>>();
+            string activeName = Convert.ToString(active.Name);
+            foreach (dynamic ws in wb.Worksheets)
+            {
+                if (overview.Count >= OverviewSheetLimit)
+                {
+                    break;
+                }
+                string name = Convert.ToString(ws.Name);
+                List<Dictionary<string, object>> sheetIssues;
+                Dictionary<string, object> detail = name == activeName ? report : null;
+                if (detail == null)
+                {
+                    try
+                    {
+                        detail = CheckSheet(wb, ws, null, false);
+                    }
+                    catch (Exception ex)
+                    {
+                        detail = new Dictionary<string, object>
+                        {
+                            { "usedRange", "" }, { "columns", new List<Dictionary<string, object>>() },
+                            { "issues", new List<Dictionary<string, object>> { Issue("check-failed", ex.Message) } }
+                        };
+                    }
+                    sheetIssues = (List<Dictionary<string, object>>)detail["issues"];
+                    foreach (Dictionary<string, object> issue in sheetIssues)
+                    {
+                        issue["sheet"] = name;
+                        issue["detail"] = name + ": " + Convert.ToString(issue["detail"]);
+                        issues.Add(issue);
+                    }
+                    object otherNotes;
+                    if (detail.TryGetValue("notes", out otherNotes) && otherNotes is List<Dictionary<string, object>>)
+                    {
+                        foreach (Dictionary<string, object> note in (List<Dictionary<string, object>>)otherNotes)
+                        {
+                            note["detail"] = name + ": " + Convert.ToString(note["detail"]);
+                            ((List<Dictionary<string, object>>)report["notes"]).Add(note);
+                        }
+                    }
+                }
+                else
+                {
+                    sheetIssues = issues.Where(i => Convert.ToString(i["sheet"]) == name).ToList();
+                }
+                int formulas = 0, cells = 0;
+                foreach (Dictionary<string, object> column in (IEnumerable)detail["columns"])
+                {
+                    formulas += Convert.ToInt32(column["formulas"]);
+                    cells += Convert.ToInt32(column["numbers"]) + Convert.ToInt32(column["texts"]);
+                }
+                var line = new Dictionary<string, object>
+                {
+                    { "sheet", name }, { "usedRange", detail["usedRange"] }, { "filledCells", cells }, { "formulas", formulas },
+                    { "charts", SafeCount(() => ws.ChartObjects().Count) },
+                    { "tables", SafeNames(ws.ListObjects) },
+                    { "validations", SafeCount(() => ws.Cells.SpecialCells(-4174).Count) },
+                    { "conditionalFormats", SafeCount(() => ws.Cells.FormatConditions.Count) },
+                    { "issues", sheetIssues.Select(i => Convert.ToString(i["type"])).Distinct().ToList() }
+                };
+                if (cells == 0)
+                {
+                    var empty = Issue("empty-sheet", name + ": the sheet has no values yet");
+                    empty["sheet"] = name;
+                    issues.Add(empty);
+                    ((List<string>)line["issues"]).Add("empty-sheet");
+                }
+                overview.Add(line);
+            }
+            report["workbook"] = overview;
+            report["issueCount"] = issues.Count;
+        }
+
+        private static int SafeCount(Func<object> count)
+        {
+            try
+            {
+                return Convert.ToInt32(count());
+            }
+            catch (Exception)
+            {
+                // SpecialCells ném lỗi khi sheet không có ô nào loại đó.
+                return 0;
+            }
+        }
+
+        private static List<string> SafeNames(dynamic items)
+        {
+            var names = new List<string>();
+            try
+            {
+                foreach (dynamic item in items)
+                {
+                    names.Add(Convert.ToString(item.Name));
+                }
+            }
+            catch (Exception)
+            {
+            }
+            return names;
+        }
+
+        // Định dạng số đại diện của từng cột trong hàng [first, last]: ô số lẻ đầu tiên (không phải luôn hàng 2 - sheet cấu
+        // hình có hàng 2 trống, ô 0.9 đã để 0% vẫn bị báo no-number-format và model ghi lại mãi, bộ đo 27/10/2026 ca B).
+        private static List<string> ColumnFormats(dynamic range, object[,] values, int first, int last, int cols)
+        {
             var formats = new List<string>();
             for (int c = 1; c <= cols; c++)
             {
                 string format = "";
+                int sample = Math.Min(first + 2, last + 1);
+                for (int r = first + 1; r <= last; r++)
+                {
+                    if (values[r, c - 1] is double && Math.Abs((double)values[r, c - 1] % 1) > 1e-9)
+                    {
+                        sample = r + 1;
+                        break;
+                    }
+                }
                 try
                 {
-                    format = Convert.ToString(range.Cells[Math.Min(2, rows), c].NumberFormat);
+                    format = Convert.ToString(range.Cells[sample, c].NumberFormat);
                 }
                 catch (Exception)
                 {
                 }
                 formats.Add(format);
             }
+            return formats;
+        }
+
+        // Hàng đầu khối là tiêu đề cột: ít nhất 2 ô có chữ và không ô nào là số.
+        private static bool TableHeader(object[,] values, int cols)
+        {
+            int labels = 0;
+            for (int c = 0; c < cols; c++)
+            {
+                object cell = values[0, c];
+                if (cell == null || Convert.ToString(cell).Trim().Length == 0)
+                {
+                    continue;
+                }
+                if (!(cell is string))
+                {
+                    return false;
+                }
+                labels++;
+            }
+            return labels >= 2;
+        }
+
+        // Dải hàng liền nhau có nội dung, ngăn bởi hàng trống: [đầu, cuối] (chỉ số 0 trong ma trận).
+        private static List<int[]> RowBands(object[,] values, int rows, int cols)
+        {
+            var bands = new List<int[]>();
+            int start = -1;
+            for (int r = 0; r <= rows; r++)
+            {
+                bool filled = false;
+                for (int c = 0; r < rows && c < cols && !filled; c++)
+                {
+                    filled = values[r, c] != null && Convert.ToString(values[r, c]).Trim().Length > 0;
+                }
+                if (filled && start < 0)
+                {
+                    start = r;
+                }
+                else if (!filled && start >= 0)
+                {
+                    bands.Add(new[] { start, r - 1 });
+                    start = -1;
+                }
+            }
+            return bands;
+        }
+
+        private static Dictionary<string, object> CheckSheet(dynamic wb, dynamic sheet, string address, bool wholeBook)
+        {
+            dynamic used = sheet.UsedRange;
+            dynamic range = string.IsNullOrEmpty(address) ? used : sheet.Range[address];
+            int rows = Convert.ToInt32(range.Rows.Count);
+            int cols = Convert.ToInt32(range.Columns.Count);
+            object[,] values = AsMatrix(range.Value2, rows, cols);
+            object[,] formulas = AsMatrix(range.Formula, rows, cols);
+            var formats = ColumnFormats(range, values, 0, rows - 1, cols);
 
             var issues = new List<Dictionary<string, object>>();
-            var columns = ColumnStats(values, formulas, formats, rows, cols, Convert.ToInt32(range.Column), issues);
+            var notes = new List<Dictionary<string, object>>();
+            int firstColumn = Convert.ToInt32(range.Column);
+            int firstRow = Convert.ToInt32(range.Row);
+            // Sheet trình bày (tiêu đề, cặp nhãn - số KPI, bảng nhỏ, khối cấu hình ngăn bởi hàng trống): soát cột theo TỪNG
+            // khối, hàng đầu khối là tiêu đề. Soát cả sheet như một bảng thì báo nhầm empty-header / mixed-types mà model
+            // không sửa được, nên sửa - soát lại tới hết vòng (bộ đo 27/10/2026 ca B, Dashboard và Config).
+            List<int[]> bands = string.IsNullOrEmpty(address) ? RowBands(values, rows, cols) : new List<int[]>();
+            var columns = ColumnStats(values, formulas, formats, rows, cols, firstColumn,
+                bands.Count >= 1 ? new List<Dictionary<string, object>>() : issues);
+            if (bands.Count >= 1)
+            {
+                foreach (int[] band in bands.Where(b => b[1] > b[0]))
+                {
+                    int bandRows = band[1] - band[0] + 1;
+                    var bandValues = new object[bandRows, cols];
+                    var bandFormulas = new object[bandRows, cols];
+                    for (int r = 0; r < bandRows; r++)
+                    {
+                        for (int c = 0; c < cols; c++)
+                        {
+                            bandValues[r, c] = values[band[0] + r, c];
+                            bandFormulas[r, c] = formulas[band[0] + r, c];
+                        }
+                    }
+                    var bandIssues = new List<Dictionary<string, object>>();
+                    ColumnStats(bandValues, bandFormulas, ColumnFormats(range, values, band[0], band[1], cols), bandRows, cols,
+                        firstColumn, bandIssues);
+                    // Khối biểu mẫu (hàng đầu là tiêu đề một ô, hoặc cặp nhãn - giá trị như "Ngưỡng cảnh báo | 0.9"): không có
+                    // hàng tiêu đề cột nên empty-header / mixed-types là báo nhầm (bộ đo 27/10/2026 ca B, lần p3j: model xoá
+                    // rồi dựng lại sheet Config 3 lần cho hết lỗi).
+                    bool table = TableHeader(bandValues, cols);
+                    string block = string.Format("block rows {0}-{1}", firstRow + band[0], firstRow + band[1]);
+                    foreach (Dictionary<string, object> issue in bandIssues)
+                    {
+                        string type = Convert.ToString(issue["type"]);
+                        if (!table && (type == "empty-header" || type == "mixed-types"))
+                        {
+                            continue;
+                        }
+                        if (bands.Count >= 2)
+                        {
+                            issue["detail"] = block + ": " + Convert.ToString(issue["detail"]);
+                        }
+                        issues.Add(issue);
+                    }
+                }
+            }
 
             // Dữ liệu lạc ra ngoài bảng chính (vùng liền kề của ô đầu): UsedRange rộng hơn CurrentRegion.
             string usedAddress = Convert.ToString(used.Address(false, false));
@@ -370,9 +652,11 @@ namespace AxiomOffice.Bridge
                 regionAddress = Convert.ToString(region.Address(false, false));
                 int usedCells = Convert.ToInt32(used.Rows.Count) * Convert.ToInt32(used.Columns.Count);
                 int regionCells = Convert.ToInt32(region.Rows.Count) * Convert.ToInt32(region.Columns.Count);
+                // Chỉ là ghi chú, không tính vào issueCount: sheet nhiều khối (Dashboard, Config) luôn có nội dung ngoài
+                // vùng liền kề của A1 - coi là lỗi thì model xoá / ghi lại ô đúng mãi.
                 if (string.IsNullOrEmpty(address) && usedCells > regionCells)
                 {
-                    issues.Add(Issue("outside-table",
+                    notes.Add(Issue("outside-table",
                         "the sheet has content outside the table " + regionAddress + " (used range " + usedAddress
                         + "): check for stray values written to the wrong cells"));
                 }
@@ -402,6 +686,25 @@ namespace AxiomOffice.Bridge
                 // soát thêm không được làm hỏng cả báo cáo
             }
 
+            // Không chỉ định vùng/sheet = soát cả sổ: ô lỗi (#DIV/0!, #REF!...) ở MỌI sheet, kể cả sheet đang không mở (plan 21 P2).
+            if (wholeBook)
+            {
+                try
+                {
+                    List<string> errorCells = WorkbookErrorCells(wb);
+                    if (errorCells.Count > 0)
+                    {
+                        issues.Add(Issue("error-cells", errorCells.Count + (errorCells.Count >= ErrorCellLimit ? "+" : "")
+                            + " formula cell(s) in the workbook show an error: " + string.Join("; ", errorCells.Take(12))
+                            + " - fix the formula (#DIV/0! = divide by zero/empty, #REF! = deleted reference, #NAME? = typo, #VALUE! = text in maths)",
+                            new Dictionary<string, object> { { "cells", errorCells } }));
+                    }
+                }
+                catch (Exception)
+                {
+                }
+            }
+
             return new Dictionary<string, object>
             {
                 { "sheet", Convert.ToString(sheet.Name) },
@@ -412,8 +715,48 @@ namespace AxiomOffice.Bridge
                 { "cols", cols },
                 { "columns", columns },
                 { "issueCount", issues.Count },
-                { "issues", issues }
+                { "issues", issues },
+                // Ghi chú không phải lỗi (outside-table): không cần sửa để issueCount về 0.
+                { "notes", notes }
             };
+        }
+
+        private const int ErrorCellLimit = 40;
+
+        // Ô công thức đang ra lỗi trên mọi sheet ("Sheet!D4 #DIV/0!"). SpecialCells(xlCellTypeFormulas = -4123, xlErrors = 16)
+        // ném lỗi khi sheet không có ô nào như vậy.
+        private static List<string> WorkbookErrorCells(dynamic wb)
+        {
+            var found = new List<string>();
+            foreach (dynamic ws in wb.Worksheets)
+            {
+                dynamic cells;
+                try
+                {
+                    cells = ws.UsedRange.SpecialCells(-4123, 16);
+                }
+                catch (Exception)
+                {
+                    continue;
+                }
+                foreach (dynamic cell in cells.Cells)
+                {
+                    string name = "#ERR";
+                    try
+                    {
+                        name = ExcelErrorName(Convert.ToInt32(cell.Value2));
+                    }
+                    catch (Exception)
+                    {
+                    }
+                    found.Add(Convert.ToString(ws.Name) + "!" + Convert.ToString(cell.Address(false, false)) + " " + name);
+                    if (found.Count >= ErrorCellLimit)
+                    {
+                        return found;
+                    }
+                }
+            }
+            return found;
         }
 
         // Giới hạn khi soi tham chiếu: bảng 50.000 dòng có thể có hàng trăm nghìn công thức, soi hết thì
@@ -708,7 +1051,10 @@ namespace AxiomOffice.Bridge
                     {
                     }
                 }
-                if (empty > 0)
+                // Ô trống ở bảng dàn trang là CỐ Ý (khoảng trống ký, ô chờ điền) nên không báo - cùng quy tắc với
+                // LibreOffice (checks.py) và WPS. "long-header-cell" vẫn báo cho mọi bảng.
+                bool layout = IsLayoutTable(table);
+                if (empty > 0 && !layout)
                 {
                     issues.Add(Issue("empty-cells", "table " + t + " has " + empty + " empty cell(s)", new Dictionary<string, object> { { "table", t } }));
                 }
@@ -730,7 +1076,8 @@ namespace AxiomOffice.Bridge
                     { "rows", rows },
                     { "cols", cols },
                     { "emptyCells", empty },
-                    { "header", header }
+                    { "header", header },
+                    { "layout", layout }
                 });
             }
             return new Dictionary<string, object>

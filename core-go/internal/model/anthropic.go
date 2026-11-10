@@ -25,7 +25,19 @@ func (anthropicCodec) BuildRequest(model, systemPrompt string, turns []Message, 
 		maxTokens = anthropicDefaultMaxTokens
 	}
 	messages := append([]any{}, turns...)
-	body := map[string]any{"model": model, "max_tokens": maxTokens, "system": systemPrompt, "messages": messages}
+	// Prompt caching (bao cao "Giam ngu canh gui lai agent", muc 5): tren Anthropic KHONG cache gi khi khong
+	// co danh dau, con cac nha cung cap kieu OpenAI cache ngam dinh nen tool/system cua Axiom da do 84% bo
+	// cache bao nhien. Hai cach danh dau chuan cua API /messages:
+	//  - Khoi system cuoi mang ephemeral: tien to CO DINH (tool dinh nghia + system, ~71% dau vao moi vong)
+	//    lap mot muc cache khong doi khi tin nhan tang them - khong pha duoc cache do phan duoi thay doi.
+	//  - cache_control cap request = "automatic": tu danh dau khoi tui cuoi moi vong, nen lich su cung doc du
+	//    tu cache cua vong truoc (chi tra gia nhap them phan moi).
+	body := map[string]any{"model": model, "max_tokens": maxTokens,
+		"cache_control": map[string]any{"type": "ephemeral"}, "messages": messages}
+	if systemPrompt != "" {
+		body["system"] = []any{map[string]any{"type": "text", "text": systemPrompt,
+			"cache_control": map[string]any{"type": "ephemeral"}}}
+	}
 	if toolsEnabled && len(tools) > 0 {
 		definitions := make([]any, 0, len(tools))
 		for _, tool := range tools {

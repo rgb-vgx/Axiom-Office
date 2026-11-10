@@ -55,103 +55,108 @@ namespace AxiomOffice.Bridge
             var tablesSeen = new HashSet<int>();
             var tables = TableSpans(doc);
             int index = 0;
-            foreach (dynamic paragraph in doc.Paragraphs)
+            // Cùng điều kiện với writer.getText: còn revision thì chữ bị xoá vẫn nằm trong Range.Text - không ẩn thì outline
+            // trả "đã sửa mộtgốc một" (cả đoạn đã xoá) trong khi getText trả chữ cuối, agent tưởng lệnh sửa chưa ăn.
+            using (new HiddenRevisions(doc))
             {
-                index++;
-                dynamic range = paragraph.Range;
-                int tableIndex = TableAt(tables, Convert.ToInt32(range.Start));
-                if (tableIndex >= 0)
+                foreach (dynamic paragraph in doc.Paragraphs)
                 {
-                    dynamic table = tables[tableIndex];
-                    if (tablesSeen.Add(tableIndex))
+                    index++;
+                    dynamic range = paragraph.Range;
+                    int tableIndex = TableAt(tables, Convert.ToInt32(range.Start));
+                    if (tableIndex >= 0)
                     {
-                        var header = new List<string>();
+                        dynamic table = tables[tableIndex];
+                        if (tablesSeen.Add(tableIndex))
+                        {
+                            var header = new List<string>();
+                            try
+                            {
+                                foreach (dynamic cell in table.Rows[1].Cells)
+                                {
+                                    header.Add(CleanCellText(Convert.ToString(cell.Range.Text), 40));
+                                }
+                            }
+                            catch
+                            {
+                            }
+                            string caption = TableCaption(doc, table);
+                            var tentry = new System.Collections.Generic.Dictionary<string, object>
+                            {
+                                { "n", index }, { "kind", "table" }, { "rows", Convert.ToInt32(table.Rows.Count) },
+                                { "cols", Convert.ToInt32(table.Columns.Count) }, { "header", header }
+                            };
+                            if (!string.IsNullOrEmpty(caption)) tentry["caption"] = caption;
+                            items.Add(tentry);
+                        }
+                        continue;
+                    }
+                    string text = Convert.ToString(range.Text).TrimEnd('\r', '\a').Trim();
+                    bool hasShape = false;
+                    try
+                    {
+                        hasShape = Convert.ToInt32(range.InlineShapes.Count) > 0 || Convert.ToInt32(range.ShapeRange.Count) > 0;
+                    }
+                    catch
+                    {
+                    }
+                    if (text.Length == 0 && !hasShape)
+                    {
+                        continue;
+                    }
+                    var entry = new Dictionary<string, object> { { "n", index }, { "t", text.Length > maxChars ? text.Substring(0, maxChars) + "…" : text } };
+                    string list = "";
+                    try
+                    {
+                        list = Convert.ToString(range.ListFormat.ListString);
+                    }
+                    catch
+                    {
+                    }
+                    if (!string.IsNullOrEmpty(list))
+                    {
+                        entry["list"] = list;
+                    }
+                    try
+                    {
+                        var marks = new System.Collections.Generic.List<string>();
+                        foreach (dynamic mark in range.Bookmarks)
+                        {
+                            try { marks.Add(System.Convert.ToString(mark.Name)); }
+                            catch { }
+                        }
+                        if (marks.Count > 0) entry["bookmarks"] = marks;
+                    }
+                    catch
+                    {
+                    }
+                    try
+                    {
+                        string style = Convert.ToString(paragraph.Style.NameLocal);
+                        if (!string.IsNullOrEmpty(style) && style != "Normal" && style != "Mặc định")
+                            entry["style"] = style;
+                    }
+                    catch
+                    {
+                    }
+                    if (hasShape && text.Trim('/', ' ').Length == 0)
+                    {
+                        string label = "[ảnh]";
                         try
                         {
-                            foreach (dynamic cell in table.Rows[1].Cells)
+                            foreach (dynamic shape in range.ShapeRange)
                             {
-                                header.Add(CleanCellText(Convert.ToString(cell.Range.Text), 40));
+                                label = ShapeLabel(shape);
+                                break;
                             }
                         }
                         catch
                         {
                         }
-                        string caption = TableCaption(doc, table);
-                        var tentry = new System.Collections.Generic.Dictionary<string, object>
-                        {
-                            { "n", index }, { "kind", "table" }, { "rows", Convert.ToInt32(table.Rows.Count) },
-                            { "cols", Convert.ToInt32(table.Columns.Count) }, { "header", header }
-                        };
-                        if (!string.IsNullOrEmpty(caption)) tentry["caption"] = caption;
-                        items.Add(tentry);
+                        entry["t"] = label.Length > maxChars ? label.Substring(0, maxChars) + "…" : label;
                     }
-                    continue;
+                    items.Add(entry);
                 }
-                string text = Convert.ToString(range.Text).TrimEnd('\r', '\a').Trim();
-                bool hasShape = false;
-                try
-                {
-                    hasShape = Convert.ToInt32(range.InlineShapes.Count) > 0 || Convert.ToInt32(range.ShapeRange.Count) > 0;
-                }
-                catch
-                {
-                }
-                if (text.Length == 0 && !hasShape)
-                {
-                    continue;
-                }
-                var entry = new Dictionary<string, object> { { "n", index }, { "t", text.Length > maxChars ? text.Substring(0, maxChars) + "…" : text } };
-                string list = "";
-                try
-                {
-                    list = Convert.ToString(range.ListFormat.ListString);
-                }
-                catch
-                {
-                }
-                if (!string.IsNullOrEmpty(list))
-                {
-                    entry["list"] = list;
-                }
-                try
-                {
-                    var marks = new System.Collections.Generic.List<string>();
-                    foreach (dynamic mark in range.Bookmarks)
-                    {
-                        try { marks.Add(System.Convert.ToString(mark.Name)); }
-                        catch { }
-                    }
-                    if (marks.Count > 0) entry["bookmarks"] = marks;
-                }
-                catch
-                {
-                }
-                try
-                {
-                    string style = Convert.ToString(paragraph.Style.NameLocal);
-                    if (!string.IsNullOrEmpty(style) && style != "Normal" && style != "Mặc định")
-                        entry["style"] = style;
-                }
-                catch
-                {
-                }
-                if (hasShape && text.Trim('/', ' ').Length == 0)
-                {
-                    string label = "[ảnh]";
-                    try
-                    {
-                        foreach (dynamic shape in range.ShapeRange)
-                        {
-                            label = ShapeLabel(shape);
-                            break;
-                        }
-                    }
-                    catch
-                    {
-                    }
-                    entry["t"] = label.Length > maxChars ? label.Substring(0, maxChars) + "…" : label;
-                }
-                items.Add(entry);
             }
             return new Dictionary<string, object> { { "paragraphs", index }, { "items", items } };
         }
@@ -365,9 +370,20 @@ namespace AxiomOffice.Bridge
                 // từ 1 (bản thử 14/10/2026: "1. Địa điểm", "1. Thiết bị").
                 var paragraphs = new List<dynamic>();
                 var lists = new List<Tuple<int, int, string>>();
+                bool administrative = false;
                 foreach (dynamic paragraph in doc.Paragraphs)
                 {
                     paragraphs.Add(paragraph);
+                    if (!administrative)
+                    {
+                        try
+                        {
+                            administrative = IsNationalTitle(Convert.ToString(paragraph.Range.Text));
+                        }
+                        catch
+                        {
+                        }
+                    }
                     int listType = 0, listLevel = 1;
                     string listString = "";
                     try
@@ -384,6 +400,14 @@ namespace AxiomOffice.Bridge
                     {
                     }
                     lists.Add(Tuple.Create(listType, listLevel, listString));
+                }
+                // Văn bản hành chính (có quốc hiệu): thể thức Nghị định 30/2020 - chữ đen, không tô màu nhấn, không
+                // kẻ gạch dưới tiêu đề mục. Đo 24/10/2026: lá đơn có quốc hiệu căn giữa + đậm bị tô #2E5C8A.
+                if (administrative)
+                {
+                    accent = 0;
+                    text = 0;
+                    muted = 0;
                 }
                 var tableList = TableSpans(doc);
                 var empty = new List<dynamic>();
@@ -468,11 +492,14 @@ namespace AxiomOffice.Bridge
                         range.Font.Bold = -1;
                         range.Font.Italic = 0;
                         range.Font.Color = accent;
-                        dynamic bottom = paragraph.Borders[-3];
-                        bottom.LineStyle = 1;
-                        bottom.LineWidth = 4;
-                        bottom.Color = ParseBgrColor("#C9DAEC").Value;
-                        paragraph.Borders.DistanceFromBottom = 3;
+                        if (!administrative)
+                        {
+                            dynamic bottom = paragraph.Borders[-3];
+                            bottom.LineStyle = 1;
+                            bottom.LineWidth = 4;
+                            bottom.Color = ParseBgrColor("#C9DAEC").Value;
+                            paragraph.Borders.DistanceFromBottom = 3;
+                        }
                         headings++;
                         continue;
                     }
@@ -529,7 +556,8 @@ namespace AxiomOffice.Bridge
                     range.Font.Color = text;
                 }
                 long paragraphMs = watch.ElapsedMilliseconds;
-                for (int i = empty.Count - 1; i >= 0; i--)
+                // Văn bản hành chính: dòng trống giữa chức danh và họ tên là khoảng trống KÝ - không xoá.
+                for (int i = empty.Count - 1; i >= 0 && !administrative; i--)
                 {
                     try
                     {
@@ -540,18 +568,41 @@ namespace AxiomOffice.Bridge
                     {
                     }
                 }
+                int layoutTables = 0;
                 foreach (dynamic table in doc.Tables)
                 {
+                    // Bảng dàn trang (formatTable {borders:false}) cố ý không viền: kẻ khung lại là sai bố cục.
+                    if (IsLayoutTable(table))
+                    {
+                        layoutTables++;
+                        continue;
+                    }
                     RestyleTable(doc, table, font, accent, text);
                     tables++;
                 }
                 RestylePage(doc, muted);
-                Logger.Info("writer.restyle: " + paragraphs.Count + " paragraphs " + paragraphMs + " ms, total " + watch.ElapsedMilliseconds + " ms");
+                Logger.Info("writer.restyle: " + paragraphs.Count + " paragraphs " + paragraphMs + " ms, total " + watch.ElapsedMilliseconds
+                    + " ms" + (administrative ? " (administrative)" : ""));
+                return new Dictionary<string, object>
+                {
+                    { "headings", headings }, { "bullets", bullets }, { "removedEmpty", removed }, { "tables", tables },
+                    { "layoutTables", layoutTables }, { "mode", administrative ? "administrative" : "design" }
+                };
             }
-            return new Dictionary<string, object>
+        }
+
+        // Quốc hiệu (Nghị định 30/2020, Phụ lục I): dấu hiệu văn bản hành chính. So sánh sau khi bỏ khoảng trắng
+        // thừa và ký tự kết ô/đoạn của Word, không phân biệt hoa/thường.
+        internal static bool IsNationalTitle(string raw)
+        {
+            if (string.IsNullOrEmpty(raw))
             {
-                { "headings", headings }, { "bullets", bullets }, { "removedEmpty", removed }, { "tables", tables }
-            };
+                return false;
+            }
+            string value = Regex.Replace(raw.Replace("\r", " ").Replace("\a", " ").Replace("\v", " "), @"\s+", " ").Trim()
+                .Normalize(NormalizationForm.FormC).ToUpper(CultureInfo.GetCultureInfo("vi-VN"))
+                .Replace("HOÀ", "HÒA");   // dấu đặt kiểu cũ/mới đều gặp trong văn bản thật
+            return value.Length >= 30 && value.Length <= 60 && value.Contains("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM");
         }
 
         // Thay phần đầu đoạn (dấu gạch, "* ") bằng `replacement` mà không đụng phần chữ còn lại.

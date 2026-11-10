@@ -1,4 +1,4 @@
-"""Test e2e cua Agent Core (New_arch.md muc 11): Core that + LLM gia + bridge gia.
+"""Test e2e cua Agent Core (docs/architecture/core.md muc 11): Core that + LLM gia + bridge gia.
 
     python tests/core/test_core_e2e.py            # khong can Office (bridge gia, session gia)
     python tests/core/test_core_e2e.py --office   # bridge that: tu mo Word/Excel/PowerPoint
@@ -101,6 +101,9 @@ COMMANDS = [
     {"name": "et.save", "kind": "et", "agent": False, "summary": "luu", "params": []},
     {"name": "et.saveAs", "kind": "et", "agent": True, "summary": "luu thanh file", "params": [{"name": "path", "required": True, "hint": None}]},
     {"name": "writer.closeAll", "kind": "wps", "agent": False, "summary": "dong het", "params": []},
+    # Add-in that (Windows CommandCatalog.All, WPS khi co handler) khai ca lenh agent=false; Core chi dua
+    # look_at_document khi bridge co app.screenshot (core-go/internal/tools/needs.go).
+    {"name": "app.screenshot", "kind": None, "agent": False, "summary": "anh chup trang", "params": []},
 ]
 
 
@@ -427,7 +430,7 @@ def write_skill(root: str, folder: str, frontmatter: str, body: str) -> str:
 
 
 def test_skills(work: str, token: str, bridge: FakeBridge, document_path: str, session_dir: str) -> None:
-    """Giai doan 2 (New_arch.md 8.4, 12): luong load_skill / read_skill_file voi LLM gia, skill loi khong lam hong Core."""
+    """Giai doan 2 (docs/architecture/core.md 8.4, 12): luong load_skill / read_skill_file voi LLM gia, skill loi khong lam hong Core."""
     org = os.path.join(work, "skills-org")
     write_skill(org, "quy-trinh-rieng", "name: quy-trinh-rieng\ndescription: Quy trinh bang tinh rieng cua to chuc. Dung khi lap bao cao.\napps: [et]",
                 "# Buoc\nMa kiem tra: BUOC-BI-MAT-123. Ghi bang roi soat bang et.checkRange.")
@@ -503,7 +506,7 @@ def wait_for(predicate, timeout=30.0, interval=0.3):
 
 
 def test_memory(work: str, token: str, bridge: FakeBridge, document_path: str, session_dir: str) -> None:
-    """Giai doan 3 (New_arch.md 8.5, 12): memory ghi o phien nay duoc dung o phien sau (ke ca sau khi Core khoi dong
+    """Giai doan 3 (docs/architecture/core.md 8.5, 12): memory ghi o phien nay duoc dung o phien sau (ke ca sau khi Core khoi dong
     lai); thong tin moi mau thuan -> memory MOI ghi ro chuyen doi + lien ket ban cu (ban cu khong bi sua); trung hash
     khong tao ban moi; id bia bi bo; lenh thao tac thuan khong ton lenh goi trich xuat; tat MemoryEnabled thi khong
     doc/ghi; xoa la mat khoi ngu canh."""
@@ -753,8 +756,12 @@ def test_anthropic(work: str, token: str, bridge: FakeBridge, document_path: str
               and first["headers"].get("anthropic-version") == "2023-06-01",
               "Anthropic: gui x-api-key + anthropic-version", {k: v for k, v in first["headers"].items() if "key" in k or "anthropic" in k})
         body = first["body"]
-        check(isinstance(body.get("system"), str) and "AI assistant embedded inside" in body["system"],
-              "Anthropic: system la truong rieng (khong nam trong messages)", str(body.get("system"))[:80])
+        system = body.get("system")
+        check(isinstance(system, list) and system and "AI assistant embedded inside" in str(system[0].get("text", "")),
+              "Anthropic: system la truong rieng dang block (khong nam trong messages)", str(body.get("system"))[:160])
+        check(system[-1].get("cache_control") == {"type": "ephemeral"} and body.get("cache_control") == {"type": "ephemeral"},
+              "Anthropic: khoi system cuoi + request deu gan ephemeral de cache tien to tro lai moi vong",
+              {"system": system[-1].get("cache_control"), "request": body.get("cache_control")})
         check(all(message.get("role") != "system" for message in body["messages"]),
               "Anthropic: messages khong co role system")
         tools = body.get("tools") or []
@@ -851,7 +858,7 @@ def test_embeddings(work: str, token: str, bridge: FakeBridge, document_path: st
 
 def test_summarize(work: str, token: str, bridge: FakeBridge, document_path: str, session_dir: str) -> None:
     """Hoi thoai dai: Core tom tat o hang doi nen, CHI khi vuot moc (khong ton mot lan goi model moi luot),
-    va ban tom tat duoc dua vao ngu canh cua luot sau (New_arch.md muc 8.5.9).
+    va ban tom tat duoc dua vao ngu canh cua luot sau (docs/architecture/core.md muc 8.5.9).
     """
     llm = FakeLlm(work, [{"text": "Da lam xong."}] * 80)
     data_dir = os.path.join(work, "core-summarize")
@@ -951,6 +958,24 @@ def test_cancel(work: str, token: str, bridge: FakeBridge, document_path: str, s
         check(status == 409, "huy luot da xong -> 409", again)
         status, health = http_json(core.base + "/health")
         check(status == 200 and health["result"]["memory"] == "on", "sau khi huy, Core van khoe", health["result"]["memory"])
+
+        # Luot bi huy de lai mot dong trong hoi thoai; luot sau thay no trong "Recent turns" cua system prompt (Codex/Grok
+        # Build: luot bi ngat la trang thai co ten, model biet tai lieu co the da doi mot phan).
+        conversation_id = run.get("conversationId")
+        messages = core.conversation(conversation_id)["messages"]
+        notes = [m["content"] for m in messages if m["role"] == "tool_summary" and "ended before finishing" in m["content"]]
+        check(len(notes) == 1 and "cancelled" in notes[0], "hoi thoai ghi lai luot bi huy giua chung", notes)
+        before = len(llm.requests())
+        status, again = core.run("lam tiep", office, conversation_id=conversation_id,
+                                 document={"name": "bao-cao.xlsx", "fullName": document_path})
+        deadline = time.time() + 30
+        while len(llm.requests()) <= before and time.time() < deadline:
+            time.sleep(0.1)
+        prompt = llm.requests()[-1]["body"]["messages"][0]["content"] if len(llm.requests()) > before else ""
+        check("ended before finishing: cancelled" in prompt, "luot sau thay dong 'luot truoc bi dung' trong system prompt",
+              prompt[-400:])
+        if status == 200:
+            http_json(f"{core.base}/v1/runs/{again['result']['runId']}/cancel", method="POST", token=core.token)
     finally:
         core.stop()
         llm.stop()
@@ -1027,7 +1052,7 @@ def test_mcp_http(work: str, token: str, bridge: FakeBridge, document_path: str,
 
 
 def test_confirm(work: str, token: str, bridge: FakeBridge, document_path: str, session_dir: str) -> None:
-    """Giai doan 4 (New_arch.md 8.6, 12): policy xac nhan - dong y / tu choi / het gio; audit day du."""
+    """Giai doan 4 (docs/architecture/core.md 8.6, 12): policy xac nhan - dong y / tu choi / het gio; audit day du."""
     llm = FakeLlm(work, [
         {"tool": "office_action", "arguments": {"action": "et.saveAs", "params": {"path": os.path.join(work, "dong-y.xlsx")}}},
         {"text": "Da luu (dong y)"},
@@ -1109,13 +1134,90 @@ def test_confirm(work: str, token: str, bridge: FakeBridge, document_path: str, 
         check(declined and "user declined" in (declined[0].get("error") or "") and bridge.actions() == [],
               "interactive=false: lenh rui ro bi tu choi ngay, khong xuong bridge", declined)
         check(time.time() - started < 8, "interactive=false: khong cho het han xac nhan", round(time.time() - started, 1))
+        # Luot khong nhac tep Office nao: khong gui tool file cua server built-in "office" (progressive disclosure,
+        # agent/disclosure.go); test_mcp kiem chieu nguoc lai (nhac ten tep thi co).
+        status, servers = http_json(core.base + "/v1/mcp", token=core.token)
+        office_tools = next((s["tools"] for s in servers["result"]["servers"] if s["name"] == "office"), [])
+        last_tools = [t["function"]["name"] for t in llm.requests()[-1]["body"].get("tools", [])]
+        check(office_tools and "office_action" in last_tools and not any(name.startswith("mcp__office__") for name in last_tools),
+              "luot khong nhac tep: server office co tool file nhung khong gui cho model", (len(office_tools), last_tools))
     finally:
         core.stop()
         llm.stop()
 
 
+def test_cross_app(work: str, token: str, bridge: FakeBridge, document_path: str, session_dir: str) -> None:
+    """Lam viec xuyen ung dung (tools/other_document.go): co tai lieu khac dang mo thi model co tool other_document,
+    lenh di dung bridge cua tai lieu do, sua thi hoi nguoi dung truoc (khong co ai hoi thi tu choi)."""
+    other_dir = os.path.join(work, "sessions-cross")
+    write_session(other_dir, bridge.pid, bridge.port, "et", document_path)
+    second = FakeBridge(pid=os.getppid())
+    write_args = {"range": "A1", "values": [["Tong", 42]]}
+    llm = FakeLlm(work, [
+        {"text": "Mot tai lieu"},
+        {"tool": "other_document", "arguments": {"document": "nguon", "action": "commands"}},
+        {"tool": "other_document", "arguments": {"document": "nguon.xlsx", "action": "et.writeRange", "params": write_args}},
+        {"text": "Khong ai xac nhan"},
+        {"tool": "other_document", "arguments": {"document": str(second.port), "action": "et.writeRange", "params": write_args}},
+        {"text": "Da ghi sang so nguon"},
+    ])
+    data_dir = os.path.join(work, "core-cross")
+    os.makedirs(data_dir, exist_ok=True)
+    core = Core(data_dir, other_dir, llm, token, {"AXIOM_CONFIRM_TIMEOUT": "20", "AXIOM_MEMORY_AUTO_EXTRACT": "0"})
+    office = {"port": bridge.port, "pid": bridge.pid, "app": "et", "family": "office"}
+    document = {"name": "bao-cao.xlsx", "fullName": document_path}
+    try:
+        status, created = core.run("Tom tat bang", office, document=document)
+        core.events(created["result"]["runId"])
+        tools = [t["function"]["name"] for t in llm.requests()[-1]["body"].get("tools", [])]
+        check("other_document" not in tools, "mot tai lieu dang mo: khong gui tool other_document", tools)
+
+        write_session(other_dir, second.pid, second.port, "et", os.path.join(work, "nguon.xlsx"))
+        bridge.commands.clear()
+        status, created = core.run("Lay tong tu so nguon", office, document=document, options={"interactive": False})
+        events = core.events(created["result"]["runId"])
+        request = llm.requests()[-1]["body"]
+        described = next((t["function"]["description"] for t in request.get("tools", [])
+                          if t["function"]["name"] == "other_document"), "")
+        finished = [p.get("data", {}) for t, p in events if t == "tool.finished"]
+        check("nguon.xlsx (Excel, port %d)" % second.port in described and "bao-cao.xlsx" not in described,
+              "hai tai lieu: other_document liet ke tai lieu KHAC", described[:300])
+        check(len(finished) == 2 and "user declined" in (finished[1].get("error") or "") and second.actions() == []
+              and bridge.actions() == [], "khong ai xac nhan: khong sua tai lieu khac", (finished, second.actions()))
+        listed = [m for m in request.get("messages", []) if m.get("role") == "tool"]
+        check(listed and "et.writeRange {range" in (listed[0].get("content") or ""),
+              "action commands tra lenh cua app kia", listed[:1])
+
+        status, created = core.run("Ghi tong sang so nguon", office, document=document)
+        run_id = created["result"]["runId"]
+        collected: list = []
+        url = f"{core.base}/v1/runs/{run_id}/events"
+        reader = threading.Thread(target=lambda: sse_events(url, core.token, timeout=60, sink=collected), daemon=True)
+        reader.start()
+        confirmation, reason = None, ""
+        deadline = time.time() + 20
+        while confirmation is None and time.time() < deadline:
+            found = next((p.get("data", {}) for t, p in list(collected) if t == "confirm.required"), None)
+            if found:
+                confirmation, reason = found.get("confirmationId"), found.get("reason", "")
+            else:
+                time.sleep(0.1)
+        if confirmation:
+            http_json(f"{core.base}/v1/runs/{run_id}/confirm", method="POST", token=core.token,
+                      body={"confirmationId": confirmation, "approved": True})
+        reader.join(timeout=60)
+        check("nguon.xlsx" in reason, "hoi xac nhan neu ten tai lieu khac", reason)
+        check(second.actions() == ["et.writeRange"] and bridge.actions() == [],
+              "dong y: lenh ghi xuong bridge cua tai lieu khac, khong dung tai lieu cua luot",
+              (second.actions(), bridge.actions()))
+    finally:
+        core.stop()
+        llm.stop()
+        second.stop()
+
+
 def test_mcp(work: str, token: str, bridge: FakeBridge, document_path: str, session_dir: str) -> None:
-    """Giai doan 4 (New_arch.md 8.7, 12): MCP server mau (Python stdlib) duoc goi qua agent; server ngoai can xac
+    """Giai doan 4 (docs/architecture/core.md 8.7, 12): MCP server mau (Python stdlib) duoc goi qua agent; server ngoai can xac
     nhan, "trusted" thi khong; lan file office (Host.exe) doc/ghi file; ghi de file da co thi hoi; server loi
     khong hong run; audit ghi du tham so."""
     sample = os.path.join(ROOT, "tests", "core", "mcp_sample_server.py")
@@ -1138,7 +1240,12 @@ def test_mcp(work: str, token: str, bridge: FakeBridge, document_path: str, sess
         {"text": "Da dung cong cu MCP"},
     ])
     core = Core(data_dir, session_dir, llm, token, {"AXIOM_MEMORY_AUTO_EXTRACT": "0", "AXIOM_CONFIRM_TIMEOUT": "20"})
-    office = {"port": bridge.port, "pid": bridge.pid, "app": "et", "family": "office"}
+    # appKind lay tu session ghi trong session_dir (file sessions/{pid}.json), khong pha tu POST /v1/runs. Tu thay doi
+    # "loc cong cu MCP theo app" (25/10/2026), lenh ghi doc_ (tao/ghi de docx) chi con den phien Word - nen ca nay ghi
+    # lai session thanh "wps" de giu nguyen ba so: tao file moi khong hoi, ghi de file co roi thi hoi, tu choi thi bao
+    # "user declined". Cuoi cung tra lai "et" cho cac ca sau.
+    write_session(session_dir, bridge.pid, bridge.port, "wps", document_path)
+    office = {"port": bridge.port, "pid": bridge.pid, "app": "wps", "family": "office"}
     try:
         status, listing = http_json(core.base + "/v1/mcp", token=core.token)
         servers = {s["name"]: s for s in listing["result"]["servers"]}
@@ -1149,7 +1256,10 @@ def test_mcp(work: str, token: str, bridge: FakeBridge, document_path: str, sess
         check(servers["hong"]["error"] and not servers["hong"]["tools"], "server loi: bao loi, an tool", servers["hong"])
         check(servers["mau"]["tools"] == ["mcp__mau__add", "mcp__mau__shout", "mcp__mau__fail"], "tool ten mcp__<server>__<tool>", servers["mau"]["tools"])
 
-        status, created = core.run("Dung cong cu MCP", office, document={"name": "bao-cao.xlsx", "fullName": document_path})
+        # Tool file cua server "office" chi duoc gui khi luot nhac toi mot tep Office (agent/disclosure.go) - nguoi dung
+        # muon tao/doc tep thi neu ten tep.
+        status, created = core.run("Dung cong cu MCP, ghi chu vao ghi-chu-mcp.docx", office,
+                                   document={"name": "bao-cao.xlsx", "fullName": document_path})
         run_id = created["result"]["runId"]
         collected: list = []
         url = f"{core.base}/v1/runs/{run_id}/events"
@@ -1190,12 +1300,13 @@ def test_mcp(work: str, token: str, bridge: FakeBridge, document_path: str, sess
               and '"a":2' in (calls[0]["params"] or "") and calls[4]["ok"] is False,
               "audit day du cho tool MCP (ten, tham so, ok)", [(c["tool"], c["ok"]) for c in calls])
     finally:
+        write_session(session_dir, bridge.pid, bridge.port, "et", document_path)
         core.stop()
         llm.stop()
 
 
 def test_visual(work: str, token: str, bridge: FakeBridge, document_path: str, session_dir: str) -> None:
-    """Giai doan 4 (New_arch.md 8.4.6): QA thi giac chi khi bat VisualQaEnabled; anh toi model dang image_url."""
+    """Giai doan 4 (docs/architecture/core.md 8.4.6): QA thi giac chi khi bat VisualQaEnabled; anh toi model dang image_url."""
     office = {"port": bridge.port, "pid": bridge.pid, "app": "et", "family": "office"}
     for enabled in (False, True):
         # Moi Core mot LLM gia rieng: kich ban tuan tu, Core truoc khong duoc tieu buoc cua Core sau.
@@ -1248,7 +1359,7 @@ def real_commands() -> list[dict]:
 
 def test_real_llm(work: str, token: str) -> None:
     """LLM that (cau hinh HKCU, chi doc): model tu chon dung skill cho 3 yeu cau mau va khong nap skill thiet ke cho sua nho.
-    Bridge gia (khong can Office) tra ok cho moi lenh. Bao cao so vong va thoi gian (New_arch.md muc 11, 12)."""
+    Bridge gia (khong can Office) tra ok cho moi lenh. Bao cao so vong va thoi gian (docs/architecture/core.md muc 11, 12)."""
     global COMMANDS
     COMMANDS = real_commands()
     session_dir = os.path.join(work, "sessions-real")
@@ -1413,7 +1524,7 @@ def test_office(core: Core, port: int, pid: int) -> None:
 
 
 def test_verify(work: str, token: str, bridge: FakeBridge, document_path: str, session_dir: str) -> None:
-    """Tu kiem chung sau khi sua tai lieu (mac dinh BAT) - New_arch.md muc 8.1.
+    """Tu kiem chung sau khi sua tai lieu (mac dinh BAT) - docs/architecture/core.md muc 8.1.
 
     Do duoc tu ba bo khung chay cung mot prompt (02/10/2026): bo khung khong tu kiem chung thi phai co
     nguoi nhac moi chay tiep. Bai nay kiem ba mat: co kiem chung, tat duoc, va khi lan doc lai THAT SU
@@ -1503,7 +1614,7 @@ def test_verify(work: str, token: str, bridge: FakeBridge, document_path: str, s
 
 
 # Cac phan chay duoc rieng (--only); /health luon chay truoc.
-SECTIONS = ["fake_bridge", "guards", "skills", "memory", "confirm", "mcp", "visual", "setup", "shutdown",
+SECTIONS = ["fake_bridge", "guards", "skills", "memory", "confirm", "cross_app", "mcp", "visual", "setup", "shutdown",
             "anthropic", "embeddings", "summarize", "cancel", "mcp_http", "verify"]
 
 # Phan phu thuoc: `guards` dung chung kich ban LLM voi `fake_bridge` (kich ban tuan tu) nen chay mot minh
@@ -1606,6 +1717,8 @@ def main() -> int:
                 test_memory(work, token, bridge, document_path, session_dir)
             if wanted("confirm"):
                 test_confirm(work, token, bridge, document_path, session_dir)
+            if wanted("cross_app"):
+                test_cross_app(work, token, bridge, document_path, session_dir)
             if wanted("mcp"):
                 test_mcp(work, token, bridge, document_path, session_dir)
             if wanted("visual"):

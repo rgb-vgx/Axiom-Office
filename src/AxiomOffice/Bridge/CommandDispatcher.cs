@@ -14,19 +14,31 @@ namespace AxiomOffice.Bridge
         public static readonly string BridgeVersion =
             typeof(CommandDispatcher).Assembly.GetName().Version.ToString(3);
 
-        private const int MaxComRetries = 10;
+        // Word 16.0.20527 vừa khởi động có thể từ chối COM (RPC_E_CALL_REJECTED) khá lâu khi các add-in
+        // COM bên thứ ba (WPS PDF, Nitro PDF...) còn đang nạp; 10 lần x ~0.55 giây nghĩa là chết cả rổ lệnh
+        // trong những lần đó. Nâng cửa sổ thử lại lên ~25 giây (30 lần, mỗi lần tối đa 1 giây).
+        private const int MaxComRetries = 30;
 
         private static int _firstCommandLogged;
 
         // Mọi lệnh, theo thứ tự hiển thị trong README và mô tả tool.
-        internal static readonly CommandInfo[] Commands = GeneralCommands()
+        internal static readonly CommandInfo[] Commands = WithTargetParams(GeneralCommands()
             .Concat(WriterCommands())
             .Concat(WriterDesignCommands())
             .Concat(WriterScopeCommands())
+            .Concat(WriterStructureCommands())
+            .Concat(WriterLayoutCommands())
+            .Concat(WriterTemplateCommands())
+            .Concat(WriterReviewCommands())
             .Concat(SpreadsheetCommands())
+            .Concat(SpreadsheetStructureCommands())
+            .Concat(SpreadsheetSortCommands())
+            .Concat(SpreadsheetPivotCommands())
             .Concat(PresentationCommands())
             .Concat(TemplateCommands())
+            .Concat(ShapeCommands())
             .Concat(CheckCommands())
+            .Concat(NavigationCommands()))
             .ToArray();
 
         private static readonly Dictionary<string, CommandInfo> CommandsByName =
@@ -90,6 +102,7 @@ namespace AxiomOffice.Bridge
             {
                 return Err("unknown action: " + action);
             }
+            ActivateTarget(host, command, p);
             if (command.Kind != null)
             {
                 RequireKind(host, command.Kind);
@@ -97,7 +110,9 @@ namespace AxiomOffice.Bridge
             try
             {
                 // Khoá vùng bôi đen (CommandDispatcher.WriterScope.cs): lệnh writer.* chỉ được đổi chữ trong vùng đã chọn.
-                return Ok(RunInSelectionLock(host, action, command, p));
+                // Khi lượt đang bật Track Changes, lệnh AI chạy dưới tên "Axiom AI", còn chữ người dùng gõ giữa các lệnh
+                // vẫn mang tên người dùng (WriterReview.RunWithTrackingAuthor).
+                return Ok(RunWithTrackingAuthor(host, action, delegate { return RunInSelectionLock(host, action, command, p); }));
             }
             catch (CommandRejectedException ex)
             {
@@ -244,7 +259,7 @@ namespace AxiomOffice.Bridge
                     Req("prompt")).Ungated(),
                 // ui.askpane chuyển sang UI thread; giữ cổng ở đây có thể deadlock với UI thread đang chờ cổng.
                 Command("ui.askpane", null, UiAskPane, "Mở task pane Ask AI").Ungated(),
-                // QA thị giác (New_arch.md 8.4.6): Core gửi ảnh cho model qua tool look_at_document; agent không
+                // QA thị giác (docs/architecture/core.md 8.4.6): Core gửi ảnh cho model qua tool look_at_document; agent không
                 // gọi thẳng (base64 lớn sẽ đổ vào ngữ cảnh) nên không ForAgent.
                 Command("app.screenshot", null, AppScreenshot, "Ảnh chụp trang/slide hiện tại (PNG base64, thu nhỏ theo `maxWidth`, mặc định 1280)",
                     Opt("maxWidth"))
@@ -314,7 +329,7 @@ namespace AxiomOffice.Bridge
         private static Dictionary<string, object> ExportCurrentSlide(IAppHost host, int maxWidth)
         {
             dynamic app = host.Application;
-            dynamic pres = app.ActivePresentation;
+            dynamic pres = CurrentPresentation(app);
             int count = Convert.ToInt32(pres.Slides.Count);
             if (count == 0)
             {
@@ -341,6 +356,12 @@ namespace AxiomOffice.Bridge
             {
                 index = 1;
             }
+            return ExportSlide(pres, index, count, maxWidth);
+        }
+
+        // Xuất một slide ra PNG rộng maxWidth (giữ tỉ lệ slide) - dùng chung cho app.screenshot và wpp.renderSlide.
+        internal static Dictionary<string, object> ExportSlide(dynamic pres, int index, int count, int maxWidth)
+        {
             double slideWidth = Convert.ToDouble(pres.PageSetup.SlideWidth);
             double slideHeight = Convert.ToDouble(pres.PageSetup.SlideHeight);
             int width = maxWidth;
@@ -427,8 +448,9 @@ namespace AxiomOffice.Bridge
             {
                 throw new InvalidOperationException("'prompt' is required");
             }
-            // Giai đoạn 4 (New_arch.md 7.7): chạy qua Agent Core khi có (skill, memory, policy, MCP), dịch kết quả về
-            // đúng hình dạng cũ; Core không dùng được (chưa nhận lượt chạy) thì chạy agent in-process như trước.
+            // docs/architecture/core.md 7.7: chạy qua Agent Core (skill, memory, policy, MCP), dịch kết quả về đúng hình dạng cũ.
+            // Core không dùng được (chưa nhận lượt chạy, hoặc chế độ companion không có add-in) thì báo lỗi: không còn agent
+            // in-process bỏ qua policy/xác nhận/audit.
             Ai.LlmResult agentResult = null;
             var connect = host as Connect;
             if (connect != null && Ai.CoreClient.Instance.Enabled)
@@ -443,10 +465,10 @@ namespace AxiomOffice.Bridge
             }
             if (agentResult == null)
             {
-                agentResult = Ai.AiAgent.Run(host, prompt, delegate(string line)
-                {
-                    Logger.Info("ai.ask progress: " + line);
-                });
+                agentResult = new Ai.LlmResult();
+                agentResult.Error = connect == null
+                    ? "ai.ask needs Agent Core, which runs only inside the add-in (not in companion mode)"
+                    : "Agent Core is not running (" + (Ai.CoreClient.Instance.LastError ?? "unknown reason") + ")";
             }
             var reply = new Dictionary<string, object>();
             reply["ok"] = agentResult.Ok;
@@ -511,12 +533,18 @@ namespace AxiomOffice.Bridge
             else if (host.AppKind == "wpp")
             {
                 info["presentations"] = Safe(() => Convert.ToInt32(app.Presentations.Count));
-                info["activePresentation"] = Safe(() => new Dictionary<string, object>
+                info["activePresentation"] = Safe(() =>
                 {
-                    { "name", Convert.ToString(app.ActivePresentation.Name) },
-                    { "fullName", Convert.ToString(app.ActivePresentation.FullName) },
-                    { "saved", Convert.ToBoolean(app.ActivePresentation.Saved) },
-                    { "slides", Convert.ToInt32(app.ActivePresentation.Slides.Count) }
+                    // Bài bridge đang làm (có thể khác ActivePresentation thật khi PowerPoint không chịu
+                    // chuyển cửa sổ): pane/agent phải đọc đúng bài đích.
+                    dynamic pres = CurrentPresentation(app);
+                    return new Dictionary<string, object>
+                    {
+                        { "name", Convert.ToString(pres.Name) },
+                        { "fullName", Convert.ToString(pres.FullName) },
+                        { "saved", Convert.ToBoolean(pres.Saved) },
+                        { "slides", Convert.ToInt32(pres.Slides.Count) }
+                    };
                 });
             }
             return info;

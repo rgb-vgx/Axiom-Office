@@ -10,8 +10,8 @@ import (
 )
 
 // Token thiet ke (skills/_design/tokens.json) la DU LIEU, khong phai van ban de chep lai: file tham chieu
-// chi duoc ghi TEN token, de sua tokens.json la moi cho theo (New_arch.md muc 8.4.6). Do 11/10/2026
-// (docs/skills-review.md muc 4.1): bo-cuc.md chep cung co chu (40/32/18) va mau (#1F4E79, #595959...)
+// chi duoc ghi TEN token, de sua tokens.json la moi cho theo (docs/architecture/core.md muc 8.4.6). Do 11/10/2026
+// (docs/research/skills-review.md muc 4.1): bo-cuc.md chep cung co chu (40/32/18) va mau (#1F4E79, #595959...)
 // lech han tokens.json, nen bao-cao-thang va trinh-bay-chuyen-nghiep dung cung nhau ra hai co tieu de
 // khac nhau - va sua tokens.json khong lan toi bo-cuc.md.
 var (

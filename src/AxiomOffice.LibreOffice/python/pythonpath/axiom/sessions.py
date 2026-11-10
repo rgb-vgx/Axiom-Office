@@ -1,5 +1,5 @@
 """Session registry: moi (process, loai app) mot file {pid}-{kind}.json trong thu muc sessions chung voi
-add-in (Windows) de Agent Core / MCP tim thay bridge (LibreOffice_arch.md muc 5.2). Heartbeat 25s."""
+add-in (Windows) de Agent Core / MCP tim thay bridge (docs/architecture/libreoffice.md muc 5.2). Heartbeat 25s."""
 from __future__ import annotations
 
 import datetime

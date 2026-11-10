@@ -239,9 +239,65 @@ func TestOncePerReplyBlocksSecondCall(t *testing.T) {
 	client.RunAgent(context.Background(), "s", nil, "u", mutatingTools(),
 		func(ctx context.Context, call ToolCall) ToolResult {
 			executed++
-			return ToolResult{CallID: call.ID, Name: call.Name, OK: true, ResultJSON: `{"ok":true}`}
+			// Mutating: tool ghi (write_todos) - lan goi y het o phan hoi sau khong bi docStateGuard thay bang "khong doi".
+			return ToolResult{CallID: call.ID, Name: call.Name, OK: true, Mutating: true, ResultJSON: `{"ok":true}`}
 		}, options, AgentCallbacks{})
 	if executed != 2 {
 		t.Fatalf("moi phan hoi chi chay mot lan: chay %d lan qua 2 phan hoi", executed)
+	}
+}
+
+// RepairToolCall sua ten truoc khi ghi luot assistant: lich su gui lai nha cung cap, ToolStarted va executor
+// deu thay cuoc goi da sua; dem vao RepairedToolCalls.
+func TestRepairToolCallRewritesBeforeHistory(t *testing.T) {
+	wrong := `{"choices":[{"message":{"role":"assistant","content":null,"tool_calls":[` +
+		`{"id":"a","function":{"name":"writer.getText","arguments":"{}"}}]}}],"usage":{"prompt_tokens":10,"completion_tokens":1}}`
+	server, bodies := verifyServer(t, []string{wrong, strings.Replace(replyText, "%s", "xong", 1)})
+	client := NewClient(server.Client(), "openai", server.URL, "", "m")
+	options := DefaultAgentOptions()
+	options.Verify = false
+	options.RepairToolCall = func(call ToolCall) (ToolCall, bool) {
+		if call.Name != "writer.getText" {
+			return call, false
+		}
+		return ToolCall{ID: call.ID, Name: "t", Arguments: `{"action":"writer.getText"}`}, true
+	}
+	started, executed := []string{}, []string{}
+	result := client.RunAgent(context.Background(), "s", nil, "u", mutatingTools(),
+		func(ctx context.Context, call ToolCall) ToolResult {
+			executed = append(executed, call.Name)
+			return ToolResult{CallID: call.ID, Name: call.Name, OK: true, ResultJSON: `{"ok":true}`}
+		}, options, AgentCallbacks{ToolStarted: func(call ToolCall) { started = append(started, call.Name) }})
+	if !result.OK || result.RepairedToolCalls != 1 || strings.Join(started, ",") != "t" || strings.Join(executed, ",") != "t" {
+		t.Fatalf("%+v started=%v executed=%v", result, started, executed)
+	}
+	all := bodies()
+	if len(all) < 2 || strings.Contains(all[1], "writer.getText\",\"arguments") || !strings.Contains(all[1], `"name":"t"`) {
+		t.Fatalf("lich su phai mang ten da sua: %v", all)
+	}
+}
+
+// Doi so hong (model dut giua chung): lenh khong chay, model nhan loi ro; lich su gui lai mang "{}" chu khong mang chuoi
+// hong - nha cung cap tu choi ca request khi arguments khong phai JSON (bo do 27/10/2026, ca x11).
+func TestInvalidArgumentsNotExecutedNorResent(t *testing.T) {
+	cut := `{"choices":[{"message":{"role":"assistant","content":null,"tool_calls":[` +
+		`{"id":"a","function":{"name":"t","arguments":"{\"source\": \"Data!A1:D13\", \"kpis\": [{\"label\": \"Tổng"}}]}}],"usage":{"prompt_tokens":10,"completion_tokens":1}}`
+	server, bodies := verifyServer(t, []string{cut, strings.Replace(replyText, "%s", "xong", 1)})
+	client := NewClient(server.Client(), "openai", server.URL, "", "m")
+	options := DefaultAgentOptions()
+	options.Verify = false
+	executed := 0
+	finished := []ToolResult{}
+	result := client.RunAgent(context.Background(), "s", nil, "u", mutatingTools(),
+		func(ctx context.Context, call ToolCall) ToolResult {
+			executed++
+			return ToolResult{CallID: call.ID, Name: call.Name, OK: true, ResultJSON: `{"ok":true}`}
+		}, options, AgentCallbacks{ToolFinished: func(result ToolResult) { finished = append(finished, result) }})
+	if !result.OK || executed != 0 || len(finished) != 1 || finished[0].OK || !strings.Contains(finished[0].ResultJSON, "NOTHING ran") {
+		t.Fatalf("lenh doi so hong khong duoc chay, phai bao loi: %+v executed=%d finished=%+v", result, executed, finished)
+	}
+	all := bodies()
+	if len(all) < 2 || strings.Contains(all[1], `"arguments":"{\"source`) || !strings.Contains(all[1], `"arguments":"{}"`) {
+		t.Fatalf("lich su phai mang {} thay chuoi hong: %v", all)
 	}
 }

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Sửa bằng AI</title>
+<!--
+  Khung chat mini canh doan boi den (docs/architecture/ribbon-ui.md, "Trong khung chat"). Mo bang Application.ShowDialog tu menu
+  chuot phai (main.js: openMini): "Sua bang AI > Trau chuot" mo ra va chay muc do ngay (?quick=polish); "Hoi AI ve
+  doan nay" mo ra trong, cho chon chip hoac go yeu cau. Go them ("ngan hon nua") la luot tiep trong CUNG hoi thoai.
+
+  Logic dung chung pane-core.js voi khung chat lon (gui, huy, hoan tac, dich loi). Khac duy nhat: create({
+  requireSelection: true }) - moi luot deu bat buoc co doan boi den, khong co thi Core dung ngay (kind "selection"),
+  de mot cau go tay khong bi hieu thanh sua CA tai lieu.
+
+  :root trong pane.css CHEP NGUYEN sang mini.css - spec tests/wps/test_mini_view.mjs bat hai ban phai giong het.
+  ES5 only (CEF Chrome 87).
+-->
+<script src="pane-dom.js"></script>
+<script src="pane-core.js"></script>
+<link rel="stylesheet" href="mini.css">
+</head>
+<body>
+<div id="mini">
+  <header id="miniHeader">
+    <span class="dot" aria-hidden="true"></span>
+    <div class="miniHead">
+      <span id="miniTitle">Sửa bằng AI</span>
+      <span id="miniSelection">Đoạn đang bôi đen</span>
+    </div>
+    <span id="miniModel"></span>
+    <button id="miniCloseX" class="miniClose" type="button" data-act="close" title="Đóng (Esc)"
+            aria-label="Đóng">×</button>
+  </header>
+  <main id="miniBody" role="log" aria-live="polite" aria-label="Kết quả"></main>
+  <div id="miniComposer">
+    <textarea id="miniInput" rows="1" aria-label="Yêu cầu cho đoạn đang bôi đen" placeholder="Yêu cầu cho đoạn đang bôi đen…"></textarea>
+    <button id="miniSend" class="btnPrimary" type="button" data-act="send" title="Enter để gửi · Shift+Enter xuống dòng">Gửi</button>
+  </div>
+  <footer id="miniFooter">
+    <span id="miniStatus">Sẵn sàng</span>
+    <button id="miniUndo" class="link" type="button" data-act="undo" hidden>Hoàn tác</button>
+    <button id="miniStop" class="link" type="button" data-act="stop" hidden>Dừng</button>
+    <button id="miniClose" class="link" type="button" data-act="close">Đóng</button>
+  </footer>
+</div>
+<script src="mini.js"></script>
+</body>
+</html>

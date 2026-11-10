@@ -1,0 +1,643 @@
+{
+  "cards-3": [
+    {
+      "action": "wpp.addSlideFromTemplate",
+      "params": {
+        "expect": "TextBox 2",
+        "kind": 2,
+        "tag": "src:3-4",
+        "template": "<template>"
+      }
+    },
+    {
+      "action": "wpp.setShapeText",
+      "params": {
+        "shape": "TextBox 2",
+        "slide": 5,
+        "text": "VAI TRÒ XQUANG"
+      }
+    },
+    {
+      "action": "wpp.deleteShapes",
+      "params": {
+        "emptyPlaceholders": true,
+        "shapes": [
+          "Rectangle 4",
+          "TextBox 7",
+          "Rectangle 9",
+          "TextBox 12",
+          "Rectangle 14",
+          "TextBox 17"
+        ],
+        "slide": 5
+      }
+    },
+    {
+      "action": "wpp.addParagraphs",
+      "params": {
+        "accent": "#1F4E79",
+        "anchor": "middle",
+        "box": "rounded",
+        "color": "#262626",
+        "fill": "#E9EDF2",
+        "font": "Arial",
+        "fontSize": 22,
+        "height": 123.3,
+        "left": 36,
+        "line": "#9AAFC3",
+        "minFontSize": 12,
+        "paragraphs": [
+          {
+            "t": "Ưu điểm",
+            "b": true,
+            "a": "center"
+          },
+          {
+            "t": "Rẻ, nhanh"
+          }
+        ],
+        "slide": 5,
+        "top": 268.8,
+        "width": 278.7
+      }
+    },
+    {
+      "action": "wpp.addParagraphs",
+      "params": {
+        "accent": "#1F4E79",
+        "anchor": "middle",
+        "box": "rounded",
+        "color": "#262626",
+        "fill": "#E9EDF2",
+        "font": "Arial",
+        "fontSize": 22,
+        "height": 123.3,
+        "left": 328.7,
+        "line": "#9AAFC3",
+        "minFontSize": 12,
+        "paragraphs": [
+          {
+            "t": "Hạn chế",
+            "b": true,
+            "a": "center"
+          },
+          {
+            "t": "Độ nhạy thấp"
+          }
+        ],
+        "slide": 5,
+        "top": 268.8,
+        "width": 278.7
+      }
+    },
+    {
+      "action": "wpp.addParagraphs",
+      "params": {
+        "accent": "#1F4E79",
+        "anchor": "middle",
+        "box": "rounded",
+        "color": "#262626",
+        "fill": "#E9EDF2",
+        "font": "Arial",
+        "fontSize": 22,
+        "height": 123.3,
+        "left": 621.3,
+        "line": "#9AAFC3",
+        "minFontSize": 12,
+        "paragraphs": [
+          {
+            "t": "Chỉ định",
+            "b": true,
+            "a": "center"
+          },
+          {
+            "t": "Nghi thủng"
+          },
+          {
+            "t": "Nghi tắc ruột"
+          }
+        ],
+        "slide": 5,
+        "top": 268.8,
+        "width": 278.7
+      }
+    },
+    {
+      "action": "wpp.setNotes",
+      "params": {
+        "slide": 5,
+        "text": "ghi chu"
+      }
+    },
+    {
+      "action": "wpp.checkLayout",
+      "params": {
+        "slide": 5
+      }
+    }
+  ],
+  "cards-4": [
+    {
+      "action": "wpp.addSlideFromTemplate",
+      "params": {
+        "expect": "TextBox 2",
+        "kind": 2,
+        "tag": "src:3-4",
+        "template": "<template>"
+      }
+    },
+    {
+      "action": "wpp.setShapeText",
+      "params": {
+        "shape": "TextBox 2",
+        "slide": 5,
+        "text": "BỐN NHIỆM VỤ"
+      }
+    },
+    {
+      "action": "wpp.deleteShapes",
+      "params": {
+        "emptyPlaceholders": true,
+        "shapes": [
+          "Rectangle 4",
+          "TextBox 7",
+          "Rectangle 9",
+          "TextBox 12",
+          "Rectangle 14",
+          "TextBox 17"
+        ],
+        "slide": 5
+      }
+    },
+    {
+      "action": "wpp.addParagraphs",
+      "params": {
+        "accent": "#1F4E79",
+        "anchor": "middle",
+        "box": "rounded",
+        "color": "#262626",
+        "fill": "#E9EDF2",
+        "font": "Arial",
+        "fontSize": 22,
+        "height": 120,
+        "left": 36,
+        "line": "#9AAFC3",
+        "minFontSize": 12,
+        "paragraphs": [
+          {
+            "t": "A",
+            "b": true,
+            "a": "center"
+          },
+          {
+            "t": "a"
+          }
+        ],
+        "slide": 5,
+        "top": 203.4,
+        "width": 425
+      }
+    },
+    {
+      "action": "wpp.addParagraphs",
+      "params": {
+        "accent": "#1F4E79",
+        "anchor": "middle",
+        "box": "rounded",
+        "color": "#262626",
+        "fill": "#E9EDF2",
+        "font": "Arial",
+        "fontSize": 22,
+        "height": 120,
+        "left": 475,
+        "line": "#9AAFC3",
+        "minFontSize": 12,
+        "paragraphs": [
+          {
+            "t": "B",
+            "b": true,
+            "a": "center"
+          },
+          {
+            "t": "b"
+          }
+        ],
+        "slide": 5,
+        "top": 203.4,
+        "width": 425
+      }
+    },
+    {
+      "action": "wpp.addParagraphs",
+      "params": {
+        "accent": "#1F4E79",
+        "anchor": "middle",
+        "box": "rounded",
+        "color": "#262626",
+        "fill": "#E9EDF2",
+        "font": "Arial",
+        "fontSize": 22,
+        "height": 120,
+        "left": 36,
+        "line": "#9AAFC3",
+        "minFontSize": 12,
+        "paragraphs": [
+          {
+            "t": "C",
+            "b": true,
+            "a": "center"
+          },
+          {
+            "t": "c"
+          }
+        ],
+        "slide": 5,
+        "top": 337.4,
+        "width": 425
+      }
+    },
+    {
+      "action": "wpp.addParagraphs",
+      "params": {
+        "accent": "#1F4E79",
+        "anchor": "middle",
+        "box": "rounded",
+        "color": "#262626",
+        "fill": "#E9EDF2",
+        "font": "Arial",
+        "fontSize": 22,
+        "height": 120,
+        "left": 475,
+        "line": "#9AAFC3",
+        "minFontSize": 12,
+        "paragraphs": [
+          {
+            "t": "D",
+            "b": true,
+            "a": "center"
+          },
+          {
+            "t": "d"
+          }
+        ],
+        "slide": 5,
+        "top": 337.4,
+        "width": 425
+      }
+    },
+    {
+      "action": "wpp.setNotes",
+      "params": {
+        "slide": 5,
+        "text": "ghi chu"
+      }
+    },
+    {
+      "action": "wpp.checkLayout",
+      "params": {
+        "slide": 5
+      }
+    }
+  ],
+  "content-pictures": [
+    {
+      "action": "wpp.addSlideFromTemplate",
+      "params": {
+        "expect": "TextBox 2",
+        "kind": 2,
+        "tag": "src:3-4",
+        "template": "<template>"
+      }
+    },
+    {
+      "action": "wpp.setShapeText",
+      "params": {
+        "shape": "TextBox 2",
+        "slide": 5,
+        "text": "THỦNG TẠNG RỖNG"
+      }
+    },
+    {
+      "action": "wpp.deleteShapes",
+      "params": {
+        "emptyPlaceholders": true,
+        "shapes": [
+          "Rectangle 4",
+          "TextBox 7",
+          "Rectangle 9",
+          "TextBox 12",
+          "Rectangle 14",
+          "TextBox 17"
+        ],
+        "slide": 5
+      }
+    },
+    {
+      "action": "wpp.addParagraphs",
+      "params": {
+        "accent": "#1F4E79",
+        "anchor": "top",
+        "color": "#262626",
+        "font": "Arial",
+        "fontSize": 24,
+        "height": 0,
+        "left": 0,
+        "minFontSize": 14,
+        "paragraphs": [
+          {
+            "t": "Liềm hơi dưới hoành"
+          }
+        ],
+        "slide": 5,
+        "top": 0,
+        "width": 0
+      }
+    },
+    {
+      "action": "wpp.addParagraphs",
+      "params": {
+        "accent": "#1F4E79",
+        "anchor": "top",
+        "color": "#595959",
+        "font": "Arial",
+        "fontSize": 12,
+        "height": 25,
+        "left": 36,
+        "minFontSize": 10,
+        "paragraphs": [
+          {
+            "t": "Trái: đứng • Phải: nằm",
+            "i": true,
+            "a": "center"
+          }
+        ],
+        "slide": 5,
+        "top": 429,
+        "width": 864
+      }
+    },
+    {
+      "action": "wpp.copyPicture",
+      "params": {
+        "format": "jpg",
+        "from": "C:\\nguon\\bai-cu.pptx",
+        "fromSlide": 7,
+        "height": 266.2,
+        "left": 184.7,
+        "overlays": false,
+        "shape": "Picture 4",
+        "slide": 5,
+        "top": 156.8,
+        "width": 354.9
+      }
+    },
+    {
+      "action": "wpp.copyPicture",
+      "params": {
+        "format": "jpg",
+        "from": "C:\\nguon\\bai-cu.pptx",
+        "fromSlide": 7,
+        "height": 266.2,
+        "left": 551.6,
+        "overlays": false,
+        "shape": "Picture 5",
+        "slide": 5,
+        "top": 156.8,
+        "width": 199.6
+      }
+    },
+    {
+      "action": "wpp.addParagraphs",
+      "params": {
+        "accent": "#1F4E79",
+        "anchor": "middle",
+        "box": "rounded",
+        "color": "#262626",
+        "fill": "#E4EAEF",
+        "font": "Arial",
+        "fontSize": 15,
+        "height": 38,
+        "left": 36,
+        "line": "#1F4E79",
+        "minFontSize": 12,
+        "paragraphs": [
+          {
+            "t": "⚠ Bắt buộc lấy vòm hoành"
+          }
+        ],
+        "slide": 5,
+        "top": 466,
+        "width": 864
+      }
+    },
+    {
+      "action": "wpp.setNotes",
+      "params": {
+        "slide": 5,
+        "text": "ghi chu"
+      }
+    },
+    {
+      "action": "wpp.checkLayout",
+      "params": {
+        "slide": 5
+      }
+    }
+  ],
+  "content-text": [
+    {
+      "action": "wpp.addSlideFromTemplate",
+      "params": {
+        "expect": "TextBox 2",
+        "kind": 2,
+        "tag": "src:3-4",
+        "template": "<template>"
+      }
+    },
+    {
+      "action": "wpp.setShapeText",
+      "params": {
+        "shape": "TextBox 2",
+        "slide": 5,
+        "text": "XQUANG BKCB – TƯ THẾ ĐỨNG"
+      }
+    },
+    {
+      "action": "wpp.deleteShapes",
+      "params": {
+        "emptyPlaceholders": true,
+        "shapes": [
+          "Rectangle 4",
+          "TextBox 7",
+          "Rectangle 9",
+          "TextBox 12",
+          "Rectangle 14",
+          "TextBox 17"
+        ],
+        "slide": 5
+      }
+    },
+    {
+      "action": "wpp.addParagraphs",
+      "params": {
+        "accent": "#1F4E79",
+        "anchor": "middle",
+        "color": "#262626",
+        "font": "Arial",
+        "fontSize": 24,
+        "height": 347.2,
+        "left": 36,
+        "minFontSize": 14,
+        "paragraphs": [
+          {
+            "t": "**Đứng**, bụng áp phim"
+          },
+          {
+            "t": "Tia trung tâm ở đường giữa"
+          }
+        ],
+        "slide": 5,
+        "top": 156.8,
+        "width": 864
+      }
+    },
+    {
+      "action": "wpp.setNotes",
+      "params": {
+        "slide": 5,
+        "text": "ghi chu"
+      }
+    },
+    {
+      "action": "wpp.checkLayout",
+      "params": {
+        "slide": 5
+      }
+    }
+  ],
+  "cover": [
+    {
+      "action": "wpp.addSlideFromTemplate",
+      "params": {
+        "expect": "TextBox 3",
+        "kind": 1,
+        "tag": "src:3-4",
+        "template": "<template>"
+      }
+    },
+    {
+      "action": "wpp.setShapeText",
+      "params": {
+        "shape": "TextBox 3",
+        "slide": 5,
+        "text": "CĐHA CẤP CỨU BỤNG"
+      }
+    },
+    {
+      "action": "wpp.setShapeText",
+      "params": {
+        "shape": "TextBox 6",
+        "slide": 5,
+        "text": "ThS. Phan Nhật Anh"
+      }
+    },
+    {
+      "action": "wpp.deleteShapes",
+      "params": {
+        "emptyPlaceholders": true,
+        "shapes": [],
+        "slide": 5
+      }
+    },
+    {
+      "action": "wpp.setNotes",
+      "params": {
+        "slide": 5,
+        "text": "ghi chu bia"
+      }
+    },
+    {
+      "action": "wpp.checkLayout",
+      "params": {
+        "slide": 5
+      }
+    }
+  ],
+  "table": [
+    {
+      "action": "wpp.addSlideFromTemplate",
+      "params": {
+        "expect": "TextBox 2",
+        "kind": 2,
+        "tag": "src:3-4",
+        "template": "<template>"
+      }
+    },
+    {
+      "action": "wpp.setShapeText",
+      "params": {
+        "shape": "TextBox 2",
+        "slide": 5,
+        "text": "SO SÁNH KỸ THUẬT"
+      }
+    },
+    {
+      "action": "wpp.deleteShapes",
+      "params": {
+        "emptyPlaceholders": true,
+        "shapes": [
+          "Rectangle 4",
+          "TextBox 7",
+          "Rectangle 9",
+          "TextBox 12",
+          "Rectangle 14",
+          "TextBox 17"
+        ],
+        "slide": 5
+      }
+    },
+    {
+      "action": "wpp.addGrid",
+      "params": {
+        "band": "#E9EDF2",
+        "font": "Arial",
+        "header": "#1F4E79",
+        "height": 347.2,
+        "left": 36,
+        "slide": 5,
+        "top": 156.8,
+        "values": [
+          [
+            "Bệnh cảnh",
+            "Xquang",
+            "CT"
+          ],
+          [
+            "Thủng tạng rỗng",
+            "+",
+            "++"
+          ],
+          [
+            "Tắc ruột",
+            "+",
+            "++"
+          ]
+        ],
+        "width": 864
+      }
+    },
+    {
+      "action": "wpp.setNotes",
+      "params": {
+        "slide": 5,
+        "text": "ghi chu"
+      }
+    },
+    {
+      "action": "wpp.checkLayout",
+      "params": {
+        "slide": 5
+      }
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-// Spec T7 (docs/wps-bridge.md muc 5): 23 lenh `et.*` (Spreadsheets) cua JS add-in WPS.
+// Spec T7 (docs/architecture/wps-bridge.md muc 5): 23 lenh `et.*` (Spreadsheets) cua JS add-in WPS.
 //
 //   node --test tests/wps/test_addin_et.mjs
 //
@@ -15,6 +15,8 @@
 //   et.renameSheet {sheet, name}           -> {sheet, sheets}
 //   et.activateSheet {sheet}               -> {active}
 //   et.readRange {range, sheet?, formulas?}-> {sheet, range, values} | {sheet, range, formulas}
+//   et.readRanges {reads:[{range, sheet?, formulas?}], sheet?, formulas?}
+//                                          -> {reads:[{sheet, range, values|formulas}], cells}
 //   et.writeRange {range, values, sheet?}  -> {written, sheet}
 //   et.importCsv {path, range?, sheet?, delimiter?, encoding?}
 //                                          -> {path, sheet, range, rows, columns, cells}
@@ -33,7 +35,7 @@
 //   et.closeAll {}                         -> {closed, rescued}
 //   et.checkRange {range?, sheet?}         -> {sheet, range, usedRange, table, rows, cols, title, columns, issueCount, issues}
 //
-// Khac ban LibreOffice (do WPS that, ghi o docs/wps-bridge.md muc 6 va REFERENCE.md):
+// Khac ban LibreOffice (do WPS that, ghi o docs/architecture/wps-bridge.md muc 6 va REFERENCE.md):
 // - `undo`: ET khong co UndoRecord. Add-in TU CHUP gia tri o truoc khi ghi (va ghi nhan sheet do luot
 //   truoc tao), roi khoi phuc theo thu tu nguoc. Chi hoan tac duoc trong cung phien add-in.
 // - `exportPdf`: API goc (ExportAsFixedFormat/SaveAs .pdf) bao thanh cong ma KHONG ghi file, nen add-in
@@ -47,7 +49,7 @@
 // - `importCsv`: WPS chi doc duoc file qua `FileSystem.ReadFile` (UTF-8; `readFileString`/`writeFileString` bi
 //   sandbox - nem voi moi duong dan co dau phan cach). Nen `encoding` chi nhan cac cach viet UTF-8
 //   (mac dinh "utf-8-sig"; chuan hoa "_" -> "-", khong phan biet hoa/thuong), giao thuc khac bi tu choi ro rang
-//   thay vi am tham tra ve chuoi hong; BOM dau file bi cat. Chi tiet: docs/wps-bridge.md muc 6, REFERENCE.md.
+//   thay vi am tham tra ve chuoi hong; BOM dau file bi cat. Chi tiet: docs/architecture/wps-bridge.md muc 6, REFERENCE.md.
 // - Ghi o: ET EP KIEU chuoi trong nhu so / nhu ngay khi gan vao `Value2` ("42" -> 42, "01/01" -> ngay), khac
 //   LibreOffice (giu nguyen chuoi). Fake CHUA mo phong viec ep kieu nay (xem ghi chu o setCellScalar trong
 //   addin_fake.mjs): spec o day kiem hanh vi cua add-in, khong kiem lai luat ep kieu cua WPS.
@@ -62,6 +64,20 @@ const ET_COMMANDS = [
   "et.activateSheet", "et.readRange", "et.writeRange", "et.importCsv", "et.writeRanges", "et.fillRange",
   "et.formatRange", "et.setConditionalFormat", "et.listConditionalFormats", "et.addChart", "et.listCharts",
   "et.undo", "et.exportPdf", "et.save", "et.saveAs", "et.closeAll", "et.checkRange",
+  // Plan 21 P1 (26/10/2026): co trong catalog, add-in WPS chua co handler (test_addin.mjs CHUA_CO_HANDLER).
+  "et.createTable", "et.freezePanes", "et.setValidation",
+  // Plan 21 P3 (27/10/2026): idem (riêng et.readRanges đã có handler từ 28/10/2026 - đường data cho
+  // tool `trace_formula` của Core, orchestrator chỉ gắn tool khi bridge khai đủ et.readRanges + et.sheetInfo).
+  "et.deleteSheet", "et.formatRanges", "et.whatIf",
+  // et.readRanges (28/10/2026): đọc nhiều vùng trong MỘT lời gọi (contract C# CommandDispatcher.SpreadsheetBatch.cs),
+  // đường data cho tool trace_formula (core-go/internal/tools/trace_formula.go).
+  "et.readRanges",
+  // Trich dan bam duoc (27/10/2026): pane goi khi nguoi dung bam [Sheet!A1].
+  "et.goto",
+  // Sap xep / loc (27/10/2026): add-in WPS chua co handler (test_addin.mjs CHUA_CO_HANDLER).
+  "et.sort", "et.filter",
+  // PivotTable / xuat bieu do thanh anh (27/10/2026): idem.
+  "et.pivot", "et.exportChart",
 ];
 
 const MUTATING = ["et.addSheet", "et.renameSheet", "et.writeRange", "et.importCsv", "et.writeRanges",
@@ -71,10 +87,10 @@ const MUTATING = ["et.addSheet", "et.renameSheet", "et.writeRange", "et.importCs
 // van chay voi `range` mac dinh "A1" (metadata ghi required nhung handler co default) - add-in giu
 // dung hanh vi runtime cua LibreOffice, xem test readRange ben duoi.
 const REQUIRES_PARAM = ["et.open", "et.renameSheet", "et.activateSheet", "et.writeRange", "et.importCsv",
-  "et.writeRanges", "et.fillRange", "et.formatRange", "et.setConditionalFormat", "et.addChart",
+  "et.writeRanges", "et.readRanges", "et.fillRange", "et.formatRange", "et.setConditionalFormat", "et.addChart",
   "et.exportPdf", "et.saveAs"];
 
-test("registry: du 23 lenh et.*, metadata giong het registry LibreOffice", () => {
+test("registry: du 27 lenh et.*, metadata giong het registry LibreOffice", () => {
   const ctx = loadAddin();
   const mine = addinCatalog(ctx).filter((c) => c.name.indexOf("et.") === 0);
   assertMetadata(ET_COMMANDS, mine);
@@ -270,6 +286,43 @@ test("et.writeRanges: gop nhieu vung, kiem HET truoc khi ghi", () => {
   assertFails(ctx, app, "et.writeRanges", { writes: [] }, /'writes' is required/);
 });
 
+test("et.readRanges: doc nhieu vung/nhieu sheet trong mot loi goi, mirror contract C# EtReadRanges", () => {
+  const ctx = loadAddin();
+  const app = makeEtApp({ sheets: [{ name: "Data", cells: { A1: 10, B1: 0 } }, { name: "Trống" }] });
+  run(ctx, app, "et.writeRange", { sheet: "Trống", range: "C1", values: [["=Data!A1+1"]] });
+
+  // Mot loi goi doc hai sheet: `sheet` top-level lam mac dinh; sheet theo dia chi "Trống!C1" hay sheet
+  // per-read thi uu tien; `formulas` per-read lam le top-level.
+  const out = run(ctx, app, "et.readRanges", { sheet: "Data", reads: [
+    { range: "A1:B1" },
+    { range: "Trống!C1", formulas: true },
+    { range: "A2:B2", sheet: "Trống" },
+  ] });
+  assert.deepEqual(out, { cells: 5, reads: [
+    { sheet: "Data", range: "A1:B1", values: [[10, 0]] },
+    { sheet: "Trống", range: "C1", formulas: [["=Data!A1+1"]] },
+    { sheet: "Trống", range: "A2:B2", values: [[null, null]] },
+  ] });
+
+  // Wrapper {items: ...} nhu et.writeRanges (Core co goi reads qua hop "items").
+  const wrap = run(ctx, app, "et.readRanges", { reads: { items: [{ range: "Data!B1" }] } });
+  assert.equal(wrap.cells, 1);
+  assert.deepEqual(wrap.reads[0].range, "B1");
+
+  // Loi mirror het message cua contract C# EtReadRanges.
+  assertFails(ctx, app, "et.readRanges", {}, /'reads' is required: a list of \{range, sheet\?, formulas\?\}/);
+  assertFails(ctx, app, "et.readRanges", { reads: [] }, /'reads' is required/);
+  assertFails(ctx, app, "et.readRanges", { reads: [["Data!A1"]] }, /reads\[0\] must be an object like \{range, sheet\?, formulas\?\}/);
+  assertFails(ctx, app, "et.readRanges", { reads: [{ sheet: "Data" }] }, /'reads\[0\]' needs 'range', e\.g\. 'A1:C10'/);
+  assertFails(ctx, app, "et.readRanges", { reads: [{ range: "DuLieu!A1" }] },
+    /'reads\[0\]': no sheet named 'DuLieu' \(sheets: Data, Trống\)/);
+  assertFails(ctx, app, "et.readRanges", { reads: [{ range: "Data!khongco" }] },
+    /'reads\[0\]': 'Data!khongco' is not a range address/);
+  // Vuot 4000 o: fail TRUOC khi doc bat ki vung nao (per contract C#, parse het roi moi read).
+  assertFails(ctx, app, "et.readRanges", { reads: [{ range: "Data!A1" }, { range: "A1:ZZ10000" }] },
+    /the ranges hold [0-9]+ cells \(limit 4000 per call\): read only the cells you need/);
+});
+
 test("et.fillRange: mot cong thuc roi dien, tham chieu tuong doi tu dich", () => {
   const ctx = loadAddin();
   const app = makeEtApp({ sheets: [{ name: "S", cells: { A1: 2, A2: 3, A3: 4 } }] });
@@ -434,6 +487,52 @@ test("et.undo {count}: go N buoc theo thu tu nguoc", () => {
   assert.deepEqual(run(ctx, app, "et.readRange", { range: "A1:A2" }).values, [["a0"], ["a1"]]);
 });
 
+test("et.undo: moi workbook giu ngan undo rieng, khong khoi phuc vao workbook dang active", () => {
+  const ctx = loadAddin();
+  const app = makeEtApp({ workbookName: "a.xlsx", sheets: [{ name: "S", cells: { A1: "a0" } }] });
+  const wb1 = app.Workbooks.Item(1);
+  run(ctx, app, "et.writeRange", { range: "A1", values: [["a1"]] });
+
+  // Workbook thu hai cung co sheet ten "S": khoa chi theo ten sheet se tron hai so vao nhau.
+  run(ctx, app, "et.newWorkbook");
+  run(ctx, app, "et.addSheet", { name: "S" });
+  run(ctx, app, "et.writeRange", { range: "A1", values: [["b1"]] });
+
+  const undone = run(ctx, app, "et.undo", { count: 3 });
+  assert.equal(undone.undone, 3, "buoc ghi cua hai so + buoc tao sheet");
+  assert.equal(wb1.Worksheets.Item(1).Cells.Item(1, 1).Value2, "a0",
+    "buoc cua workbook 1 phai khoi phuc trong workbook 1");
+  assert.equal(app.Workbooks.Item(2).Worksheets.Item(1).Cells.Item(1, 1).Value2, null,
+    "workbook 2 khong duoc nhan gia tri cua workbook 1");
+});
+
+test("et.undo: doi ten sheet thi buoc cu di theo ten moi, khong roi vao sheet dang active", () => {
+  const ctx = loadAddin();
+  const app = makeEtApp({ sheets: [{ name: "S", cells: { A1: "cu" } }, { name: "Khac", cells: { A1: "khac" } }] });
+  run(ctx, app, "et.writeRange", { range: "A1", values: [["moi"]] });
+  run(ctx, app, "et.renameSheet", { sheet: "S", name: "T" });
+  run(ctx, app, "et.activateSheet", { sheet: "Khac" });
+  run(ctx, app, "et.undo", { count: 2 });   // renameSheet giu cho "none", ghi de la buoc that
+
+  assert.equal(app.Workbooks.Item(1).Worksheets.Item(1).Cells.Item(1, 1).Value2, "cu",
+    "sheet T phai duoc khoi phuc");
+  assert.equal(app.Workbooks.Item(1).Worksheets.Item(2).Cells.Item(1, 1).Value2, "khac",
+    "sheet dang active khong duoc bi ghi de");
+});
+
+test("et.renameSheet: chuyen ca kho dinh dang co dieu kien sang ten moi", () => {
+  const ctx = loadAddin();
+  const app = makeEtApp({ sheets: [{ name: "S", cells: { A1: 1 } }] });
+  run(ctx, app, "et.setConditionalFormat", { range: "A1", rules: [{ operator: "less", formula1: "10" }] });
+  run(ctx, app, "et.renameSheet", { sheet: "S", name: "T" });
+  run(ctx, app, "et.addSheet", { name: "S" });
+
+  // Sheet "S" MOI khong co dinh dang nao. Neu kho cu con nam duoi khoa "S", lenh doc se tra nham
+  // dinh dang cua sheet cu.
+  const out = run(ctx, app, "et.listConditionalFormats", { sheet: "S", range: "A1" });
+  assert.deepEqual(out.formats, [], "kho dinh dang phai di theo sheet, khong o lai ten cu");
+});
+
 test("et.exportPdf: API goc khong ghi file -> tu dung PDF that", () => {
   const ctx = loadAddin();
   const app = makeEtApp({ sheets: [{ name: "S", cells: { A1: "Xin chao", A2: 42 } }] });
@@ -474,9 +573,16 @@ test("et.save / et.saveAs / et.closeAll", () => {
   assert.equal(closed.rescued.length, 1);
   assert.match(closed.rescued[0], /rescued/);
   const log = callsOf(app);
+  assert.ok(log.includes('FileSystem.Mkdir(/tmp/rescued)'), "phai tao thu muc cuu truoc khi SaveAs: " + log.slice(-8).join(" | "));
   // ET ghi nhat ky co tien to "Workbook." (ban WPP ghi tran "SaveAs(...)"), nen khop ca hai dang.
   assert.ok(log.some((line) => /(^|\.)SaveAs\(/.test(line) && line.indexOf("rescued") > 0),
     "phai SaveAs ban cuu ho truoc khi Close: " + log.slice(-6).join(" | "));
+
+  // So khong co ten (Name rong): ten mac dinh phai duoc dung, khong duoc thanh "/tmp/rescued/".
+  const unnamed = makeEtApp({ workbookName: "", sheets: [{ name: "S" }] });
+  unnamed.ActiveWorkbook.Saved = false;
+  const rescued = run(ctx, unnamed, "et.closeAll").rescued;
+  assert.deepEqual(rescued, ["/tmp/rescued/workbook.xlsx"]);
 });
 
 test("et.checkRange: soat bang du lieu (tieu de trong, kieu lan, so dang chu, o loi, numFmt)", () => {
@@ -541,10 +647,14 @@ test("et.* chi chay trong Spreadsheets; lenh la va object model hong khong throw
   assert.equal(unknown.ok, false);
   assert.match(String(unknown.error), /et\.khongCo/);
 
-  for (const action of ["et.listSheets", "et.sheetInfo", "et.readRange", "et.addChart"]) {
+  for (const action of ["et.listSheets", "et.sheetInfo", "et.readRange", "et.readRanges", "et.addChart"]) {
     const broken = mockApp([], { "app.Name": "WPS Spreadsheets",
       "app.ActiveWorkbook": throwing("boom"), "app.ActiveSheet": throwing("boom") });
-    assertFails(ctx, broken, action, { range: "A1:B2", type: "column" }, /boom/);
+    // et.readRanges kiem 'reads' TRUOC khi cham object model (mirror thu tu C# EtReadRanges:
+    // ParamObjects -> EnsureWorkbook), nen truong hop nay phai gui reads day du.
+    const paramsBroken = (action === "et.readRanges") ? { reads: [{ range: "A1:B2" }] }
+      : { range: "A1:B2", type: "column" };
+    assertFails(ctx, broken, action, paramsBroken, /boom/);
   }
 });
 
@@ -558,4 +668,92 @@ test("moi lenh et.* deu tra {ok:false, error} khi thieu tham so bat buoc, khong 
     assert.equal(reply.ok, false, command + " thieu tham so bat buoc phai ok:false, duoc " + JSON.stringify(reply));
     assert.ok(String(reply.error).length > 0, command + ": phai co thong diep loi");
   }
+});
+
+test("et.undo: moi lenh co co undo = dung mot buoc, ke ca lenh WPS chua hoan tac duoc", () => {
+  // Pane dem so lenh co co undo cua luot roi gui et.undo {count}. Lenh khong day buoc nao (dinh dang...) ma
+  // khong giu cho thi count lech: hoan tac luot nay go mat buoc cua luot TRUOC.
+  const ctx = loadAddin();
+  const app = makeEtApp({ sheets: [{ name: "S", cells: { A1: "a0", B1: "b0", C1: "c0" } }] });
+  run(ctx, app, "et.writeRange", { range: "A1", values: [["x"]] });           // luot truoc
+  run(ctx, app, "et.formatRange", { range: "A1", bold: true });               // luot nay: 1 lenh
+  const one = run(ctx, app, "et.undo", { count: 1 });
+  assert.equal(one.undone, 0, "formatRange khong hoan tac duoc tren WPS");
+  assert.deepEqual(one.skipped, ["et.formatRange"]);
+  assert.equal(run(ctx, app, "et.readRange", { range: "A1" }).values[0][0], "x", "khong duoc go buoc cua luot truoc");
+
+  // writeRanges ghi hai vung = MOT buoc (mot lenh), go mot lan la ve het.
+  run(ctx, app, "et.writeRanges", { writes: [{ range: "B1", values: [["y"]] }, { range: "C1", values: [["z"]] }] });
+  const two = run(ctx, app, "et.undo", { count: 1 });
+  assert.equal(two.undone, 1);
+  assert.deepEqual(run(ctx, app, "et.readRange", { range: "A1:C1" }).values, [["x", "b0", "c0"]]);
+});
+
+// ---- et.sort / et.filter (28/10/2026): WPS 12.1.2 co Range.Sort + Range.AutoFilter (spike thật) ----
+//
+// Contract: src/AxiomOffice/Bridge/CommandDispatcher.SpreadsheetSort.cs. WPS không có Worksheet.Sort
+// (Excel 2007+), nên handler chỉ dùng Range.Sort(Key1, Order1, Key2, Order2, Key3, Order3, Header).
+
+function sortableApp() {
+  return makeEtApp({ sheets: [{ name: "Data", cells: {
+    A1: "Ten", B1: "Diem", A2: "Chi", B2: 9, A3: "An", B3: 7, A4: "Binh", B4: 8,
+  } }] });
+}
+
+test("et.sort: sap xep theo tieu de, tra rows/keys va goi Range.Sort dung khoa + huong", () => {
+  const ctx = loadAddin();
+  const app = sortableApp();
+  const result = run(ctx, app, "et.sort", { range: "A1:B4", keys: [{ column: "Diem", order: "desc" }] });
+  assert.deepEqual(result, { sheet: "Data", range: "A1:B4", rows: 3, keys: [{ column: 2, order: "desc" }] });
+  const log = callsOf(app).join("\n");
+  assert.match(log, /\.Sort\(/, "phai goi Range.Sort: " + log);
+  assert.match(log, /Columns\.Item\(2\),2,/, "khoa thu hai phai la 2 (xlDescending): " + log);
+});
+
+test("et.sort: chu cot ('B') va nhieu khoa; header=false thi sap xep ca hang dau", () => {
+  const ctx = loadAddin();
+  const app = sortableApp();
+  const byLetter = run(ctx, app, "et.sort", { range: "A1:B4", keys: [{ column: "B" }] });
+  assert.deepEqual(byLetter.keys, [{ column: 2, order: "asc" }]);
+  assert.equal(byLetter.rows, 3);
+  const noHeader = run(ctx, app, "et.sort", { range: "A1:B4", header: false, keys: [{ column: "A", order: "desc" }] });
+  assert.equal(noHeader.rows, 4, "header=false: sap xep ca 4 hang");
+  const two = run(ctx, app, "et.sort", { range: "A1:B4", keys: [{ column: "B", order: "desc" }, { column: "A" }] });
+  assert.deepEqual(two.keys, [{ column: 2, order: "desc" }, { column: 1, order: "asc" }]);
+});
+
+test("et.sort: tu choi thieu range/keys, cot la, qua it hang - thong bao khop ban C#", () => {
+  const ctx = loadAddin();
+  const app = sortableApp();
+  assertFails(ctx, app, "et.sort", { keys: [{ column: "B" }] }, /'range' is required/);
+  assertFails(ctx, app, "et.sort", { range: "A1:B4" }, /'keys' must hold 1-3 items/);
+  assertFails(ctx, app, "et.sort", { range: "A1:B4", keys: [] }, /'keys' must hold 1-3 items/);
+  assertFails(ctx, app, "et.sort", { range: "A1:B4", keys: [{ column: "KhongCo" }] }, /not in the range \(headers: Ten, Diem\)/);
+  assertFails(ctx, app, "et.sort", { range: "A1:B2", keys: [{ column: "B" }] }, /too few rows/);
+  assertFails(ctx, app, "et.sort", { range: "A1:B4", keys: [{ column: "B" }, { column: "A" }, { column: "B" }, { column: "A" }] },
+    /'keys' must hold 1-3 items/);
+});
+
+test("et.filter: values -> AutoFilter(field, values, 7); criteria -> AutoFilter(field, criteria)", () => {
+  const ctx = loadAddin();
+  const app = sortableApp();
+  const kept = run(ctx, app, "et.filter", { range: "A1:B4", column: "Diem", values: [7, 9] });
+  assert.deepEqual(kept, { sheet: "Data", range: "A1:B4", column: 2 });
+  assert.match(callsOf(app).join("\n"), /AutoFilter\(2,.*7/s, "loc theo danh sach gia tri");
+
+  const byCriteria = run(ctx, app, "et.filter", { range: "A1:B4", column: "B", criteria: ">8" });
+  assert.equal(byCriteria.column, 2);
+  assert.match(callsOf(app).join("\n"), /AutoFilter\(2,>8\)/);
+});
+
+test("et.filter: clear bo loc (ShowAllData / AutoFilterMode=false), thieu tham so bao ro", () => {
+  const ctx = loadAddin();
+  const app = sortableApp();
+  run(ctx, app, "et.filter", { range: "A1:B4", column: "Diem", values: [7] });
+  const cleared = run(ctx, app, "et.filter", { range: "A1:B4", clear: true });
+  assert.deepEqual(cleared, { sheet: "Data", cleared: true });
+  assert.match(callsOf(app).join("\n"), /ShowAllData\(\)/, "FilterMode=true -> phai goi ShowAllData");
+  assertFails(ctx, app, "et.filter", { range: "A1:B4" }, /'column' is required/);
+  assertFails(ctx, app, "et.filter", { range: "A1:B4", column: "Diem" }, /give 'values'.*or 'criteria'/);
+  assertFails(ctx, app, "et.filter", { range: "A1:B4", column: "KhongCo", values: [1] }, /not in the range/);
 });

@@ -1,13 +1,258 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Ribbon cua add-in WPS (docs/architecture/ribbon-ui.md muc 2): cung mot tab, cung nhom, cung nhan voi ban Windows
+  (src/AxiomOffice/Ribbon/RibbonUi.cs, const RibbonXml) - nguoi dung doi may khong phai hoc lai.
+
+  Bon nguyen tac cua docs/architecture/ribbon-ui.md muc 1 duoc giu o day:
+   - Mot tab duy nhat "Axiom Office"; khong mo tab thu hai.
+   - Khong ve control gia: moi nut deu co duong that dung sau (lenh bridge da co, hoac route /wps/v1/*
+     ma pane goi duoc). Bon thu cua ban Windows CO Y KHONG ve o day, xem chu thich ngay duoi.
+   - getVisible chi de DON DEP (an nut khong dung cho app dang mo). WPS co the bo qua callback nay,
+     nen nut van phai tu noi duoc ly do khi bam sai app - do la viec cua tag + OnAction trong main.js,
+     khong phai cua getVisible.
+
+  Icon (giong ban Windows: moi nut deu co icon):
+   - Nut moi tu 01/11/2026 (nhom Ca tai lieu, Viet voi AI, Soat chinh ta ...) dung getImage -> SVG rieng trong
+     images/ (main.js ICON_FILES): bo imageMso cua WPS chi ve duoc vai ten (do 01/11, tests/wps/REFERENCE.md).
+   - Nut cu tren RIBBON dung imageMso = bo icon co san cua chinh WPS (do tren WPS 12.1.2 that 20/10/2026: hien
+     dung icon). WPS tra ten kieu Office qua bang lenh cua no - /opt/kingsoft/wps-office/office6/res/commands/
+     <wps|et|wpp>/ongmani/*.kuip, moi lenh co idMso="..." va icon="..._kd". CHI dung ten co trong bang do: ten
+     khong co thi WPS khong ve icon. Ten nao chi co o mot app (SlideShowFromCurrent: trinh chieu,
+     TableInsertDialogWord: van ban, DataValidation: bang tinh) thi chi dung cho nut cua dung app do (ba nut
+     Soat); nut dung chung ca ba app phai la ten co o CA BA bang. Bang ten + ly do: docs/architecture/ribbon-ui.md muc 5.3;
+     spec tests/wps/test_pane.mjs ghim.
+   - Menu CHUOT PHAI van dung getImage="ribbon.OnGetImage" -> main.js tra DUONG DAN TUONG DOI "images/<tag>.svg"
+     (askAi.svg, quickMenu.svg) - imageMso trong menu ngu canh chua thu. WPS KHONG nhan data URI cho getImage: no
+     phan giai chuoi tra ve nhu mot duong dan, truot thi ve dau "?" (SDK: @wps-jsapi/wps/js/ribbon.js).
+
+  Menu chuot phai (<contextMenus> cuoi tep): "Sua bang AI >" 15 muc (5 muc giong van trong menu con "Doi giong >")
+  + "Hoi AI ve doan nay", tren chu thuong va tren dong danh sach. Bam mot muc thi mo KHUNG CHAT MINI canh doan boi
+  den (mini.html, Application.ShowDialog); ban WPS khong co ShowDialog thi quay ve khung chat lon (main.js: openMini /
+  runQuick).
+  Ban Windows chi co "Hoi AI ve doan nay" va chi dua contextMenus cho Office (RibbonUi.cs: "WPS khong nhan chac").
+  WPS Linux THI NHAN: menu da hien va chay tren WPS that 20/10/2026 (docs/architecture/ribbon-ui.md muc 5.3).
+
+  Vi sao thieu bon control so voi ban Windows (xem docs/architecture/ribbon-ui.md muc 5):
+   - toggleButton "Nhin tai lieu" (visualQa): lenh app.screenshot ma Core gui qua bridge CHUA co handler
+     trong add-in WPS, nen bat toggle len la moi luot chay agent se hong o buoc "nhin tai lieu".
+   - dropDown "Tim web": chon nguon tim kiem ghi ca vao mcp.json (SearchSources.Activate), ma kenh
+     /wps/v1/* khong co route ghi mcp.json - ve ra thi nut khong lam duoc gi.
+   - button "Cong cu ngoai..." (MCP): GET /v1/mcp khong nam tren kenh /wps/v1/*, va cung khong co route ghi.
+   - button "Cai dat nang cao...": man hinh Thiet lap cua pane da chua DAY DU cac truong cau hinh
+     (endpoint, model, khoa, cac cong tac) - them mot nut mo dung man hinh do la nut gia.
+   - button "Tat Agent Core...": route POST /v1/admin/shutdown khong co tren kenh /wps/v1/*, va Core
+     chinh la thu dang phuc vu pane - tat no la lam pane chet ngay truoc mat nguoi dung.
+   - menu ngon ngu: WPS khong co tep lang/*.json (scripts/check_i18n.py chi quet ban C#), nhan o day la
+     tieng Viet co dinh.
+-->
 <customUI xmlns="http://schemas.microsoft.com/office/2006/01/customui" onLoad="ribbon.OnAddinLoad">
   <ribbon>
     <tabs>
       <tab id="axiomTab" label="Axiom Office">
-        <group id="axiomGroup" label="Axiom">
-          <button id="axiomReportBtn" label="Axiom" onAction="ribbon.OnAction"/>
-          <button id="axiomAskAI" label="Ask AI" onAction="ribbon.OnAction"/>
+
+        <!-- Thứ tự nhóm theo việc người dùng làm, không theo hệ thống: viết (Trợ lý) -> kiểm (Kiểm tra)
+             -> quản lý dữ liệu AI (Bộ nhớ, Kỹ năng) -> cấu hình/máy móc (Hệ thống, đẩy về cuối). Nhóm
+             "Quản lý" cũ gộp Bộ nhớ + Kỹ năng (dữ liệu AI) nhưng lại đứng cạnh Hệ thống (cấu hình), nên
+             người dùng phải đọc kỹ mới biết nhóm nào dùng hằng ngày. -->
+        <group id="axiomAssistantGroup" label="Trợ lý">
+          <!-- Nút chính của cả add-in: đứng một mình, nhãn nêu đúng việc (mở khung trò chuyện). -->
+          <button id="axiomAskAI" label="Ask AI" size="large" tag="askAi" onAction="ribbon.OnAction" imageMso="Help"
+                  screentip="Mở khung trò chuyện với AI"
+                  supertip="Hỏi AI ngay bên cạnh tài liệu. AI đọc và sửa trực tiếp tài liệu đang mở; mỗi lượt sửa là một bước Hoàn tác."/>
         </group>
+
+        <!-- Cả tài liệu (01/11/2026, đối chiếu tab WPS AI: Smart Create, Smart Edit, Generate Slides from Doc): MỌI lệnh AI
+             làm trên cả bài (doc:<id> của Core, agent/quickactions.go DocumentActions), không cần bôi đen - tách khỏi
+             "Viết với AI" (chỉ đoạn bôi đen) để "Tóm tắt" / "Tóm tắt cả bài" không đứng cạnh nhau. Soạn văn bản, Sửa
+             thông minh chờ người dùng gõ yêu cầu (Input). Tạo slide từ tài liệu hiện ở Presentation VÀ Writer: chạy trong
+             Presentation (bấm ở Writer thì Core chuyển lượt sang phiên Presentation đang mở - QuickAction.ShownIn), đọc
+             tài liệu Writer qua other_document. Icon: SVG riêng theo phong cách
+             icon nét của tab WPS AI (images/<tag, ':' thành '_'>.svg) - imageMso hợp nghĩa đều ra "?" trên WPS thật. -->
+        <group id="axiomCreateGroup" label="Cả tài liệu">
+          <button id="axiomSmartCreate" label="Soạn văn bản" tag="doc:smartCreate" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
+                  getImage="ribbon.OnGetImage" screentip="Soạn văn bản mới bằng AI"
+                  supertip="Gõ yêu cầu (loại văn bản, mục đích, nội dung chính); AI soạn cả bài vào cuối tài liệu với tiêu đề, đoạn văn, danh sách, bảng. Chỗ thiếu thông tin để trống cho bạn điền."/>
+          <button id="axiomSmartEdit" label="Sửa thông minh" tag="doc:smartEdit" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
+                  getImage="ribbon.OnGetImage" screentip="Sửa cả tài liệu theo yêu cầu"
+                  supertip="Gõ cách muốn sửa (viết gọn, đổi giọng, thống nhất thuật ngữ…); AI sửa cả bài, mỗi chỗ sửa là một Theo dõi thay đổi để bạn nhận hoặc từ chối."/>
+          <button id="axiomSummarizeDoc" label="Tóm tắt cả bài" tag="doc:summarizeDoc" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
+                  getImage="ribbon.OnGetImage" screentip="Tóm tắt cả tài liệu"
+                  supertip="Tóm tắt toàn bộ tài liệu theo từng mục, giữ đúng số liệu. Không cần bôi đen; AI trả lời trong khung chat, không sửa tài liệu."/>
+          <button id="axiomTranslateDoc" label="Dịch song ngữ cả bài" tag="doc:translateDoc" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
+                  getImage="ribbon.OnGetImage" screentip="Dịch song ngữ cả tài liệu"
+                  supertip="Chèn bản dịch ngay dưới từng đoạn (tiếng Việt sang tiếng Anh, ngôn ngữ khác sang tiếng Việt), giữ đoạn gốc. Không cần bôi đen."/>
+          <button id="axiomSlidesFromDoc" label="Tạo slide từ tài liệu" tag="doc:slidesFromDoc" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
+                  getImage="ribbon.OnGetImage" screentip="Tạo slide từ tài liệu Writer đang mở"
+                  supertip="AI đọc tài liệu văn bản đang mở trong WPS Writer và dựng bài trình chiếu trong WPS Presentation đang mở: bìa, các mục chính, số liệu, tóm tắt. Bấm được ở cả Writer lẫn Presentation; cần mở sẵn cả hai. Slide cũ được giữ nguyên."/>
+        </group>
+
+        <!-- Viết với AI: 15 mục "Sửa bằng AI" của menu chuột phải đưa lên ribbon (cùng tag quick:<id>, cùng nhãn bảng Core),
+             chỉ Writer. Bấm: giống menu chuột phải - khung chat mini cạnh đoạn bôi đen; chưa bôi đen thì Core báo. Toàn
+             nút NHỎ (icon trái, nhãn phải); WPS xếp 2 nút mỗi cột theo thứ tự trong tệp, nên thứ tự ở đây là từng cặp:
+             Trau chuốt/Sửa lỗi chính tả, Viết lại/Viết tiếp, Mở rộng/Rút gọn, Dịch song ngữ/Dịch, Tóm tắt/Giải thích,
+             rồi Đổi giọng ▾ một mình. Lệnh cả bài nằm ở nhóm "Cả tài liệu". -->
+        <group id="axiomWriteGroup" label="Viết với AI">
+          <button id="axiomRb_polish" label="Trau chuốt" tag="quick:polish" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
+                  getImage="ribbon.OnGetImage" screentip="Trau chuốt đoạn văn"
+                  supertip="Sửa câu chữ cho trôi chảy, mạch lạc; giữ ý, giọng văn và ngôn ngữ. Bôi đen đoạn văn trước; AI chỉ sửa trong đoạn đó, một bước Hoàn tác."/>
+          <button id="axiomRb_fix" label="Sửa lỗi chính tả" tag="quick:fix" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
+                  getImage="ribbon.OnGetImage" screentip="Sửa lỗi chính tả trong đoạn"
+                  supertip="Sửa chính tả, ngữ pháp, dấu câu; câu đúng thì giữ nguyên. Bôi đen đoạn văn trước; AI chỉ sửa trong đoạn đó, một bước Hoàn tác."/>
+          <button id="axiomRb_rewrite" label="Viết lại" tag="quick:rewrite" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
+                  getImage="ribbon.OnGetImage" screentip="Viết lại đoạn văn"
+                  supertip="Diễn đạt lại bằng cách khác, giữ nguyên ý. Bôi đen đoạn văn trước; AI chỉ sửa trong đoạn đó, một bước Hoàn tác."/>
+          <button id="axiomRb_continue" label="Viết tiếp" tag="quick:continue" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
+                  getImage="ribbon.OnGetImage" screentip="Viết tiếp đoạn văn"
+                  supertip="Viết thêm phần tiếp theo ngay sau đoạn, cùng giọng văn. Bôi đen đoạn văn trước; AI chỉ sửa trong đoạn đó, một bước Hoàn tác."/>
+          <button id="axiomRb_expand" label="Mở rộng" tag="quick:expand" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
+                  getImage="ribbon.OnGetImage" screentip="Mở rộng đoạn văn"
+                  supertip="Thêm giải thích, chi tiết, ví dụ; không bịa số liệu. Bôi đen đoạn văn trước; AI chỉ sửa trong đoạn đó, một bước Hoàn tác."/>
+          <button id="axiomRb_shorten" label="Rút gọn" tag="quick:shorten" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
+                  getImage="ribbon.OnGetImage" screentip="Rút gọn đoạn văn"
+                  supertip="Còn khoảng một nửa độ dài, giữ ý chính và số liệu. Bôi đen đoạn văn trước; AI chỉ sửa trong đoạn đó, một bước Hoàn tác."/>
+          <button id="axiomRb_bilingual" label="Dịch song ngữ" tag="quick:bilingual" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
+                  getImage="ribbon.OnGetImage" screentip="Dịch song ngữ"
+                  supertip="Chèn bản dịch ngay dưới đoạn gốc, giữ đoạn gốc. Bôi đen đoạn văn trước; AI chỉ sửa trong đoạn đó, một bước Hoàn tác."/>
+          <button id="axiomRb_translate" label="Dịch" tag="quick:translate" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
+                  getImage="ribbon.OnGetImage" screentip="Dịch đoạn văn"
+                  supertip="Dịch đoạn bôi đen. Bôi đen đoạn văn trước; AI trả lời trong khung chat, không sửa tài liệu."/>
+          <button id="axiomRb_summarize" label="Tóm tắt" tag="quick:summarize" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
+                  getImage="ribbon.OnGetImage" screentip="Tóm tắt đoạn văn"
+                  supertip="Tóm tắt ý chính của đoạn bôi đen. Bôi đen đoạn văn trước; AI trả lời trong khung chat, không sửa tài liệu."/>
+          <button id="axiomRb_explain" label="Giải thích" tag="quick:explain" getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction"
+                  getImage="ribbon.OnGetImage" screentip="Giải thích đoạn văn"
+                  supertip="Giải thích nghĩa, thuật ngữ, ý của đoạn bôi đen. Bôi đen đoạn văn trước; AI trả lời trong khung chat, không sửa tài liệu."/>
+          <menu id="axiomRbTone" label="Đổi giọng" tag="toneMenu" getVisible="ribbon.OnGetVisible" getImage="ribbon.OnGetImage"
+                screentip="Đổi giọng văn" supertip="Viết lại đoạn bôi đen theo giọng khác: trang trọng, học thuật, ngắn gọn, dễ hiểu, tích cực.">
+            <button id="axiomRb_formal" label="Trang trọng hơn" tag="quick:formal" onAction="ribbon.OnAction"/>
+            <button id="axiomRb_academic" label="Học thuật hơn" tag="quick:academic" onAction="ribbon.OnAction"/>
+            <button id="axiomRb_concise" label="Ngắn gọn hơn" tag="quick:concise" onAction="ribbon.OnAction"/>
+            <button id="axiomRb_plain" label="Dễ hiểu hơn" tag="quick:plain" onAction="ribbon.OnAction"/>
+            <button id="axiomRb_positive" label="Tích cực hơn" tag="quick:positive" onAction="ribbon.OnAction"/>
+          </menu>
+        </group>
+
+        <!-- Ba nút soát: chỉ đọc, không dùng AI, mỗi nút một ứng dụng. Nhãn nêu rõ đối tượng được soát để
+             người dùng không bấm nhầm nút của ứng dụng khác (WPS có thể bỏ qua getVisible). Hai nút doc:<id>
+             (Soát chính tả, Làm đẹp bảng) thì dùng AI, chỉ Writer: lệnh cả tài liệu của Core. -->
+        <group id="axiomCheckGroup" label="Kiểm tra tài liệu">
+          <button id="axiomCheckLayout" label="Soát bố cục" size="large" tag="checkLayout"
+                  getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction" imageMso="SelectionPane"
+                  screentip="Soát bố cục bài trình chiếu"
+                  supertip="Tìm chữ tràn khung, khung ra ngoài trang, khung chồng nhau, chữ quá nhỏ. Chỉ đọc, không sửa tài liệu và không dùng AI."/>
+          <button id="axiomCheckTables" label="Soát bảng" size="large" tag="checkTables"
+                  getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction" imageMso="TableInsertDialogWord"
+                  screentip="Soát bảng trong văn bản"
+                  supertip="Tìm ô trống và ô tiêu đề lẫn cả đoạn văn trong các bảng. Chỉ đọc, không sửa tài liệu và không dùng AI."/>
+          <!-- Lệnh cả tài liệu: mở khung chat lớn (không phải khung mini) rồi nhờ Core chạy. -->
+          <button id="axiomProofread" label="Soát chính tả" size="large" tag="doc:proofread"
+                  getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction" imageMso="ReviewTrackChanges"
+                  screentip="Soát chính tả cả bài bằng AI"
+                  supertip="AI sửa lỗi chính tả, dấu và lỗi gõ của cả tài liệu dưới dạng Theo dõi thay đổi để bạn nhận hoặc từ chối; chỗ nào chưa chắc thì thêm bình luận."/>
+          <button id="axiomTableTidy" label="Làm đẹp bảng" size="large" tag="doc:tableTidy"
+                  getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction" imageMso="TableAutoFitContents"
+                  screentip="Làm đẹp các bảng bằng AI"
+                  supertip="AI định dạng các bảng dữ liệu của tài liệu (kẻ khung, tiêu đề in đậm và lặp lại mỗi trang, vừa chiều rộng trang, phông chữ thân bảng) mà không đổi nội dung chữ; mỗi bảng là một bước Hoàn tác."/>
+          <button id="axiomCheckRange" label="Soát vùng dữ liệu" size="large" tag="checkRange"
+                  getVisible="ribbon.OnGetVisible" onAction="ribbon.OnAction" imageMso="DataValidation"
+                  screentip="Soát vùng dữ liệu bảng tính"
+                  supertip="Tìm cột thiếu tiêu đề, số lưu dạng chữ, ô lỗi, dữ liệu lạc ngoài bảng. Chỉ đọc, không sửa tài liệu và không dùng AI."/>
+        </group>
+
+        <!-- Du lieu AI va ky nang: thu nguoi dung muon XEM/SUA, khac han nhom He thong ben duoi. -->
+        <group id="axiomManageGroup" label="Bộ nhớ &amp; kỹ năng">
+          <button id="axiomMemory" label="Bộ nhớ AI…" size="large" tag="memory" onAction="ribbon.OnAction" imageMso="FileSave"
+                  screentip="Bộ nhớ AI"
+                  supertip="Xem, lọc theo phạm vi, xoá tạm, khôi phục, xoá vĩnh viễn những điều AI đã ghi nhớ về bạn và tài liệu."/>
+          <button id="axiomSkills" label="Kỹ năng…" size="large" tag="skills" onAction="ribbon.OnAction" imageMso="AddInManager"
+                  screentip="Kỹ năng"
+                  supertip="Các kỹ năng AI đang có cho ứng dụng này; nạp lại sau khi thêm hoặc sửa kỹ năng."/>
+        </group>
+
+        <!-- Cau hinh va chan doan: dat CUOI CUNG vi day la viec lam mot lan, khong phai viec hang ngay. -->
+        <group id="axiomSystemGroup" label="Hệ thống">
+          <button id="axiomSetup" label="Thiết lập…" size="large" tag="setup" onAction="ribbon.OnAction" imageMso="ApplicationOptionsDialog"
+                  screentip="Thiết lập"
+                  supertip="Máy chủ AI, model, khoá API và các công tắc của Agent Core. Lưu xong có hiệu lực ngay."/>
+          <button id="axiomStatus" label="Trạng thái" tag="status" onAction="ribbon.OnAction" imageMso="About"
+                  screentip="Trạng thái"
+                  supertip="Kiểm tra thật: add-in có trả lời không, Agent Core có chạy không, model đang dùng."/>
+          <button id="axiomLog" label="Mở nhật ký" tag="openLog" onAction="ribbon.OnAction" imageMso="FileOpen"
+                  screentip="Mở nhật ký"
+                  supertip="Xem phần cuối nhật ký của Agent Core (cùng tệp mà bản Windows mở bằng trình soạn thảo)."/>
+          <!-- Menu "Khác" gom viec chan doan phu, de nhom He thong chi con ba nut chinh. -->
+          <menu id="axiomMoreMenu" label="Khác" tag="more" imageMso="FileProperties">
+            <button id="axiomTestModel" label="Kiểm tra mô hình" tag="testModel" onAction="ribbon.OnAction" imageMso="ReviewAcceptChange"
+                    screentip="Kiểm tra mô hình"
+                    supertip="Gửi một câu hỏi ngắn tới model đang cấu hình để xem có trả lời được không."/>
+            <button id="axiomCopyUrl" label="Sao chép API URL" tag="copyUrl" onAction="ribbon.OnAction" imageMso="Copy"
+                    screentip="Sao chép API URL"
+                    supertip="Địa chỉ bridge của add-in kèm /health - dán vào trình duyệt để tự kiểm tra add-in còn trả lời không. API của Agent Core đòi token nên không dán thẳng vào trình duyệt được."/>
+          </menu>
+        </group>
+
       </tab>
     </tabs>
   </ribbon>
+  <!-- Menu chuot phai khi boi den (docs/architecture/ribbon-ui.md, "Trong khung chat"): 15 muc "Sua bang AI", cung thu tu va
+       nhan voi bang cua Core (agent/quickactions.go) - spec test_pane.mjs ghim hai ben. Nhom tone (Trang trong /
+       Hoc thuat / Ngan gon / De hieu / Tich cuc) nam trong menu con "Doi giong" (axiomCtxTone_<t|l> - menu long trong contextMenu
+       hien va bam duoc tren WPS that 12.1.2, 31/10/2026), roi den Viet tiep, Dich song ngu, vach ngan, ba muc
+       chi-tra-loi. Bam mot muc: main.js mo KHUNG CHAT MINI (mini.html, Application.ShowDialog) va muc do chay ngay
+       trong khung ay. Du phong khi WPS khong co ShowDialog: hien khung chat lon roi nho Core chuyen muc (POST /wps/v1/pane/request -> SSE
+       /wps/v1/pane/events), muc chay trong hoi thoai cua khung chat lon.
+       ContextMenuText = chuot phai tren chu thuong, ContextMenuList = tren dong danh sach (ten idMso co trong bang
+       lenh cua Writer WPS: res/commands/wps).
+       Khoi duoi SINH tu bang QuickActions cua Core: sua quickactions.go roi chay python3 scripts/generate_ribbon_menus.py
+       (make check-gen bao lech). -->
+  <!-- BEGIN SINH TU DONG (scripts/generate_ribbon_menus.py) - KHONG SUA TAY -->
+  <contextMenus>
+    <contextMenu idMso="ContextMenuText">
+      <menu id="axiomCtxQuick_t" label="Sửa bằng AI" tag="quickMenu" getImage="ribbon.OnGetImage" insertBeforeMso="Cut">
+        <button id="axiomQuick_polish_t" label="Trau chuốt" tag="quick:polish" onAction="ribbon.OnAction"/>
+        <button id="axiomQuick_rewrite_t" label="Viết lại" tag="quick:rewrite" onAction="ribbon.OnAction"/>
+        <button id="axiomQuick_shorten_t" label="Rút gọn" tag="quick:shorten" onAction="ribbon.OnAction"/>
+        <button id="axiomQuick_expand_t" label="Mở rộng" tag="quick:expand" onAction="ribbon.OnAction"/>
+        <button id="axiomQuick_fix_t" label="Sửa lỗi chính tả" tag="quick:fix" onAction="ribbon.OnAction"/>
+        <menu id="axiomCtxTone_t" label="Đổi giọng">
+          <button id="axiomQuick_formal_t" label="Trang trọng hơn" tag="quick:formal" onAction="ribbon.OnAction"/>
+          <button id="axiomQuick_academic_t" label="Học thuật hơn" tag="quick:academic" onAction="ribbon.OnAction"/>
+          <button id="axiomQuick_concise_t" label="Ngắn gọn hơn" tag="quick:concise" onAction="ribbon.OnAction"/>
+          <button id="axiomQuick_plain_t" label="Dễ hiểu hơn" tag="quick:plain" onAction="ribbon.OnAction"/>
+          <button id="axiomQuick_positive_t" label="Tích cực hơn" tag="quick:positive" onAction="ribbon.OnAction"/>
+        </menu>
+        <button id="axiomQuick_continue_t" label="Viết tiếp" tag="quick:continue" onAction="ribbon.OnAction"/>
+        <button id="axiomQuick_bilingual_t" label="Dịch song ngữ" tag="quick:bilingual" onAction="ribbon.OnAction"/>
+        <menuSeparator id="axiomCtxQuickSep_t"/>
+        <button id="axiomQuick_summarize_t" label="Tóm tắt" tag="quick:summarize" onAction="ribbon.OnAction"/>
+        <button id="axiomQuick_explain_t" label="Giải thích" tag="quick:explain" onAction="ribbon.OnAction"/>
+        <button id="axiomQuick_translate_t" label="Dịch" tag="quick:translate" onAction="ribbon.OnAction"/>
+      </menu>
+      <button id="axiomCtxAsk_t" label="Hỏi AI về đoạn này" tag="askAi" onAction="ribbon.OnAction" getImage="ribbon.OnGetImage" insertBeforeMso="Cut"/>
+    </contextMenu>
+    <contextMenu idMso="ContextMenuList">
+      <menu id="axiomCtxQuick_l" label="Sửa bằng AI" tag="quickMenu" getImage="ribbon.OnGetImage" insertBeforeMso="Cut">
+        <button id="axiomQuick_polish_l" label="Trau chuốt" tag="quick:polish" onAction="ribbon.OnAction"/>
+        <button id="axiomQuick_rewrite_l" label="Viết lại" tag="quick:rewrite" onAction="ribbon.OnAction"/>
+        <button id="axiomQuick_shorten_l" label="Rút gọn" tag="quick:shorten" onAction="ribbon.OnAction"/>
+        <button id="axiomQuick_expand_l" label="Mở rộng" tag="quick:expand" onAction="ribbon.OnAction"/>
+        <button id="axiomQuick_fix_l" label="Sửa lỗi chính tả" tag="quick:fix" onAction="ribbon.OnAction"/>
+        <menu id="axiomCtxTone_l" label="Đổi giọng">
+          <button id="axiomQuick_formal_l" label="Trang trọng hơn" tag="quick:formal" onAction="ribbon.OnAction"/>
+          <button id="axiomQuick_academic_l" label="Học thuật hơn" tag="quick:academic" onAction="ribbon.OnAction"/>
+          <button id="axiomQuick_concise_l" label="Ngắn gọn hơn" tag="quick:concise" onAction="ribbon.OnAction"/>
+          <button id="axiomQuick_plain_l" label="Dễ hiểu hơn" tag="quick:plain" onAction="ribbon.OnAction"/>
+          <button id="axiomQuick_positive_l" label="Tích cực hơn" tag="quick:positive" onAction="ribbon.OnAction"/>
+        </menu>
+        <button id="axiomQuick_continue_l" label="Viết tiếp" tag="quick:continue" onAction="ribbon.OnAction"/>
+        <button id="axiomQuick_bilingual_l" label="Dịch song ngữ" tag="quick:bilingual" onAction="ribbon.OnAction"/>
+        <menuSeparator id="axiomCtxQuickSep_l"/>
+        <button id="axiomQuick_summarize_l" label="Tóm tắt" tag="quick:summarize" onAction="ribbon.OnAction"/>
+        <button id="axiomQuick_explain_l" label="Giải thích" tag="quick:explain" onAction="ribbon.OnAction"/>
+        <button id="axiomQuick_translate_l" label="Dịch" tag="quick:translate" onAction="ribbon.OnAction"/>
+      </menu>
+      <button id="axiomCtxAsk_l" label="Hỏi AI về đoạn này" tag="askAi" onAction="ribbon.OnAction" getImage="ribbon.OnGetImage" insertBeforeMso="Cut"/>
+    </contextMenu>
+  </contextMenus>
+  <!-- END SINH TU DONG -->
 </customUI>
