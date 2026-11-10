@@ -17,6 +17,8 @@ giữ bản đầy đủ và trả về preview kèm con trỏ để model đọ
   trong store thay vì bị bỏ.
 - Tool mới `read_result {id, offset, limit}`: trả `text`, `totalChars`, `nextOffset`, `truncated`; mặc định
   20.000 ký tự/lần, tối đa 40.000. Model đọc tiếp thay vì gọi lại lệnh bridge hoặc đoán phần bị cắt.
+- `offset`/`limit` đếm theo **ký tự Unicode**, không theo byte — tiếng Việt có dấu là nhiều byte, cắt theo byte
+  sẽ vỡ giữa một code point. Test `TestReadResultUsesUnicodeCharacters`.
 - `et.readRange` vẫn giữ `nextRange` sẵn có; offload áp cho các lệnh không có cơ chế đọc tiếp
   (`writer.getText`, `writer.outline`, `checkRange`, `wpp.listSlides`...).
 - Test: `tools/results_test.go` (lưu/đọc/trần, gắn resultId, phân trang, id sai).

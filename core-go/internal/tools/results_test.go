@@ -82,3 +82,18 @@ func TestReadResultPagination(t *testing.T) {
 		t.Fatal("khong co store phai loi")
 	}
 }
+
+// Tiếng Việt có dấu là nhiều byte: offset/limit phải đếm theo KÝ TỰ, không cắt vỡ giữa một code point.
+func TestReadResultUsesUnicodeCharacters(t *testing.T) {
+	run := &RunContext{Results: NewResultStore()}
+	id := run.Results.Put("aếb")
+	reply := NewReadResultTool().Invoke(nil, map[string]any{"id": id, "offset": float64(0), "limit": float64(2)}, run)
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(reply.JSON), &payload); err != nil {
+		t.Fatal(err)
+	}
+	result := payload["result"].(map[string]any)
+	if result["text"] != "aế" || result["totalChars"] != float64(3) || result["nextOffset"] != float64(2) {
+		t.Fatalf("phai cat theo ky tu: %+v", result)
+	}
+}
