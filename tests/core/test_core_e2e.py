@@ -759,9 +759,14 @@ def test_anthropic(work: str, token: str, bridge: FakeBridge, document_path: str
         system = body.get("system")
         check(isinstance(system, list) and system and "AI assistant embedded inside" in str(system[0].get("text", "")),
               "Anthropic: system la truong rieng dang block (khong nam trong messages)", str(body.get("system"))[:160])
-        check(system[-1].get("cache_control") == {"type": "ephemeral"} and body.get("cache_control") == {"type": "ephemeral"},
-              "Anthropic: khoi system cuoi + request deu gan ephemeral de cache tien to tro lai moi vong",
-              {"system": system[-1].get("cache_control"), "request": body.get("cache_control")})
+        # System tach 2 khoi: chi khoi ON DINH (dau) mang cache_control; khoi dong (tai lieu/memory/hoi thoai)
+        # khong mang, de doi vung chon/slide khong pha cache cua tien to.
+        check(system[0].get("cache_control") == {"type": "ephemeral"} and body.get("cache_control") == {"type": "ephemeral"},
+              "Anthropic: khoi system on dinh + request deu gan ephemeral de cache tien to tro lai moi vong",
+              {"stable": system[0].get("cache_control"), "request": body.get("cache_control")})
+        check(all(block.get("cache_control") is None for block in system[1:]),
+              "Anthropic: khoi system dong khong gan cache_control",
+              {"blocks": [block.get("cache_control") for block in system]})
         check(all(message.get("role") != "system" for message in body["messages"]),
               "Anthropic: messages khong co role system")
         tools = body.get("tools") or []

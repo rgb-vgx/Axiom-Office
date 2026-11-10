@@ -47,7 +47,9 @@ riêng sau phần prompt ổn định; chỉ khối system cuối/ổn định �
   message (nhiều nhà cung cấp không nhận nhiều system message) nhưng vẫn giữ phần ổn định ở đầu.
 - `RunAgentWithSystem` cho đường mới; `RunAgent` cũ giữ nguyên chữ ký cho test/agent bên ngoài.
 - Trace thêm `systemStableChars`/`systemDynamicChars` để đo tỉ lệ phần cache được.
-- Test: `agent/harness_test.go` (tách đúng phần), `model/model_test.go` (hai block, chỉ block đầu có cache).
+- Test: `agent/harness_test.go` (tách đúng phần), `model/model_test.go` (hai block, chỉ block đầu có cache),
+  `tests/core/test_core_e2e.py` kiểm hợp đồng mới trên request Anthropic thật (block đầu có `cache_control`,
+  block động không).
 
 ### Added — HarnessProfile theo model + mô tả lệnh gọn (11/11/2026)
 
