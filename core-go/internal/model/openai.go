@@ -18,9 +18,11 @@ func (openAICodec) IsToolUnsupported(errorText string) bool {
 	return strings.Contains(strings.ToLower(errorText), "tool")
 }
 
-func (openAICodec) BuildRequest(model, systemPrompt string, turns []Message, tools []Tool, toolsEnabled bool, maxTokens int) map[string]any {
+func (openAICodec) BuildRequest(model string, system SystemPrompt, turns []Message, tools []Tool, toolsEnabled bool, maxTokens int) map[string]any {
 	messages := make([]any, 0, len(turns)+1)
-	messages = append(messages, map[string]any{"role": "system", "content": systemPrompt})
+	// Nhieu nha cung cap kieu OpenAI chi nhan mot system message: gop hai phan, giu thu tu on dinh -> dong.
+	// Cache tu dong cua ho van tinh theo tien to chung; phan dong nam cuoi nen khong lam mat phan dau.
+	messages = append(messages, map[string]any{"role": "system", "content": system.String()})
 	messages = append(messages, turns...)
 	body := map[string]any{"model": model, "messages": messages}
 	if toolsEnabled && len(tools) > 0 {

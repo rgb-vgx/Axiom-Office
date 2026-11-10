@@ -218,7 +218,7 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 	defer ex.trace.close()
 	ex.runContext.Trace = ex.trace.callback()
 	ex.traceStart()
-	result := ex.client.RunAgent(ctx, ex.systemPrompt, ex.assembled.PriorTurns, request.Prompt, ex.registry.ModelTools(),
+	result := ex.client.RunAgentWithSystem(ctx, ex.systemPrompt, ex.assembled.PriorTurns, request.Prompt, ex.registry.ModelTools(),
 		func(inner context.Context, call model.ToolCall) model.ToolResult {
 			return executeTool(inner, ex.registry, call, ex.runContext)
 		}, ex.options, o.buildCallbacks(ex))

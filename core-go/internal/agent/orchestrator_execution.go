@@ -32,7 +32,7 @@ type execution struct {
 	assembled         AssembledContext
 	registry          *tools.Registry
 	runContext        *tools.RunContext
-	systemPrompt      string
+	systemPrompt      model.SystemPrompt
 	options           model.AgentOptions
 	choose            func(string, string, []tools.Choice) (string, string, error)
 	// trace: DebugTrace cua luot (nil = tat) - trace.go.
@@ -288,7 +288,7 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 		}
 	}
 
-	systemPrompt := Build(appKind, session, request.Document, appSkills, memoryContext.Lines, memoryContext.OrgLines,
+	systemPrompt := BuildParts(appKind, session, request.Document, appSkills, memoryContext.Lines, memoryContext.OrgLines,
 		assembled.Summary, assembled.RecentActionLines)
 	if request.Plan {
 		// Ke hoach phai dung lenh se CO khi chay: luot that 25/10/2026 (ocg/beam-free, de 10 slide kien truc) chi thay
@@ -297,20 +297,20 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 		if request.CompactTools {
 			planOffice = tools.NewCompactOfficeActionTool(catalog, appKind)
 		}
-		systemPrompt += "\n\n" + PlanModeRule + PlanCapabilities(planOffice,
-			o.actTools(appKind, catalog, request))
+		systemPrompt = systemPrompt.AppendStable(PlanModeRule + PlanCapabilities(planOffice,
+			o.actTools(appKind, catalog, request)))
 	}
 	// Lenh nhanh "Sua bang AI": nguoi dung bam lenh la da quyet - sua ngay, khong hoi lai (quickactions.go).
 	if request.QuickAction != "" {
 		switch {
 		case request.WholeDocument && request.ReadOnly:
-			systemPrompt += "\n\n" + DocumentAnswerRule
+			systemPrompt = systemPrompt.AppendStable(DocumentAnswerRule)
 		case request.WholeDocument:
-			systemPrompt += "\n\n" + DocumentEditRule
+			systemPrompt = systemPrompt.AppendStable(DocumentEditRule)
 		case request.ReadOnly:
-			systemPrompt += "\n\n" + QuickAnswerRule
+			systemPrompt = systemPrompt.AppendStable(QuickAnswerRule)
 		default:
-			systemPrompt += "\n\n" + QuickEditRule
+			systemPrompt = systemPrompt.AppendStable(QuickEditRule)
 		}
 	}
 

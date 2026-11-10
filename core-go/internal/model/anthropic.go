@@ -20,7 +20,7 @@ func (anthropicCodec) IsToolUnsupported(errorText string) bool {
 	return strings.Contains(strings.ToLower(errorText), "tool")
 }
 
-func (anthropicCodec) BuildRequest(model, systemPrompt string, turns []Message, tools []Tool, toolsEnabled bool, maxTokens int) map[string]any {
+func (anthropicCodec) BuildRequest(model string, system SystemPrompt, turns []Message, tools []Tool, toolsEnabled bool, maxTokens int) map[string]any {
 	if maxTokens <= 0 {
 		maxTokens = anthropicDefaultMaxTokens
 	}
@@ -34,9 +34,18 @@ func (anthropicCodec) BuildRequest(model, systemPrompt string, turns []Message, 
 	//    tu cache cua vong truoc (chi tra gia nhap them phan moi).
 	body := map[string]any{"model": model, "max_tokens": maxTokens,
 		"cache_control": map[string]any{"type": "ephemeral"}, "messages": messages}
-	if systemPrompt != "" {
-		body["system"] = []any{map[string]any{"type": "text", "text": systemPrompt,
-			"cache_control": map[string]any{"type": "ephemeral"}}}
+	// Hai block: chi block ON DINH mang cache_control. Tai lieu dang mo / memory / hoi thoai doi moi luot,
+	// nam o block sau nen khong pha cache cua tien to (Base + quy tac + skill + tool).
+	blocks := []any{}
+	if system.Stable != "" {
+		blocks = append(blocks, map[string]any{"type": "text", "text": system.Stable,
+			"cache_control": map[string]any{"type": "ephemeral"}})
+	}
+	if system.Dynamic != "" {
+		blocks = append(blocks, map[string]any{"type": "text", "text": system.Dynamic})
+	}
+	if len(blocks) > 0 {
+		body["system"] = blocks
 	}
 	if toolsEnabled && len(tools) > 0 {
 		definitions := make([]any, 0, len(tools))

@@ -171,7 +171,7 @@ func (c *Client) Chat(ctx context.Context, systemPrompt, userPrompt string, maxT
 	}
 	callCtx, cancel := context.WithTimeout(ctx, c.ShortCallTimeout())
 	defer cancel()
-	body := c.Codec.BuildRequest(c.Model, systemPrompt,
+	body := c.Codec.BuildRequest(c.Model, SystemPrompt{Stable: systemPrompt},
 		[]Message{map[string]any{"role": "user", "content": userPrompt}}, nil, false, maxTokens)
 	// Loi goi ngan: khong stream, va vi body khong phai SSE nen Parse thường dung duoc.
 	body["stream"] = false

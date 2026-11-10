@@ -89,7 +89,7 @@ type Codec interface {
 	Name() string
 	Path() string
 	IsToolUnsupported(errorText string) bool
-	BuildRequest(model, systemPrompt string, turns []Message, tools []Tool, toolsEnabled bool, maxTokens int) map[string]any
+	BuildRequest(model string, system SystemPrompt, turns []Message, tools []Tool, toolsEnabled bool, maxTokens int) map[string]any
 	Parse(body []byte) (*Turn, string)
 	// ParseStream doc body dang SSE (khi gui stream: true) va gom cac delta thanh mot Turn.
 	// Codec tu roi ve Parse khi body khong phai SSE (may chu bo qua stream: true).

@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"axiomoffice/core/internal/model"
 	"axiomoffice/core/internal/office"
 	"axiomoffice/core/internal/skills"
 	"axiomoffice/core/internal/tools"
@@ -293,22 +294,43 @@ func ConversationSection(summary string, recentLines []string) string {
 	return strings.Join(parts, "\n\n")
 }
 
-// Build: ghep system prompt theo thu tu on dinh de cache duoc (muc 8.8).
+// Build: ghep system prompt thanh mot chuoi (giu cho test/ben goi cu).
 func Build(appKind string, session *office.Session, document *DocumentContext, appSkills []skills.Definition,
 	memories []string, orgLines []string, summary string, recentLines []string) string {
-	sections := []string{Base(AppName(appKind)), CitationRule(appKind), DocumentSection(session, document)}
-	for _, section := range []string{
-		SkillsSection(appSkills),
-		OrgStyleSection(orgLines),
-		MemorySection(memories),
-		ConversationSection(summary, recentLines),
-		ViewSection(document),
-	} {
+	return BuildParts(appKind, session, document, appSkills, memories, orgLines, summary, recentLines).String()
+}
+
+// BuildParts: tach system prompt thanh phan ON DINH (cache duoc) va phan DONG.
+//
+// Hoc tu Deep Agents (_prompt_caching.py, LocalContextMiddleware): tai lieu dang mo, memory va hoi thoai
+// doi moi luot nen khong duoc nam trong khoi cache. Phan on dinh (Base + quy tac + danh muc skill) dung
+// truoc; codec Anthropic chi gan cache_control cho block dau, cac nha kieu OpenAI cache theo tien to chung.
+func BuildParts(appKind string, session *office.Session, document *DocumentContext, appSkills []skills.Definition,
+	memories []string, orgLines []string, summary string, recentLines []string) model.SystemPrompt {
+	return model.SystemPrompt{
+		Stable: joinSections(
+			Base(AppName(appKind)),
+			CitationRule(appKind),
+			SkillsSection(appSkills),
+		),
+		Dynamic: joinSections(
+			DocumentSection(session, document),
+			OrgStyleSection(orgLines),
+			MemorySection(memories),
+			ConversationSection(summary, recentLines),
+			ViewSection(document),
+		),
+	}
+}
+
+func joinSections(sections ...string) string {
+	kept := make([]string, 0, len(sections))
+	for _, section := range sections {
 		if section != "" {
-			sections = append(sections, section)
+			kept = append(kept, section)
 		}
 	}
-	return strings.Join(sections, "\n\n")
+	return strings.Join(kept, "\n\n")
 }
 
 func flatten(value string, max int) string {

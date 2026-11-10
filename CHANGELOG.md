@@ -5,6 +5,21 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed — tách system prompt ổn định/động để cache đúng phần tiền tố (11/11/2026)
+
+Học từ **Deep Agents**: `_prompt_caching.py` và cách `LocalContextMiddleware` chèn context động thành message
+riêng sau phần prompt ổn định; chỉ khối system cuối/ổn định được đánh dấu cache.
+
+- `model.SystemPrompt{Stable, Dynamic}`: phần ổn định (Base + quy tắc + danh mục skill) đi trước, phần động
+  (tài liệu đang mở, memory, hội thoại, view) đi sau. `agent.BuildParts` trả hai phần; `Build` giữ nguyên
+  chuỗi đầy đủ cho test/bên gọi cũ.
+- Codec Anthropic gửi **hai block**, chỉ block `Stable` mang `cache_control: ephemeral`; trước đây cả system
+  prompt là một block nên đổi vùng chọn/slide là mất cache. Codec OpenAI gộp hai phần thành một system
+  message (nhiều nhà cung cấp không nhận nhiều system message) nhưng vẫn giữ phần ổn định ở đầu.
+- `RunAgentWithSystem` cho đường mới; `RunAgent` cũ giữ nguyên chữ ký cho test/agent bên ngoài.
+- Trace thêm `systemStableChars`/`systemDynamicChars` để đo tỉ lệ phần cache được.
+- Test: `agent/harness_test.go` (tách đúng phần), `model/model_test.go` (hai block, chỉ block đầu có cache).
+
 ### Added — HarnessProfile theo model + mô tả lệnh gọn (11/11/2026)
 
 Học từ **Deep Agents** (`langchain-ai/deepagents`, bản 10/11/2026): tách *provider profile* (cách dựng client:

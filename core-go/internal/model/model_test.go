@@ -58,7 +58,7 @@ func TestAnthropicRoundTrip(t *testing.T) {
 	}
 	turns := codec.AppendAssistant(nil, turn)
 	turns = codec.AppendToolResults(turns, []ToolResult{{CallID: "t1", ResultJSON: `{"ok":true}`, ImageDataURL: "data:image/png;base64,QUJD"}})
-	request := codec.BuildRequest("m", "sys", turns, nil, false, 0)
+	request := codec.BuildRequest("m", SystemPrompt{Stable: "sys"}, turns, nil, false, 0)
 	data, _ := json.Marshal(request)
 	for _, want := range []string{`"max_tokens":4096`, `"tool_use_id":"t1"`, `"media_type":"image/png"`, `"data":"QUJD"`} {
 		if !strings.Contains(string(data), want) {
@@ -73,7 +73,7 @@ func TestAnthropicRoundTrip(t *testing.T) {
 func TestAnthropicPromptCachingControls(t *testing.T) {
 	codec := anthropicCodec{}
 	tools := []Tool{{Name: "n", Description: "d", Parameters: json.RawMessage(`{"type":"object"}`)}}
-	data, _ := json.Marshal(codec.BuildRequest("m", "sys", nil, tools, true, 0))
+	data, _ := json.Marshal(codec.BuildRequest("m", SystemPrompt{Stable: "sys"}, nil, tools, true, 0))
 	for _, want := range []string{
 		`"cache_control":{"type":"ephemeral"}`,
 		`"system":[{"cache_control":{"type":"ephemeral"},"text":"sys","type":"text"}]`,
@@ -82,7 +82,16 @@ func TestAnthropicPromptCachingControls(t *testing.T) {
 			t.Fatalf("request missing %s:\n%s", want, data)
 		}
 	}
-	plain, _ := json.Marshal(codec.BuildRequest("m", "", nil, nil, false, 0))
+	// Phan dong khong mang cache_control: cache chi giu tien to on dinh.
+	split, _ := json.Marshal(codec.BuildRequest("m", SystemPrompt{Stable: "on-dinh", Dynamic: "dong"}, nil, nil, false, 0))
+	for _, want := range []string{
+		`"system":[{"cache_control":{"type":"ephemeral"},"text":"on-dinh","type":"text"},{"text":"dong","type":"text"}]`,
+	} {
+		if !strings.Contains(string(split), want) {
+			t.Fatalf("split system missing %s:\n%s", want, split)
+		}
+	}
+	plain, _ := json.Marshal(codec.BuildRequest("m", SystemPrompt{}, nil, nil, false, 0))
 	if strings.Contains(string(plain), `"system"`) {
 		t.Fatalf("system rong khong ghi truong: %s", plain)
 	}

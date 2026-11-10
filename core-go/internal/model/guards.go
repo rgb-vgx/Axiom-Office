@@ -60,7 +60,7 @@ type agentLoop struct {
 	options      AgentOptions
 	callbacks    AgentCallbacks
 	result       *AgentResult
-	systemPrompt string
+	systemPrompt SystemPrompt
 	turns        []Message
 	toolsEnabled bool
 	// model: model dang goi - doi sang model du phong khi model chinh hong (fallbackGuard).

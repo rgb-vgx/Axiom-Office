@@ -188,7 +188,20 @@ type Executor func(ctx context.Context, call ToolCall) ToolResult
 
 // RunAgent: goi model, chay tool model yeu cau, lap toi khi model tra loi xong (ModelClient.RunAgentAsync). Cac co
 // che chan/nhac/cuu (tu kiem chung, ngan sach, don ngu canh, model du phong...) nam trong guards.go.
+//
+// Giu chu ky cu cho test/ben goi cu; prompt co phan on dinh/dong thi dung RunAgentWithSystem.
 func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []ConversationTurn, userPrompt string,
+	tools []Tool, execute Executor, options AgentOptions, callbacks AgentCallbacks) AgentResult {
+	return c.runAgent(ctx, SystemPrompt{Stable: systemPrompt}, prior, userPrompt, tools, execute, options, callbacks)
+}
+
+// RunAgentWithSystem: nhu RunAgent nhung tach phan on dinh (cache duoc) khoi phan dong cua system prompt.
+func (c *Client) RunAgentWithSystem(ctx context.Context, system SystemPrompt, prior []ConversationTurn, userPrompt string,
+	tools []Tool, execute Executor, options AgentOptions, callbacks AgentCallbacks) AgentResult {
+	return c.runAgent(ctx, system, prior, userPrompt, tools, execute, options, callbacks)
+}
+
+func (c *Client) runAgent(ctx context.Context, system SystemPrompt, prior []ConversationTurn, userPrompt string,
 	tools []Tool, execute Executor, options AgentOptions, callbacks AgentCallbacks) AgentResult {
 	started := time.Now()
 	result := AgentResult{Transcript: []string{}, Model: c.Model}
@@ -233,7 +246,7 @@ func (c *Client) RunAgent(ctx context.Context, systemPrompt string, prior []Conv
 	}
 
 	options = options.FitWindow()
-	loop := &agentLoop{client: c, options: options, callbacks: callbacks, result: &result, systemPrompt: systemPrompt,
+	loop := &agentLoop{client: c, options: options, callbacks: callbacks, result: &result, systemPrompt: system,
 		toolsEnabled: len(tools) > 0, model: c.Model, addLine: addLine, verifiedAt: -1, reads: map[string]int{}}
 	loop.turns = make([]Message, 0, len(prior)+1)
 	for _, turn := range prior {
@@ -489,7 +502,7 @@ func (l *agentLoop) traceRound(turn *Turn) {
 	for _, call := range turn.ToolCalls {
 		calls = append(calls, map[string]any{"id": call.ID, "name": call.Name, "args": call.Arguments})
 	}
-	contextChars := len(l.systemPrompt)
+	contextChars := len(l.systemPrompt.String())
 	for _, message := range l.turns {
 		if raw, err := json.Marshal(message); err == nil {
 			contextChars += len(raw)
