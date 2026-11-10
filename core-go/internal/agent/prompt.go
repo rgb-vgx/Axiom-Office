@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"axiomoffice/core/internal/benchflags"
 	"axiomoffice/core/internal/model"
 	"axiomoffice/core/internal/office"
 	"axiomoffice/core/internal/skills"
@@ -307,6 +308,20 @@ func Build(appKind string, session *office.Session, document *DocumentContext, a
 // truoc; codec Anthropic chi gan cache_control cho block dau, cac nha kieu OpenAI cache theo tien to chung.
 func BuildParts(appKind string, session *office.Session, document *DocumentContext, appSkills []skills.Definition,
 	memories []string, orgLines []string, summary string, recentLines []string) model.SystemPrompt {
+	// Nhánh benchmark B0/B1/B2/B4/B5 tắt tách cache: giữ đúng thứ tự prompt cũ (tài liệu đứng sau quy tắc)
+	// để phép so sánh là "tách hay không tách", không lẫn thay đổi thứ tự.
+	if !benchflags.Enabled(benchflags.Prompt) {
+		return model.SystemPrompt{Stable: joinSections(
+			Base(AppName(appKind)),
+			CitationRule(appKind),
+			DocumentSection(session, document),
+			SkillsSection(appSkills),
+			OrgStyleSection(orgLines),
+			MemorySection(memories),
+			ConversationSection(summary, recentLines),
+			ViewSection(document),
+		)}
+	}
 	return model.SystemPrompt{
 		Stable: joinSections(
 			Base(AppName(appKind)),

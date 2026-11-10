@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"axiomoffice/core/internal/benchflags"
 	"axiomoffice/core/internal/corelog"
 	"axiomoffice/core/internal/memory"
 	"axiomoffice/core/internal/model"
@@ -48,9 +49,19 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 	// luot truoc nho hon. Doc /models mot lan roi dung lai cho AgentOptions.ContextWindow.
 	contextWindow := client.ModelInfo(ctx, client.Model).ContextWindow
 	harness := model.HarnessFor(client.Provider, client.Model, contextWindow)
-	request.CompactTools = harness.CompactToolDescriptions
-	request.ContextBudgetTokens = harness.ContextBudgetTokens
-	request.SummarizeEvery = harness.SummarizeEvery
+	// Công tắc benchmark (AXIOM_BENCH_VARIANT): B0 tắt hết, B1 chỉ harness, B2 chỉ compact...
+	// Không đặt biến = production như trước.
+	request.ContextBudgetTokens = 0
+	request.SummarizeEvery = 0
+	if benchflags.Enabled(benchflags.Harness) {
+		request.ContextBudgetTokens = harness.ContextBudgetTokens
+		request.SummarizeEvery = harness.SummarizeEvery
+	}
+	if benchflags.CompactAuto() {
+		request.CompactTools = harness.CompactToolDescriptions
+	} else {
+		request.CompactTools = benchflags.Enabled(benchflags.Compact)
+	}
 
 	session := o.Sessions.Find(request.Port)
 	if session == nil {
@@ -280,7 +291,9 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 		runContext.FocusSlide = request.Document.Slide
 	}
 	// Kết quả tool bị truncate: giữ bản đầy đủ trong bộ nhớ của lượt cho read_result.
-	runContext.Results = tools.NewResultStore()
+	if benchflags.Enabled(benchflags.Results) {
+		runContext.Results = tools.NewResultStore()
+	}
 	// Track Changes cho luot Word (tracking.go): bat truoc lenh sua dau tien, tra lai trong finish().
 	o.startTracking(ctx, run, request, appKind, catalog, readOnly, runContext.TargetDocument)
 	// Luu nguon web tai ve trong luot (WebSourceStore bat + kho mo duoc): tool web ghi qua RunContext.
@@ -322,7 +335,8 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 	// Model du phong + cua so ngu canh (GET /models doc mot lan cho moi cau hinh LLM).
 	options.FallbackModels = o.Config().LlmFallbackModels
 	options.ContextWindow = contextWindow
-	if harness.MaxRounds > 0 && (options.MaxRounds <= 0 || options.MaxRounds > harness.MaxRounds) {
+	if benchflags.Enabled(benchflags.Harness) && harness.MaxRounds > 0 &&
+		(options.MaxRounds <= 0 || options.MaxRounds > harness.MaxRounds) {
 		options.MaxRounds = harness.MaxRounds
 	}
 	options.OncePerReply = []string{tools.TodoToolName}
@@ -359,7 +373,7 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 func (o *Orchestrator) buildCallbacks(ex *execution) model.AgentCallbacks {
 	run, conversation, client, actions := ex.run, ex.conversation, ex.client, ex.actions
 	liveReasoning, liveStatus := "", ""
-	return model.AgentCallbacks{
+	callbacks := model.AgentCallbacks{
 		Transcript: run.appendTranscript,
 		// Suy luan cua model hien cho nguoi dung xem (muc 7.4): chi co khi nguoi dung bat
 		// LlmShowReasoning - xem model.Client.ShowReasoning. Pane nao khong biet su kien nay thi bo qua.
@@ -398,9 +412,7 @@ func (o *Orchestrator) buildCallbacks(ex *execution) model.AgentCallbacks {
 			return choice == "continue"
 		},
 
-		// Checklist hiện tại: chỉ chèn khi đổi, để model yếu không quên bước giữa lượt dài.
-		StateNote: func(round int) string { return todoStateNote(ex.runContext.Todos) },
-		Trace:     ex.trace.callback(),
+		Trace: ex.trace.callback(),
 		RoundFinished: func(stat model.RoundStat) {
 			o.Runs.AddRound(run.ID, store.RoundRow{Round: stat.Round, InputTokens: stat.InputTokens, CachedTokens: stat.CachedTokens,
 				OutputTokens: stat.OutputTokens, ToolCalls: stat.ToolCalls, Kind: stat.Kind})
@@ -444,6 +456,11 @@ func (o *Orchestrator) buildCallbacks(ex *execution) model.AgentCallbacks {
 			}
 		},
 	}
+	// Checklist hiện tại: chỉ chèn khi đổi, để model yếu không quên bước giữa lượt dài.
+	if benchflags.Enabled(benchflags.Checklist) {
+		callbacks.StateNote = func(round int) string { return todoStateNote(ex.runContext.Todos) }
+	}
+	return callbacks
 }
 
 // applyResult ghi ket qua cua luot vao Run/hoi thoai/audit va phat su kien ket thuc tuong ung.
@@ -582,7 +599,10 @@ func (o *Orchestrator) otherSessions(ctx context.Context, current *office.Sessio
 // actTools: tool chi co khi LAM THAT - khong co o lap ke hoach / lenh nhanh chi tra loi (o lap ke hoach chi duoc
 // MO TA qua PlanCapabilities, de ke hoach dung dung lenh se co khi chay).
 func (o *Orchestrator) actTools(appKind string, catalog *office.CommandCatalog, request *Request) []tools.Tool {
-	list := []tools.Tool{tools.NewReadResultTool()}
+	list := []tools.Tool{}
+	if benchflags.Enabled(benchflags.Results) {
+		list = append(list, tools.NewReadResultTool())
+	}
 	// Tool nao chi dung khi bridge co du lenh no goi: loc chung o prepareExecution theo tools.CommandNeeds, o day
 	// chi chon theo app va tinh huong.
 	//

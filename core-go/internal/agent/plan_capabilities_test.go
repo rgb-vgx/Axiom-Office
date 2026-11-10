@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"axiomoffice/core/internal/benchflags"
 	"axiomoffice/core/internal/office"
 	"axiomoffice/core/internal/tools"
 )
@@ -78,5 +79,25 @@ func TestActToolsConditions(t *testing.T) {
 	locked := &Request{Document: &DocumentContext{SelectionLocked: true}}
 	if got := names(o.actTools("wps", writer, locked)); got != tools.ReadResultToolName+","+tools.TodoToolName {
 		t.Fatalf("wps dang khoa vung: %s", got)
+	}
+}
+
+// Công tắc benchmark: B0 không có read_result; B5 có; B2 mô tả lệnh gọn nhưng vẫn giữ harness tắt.
+func TestBenchVariantsToggleTools(t *testing.T) {
+	o := &Orchestrator{}
+	names := func(list []tools.Tool) string {
+		parts := []string{}
+		for _, tool := range list {
+			parts = append(parts, tool.Name())
+		}
+		return strings.Join(parts, ",")
+	}
+	t.Setenv(benchflags.Env, "B0")
+	if got := names(o.actTools("wpp", planCatalog(), &Request{})); strings.Contains(got, tools.ReadResultToolName) {
+		t.Fatalf("B0 khong duoc co read_result: %s", got)
+	}
+	t.Setenv(benchflags.Env, "B5")
+	if got := names(o.actTools("wpp", planCatalog(), &Request{})); !strings.Contains(got, tools.ReadResultToolName) {
+		t.Fatalf("B5 phai co read_result: %s", got)
 	}
 }

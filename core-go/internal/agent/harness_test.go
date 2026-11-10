@@ -4,9 +4,24 @@ import (
 	"strings"
 	"testing"
 
+	"axiomoffice/core/internal/benchflags"
 	"axiomoffice/core/internal/office"
 	"axiomoffice/core/internal/skills"
 )
+
+// B0/B3: nhánh benchmark tắt tách prompt thì mọi thứ nằm ở Stable theo thứ tự cũ.
+func TestBuildPartsHonoursPromptFlag(t *testing.T) {
+	t.Setenv(benchflags.Env, "B0")
+	parts := BuildParts("wps", &office.Session{App: "wps"}, &DocumentContext{Name: "a.docx"}, nil, nil, nil, "", nil)
+	if parts.Dynamic != "" || !strings.Contains(parts.Stable, "Open document") {
+		t.Fatalf("B0 phai gop mot khoi: %+v", parts)
+	}
+	t.Setenv(benchflags.Env, "B3")
+	parts = BuildParts("wps", &office.Session{App: "wps"}, &DocumentContext{Name: "a.docx"}, nil, nil, nil, "", nil)
+	if parts.Dynamic == "" || strings.Contains(parts.Stable, "Open document") {
+		t.Fatalf("B3 phai tach phan dong: %+v", parts)
+	}
+}
 
 // Phần ổn định (Base + quy tắc + skill) đi trước và cache được; tài liệu/memory/hội thoại nằm ở phần động.
 func TestBuildPartsSplitsStableAndDynamic(t *testing.T) {

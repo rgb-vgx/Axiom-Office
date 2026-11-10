@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"axiomoffice/core/internal/benchflags"
 	"axiomoffice/core/internal/config"
 	"axiomoffice/core/internal/corelog"
 )
@@ -96,6 +97,7 @@ func (ex *execution) traceStart() {
 		"options": map[string]any{"verify": ex.options.Verify, "maxRounds": ex.options.MaxRounds,
 			"maxIdenticalCalls": ex.options.MaxIdenticalCalls, "contextClearAt": ex.options.ContextClearAt,
 			"contextWindow": ex.options.ContextWindow},
+		"benchVariant":      benchflags.Summary(),
 		"systemPromptChars": len(ex.systemPrompt.String()), "systemStableChars": len(ex.systemPrompt.Stable),
 		"systemDynamicChars": len(ex.systemPrompt.Dynamic), "systemPrompt": ex.systemPrompt.String(),
 		"toolCount": len(toolList), "toolChars": toolChars, "tools": toolList, "prior": prior})
