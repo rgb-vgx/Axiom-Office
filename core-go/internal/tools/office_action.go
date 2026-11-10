@@ -20,6 +20,9 @@ type OfficeActionTool struct {
 	allowed    map[string]office.Command
 	names      []string
 	signatures string
+	// compact: bỏ hint dài trong chữ ký lệnh (HarnessProfile.CompactToolDescriptions) - model cửa sổ nhỏ
+	// đỡ tốn token tiền tố mỗi vòng; tên tham số vẫn còn, chỉ mất câu giải thích.
+	compact bool
 }
 
 const (
@@ -50,6 +53,37 @@ const (
 )
 
 func NewOfficeActionTool(catalog *office.CommandCatalog, appKind string) *OfficeActionTool {
+	return newOfficeActionTool(catalog, appKind, false)
+}
+
+// NewCompactOfficeActionTool: như NewOfficeActionTool nhưng chữ ký lệnh bỏ hint dài. Dùng cho model có
+// cửa sổ ngữ cảnh nhỏ (HarnessProfile) - tiền tố tool là phần cố định tốn token nhất mỗi vòng.
+func NewCompactOfficeActionTool(catalog *office.CommandCatalog, appKind string) *OfficeActionTool {
+	return newOfficeActionTool(catalog, appKind, true)
+}
+
+// NewReadOnlyOfficeActionTool: office_action cho che do lap ke hoach - chi liet ke VA chi cho goi lenh doc
+// (ReadOnly). Model yeu thay lenh sua trong mo ta tool thi hay goi thu; an han khoi danh sach thay vi chi chan.
+func NewReadOnlyOfficeActionTool(catalog *office.CommandCatalog, appKind string) *OfficeActionTool {
+	return newReadOnlyOfficeActionTool(catalog, appKind, false)
+}
+
+// NewCompactReadOnlyOfficeActionTool: bản đọc-chỉ với mô tả gọn.
+func NewCompactReadOnlyOfficeActionTool(catalog *office.CommandCatalog, appKind string) *OfficeActionTool {
+	return newReadOnlyOfficeActionTool(catalog, appKind, true)
+}
+
+func newReadOnlyOfficeActionTool(catalog *office.CommandCatalog, appKind string, compact bool) *OfficeActionTool {
+	reads := &office.CommandCatalog{Version: catalog.Version}
+	for _, command := range catalog.Commands {
+		if ReadOnly(command.Name) {
+			reads.Commands = append(reads.Commands, command)
+		}
+	}
+	return newOfficeActionTool(reads, appKind, compact)
+}
+
+func newOfficeActionTool(catalog *office.CommandCatalog, appKind string, compact bool) *OfficeActionTool {
 	allowed := map[string]office.Command{}
 	names := []string{}
 	signatures := []string{}
@@ -59,32 +93,20 @@ func NewOfficeActionTool(catalog *office.CommandCatalog, appKind string) *Office
 		}
 		allowed[command.Name] = command
 		names = append(names, command.Name)
-		signatures = append(signatures, signature(command))
+		signatures = append(signatures, signature(command, compact))
 	}
 	sort.Strings(names)
-	return &OfficeActionTool{allowed: allowed, names: names, signatures: strings.Join(signatures, "; ")}
+	return &OfficeActionTool{allowed: allowed, names: names, signatures: strings.Join(signatures, "; "), compact: compact}
 }
 
-// NewReadOnlyOfficeActionTool: office_action cho che do lap ke hoach - chi liet ke VA chi cho goi lenh doc
-// (ReadOnly). Model yeu thay lenh sua trong mo ta tool thi hay goi thu; an han khoi danh sach thay vi chi chan.
-func NewReadOnlyOfficeActionTool(catalog *office.CommandCatalog, appKind string) *OfficeActionTool {
-	reads := &office.CommandCatalog{Version: catalog.Version}
-	for _, command := range catalog.Commands {
-		if ReadOnly(command.Name) {
-			reads.Commands = append(reads.Commands, command)
-		}
-	}
-	return NewOfficeActionTool(reads, appKind)
-}
-
-func signature(command office.Command) string {
+func signature(command office.Command, compact bool) string {
 	params := make([]string, 0, len(command.Params))
 	hidden := targetParam(command.Name)
 	for _, param := range command.Params {
 		if param.Name == hidden {
 			continue // Core tu gan tai lieu cua luot (target.go): model khong can doc tham so nay
 		}
-		if param.Hint == "" {
+		if compact || param.Hint == "" {
 			params = append(params, param.Name)
 			continue
 		}

@@ -44,6 +44,13 @@ type execution struct {
 func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *Request) *execution {
 	client := o.Models.Current()
 	actions := newActionLog()
+	// HarnessProfile theo model (hoc tu Deep Agents): model cua so nho nhan chu ky lenh gon + ngan sach
+	// luot truoc nho hon. Doc /models mot lan roi dung lai cho AgentOptions.ContextWindow.
+	contextWindow := client.ModelInfo(ctx, client.Model).ContextWindow
+	harness := model.HarnessFor(client.Provider, client.Model, contextWindow)
+	request.CompactTools = harness.CompactToolDescriptions
+	request.ContextBudgetTokens = harness.ContextBudgetTokens
+	request.SummarizeEvery = harness.SummarizeEvery
 
 	session := o.Sessions.Find(request.Port)
 	if session == nil {
@@ -127,7 +134,7 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 			before = append(before, message)
 		}
 	}
-	assembled := o.Assembler.Assemble(conversation, before, 10)
+	assembled := o.Assembler.AssembleWithBudget(conversation, before, 10, request.ContextBudgetTokens)
 
 	catalog := o.Bridge.GetCommandsFor(ctx, request.Port, appKind, false)
 	if catalog == nil {
@@ -144,6 +151,9 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 	// readOnly: lap ke hoach, hoac lenh nhanh chi tra loi (Tom tat, Dich...) - ca hai chi duoc goi lenh doc.
 	readOnly := request.Plan || request.ReadOnly
 	officeTool := tools.NewOfficeActionTool(catalog, appKind)
+	if request.CompactTools {
+		officeTool = tools.NewCompactOfficeActionTool(catalog, appKind)
+	}
 	if readOnly {
 		officeTool = tools.NewReadOnlyOfficeActionTool(catalog, appKind)
 	}
@@ -283,7 +293,11 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 	if request.Plan {
 		// Ke hoach phai dung lenh se CO khi chay: luot that 25/10/2026 (ocg/beam-free, de 10 slide kien truc) chi thay
 		// lenh doc nen len ke hoach so do bang chu, hoi "neu lenh ve khoi/mui ten khong kha dung".
-		systemPrompt += "\n\n" + PlanModeRule + PlanCapabilities(tools.NewOfficeActionTool(catalog, appKind),
+		planOffice := tools.NewOfficeActionTool(catalog, appKind)
+		if request.CompactTools {
+			planOffice = tools.NewCompactOfficeActionTool(catalog, appKind)
+		}
+		systemPrompt += "\n\n" + PlanModeRule + PlanCapabilities(planOffice,
 			o.actTools(appKind, catalog, request))
 	}
 	// Lenh nhanh "Sua bang AI": nguoi dung bam lenh la da quyet - sua ngay, khong hoi lai (quickactions.go).
@@ -305,7 +319,10 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 	options.Verify = o.Config().VerifyWorkEnabled && !readOnly
 	// Model du phong + cua so ngu canh (GET /models doc mot lan cho moi cau hinh LLM).
 	options.FallbackModels = o.Config().LlmFallbackModels
-	options.ContextWindow = client.ModelInfo(ctx, client.Model).ContextWindow
+	options.ContextWindow = contextWindow
+	if harness.MaxRounds > 0 && (options.MaxRounds <= 0 || options.MaxRounds > harness.MaxRounds) {
+		options.MaxRounds = harness.MaxRounds
+	}
 	options.OncePerReply = []string{tools.TodoToolName}
 	// Lop 3 cua repair.go: ten lenh dung lam ten tool -> office_action (chi khi khop chinh xac lenh duoc phep).
 	options.RepairToolCall = func(call model.ToolCall) (model.ToolCall, bool) {
@@ -502,11 +519,11 @@ func (o *Orchestrator) applyResult(ctx context.Context, ex *execution, result mo
 		// Tom tat hoi thoai o hang doi nen (muc 8.5.9): khong bat pane cho sau khi run xong.
 		target, seq := conversation, ex.userSeq
 		o.Memory.Enqueue(func(inner context.Context) error {
-			o.maybeSummarize(inner, o.Models.Current(), target, seq)
+			o.maybeSummarizeEvery(inner, o.Models.Current(), target, seq, request.SummarizeEvery)
 			return nil
 		})
 	} else if result.OK {
-		o.maybeSummarize(ctx, ex.client, conversation, ex.userSeq)
+		o.maybeSummarizeEvery(ctx, ex.client, conversation, ex.userSeq, request.SummarizeEvery)
 	}
 }
 

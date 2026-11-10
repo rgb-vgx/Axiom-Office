@@ -5,6 +5,26 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — HarnessProfile theo model + mô tả lệnh gọn (11/11/2026)
+
+Học từ **Deep Agents** (`langchain-ai/deepagents`, bản 10/11/2026): tách *provider profile* (cách dựng client:
+auth, codec) khỏi *harness profile* (cách agent hành xử: prompt, tool nào được thấy, ngân sách). Nguồn đọc:
+`libs/deepagents/deepagents/profiles/`, `openwiki/concepts/profiles-models.md`.
+
+- `core-go/internal/model/harness.go`: `HarnessProfile` khoá theo `provider:model` → `provider` → `model` →
+  mặc định, gồm `ContextBudgetTokens`, `CompactToolDescriptions`, `SummarizeEvery`, `MaxRounds`;
+  `RegisterHarness` cho phép thêm profile không sửa lõi.
+- Model có cửa sổ ngữ cảnh ≤ 32k (từ `/models` hoặc `LlmContextWindow`) tự nhận mô tả tool gọn và ngân sách
+  lượt trước nhỏ hơn (8k → 2.000 token, 32k → 4.000; không rõ cửa sổ → 8.000 như trước). Đây là cách áp dụng
+  ý "trigger/keep theo `max_input_tokens`" của Deep Agents (`middleware/summarization.py`) cho phần lịch sử
+  hội thoại của Axiom.
+- `office_action` có bản chữ ký gọn: giữ đủ tên tham số nhưng bỏ hint dài (`NewCompactOfficeActionTool`,
+  `NewCompactReadOnlyOfficeActionTool`). Đo trên catalog hiện tại: phần chữ ký Word ~12,7k → ~4,1k ký tự,
+  Excel ~10,7k → ~3,7k, PowerPoint ~6,2k → ~2,1k; enum `action` không đổi.
+- `ContextAssembler.AssembleWithBudget` + `ShouldSummarizeEvery`: ngân sách và chu kỳ tóm tắt lấy từ
+  `HarnessProfile` thay vì hằng số 8.000/20 cho mọi model.
+- Test: `model/harness_test.go`, `tools/office_action_compact_test.go`.
+
 ### Added — WPS: soát phân trang, văn bản hành chính, "Tạo slide" ở Writer (01/11/2026)
 
 - `writer.checkLayout` + `writer.deleteParagraphs` trên WPS (TASK-000160, port bản Windows; đã chạy trên WPS thật: bắt

@@ -50,6 +50,11 @@ type Request struct {
 	TrackChanges *bool
 	// Language: ngon ngu giao dien de Core dich cac cau TRANG THAI tu gui (P7-03). "vi" (mac dinh) hoac "en".
 	Language string
+	// CompactTools / ContextBudgetTokens: do HarnessProfile cua model quyet dinh, KHONG lay tu body.
+	// Model cua so nho -> chu ky lenh gon + ngan sach luot truoc nho hon.
+	CompactTools        bool
+	ContextBudgetTokens int
+	SummarizeEvery      int
 }
 
 const (
@@ -361,15 +366,27 @@ func conversationKey(documentKey string) *string {
 const SummaryEvery = 20
 
 func ShouldSummarize(firstSeqOfRun, lastSeq int) bool {
-	if lastSeq <= SummaryEvery {
+	return ShouldSummarizeEvery(firstSeqOfRun, lastSeq, SummaryEvery)
+}
+
+// ShouldSummarizeEvery: như ShouldSummarize nhưng chu kỳ do HarnessProfile quyết định (0 = mặc định).
+func ShouldSummarizeEvery(firstSeqOfRun, lastSeq, every int) bool {
+	if every <= 0 {
+		every = SummaryEvery
+	}
+	if lastSeq <= every {
 		return false
 	}
-	return lastSeq/SummaryEvery > (firstSeqOfRun-1)/SummaryEvery
+	return lastSeq/every > (firstSeqOfRun-1)/every
 }
 
 func (o *Orchestrator) maybeSummarize(ctx context.Context, client *model.Client, conversation *store.ConversationRow, userSeq int) {
+	o.maybeSummarizeEvery(ctx, client, conversation, userSeq, SummaryEvery)
+}
+
+func (o *Orchestrator) maybeSummarizeEvery(ctx context.Context, client *model.Client, conversation *store.ConversationRow, userSeq, every int) {
 	history := o.Conversations.Messages(conversation.ID, 60)
-	if len(history) == 0 || !ShouldSummarize(userSeq, history[len(history)-1].Seq) {
+	if len(history) == 0 || !ShouldSummarizeEvery(userSeq, history[len(history)-1].Seq, every) {
 		return
 	}
 	lines := make([]string, 0, len(history))

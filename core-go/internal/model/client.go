@@ -76,6 +76,8 @@ type Client struct {
 	Codec    Codec
 	endpoint string
 	apiKey   string
+	// Provider: tên provider trong cấu hình (openai, anthropic, gemini...) - dùng cho HarnessProfile.
+	Provider string
 	Model    string
 
 	// RequestTimeout: tran cho MOT request; 0 = khong tran (mac dinh cho luot agent). Loi goi ngan
@@ -111,6 +113,7 @@ func NewClient(httpClient *http.Client, provider, endpoint, apiKey, model string
 		Codec:       NewCodec(provider),
 		endpoint:    NormalizeEndpoint(endpoint),
 		apiKey:      apiKey,
+		Provider:    provider,
 		Model:       model,
 		IdleTimeout: DefaultIdleTimeout,
 		RetryDelays: DefaultRetryDelays,

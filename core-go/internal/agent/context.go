@@ -24,6 +24,15 @@ func EstimateTokens(text string) int {
 }
 
 func (a *ContextAssembler) Assemble(conversation *store.ConversationRow, messages []store.MessageRow, maxActionLines int) AssembledContext {
+	return a.AssembleWithBudget(conversation, messages, maxActionLines, 0)
+}
+
+// AssembleWithBudget: như Assemble nhưng ngân sách do HarnessProfile của model quyết định (0 = mặc định
+// của assembler). Model cửa sổ nhỏ nhận ngân sách nhỏ để chừa chỗ cho system prompt + tool + câu trả lời.
+func (a *ContextAssembler) AssembleWithBudget(conversation *store.ConversationRow, messages []store.MessageRow, maxActionLines, budgetTokens int) AssembledContext {
+	if budgetTokens <= 0 {
+		budgetTokens = a.BudgetTokens
+	}
 	turns := []model.ConversationTurn{}
 	actions := []string{}
 	tokens := 0
@@ -42,7 +51,7 @@ func (a *ContextAssembler) Assemble(conversation *store.ConversationRow, message
 		}
 
 		cost := EstimateTokens(message.Content) + 4
-		if !overBudget && tokens+cost > a.BudgetTokens {
+		if !overBudget && tokens+cost > budgetTokens {
 			// Het ngan sach: phan con lai chi con trong ban tom tat.
 			overBudget = true
 		}
