@@ -337,7 +337,9 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 	// loi van tra nguyen van de model doc thong diep loi day du) - xem truncate.go.
 	raw := result.RawJSON
 	if result.OK {
+		original := raw
 		raw = TruncateBridgeResult(action, result.Result, raw, run.FocusSlide)
+		raw = attachResultRef(raw, original, run)
 	}
 	if result.OK && batchHints[action].batch != "" {
 		if run.singleCalls == nil {

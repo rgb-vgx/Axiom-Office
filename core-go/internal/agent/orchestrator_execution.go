@@ -279,6 +279,8 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 	if request.Document != nil {
 		runContext.FocusSlide = request.Document.Slide
 	}
+	// Kết quả tool bị truncate: giữ bản đầy đủ trong bộ nhớ của lượt cho read_result.
+	runContext.Results = tools.NewResultStore()
 	// Track Changes cho luot Word (tracking.go): bat truoc lenh sua dau tien, tra lai trong finish().
 	o.startTracking(ctx, run, request, appKind, catalog, readOnly, runContext.TargetDocument)
 	// Luu nguon web tai ve trong luot (WebSourceStore bat + kho mo duoc): tool web ghi qua RunContext.
@@ -580,7 +582,7 @@ func (o *Orchestrator) otherSessions(ctx context.Context, current *office.Sessio
 // actTools: tool chi co khi LAM THAT - khong co o lap ke hoach / lenh nhanh chi tra loi (o lap ke hoach chi duoc
 // MO TA qua PlanCapabilities, de ke hoach dung dung lenh se co khi chay).
 func (o *Orchestrator) actTools(appKind string, catalog *office.CommandCatalog, request *Request) []tools.Tool {
-	list := []tools.Tool{}
+	list := []tools.Tool{tools.NewReadResultTool()}
 	// Tool nao chi dung khi bridge co du lenh no goi: loc chung o prepareExecution theo tools.CommandNeeds, o day
 	// chi chon theo app va tinh huong.
 	//

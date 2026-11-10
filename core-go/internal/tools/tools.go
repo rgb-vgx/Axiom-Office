@@ -126,6 +126,8 @@ type RunContext struct {
 	Trace func(event string, fields map[string]any)
 	// Todos: danh sach viec model ghi gan nhat (write_todos).
 	Todos []Todo
+	// Results: kết quả tool nguyên văn bị truncate trong lượt (results.go) - đọc lại bằng read_result.
+	Results *ResultStore
 	// lastTemplate, lastSource, lastTarget: tham so slides_from_template lan truoc trong luot (model hay bo o lan sau).
 	lastTemplate, lastSource, lastTarget string
 	// droppedPictures: anh bo co chu dich trong che do bien soan (bao trong cau tra loi cuoi).

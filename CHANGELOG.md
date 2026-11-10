@@ -5,6 +5,22 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — giữ kết quả tool bị cắt + `read_result` đọc lại theo phần (11/11/2026)
+
+Học từ **Deep Agents** (`middleware/_message_eviction.py`, `_overflow_clip.py`): khi kết quả tool quá lớn,
+giữ bản đầy đủ và trả về preview kèm con trỏ để model đọc lại bằng `read_file(offset, limit)`; riêng kết quả
+đọc file thì trỏ về đúng đường dẫn gốc.
+
+- `tools.ResultStore`: giữ nguyên văn kết quả bị truncate **trong bộ nhớ của lượt** (không ghi đĩa), trần
+  4 MB/kết quả và 16 MB/lượt; lượt xong là mất, không để lại nội dung tài liệu.
+- `office_action`: khi `truncated=true`, gắn `resultId` + `readMore` vào kết quả; phần bị cắt vẫn còn nguyên
+  trong store thay vì bị bỏ.
+- Tool mới `read_result {id, offset, limit}`: trả `text`, `totalChars`, `nextOffset`, `truncated`; mặc định
+  20.000 ký tự/lần, tối đa 40.000. Model đọc tiếp thay vì gọi lại lệnh bridge hoặc đoán phần bị cắt.
+- `et.readRange` vẫn giữ `nextRange` sẵn có; offload áp cho các lệnh không có cơ chế đọc tiếp
+  (`writer.getText`, `writer.outline`, `checkRange`, `wpp.listSlides`...).
+- Test: `tools/results_test.go` (lưu/đọc/trần, gắn resultId, phân trang, id sai).
+
 ### Added — chèn lại checklist mỗi vòng để model yếu không quên bước (11/11/2026)
 
 Học từ **Deep Agents**: goal state notice được fingerprint, giới hạn kích thước, ẩn khỏi transcript người dùng

@@ -59,13 +59,13 @@ func TestActToolsConditions(t *testing.T) {
 		}
 		return strings.Join(out, ",")
 	}
-	if got := names(o.actTools("wpp", planCatalog(), &Request{})); got != "slides_from_brief,"+tools.TodoToolName {
+	if got := names(o.actTools("wpp", planCatalog(), &Request{})); got != tools.ReadResultToolName+",slides_from_brief,"+tools.TodoToolName {
 		t.Fatalf("wpp: %s", got)
 	}
 	writer := &office.CommandCatalog{Commands: []office.Command{{Name: "writer.insertBlocks", Kind: "wps", Agent: true},
 		{Name: "writer.restyle", Kind: "wps", Agent: true}, {Name: "writer.outline", Kind: "wps", Agent: true},
 		{Name: "writer.getText", Kind: "wps", Agent: true}}}
-	if got := names(o.actTools("wps", writer, &Request{})); !strings.HasPrefix(got, "doc_design,") {
+	if got := names(o.actTools("wps", writer, &Request{})); !strings.HasPrefix(got, tools.ReadResultToolName+",doc_design,") {
 		t.Fatalf("wps: %s", got)
 	}
 	// Truoc 31/10/2026 Core chi kiem writer.insertBlocks: backend co insertBlocks ma thieu writer.restyle van nhan
@@ -76,7 +76,7 @@ func TestActToolsConditions(t *testing.T) {
 		t.Fatalf("thieu writer.restyle thi khong duoc dua doc_design: %s", got)
 	}
 	locked := &Request{Document: &DocumentContext{SelectionLocked: true}}
-	if got := names(o.actTools("wps", writer, locked)); got != tools.TodoToolName {
+	if got := names(o.actTools("wps", writer, locked)); got != tools.ReadResultToolName+","+tools.TodoToolName {
 		t.Fatalf("wps dang khoa vung: %s", got)
 	}
 }
