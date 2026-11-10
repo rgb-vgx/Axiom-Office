@@ -1,7 +1,7 @@
 ﻿# Tình trạng dự án Axiom Office
 
-Cập nhật: **10/11/2026** · nhánh `main` · đã hợp nhất nhánh WPS Linux 16/10–01/11 với các tính năng local 17–18/10
-(§2.17); **chưa push** remote.
+Cập nhật: **11/11/2026** · nhánh `main` · đã hợp nhất nhánh WPS Linux 16/10–01/11 với các tính năng local 17–18/10
+(§2.17) và thử 4 cải tiến học từ Deep Agents (§2.18); **chưa push** remote.
 Số liệu kiểm chứng ở §2.4 là lượt đo **01/10/2026**; số mới của đợt WPS ở §2.6, lượt đo lại toàn bộ ở §2.7, lượt đo
 lại job Windows ở §2.8, đợt Office x64 + sửa định dạng văn bản ở §2.9, ba đợt 25/10 ở §2.10–2.12, đợt 27–28/10 ở §2.15,
 đợt 31/10 ở §2.16 và đợt hợp nhất 10/11 ở §2.17.
@@ -373,6 +373,22 @@ dựng được Core + `AxiomOffice.dll` + Host; `tests/lo/test_dialogs.py` **27
 trên Linux/CI khớp). Nhánh `backup/local-18-10` giữ nguyên trạng thái trước merge; bản docs 18/10 chưa commit nằm ở
 `stash@{0}`.
 
+### 2.18 Đợt 11/11/2026: thử học từ Deep Agents
+
+Đọc repo **LangChain Deep Agents** (`C:\Users\ThuyetMT\Documents\work\deepagents`, bản 10/11/2026) và làm thử 4 việc
+trong Core Go. Chi tiết "học gì từ file nào" nằm ở đầu `CHANGELOG.md` mục `[Unreleased]`.
+
+| Việc | Nội dung | Nguồn Deep Agents |
+|---|---|---|
+| HarnessProfile theo model | `model/harness.go`: tách khỏi provider profile; ngân sách lượt trước, chu kỳ tóm tắt, `MaxRounds`, mô tả lệnh gọn; model cửa sổ ≤ 32k tự dùng bản gọn | `profiles/`, `openwiki/concepts/profiles-models.md`, `middleware/summarization.py` |
+| Mô tả lệnh gọn | `office_action` giữ tên tham số, bỏ hint dài: Word ~12,7k → ~4,1k ký tự, Excel ~10,7k → ~3,7k, PowerPoint ~6,2k → ~2,1k | ý progressive disclosure / harness profile |
+| System prompt ổn định/động | `model.SystemPrompt`; Anthropic gửi 2 block, chỉ block ổn định mang `cache_control`; OpenAI gộp một message | `middleware/_prompt_caching.py`, `LocalContextMiddleware` |
+| Checklist mỗi vòng | `AgentCallbacks.StateNote` + `agent/state.go`: chèn lại `write_todos` khi đổi, nhãn `[state]` | goal state notice (`openwiki/concepts/context-management.md`, `goal_state_notice.py`) |
+| Giữ kết quả bị cắt | `tools.ResultStore` + tool `read_result {id, offset, limit}`: bản đầy đủ chỉ trong bộ nhớ lượt (4 MB/kết quả, 16 MB/lượt) | `middleware/_message_eviction.py`, `_overflow_clip.py` |
+
+Kiểm (11/11): `go test ./...` xanh, `go vet` + `gofmt` sạch, e2e Core **180/180**, `scripts\build.ps1` dựng được Core +
+DLL + Host. **Chưa đo bằng LLM thật/bench** — đây là thử nghiệm cơ chế, cần A/B trước khi bật mặc định cho mọi model.
+
 ## 3. Chưa làm / chưa kiểm chứng
 
 | Việc | Tình trạng | Ghi chú |
@@ -383,7 +399,7 @@ trên Linux/CI khớp). Nhánh `backup/local-18-10` giữ nguyên trạng thái 
 | Trích xuất memory với **LLM thật** | **Đã (24/10/2026)** | Lượt thật trích 1 fact (`core.log`: `1 added`) |
 | **Office 32-bit** | **Không hỗ trợ** | Add-in .NET làm Office 32-bit crash `mso98win32client.dll`; kiểm bằng add-in tối giản (§2.9) |
 | Đọc/ghi **HKCU** bằng test tự động trên Windows | Một phần | Đối chiếu tay: Core Go đọc đúng endpoint/model/token/DPAPI của bạn; test tự động hiện dùng `AXIOM_*`. Từ 24/10 test cũng **không còn ghi vào HKCU thật** (nguồn cấu hình inject file tạm — §2.8) |
-| **Push remote** | **Chưa (10/11/2026)** | `main` đang **ahead 17** so với `origin/main`: 15 commit local 17–18/10, merge `4c435f8` và ca kiểm `/v1/skills/inspect`; chưa push theo yêu cầu |
+| **Push remote** | **Chưa (11/11/2026)** | `main` đang **ahead 23** so với `origin/main`: 15 commit local 17–18/10, merge `4c435f8`, ca kiểm `/v1/skills/inspect` và 5 commit thử học Deep Agents (§2.18); chưa push theo yêu cầu |
 | CI job **windows** | **Xanh (24/10/2026)** | Trước đó đỏ ở bước `go test` (`TestWPSConfigWrite` giả định nguồn cấu hình là `config.json`, nhưng trên Windows `DefaultSource()` là HKCU) và ở bước build net48 (`}` thừa trong `AskAiPane.cs`). Đã sửa cả hai — xem §2.8 |
 | Nghiệm thu plan 20 §5.1 trên đề thật | **Đạt 26/10/2026** | 3 lượt liền (`r_e6766361`, `r_9a7512ac`, `r_fb096418`, `ocg/beam-free`) lần dựng đầu không còn `connector-*` (§2.13) |
 | Merge `feat/setup-wizard` + `feat/core-go` vào `main` | **Đã xong** | Fast-forward, lịch sử thẳng |
