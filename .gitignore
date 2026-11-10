@@ -20,3 +20,8 @@ tests/ui/out/
 tests/wps/out/
 # CSDL cua may chu MCP nghien cuu web cua opencode (tao trong thu muc lam viec)
 /data/
+.archify/**/review-*/
+.archify/**/visual-check*/
+.archify/**/*.finalize*.json
+.archify/**/*.delivery.json
+.archify/**/*.browser-check.json
