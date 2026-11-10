@@ -44,6 +44,7 @@ test-lo:
 test-bench:
 	python3 -m unittest discover -s tests/bench/slides -v
 	python3 -m unittest discover -s tests/bench/chinh-ta -v
+	python3 -m unittest discover -s tests/bench/campaign -v
 
 # Catalog lenh bridge (catalog/live-commands.json - nguon chuan): dinh dang, tham so chon tai lieu, khop ban C# (khi da build).
 test-catalog:

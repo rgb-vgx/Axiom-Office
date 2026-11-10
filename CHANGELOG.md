@@ -5,6 +5,22 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — hạ tầng benchmark paired cho 5 cải tiến (11/11/2026)
+
+Theo thiết kế trong `docs/research/gpt-advice.md`: so **cùng task, cùng fixture, có/không có cải tiến**
+thay vì so điểm trung bình của hai đợt khác nhau; success nhị phân S0–S3; cost per successful task;
+median giảm theo cặp + bootstrap CI; McNemar exact cho success.
+
+- `core-go/internal/benchflags`: công tắc `AXIOM_BENCH_VARIANT` **B0–B6** — B0 tắt hết, B1 HarnessProfile,
+  B2 mô tả lệnh gọn, B3 tách prompt, B4 checklist, B5 `read_result`, B6 tất cả. **Không đặt biến = production**
+  (HarnessProfile tự quyết định compact như trước). Variant được ghi vào `DebugTrace` (`benchVariant`).
+- `tests/bench/campaign/`: `records.py` (schema + ghép cặp), `stats.py` (McNemar exact, median reduction,
+  bootstrap theo cặp, cost/success), `report.py` (báo cáo Markdown theo nhánh/task), `record.py` (ghi nối
+  một lần chạy). README mô tả schema và cách chạy P0–P3.
+- `Makefile` target `test-bench` chạy thêm test của bộ campaign.
+- Báo cáo cố ý không tự quyết định thay người đọc: chỉ in KEEP/REJECT/HOLD theo ngưỡng success + billable,
+  kèm cảnh báo CI rộng thì HOLD; các metric phụ (invalid param, đọc trùng, recovery) phải xem bảng chi tiết.
+
 ### Added — giữ kết quả tool bị cắt + `read_result` đọc lại theo phần (11/11/2026)
 
 Học từ **Deep Agents** (`middleware/_message_eviction.py`, `_overflow_clip.py`): khi kết quả tool quá lớn,

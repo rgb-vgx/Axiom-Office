@@ -389,6 +389,10 @@ trong Core Go. Chi tiết "học gì từ file nào" nằm ở đầu `CHANGELOG
 Kiểm (11/11): `go test ./...` xanh, `go vet` + `gofmt` sạch, e2e Core **180/180**, `scripts\build.ps1` dựng được Core +
 DLL + Host. **Chưa đo bằng LLM thật/bench** — đây là thử nghiệm cơ chế, cần A/B trước khi bật mặc định cho mọi model.
 
+Hạ tầng benchmark paired đã thêm cùng đợt: `AXIOM_BENCH_VARIANT` (B0–B6, không đặt = production) và
+`tests/bench/campaign/` (manifest, McNemar exact, median giảm theo cặp + bootstrap CI, cost/success, báo cáo
+Markdown). Xem `tests/bench/campaign/README.md`.
+
 ## 3. Chưa làm / chưa kiểm chứng
 
 | Việc | Tình trạng | Ghi chú |

@@ -1,5 +1,9 @@
 # Đối chiếu benchmark LibreOffice Calc với Claude Code
 
+> Muốn so **có/không có một cải tiến** trên cùng task (paired, McNemar, bootstrap, cost/success):
+> xem [campaign/README.md](campaign/README.md). Công tắc nhánh nằm ở `AXIOM_BENCH_VARIANT` (B0–B6);
+> không đặt biến là chạy production.
+
 Bộ đề: `libre_calc_agent_extreme_benchmark` (4 bài, mỗi bài 100 điểm). Mục đích không phải chấm điểm
 Axiom mà là **tìm khoảng cách**: cùng một đề, Claude Code làm được gì, Axiom Core làm được gì, và vì sao
 khác nhau — kèm bằng chứng lấy từ log/transcript chứ không phải suy đoán.
