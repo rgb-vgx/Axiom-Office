@@ -5,6 +5,19 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — chèn lại checklist mỗi vòng để model yếu không quên bước (11/11/2026)
+
+Học từ **Deep Agents**: goal state notice được fingerprint, giới hạn kích thước, ẩn khỏi transcript người dùng
+và chèn lại mỗi lượt (`openwiki/concepts/context-management.md`; `libs/code/deepagents_code/goal_state_notice.py`).
+
+- `model.AgentCallbacks.StateNote`: trước mỗi vòng, harness trả một câu trạng thái ngắn; Core chỉ chèn khi câu
+  đó **đổi** so với lần trước, dưới nhãn `[state] ...` (cùng cơ chế với các câu nhắc của Core).
+- `agent/state.go`: `todoStateNote` gom `write_todos` thành "Checklist 1/3 done; doing: ..." + các bước
+  `[x]/[>]/[ ]`, tối đa 8 bước và 500 ký tự.
+- `Orchestrator.buildCallbacks` nối `runContext.Todos` vào callback. Trước đây checklist chỉ nằm trong kết quả
+  tool `write_todos`, model yếu dễ quên bước giữa lượt dài.
+- Test: `agent/state_test.go`, `model/agent_state_test.go` (chỉ chèn một lần khi chuỗi không đổi).
+
 ### Changed — tách system prompt ổn định/động để cache đúng phần tiền tố (11/11/2026)
 
 Học từ **Deep Agents**: `_prompt_caching.py` và cách `LocalContextMiddleware` chèn context động thành message

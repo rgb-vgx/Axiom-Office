@@ -396,7 +396,9 @@ func (o *Orchestrator) buildCallbacks(ex *execution) model.AgentCallbacks {
 			return choice == "continue"
 		},
 
-		Trace: ex.trace.callback(),
+		// Checklist hiện tại: chỉ chèn khi đổi, để model yếu không quên bước giữa lượt dài.
+		StateNote: func(round int) string { return todoStateNote(ex.runContext.Todos) },
+		Trace:     ex.trace.callback(),
 		RoundFinished: func(stat model.RoundStat) {
 			o.Runs.AddRound(run.ID, store.RoundRow{Round: stat.Round, InputTokens: stat.InputTokens, CachedTokens: stat.CachedTokens,
 				OutputTokens: stat.OutputTokens, ToolCalls: stat.ToolCalls, Kind: stat.Kind})

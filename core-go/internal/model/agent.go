@@ -134,6 +134,10 @@ type AgentCallbacks struct {
 	RoundFinished func(stat RoundStat)
 	// Trace: su kien chi tiet de soi loi (round, tool, guard, state) voi DAY DU noi dung - chi gan khi bat DebugTrace.
 	Trace func(event string, fields map[string]any)
+	// StateNote: trang thai ngan cua harness truoc mot vong (vd checklist write_todos). Chi chèn khi chuỗi
+	// đổi so với lần trước, và chèn như một tin nhắn user có nhãn "[state]" (giống các câu nhắc của Core).
+	// Học từ Deep Agents: goal state notice được chèn lại mỗi lượt, ẩn khỏi transcript người dùng.
+	StateNote func(round int) string
 }
 
 // RoundStat: mot vong goi model. Kind: "tools" (co tool call), "final" (cau tra loi cuoi), "nudge:<guard>" (guard nhac
@@ -258,6 +262,7 @@ func (c *Client) runAgent(ctx context.Context, system SystemPrompt, prior []Conv
 		return done(decision.ok, decision.text, decision.err, decision.kind)
 	}
 
+	lastStateNote := ""
 	for options.MaxRounds <= 0 || result.Rounds < options.MaxRounds {
 		result.ToolsDisabled = !loop.toolsEnabled
 		if runCtx.Err() != nil {
@@ -266,6 +271,12 @@ func (c *Client) runAgent(ctx context.Context, system SystemPrompt, prior []Conv
 		result.Rounds++
 		if callbacks.RoundStarted != nil {
 			callbacks.RoundStarted(result.Rounds)
+		}
+		if callbacks.StateNote != nil {
+			if note := strings.TrimSpace(callbacks.StateNote(result.Rounds)); note != "" && note != lastStateNote {
+				loop.say("[state] " + note)
+				lastStateNote = note
+			}
 		}
 
 		turn, failure := loop.ask(runCtx, ctx, tools)
