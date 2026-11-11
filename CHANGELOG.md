@@ -5,6 +5,15 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Docs — bộ 22 task test tham khảo cho 3 ứng dụng (12/11/2026)
+
+- `docs/research/gpt-test-tasks.md`: prompt + phản hồi GPT, đã dọn thành tài liệu đọc được; 22 task
+  (6 smoke, 10 core, 6 stress; Word 8, Excel 7, PowerPoint 7), mỗi task có prompt người dùng,
+  tiêu chí đạt nhị phân, điều không được làm, thay đổi cần chạm và dấu hiệu quan sát.
+- `docs/research/gpt-test-tasks.json`: cùng bộ 22 task ở dạng máy đọc, 22 id duy nhất, đủ trường
+  `user_prompt/acceptance/must_not/feature/watch_for`.
+- Đây là **bộ đề nháp** để test tay; task nào ổn mới chuyển vào `tests/bench/` hoặc `tests/live/tasks/`.
+
 ### Added — hạ tầng benchmark paired cho 5 cải tiến (11/11/2026)
 
 Theo thiết kế trong `docs/research/gpt-advice.md`: so **cùng task, cùng fixture, có/không có cải tiến**

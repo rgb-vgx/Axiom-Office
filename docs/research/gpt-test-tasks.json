@@ -1,0 +1,626 @@
+{
+  "suite": "axiom-office-benchmark-v1",
+  "language": "vi",
+  "tasks": [
+    {
+      "id": "W01",
+      "tier": "smoke",
+      "app": "wps",
+      "title": "Sửa đơn xin việc",
+      "user_prompt": "Kiểm tra và sửa lỗi chính tả trong đơn xin việc này giúp tôi. Giữ nguyên nội dung, chỉ sửa lỗi sai thôi nhé.",
+      "acceptance": [
+        "Sửa 'lam việc' thành 'làm việc'",
+        "Sửa 'kinh nghiêm' thành 'kinh nghiệm'",
+        "Không còn hai chuỗi lỗi",
+        "Số đoạn văn không đổi",
+        "Nội dung ngoài hai vị trí sai không đổi"
+      ],
+      "must_not": [
+        "Viết lại toàn bộ đơn",
+        "Tự thêm thông tin cá nhân",
+        "Thay đổi bố cục"
+      ],
+      "feature": "đối chứng",
+      "watch_for": [
+        "Đọc văn bản trước khi sửa",
+        "Chỉ sửa hai vị trí",
+        "Đọc lại sau khi sửa"
+      ]
+    },
+    {
+      "id": "W02",
+      "tier": "smoke",
+      "app": "wps",
+      "title": "Chuẩn hóa bảng thông tin",
+      "user_prompt": "Chỉnh lại bảng này cho dễ đọc nhé. Tiêu đề in đậm, nền xanh nhạt, chữ căn giữa. Các dòng dữ liệu căn giữa theo chiều dọc và có đường viền đầy đủ.",
+      "acceptance": [
+        "Bảng có 5 hàng và 4 cột",
+        "Nội dung 16 ô không đổi",
+        "Hàng đầu in đậm",
+        "Hàng đầu có nền xanh nhạt",
+        "Nội dung căn giữa ngang",
+        "Nội dung căn giữa dọc",
+        "Có border ngoài và border phân cách ô"
+      ],
+      "must_not": [
+        "Thêm hoặc xóa hàng cột",
+        "Thay đổi dữ liệu nhân viên"
+      ],
+      "feature": "đối chứng",
+      "watch_for": [
+        "Truyền tham số định dạng",
+        "Áp dụng định dạng toàn bảng",
+        "Kiểm tra bảng sau sửa"
+      ]
+    },
+    {
+      "id": "E01",
+      "tier": "smoke",
+      "app": "et",
+      "title": "Tính bảng điểm",
+      "user_prompt": "Tính điểm trung bình cho từng học sinh, làm tròn 2 chữ số thập phân. Định dạng tiêu đề cho dễ nhìn và kẻ bảng giúp tôi.",
+      "acceptance": [
+        "F2:F6 có công thức AVERAGE tương ứng",
+        "Kết quả lần lượt 8, 7, 8.67, 6, 8",
+        "F2:F6 hiển thị 2 chữ số thập phân",
+        "A1:F1 in đậm",
+        "A1:F6 có border",
+        "Dữ liệu C2:E6 không đổi"
+      ],
+      "must_not": [
+        "Hardcode kết quả",
+        "Ghi đè điểm gốc",
+        "Đổi tên sheet"
+      ],
+      "feature": "đối chứng",
+      "watch_for": [
+        "Sử dụng công thức",
+        "Đọc dữ liệu trước khi tính",
+        "Đọc lại kết quả"
+      ]
+    },
+    {
+      "id": "E02",
+      "tier": "smoke",
+      "app": "et",
+      "title": "Chuẩn hóa bảng nhân viên",
+      "user_prompt": "Làm bảng nhân viên này chuyên nghiệp hơn, định dạng lương có dấu phân cách hàng nghìn, ngày theo dd/mm/yyyy, hàng tiêu đề nổi bật và bật bộ lọc giúp tôi.",
+      "acceptance": [
+        "A1:E6 được tạo thành Excel Table hoặc cấu trúc tương đương có AutoFilter",
+        "Header in đậm và có màu nền",
+        "D2:D6 có phân cách hàng nghìn",
+        "E2:E6 có định dạng dd/mm/yyyy",
+        "Có bộ lọc 5 cột",
+        "Dữ liệu không đổi"
+      ],
+      "must_not": [
+        "Sắp xếp lại nhân viên",
+        "Thay đổi mức lương",
+        "Tạo sheet mới"
+      ],
+      "feature": "đối chứng",
+      "watch_for": [
+        "Tạo Table hoặc AutoFilter",
+        "Định dạng ngày và số",
+        "Kiểm tra kết quả"
+      ]
+    },
+    {
+      "id": "P01",
+      "tier": "smoke",
+      "app": "wpp",
+      "title": "Sửa nội dung thuyết trình",
+      "user_prompt": "Sửa lỗi gõ thừa dấu % ở slide 2 giúp tôi. Những nội dung khác giữ nguyên.",
+      "acceptance": [
+        "Slide 2 có 'Lợi nhuận tăng 8%'",
+        "Số slide vẫn là 3",
+        "Số shape không đổi",
+        "Nội dung khác không đổi"
+      ],
+      "must_not": [
+        "Thêm slide",
+        "Thay theme",
+        "Viết lại nội dung"
+      ],
+      "feature": "đối chứng",
+      "watch_for": [
+        "Xác định đúng slide và shape",
+        "Không thay đổi ngoài phạm vi",
+        "Đọc lại nội dung"
+      ]
+    },
+    {
+      "id": "P02",
+      "tier": "smoke",
+      "app": "wpp",
+      "title": "Thêm slide giới thiệu",
+      "user_prompt": "Thêm một slide sau slide 1 để giới thiệu đội ngũ của công ty. Có tiêu đề và 3 ý: Ban lãnh đạo, Đội ngũ kỹ thuật, Bộ phận kinh doanh.",
+      "acceptance": [
+        "Tổng số slide là 3",
+        "Slide mới nằm ở vị trí 2",
+        "Tiêu đề đúng 'ĐỘI NGŨ CỦA CHÚNG TÔI'",
+        "Có đủ 3 nội dung",
+        "Có ít nhất 4 shape nội dung",
+        "Slide cũ giữ nguyên"
+      ],
+      "must_not": [
+        "Xóa slide cũ",
+        "Sửa nội dung slide cũ"
+      ],
+      "feature": "đối chứng",
+      "watch_for": [
+        "Đọc danh sách slide",
+        "Thêm đúng vị trí",
+        "Kiểm tra số slide và shape"
+      ]
+    },
+    {
+      "id": "W03",
+      "tier": "core",
+      "app": "wps",
+      "title": "Hoàn thiện báo cáo tháng",
+      "user_prompt": "Hoàn thiện báo cáo này theo phong cách văn bản nội bộ công ty nhé. Tiêu đề và các mục phải rõ ràng, bảng dễ đọc, bổ sung phần kết luận ngắn ở cuối và đánh số trang.",
+      "acceptance": [
+        "Tiêu đề căn giữa và in đậm",
+        "Ba mục chính là Heading 1",
+        "Bảng giữ 4 hàng 3 cột",
+        "Header bảng in đậm",
+        "Bảng có border",
+        "Bảng căn giữa dọc",
+        "Có heading IV. Kết luận",
+        "Có đoạn kết luận",
+        "Footer có số trang",
+        "Dữ liệu 3 dự án không đổi"
+      ],
+      "must_not": [
+        "Thay đổi số liệu",
+        "Bịa kết quả công việc",
+        "Xóa phần khó khăn"
+      ],
+      "feature": "checklist mỗi vòng",
+      "watch_for": [
+        "Theo dõi checklist 10 bước",
+        "Không bỏ sót kết luận hoặc số trang",
+        "Đọc lại toàn bộ kết quả"
+      ]
+    },
+    {
+      "id": "W04",
+      "tier": "core",
+      "app": "wps",
+      "title": "Tạo mục lục và chuẩn hóa trang",
+      "user_prompt": "Đây là tài liệu hướng dẫn nội bộ. Thêm mục lục ở đầu, chuẩn hóa về A4, lề trái 3 cm, phải 2 cm, trên dưới 2 cm. Font Times New Roman 13, giãn dòng 1.5. Giữ nguyên nội dung nhé.",
+      "acceptance": [
+        "Mục lục đứng trước Chương 1",
+        "Mục lục có 3 Heading 1 và 6 Heading 2",
+        "Heading giữ đúng cấp",
+        "Khổ giấy A4",
+        "Lề trái 3 cm",
+        "Lề phải 2 cm",
+        "Lề trên dưới 2 cm",
+        "Font Times New Roman cỡ 13",
+        "Line spacing 1.5",
+        "Nội dung gốc không mất"
+      ],
+      "must_not": [
+        "Gộp cấp heading",
+        "Xóa đoạn văn",
+        "Viết lại chương"
+      ],
+      "feature": "mô tả lệnh gọn",
+      "watch_for": [
+        "Truyền đủ margin font spacing",
+        "Tạo mục lục từ heading thật",
+        "Kiểm tra mục lục"
+      ]
+    },
+    {
+      "id": "W05",
+      "tier": "core",
+      "app": "wps",
+      "title": "Hoàn thiện tờ trình hành chính",
+      "user_prompt": "Chỉnh lại tờ trình này theo thể thức văn bản hành chính. Thêm dòng tổng cộng cho bảng dự toán, làm rõ phần kính gửi và phần đề nghị, cuối văn bản bố trí hai vị trí ký: người lập và trưởng phòng.",
+      "acceptance": [
+        "Có phần Kính gửi",
+        "Có phần Nội dung đề nghị",
+        "Bảng có dòng tổng cộng",
+        "Tổng tiền là 110000000",
+        "Bảng có 5 hàng 3 cột",
+        "Có vị trí ký Người lập",
+        "Có vị trí ký Trưởng phòng",
+        "Thông tin đơn vị được giữ",
+        "Nội dung mua 5 máy tính được giữ"
+      ],
+      "must_not": [
+        "Thay đổi số lượng hoặc đơn giá",
+        "Tự tạo tên người ký",
+        "Tạo nội dung phê duyệt giả"
+      ],
+      "feature": "checklist mỗi vòng",
+      "watch_for": [
+        "Hoàn thành đủ các bước nội dung và bảng",
+        "Tính tổng từ dữ liệu gốc",
+        "Không phá bố cục hành chính"
+      ]
+    },
+    {
+      "id": "W06",
+      "tier": "core",
+      "app": "wps",
+      "title": "Chỉnh sửa CV theo vị trí ứng tuyển",
+      "user_prompt": "Lượt 1: Giúp tôi chỉnh CV này để ứng tuyển Backend Developer. Làm phần kinh nghiệm và kỹ năng nổi bật hơn, định dạng lại cho chuyên nghiệp. Đừng tự thêm kinh nghiệm không có thật. Lượt 2: Tôi vừa chọn phần Kinh nghiệm. Chỉnh riêng phần này giúp tôi: làm nổi bật các công việc liên quan backend và giữ nguyên thứ tự thời gian.",
+      "acceptance": [
+        "Có đủ 5 heading ban đầu",
+        "Có đủ 2 công việc",
+        "Không thêm công ty hoặc thời gian",
+        "Có đủ 6 kỹ năng",
+        "Lượt 2 chỉ tác động phần Kinh nghiệm",
+        "Thứ tự thời gian không đổi",
+        "Bảng liên hệ vẫn 2 hàng 2 cột"
+      ],
+      "must_not": [
+        "Thêm công nghệ chưa khai báo",
+        "Xóa kinh nghiệm",
+        "Chỉnh Học vấn ở lượt 2"
+      ],
+      "feature": "tách prompt ổn định/động",
+      "watch_for": [
+        "Giữ ngữ cảnh qua hai lượt",
+        "Nhận biết vùng chọn mới",
+        "Không chỉnh toàn bộ tài liệu ở lượt 2"
+      ]
+    },
+    {
+      "id": "E03",
+      "tier": "core",
+      "app": "et",
+      "title": "Hoàn thiện bảng lương",
+      "user_prompt": "Tính lương thực nhận theo số ngày công, quy ước một tháng có 26 ngày. Thêm tổng quỹ lương ở cuối bảng. Định dạng tiền có dấu phân cách hàng nghìn và thêm màu cho hàng tiêu đề.",
+      "acceptance": [
+        "F2 có công thức =(C2+D2)*E2/26",
+        "F3:F6 có công thức tương ứng",
+        "F2:F6 lần lượt xấp xỉ 13000000, 15230769.23, 20000000, 11846153.85, 16826923.08",
+        "F7 có công thức SUM(F2:F6)",
+        "F7 xấp xỉ 76903846.15",
+        "C2:F7 có phân cách hàng nghìn",
+        "Header in đậm và có màu nền",
+        "A2:E6 không đổi"
+      ],
+      "must_not": [
+        "Hardcode kết quả",
+        "Sửa dữ liệu gốc",
+        "Xóa dòng tổng"
+      ],
+      "feature": "mô tả lệnh gọn",
+      "watch_for": [
+        "Dùng công thức tham chiếu tương đối",
+        "Truyền đúng định dạng số",
+        "Kiểm tra công thức và tổng"
+      ]
+    },
+    {
+      "id": "E04",
+      "tier": "core",
+      "app": "et",
+      "title": "Báo cáo doanh thu bằng biểu đồ",
+      "user_prompt": "Tôi cần báo cáo doanh thu 6 tháng đầu năm. Thêm tổng doanh thu từng tháng, tính tổng cả hai miền, tạo biểu đồ so sánh Bắc và Nam theo tháng. Trình bày bảng và biểu đồ gọn trong cùng sheet.",
+      "acceptance": [
+        "D1 là Tổng doanh thu",
+        "D2:D7 có công thức SUM(B:C) tương ứng",
+        "D2:D7 lần lượt là 220, 250, 255, 300, 330, 335",
+        "D8 có công thức SUM(D2:D7)",
+        "D8 bằng 1690",
+        "Có biểu đồ cột",
+        "Biểu đồ có 2 series Bắc và Nam",
+        "Trục danh mục có T1 đến T6",
+        "Biểu đồ có tiêu đề",
+        "Dữ liệu gốc không đổi"
+      ],
+      "must_not": [
+        "Gộp hai miền thành một series",
+        "Hardcode tổng",
+        "Xóa sheet"
+      ],
+      "feature": "checklist mỗi vòng",
+      "watch_for": [
+        "Theo dõi đủ 9 bước",
+        "Chọn đúng vùng dữ liệu biểu đồ",
+        "Kiểm tra biểu đồ sau tạo"
+      ]
+    },
+    {
+      "id": "E05",
+      "tier": "core",
+      "app": "et",
+      "title": "Lập kế hoạch nhân sự nhiều sheet",
+      "user_prompt": "Lượt 1: Từ dữ liệu nhân sự, hoàn thiện sheet kế hoạch. Tính số nhân viên và tổng quỹ lương từng phòng ban. Thêm dòng tổng cộng. Lượt 2: Tôi chuyển sang sheet NhanSu rồi. Thêm cột phân loại lương: dưới 15 triệu là Thấp, từ 15 đến dưới 18 triệu là Trung bình, từ 18 triệu trở lên là Cao.",
+      "acceptance": [
+        "KeHoach B2:B4 có công thức đếm theo phòng ban",
+        "KeHoach C2:C4 có công thức tính tổng lương",
+        "Số nhân viên là 2, 2, 1",
+        "Quỹ lương là 38000000, 31000000, 14000000",
+        "Tổng nhân sự là 5",
+        "Tổng quỹ lương là 83000000",
+        "NhanSu có cột E tên Phân loại lương",
+        "E2:E6 có công thức phân loại",
+        "Kết quả Cao, Trung bình, Cao, Thấp, Trung bình",
+        "Hai sheet cũ tồn tại"
+      ],
+      "must_not": [
+        "Đổi tên sheet",
+        "Di chuyển dữ liệu nhân viên",
+        "Hardcode kết quả",
+        "Ghi phân loại vào KeHoach"
+      ],
+      "feature": "tách prompt ổn định/động",
+      "watch_for": [
+        "Giữ ngữ cảnh giữa hai lượt",
+        "Nhận biết sheet được chọn",
+        "Không ghi nhầm sheet"
+      ]
+    },
+    {
+      "id": "P03",
+      "tier": "core",
+      "app": "wpp",
+      "title": "Báo cáo kết quả kinh doanh",
+      "user_prompt": "Bổ sung vào slide kết quả kinh doanh 3 chỉ số: doanh thu 5 tỷ, lợi nhuận 800 triệu, tăng trưởng 15%. Làm số liệu nổi bật, dùng bố cục 3 khối ngang. Giữ nguyên các slide khác.",
+      "acceptance": [
+        "Số slide vẫn là 3",
+        "Slide 2 có tiêu đề",
+        "Có đúng 3 khối số liệu",
+        "Có đủ doanh thu 5 tỷ, lợi nhuận 800 triệu, tăng trưởng 15%",
+        "Mỗi số liệu có shape riêng",
+        "Slide 1 và 3 giữ nguyên nội dung"
+      ],
+      "must_not": [
+        "Thêm số liệu khác",
+        "Xóa slide",
+        "Sửa slide 3"
+      ],
+      "feature": "mô tả lệnh gọn",
+      "watch_for": [
+        "Truyền đúng tọa độ và kích thước",
+        "Truyền màu và căn chỉnh",
+        "Kiểm tra layout"
+      ]
+    },
+    {
+      "id": "P04",
+      "tier": "core",
+      "app": "wpp",
+      "title": "Sửa slide bị tràn chữ",
+      "user_prompt": "Lượt 1: Slide 2 và 3 bị tràn chữ. Chỉnh lại cho vừa khung, ưu tiên giữ font dễ đọc, nếu cần thì tăng chiều cao khung. Lượt 2: Tôi đang chọn slide 4. Căn chỉnh hai khung nội dung trên slide này cho thẳng hàng và có khoảng cách đều nhau.",
+      "acceptance": [
+        "Slide 2 không còn overflow",
+        "Slide 3 không còn overflow",
+        "Slide 4 có đúng 2 textbox nội dung",
+        "Hai textbox cùng chiều rộng",
+        "Hai textbox cùng chiều cao",
+        "Hai textbox thẳng hàng",
+        "Số slide không đổi",
+        "Nội dung không bị xóa"
+      ],
+      "must_not": [
+        "Xóa chữ để xử lý overflow",
+        "Chỉnh slide 1",
+        "Tiếp tục sửa slide 2 và 3 ở lượt 2"
+      ],
+      "feature": "tách prompt ổn định/động",
+      "watch_for": [
+        "Nhận biết slide chọn thay đổi",
+        "Xử lý overflow thực sự",
+        "Kiểm tra các slide liên quan"
+      ]
+    },
+    {
+      "id": "P05",
+      "tier": "core",
+      "app": "wpp",
+      "title": "Chuyển báo cáo Word thành slide",
+      "user_prompt": "Từ báo cáo Word đang mở, tạo cho tôi một bài thuyết trình ngắn để báo cáo lãnh đạo. Khoảng 8 slide, có số liệu, khó khăn và kế hoạch. Đừng bỏ các thông tin quan trọng.",
+      "acceptance": [
+        "Có đúng 8 slide",
+        "Slide 1 Tổng quan",
+        "Slide 2 Mục tiêu và phạm vi",
+        "Slide 3 Kết quả thực hiện",
+        "Slide 4 Bảng số liệu",
+        "Slide 5 Khó khăn",
+        "Slide 6 Nguyên nhân và giải pháp",
+        "Slide 7 Kế hoạch tiếp theo",
+        "Slide 8 Kết luận",
+        "Không có slide rỗng",
+        "Giữ đúng số liệu 120, 95%, 3, 2",
+        "Bảng số liệu có 4 hàng 3 cột",
+        "Word nguồn không bị sửa"
+      ],
+      "must_not": [
+        "Bịa số liệu",
+        "Bỏ phần khó khăn",
+        "Sửa Word nguồn"
+      ],
+      "feature": "checklist mỗi vòng",
+      "watch_for": [
+        "Đọc đủ nội dung Word",
+        "Lập kế hoạch 8 slide",
+        "Không bỏ sót bảng và số liệu"
+      ]
+    },
+    {
+      "id": "W07",
+      "tier": "stress",
+      "app": "wps",
+      "title": "Sửa tài liệu dài nhiều lỗi",
+      "user_prompt": "Kiểm tra tài liệu này, sửa các lỗi chính tả tiếng Việt và chuẩn hóa cách viết thuật ngữ. Đặc biệt chú ý các từ liên quan đến công nghệ. Không viết lại nội dung.",
+      "acceptance": [
+        "Sửa Công nghê thông tin",
+        "Sửa quy trinh xử lý",
+        "Sửa phân tich dữ liệu",
+        "Sửa hiêu quả công việc",
+        "Sửa triên khai hệ thống",
+        "Không còn 5 chuỗi lỗi",
+        "Không mất đoạn văn",
+        "Số heading không đổi",
+        "Số bảng không đổi",
+        "Số liệu trong bảng không đổi"
+      ],
+      "must_not": [
+        "Tóm tắt tài liệu",
+        "Xóa đoạn để giảm ngữ cảnh",
+        "Sửa thuật ngữ đúng"
+      ],
+      "feature": "ngân sách ngữ cảnh theo model",
+      "watch_for": [
+        "Đọc toàn bộ tài liệu",
+        "Giữ danh sách vị trí lỗi",
+        "Xác minh đủ 5 vị trí"
+      ]
+    },
+    {
+      "id": "W08",
+      "tier": "stress",
+      "app": "wps",
+      "title": "Xử lý tài liệu dài và mục lục",
+      "user_prompt": "Tạo mục lục cho toàn bộ tài liệu này. Tôi cần đủ các chương và phụ lục, kể cả phần kiểm soát rủi ro ở giữa tài liệu. Đặt mục lục sau trang bìa và giữ nguyên nội dung các chương.",
+      "acceptance": [
+        "Mục lục sau trang bìa",
+        "Có đủ 20 heading",
+        "Có CHƯƠNG IV. KIỂM SOÁT RỦI RO",
+        "Có PHỤ LỤC D. QUY ĐỊNH TRIỂN KHAI",
+        "Không có heading trùng",
+        "Không bỏ heading giữa",
+        "Không mất 6 bảng",
+        "Không xóa nội dung gốc"
+      ],
+      "must_not": [
+        "Chỉ lấy heading đầu và cuối",
+        "Tự suy đoán tên heading",
+        "Tóm tắt tài liệu"
+      ],
+      "feature": "đọc lại kết quả bị cắt",
+      "watch_for": [
+        "Nhận biết kết quả đọc bị cắt",
+        "Đọc tiếp vùng giữa",
+        "Xác minh heading cuối"
+      ]
+    },
+    {
+      "id": "E06",
+      "tier": "stress",
+      "app": "et",
+      "title": "Kiểm tra dữ liệu bán hàng lớn",
+      "user_prompt": "Kiểm tra bảng bán hàng này, tính thành tiền cho từng đơn, tìm các dòng dữ liệu bất thường và tổng hợp doanh thu theo mã sản phẩm. Tôi nghi có một vài dòng nhập sai ở đâu đó.",
+      "acceptance": [
+        "F2:F2001 có công thức D*E tương ứng",
+        "Phát hiện SP99 tại hàng 1000",
+        "Phát hiện số lượng âm tại hàng 1500",
+        "Phát hiện đơn giá âm tại hàng 1990",
+        "Có bảng tổng hợp mã sản phẩm",
+        "Có đủ 20 mã hợp lệ",
+        "Không xóa dữ liệu bất thường",
+        "Không bỏ dữ liệu hàng 1000 trở đi"
+      ],
+      "must_not": [
+        "Sửa hoặc xóa dòng lỗi",
+        "Thay đổi mã đơn hàng",
+        "Tự thay số âm bằng số dương",
+        "Chỉ tính 100 dòng đầu"
+      ],
+      "feature": "đọc lại kết quả bị cắt",
+      "watch_for": [
+        "Phát hiện giới hạn dữ liệu đọc",
+        "Đọc tiếp vùng giữa và cuối",
+        "Giữ thông tin bất thường khi tổng hợp"
+      ]
+    },
+    {
+      "id": "E07",
+      "tier": "stress",
+      "app": "et",
+      "title": "Sửa mô hình doanh thu sai công thức",
+      "user_prompt": "Mô hình doanh thu này có vẻ tính sai. Kiểm tra công thức ở các sheet, sửa những chỗ sai và đảm bảo báo cáo tổng hợp khớp với dữ liệu đơn hàng. Đừng thay đổi dữ liệu gốc.",
+      "acceptance": [
+        "500 dòng thành tiền có công thức số lượng nhân đơn giá",
+        "Sửa công thức sai hàng 100, 250, 450",
+        "BaoCao tham chiếu đủ 500 đơn hàng",
+        "TongHop có đủ dữ liệu",
+        "Tổng doanh thu BaoCao bằng tổng DonHang",
+        "Không có lỗi REF VALUE DIV0",
+        "Dữ liệu gốc không đổi"
+      ],
+      "must_not": [
+        "Xóa sheet",
+        "Hardcode kết quả",
+        "Xóa đơn hàng",
+        "Bỏ qua hàng giữa"
+      ],
+      "feature": "ngân sách ngữ cảnh theo model",
+      "watch_for": [
+        "Lập danh sách vùng cần kiểm tra",
+        "Giữ quan hệ giữa ba sheet",
+        "Kiểm tra tính nhất quán"
+      ]
+    },
+    {
+      "id": "P06",
+      "tier": "stress",
+      "app": "wpp",
+      "title": "Chuẩn hóa bộ slide 12 trang",
+      "user_prompt": "Chuẩn hóa toàn bộ bộ slide này thành một báo cáo tháng chuyên nghiệp. Đồng nhất font, màu sắc, tiêu đề, căn lề; sửa hai slide bị tràn chữ. Giữ nguyên thứ tự và nội dung các slide.",
+      "acceptance": [
+        "Vẫn có 12 slide",
+        "12 tiêu đề không đổi",
+        "Tiêu đề đồng nhất font cỡ màu",
+        "Các shape tiêu đề cùng tọa độ Y",
+        "Không có shape nội dung ngoài slide",
+        "Slide 5 không overflow",
+        "Slide 9 không overflow",
+        "Không có slide rỗng",
+        "Không xóa shape nội dung",
+        "Thứ tự slide không đổi"
+      ],
+      "must_not": [
+        "Thay đổi số liệu",
+        "Xóa slide",
+        "Rút ngắn nội dung để che overflow",
+        "Thay đổi nội dung báo cáo"
+      ],
+      "feature": "checklist mỗi vòng",
+      "watch_for": [
+        "Lập checklist 12 slide",
+        "Sửa đủ hai slide overflow",
+        "Xác minh toàn bộ 12 slide"
+      ]
+    },
+    {
+      "id": "P07",
+      "tier": "stress",
+      "app": "wpp",
+      "title": "Sửa bộ slide nhiều lỗi bố cục",
+      "user_prompt": "Kiểm tra toàn bộ slide giúp tôi. Sửa các lỗi bố cục, shape bị chồng, chữ tràn và tiêu đề bị thiếu. Đặc biệt đừng bỏ qua các slide ở giữa nhé. Nội dung số liệu phải giữ nguyên.",
+      "acceptance": [
+        "Vẫn có 20 slide",
+        "Slide 2 không có shape ngoài mép phải",
+        "Slide 10 không còn shape chồng lấn",
+        "Slide 15 không overflow",
+        "Slide 19 có đúng một shape tiêu đề",
+        "Slide 20 không còn textbox rỗng",
+        "Tiêu đề khác không đổi",
+        "Không xóa shape chứa số liệu",
+        "Không mất nội dung slide"
+      ],
+      "must_not": [
+        "Xóa slide",
+        "Xóa shape số liệu",
+        "Thay đổi nội dung",
+        "Chỉ kiểm tra slide đầu và cuối"
+      ],
+      "feature": "đọc lại kết quả bị cắt",
+      "watch_for": [
+        "Đọc tiếp danh sách slide",
+        "Phát hiện lỗi slide 10 và 15",
+        "Đọc lại từng slide liên quan"
+      ]
+    }
+  ]
+}
