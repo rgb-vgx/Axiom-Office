@@ -403,7 +403,7 @@ Markdown). Xem `tests/bench/campaign/README.md`.
 | Trích xuất memory với **LLM thật** | **Đã (24/10/2026)** | Lượt thật trích 1 fact (`core.log`: `1 added`) |
 | **Office 32-bit** | **Không hỗ trợ** | Add-in .NET làm Office 32-bit crash `mso98win32client.dll`; kiểm bằng add-in tối giản (§2.9) |
 | Đọc/ghi **HKCU** bằng test tự động trên Windows | Một phần | Đối chiếu tay: Core Go đọc đúng endpoint/model/token/DPAPI của bạn; test tự động hiện dùng `AXIOM_*`. Từ 24/10 test cũng **không còn ghi vào HKCU thật** (nguồn cấu hình inject file tạm — §2.8) |
-| **Push remote** | **Chưa (11/11/2026)** | `main` đang **ahead 23** so với `origin/main`: 15 commit local 17–18/10, merge `4c435f8`, ca kiểm `/v1/skills/inspect` và 5 commit thử học Deep Agents (§2.18); chưa push theo yêu cầu |
+| **Push remote** | **Chưa (11/11/2026)** | `main` đang **ahead 27** so với `origin/main`: 15 commit local 17–18/10, merge `4c435f8`, ca kiểm `/v1/skills/inspect`, 5 commit thử học Deep Agents và 2 commit hạ tầng benchmark (§2.18); chưa push theo yêu cầu |
 | CI job **windows** | **Xanh (24/10/2026)** | Trước đó đỏ ở bước `go test` (`TestWPSConfigWrite` giả định nguồn cấu hình là `config.json`, nhưng trên Windows `DefaultSource()` là HKCU) và ở bước build net48 (`}` thừa trong `AskAiPane.cs`). Đã sửa cả hai — xem §2.8 |
 | Nghiệm thu plan 20 §5.1 trên đề thật | **Đạt 26/10/2026** | 3 lượt liền (`r_e6766361`, `r_9a7512ac`, `r_fb096418`, `ocg/beam-free`) lần dựng đầu không còn `connector-*` (§2.13) |
 | Merge `feat/setup-wizard` + `feat/core-go` vào `main` | **Đã xong** | Fast-forward, lịch sử thẳng |
