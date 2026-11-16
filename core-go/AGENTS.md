@@ -14,7 +14,7 @@ Rules for the Go Agent Core. See `README.md` for architecture and the package ma
 
 - `core.db` must stay schema-compatible with the retired .NET core. Both read the
   same user database, so schema changes are forward-only and tracked with
-  `PRAGMA user_version` (currently `SchemaVersion = 4`).
+  `PRAGMA user_version` (currently `SchemaVersion = 5`).
 - Core API v1 is append-only: add fields/endpoints, never change or remove existing
   behavior, field names, or response shapes. The add-in, LibreOffice extension, and
   MCP bridge depend on the old contract.

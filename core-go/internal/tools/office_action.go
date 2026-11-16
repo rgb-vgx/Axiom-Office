@@ -251,10 +251,13 @@ func (t *OfficeActionTool) Invoke(ctx context.Context, arguments map[string]any,
 		}
 	}
 
-	// Policy xac nhan (muc 8.6): hoi nguoi dung truoc lenh rui ro.
-	decision := policy.Evaluate(ctx, action, params, run.Prompt, func(inner context.Context) *int {
+	// Policy xac nhan (muc 8.6): quy tac khai bao (Decide) chay truoc, roi dieu kien thuc te (Evaluate).
+	decision := policy.Check(run.Policy, ctx, action, run.TargetDocument, params, run.Prompt, func(inner context.Context) *int {
 		return policy.WordLength(inner, run.Bridge, run.Office.Port)
 	})
+	if decision.Denied {
+		return Result{JSON: ErrorJSON("policy denied: " + decision.Reason), Action: action}
+	}
 	if decision.NeedsConfirmation && run.ownedObjects().covers(action, params) {
 		// Agent sua lai chinh thu no vua dung trong luot: khong hoi (owned.go). Ghi log de soat lai duoc.
 		corelog.Info("run %s: %s khong can xac nhan - chi dung toi doi tuong do luot tao (%s)", run.RunID, action,

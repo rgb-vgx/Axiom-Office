@@ -87,6 +87,7 @@ func Handler(deps *Deps, mux *http.ServeMux) http.Handler {
 	mapSetup(mux, deps)
 	mapLog(mux, deps)
 	mapRuns(mux, deps)
+	mapApprovals(mux, deps)
 	mapQuickActions(mux, deps)
 	if deps.Skills != nil {
 		mapSkills(mux, deps)

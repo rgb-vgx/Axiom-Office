@@ -8,6 +8,7 @@ import (
 
 	"axiomoffice/core/internal/model"
 	"axiomoffice/core/internal/office"
+	"axiomoffice/core/internal/policy"
 )
 
 // Result: ket qua mot lan chay tool. JSON = nguyen van de gui cho model; Action = ten lenh office (de ghi audit).
@@ -90,6 +91,9 @@ type RunContext struct {
 	Office         *office.Session
 	Bridge         *office.BridgeClient
 	Prompt         string
+	// Policy: quy tac chinh sach cua luot = policy.DefaultRules() + policy.rules trong cau hinh
+	// (agent.policyRules). Rong = chi con Evaluate (dieu kien thuc te) nhu truoc.
+	Policy policy.Ruleset
 	// Event phat su kien ra SSE cua luot chay (vd skill.loaded).
 	Event func(eventType string, data map[string]any)
 	// Confirm hoi nguoi dung truoc lenh rui ro (confirm.required -> POST /v1/runs/{id}/confirm).

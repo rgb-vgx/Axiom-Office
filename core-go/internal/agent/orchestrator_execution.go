@@ -231,19 +231,7 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 	}
 	registry := tools.NewRegistry(list)
 
-	var confirm func(string, string, string) (bool, error)
-	var choose func(string, string, []tools.Choice) (string, string, error)
-	if request.Interactive {
-		timeout := time.Duration(o.Config().ConfirmTimeoutSeconds) * time.Second
-		confirm = func(action, reason, preview string) (bool, error) {
-			return run.Confirmations.Request(ctx, run.Events, action, reason, preview, timeout), nil
-		}
-		choose = func(action, question string, choices []tools.Choice) (string, string, error) {
-			choice, text := run.Confirmations.Choose(ctx, run.Events, action, question, choices, timeout)
-			return choice, text, nil
-		}
-	}
-
+	target := targetDocument(request.Document, session)
 	runContext := &tools.RunContext{
 		RunID:          run.ID,
 		ConversationID: conversation.ID,
@@ -253,9 +241,22 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 		Event: func(eventType string, data map[string]any) {
 			run.Events.Publish(eventType, data)
 		},
-		Confirm:        confirm,
-		Choose:         choose,
-		TargetDocument: targetDocument(request.Document, session),
+		Policy:         policyRules(o.Config()),
+		TargetDocument: target,
+	}
+	// Confirm: policy/overwrite/sort hoi nguoi dung qua cung mot cua (agent/confirm.go). Approval da luu
+	// (POST /v1/approvals, always=true) duoc kiem tra TRUOC khi hoi.
+	var choose func(string, string, []tools.Choice) (string, string, error)
+	if request.Interactive {
+		timeout := time.Duration(o.Config().ConfirmTimeoutSeconds) * time.Second
+		runContext.Confirm = func(action, reason, preview string) (bool, error) {
+			return o.requestConfirmation(ctx, run, action, runContext.TargetDocument, reason, preview, timeout), nil
+		}
+		runContext.Choose = func(action, question string, choices []tools.Choice) (string, string, error) {
+			choice, text := run.Confirmations.Choose(ctx, run.Events, action, question, choices, timeout)
+			return choice, text, nil
+		}
+		choose = runContext.Choose
 	}
 	if request.Document != nil {
 		runContext.FocusSlide = request.Document.Slide

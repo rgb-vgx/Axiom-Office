@@ -19,6 +19,11 @@ const LargeDocumentChars = 20_000
 type Decision struct {
 	NeedsConfirmation bool
 	Reason            string
+	// Denied: mot quy tac chinh sach (rules.go) cam lenh - khong hoi, khong chay.
+	Denied bool
+	// Explicit: quyet dinh den tu mot quy tac nguoi dung tu khai bao (khong phai DefaultRules).
+	// Quy tac nguoi dung la quyet dinh cuoi cung, khong bi Evaluate go.
+	Explicit bool
 }
 
 var Allow = Decision{}

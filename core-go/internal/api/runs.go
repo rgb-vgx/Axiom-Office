@@ -227,6 +227,7 @@ func serveUndoRun(w http.ResponseWriter, r *http.Request, deps *Deps, runID stri
 }
 
 // serveConfirmRun: tra loi yeu cau xac nhan cua policy (dung chung cho /v1 va /wps).
+// "always": true (tuy chon) = luu phe duyet cho action+resource cua cau hoi nay de luot sau khong hoi lai.
 func serveConfirmRun(w http.ResponseWriter, deps *Deps, runID string, body map[string]any) {
 	run := deps.Manager.Get(runID)
 	if run == nil {
@@ -235,6 +236,7 @@ func serveConfirmRun(w http.ResponseWriter, deps *Deps, runID string, body map[s
 	}
 	id, hasID := body["confirmationId"].(string)
 	approved, hasApproved := body["approved"].(bool)
+	always, _ := body["always"].(bool)
 	// The nhieu lua chon: {"confirmationId", "choice": "<id>"}.
 	choice, hasChoice := body["choice"].(string)
 	hasChoice = hasChoice && strings.TrimSpace(choice) != ""
@@ -242,6 +244,8 @@ func serveConfirmRun(w http.ResponseWriter, deps *Deps, runID string, body map[s
 		Error(w, http.StatusBadRequest, "'confirmationId' and 'approved' (true|false) or 'choice' are required")
 		return
 	}
+	// Doc action/resource truoc khi Resolve (yeu cau da xu ly xong la khong con trong danh sach cho).
+	action, resource, hasPending := run.Confirmations.PendingAction(id)
 	resolved := false
 	if hasChoice {
 		// O tu go ("Kieu khac"): {"choice": "custom", "text": "..."}.
@@ -254,11 +258,40 @@ func serveConfirmRun(w http.ResponseWriter, deps *Deps, runID string, body map[s
 		ErrorCode(w, http.StatusNotFound, CodeNotFound, "no pending confirmation: "+id)
 		return
 	}
+	response := map[string]any{"confirmationId": id}
 	if hasChoice {
-		OK(w, map[string]any{"confirmationId": id, "choice": strings.TrimSpace(choice)})
-		return
+		response["choice"] = strings.TrimSpace(choice)
+	} else {
+		response["approved"] = approved
 	}
-	OK(w, map[string]any{"confirmationId": id, "approved": approved})
+	// always=true chi co nghia khi DONG Y mot lenh; cau hoi khong biet action (vd the lua chon) thi khong luu.
+	if !hasChoice && approved && always && hasPending && strings.TrimSpace(action) != "" {
+		if row, saved := saveApproval(deps, action, resource); saved {
+			response["always"] = true
+			response["approval"] = approvalJSON(row)
+		}
+	}
+	OK(w, response)
+}
+
+// saveApproval: luu phe duyet "luon dong y" cho mot cau hoi da duoc nguoi dung chap nhan. Khong biet tai
+// lieu (resource rong) -> scope global; nguoc lai mot tai lieu. Loi ghi chi ghi log: cau tra loi dong y
+// cua nguoi dung khong duoc hong vi viec luu phe duyet.
+func saveApproval(deps *Deps, action, resource string) (store.ApprovalRow, bool) {
+	if deps.Stores == nil || deps.Stores.Approvals == nil {
+		return store.ApprovalRow{}, false
+	}
+	scope := store.ApprovalScopeDocument
+	if strings.TrimSpace(resource) == "" {
+		scope, resource = store.ApprovalScopeGlobal, "*"
+	}
+	row, err := deps.Stores.Approvals.AddApproval(action, resource, scope, "")
+	if err != nil {
+		corelog.Error("save approval for %s failed: %v", action, err)
+		return store.ApprovalRow{}, false
+	}
+	corelog.Info("approval %s saved for %s on %q (scope %s)", row.ID, row.Action, row.Resource, row.Scope)
+	return row, true
 }
 
 // serveRunEvents: SSE cua mot luot chay (dung chung cho /v1 va /wps).

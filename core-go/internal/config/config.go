@@ -6,6 +6,7 @@
 package config
 
 import (
+	"encoding/json"
 	"os"
 	"strconv"
 	"strings"
@@ -81,7 +82,22 @@ type Config struct {
 	// Experimental: co experimental.<name> (JSON/HKCU). Chi la co release-safe cho hanh vi moi;
 	// ten khong khai -> tat. Xem package flag de biet thu tu uu tien voi AXIOM_FLAGS.
 	Experimental map[string]bool
+
+	// Policy: quy tac chinh sach nguoi dung tu khoa "policy.rules" (JSON/HKCU). Ap dung SAU
+	// policy.DefaultRules() nen quy tac o day nam sau va de len mac dinh (last match wins).
+	Policy Ruleset
 }
+
+// Rule: mot quy tac chinh sach trong cau hinh (policy.rules): {"action": "...", "resource": "...",
+// "effect": "allow|ask|deny"}. Kieu rieng (khong dung policy.Rule) de config khong phu thuoc policy.
+type Rule struct {
+	Action   string `json:"action"`
+	Resource string `json:"resource"`
+	Effect   string `json:"effect"`
+}
+
+// Ruleset: danh sach quy tac nguoi dung, theo thu tu ap dung (sau DefaultRules).
+type Ruleset []Rule
 
 // DynamicPort: CorePort = 0 -> de he dieu hanh cap port (chi dung cho test).
 func (c Config) DynamicPort() bool { return c.CorePort == 0 }
@@ -141,6 +157,7 @@ func From(env Env, source Source) Config {
 		SessionDirectoryOverride: text(env, "AXIOM_SESSION_DIR", nil, ""),
 		SkillDirs:                list(text(env, "AXIOM_SKILL_DIRS", source, "SkillDirs")),
 		Experimental:             experimental(source),
+		Policy:                   policyRules(text(env, "AXIOM_POLICY_RULES", source, "policy.rules")),
 	}
 }
 
@@ -210,4 +227,45 @@ func modelList(raw string) []string {
 		}
 	}
 	return items
+}
+
+// policyRules: doc khoa "policy.rules". Nhan ba dang cung mot nghia: mang JSON
+// ([{"action":...}]), mot object, va cac object cach nhau bang ';' (JSONSource noi phan tu mang bang
+// ';'). Dang hong / thieu action / thieu effect -> bo qua tung quy tac, khong lam hong cau hinh.
+func policyRules(raw string) Ruleset {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	var decoded []Rule
+	if strings.HasPrefix(raw, "[") {
+		if json.Unmarshal([]byte(raw), &decoded) == nil {
+			return cleanRules(decoded)
+		}
+	}
+	rules := make([]Rule, 0, strings.Count(raw, "{")+1)
+	for _, part := range strings.Split(raw, ";") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		var rule Rule
+		if json.Unmarshal([]byte(part), &rule) == nil {
+			rules = append(rules, rule)
+		}
+	}
+	return cleanRules(rules)
+}
+
+func cleanRules(rules []Rule) Ruleset {
+	kept := make([]Rule, 0, len(rules))
+	for _, rule := range rules {
+		action := strings.TrimSpace(rule.Action)
+		effect := strings.ToLower(strings.TrimSpace(rule.Effect))
+		if action == "" || effect == "" {
+			continue
+		}
+		kept = append(kept, Rule{Action: action, Resource: strings.TrimSpace(rule.Resource), Effect: effect})
+	}
+	return kept
 }

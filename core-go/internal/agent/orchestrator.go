@@ -212,8 +212,10 @@ type Orchestrator struct {
 	MCP           *mcp.Manager
 	// WebSources: kho nguon web tai ve (nhieu luot). nil = memory/kho khong mo duoc - bo qua tinh nang nay.
 	WebSources *store.WebSources
-	Config     func() config.Config
-	Assembler  *ContextAssembler
+	// Approvals: phe duyet da luu cho lenh rui ro (schema v5). nil = khong bo qua cau hoi nao.
+	Approvals *store.Approvals
+	Config    func() config.Config
+	Assembler *ContextAssembler
 	// BusyPort: cong Office dang co luot khac chay (Manager.BusyPort) - other_document khong sua tai lieu do. nil = khong kiem.
 	BusyPort func(port int) bool
 }

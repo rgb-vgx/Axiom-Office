@@ -166,6 +166,7 @@ func run() int {
 	// Kho nguon web (schema v3): nguon tai ve trong cac luot truoc - don luc khoi dong (qua han / qua tran).
 	if stores.Available {
 		orchestrator.WebSources = stores.DB.WebSources()
+		orchestrator.Approvals = stores.Approvals
 		go func() {
 			current := config.Load()
 			if purged := orchestrator.WebSources.Purge(current.WebSourceKeepDays, int64(current.WebSourceMaxMB)<<20); purged > 0 {

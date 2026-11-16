@@ -35,6 +35,10 @@ func (s JSONSource) String(name string) (string, bool) {
 	}
 	raw, ok := values[name]
 	if !ok {
+		// "policy.rules" cung doc duoc dang long: {"policy":{"rules":[...]}}.
+		raw, ok = nestedValue(values, name)
+	}
+	if !ok {
 		return "", false
 	}
 	var value any
@@ -118,6 +122,30 @@ func (s JSONSource) Experimental() (map[string]bool, bool) {
 		}
 	}
 	return flags, found
+}
+
+// nestedValue: tim "a.b" trong {"a":{"b":...}}; khong co thi tra false. Dung cho khoa co dau cham
+// (policy.rules) ma nguoi dung lai viet dang long trong config.json.
+func nestedValue(values map[string]json.RawMessage, name string) (json.RawMessage, bool) {
+	parts := strings.Split(name, ".")
+	if len(parts) < 2 {
+		return nil, false
+	}
+	raw, ok := values[parts[0]]
+	if !ok {
+		return nil, false
+	}
+	for _, part := range parts[1:] {
+		var current map[string]json.RawMessage
+		if json.Unmarshal(raw, &current) != nil {
+			return nil, false
+		}
+		raw, ok = current[part]
+		if !ok {
+			return nil, false
+		}
+	}
+	return raw, true
 }
 
 // Set ghi mot khoa vao config.json, giu nguyen moi khoa khac (file dung chung voi extension
