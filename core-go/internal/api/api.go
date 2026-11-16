@@ -122,15 +122,57 @@ func OK(w http.ResponseWriter, result any) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "result": result})
 }
 
+// Ma loi on dinh cua phong bi API. Ben goi dich theo ma, khong do chuoi tieng Anh cua Core.
+const (
+	CodeInvalidRequest  = "invalid_request"
+	CodeUnauthorized    = "unauthorized"
+	CodeForbidden       = "forbidden"
+	CodeNotFound        = "not_found"
+	CodeBusy            = "busy"
+	CodeCoreUnavailable = "core_unavailable"
+	CodeCancelled       = "cancelled"
+	CodeUncertain       = "uncertain"
+	CodeInternal        = "internal"
+)
+
+// DefaultErrorCode: ma hop ly cho moi status khi call site khong co ma rieng. Giu api.Error cu
+// chay duoc nhung phong bi van co truong code on dinh.
+func DefaultErrorCode(status int) string {
+	switch status {
+	case http.StatusBadRequest, http.StatusRequestEntityTooLarge, http.StatusUnsupportedMediaType:
+		return CodeInvalidRequest
+	case http.StatusUnauthorized:
+		return CodeUnauthorized
+	case http.StatusForbidden:
+		return CodeForbidden
+	case http.StatusNotFound, http.StatusGone:
+		return CodeNotFound
+	case http.StatusConflict, http.StatusTooManyRequests:
+		return CodeBusy
+	case http.StatusRequestTimeout, 499: // 499: client dong ket noi (nginx), mot so SDK dung.
+		return CodeCancelled
+	case http.StatusServiceUnavailable, http.StatusBadGateway:
+		return CodeCoreUnavailable
+	default:
+		if status >= 400 && status < 500 {
+			return CodeInvalidRequest
+		}
+		return CodeInternal
+	}
+}
+
 // Error: loi nghiep vu tra HTTP 200 kem ok:false (giong bridge); status khac cho loi giao thuc.
+// Luon kem code on dinh (DefaultErrorCode) - dung ErrorCode khi can ma cu the hon.
 func Error(w http.ResponseWriter, status int, message string) {
-	writeJSON(w, status, map[string]any{"ok": false, "error": message})
+	ErrorCode(w, status, DefaultErrorCode(status), message)
 }
 
 // ErrorCode: nhu Error nhung kem ma may doc duoc, de ben goi dich duoc sang tieng cua no ma khong phai
-// do chuoi tieng Anh cua Core. Dung cho cac ca pane WPS phai noi mot cau khac han nhau (xem
-// wpsadmin.go: /wps/v1/exec).
+// do chuoi tieng Anh cua Core.
 func ErrorCode(w http.ResponseWriter, status int, code, message string) {
+	if code == "" {
+		code = DefaultErrorCode(status)
+	}
 	writeJSON(w, status, map[string]any{"ok": false, "error": message, "code": code})
 }
 

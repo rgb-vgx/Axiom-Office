@@ -50,6 +50,24 @@ func TestJSONSource(t *testing.T) {
 	}
 }
 
+func TestJSONSourceExperimental(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	body := `{"Experimental":{" nested-on ":true,"nested-off":false},"experimental.dotted-on":"1","experimental.dotted-off":"0"}`
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := From(env(nil), JSONSource{Path: path})
+	want := map[string]bool{"nested-on": true, "nested-off": false, "dotted-on": true, "dotted-off": false}
+	for name, enabled := range want {
+		if cfg.Experimental[name] != enabled {
+			t.Fatalf("Experimental[%q] = %v, want %v (all: %+v)", name, cfg.Experimental[name], enabled, cfg.Experimental)
+		}
+	}
+	if len(cfg.Experimental) != len(want) {
+		t.Fatalf("Experimental = %+v", cfg.Experimental)
+	}
+}
+
 func TestPathsOverride(t *testing.T) {
 	root := t.TempDir()
 	paths := NewPaths(root)

@@ -59,7 +59,7 @@ func mapWPSAdmin(mux *http.ServeMux, deps *Deps) {
 		}
 		body, parsed := readJSON(r)
 		if !parsed {
-			Error(w, http.StatusBadRequest, "invalid JSON body")
+			ErrorCode(w, http.StatusBadRequest, CodeInvalidRequest, "invalid JSON body")
 			return
 		}
 		action := strings.TrimSpace(textOf(body["action"]))
@@ -107,7 +107,7 @@ func mapWPSAdmin(mux *http.ServeMux, deps *Deps) {
 		}
 		body, parsed := readJSON(r)
 		if !parsed {
-			Error(w, http.StatusBadRequest, "invalid JSON body")
+			ErrorCode(w, http.StatusBadRequest, CodeInvalidRequest, "invalid JSON body")
 			return
 		}
 		if len(body) == 0 {

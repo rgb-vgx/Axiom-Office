@@ -231,9 +231,36 @@ func writeOK(w http.ResponseWriter, result any) {
 func writeErr(w http.ResponseWriter, status int, message string) {
 	// Loi nghiep vu (ok:false kem HTTP 200) dung cho id la cua /result va /cmd khi chua ket noi;
 	// loi giao thuc (401/403/404/405/415) cung dang {"ok":false,"error"} nhu guard cua Core.
+	payload := map[string]any{"ok": false, "error": message}
+	// Them ma on dinh cho loi giao thuc (cung bo voi api.ErrorCode). Loi nghiep vu HTTP 200 giu
+	// nguyen dang cu, khong gan ma "internal" vo nghia.
+	if code := errorCodeForStatus(status); code != "" {
+		payload["code"] = code
+	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	encoder := json.NewEncoder(w)
 	encoder.SetEscapeHTML(false)
-	_ = encoder.Encode(map[string]any{"ok": false, "error": message})
+	_ = encoder.Encode(payload)
+}
+
+func errorCodeForStatus(status int) string {
+	switch status {
+	case http.StatusBadRequest, http.StatusMethodNotAllowed, http.StatusUnsupportedMediaType:
+		return "invalid_request"
+	case http.StatusUnauthorized:
+		return "unauthorized"
+	case http.StatusForbidden:
+		return "forbidden"
+	case http.StatusNotFound:
+		return "not_found"
+	case http.StatusConflict:
+		return "busy"
+	case http.StatusServiceUnavailable:
+		return "core_unavailable"
+	case http.StatusInternalServerError:
+		return "internal"
+	default:
+		return ""
+	}
 }

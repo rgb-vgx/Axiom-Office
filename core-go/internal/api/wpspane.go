@@ -103,7 +103,7 @@ func mapWPSPane(mux *http.ServeMux, deps *Deps) {
 		}
 		body, parsed := readJSON(r)
 		if !parsed {
-			Error(w, http.StatusBadRequest, "invalid JSON body")
+			ErrorCode(w, http.StatusBadRequest, CodeInvalidRequest, "invalid JSON body")
 			return
 		}
 		id := strings.TrimSpace(textOf(body["quickAction"]))

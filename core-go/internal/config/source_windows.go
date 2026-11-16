@@ -5,6 +5,7 @@ package config
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"golang.org/x/sys/windows/registry"
 )
@@ -46,6 +47,56 @@ func (r RegistrySource) Set(name string, value any) error {
 	}
 	defer key.Close()
 	return key.SetStringValue(name, text)
+}
+
+// Experimental: co experimental.<name> trong HKCU\Software\AxiomOffice. Nhan khoa phang
+// "experimental.foo" (REG_SZ/REG_DWORD) va khoa "Experimental" dang chuoi "foo,-bar", cung quy
+// tac voi config.json.
+func (r RegistrySource) Experimental() (map[string]bool, bool) {
+	key, err := registry.OpenKey(registry.CURRENT_USER, r.KeyPath, registry.QUERY_VALUE)
+	if err != nil {
+		return nil, false
+	}
+	defer key.Close()
+	names, err := key.ReadValueNames(-1)
+	if err != nil {
+		return nil, false
+	}
+	flags := map[string]bool{}
+	found := false
+	for _, name := range names {
+		lower := strings.ToLower(strings.TrimSpace(name))
+		switch {
+		case lower == "experimental":
+			if text, _, err := key.GetStringValue(name); err == nil {
+				parsed := experimentalList(text)
+				if len(parsed) > 0 {
+					found = true
+					mergeExperimental(flags, parsed)
+				}
+			}
+		case strings.HasPrefix(lower, experimentalPrefix):
+			flagName := strings.TrimSpace(name[len(experimentalPrefix):])
+			if flagName == "" {
+				continue
+			}
+			if enabled, ok := registryBool(key, name); ok {
+				flags[flagName] = enabled
+				found = true
+			}
+		}
+	}
+	return flags, found
+}
+
+func registryBool(key registry.Key, name string) (bool, bool) {
+	if text, _, err := key.GetStringValue(name); err == nil {
+		return experimentalBoolText(text)
+	}
+	if number, _, err := key.GetIntegerValue(name); err == nil {
+		return number != 0, true
+	}
+	return false, false
 }
 
 func (r RegistrySource) Int(name string) (int, bool) {

@@ -14,7 +14,7 @@ func mapMemory(mux *http.ServeMux, deps *Deps) {
 
 	routeBoth(mux, deps, "GET /v1/memory", func(w http.ResponseWriter, r *http.Request) {
 		if !service.Available() {
-			Error(w, http.StatusServiceUnavailable, "memory unavailable")
+			ErrorCode(w, http.StatusServiceUnavailable, CodeCoreUnavailable, "memory unavailable")
 			return
 		}
 		query := r.URL.Query()
@@ -67,7 +67,7 @@ func mapMemory(mux *http.ServeMux, deps *Deps) {
 			ExpiresAt: textOf(body["expiresAt"])}
 		result := service.Add(r.Context(), []memory.NewMemory{fact}, memory.ActorUser, "")
 		if len(result) == 0 {
-			Error(w, http.StatusServiceUnavailable, "memory unavailable")
+			ErrorCode(w, http.StatusServiceUnavailable, CodeCoreUnavailable, "memory unavailable")
 			return
 		}
 		if result[0].Event == "SKIPPED" {

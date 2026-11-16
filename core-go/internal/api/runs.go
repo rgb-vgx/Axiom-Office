@@ -23,12 +23,12 @@ const (
 func mapRuns(mux *http.ServeMux, deps *Deps) {
 	mux.HandleFunc("POST /v1/runs", func(w http.ResponseWriter, r *http.Request) {
 		if !deps.Stores.Available {
-			Error(w, http.StatusServiceUnavailable, "memory unavailable: "+deps.Stores.Error)
+			ErrorCode(w, http.StatusServiceUnavailable, CodeCoreUnavailable, "memory unavailable: "+deps.Stores.Error)
 			return
 		}
 		body, parsed := readJSON(r)
 		if !parsed {
-			Error(w, http.StatusBadRequest, "invalid JSON body")
+			ErrorCode(w, http.StatusBadRequest, CodeInvalidRequest, "invalid JSON body")
 			return
 		}
 		request, problem := agent.ParseRequest(body)
@@ -136,7 +136,7 @@ func serveStartRun(w http.ResponseWriter, deps *Deps, request *agent.Request) {
 		if startError == "" {
 			startError = "cannot start run"
 		}
-		Error(w, http.StatusConflict, startError)
+		ErrorCode(w, http.StatusConflict, CodeBusy, startError)
 		return
 	}
 	// Gui lai cung clientRequestId: tra ve luot cu (200, cung runId/conversationId), khong chay lan hai.
@@ -170,7 +170,7 @@ func serveGetRun(w http.ResponseWriter, deps *Deps, runID string) {
 			OK(w, stored)
 			return
 		}
-		Error(w, http.StatusNotFound, "unknown run: "+runID)
+		ErrorCode(w, http.StatusNotFound, CodeNotFound, "unknown run: "+runID)
 		return
 	}
 	OK(w, run.JSON())
@@ -197,7 +197,7 @@ func storedRunJSON(deps *Deps, runID string) map[string]any {
 func serveCancelRun(w http.ResponseWriter, deps *Deps, runID string) {
 	run := deps.Manager.Get(runID)
 	if run == nil {
-		Error(w, http.StatusNotFound, "unknown run: "+runID)
+		ErrorCode(w, http.StatusNotFound, CodeNotFound, "unknown run: "+runID)
 		return
 	}
 	if !deps.Manager.Cancel(run.ID) {
@@ -211,11 +211,11 @@ func serveCancelRun(w http.ResponseWriter, deps *Deps, runID string) {
 func serveUndoRun(w http.ResponseWriter, r *http.Request, deps *Deps, runID string) {
 	run := deps.Manager.Get(runID)
 	if run == nil {
-		Error(w, http.StatusNotFound, "unknown run: "+runID)
+		ErrorCode(w, http.StatusNotFound, CodeNotFound, "unknown run: "+runID)
 		return
 	}
 	if deps.Manager.BusyPort(run.Port) {
-		Error(w, http.StatusConflict, "a run is in progress on this document: wait for it to finish")
+		ErrorCode(w, http.StatusConflict, CodeBusy, "a run is in progress on this document: wait for it to finish")
 		return
 	}
 	result, problem := deps.Orchestrator.UndoRun(r.Context(), run)
@@ -230,7 +230,7 @@ func serveUndoRun(w http.ResponseWriter, r *http.Request, deps *Deps, runID stri
 func serveConfirmRun(w http.ResponseWriter, deps *Deps, runID string, body map[string]any) {
 	run := deps.Manager.Get(runID)
 	if run == nil {
-		Error(w, http.StatusNotFound, "unknown run: "+runID)
+		ErrorCode(w, http.StatusNotFound, CodeNotFound, "unknown run: "+runID)
 		return
 	}
 	id, hasID := body["confirmationId"].(string)
@@ -251,7 +251,7 @@ func serveConfirmRun(w http.ResponseWriter, deps *Deps, runID string, body map[s
 		resolved = run.Confirmations.Resolve(id, approved)
 	}
 	if !resolved {
-		Error(w, http.StatusNotFound, "no pending confirmation: "+id)
+		ErrorCode(w, http.StatusNotFound, CodeNotFound, "no pending confirmation: "+id)
 		return
 	}
 	if hasChoice {
@@ -265,7 +265,7 @@ func serveConfirmRun(w http.ResponseWriter, deps *Deps, runID string, body map[s
 func serveRunEvents(w http.ResponseWriter, r *http.Request, deps *Deps, runID string) {
 	run := deps.Manager.Get(runID)
 	if run == nil {
-		Error(w, http.StatusNotFound, "unknown run: "+runID)
+		ErrorCode(w, http.StatusNotFound, CodeNotFound, "unknown run: "+runID)
 		return
 	}
 	streamEvents(w, r, run)

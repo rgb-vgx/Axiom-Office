@@ -78,6 +78,9 @@ type Config struct {
 	DataDirOverride          string
 	SessionDirectoryOverride string
 	SkillDirs                []string
+	// Experimental: co experimental.<name> (JSON/HKCU). Chi la co release-safe cho hanh vi moi;
+	// ten khong khai -> tat. Xem package flag de biet thu tu uu tien voi AXIOM_FLAGS.
+	Experimental map[string]bool
 }
 
 // DynamicPort: CorePort = 0 -> de he dieu hanh cap port (chi dung cho test).
@@ -137,6 +140,7 @@ func From(env Env, source Source) Config {
 		DataDirOverride:          text(env, "AXIOM_CORE_DATA_DIR", nil, ""),
 		SessionDirectoryOverride: text(env, "AXIOM_SESSION_DIR", nil, ""),
 		SkillDirs:                list(text(env, "AXIOM_SKILL_DIRS", source, "SkillDirs")),
+		Experimental:             experimental(source),
 	}
 }
 

@@ -79,6 +79,47 @@ func (s JSONSource) Int(name string) (int, bool) {
 	return value, err == nil
 }
 
+// Experimental: co experimental.<name> trong config.json. Nhan ca ban do long nhau
+// {"Experimental":{"foo":true}} va khoa phang {"experimental.foo":true} - hai cach viet cung
+// mot y, de file cau hinh dung chung voi extension LibreOffice khong phai doi dinh dang.
+func (s JSONSource) Experimental() (map[string]bool, bool) {
+	data, err := os.ReadFile(s.Path)
+	if err != nil {
+		return nil, false
+	}
+	var values map[string]json.RawMessage
+	if json.Unmarshal(data, &values) != nil {
+		return nil, false
+	}
+	flags := map[string]bool{}
+	found := false
+	for name, raw := range values {
+		lower := strings.ToLower(strings.TrimSpace(name))
+		switch {
+		case lower == "experimental":
+			parsed, ok := experimentalJSONValue(raw)
+			if ok {
+				found = true
+				mergeExperimental(flags, parsed)
+			}
+		case strings.HasPrefix(lower, experimentalPrefix):
+			flagName := strings.TrimSpace(name[len(experimentalPrefix):])
+			if flagName == "" {
+				continue
+			}
+			var value any
+			if json.Unmarshal(raw, &value) != nil {
+				continue
+			}
+			if enabled, ok := experimentalBool(value); ok {
+				flags[flagName] = enabled
+				found = true
+			}
+		}
+	}
+	return flags, found
+}
+
 // Set ghi mot khoa vao config.json, giu nguyen moi khoa khac (file dung chung voi extension
 // LibreOffice nen khong duoc ghi de ca file). Ghi kieu JSON that (true/false, chuoi, so) - dung dang
 // config.py:set_value da ghi, de hai ben doc lai nhu nhau. File hong -> ghi lai tu dau.
