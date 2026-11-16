@@ -152,8 +152,8 @@ func (h *WPSHost) Document() Document {
 	return documentFromMap(document)
 }
 
-// Execute sends one command to the add-in through its queue. The queue does not
-// take a context, so a cancelled context is checked before enqueueing only.
+// Execute sends one command to the add-in through its queue and waits with the
+// caller's context, so cancelling a run stops the wait.
 func (h *WPSHost) Execute(ctx context.Context, action string, params map[string]any) (map[string]any, error) {
 	if h.client == nil {
 		return nil, errors.New("host: no WPS bridge client")
@@ -161,7 +161,7 @@ func (h *WPSHost) Execute(ctx context.Context, action string, params map[string]
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	reply, ok := h.client.Enqueue(action, params)
+	reply, ok := h.client.Enqueue(ctx, action, params)
 	if !ok {
 		return nil, errors.New("host: WPS add-in is not connected")
 	}
@@ -244,7 +244,7 @@ func (h *WPSBridgeHost) Execute(ctx context.Context, action string, params map[s
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	reply, ok := client.Enqueue(action, params)
+	reply, ok := client.Enqueue(ctx, action, params)
 	if !ok {
 		return nil, errors.New("host: WPS add-in is not connected")
 	}
