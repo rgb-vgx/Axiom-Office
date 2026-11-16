@@ -9,8 +9,8 @@
  *               doan boi den - mini.html): Core dung ngay neu khong co doan boi den, khong sua ca tai lieu.
  *   state   = { messages: [{role: "user"|"assistant"|"error"|"info", text}],
  *               running, steps: [{action, ok, error?}],
- *               confirmation: null | {id, action, reason, choices?: [{id, label, detail, input?}]}, conversationId,
- *               model, mode: ""|"plan"|"act", plan, planReady,
+ *               confirmation: null | {id, action, reason, approvable?, choices?: [{id, label, detail, input?}]},
+ *               conversationId, model, mode: ""|"plan"|"act", plan, planReady,
  *               reasoning: null | {round, text, live, expanded},
  *               skills: [{name}], notes: [{id, text, state}], progress,
  *               seconds, rounds, edits, error, status, lastReply, canUndo, canInsert }
@@ -24,7 +24,9 @@
  *                               chi Writer, app khac giu []. Loi -> [].
  * controller.quick(id)       -> POST base+"runs" {quickAction: id, conversationId?} - cau lenh do Core lay theo id;
  *                               tin nhan nguoi dung hien NHAN cua muc. Bo qua "Lap ke hoach truoc" (viec nho, ro).
- * controller.confirm(ok)     -> POST base+"runs/<id>/confirm" {confirmationId, approved: ok}
+ * controller.confirm(ok, always?) -> POST base+"runs/<id>/confirm" {confirmationId, approved: ok}
+ *                               (always=true chi gui khi dong y VA Core bao confirmation.approvable: luu phe duyet
+ *                               "luon cho phep" cho action+resource nay; tu choi thi khong bao gio gui always)
  * controller.choose(id, text?) -> POST base+"runs/<id>/confirm" {confirmationId, choice: id, text?} (the nhieu lua
  *                               chon; text = chu nguoi dung go o lua chon input)
  * controller.stop()          -> POST base+"runs/<id>/cancel"
@@ -66,6 +68,10 @@
     "selection-lock": "B\u1EA3n WPS n\u00E0y kh\u00F4ng kho\u00E1 \u0111\u01B0\u1EE3c v\u00F9ng b\u00F4i \u0111en, n\u00EAn kh\u00F4ng ch\u1EA1y l\u1EC7nh s\u1EEDa nhanh (AI c\u00F3 th\u1EC3 s\u1EEDa ra ngo\u00E0i \u0111o\u1EA1n \u0111\u00E3 ch\u1ECDn). H\u00E3y g\u00F5 y\u00EAu c\u1EA7u v\u00E0o \u00F4 so\u1EA1n."
   };
   var SEND_ERROR = "Agent Core tr\u1EA3 l\u1EDDi kh\u00F4ng h\u1EE3p l\u1EC7. Vui l\u00F2ng th\u1EED l\u1EA1i; n\u1EBFu v\u1EABn l\u1ED7i, kh\u1EDFi \u0111\u1ED9ng l\u1EA1i Core.";
+  // Nhan "luon cho phep" cua the xac nhan. WPS khong co tep lang/*.json (giong ribbon.xml: chi ban C# moi co
+  // scripts/check_i18n.py) nen pane giu chuoi tieng Viet nhu moi nhan khac o day. Chi hien khi Core gui
+  // confirmation.approvable=true (policy.Approvable) - cau hoi khong luu duoc (the lua chon, lenh bi tu choi) thi khong hien.
+  var CONFIRM_ALWAYS_LABEL = "Lu\u00F4n cho ph\u00E9p cho t\u00E0i li\u1EC7u n\u00E0y";
 
   // Suy luan ngan hon nguong nay thi hien thang; dai hon thi thu lai thanh mot dong (bam "Hien" de mo) -
   // cung nguong voi chat.py:REASONING_INLINE_LIMIT.
@@ -416,6 +422,9 @@
             action: safeString(p.action),
             reason: safeString(p.reason)
           };
+          // Chi luu co "luon cho phep" khi Core bao action nay luu duoc. Giu vang mat khi false de khong doi
+          // hinh dang state cua cau hoi cu (test_pane.mjs deepEqual).
+          try { if (p.approvable) { state.confirmation.approvable = true; } } catch (eApprovable) {}
           // The nhieu lua chon (doc_design hoi kieu trinh bay).
           try {
             if (p.choices && p.choices.length) {
@@ -835,8 +844,13 @@
       }
     }
 
-    function confirm(approved) {
-      return answer({ approved: !!approved });
+    function confirm(approved, always) {
+      var reply = { approved: !!approved };
+      // Tu choi = khong bao gio luu phe duyet. "always" chi co nghia khi dong y mot lenh Core cho phep luu.
+      var savable = false;
+      try { savable = !!(state.confirmation && state.confirmation.approvable); } catch (e) { savable = false; }
+      if (approved && always && savable) { reply.always = true; }
+      return answer(reply);
     }
 
     function choose(choiceId, text) {
@@ -1311,7 +1325,7 @@
     } catch (e) { return "lỗi"; }
   }
 
-  var api = { create: create, ACTION_LABELS: ACTION_LABELS, SUFFIX_LABELS: SUFFIX_LABELS, TOOL_LABELS: TOOL_LABELS, NOUNS: NOUNS, APP_NAMES: APP_NAMES, SUGGESTIONS: SUGGESTIONS, labelFor: labelFor, emptyState: emptyState, plainReply: plainReply, citationCommand: citationCommand, isEdit: isEdit, summary: summary, reasoningPreview: reasoningPreview, errorSummary: errorSummary, EDIT_ACTIONS: EDIT_ACTIONS, UNDO_ACTIONS: UNDO_ACTIONS, INSERT_ACTIONS: INSERT_ACTIONS, PLAN_EXECUTE_PROMPT: PLAN_EXECUTE_PROMPT, REASONING_INLINE_LIMIT: REASONING_INLINE_LIMIT };
+  var api = { create: create, CONFIRM_ALWAYS_LABEL: CONFIRM_ALWAYS_LABEL, ACTION_LABELS: ACTION_LABELS, SUFFIX_LABELS: SUFFIX_LABELS, TOOL_LABELS: TOOL_LABELS, NOUNS: NOUNS, APP_NAMES: APP_NAMES, SUGGESTIONS: SUGGESTIONS, labelFor: labelFor, emptyState: emptyState, plainReply: plainReply, citationCommand: citationCommand, isEdit: isEdit, summary: summary, reasoningPreview: reasoningPreview, errorSummary: errorSummary, EDIT_ACTIONS: EDIT_ACTIONS, UNDO_ACTIONS: UNDO_ACTIONS, INSERT_ACTIONS: INSERT_ACTIONS, PLAN_EXECUTE_PROMPT: PLAN_EXECUTE_PROMPT, REASONING_INLINE_LIMIT: REASONING_INLINE_LIMIT };
   try {
     if (root) { root.AxiomPaneCore = api; }
   } catch (e) {}

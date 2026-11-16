@@ -1089,3 +1089,65 @@ test("dot 2 (01/11/2026): Sua thong minh + Tom tat/Dich song ngu ca bai chi o Wr
   assert.deepEqual(posts.map((p) => p.quickAction), ["summarizeDoc"]);
   if (ctx.AxiomBridge) { ctx.AxiomBridge.stop(); }
 });
+
+// ---------------------------------------------------------------- phe duyet "luon cho phep" (permission_approvals)
+
+async function confirmEvent(h, data) {
+  FakeSource.last.emit("confirm.required", { data });
+  await tick();
+}
+
+test("the xac nhan: KHONG tick 'luon cho phep' -> chi gui approved", async () => {
+  const h = harness({ "/runs": [200, { ok: true, result: { runId: "ap1", conversationId: "cap1" } }] });
+  await h.pane.send("Lưu tài liệu");
+  await tick();
+  await confirmEvent(h, { confirmationId: "cf_a1", action: "writer.save", reason: "AI muốn lưu", approvable: true });
+  assert.equal(h.state.confirmation.approvable, true, "Core bao action nay luu duoc phe duyet");
+  await h.pane.confirm(true);
+  const call = h.calls.find((c) => c.url === BASE + "runs/ap1/confirm");
+  assert.deepEqual(call.body, { confirmationId: "cf_a1", approved: true }, "khong tick thi khong gui always");
+});
+
+test("the xac nhan: tick 'luon cho phep' -> gui approved + always", async () => {
+  const h = harness({ "/runs": [200, { ok: true, result: { runId: "ap2", conversationId: "cap2" } }] });
+  await h.pane.send("Lưu tài liệu");
+  await tick();
+  await confirmEvent(h, { confirmationId: "cf_a2", action: "writer.save", reason: "AI muốn lưu", approvable: true });
+  await h.pane.confirm(true, true);
+  const call = h.calls.find((c) => c.url === BASE + "runs/ap2/confirm");
+  assert.deepEqual(call.body, { confirmationId: "cf_a2", approved: true, always: true });
+});
+
+test("the xac nhan: Tu choi KHONG BAO GIO gui always, du co tick", async () => {
+  const h = harness({ "/runs": [200, { ok: true, result: { runId: "ap3", conversationId: "cap3" } }] });
+  await h.pane.send("Lưu tài liệu");
+  await tick();
+  await confirmEvent(h, { confirmationId: "cf_a3", action: "writer.save", reason: "AI muốn lưu", approvable: true });
+  await h.pane.confirm(false, true);
+  const call = h.calls.find((c) => c.url === BASE + "runs/ap3/confirm");
+  assert.deepEqual(call.body, { confirmationId: "cf_a3", approved: false });
+});
+
+test("the xac nhan: cau hoi khong luu duoc (khong co approvable) thi khong gui always", async () => {
+  const h = harness({ "/runs": [200, { ok: true, result: { runId: "ap4", conversationId: "cap4" } }] });
+  await h.pane.send("Lưu tài liệu");
+  await tick();
+  await confirmEvent(h, { confirmationId: "cf_a4", action: "writer.save", reason: "AI muốn lưu" });
+  assert.equal(h.state.confirmation.approvable, undefined, "khong co co thi giu hinh dang cu");
+  await h.pane.confirm(true, true);
+  const call = h.calls.find((c) => c.url === BASE + "runs/ap4/confirm");
+  assert.deepEqual(call.body, { confirmationId: "cf_a4", approved: true }, "Core quyet dinh - pane khong tu gui always");
+});
+
+test("huy luot chay van di duong cu: POST /cancel, khong dinh dang confirm", async () => {
+  const h = harness({ "/runs": [200, { ok: true, result: { runId: "ap5", conversationId: "cap5" } }] });
+  await h.pane.send("Làm lâu");
+  await tick();
+  await confirmEvent(h, { confirmationId: "cf_a5", action: "writer.save", reason: "AI muốn lưu", approvable: true });
+  await h.pane.stop();
+  const cancel = h.calls.find((c) => c.url === BASE + "runs/ap5/cancel");
+  assert.ok(cancel, "phai POST runs/<id>/cancel");
+  assert.equal(cancel.method, "POST");
+  assert.deepEqual(cancel.body, {}, "huy khong gui approved/always");
+  assert.equal(h.calls.filter((c) => c.url === BASE + "runs/ap5/confirm").length, 0, "huy khong cham vao /confirm");
+});

@@ -1177,3 +1177,51 @@ test("header: nut Lich su (dong ho) canh '...' mo thang man hinh Hoi thoai truoc
   await tick();
   assert.match(pane.text("view"), /Giáo án tuần 3/, "mo man hinh Hoi thoai truoc");
 });
+
+test("the xac nhan: chi hien 'Luon cho phep' khi Core bao approvable; tick moi gui always", async () => {
+  const { pane, calls } = paneWith({ "POST /runs": [200, { ok: true, result: { runId: "c1" } }] });
+  await startRun(pane, "Lưu tài liệu");
+  pane.emit("confirm.required", { confirmationId: "cf_1", action: "writer.save", reason: "AI muốn lưu", approvable: true });
+  await tick();
+  assert.match(pane.text("chat"), /Cần bạn xác nhận: Lưu tệp/);
+  assert.match(pane.text("chat"), /Luôn cho phép cho tài liệu này/);
+  const box = pane.byId("confirmAlways");
+  assert.ok(box, "the xac nhan phai co o 'Luon cho phep' (#confirmAlways)");
+  assert.equal(box.checked, false, "mac dinh khong tick");
+
+  // Khong tick: gui y nhu cu, khong co always.
+  pane.click(pane.find((el) => el.getAttribute && el.getAttribute("data-act") === "approve"));
+  await tick();
+  let confirm = calls.find((c) => c.url === BASE + "runs/c1/confirm");
+  assert.deepEqual(confirm.body, { confirmationId: "cf_1", approved: true });
+
+  // Tick roi moi dong y: gui kem always=true.
+  pane.emit("confirm.required", { confirmationId: "cf_2", action: "writer.save", reason: "AI muốn lưu", approvable: true });
+  await tick();
+  pane.byId("confirmAlways").checked = true;
+  pane.click(pane.find((el) => el.getAttribute && el.getAttribute("data-act") === "approve"));
+  await tick();
+  confirm = calls.filter((c) => c.url === BASE + "runs/c1/confirm").pop();
+  assert.deepEqual(confirm.body, { confirmationId: "cf_2", approved: true, always: true });
+
+  // Tu choi: du tick cung khong gui always.
+  pane.emit("confirm.required", { confirmationId: "cf_3", action: "writer.save", reason: "AI muốn lưu", approvable: true });
+  await tick();
+  pane.byId("confirmAlways").checked = true;
+  pane.click(pane.find((el) => el.getAttribute && el.getAttribute("data-act") === "deny"));
+  await tick();
+  confirm = calls.filter((c) => c.url === BASE + "runs/c1/confirm").pop();
+  assert.deepEqual(confirm.body, { confirmationId: "cf_3", approved: false });
+});
+
+test("the xac nhan: cau hoi khong luu duoc thi KHONG hien o 'Luon cho phep'", async () => {
+  const { pane, calls } = paneWith({ "POST /runs": [200, { ok: true, result: { runId: "c2" } }] });
+  await startRun(pane, "Lưu tài liệu");
+  pane.emit("confirm.required", { confirmationId: "cf_4", action: "writer.save", reason: "AI muốn lưu" });
+  await tick();
+  assert.equal(pane.byId("confirmAlways"), null, "khong co co approvable thi khong moi luu phe duyet");
+  pane.click(pane.find((el) => el.getAttribute && el.getAttribute("data-act") === "approve"));
+  await tick();
+  const confirm = calls.find((c) => c.url === BASE + "runs/c2/confirm");
+  assert.deepEqual(confirm.body, { confirmationId: "cf_4", approved: true });
+});

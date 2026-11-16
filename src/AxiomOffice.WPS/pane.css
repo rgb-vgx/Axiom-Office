@@ -331,6 +331,19 @@ body {
   white-space: pre-wrap;
   overflow-wrap: break-word;
 }
+/* "Luon cho phep cho tai lieu nay": mot dong nho truoc hang nut Dong y/Tu choi. */
+.confirmAlways {
+  display: flex;
+  align-items: center;
+  gap: var(--axiom-gap-chip);
+  margin: 0 0 var(--axiom-gap-chip) 0;
+  color: var(--axiom-text-primary);
+  font-size: var(--axiom-size-caption);
+  cursor: pointer;
+}
+.confirmAlways input {
+  margin: 0;
+}
 #confirmTitle {
   color: var(--axiom-accent-fg);
   font-weight: 600;

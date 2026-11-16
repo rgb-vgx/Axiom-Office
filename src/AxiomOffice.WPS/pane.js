@@ -357,6 +357,26 @@
     }
     var row = document.createElement("div");
     try { row.className = "btnRow"; } catch (e6) {}
+    // Chi hien "Luon cho phep" khi Core bao cau hoi nay luu duoc phe duyet (confirm.required: approvable=true).
+    // Cau hoi nhieu lua chon khong luu duoc; mac dinh khong gui always khi nguoi dung khong tick.
+    var approvable = false;
+    try { approvable = !!(confirmation && confirmation.approvable); } catch (eA) { approvable = false; }
+    if (approvable) {
+      var alwaysRow = document.createElement("label");
+      try { alwaysRow.className = "confirmAlways"; } catch (eAR) {}
+      var alwaysBox = document.createElement("input");
+      try {
+        alwaysBox.type = "checkbox";
+        alwaysBox.id = "confirmAlways";
+      } catch (eAB) {}
+      alwaysRow.appendChild(alwaysBox);
+      var alwaysText = document.createElement("span");
+      var alwaysLabel = "Luôn cho phép cho tài liệu này";
+      try { alwaysLabel = AxiomPaneCore.CONFIRM_ALWAYS_LABEL || alwaysLabel; } catch (eAL) {}
+      addText(alwaysText, alwaysLabel);
+      alwaysRow.appendChild(alwaysText);
+      card.appendChild(alwaysRow);
+    }
     var ok = document.createElement("button");
     try {
       ok.type = "button";
@@ -2316,7 +2336,14 @@
     cancelPending: function () { withCtl(function (c) { c.cancelPending(); }); },
     send: doSend,
     stop: function () { withCtl(function (c) { c.stop(); }); },
-    approve: function () { withCtl(function (c) { c.confirm(true); }); },
+    approve: function () {
+      var always = false;
+      try {
+        var box = $("confirmAlways");
+        always = !!(box && box.checked);
+      } catch (e) { always = false; }
+      withCtl(function (c) { c.confirm(true, always); });
+    },
     deny: function () { withCtl(function (c) { c.confirm(false); }); },
     choose: function (value) { withCtl(function (c) { c.choose(value); }); },
     chooseText: function (value) {
