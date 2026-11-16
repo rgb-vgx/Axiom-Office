@@ -19,7 +19,7 @@ this file only covers rules agents and contributors must not break.
 - Never commit while on `main`; create a branch first.
 - Commit messages are Vietnamese with a `feat:`, `fix:`, `docs:`, `refactor:`, or
   `test:` prefix.
-- Do not push (the repository has no remote configured for this workflow).
+- Do not push unless the user explicitly asks.
 
 ## Generated files
 
