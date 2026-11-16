@@ -1,7 +1,7 @@
 ﻿# Tình trạng dự án Axiom Office
 
-Cập nhật: **31/10/2026** · nhánh `main` · đợt 31/10 (§2.16: WPS nhiều app cùng mở, hợp đồng lệnh của tool, đóng băng
-LibreOffice) **chưa commit**.
+Cập nhật: **16/11/2026** · nhánh `feat/architecture-hardening` · đợt 16/11 (§2.17: nền tảng agent — idempotency,
+durable run journal, policy/saved approvals, flags, model capabilities, host seam) **chưa merge `main`**.
 Số liệu kiểm chứng ở §2.4 là lượt đo **01/10/2026**; số mới của đợt WPS ở §2.6, lượt đo lại toàn bộ ở §2.7, lượt đo
 lại job Windows ở §2.8, đợt Office x64 + sửa định dạng văn bản ở §2.9, ba đợt 25/10 ở §2.10–2.12, đợt 27–28/10 ở §2.15
 và đợt 31/10 ở §2.16.
@@ -32,7 +32,7 @@ hướng dẫn dùng ở [README.md](README.md); lịch sử thay đổi ở [CH
 
 ### 2.1 Agent Core viết lại bằng Go (`core-go/`) — G1 → G10
 
-Bản Go dùng **chung hợp đồng** với bản .NET: cùng Core API v1, cùng `core.json`, cùng `core.db` (schema 4,
+Bản Go dùng **chung hợp đồng** với bản .NET: cùng Core API v1, cùng `core.json`, cùng `core.db` (nay schema 6,
 cùng nguồn cấu hình (`AXIOM_*` → HKCU/DPAPI hoặc `~/.config/axiom-office/config.json` + libsecret), cùng tên
 mutex một-phiên-bản. Nhờ vậy add-in/extension/MCP không phải đổi gì.
 
@@ -355,6 +355,25 @@ mở thành hai phiên, `/health` mỗi cổng không còn đảo app; lượt a
 `writer.*`), từ pane Sheets chỉ chạm Sheets (23 lệnh `et.*`); đóng Sheets thì cổng + file session của nó được dọn sau
 ~50 giây; WPS chết giữa lệnh thì `/cmd` báo lỗi sau ~1 giây thay vì 300 giây (`wpsoffice` — máy chủ CEF của add-in — thoát
 theo app cuối). Phát hiện phụ: `oem.ini` của bản này không có `JsApiPlugin=true` mà add-in vẫn nạp (chỉ hỏi tin cậy lần đầu).
+
+### 2.17 Đợt 16/11/2026: nền tảng agent (nhánh `feat/architecture-hardening`)
+
+| Việc | Nội dung | Kiểm chứng |
+|---|---|---|
+| Nhận lượt idempotent | `clientRequestId` trên `POST /v1/runs`; trùng id trên cùng port trả đúng lượt cũ; hội thoại + dòng `runs` tạo trước khi chạy nên trả `conversationId` ngay, bỏ vòng chờ 10 giây | `go test -race`, 179 core e2e |
+| Huỷ lan truyền WPS | `Client.Enqueue(ctx, ...)`; Dừng bỏ lệnh đang chờ, phân biệt “chưa gửi” / “có thể đã áp dụng” | Go test + WPS e2e 96+16 |
+| Durable run journal | Schema 6 `run_events`; SSE phát lại sau restart/quá retention; `stream.lagged`; `/health.capabilities` có `events.durable` | Go test + 179 core e2e |
+| Policy + saved approvals | Ruleset `allow/ask/deny` + `policy.rules`; `permission_approvals` (schema 5); `GET/POST/DELETE /v1/approvals`; `confirm always:true`; chỉ lớp lệnh rủi ro mới lưu được | Go test + `make test-wps` 305 |
+| Feature flags + errors | `AXIOM_FLAGS`, `experimental.*`, `/health.capabilities`, `code` ổn định trong envelope lỗi | Go test + e2e |
+| Model capabilities | `max_output_tokens`, tools/vision/reasoning/cache/giá; Visual QA chỉ ẩn khi gateway khai rõ `vision=false` | Go test + 179 core e2e |
+| Event manifest | `core-go/internal/protocol/events.json`; sinh JS/Python; `make check-gen` bắt lệch | `make check-gen` |
+| Host seam | `internal/host` (Kind/Family/Capabilities/Catalog/Document/Execute) + adapter Office/WPS; chưa thay call site | Go test |
+| WPS “luôn cho phép” | Nút trong hộp thoại xác nhận, chỉ hiện khi `confirm.required.approvable`; gửi `always:true` | `make test-wps` 305 |
+| MCP headers | `{env:NAME}` trong `mcp.json`; chặn CR/LF; header giao thức luôn thắng | Go test |
+
+Số đo cuối đợt: `make test` xanh (Go race, 179 core e2e, 96+16 WPS e2e, 61 MCP, catalog, install/package),
+`make lint` sạch, `GOOS=windows` + `linux/arm64` build xanh. WPS live: 78/90 pass; 12 ca lỗi đều là
+xdotool/XTEST chọn vùng (môi trường, không phải lệnh WPS) — xem ghi chú trong log `tests/wps/`.
 
 ## 3. Chưa làm / chưa kiểm chứng
 
