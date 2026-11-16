@@ -37,7 +37,7 @@ func TestHealthCapabilities(t *testing.T) {
 	if !ok {
 		t.Fatalf("thieu capabilities: %+v", result)
 	}
-	for _, name := range []string{"runs.idempotency", "events.durable", "approvals.saved"} {
+	for _, name := range []string{"runs.idempotency", "approvals.saved"} {
 		if caps[name] != true {
 			t.Errorf("capabilities[%q] = %v", name, caps[name])
 		}

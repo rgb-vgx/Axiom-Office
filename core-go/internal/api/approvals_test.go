@@ -90,6 +90,8 @@ func TestApprovalsAPIEnvelope(t *testing.T) {
 		`{}`,
 		`{"action":"et.saveAs","scope":"everything"}`,
 		`{"action":"et.saveAs","expiresAt":"ngay mai"}`,
+		// Lenh ghi chung khong duoc luu "luon dong y": se bo qua guard ghi de/sort.
+		`{"action":"et.writeRange"}`,
 	} {
 		if code := call(handler, "POST", "/v1/approvals", body, auth).Code; code != http.StatusBadRequest {
 			t.Errorf("POST %s = %d, muon 400", body, code)

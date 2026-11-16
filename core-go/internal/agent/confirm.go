@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"axiomoffice/core/internal/corelog"
+	"axiomoffice/core/internal/policy"
 	"axiomoffice/core/internal/store"
 	"axiomoffice/core/internal/tools"
 )
@@ -101,6 +102,7 @@ func (c *Confirmations) ask(ctx context.Context, events *EventStream, action, re
 	payload := map[string]any{
 		"confirmationId": id,
 		"action":         action,
+		"approvable":     policy.Approvable(action),
 		"reason":         reason,
 		"paramsPreview":  nilIfEmpty(paramsPreview),
 		"timeoutSeconds": int(timeout.Seconds()),

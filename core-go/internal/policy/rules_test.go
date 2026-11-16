@@ -160,3 +160,18 @@ func TestParseEffect(t *testing.T) {
 		}
 	}
 }
+
+// Chi lop lenh rui ro mac dinh moi duoc luu "luon dong y"; mot lenh ghi chung nhu et.writeRange
+// khong duoc phep, neu khong se bo qua guard ghi de/sort cua moi tai lieu.
+func TestApprovableOnlyRiskClasses(t *testing.T) {
+	for _, action := range []string{"et.saveAs", "writer.save", "wpp.deleteSlide", "et.deleteSheet", "mcp__foo__bar"} {
+		if !Approvable(action) {
+			t.Errorf("Approvable(%q) = false, want true", action)
+		}
+	}
+	for _, action := range []string{"", "et.writeRange", "writer.typeText", "writer.getText", "unknown.action"} {
+		if Approvable(action) {
+			t.Errorf("Approvable(%q) = true, want false", action)
+		}
+	}
+}

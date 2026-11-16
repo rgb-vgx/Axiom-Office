@@ -127,6 +127,22 @@ func Decide(rules Ruleset, action, resource string) Decision {
 	}
 }
 
+// Approvable: action co nam trong lop lenh rui ro ma nguoi dung duoc phep luu phe duyet "luon dong y"
+// khong. Chi cac quy tac ask mac dinh duoc phep: quyen "luon cho phep" cho mot lenh ghi bat ky (vd
+// et.writeRange) se bo qua ca guard ghi de/sort, nen API va confirm always=true phai tu choi.
+func Approvable(action string) bool {
+	action = strings.TrimSpace(action)
+	if action == "" {
+		return false
+	}
+	for _, rule := range DefaultRules() {
+		if rule.Effect == EffectAsk && matchAction(rule.Action, action) {
+			return true
+		}
+	}
+	return false
+}
+
 // Check: quyet dinh cho mot lenh cu the. Decide (quy tac khai bao) chay TRUOC, roi Evaluate (dieu kien
 // thuc te) - de mot quy tac deny chan ngay ma khong ton mot lan goi bridge (WordLength), va de quy tac
 // nguoi dung khai bao ro (allow/ask/deny) la quyet dinh cuoi cung.

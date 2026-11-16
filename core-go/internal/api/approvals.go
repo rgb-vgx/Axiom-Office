@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"axiomoffice/core/internal/policy"
 	"axiomoffice/core/internal/store"
 )
 
@@ -37,6 +38,10 @@ func mapApprovals(mux *http.ServeMux, deps *Deps) {
 		action = strings.TrimSpace(action)
 		if action == "" {
 			Error(w, http.StatusBadRequest, "'action' is required")
+			return
+		}
+		if !policy.Approvable(action) {
+			Error(w, http.StatusBadRequest, "'action' is not eligible for a saved approval: "+action)
 			return
 		}
 		resource, _ := body["resource"].(string)

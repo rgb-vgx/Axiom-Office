@@ -9,6 +9,7 @@ import (
 	"axiomoffice/core/internal/agent"
 	"axiomoffice/core/internal/corelog"
 	"axiomoffice/core/internal/model"
+	"axiomoffice/core/internal/policy"
 	"axiomoffice/core/internal/store"
 )
 
@@ -279,6 +280,11 @@ func serveConfirmRun(w http.ResponseWriter, deps *Deps, runID string, body map[s
 // cua nguoi dung khong duoc hong vi viec luu phe duyet.
 func saveApproval(deps *Deps, action, resource string) (store.ApprovalRow, bool) {
 	if deps.Stores == nil || deps.Stores.Approvals == nil {
+		return store.ApprovalRow{}, false
+	}
+	// Chi lop lenh rui ro mac dinh moi duoc luu: "luon dong y" cho et.writeRange se bo qua guard
+	// ghi de/sort cua moi tai lieu, khong phai y nguoi dung muon khi bam hop thoai.
+	if !policy.Approvable(action) {
 		return store.ApprovalRow{}, false
 	}
 	scope := store.ApprovalScopeDocument
