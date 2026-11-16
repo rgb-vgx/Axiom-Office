@@ -323,6 +323,14 @@ func (t *httpTransport) post(ctx context.Context, id *int64, method string, para
 	if err != nil {
 		return nil, err
 	}
+	// Header nguoi dung (mcp.json "headers") dat truoc, header giao thuc dat sau va luon thang: ten trung
+	// Content-Type / Accept / MCP-Protocol-Version / Mcp-Session-Id bi bo qua (protocolHeaderNames).
+	for key, value := range t.headers {
+		if protocolHeaderNames[strings.ToLower(key)] {
+			continue
+		}
+		request.Header.Set(key, value)
+	}
 	request.Header.Set("Content-Type", "application/json; charset=utf-8")
 	request.Header.Set("Accept", "application/json, text/event-stream")
 	request.Header.Set("MCP-Protocol-Version", ProtocolVersion)
@@ -331,9 +339,6 @@ func (t *httpTransport) post(ctx context.Context, id *int64, method string, para
 	t.mu.Unlock()
 	if session != "" {
 		request.Header.Set("Mcp-Session-Id", session)
-	}
-	for key, value := range t.headers {
-		request.Header.Set(key, value)
 	}
 
 	response, err := t.http.Do(request)

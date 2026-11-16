@@ -930,6 +930,12 @@ Khi dựng ngữ cảnh: các tin gần nhất trong ngân sách ~8.000 token (�
 - Cấu hình thêm server ngoài: `%LOCALAPPDATA%\AxiomOffice\mcp.json` theo định dạng quen thuộc
   `{"mcpServers": {"name": {"command": "...", "args": [...], "env": {...}}}}` (stdio) hoặc
   `{"url": "http://..."}` (Streamable HTTP).
+- Server HTTP có thể gửi thêm header: `"headers": {"Authorization": "Bearer {env:MCP_TOKEN}"}`. Giá trị
+  là chuỗi literal hoặc tham chiếu `{env:NAME}` lấy từ môi trường của tiến trình Core; giá trị đã giải
+  không bao giờ ghi log. Header giao thức `Content-Type`, `Accept`, `MCP-Protocol-Version`,
+  `Mcp-Session-Id` do Core tự đặt và **thắng** header trùng tên trong `headers`. Tên/giá trị header sai
+  hoặc chứa CR/LF, hoặc thiếu biến môi trường → server đó báo lỗi khởi động (tool bị ẩn), các server
+  khác vẫn dùng được. Server stdio bỏ qua `headers` (stdio không có header).
 - Khởi động server lười khi run đầu tiên cần; tool đặt tên `mcp__<server>__<tool>`; **mặc định mọi
   tool MCP ngoài cần xác nhận** trừ khi cấu hình `"trusted": true` (server `office` đã tin cậy).
 - Lỗi một server không làm hỏng run (tool của nó bị ẩn, log lỗi).
