@@ -1,6 +1,7 @@
 package wpsbridge
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -119,7 +120,7 @@ func TestWriterAndSpreadsheetsKeepSeparateSessions(t *testing.T) {
 	et := b.Resolve("e1", "")
 	replyCh := make(chan map[string]any, 1)
 	go func() {
-		reply, _ := et.Enqueue("et.readRange", map[string]any{"range": "A1"})
+		reply, _ := et.Enqueue(context.Background(), "et.readRange", map[string]any{"range": "A1"})
 		replyCh <- reply
 	}()
 	time.Sleep(100 * time.Millisecond)
@@ -230,7 +231,7 @@ func TestInFlightCommandFailsFastWhenWPSIsGone(t *testing.T) {
 	started := time.Now()
 	replyCh := make(chan map[string]any, 1)
 	go func() {
-		reply, _ := b.Enqueue("et.importCsv", map[string]any{})
+		reply, _ := b.Enqueue(context.Background(), "et.importCsv", map[string]any{})
 		replyCh <- reply
 	}()
 	if jobs := takeJobsWithin(t, b, 3*time.Second); len(jobs) != 1 {
@@ -261,7 +262,7 @@ func TestInFlightCommandWaitsWhileWPSIsRunning(t *testing.T) {
 		b.recordPoll(map[string]any{})
 		replyCh := make(chan map[string]any, 1)
 		go func() {
-			reply, _ := b.Enqueue("et.importCsv", map[string]any{})
+			reply, _ := b.Enqueue(context.Background(), "et.importCsv", map[string]any{})
 			replyCh <- reply
 		}()
 		jobs := takeJobsWithin(t, b, 3*time.Second)

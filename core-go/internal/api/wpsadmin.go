@@ -89,7 +89,7 @@ func mapWPSAdmin(mux *http.ServeMux, deps *Deps) {
 			ErrorCode(w, http.StatusConflict, "addin-disconnected", "WPS add-in is not connected: open a document in WPS to connect the add-in")
 			return
 		}
-		reply, ok := client.Enqueue(action, params)
+		reply, ok := client.Enqueue(r.Context(), action, params)
 		if !ok {
 			ErrorCode(w, http.StatusConflict, "addin-disconnected", "WPS add-in is not connected: open a document in WPS to connect the add-in")
 			return

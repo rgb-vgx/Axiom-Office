@@ -9,6 +9,7 @@
 package wpsbridge
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
@@ -406,9 +407,9 @@ func (b *Bridge) Snapshot() (map[string]any, []any, string, bool) { return b.Pri
 // Status: trang thai cua client chinh kem danh sach client.
 func (b *Bridge) Status() map[string]any { return b.Primary().Status() }
 
-// Enqueue: gui lenh cho client chinh.
-func (b *Bridge) Enqueue(action string, params map[string]any) (map[string]any, bool) {
-	return b.Primary().Enqueue(action, params)
+// Enqueue: gui lenh cho client chinh, huy duoc theo ctx cua luot chay.
+func (b *Bridge) Enqueue(ctx context.Context, action string, params map[string]any) (map[string]any, bool) {
+	return b.Primary().Enqueue(ctx, action, params)
 }
 
 // ---- Hang doi lenh ----
@@ -422,7 +423,9 @@ func (b *Bridge) newJobID() string {
 }
 
 // Enqueue dua lenh vao hang doi cua client va cho ket qua toi da CmdWaitSeconds giay (theo cau hinh).
-func (c *Client) Enqueue(action string, params map[string]any) (map[string]any, bool) {
+// ctx bi huy (nguoi dung bam Dung, het gio cua luot, Core dung) thi bo job va tra ngay: khong giu
+// goroutine/ban ghi den het CmdWaitSeconds, va noi ro lenh da gui hay chua de agent biet co nen thu lai.
+func (c *Client) Enqueue(ctx context.Context, action string, params map[string]any) (map[string]any, bool) {
 	if !c.Connected() {
 		return nil, false
 	}
@@ -445,6 +448,14 @@ func (c *Client) Enqueue(action string, params map[string]any) (map[string]any, 
 		select {
 		case reply := <-job.wait:
 			return reply, true
+		case <-ctx.Done():
+			sent := c.cancelJob(job)
+			// Job da bi go o tren; forget la buoc don chung cua moi duong thoat (het gio/mat ket noi/appGone).
+			c.forget(job)
+			if sent {
+				return map[string]any{"ok": false, "sent": true, "error": "cancelled while the command was running; it may have been applied - check the document before retrying"}, true
+			}
+			return map[string]any{"ok": false, "sent": false, "error": "cancelled before the command was sent; safe to retry"}, true
 		case <-timeout.C:
 			c.forget(job)
 			return map[string]any{"ok": false, "error": fmt.Sprintf("WPS add-in did not answer within %ds; the command may have been applied - check the document before retrying", cmdWait)}, true
@@ -468,6 +479,23 @@ func (c *Client) Enqueue(action string, params map[string]any) (map[string]any, 
 			return map[string]any{"ok": false, "error": "Core is stopping"}, true
 		}
 	}
+}
+
+// cancelJob bo mot job vi nguoi goi bi huy, va cho biet job da duoc giao cho add-in chua
+// (sentAt zero = con trong hang doi). Job duoc go khoi queue + waiting trong cung mot lan giu
+// b.mu de mot poll chen vao khong gui no di sau khi ta da bao "chua gui".
+func (c *Client) cancelJob(job *Job) bool {
+	c.b.mu.Lock()
+	defer c.b.mu.Unlock()
+	sent := !job.sentAt.IsZero()
+	delete(c.waiting, job.ID)
+	for i, item := range c.queue {
+		if item == job {
+			c.queue = append(c.queue[:i], c.queue[i+1:]...)
+			break
+		}
+	}
+	return sent
 }
 
 // forget bo job khoi hang doi va danh sach cho ket qua (het gio / mat ket noi).

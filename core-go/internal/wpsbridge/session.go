@@ -210,7 +210,7 @@ func (c *Client) serveBridgeCmd(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusOK, "WPS add-in is not connected: open a document in WPS to connect the add-in")
 		return
 	}
-	reply, ok := c.Enqueue(action, params)
+	reply, ok := c.Enqueue(r.Context(), action, params)
 	if !ok {
 		writeErr(w, http.StatusOK, "WPS add-in is not connected: open a document in WPS to connect the add-in")
 		return
