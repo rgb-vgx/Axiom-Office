@@ -195,8 +195,9 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 		len(o.WebSources.RecentByConversation(conversation.ID, 1)) > 0, request.Prompt) {
 		list = append(list, tools.NewWebSourcesTool(o.WebSources))
 	}
-	// QA thi giac (muc 8.4.6): chi khi nguoi dung bat VisualQaEnabled (doc lai moi luot qua cau hinh).
-	if o.Config().VisualQaEnabled {
+	// QA thi giac (muc 8.4.6): chi khi nguoi dung bat VisualQaEnabled (doc lai moi luot qua cau hinh) VA
+	// model dang dung khai nhan duoc hinh anh (GET /models) - model khong nhin duoc thi tool chi ton token.
+	if o.Config().VisualQaEnabled && client.ModelInfo(ctx, client.Model).SupportsVision {
 		list = append(list, tools.NewVisualTool())
 	}
 

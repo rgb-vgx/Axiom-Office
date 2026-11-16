@@ -1,0 +1,33 @@
+{
+  "data": [
+    {
+      "id": "anthropic/claude-3.7-sonnet",
+      "context_length": 200000,
+      "architecture": {
+        "input_modalities": ["text", "image"],
+        "output_modalities": ["text"]
+      },
+      "top_provider": {
+        "context_length": 200000,
+        "max_completion_tokens": 64000
+      },
+      "supported_parameters": ["tools", "tool_choice", "reasoning", "include_reasoning", "temperature"],
+      "pricing": {
+        "prompt": "0.000003",
+        "completion": "0.000015"
+      }
+    },
+    {
+      "id": "openai/gpt-4o-mini",
+      "context_length": 128000,
+      "architecture": {
+        "input_modalities": ["text"]
+      },
+      "supported_parameters": ["temperature"],
+      "pricing": {
+        "prompt": "0.00000015",
+        "completion": "0.0000006"
+      }
+    }
+  ]
+}
