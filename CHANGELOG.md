@@ -5,6 +5,22 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — chính sách, feature flags, model capabilities (16/11/2026)
+
+- **Policy rules + saved approvals** (schema 5, `permission_approvals`): `policy.rules` trong cấu hình là
+  ruleset `allow/ask/deny` khớp wildcard; `GET/POST/DELETE /v1/approvals` lưu “luôn cho phép” theo
+  tài liệu hoặc toàn cục; `POST /v1/runs/{id}/confirm` nhận `always:true`; lần sau Core bỏ qua câu hỏi
+  và ghi audit `policy.approval`. Chỉ lớp lệnh rủi ro mặc định (`*.save`, `*.saveAs`, `*.exportPdf`,
+  xoá slide/sheet/shape, replaceAll/…, `mcp__**`) mới được lưu — không cho lưu `et.writeRange` để tránh
+  bỏ qua guard ghi đè/sort. `confirm.required` có thêm `approvable`.
+- **Feature flags + capabilities + error codes**: `AXIOM_FLAGS` (`foo`, `-foo`, `all`) đè
+  `experimental.<name>` trong config; `GET /health` có `capabilities` (`runs.idempotency`,
+  `approvals.saved`, `flags.<name>`); envelope lỗi có `code` ổn định (`invalid_request`, `busy`,
+  `core_unavailable`, `uncertain`…). API v1 giữ nguyên trường cũ, chỉ thêm.
+- **Model capabilities** (`GET /models`): đọc `max_output_tokens`, tools, vision, reasoning,
+  prompt-cache và giá theo token; `ModelInfo.Has(...)`. Visual QA chỉ bị ẩn khi gateway khai rõ
+  `vision=false`; gateway không khai thì giữ hành vi cũ.
+
 ### Added — nền tảng agent: nhận lượt idempotent, event manifest, host seam (16/11/2026)
 
 - `POST /v1/runs` nhận `clientRequestId` (hoặc `client_request_id`): gửi lại cùng id trên cùng app
