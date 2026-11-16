@@ -15,7 +15,7 @@ import (
 	"axiomoffice/core/internal/corelog"
 )
 
-const SchemaVersion = 4
+const SchemaVersion = 6
 
 type DB struct {
 	Path string
@@ -107,6 +107,16 @@ func (d *DB) Migrate() error {
 	if version < 4 {
 		if _, err := tx.Exec(schemaV4); err != nil {
 			return fmt.Errorf("schema v4: %w", err)
+		}
+	}
+	if version < 5 {
+		if _, err := tx.Exec(schemaV5); err != nil {
+			return fmt.Errorf("schema v5: %w", err)
+		}
+	}
+	if version < 6 {
+		if _, err := tx.Exec(schemaV6); err != nil {
+			return fmt.Errorf("schema v6: %w", err)
 		}
 	}
 	if _, err := tx.Exec(fmt.Sprintf("PRAGMA user_version = %d", SchemaVersion)); err != nil {
@@ -234,6 +244,7 @@ type Stores struct {
 	DB        *DB
 	Convs     *Conversations
 	Runs      *Runs
+	Approvals *Approvals
 	Available bool
 	Error     string
 }
@@ -255,6 +266,7 @@ func OpenStores(path string) *Stores {
 	stores.DB = db
 	stores.Convs = db.Conversations()
 	stores.Runs = db.Runs()
+	stores.Approvals = db.Approvals()
 	stores.Available = true
 	return stores
 }
@@ -279,4 +291,27 @@ CREATE TABLE run_rounds (
   id INTEGER PRIMARY KEY, run_id TEXT, round INTEGER, input_tokens INTEGER, cached_tokens INTEGER,
   output_tokens INTEGER, tool_calls INTEGER, kind TEXT, created_at TEXT);
 CREATE INDEX ix_run_rounds_run ON run_rounds(run_id, round);
+`
+
+// Schema v5: phe duyet da luu cho lenh rui ro (POST /v1/approvals) - nguoi dung da dong y mot lan thi
+// luot sau khong hoi lai (agent/confirm.go). scope: document (mot tai lieu) | global (moi tai lieu);
+// expires_at rong = khong het han.
+const schemaV5 = `
+CREATE TABLE permission_approvals (
+  id TEXT PRIMARY KEY, action TEXT, resource TEXT, scope TEXT, expires_at TEXT, created_at TEXT);
+CREATE INDEX ix_permission_approvals_action ON permission_approvals(action, resource);
+`
+
+// Schema v6: nhat ky su kien SSE cua tung luot chay (durable run event journal). Pane ket noi lai sau khi
+// Core khoi dong lai van doc duoc tien trinh cua luot; ky thuat ho tro xem lai mot luot da xong. seq tang
+// dan trong mot run (giong Event.Seq trong RAM) nen ?after=/Last-Event-ID phat lai dung tu do.
+const schemaV6 = `
+CREATE TABLE run_events (
+  run_id TEXT NOT NULL,
+  seq INTEGER NOT NULL,
+  type TEXT NOT NULL,
+  data_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (run_id, seq));
+CREATE INDEX ix_run_events_run ON run_events(run_id, seq);
 `

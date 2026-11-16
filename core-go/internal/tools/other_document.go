@@ -164,7 +164,7 @@ func (t *OtherDocumentTool) childFor(ctx context.Context, session *office.Sessio
 	child := &RunContext{
 		RunID: parent.RunID, ConversationID: parent.ConversationID, Office: &copied, Bridge: parent.Bridge,
 		Prompt: parent.Prompt, Event: parent.Event, Confirm: parent.Confirm, Choose: parent.Choose, Trace: parent.Trace,
-		TargetDocument: target,
+		Policy: parent.Policy, TargetDocument: target,
 	}
 	t.tools[port], t.contexts[port] = tool, child
 	return tool, child, ""

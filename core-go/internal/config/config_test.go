@@ -50,6 +50,24 @@ func TestJSONSource(t *testing.T) {
 	}
 }
 
+func TestJSONSourceExperimental(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	body := `{"Experimental":{" nested-on ":true,"nested-off":false},"experimental.dotted-on":"1","experimental.dotted-off":"0"}`
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := From(env(nil), JSONSource{Path: path})
+	want := map[string]bool{"nested-on": true, "nested-off": false, "dotted-on": true, "dotted-off": false}
+	for name, enabled := range want {
+		if cfg.Experimental[name] != enabled {
+			t.Fatalf("Experimental[%q] = %v, want %v (all: %+v)", name, cfg.Experimental[name], enabled, cfg.Experimental)
+		}
+	}
+	if len(cfg.Experimental) != len(want) {
+		t.Fatalf("Experimental = %+v", cfg.Experimental)
+	}
+}
+
 func TestPathsOverride(t *testing.T) {
 	root := t.TempDir()
 	paths := NewPaths(root)
@@ -64,5 +82,43 @@ func TestPathsOverride(t *testing.T) {
 func TestPlainSecretPassesThrough(t *testing.T) {
 	if Unprotect("sk-plain") != "sk-plain" || Unprotect("") != "" {
 		t.Fatal("plain values must pass through")
+	}
+}
+
+// policy.rules: mang JSON (bien moi truong), object noi bang ';' (JSONSource noi phan tu mang), va
+// object hong bi bo qua tung cai.
+func TestPolicyRulesFromEnvironmentAndSource(t *testing.T) {
+	array := `[{"action":"writer.save","resource":"**","effect":"allow"},` +
+		`{"action":"wpp.**","effect":"DENY"}]`
+	cfg := From(env(map[string]string{"AXIOM_POLICY_RULES": array}), mapSource{})
+	if len(cfg.Policy) != 2 || cfg.Policy[0].Action != "writer.save" || cfg.Policy[0].Effect != "allow" ||
+		cfg.Policy[1].Action != "wpp.**" || cfg.Policy[1].Effect != "deny" {
+		t.Fatalf("policy tu env = %+v", cfg.Policy)
+	}
+
+	joined := `{"action":"et.writeRange","resource":"Ban1.xlsx","effect":"ask"};` +
+		`{"action":"et.deleteSheet","effect":"deny"};hỏng`
+	cfg = From(env(nil), mapSource{"policy.rules": joined})
+	if len(cfg.Policy) != 2 || cfg.Policy[0].Action != "et.writeRange" || cfg.Policy[0].Resource != "Ban1.xlsx" ||
+		cfg.Policy[1].Effect != "deny" {
+		t.Fatalf("policy tu nguon = %+v", cfg.Policy)
+	}
+
+	// Thieu action hoac effect -> bo qua; khong co khoa -> rong.
+	if cfg = From(env(nil), mapSource{"policy.rules": `{"action":"","effect":"deny"};{"action":"et.save"}`}); len(cfg.Policy) != 0 {
+		t.Fatalf("quy tac thieu truong phai bi bo: %+v", cfg.Policy)
+	}
+	if cfg = From(env(nil), mapSource{}); len(cfg.Policy) != 0 {
+		t.Fatalf("khong co policy.rules -> rong: %+v", cfg.Policy)
+	}
+
+	// config.json: khoa phang "policy.rules" hoac dang long {"policy":{"rules":[...]}}.
+	nested := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(nested, []byte(`{"policy":{"rules":[{"action":"et.save","effect":"deny"}]}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg = From(env(nil), JSONSource{Path: nested})
+	if len(cfg.Policy) != 1 || cfg.Policy[0].Action != "et.save" || cfg.Policy[0].Effect != "deny" {
+		t.Fatalf("policy dang long trong config.json = %+v", cfg.Policy)
 	}
 }

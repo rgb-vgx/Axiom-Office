@@ -31,6 +31,8 @@ func mapCore(mux *http.ServeMux, deps *Deps) {
 			"memoryError":   memoryError,
 			"provider":      cfg.LlmProvider,
 			"model":         cfg.LlmModel,
+			// capabilities: them truong, khong doi truong cu hay protocol v1.
+			"capabilities": capabilities(cfg),
 		})
 	}
 	mux.HandleFunc("GET /health", health)

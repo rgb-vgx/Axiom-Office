@@ -53,12 +53,12 @@ func mapWPSRuns(mux *http.ServeMux, deps *Deps) {
 			return
 		}
 		if !deps.Stores.Available {
-			Error(w, http.StatusServiceUnavailable, "memory unavailable: "+deps.Stores.Error)
+			ErrorCode(w, http.StatusServiceUnavailable, CodeCoreUnavailable, "memory unavailable: "+deps.Stores.Error)
 			return
 		}
 		body, parsed := readJSON(r)
 		if !parsed {
-			Error(w, http.StatusBadRequest, "invalid JSON body")
+			ErrorCode(w, http.StatusBadRequest, CodeInvalidRequest, "invalid JSON body")
 			return
 		}
 		if body == nil {
@@ -142,14 +142,14 @@ func wpsClientOf(deps *Deps, body map[string]any) *wpsbridge.Client {
 func checkWPSAuth(w http.ResponseWriter, r *http.Request, deps *Deps) bool {
 	if code, ok := wpsbridge.DecideWPSAuth(r.Header.Get("Origin"), r.Header.Get("X-Auth-Token"), deps.Config.Token, deps.Runtime.Port, r.Method, r.Header.Get("Sec-Fetch-Site")); !ok {
 		if code == http.StatusForbidden {
-			Error(w, code, "requests with an Origin header are not allowed")
+			ErrorCode(w, code, CodeForbidden, "requests with an Origin header are not allowed")
 		} else {
-			Error(w, code, "unauthorized")
+			ErrorCode(w, code, CodeUnauthorized, "unauthorized")
 		}
 		return false
 	}
 	if !wpsbridge.CheckJSONContent(r) {
-		Error(w, http.StatusUnsupportedMediaType, "Content-Type must be application/json")
+		ErrorCode(w, http.StatusUnsupportedMediaType, CodeInvalidRequest, "Content-Type must be application/json")
 		return false
 	}
 	return true

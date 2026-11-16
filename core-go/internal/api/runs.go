@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -9,12 +10,12 @@ import (
 	"axiomoffice/core/internal/agent"
 	"axiomoffice/core/internal/corelog"
 	"axiomoffice/core/internal/model"
+	"axiomoffice/core/internal/policy"
 	"axiomoffice/core/internal/store"
 )
 
 const (
-	conversationWaitLimit = 10 * time.Second
-	ssePingEvery          = 15 * time.Second
+	ssePingEvery = 15 * time.Second
 )
 
 // Endpoint cua luot chay va hoi thoai (docs/architecture/core.md muc 7.3, 7.4):
@@ -24,12 +25,12 @@ const (
 func mapRuns(mux *http.ServeMux, deps *Deps) {
 	mux.HandleFunc("POST /v1/runs", func(w http.ResponseWriter, r *http.Request) {
 		if !deps.Stores.Available {
-			Error(w, http.StatusServiceUnavailable, "memory unavailable: "+deps.Stores.Error)
+			ErrorCode(w, http.StatusServiceUnavailable, CodeCoreUnavailable, "memory unavailable: "+deps.Stores.Error)
 			return
 		}
 		body, parsed := readJSON(r)
 		if !parsed {
-			Error(w, http.StatusBadRequest, "invalid JSON body")
+			ErrorCode(w, http.StatusBadRequest, CodeInvalidRequest, "invalid JSON body")
 			return
 		}
 		request, problem := agent.ParseRequest(body)
@@ -139,22 +140,29 @@ func mapRuns(mux *http.ServeMux, deps *Deps) {
 
 // serveStartRun: khoi dong luot chay tu Request da parse (dung chung cho /v1/runs va /wps/v1/runs).
 func serveStartRun(w http.ResponseWriter, deps *Deps, request *agent.Request) {
-	run, startError := deps.Manager.TryStart(request.Port)
+	run, startError, existing := deps.Manager.TryStartRequest(request.Port, request.ClientRequestID)
 	if run == nil {
 		if startError == "" {
 			startError = "cannot start run"
 		}
-		Error(w, http.StatusConflict, startError)
+		ErrorCode(w, http.StatusConflict, CodeBusy, startError)
 		return
 	}
-	go deps.Orchestrator.Execute(run.Context(), run, request)
-
-	// Hoi thoai duoc tao ngay dau luot chay: cho toi da 10s de tra ve conversationId nhu tai lieu.
-	deadline := time.Now().Add(conversationWaitLimit)
+	// Gui lai cung clientRequestId: tra ve luot cu (200, cung runId/conversationId), khong chay lan hai.
+	if existing {
+		status, conversationID := run.StatusAndConversation()
+		OK(w, map[string]any{
+			"runId": run.ID, "conversationId": nilIfEmpty(conversationID), "status": status,
+		})
+		return
+	}
+	// Hoi thoai + dong runs tao NGAY (truoc goroutine) de tra conversationId ma khong phai cho.
+	if deps.Orchestrator != nil {
+		deps.Orchestrator.Admit(run, request)
+	}
 	status, conversationID := run.StatusAndConversation()
-	for conversationID == "" && status == agent.StatusRunning && time.Now().Before(deadline) {
-		time.Sleep(25 * time.Millisecond)
-		status, conversationID = run.StatusAndConversation()
+	if deps.Orchestrator != nil {
+		go deps.Orchestrator.Execute(run.Context(), run, request)
 	}
 	OK(w, map[string]any{
 		"runId": run.ID, "conversationId": nilIfEmpty(conversationID), "status": status,
@@ -171,7 +179,7 @@ func serveGetRun(w http.ResponseWriter, deps *Deps, runID string) {
 			OK(w, stored)
 			return
 		}
-		Error(w, http.StatusNotFound, "unknown run: "+runID)
+		ErrorCode(w, http.StatusNotFound, CodeNotFound, "unknown run: "+runID)
 		return
 	}
 	OK(w, run.JSON())
@@ -198,7 +206,7 @@ func storedRunJSON(deps *Deps, runID string) map[string]any {
 func serveCancelRun(w http.ResponseWriter, deps *Deps, runID string) {
 	run := deps.Manager.Get(runID)
 	if run == nil {
-		Error(w, http.StatusNotFound, "unknown run: "+runID)
+		ErrorCode(w, http.StatusNotFound, CodeNotFound, "unknown run: "+runID)
 		return
 	}
 	if !deps.Manager.Cancel(run.ID) {
@@ -212,11 +220,11 @@ func serveCancelRun(w http.ResponseWriter, deps *Deps, runID string) {
 func serveUndoRun(w http.ResponseWriter, r *http.Request, deps *Deps, runID string) {
 	run := deps.Manager.Get(runID)
 	if run == nil {
-		Error(w, http.StatusNotFound, "unknown run: "+runID)
+		ErrorCode(w, http.StatusNotFound, CodeNotFound, "unknown run: "+runID)
 		return
 	}
 	if deps.Manager.BusyPort(run.Port) {
-		Error(w, http.StatusConflict, "a run is in progress on this document: wait for it to finish")
+		ErrorCode(w, http.StatusConflict, CodeBusy, "a run is in progress on this document: wait for it to finish")
 		return
 	}
 	result, problem := deps.Orchestrator.UndoRun(r.Context(), run)
@@ -228,14 +236,16 @@ func serveUndoRun(w http.ResponseWriter, r *http.Request, deps *Deps, runID stri
 }
 
 // serveConfirmRun: tra loi yeu cau xac nhan cua policy (dung chung cho /v1 va /wps).
+// "always": true (tuy chon) = luu phe duyet cho action+resource cua cau hoi nay de luot sau khong hoi lai.
 func serveConfirmRun(w http.ResponseWriter, deps *Deps, runID string, body map[string]any) {
 	run := deps.Manager.Get(runID)
 	if run == nil {
-		Error(w, http.StatusNotFound, "unknown run: "+runID)
+		ErrorCode(w, http.StatusNotFound, CodeNotFound, "unknown run: "+runID)
 		return
 	}
 	id, hasID := body["confirmationId"].(string)
 	approved, hasApproved := body["approved"].(bool)
+	always, _ := body["always"].(bool)
 	// The nhieu lua chon: {"confirmationId", "choice": "<id>"}.
 	choice, hasChoice := body["choice"].(string)
 	hasChoice = hasChoice && strings.TrimSpace(choice) != ""
@@ -243,6 +253,8 @@ func serveConfirmRun(w http.ResponseWriter, deps *Deps, runID string, body map[s
 		Error(w, http.StatusBadRequest, "'confirmationId' and 'approved' (true|false) or 'choice' are required")
 		return
 	}
+	// Doc action/resource truoc khi Resolve (yeu cau da xu ly xong la khong con trong danh sach cho).
+	action, resource, hasPending := run.Confirmations.PendingAction(id)
 	resolved := false
 	if hasChoice {
 		// O tu go ("Kieu khac"): {"choice": "custom", "text": "..."}.
@@ -252,24 +264,107 @@ func serveConfirmRun(w http.ResponseWriter, deps *Deps, runID string, body map[s
 		resolved = run.Confirmations.Resolve(id, approved)
 	}
 	if !resolved {
-		Error(w, http.StatusNotFound, "no pending confirmation: "+id)
+		ErrorCode(w, http.StatusNotFound, CodeNotFound, "no pending confirmation: "+id)
 		return
 	}
+	response := map[string]any{"confirmationId": id}
 	if hasChoice {
-		OK(w, map[string]any{"confirmationId": id, "choice": strings.TrimSpace(choice)})
-		return
+		response["choice"] = strings.TrimSpace(choice)
+	} else {
+		response["approved"] = approved
 	}
-	OK(w, map[string]any{"confirmationId": id, "approved": approved})
+	// always=true chi co nghia khi DONG Y mot lenh; cau hoi khong biet action (vd the lua chon) thi khong luu.
+	if !hasChoice && approved && always && hasPending && strings.TrimSpace(action) != "" {
+		if row, saved := saveApproval(deps, action, resource); saved {
+			response["always"] = true
+			response["approval"] = approvalJSON(row)
+		}
+	}
+	OK(w, response)
+}
+
+// saveApproval: luu phe duyet "luon dong y" cho mot cau hoi da duoc nguoi dung chap nhan. Khong biet tai
+// lieu (resource rong) -> scope global; nguoc lai mot tai lieu. Loi ghi chi ghi log: cau tra loi dong y
+// cua nguoi dung khong duoc hong vi viec luu phe duyet.
+func saveApproval(deps *Deps, action, resource string) (store.ApprovalRow, bool) {
+	if deps.Stores == nil || deps.Stores.Approvals == nil {
+		return store.ApprovalRow{}, false
+	}
+	// Chi lop lenh rui ro mac dinh moi duoc luu: "luon dong y" cho et.writeRange se bo qua guard
+	// ghi de/sort cua moi tai lieu, khong phai y nguoi dung muon khi bam hop thoai.
+	if !policy.Approvable(action) {
+		return store.ApprovalRow{}, false
+	}
+	scope := store.ApprovalScopeDocument
+	if strings.TrimSpace(resource) == "" {
+		scope, resource = store.ApprovalScopeGlobal, "*"
+	}
+	row, err := deps.Stores.Approvals.AddApproval(action, resource, scope, "")
+	if err != nil {
+		corelog.Error("save approval for %s failed: %v", action, err)
+		return store.ApprovalRow{}, false
+	}
+	corelog.Info("approval %s saved for %s on %q (scope %s)", row.ID, row.Action, row.Resource, row.Scope)
+	return row, true
 }
 
 // serveRunEvents: SSE cua mot luot chay (dung chung cho /v1 va /wps).
+//
+// Luot con trong RAM: nghe truc tiep EventStream nhu cu. Luot khong con (Core vua khoi dong lai, hoac da
+// qua RetentionMinutes): phat lai run_events da luu tu ?after=/Last-Event-ID roi ket thuc - pane thay duoc
+// tien trinh va ky thuat ho tro xem lai duoc mot luot da xong. 404 chi khi khong co ca dong runs lan su kien.
 func serveRunEvents(w http.ResponseWriter, r *http.Request, deps *Deps, runID string) {
-	run := deps.Manager.Get(runID)
-	if run == nil {
-		Error(w, http.StatusNotFound, "unknown run: "+runID)
+	if deps.Manager != nil {
+		if run := deps.Manager.Get(runID); run != nil {
+			streamEvents(w, r, run)
+			return
+		}
+	}
+	events, stored := storedRunEvents(deps, runID, parseAfter(r))
+	if !stored {
+		ErrorCode(w, http.StatusNotFound, CodeNotFound, "unknown run: "+runID)
 		return
 	}
-	streamEvents(w, r, run)
+	streamStoredEvents(w, events)
+}
+
+// storedRunEvents: su kien da luu cua mot luot (schema v6) sau moc after. stored = co dong runs hoac co
+// su kien nao do cua run id nay (ke ca khi tat ca deu <= after) - chi tra false khi khong co gi ca.
+func storedRunEvents(deps *Deps, runID string, after int64) ([]store.RunEventRow, bool) {
+	if deps.Stores == nil || !deps.Stores.Available || deps.Stores.Runs == nil {
+		return nil, false
+	}
+	events := deps.Stores.Runs.EventsSince(runID, after)
+	if deps.Stores.Runs.Get(runID) != nil || len(events) > 0 {
+		return events, true
+	}
+	// Client da o cuoi (after >= seq cuoi) nhung luot van co su kien: van la luot da biet.
+	if after > 0 && len(deps.Stores.Runs.EventsSince(runID, 0)) > 0 {
+		return events, true
+	}
+	return nil, false
+}
+
+// streamStoredEvents: SSE phat lai su kien da luu roi ket thuc (khong con gi de cho). Cung dinh dang
+// `id:` + `event:` + `data:` nhu stream song.
+func streamStoredEvents(w http.ResponseWriter, events []store.RunEventRow) {
+	w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("X-Accel-Buffering", "no")
+	w.WriteHeader(http.StatusOK)
+	for _, row := range events {
+		var data map[string]any
+		if row.DataJSON != "" && row.DataJSON != "null" {
+			_ = json.Unmarshal([]byte(row.DataJSON), &data)
+		}
+		item := agent.Event{Seq: row.Seq, Type: row.Type, Data: data, At: row.CreatedAt}
+		if writeEvent(w, item) != nil {
+			return
+		}
+	}
+	if flusher, ok := w.(http.Flusher); ok {
+		flusher.Flush()
+	}
 }
 
 // streamEvents: SSE - phat lai su kien cu (neu client ket noi lai voi ?after=) roi tiep tuc nghe.

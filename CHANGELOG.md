@@ -5,6 +5,48 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — durable run journal, WPS always-allow, MCP headers (16/11/2026)
+
+- **Run journal** (schema 6, `run_events`): mỗi SSE event được ghi bền; `GET /v1/runs/{id}/events` phát
+  lại từ `?after=`/`Last-Event-ID` khi lượt không còn trong RAM (Core restart hoặc quá 30 phút);
+  `stream.lagged` báo khi buffer 1.000 event bị cuốn; event của lượt đã xong được dọn theo retention.
+  `/health.capabilities` thêm `events.durable`.
+- **WPS**: hộp thoại xác nhận có thêm “Luôn cho phép cho tài liệu này” khi event `confirm.required`
+  báo `approvable:true`; gửi `always:true` cùng `approved`, từ chối thì không bao giờ gửi.
+- **MCP**: `mcp.json` header nhận `{env:NAME}`; Core thay bằng biến môi trường, từ chối tên/giá trị
+  header không hợp lệ hoặc CR/LF, không log giá trị; header giao thức (`Content-Type`, `Accept`,
+  `MCP-Protocol-Version`, `Mcp-Session-Id`) luôn thắng header người dùng.
+
+### Added — chính sách, feature flags, model capabilities (16/11/2026)
+
+- **Policy rules + saved approvals** (schema 5, `permission_approvals`): `policy.rules` trong cấu hình là
+  ruleset `allow/ask/deny` khớp wildcard; `GET/POST/DELETE /v1/approvals` lưu “luôn cho phép” theo
+  tài liệu hoặc toàn cục; `POST /v1/runs/{id}/confirm` nhận `always:true`; lần sau Core bỏ qua câu hỏi
+  và ghi audit `policy.approval`. Chỉ lớp lệnh rủi ro mặc định (`*.save`, `*.saveAs`, `*.exportPdf`,
+  xoá slide/sheet/shape, replaceAll/…, `mcp__**`) mới được lưu — không cho lưu `et.writeRange` để tránh
+  bỏ qua guard ghi đè/sort. `confirm.required` có thêm `approvable`.
+- **Feature flags + capabilities + error codes**: `AXIOM_FLAGS` (`foo`, `-foo`, `all`) đè
+  `experimental.<name>` trong config; `GET /health` có `capabilities` (`runs.idempotency`,
+  `approvals.saved`, `flags.<name>`); envelope lỗi có `code` ổn định (`invalid_request`, `busy`,
+  `core_unavailable`, `uncertain`…). API v1 giữ nguyên trường cũ, chỉ thêm.
+- **Model capabilities** (`GET /models`): đọc `max_output_tokens`, tools, vision, reasoning,
+  prompt-cache và giá theo token; `ModelInfo.Has(...)`. Visual QA chỉ bị ẩn khi gateway khai rõ
+  `vision=false`; gateway không khai thì giữ hành vi cũ.
+
+### Added — nền tảng agent: nhận lượt idempotent, event manifest, host seam (16/11/2026)
+
+- `POST /v1/runs` nhận `clientRequestId` (hoặc `client_request_id`): gửi lại cùng id trên cùng app
+  trong 30 phút trả về đúng lượt cũ, không tạo lượt ghi thứ hai. Hội thoại + dòng `runs` được tạo
+  đồng bộ trước khi chạy nên response trả `conversationId` ngay, bỏ vòng chờ 10 giây.
+- WPS: `Client.Enqueue`/`Bridge.Enqueue` nhận `context.Context`; bấm Dừng (hoặc Core dừng) bỏ lệnh
+  đang chờ ngay thay vì treo tới 300 giây, và trả rõ lệnh **chưa gửi** (an toàn thử lại) hay
+  **có thể đã áp dụng** (phải đọc lại tài liệu).
+- `core-go/internal/protocol`: manifest `events.json` là nguồn duy nhất cho event SSE; sinh
+  `src/AxiomOffice.WPS/protocol_gen.js` và `tests/core/protocol_gen.py`; `make check-gen` bắt lệch.
+- `core-go/internal/host`: seam host/app độc lập (Kind, Family, Capabilities, Catalog, Document,
+  Execute) cho giai đoạn chuyển tool/policy/prompt khỏi các nhánh `appKind`.
+- Test nền: import boundary, prompt golden theo app/mode, migration fixture v1–v3; thêm `AGENTS.md`
+  theo package cho core-go, tools, store, add-in Windows/WPS và tests.
 ### Docs — bộ 22 task test tham khảo cho 3 ứng dụng (12/11/2026)
 
 - `docs/research/gpt-test-tasks.md`: prompt + phản hồi GPT, đã dọn thành tài liệu đọc được; 22 task

@@ -99,6 +99,7 @@ check-gen:
 	python3 scripts/generate_setup_catalog.py --check
 	python3 scripts/generate_mcp_commands.py --check
 	python3 scripts/generate_wps_gaps.py --check
+	python3 scripts/generate_protocol.py --check
 	python3 scripts/generate_ribbon_menus.py --check
 	python3 scripts/check_version.py
 	python3 scripts/check_i18n.py

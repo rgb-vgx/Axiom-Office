@@ -126,8 +126,14 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 		return nil
 	}
 
-	run.update(func() { run.ConversationID = conversation.ID })
-	o.Runs.Insert(run.ID, &conversation.ID, client.Model)
+	// Admit da tao hoi thoai + dong runs truoc khi goroutine chay (POST /v1/runs tra ngay);
+	// duong goi truc tiep khong qua Admit thi tao o day nhu cu.
+	if !run.isAdmitted() {
+		run.update(func() { run.ConversationID = conversation.ID })
+		if o.Runs != nil {
+			o.Runs.Insert(run.ID, &conversation.ID, client.Model)
+		}
+	}
 	mode := "act"
 	if request.Plan {
 		mode = "plan"
@@ -210,8 +216,11 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 		len(o.WebSources.RecentByConversation(conversation.ID, 1)) > 0, request.Prompt) {
 		list = append(list, tools.NewWebSourcesTool(o.WebSources))
 	}
-	// QA thi giac (muc 8.4.6): chi khi nguoi dung bat VisualQaEnabled (doc lai moi luot qua cau hinh).
-	if o.Config().VisualQaEnabled {
+	// QA thi giac (muc 8.4.6): chi khi nguoi dung bat VisualQaEnabled (doc lai moi luot qua cau hinh) VA
+	// model khong khai RO la khong doc duoc anh. Gateway khong khai truong vision thi giu hanh vi cu
+	// (them tool); chi an khi nha cung cap noi ro vision=false de khong dot token vo ich.
+	if info := client.ModelInfo(ctx, client.Model); o.Config().VisualQaEnabled &&
+		(!info.VisionKnown || info.SupportsVision) {
 		list = append(list, tools.NewVisualTool())
 	}
 
@@ -245,19 +254,7 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 	}
 	registry := tools.NewRegistry(list)
 
-	var confirm func(string, string, string) (bool, error)
-	var choose func(string, string, []tools.Choice) (string, string, error)
-	if request.Interactive {
-		timeout := time.Duration(o.Config().ConfirmTimeoutSeconds) * time.Second
-		confirm = func(action, reason, preview string) (bool, error) {
-			return run.Confirmations.Request(ctx, run.Events, action, reason, preview, timeout), nil
-		}
-		choose = func(action, question string, choices []tools.Choice) (string, string, error) {
-			choice, text := run.Confirmations.Choose(ctx, run.Events, action, question, choices, timeout)
-			return choice, text, nil
-		}
-	}
-
+	target := targetDocument(request.Document, session)
 	runContext := &tools.RunContext{
 		RunID:          run.ID,
 		ConversationID: conversation.ID,
@@ -267,9 +264,8 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 		Event: func(eventType string, data map[string]any) {
 			run.Events.Publish(eventType, data)
 		},
-		Confirm:        confirm,
-		Choose:         choose,
-		TargetDocument: targetDocument(request.Document, session),
+		Policy:         policyRules(o.Config()),
+		TargetDocument: target,
 		// Language: ngon ngu giao dien cho cac cau Core tu gui (P7-03).
 		Language: request.Language,
 	}
@@ -286,6 +282,20 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 				[]memory.NewMemory{{Scope: memory.ScopeDocStyle, ScopeKey: appKind, Text: text, Category: "preference"}},
 				memory.ActorUser, run.ID)
 		}
+	}
+	// Confirm: policy/overwrite/sort hoi nguoi dung qua cung mot cua (agent/confirm.go). Approval da luu
+	// (POST /v1/approvals, always=true) duoc kiem tra TRUOC khi hoi.
+	var choose func(string, string, []tools.Choice) (string, string, error)
+	if request.Interactive {
+		timeout := time.Duration(o.Config().ConfirmTimeoutSeconds) * time.Second
+		runContext.Confirm = func(action, reason, preview string) (bool, error) {
+			return o.requestConfirmation(ctx, run, action, runContext.TargetDocument, reason, preview, timeout), nil
+		}
+		runContext.Choose = func(action, question string, choices []tools.Choice) (string, string, error) {
+			choice, text := run.Confirmations.Choose(ctx, run.Events, action, question, choices, timeout)
+			return choice, text, nil
+		}
+		choose = runContext.Choose
 	}
 	if request.Document != nil {
 		runContext.FocusSlide = request.Document.Slide

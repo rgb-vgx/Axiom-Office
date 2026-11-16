@@ -59,7 +59,7 @@ func mapWPSAdmin(mux *http.ServeMux, deps *Deps) {
 		}
 		body, parsed := readJSON(r)
 		if !parsed {
-			Error(w, http.StatusBadRequest, "invalid JSON body")
+			ErrorCode(w, http.StatusBadRequest, CodeInvalidRequest, "invalid JSON body")
 			return
 		}
 		action := strings.TrimSpace(textOf(body["action"]))
@@ -89,7 +89,7 @@ func mapWPSAdmin(mux *http.ServeMux, deps *Deps) {
 			ErrorCode(w, http.StatusConflict, "addin-disconnected", "WPS add-in is not connected: open a document in WPS to connect the add-in")
 			return
 		}
-		reply, ok := client.Enqueue(action, params)
+		reply, ok := client.Enqueue(r.Context(), action, params)
 		if !ok {
 			ErrorCode(w, http.StatusConflict, "addin-disconnected", "WPS add-in is not connected: open a document in WPS to connect the add-in")
 			return
@@ -107,7 +107,7 @@ func mapWPSAdmin(mux *http.ServeMux, deps *Deps) {
 		}
 		body, parsed := readJSON(r)
 		if !parsed {
-			Error(w, http.StatusBadRequest, "invalid JSON body")
+			ErrorCode(w, http.StatusBadRequest, CodeInvalidRequest, "invalid JSON body")
 			return
 		}
 		if len(body) == 0 {

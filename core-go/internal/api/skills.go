@@ -84,7 +84,7 @@ func mapSkills(mux *http.ServeMux, deps *Deps) {
 	routeBoth(mux, deps, "POST /v1/skills/import", func(w http.ResponseWriter, r *http.Request) {
 		body, parsed := readJSON(r)
 		if !parsed {
-			Error(w, http.StatusBadRequest, "invalid JSON body")
+			ErrorCode(w, http.StatusBadRequest, CodeInvalidRequest, "invalid JSON body")
 			return
 		}
 		dryRun, _ := body["dryRun"].(bool)
@@ -155,11 +155,11 @@ func readSkillEdit(w http.ResponseWriter, r *http.Request) (skills.Edit, bool) {
 	var edit skills.Edit
 	data, err := io.ReadAll(io.LimitReader(r.Body, 1<<20+1))
 	if err != nil || len(data) > 1<<20 {
-		Error(w, http.StatusBadRequest, "body too large or unreadable")
+		ErrorCode(w, http.StatusBadRequest, CodeInvalidRequest, "body too large or unreadable")
 		return edit, false
 	}
 	if err := json.Unmarshal(data, &edit); err != nil {
-		Error(w, http.StatusBadRequest, "invalid JSON body")
+		ErrorCode(w, http.StatusBadRequest, CodeInvalidRequest, "invalid JSON body")
 		return edit, false
 	}
 	return edit, true

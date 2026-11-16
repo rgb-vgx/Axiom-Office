@@ -470,7 +470,7 @@ core-go/                                 → AxiomOffice.Core.exe (Go, không cg
   internal/office                        BridgeClient (/cmd, /commands, /session), SessionDirectory
   internal/api                           Core API v1 (runs, SSE, confirm, conversations, skills, memory, audit,
                                          setup, mcp, admin) + kênh /wps cho WPS Linux
-  internal/store                         SQLite core.db (schema 4): hội thoại, lượt chạy, audit
+  internal/store                         SQLite core.db (schema 6): hội thoại, lượt chạy, audit
   internal/setup                         /v1/setup, /v1/llm/*, catalog sinh từ catalog/setup.json
 
 src/AxiomOffice.LibreOffice/             → axiom-office.oxt (Python UNO; thiết kế docs/architecture/libreoffice.md)
@@ -1140,7 +1140,7 @@ flowchart LR
 | `%LOCALAPPDATA%\AxiomOffice\sessions\{pid}.json` | Session registry (mục 16); LibreOffice: `{pid}-{kind}.json`; WPS Linux: `<pid Core>-wps.json` (app đầu) và `<pid Core>-wps-<cổng>.json` (mỗi app WPS sau) |
 | `%LOCALAPPDATA%\AxiomOffice\core.json` | Core đang chạy: `pid`, `port`, `version`, `protocol` (xoá khi Core thoát) |
 | `%LOCALAPPDATA%\AxiomOffice\core.log` | Log của Core |
-| `%LOCALAPPDATA%\AxiomOffice\core\core.db` | SQLite (WAL, schema 4): hội thoại, lượt chạy, audit, memory (mục 22.7) |
+| `%LOCALAPPDATA%\AxiomOffice\core\core.db` | SQLite (WAL, schema 6): hội thoại, lượt chạy, audit, memory (mục 22.7) |
 | `%LOCALAPPDATA%\AxiomOffice\skills\`, `mcp.json` | Skill của người dùng; cấu hình MCP server ngoài |
 
 Trên Linux theo XDG: cấu hình `~/.config/axiom-office/config.json` (0600), dữ liệu
@@ -1207,7 +1207,7 @@ flowchart TD
 ## 22. Agent Core (bản Go: `core-go/`)
 
 Đặc tả đầy đủ và lý do từng lựa chọn: [docs/architecture/core.md](core.md) (thiết kế ban đầu cho bản .NET);
-bản Go giữ nguyên hợp đồng ngoài (Core API v1, `core.json`, `core.db` schema 4, nguồn cấu hình,
+bản Go giữ nguyên hợp đồng ngoài (Core API v1, `core.json`, `core.db` schema 6, nguồn cấu hình,
 tên mutex) nên add-in/extension/MCP không phải đổi gì. Chi tiết cài đặt Go:
 [core-go/README.md](../../core-go/README.md). Mục này mô tả bản Go đang chạy.
 
@@ -1229,13 +1229,14 @@ tên mutex) nên add-in/extension/MCP không phải đổi gì. Chi tiết cài 
 
 | Method | Path | Mô tả |
 |---|---|---|
-| `GET` | `/health` | `pid`, `port`, `version`, `protocol`, `memory` (`on`/`off`/`unavailable`) |
-| `POST` | `/v1/runs` | Bắt đầu lượt chạy → `runId`, `conversationId` (chờ tối đa 10s để có hội thoại); `options.interactive=false` cho `ai.ask`, `options.mode="plan"` cho plan mode |
-| `GET` | `/v1/runs/{id}` · `/events` | Kết quả · SSE (kết nối lại được với `?after=` hoặc `Last-Event-ID`) |
+| `GET` | `/health` | `pid`, `port`, `version`, `protocol`, `memory` (`on`/`off`/`unavailable`), `capabilities` (`runs.idempotency`, `approvals.saved`, `flags.*`) |
+| `POST` | `/v1/runs` | Bắt đầu lượt chạy → `runId`, `conversationId`, `status` **ngay** (hội thoại + dòng `runs` tạo đồng bộ trước khi chạy); `clientRequestId` là idempotency key; `options.interactive=false` cho `ai.ask`, `options.mode="plan"` cho plan mode |
+| `GET` | `/v1/runs/{id}` · `/events` | Kết quả · SSE (kết nối lại được với `?after=` hoặc `Last-Event-ID`; sau restart đọc lại `run_events`, schema 6) |
 | `POST` | `/v1/runs/{id}/cancel` · `/confirm` | Hủy · trả lời xác nhận `{confirmationId, approved}` |
 | `GET/DELETE` | `/v1/conversations[/{id}]` | Hội thoại theo tài liệu (`?documentKey=`) |
 | `GET/POST` | `/v1/skills` · `/v1/skills/reload` | Skill theo app + lỗi nạp · quét lại |
 | `GET/POST/PATCH/DELETE` | `/v1/memory[/{id}]`, `/restore`, `/history` | Ghi nhớ (người dùng); `?scope=` cho xoá theo phạm vi |
+| `GET/POST/DELETE` | `/v1/approvals[/{id}]` | Phê duyệt “luôn cho phép” theo tài liệu/toàn cục (schema 5); chỉ lớp lệnh rủi ro mặc định |
 | `GET` | `/v1/audit?runId=&limit=` | Nhật ký tool call |
 | `GET` | `/v1/mcp` | MCP server: tool, tin cậy, lỗi khởi động |
 | `GET/POST` | `/v1/setup`, `/v1/llm/test`, `/v1/llm/models` | Wizard thiết lập (câu chữ từ `catalog/setup.json`): kiểm tra máy, thử kết nối, tải model |
@@ -1267,6 +1268,11 @@ flowchart TD
 
 - Một lượt đang chạy cho mỗi port; **không trần thời gian mặc định** (`DefaultMaxSeconds = 0`;
   kiểm soát bằng `DefaultMaxRounds = 100` + nút Dừng; bên gọi vẫn đặt `maxSeconds`/`maxTokens` được).
+- `Orchestrator.Admit` tạo hội thoại + dòng `runs` trước khi goroutine `Execute` chạy, nên
+  `POST /v1/runs` trả ngay; `clientRequestId` trùng trên cùng port trả lại đúng lượt cũ trong
+  30 phút (`Manager.TryStartRequest`), không tạo lượt ghi thứ hai.
+- Event SSE lấy tên/payload từ `core-go/internal/protocol/events.json`; `make check-gen` sinh và
+  kiểm `src/AxiomOffice.WPS/protocol_gen.js` + `tests/core/protocol_gen.py`.
 - `ContextAssembler`: các lượt gần nhất trong ngân sách, vượt mốc 20 tin thì tóm tắt bằng LLM.
 - Vòng `RunAgent` (`internal/model/agent.go`) chỉ gọi model → chạy tool → hỏi chuỗi guard
   (`internal/model/guards.go`, 4 móc `onReply/beforeCall/afterTools/recover`): trả lời rỗng (nhắc 1 lần),
@@ -1294,6 +1300,10 @@ flowchart TD
   `<thought>`/`<think>` bị lọc khỏi câu trả lời cuối. Token billable = input − cache + output.
 - `model.Source`: đọc lại cấu hình LLM mỗi lượt, cache client khi không đổi; nhớ provider đã từ chối
   `thinking` để không gửi lại.
+- `ModelInfo` (16/11/2026): ngoài `ContextWindow` còn `MaxOutputTokens`, tools, vision, reasoning,
+  prompt-cache, giá vào/ra mỗi triệu token; `ParseModelInfo` đọc OpenRouter/Anthropic/vLLM và
+  `ModelInfo.Has(...)`. `VisionKnown` tách “khai rõ không hỗ trợ” khỏi “không khai”: Visual QA chỉ bị
+  ẩn khi gateway nói rõ `vision=false`.
 
 ### 22.5 Tool registry (`internal/tools/`, `ITool` + `Registry`)
 
@@ -1312,6 +1322,10 @@ Tool gọi lệnh bridge **trực tiếp** khai hợp đồng `Required`/`Option
 catalog `/commands` của phiên thiếu một lệnh `Required` (ghi log), kể cả trong mô tả của chế độ lập kế hoạch — model
 không bao giờ được giao một tool sẽ hỏng giữa chừng trên backend đó. `needs_test.go` buộc mọi lệnh có trong mã nguồn
 của tool phải được khai.
+
+`internal/host` (16/11/2026) là seam độc lập app: `Kind`, `Family`, `Capabilities`, `Catalog`, `Document`,
+`Execute(ctx, ...)`; phase 1 bọc `office.Session`/`office.BridgeClient` và `wpsbridge.Client`, chưa thay call site.
+Bước tiếp theo là cho tool selection, policy và prompt dùng `Capabilities` thay các nhánh `appKind`.
 | `tavily_search` | Tavily REST | Chỉ khi `TavilyEnabled` và có `TavilyApiKey`; có cả trong plan mode (chỉ đọc web) |
 | `mcp__<server>__<tool>` | `Manager` + `WrapMCPTools` | Server ngoài cần xác nhận trừ khi `trusted`; làn file `office` hỏi khi ghi vào file đã có (plan mode chỉ còn tool đọc) |
 
@@ -1368,6 +1382,12 @@ tiếng Việt/Anh, trừ từ ghép và phủ định); `saveAs`/`exportPdf` gh
 (`tools/overwrite.go`): ghi vào ô sheet đã có dữ liệu từ trước thì hỏi. `ConfirmationBroker`
 (mỗi run) phát `confirm.required`, chờ `/confirm` tối đa `ConfirmTimeoutSeconds`; hết giờ/hủy =
 từ chối; lượt `interactive=false` từ chối ngay. Mọi tool call vào audit (`tool_calls`).
+
+Từ 16/11/2026 có thêm ruleset khai báo (`policy.DefaultRules()` + `policy.rules` trong config,
+wildcard `*`/`**`, last-match-wins, deny thắng ask) và phê duyệt đã lưu (`permission_approvals`,
+schema 5): `POST /v1/approvals` hoặc `always:true` ở `/confirm`; lần sau `requestConfirmation`
+bỏ qua câu hỏi và audit `policy.approval`. Chỉ lớp lệnh rủi ro mặc định mới được lưu
+(`policy.Approvable`) — không cho lưu lệnh ghi chung như `et.writeRange`.
 
 ### 22.9 MCP client (`internal/mcp/`)
 

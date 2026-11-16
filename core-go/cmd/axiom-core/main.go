@@ -117,6 +117,14 @@ func run() int {
 			}
 		}
 	}
+	// Don nhat ky SSE cua cac luot da xong qua RetentionMinutes (schema v6) - cung moc voi ket qua
+	// luot trong RAM. Moi Core chi mot nguoi dung, nhung van chi don khi duoc phep dung core.db.
+	if stores.Available {
+		cutoff := store.TimeText(time.Now().UTC().Add(-agent.RetentionMinutes * time.Minute))
+		if pruned := stores.Runs.PruneRunEvents(cutoff); pruned > 0 {
+			corelog.Info("startup: pruned %d run event(s) older than %d minutes", pruned, agent.RetentionMinutes)
+		}
+	}
 	httpClient := &http.Client{} // khong timeout chung: moi request tu dat han bang context
 	models := model.NewSource(httpClient, config.Load)
 	current := models.Current()
@@ -168,6 +176,9 @@ func run() int {
 	bridge := office.NewBridgeClient(httpClient, cfg.Token)
 	sessions := office.NewDirectory(cfg.SessionDirectoryOverride)
 	manager := agent.NewManager()
+	if stores.Available {
+		manager.SetRunEvents(stores.Runs)
+	}
 	orchestrator := &agent.Orchestrator{
 		Bridge: bridge, Sessions: sessions,
 		Conversations: stores.Convs, Runs: stores.Runs,
@@ -177,6 +188,7 @@ func run() int {
 	// Kho nguon web (schema v3): nguon tai ve trong cac luot truoc - don luc khoi dong (qua han / qua tran).
 	if stores.Available {
 		orchestrator.WebSources = stores.DB.WebSources()
+		orchestrator.Approvals = stores.Approvals
 		go func() {
 			current := config.Load()
 			if purged := orchestrator.WebSources.Purge(current.WebSourceKeepDays, int64(current.WebSourceMaxMB)<<20); purged > 0 {

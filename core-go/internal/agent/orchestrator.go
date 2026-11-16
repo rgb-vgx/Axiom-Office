@@ -23,12 +23,15 @@ import (
 type Request struct {
 	Prompt         string
 	ConversationID string
-	Port           int
-	Pid            int
-	App            string
-	Family         string
-	Document       *DocumentContext
-	Options        model.AgentOptions
+	// ClientRequestID: idempotency key do client gui (JSON clientRequestId / client_request_id).
+	// Gui lai cung id tren cung port trong RetentionMinutes tra ve luot cu, khong tao luot thu hai.
+	ClientRequestID string
+	Port            int
+	Pid             int
+	App             string
+	Family          string
+	Document        *DocumentContext
+	Options         model.AgentOptions
 	// Interactive: false (ai.ask cua agent ben ngoai) = khong co ai bam xac nhan -> tu choi lenh can xac nhan.
 	Interactive bool
 	// Plan: che do lap ke hoach (options.mode = "plan") - chi doc tai lieu, tra ve ke hoach, khong sua gi.
@@ -159,14 +162,15 @@ func ParseRequest(body map[string]any) (*Request, string) {
 		Prompt: prompt,
 		// Bo khoang trang thua: ban .NET giu nguyen nen " c_1 " se thanh hoi thoai moi (id do Core sinh,
 		// khong bao gio co khoang trang, nen cat di la an toan).
-		ConversationID: strings.TrimSpace(textOf(body["conversationId"])),
-		Port:           port,
-		Pid:            intOf(off["pid"]),
-		App:            textOf(off["app"]),
-		Family:         textOf(off["family"]),
-		Document:       document,
-		Options:        requestOptions(maxRounds, maxTokens, maxSeconds),
-		Interactive:    interactive,
+		ConversationID:  strings.TrimSpace(textOf(body["conversationId"])),
+		ClientRequestID: clientRequestIDOf(body),
+		Port:            port,
+		Pid:             intOf(off["pid"]),
+		App:             textOf(off["app"]),
+		Family:          textOf(off["family"]),
+		Document:        document,
+		Options:         requestOptions(maxRounds, maxTokens, maxSeconds),
+		Interactive:     interactive,
 		// Lenh nhanh khong ket hop voi lap ke hoach: muc nao cung la mot viec nho, ro rang tren doan boi den.
 		Plan:        mode == "plan" && quick.ID == "",
 		QuickAction: quick.ID,
@@ -178,6 +182,20 @@ func ParseRequest(body map[string]any) (*Request, string) {
 		// Ngon ngu giao dien (P7-03): thieu truong nay (request cu) -> "vi" nhu truoc.
 		Language: NormalizeLanguage(textOf(body["language"])),
 	}, ""
+}
+
+// ClientRequestIDMaxRunes: gioi han id idempotency do client gui (cameld va snake_case deu nhan).
+const ClientRequestIDMaxRunes = 128
+
+func clientRequestIDOf(body map[string]any) string {
+	id := strings.TrimSpace(textOf(body["clientRequestId"]))
+	if id == "" {
+		id = strings.TrimSpace(textOf(body["client_request_id"]))
+	}
+	if runes := []rune(id); len(runes) > ClientRequestIDMaxRunes {
+		id = string(runes[:ClientRequestIDMaxRunes])
+	}
+	return id
 }
 
 // requestOptions: tuy chon cua luot = DefaultAgentOptions + gioi han ben goi gui. Truoc 13/10/2026 toi dung
@@ -203,13 +221,20 @@ type Orchestrator struct {
 	MCP           *mcp.Manager
 	// WebSources: kho nguon web tai ve (nhieu luot). nil = memory/kho khong mo duoc - bo qua tinh nang nay.
 	WebSources *store.WebSources
-	Config     func() config.Config
-	Assembler  *ContextAssembler
+	// Approvals: phe duyet da luu cho lenh rui ro (schema v5). nil = khong bo qua cau hoi nao.
+	Approvals *store.Approvals
+	Config    func() config.Config
+	Assembler *ContextAssembler
 	// BusyPort: cong Office dang co luot khac chay (Manager.BusyPort) - other_document khong sua tai lieu do. nil = khong kiem.
 	BusyPort func(port int) bool
 }
 
 func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) {
+	// Duong goi truc tiep (test, ai.ask...) khong qua Admit: tao hoi thoai dong bo o day de hanh vi
+	// giong POST /v1/runs. Di qua Admit roi thi khong tao lai.
+	if _, conversationID := run.StatusAndConversation(); conversationID == "" {
+		o.Admit(run, request)
+	}
 	ex := o.prepareExecution(ctx, run, request)
 	if ex == nil {
 		return
@@ -228,6 +253,65 @@ func (o *Orchestrator) Execute(ctx context.Context, run *Run, request *Request) 
 		"repairedToolCalls": result.RepairedToolCalls, "model": result.Model})
 	o.applyResult(ctx, ex, result)
 	o.finish(run)
+}
+
+// Admit: tao dong hoi thoai + dong runs truoc khi Execute chay, de POST /v1/runs tra
+// {runId, conversationId, status} ngay thay vi cho goroutine Execute tao hoi thoai (toi 10s).
+// request.ConversationID duoc gan lai de prepareExecution dung lai dung hoi thoai nay.
+// Tra nil khi khong co kho hoi thoai; Execute van tu tao sau (duong cu).
+func (o *Orchestrator) Admit(run *Run, request *Request) *store.ConversationRow {
+	if o == nil || run == nil || request == nil || o.Conversations == nil {
+		return nil
+	}
+	conversation := o.admitConversation(request)
+	if conversation == nil {
+		return nil
+	}
+	run.update(func() { run.ConversationID = conversation.ID })
+	run.markAdmitted()
+	request.ConversationID = conversation.ID
+	if o.Runs != nil {
+		modelName := ""
+		if o.Models != nil {
+			modelName = o.Models.Current().Model
+		}
+		o.Runs.Insert(run.ID, &conversation.ID, modelName)
+	}
+	return conversation
+}
+
+// admitConversation: hoi thoai cua luot, doc tu registry neu co (khong hoi /health, khong khoa vung
+// boi den - viec cua prepareExecution). Thieu phien Office van tao duoc hoi thoai tu request.
+func (o *Orchestrator) admitConversation(request *Request) *store.ConversationRow {
+	if request.ConversationID != "" {
+		if existing := o.Conversations.Get(request.ConversationID); existing != nil {
+			return existing
+		}
+	}
+	var session *office.Session
+	if o.Sessions != nil {
+		session = o.Sessions.Find(request.Port)
+	}
+	appKind, family, documentPath, name := request.App, request.Family, "", ""
+	if session != nil {
+		if session.App != "" {
+			appKind = session.App
+		}
+		family = session.Family
+		documentPath = session.DocumentPath
+		name = session.Document
+	}
+	if request.Document != nil {
+		if request.Document.FullName != "" {
+			documentPath = request.Document.FullName
+		}
+		if request.Document.Name != "" {
+			name = request.Document.Name
+		}
+	}
+	id := o.Conversations.Create(appKind, family, conversationKey(office.DocumentKey(documentPath)),
+		optional(name), optional(title(request.Prompt)))
+	return o.Conversations.Get(id)
 }
 
 // lockSelection: hoi add-in WPS khoa vung dang boi den, va ghi vung do vao ngu canh cua luot de prompt
@@ -297,6 +381,21 @@ func (o *Orchestrator) finish(run *Run) {
 	now := time.Now().UTC()
 	run.update(func() { run.Finished = &now })
 	run.Events.Complete()
+	// Luot da duoc Admit (dong runs da ghi truoc khi Execute chay): prepareExecution co the dung
+	// truoc applyResult (khong co phien Office...), nen cap nhat trang thai cuoi o day. Duong
+	// thanh cong da Finish trong applyResult - update lai cung gia tri la vo hai.
+	if o.Runs != nil && run.isAdmitted() {
+		o.Runs.Finish(run.ID, run.Status, run.Rounds, run.InputTokens, run.OutputTokens, run.CachedTokens,
+			o.errorPtr(run), nil)
+	}
+	// Don nhat ky SSE cua cac luot da qua RetentionMinutes (schema v6): core.db khong phinh mai, va
+	// cung mot moc retention voi ket qua luot trong RAM.
+	if o.Runs != nil {
+		cutoff := store.TimeText(now.Add(-RetentionMinutes * time.Minute))
+		if pruned := o.Runs.PruneRunEvents(cutoff); pruned > 0 {
+			corelog.Info("run events: pruned %d event(s) older than %d minutes", pruned, RetentionMinutes)
+		}
+	}
 	message := "run " + run.ID + " " + run.Status + ": " + strconv.Itoa(run.Rounds) + " rounds, " +
 		strconv.Itoa(run.ToolCalls) + " tool calls, " + strconv.Itoa(run.InputTokens) + "+" +
 		strconv.Itoa(run.OutputTokens) + " tokens, " + strconv.FormatFloat(run.Seconds, 'f', 1, 64) + "s"

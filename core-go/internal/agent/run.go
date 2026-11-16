@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"axiomoffice/core/internal/corelog"
+	"axiomoffice/core/internal/model"
 	"axiomoffice/core/internal/store"
 )
 
@@ -32,18 +34,21 @@ const RetentionMinutes = 30
 type Run struct {
 	mu sync.Mutex
 
-	ID             string
-	Port           int
-	ConversationID string
-	Status         string
-	Started        time.Time
-	Finished       *time.Time
-	Reply          string
-	Error          string
-	ErrorKind      string
-	Rounds         int
-	InputTokens    int
-	OutputTokens   int
+	ID   string
+	Port int
+	// ClientRequestID: id do client gui (JSON clientRequestId) de gui lai cung mot yeu cau khong
+	// tao luot thu hai trong thoi gian giu ket qua. "" = khong co idempotency.
+	ClientRequestID string
+	ConversationID  string
+	Status          string
+	Started         time.Time
+	Finished        *time.Time
+	Reply           string
+	Error           string
+	ErrorKind       string
+	Rounds          int
+	InputTokens     int
+	OutputTokens    int
 	// CachedTokens: phan InputTokens doc tu cache cua nha cung cap - do cache co trung khong, khong
 	// phai tham so. 0 khi nha cung cap khong cache hoac khong bao.
 	CachedTokens int
@@ -69,7 +74,9 @@ type Run struct {
 	TargetDocument   string
 	trackingStopped  bool
 	// undone: "Hoan tac luot nay" da chay (POST /v1/runs/{id}/undo) - khong cho lan hai.
-	undone        bool
+	undone bool
+	// admitted: hoi thoai + dong runs da duoc tao dong bo truoc khi Execute chay (Orchestrator.Admit).
+	admitted      bool
 	Transcript    []string
 	Events        *EventStream
 	Confirmations *Confirmations
@@ -130,6 +137,16 @@ func (r *Run) StatusAndConversation() (string, string) {
 	return r.Status, r.ConversationID
 }
 
+func (r *Run) markAdmitted() {
+	r.update(func() { r.admitted = true })
+}
+
+func (r *Run) isAdmitted() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.admitted
+}
+
 func (r *Run) expiredBefore(cutoff time.Time) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -169,26 +186,79 @@ func (r *Run) JSON() map[string]any {
 	return payload
 }
 
-// Manager: quan ly cac luot chay - mot luot dang chay cho moi office port, huy duoc, giu ket qua 30 phut.
-type Manager struct {
-	mu   sync.Mutex
-	runs map[string]*Run
+// runKey: khoa idempotency cua mot luot - cung client request id tren cung office port la cung mot luot.
+type runKey struct {
+	port            int
+	clientRequestID string
 }
 
-func NewManager() *Manager { return &Manager{runs: map[string]*Run{}} }
+// Manager: quan ly cac luot chay - mot luot dang chay cho moi office port, huy duoc, giu ket qua 30 phut.
+type Manager struct {
+	mu         sync.Mutex
+	runs       map[string]*Run
+	clientRuns map[runKey]*Run
+	// runEvents: nhat ky SSE ben (schema v6) de pane ket noi lai sau khi Core khoi dong lai. nil = chi RAM.
+	runEvents *store.Runs
+}
 
+func NewManager() *Manager {
+	return &Manager{runs: map[string]*Run{}, clientRuns: map[runKey]*Run{}}
+}
+
+// SetRunEvents: gan kho su kien ben. Moi Run tao sau do duoc gan sink ghi run_events; loi ghi chi log,
+// khong lam hong luot chay. Goi luc Core khoi dong khi kho du lieu san sang.
+func (m *Manager) SetRunEvents(runs *store.Runs) {
+	m.mu.Lock()
+	m.runEvents = runs
+	m.mu.Unlock()
+}
+
+// runEventSink: noi nhan su kien cua mot luot - ghi tung su kien vao run_events. data giu nguyen JSON
+// cua su kien; loi ghi (kho day, SQLITE_BUSY...) chi ghi log, luot chay van tiep tuc.
+func runEventSink(runs *store.Runs, runID string) func(Event) {
+	return func(event Event) {
+		if err := runs.AppendEvent(runID, event.Seq, event.Type, model.MarshalRelaxed(event.Data), event.At); err != nil {
+			corelog.Error("run %s: event %d (%s) not persisted: %v", runID, event.Seq, event.Type, err)
+		}
+	}
+}
+
+// TryStart: nhu TryStartRequest nhung khong co client request id - giu hanh vi cu (chi chan luot dang chay).
 func (m *Manager) TryStart(port int) (*Run, string) {
+	run, problem, _ := m.TryStartRequest(port, "")
+	return run, problem
+}
+
+// TryStartRequest: nhan mot luot cho office port. Khi clientRequestID khac rong, mot yeu cau da
+// duoc nhan truoc do (dang chay, hoac da xong trong RetentionMinutes) tra ve chinh luot do voi
+// existing = true - khong bao gio tao luot ghi thu hai. ClientRequestID rong giu hanh vi cu.
+func (m *Manager) TryStartRequest(port int, clientRequestID string) (*Run, string, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.cleanup()
+
+	clientRequestID = strings.TrimSpace(clientRequestID)
+	if clientRequestID != "" {
+		if existing := m.clientRuns[runKey{port: port, clientRequestID: clientRequestID}]; existing != nil {
+			return existing, "", true
+		}
+	}
+
 	for _, existing := range m.runs {
 		if existing.Port == port && existing.CurrentStatus() == StatusRunning {
-			return nil, "busy: a run is already in progress on port " + strconv.Itoa(port) + " (run " + existing.ID + ")"
+			return nil, "busy: a run is already in progress on port " + strconv.Itoa(port) + " (run " + existing.ID + ")", false
 		}
 	}
 	run := newRun(store.NewID("r_"), port)
+	if m.runEvents != nil {
+		run.Events.SetSink(runEventSink(m.runEvents, run.ID))
+	}
+	run.ClientRequestID = clientRequestID
 	m.runs[run.ID] = run
-	return run, ""
+	if clientRequestID != "" {
+		m.clientRuns[runKey{port: port, clientRequestID: clientRequestID}] = run
+	}
+	return run, "", false
 }
 
 func (m *Manager) Get(id string) *Run {
@@ -272,6 +342,9 @@ func (m *Manager) cleanup() {
 	for id, run := range m.runs {
 		if run.expiredBefore(cutoff) {
 			delete(m.runs, id)
+			if run.ClientRequestID != "" {
+				delete(m.clientRuns, runKey{port: run.Port, clientRequestID: run.ClientRequestID})
+			}
 		}
 	}
 }

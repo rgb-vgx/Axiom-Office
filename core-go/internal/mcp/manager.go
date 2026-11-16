@@ -52,7 +52,11 @@ func (s *Server) Alive() bool { return s.conn.Alive() }
 func StartServer(ctx context.Context, config ServerConfig, httpClient *http.Client) (*Server, error) {
 	var conn transport
 	if config.URL != "" {
-		conn = newHTTPTransport(config.Name, config.URL, config.Headers, httpClient)
+		headers, err := resolveHeaders(config.Name, config.Headers)
+		if err != nil {
+			return nil, err
+		}
+		conn = newHTTPTransport(config.Name, config.URL, headers, httpClient)
 	} else {
 		directory := ""
 		if dir := filepath.Dir(config.Command); dir != "" {

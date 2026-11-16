@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"axiomoffice/core/internal/mcp"
+	"axiomoffice/core/internal/policy"
 )
 
 // MCPTool: mot tool MCP cho model: ten mcp__<server>__<tool>; server khong tin cay -> hoi nguoi dung truoc
@@ -63,7 +64,22 @@ func (t *MCPTool) Parameters() json.RawMessage { return t.bound.Schema() }
 
 func (t *MCPTool) Invoke(ctx context.Context, arguments map[string]any, run *RunContext) Result {
 	name := t.bound.Name()
-	if reason := mcp.NeedsConfirm(t.bound, arguments); reason != "" {
+	// Quy tac chinh sach (rules.go): deny chan ngay; quy tac nguoi dung khai bao ro (ask/allow) thay
+	// cho quy tac "ghi de file da co" cua mcp.NeedsConfirm. Quy tac mac dinh chi mo ta lop lenh nen
+	// khong chen them cau hoi o day (NeedsConfirm da lo).
+	declared := policy.Decide(run.Policy, name, run.TargetDocument)
+	if declared.Denied {
+		return Result{JSON: ErrorJSON("policy denied: " + declared.Reason), Action: name}
+	}
+	reason := mcp.NeedsConfirm(t.bound, arguments)
+	if declared.Explicit {
+		if declared.NeedsConfirmation {
+			reason = declared.Reason
+		} else {
+			reason = ""
+		}
+	}
+	if reason != "" {
 		preview := truncateJSON(arguments)
 		approved, err := run.ConfirmOrDecline(name, reason, preview)
 		if err != nil || !approved {

@@ -1,6 +1,7 @@
 package wpsbridge
 
 import (
+	"context"
 	"encoding/json"
 	"net"
 	"net/http"
@@ -113,7 +114,7 @@ func TestEnqueueCompleteRoundtrip(t *testing.T) {
 	b.recordPoll(map[string]any{"document": map[string]any{"name": "a.docx"}, "commands": []any{}})
 	replyCh := make(chan map[string]any, 1)
 	go func() {
-		reply, _ := b.Enqueue("writer.getText", map[string]any{})
+		reply, _ := b.Enqueue(context.Background(), "writer.getText", map[string]any{})
 		replyCh <- reply
 	}()
 	deadline := time.Now().Add(3 * time.Second)
@@ -203,7 +204,7 @@ func TestEnqueueFailsFastWhenAddinDisconnects(t *testing.T) {
 	bridge := testBridge(t, nil) // DisconnectSeconds: 2
 	bridge.recordPoll(map[string]any{})
 	started := time.Now()
-	reply, ok := bridge.Enqueue("writer.getText", map[string]any{})
+	reply, ok := bridge.Enqueue(context.Background(), "writer.getText", map[string]any{})
 	waited := time.Since(started)
 	if !ok || reply["ok"] != false || !strings.Contains(reply["error"].(string), "disconnected") {
 		t.Fatalf("mat ket noi -> ok:false 'disconnected', duoc %v %v", ok, reply)
@@ -229,7 +230,7 @@ func TestEnqueueKeepsWaitingWhileCommandIsInFlight(t *testing.T) {
 	b.recordPoll(map[string]any{})
 	replyCh := make(chan map[string]any, 1)
 	go func() {
-		reply, _ := b.Enqueue("et.importCsv", map[string]any{"path": "/tmp/ban-hang.csv"})
+		reply, _ := b.Enqueue(context.Background(), "et.importCsv", map[string]any{"path": "/tmp/ban-hang.csv"})
 		replyCh <- reply
 	}()
 	jobs := takeJobsWithin(t, b, 3*time.Second)
@@ -262,7 +263,7 @@ func TestEnqueueInFlightTimeoutWarnsBeforeRetrying(t *testing.T) {
 	started := time.Now()
 	replyCh := make(chan map[string]any, 1)
 	go func() {
-		reply, _ := b.Enqueue("et.formatRange", map[string]any{})
+		reply, _ := b.Enqueue(context.Background(), "et.formatRange", map[string]any{})
 		replyCh <- reply
 	}()
 	if jobs := takeJobsWithin(t, b, 3*time.Second); len(jobs) != 1 {
@@ -290,6 +291,175 @@ func TestEnqueueInFlightTimeoutWarnsBeforeRetrying(t *testing.T) {
 	// Job da bi bo thi khong con "dang chay": vong session moi don duoc file session.
 	if b.Connected() {
 		t.Fatal("het gio roi thi khong con lenh nao dang chay")
+	}
+}
+
+// Huy luot cho khi job CON TRONG hang doi (add-in chua poll): /cmd phai tra ngay, noi ro chua gui
+// duoc de agent thu lai an toan, va khong de job/goroutine lai trong bridge.
+func TestEnqueueCancelledBeforeSend(t *testing.T) {
+	b := testBridge(t, func(o *Options) { o.CmdWaitSeconds = 60 })
+	b.recordPoll(map[string]any{})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	replyCh := make(chan map[string]any, 1)
+	go func() {
+		reply, _ := b.Enqueue(ctx, "writer.getText", map[string]any{})
+		replyCh <- reply
+	}()
+	waitForQueued(t, b, 1)
+	cancel()
+	select {
+	case reply := <-replyCh:
+		message := textOf(reply["error"])
+		if reply["ok"] != false || !strings.Contains(message, "cancelled before the command was sent") ||
+			!strings.Contains(message, "safe to retry") {
+			t.Fatalf("huy truoc khi gui -> ok:false 'cancelled before ... safe to retry', duoc %v", reply)
+		}
+		if sent, _ := reply["sent"].(bool); sent {
+			t.Fatalf("marker sent phai false khi job chua duoc giao: %v", reply)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("ctx bi huy thi Enqueue phai tra ngay, khong cho het CmdWaitSeconds")
+	}
+	if jobs := b.takeJobs(); len(jobs) != 0 {
+		t.Fatalf("job da huy khong duoc giao cho add-in: %+v", jobs)
+	}
+	assertNoQueuedJobs(t, b)
+}
+
+// Huy luot cho SAU khi add-in da nhan job: khong the biet lenh da ghi hay chua, nen phai canh bao
+// co the da ap dung - khac han "chua gui duoc". Job phai duoc bo khoi waiting de khong con bi tinh
+// la "dang chay" va ket qua ve sau (neu co) khong duoc tra cho nguoi goi da huy.
+func TestEnqueueCancelledInFlight(t *testing.T) {
+	b := testBridge(t, func(o *Options) { o.CmdWaitSeconds = 60 })
+	b.recordPoll(map[string]any{})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	replyCh := make(chan map[string]any, 1)
+	go func() {
+		reply, _ := b.Enqueue(ctx, "et.formatRange", map[string]any{})
+		replyCh <- reply
+	}()
+	jobs := takeJobsWithin(t, b, 3*time.Second)
+	if len(jobs) != 1 {
+		t.Fatalf("khong lay duoc job: %+v", jobs)
+	}
+	cancel()
+	select {
+	case reply := <-replyCh:
+		message := textOf(reply["error"])
+		if reply["ok"] != false || !strings.Contains(message, "cancelled while the command was running") ||
+			!strings.Contains(message, "may have been applied") {
+			t.Fatalf("huy khi dang chay -> ok:false 'cancelled while ... may have been applied', duoc %v", reply)
+		}
+		if strings.Contains(message, "safe to retry") {
+			t.Fatalf("lenh da gui thi khong duoc noi la thu lai an toan: %q", message)
+		}
+		if sent, _ := reply["sent"].(bool); !sent {
+			t.Fatalf("marker sent phai true khi job da duoc giao: %v", reply)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("ctx bi huy thi Enqueue phai tra ngay")
+	}
+	if b.Complete(jobs[0].ID, map[string]any{"ok": true, "result": "x"}) {
+		t.Fatal("job da huy khong duoc nhan ket qua muon (nguoi goi da bo)")
+	}
+	assertNoQueuedJobs(t, b)
+}
+
+// Khong gui trung: job da huy truoc khi poll khong duoc tra lai trong mot poll sau, va mot lenh moi
+// chi toi add-in dung mot lan.
+func TestEnqueueCancelledIsNotDeliveredTwice(t *testing.T) {
+	b := testBridge(t, func(o *Options) { o.CmdWaitSeconds = 60 })
+	b.recordPoll(map[string]any{})
+	cancelledCtx, cancelCancelled := context.WithCancel(context.Background())
+	cancelledCh := make(chan map[string]any, 1)
+	go func() {
+		reply, _ := b.Enqueue(cancelledCtx, "writer.getText", map[string]any{})
+		cancelledCh <- reply
+	}()
+	waitForQueued(t, b, 1)
+	cancelCancelled()
+	<-cancelledCh
+	if jobs := b.takeJobs(); len(jobs) != 0 {
+		t.Fatalf("job da huy khong duoc giao lai: %+v", jobs)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	replyCh := make(chan map[string]any, 1)
+	go func() {
+		reply, _ := b.Enqueue(ctx, "writer.getText", map[string]any{})
+		replyCh <- reply
+	}()
+	jobs := takeJobsWithin(t, b, 3*time.Second)
+	if len(jobs) != 1 {
+		t.Fatalf("lenh moi phai toi add-in dung mot lan: %+v", jobs)
+	}
+	if again := b.takeJobs(); len(again) != 0 {
+		t.Fatalf("lenh khong duoc giao hai lan: %+v", again)
+	}
+	if !b.Complete(jobs[0].ID, map[string]any{"ok": true, "result": "x"}) {
+		t.Fatal("Complete job dang cho phai true")
+	}
+	select {
+	case reply := <-replyCh:
+		if reply["ok"] != true {
+			t.Fatalf("ket qua cua lenh moi phai ve nguoi goi: %v", reply)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("khong nhan duoc ket qua cua lenh moi")
+	}
+}
+
+// Timeout theo CmdWaitSeconds van giu nguyen khi ctx khong bi huy: khong duoc cat som, va cau loi
+// van canh bao lenh CO THE da ap dung.
+func TestEnqueueTimeoutStillWorksWithContext(t *testing.T) {
+	b := testBridge(t, func(o *Options) { o.DisconnectSeconds = 10; o.CmdWaitSeconds = 1 })
+	b.recordPoll(map[string]any{})
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	started := time.Now()
+	reply, ok := b.Enqueue(ctx, "et.importCsv", map[string]any{})
+	if !ok {
+		t.Fatalf("timeout cua bridge phai tra ok=true kem phong bi loi, duoc %v", ok)
+	}
+	if waited := time.Since(started); waited < 900*time.Millisecond {
+		t.Fatalf("khong duoc cat som hon CmdWaitSeconds (1s), chi cho %v", waited)
+	}
+	message := textOf(reply["error"])
+	if reply["ok"] != false || !strings.Contains(message, "did not answer") || !strings.Contains(message, "may have been applied") {
+		t.Fatalf("het gio -> ok:false 'did not answer ... may have been applied', duoc %v", reply)
+	}
+	if strings.Contains(message, "cancelled") {
+		t.Fatalf("ctx chua huy thi khong duoc bao cancelled: %q", message)
+	}
+	assertNoQueuedJobs(t, b)
+}
+
+// waitForQueued cho den khi hang doi cua client chinh co it nhat want job (queue + waiting).
+func waitForQueued(t *testing.T, b *Bridge, want int) {
+	t.Helper()
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		b.mu.Lock()
+		got := len(b.primary.queue) + len(b.primary.waiting)
+		b.mu.Unlock()
+		if got >= want {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("khong thay %d job trong hang doi", want)
+}
+
+// assertNoQueuedJobs: sau khi huy/het gio, khong con job nao trong queue hay waiting.
+func assertNoQueuedJobs(t *testing.T, b *Bridge) {
+	t.Helper()
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if len(b.primary.queue) != 0 || len(b.primary.waiting) != 0 {
+		t.Fatalf("job phai bi bo khoi hang doi: waiting=%d queue=%d", len(b.primary.waiting), len(b.primary.queue))
 	}
 }
 
@@ -381,7 +551,7 @@ func TestCompleteRefreshesLiveness(t *testing.T) {
 	b.recordPoll(map[string]any{})
 	replyCh := make(chan map[string]any, 1)
 	go func() {
-		reply, _ := b.Enqueue("writer.getText", map[string]any{})
+		reply, _ := b.Enqueue(context.Background(), "writer.getText", map[string]any{})
 		replyCh <- reply
 	}()
 	jobs := takeJobsWithin(t, b, 3*time.Second)

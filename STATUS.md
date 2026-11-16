@@ -1,7 +1,7 @@
 ﻿# Tình trạng dự án Axiom Office
 
-Cập nhật: **11/11/2026** · nhánh `main` · đã hợp nhất nhánh WPS Linux 16/10–01/11 với các tính năng local 17–18/10
-(§2.17) và thử 4 cải tiến học từ Deep Agents (§2.18); **chưa push** remote.
+Cập nhật: **17/11/2026** · nhánh `merge/origin-2026-11-17` · hợp nhất `origin/main` (16/11) với các đợt local
+10–12/11 (§2.17–2.18) và nền tảng agent 16/11 (§2.19); **chưa push** remote.
 Số liệu kiểm chứng ở §2.4 là lượt đo **01/10/2026**; số mới của đợt WPS ở §2.6, lượt đo lại toàn bộ ở §2.7, lượt đo
 lại job Windows ở §2.8, đợt Office x64 + sửa định dạng văn bản ở §2.9, ba đợt 25/10 ở §2.10–2.12, đợt 27–28/10 ở §2.15,
 đợt 31/10 ở §2.16 và đợt hợp nhất 10/11 ở §2.17.
@@ -32,7 +32,7 @@ hướng dẫn dùng ở [README.md](README.md); lịch sử thay đổi ở [CH
 
 ### 2.1 Agent Core viết lại bằng Go (`core-go/`) — G1 → G10
 
-Bản Go dùng **chung hợp đồng** với bản .NET: cùng Core API v1, cùng `core.json`, cùng `core.db` (schema 4,
+Bản Go dùng **chung hợp đồng** với bản .NET: cùng Core API v1, cùng `core.json`, cùng `core.db` (nay schema 6,
 cùng nguồn cấu hình (`AXIOM_*` → HKCU/DPAPI hoặc `~/.config/axiom-office/config.json` + libsecret), cùng tên
 mutex một-phiên-bản. Nhờ vậy add-in/extension/MCP không phải đổi gì.
 
@@ -392,6 +392,25 @@ DLL + Host. **Chưa đo bằng LLM thật/bench** — đây là thử nghiệm c
 Hạ tầng benchmark paired đã thêm cùng đợt: `AXIOM_BENCH_VARIANT` (B0–B6, không đặt = production) và
 `tests/bench/campaign/` (manifest, McNemar exact, median giảm theo cặp + bootstrap CI, cost/success, báo cáo
 Markdown). Xem `tests/bench/campaign/README.md`.
+
+### 2.19 Đợt 16/11/2026: nền tảng agent (nhánh `feat/architecture-hardening`)
+
+| Việc | Nội dung | Kiểm chứng |
+|---|---|---|
+| Nhận lượt idempotent | `clientRequestId` trên `POST /v1/runs`; trùng id trên cùng port trả đúng lượt cũ; hội thoại + dòng `runs` tạo trước khi chạy nên trả `conversationId` ngay, bỏ vòng chờ 10 giây | `go test -race`, 179 core e2e |
+| Huỷ lan truyền WPS | `Client.Enqueue(ctx, ...)`; Dừng bỏ lệnh đang chờ, phân biệt “chưa gửi” / “có thể đã áp dụng” | Go test + WPS e2e 96+16 |
+| Durable run journal | Schema 6 `run_events`; SSE phát lại sau restart/quá retention; `stream.lagged`; `/health.capabilities` có `events.durable` | Go test + 179 core e2e |
+| Policy + saved approvals | Ruleset `allow/ask/deny` + `policy.rules`; `permission_approvals` (schema 5); `GET/POST/DELETE /v1/approvals`; `confirm always:true`; chỉ lớp lệnh rủi ro mới lưu được | Go test + `make test-wps` 305 |
+| Feature flags + errors | `AXIOM_FLAGS`, `experimental.*`, `/health.capabilities`, `code` ổn định trong envelope lỗi | Go test + e2e |
+| Model capabilities | `max_output_tokens`, tools/vision/reasoning/cache/giá; Visual QA chỉ ẩn khi gateway khai rõ `vision=false` | Go test + 179 core e2e |
+| Event manifest | `core-go/internal/protocol/events.json`; sinh JS/Python; `make check-gen` bắt lệch | `make check-gen` |
+| Host seam | `internal/host` (Kind/Family/Capabilities/Catalog/Document/Execute) + adapter Office/WPS; chưa thay call site | Go test |
+| WPS “luôn cho phép” | Nút trong hộp thoại xác nhận, chỉ hiện khi `confirm.required.approvable`; gửi `always:true` | `make test-wps` 305 |
+| MCP headers | `{env:NAME}` trong `mcp.json`; chặn CR/LF; header giao thức luôn thắng | Go test |
+
+Số đo cuối đợt: `make test` xanh (Go race, 179 core e2e, 96+16 WPS e2e, 61 MCP, catalog, install/package),
+`make lint` sạch, `GOOS=windows` + `linux/arm64` build xanh. WPS live: 78/90 pass; 12 ca lỗi đều là
+xdotool/XTEST chọn vùng (môi trường, không phải lệnh WPS) — xem ghi chú trong log `tests/wps/`.
 
 ## 3. Chưa làm / chưa kiểm chứng
 

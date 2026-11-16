@@ -37,7 +37,7 @@ func mapSetup(mux *http.ServeMux, deps *Deps) {
 	routeBoth(mux, deps, "POST /v1/llm/test", func(w http.ResponseWriter, r *http.Request) {
 		body, parsed := readJSON(r)
 		if !parsed {
-			Error(w, http.StatusBadRequest, "invalid JSON body")
+			ErrorCode(w, http.StatusBadRequest, CodeInvalidRequest, "invalid JSON body")
 			return
 		}
 		request := adHocFrom(func(name string) string {
