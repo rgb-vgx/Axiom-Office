@@ -31,6 +31,9 @@ type ModelInfo struct {
 	SupportsTools bool
 	// SupportsVision: nha cung cap khai nhan dau vao hinh anh. Chi dat khi co modality image duoc khai.
 	SupportsVision bool
+	// VisionKnown: nha cung cap co khai RO vision (bat hoac tat) khong. false = khong khai, caller
+	// giu hanh vi cu thay vi coi la khong ho tro.
+	VisionKnown bool
 	// SupportsReasoning: nha cung cap khai model suy luan.
 	SupportsReasoning bool
 	// SupportsPromptCache: nha cung cap khai prompt caching.
@@ -97,9 +100,23 @@ func ParseModelInfo(body []byte) map[string]ModelInfo {
 		}
 
 		// Vision: chi tin modality image duoc khai (OpenRouter) hoac co vision duoc khai RO.
-		if imageModality(architecture["input_modalities"]) || imageModality(item["input_modalities"]) ||
-			declaredTrue(capabilities["vision"], capabilities["image_input"], capabilities["imageInput"]) {
-			info.SupportsVision = true
+		// VisionKnown tach "khai RO khong ho tro" khoi "khong khai": caller chi an tool khi biet
+		// model khong doc duoc anh, khong an chi vi gateway thieu truong.
+		if raw, ok := architecture["input_modalities"]; ok && raw != nil {
+			info.VisionKnown = true
+			info.SupportsVision = imageModality(raw)
+		}
+		if raw, ok := item["input_modalities"]; ok && raw != nil {
+			info.VisionKnown = true
+			info.SupportsVision = imageModality(raw)
+		}
+		for _, key := range []string{"vision", "image_input", "imageInput"} {
+			if raw, ok := capabilities[key]; ok {
+				if declared, ok := boolField(raw); ok {
+					info.VisionKnown = true
+					info.SupportsVision = declared
+				}
+			}
 		}
 
 		// Tools: chi dat false (NoTools) khi nha cung cap khai RO false.

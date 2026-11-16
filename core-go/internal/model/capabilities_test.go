@@ -30,6 +30,7 @@ func TestParseModelInfoCapabilities(t *testing.T) {
 				MaxOutputTokens:      64000,
 				SupportsTools:        true,
 				SupportsVision:       true,
+				VisionKnown:          true,
 				SupportsReasoning:    true,
 				InputCostPerMillion:  3,
 				OutputCostPerMillion: 15,
@@ -40,6 +41,7 @@ func TestParseModelInfoCapabilities(t *testing.T) {
 			model: "openai/gpt-4o-mini",
 			want: ModelInfo{
 				ContextWindow:        128000,
+				VisionKnown:          true,
 				InputCostPerMillion:  0.15,
 				OutputCostPerMillion: 0.6,
 			},
@@ -52,6 +54,7 @@ func TestParseModelInfoCapabilities(t *testing.T) {
 				MaxOutputTokens:     64000,
 				SupportsTools:       true,
 				SupportsVision:      true,
+				VisionKnown:         true,
 				SupportsReasoning:   true,
 				SupportsPromptCache: true,
 			},

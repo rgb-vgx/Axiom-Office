@@ -196,8 +196,10 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 		list = append(list, tools.NewWebSourcesTool(o.WebSources))
 	}
 	// QA thi giac (muc 8.4.6): chi khi nguoi dung bat VisualQaEnabled (doc lai moi luot qua cau hinh) VA
-	// model dang dung khai nhan duoc hinh anh (GET /models) - model khong nhin duoc thi tool chi ton token.
-	if o.Config().VisualQaEnabled && client.ModelInfo(ctx, client.Model).SupportsVision {
+	// model khong khai RO la khong doc duoc anh. Gateway khong khai truong vision thi giu hanh vi cu
+	// (them tool); chi an khi nha cung cap noi ro vision=false de khong dot token vo ich.
+	if info := client.ModelInfo(ctx, client.Model); o.Config().VisualQaEnabled &&
+		(!info.VisionKnown || info.SupportsVision) {
 		list = append(list, tools.NewVisualTool())
 	}
 
