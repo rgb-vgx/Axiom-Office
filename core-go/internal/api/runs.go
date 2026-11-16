@@ -13,8 +13,7 @@ import (
 )
 
 const (
-	conversationWaitLimit = 10 * time.Second
-	ssePingEvery          = 15 * time.Second
+	ssePingEvery = 15 * time.Second
 )
 
 // Endpoint cua luot chay va hoi thoai (docs/architecture/core.md muc 7.3, 7.4):
@@ -132,7 +131,7 @@ func mapRuns(mux *http.ServeMux, deps *Deps) {
 
 // serveStartRun: khoi dong luot chay tu Request da parse (dung chung cho /v1/runs va /wps/v1/runs).
 func serveStartRun(w http.ResponseWriter, deps *Deps, request *agent.Request) {
-	run, startError := deps.Manager.TryStart(request.Port)
+	run, startError, existing := deps.Manager.TryStartRequest(request.Port, request.ClientRequestID)
 	if run == nil {
 		if startError == "" {
 			startError = "cannot start run"
@@ -140,14 +139,21 @@ func serveStartRun(w http.ResponseWriter, deps *Deps, request *agent.Request) {
 		Error(w, http.StatusConflict, startError)
 		return
 	}
-	go deps.Orchestrator.Execute(run.Context(), run, request)
-
-	// Hoi thoai duoc tao ngay dau luot chay: cho toi da 10s de tra ve conversationId nhu tai lieu.
-	deadline := time.Now().Add(conversationWaitLimit)
+	// Gui lai cung clientRequestId: tra ve luot cu (200, cung runId/conversationId), khong chay lan hai.
+	if existing {
+		status, conversationID := run.StatusAndConversation()
+		OK(w, map[string]any{
+			"runId": run.ID, "conversationId": nilIfEmpty(conversationID), "status": status,
+		})
+		return
+	}
+	// Hoi thoai + dong runs tao NGAY (truoc goroutine) de tra conversationId ma khong phai cho.
+	if deps.Orchestrator != nil {
+		deps.Orchestrator.Admit(run, request)
+	}
 	status, conversationID := run.StatusAndConversation()
-	for conversationID == "" && status == agent.StatusRunning && time.Now().Before(deadline) {
-		time.Sleep(25 * time.Millisecond)
-		status, conversationID = run.StatusAndConversation()
+	if deps.Orchestrator != nil {
+		go deps.Orchestrator.Execute(run.Context(), run, request)
 	}
 	OK(w, map[string]any{
 		"runId": run.ID, "conversationId": nilIfEmpty(conversationID), "status": status,

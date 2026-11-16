@@ -78,6 +78,66 @@ func TestManagerBusyAndCancel(t *testing.T) {
 	}
 }
 
+// Gui lai cung client request id tren cung port tra ve dung luot cu - dang chay hay da xong trong
+// RetentionMinutes - va khong tao luot ghi thu hai. Id khac/rong giu hanh vi cu.
+func TestManagerClientRequestIDIsIdempotent(t *testing.T) {
+	manager := NewManager()
+	first, problem, existing := manager.TryStartRequest(47850, " req-1 ")
+	if first == nil || problem != "" || existing {
+		t.Fatalf("TryStartRequest = %+v %q %v", first, problem, existing)
+	}
+	if first.ClientRequestID != "req-1" {
+		t.Fatalf("ClientRequestID = %q", first.ClientRequestID)
+	}
+	again, problem, existing := manager.TryStartRequest(47850, "req-1")
+	if again != first || !existing || problem != "" {
+		t.Fatalf("duplicate phai tra luot cu: %+v %q %v", again, problem, existing)
+	}
+
+	// Cung port nhung id khac van bi chan khi luot dau dang chay.
+	if other, problem, _ := manager.TryStartRequest(47850, "req-2"); other != nil || !strings.Contains(problem, "already in progress") {
+		t.Fatalf("id khac phai busy: %+v %q", other, problem)
+	}
+
+	// Luot dau xong: cung id tra luot cu; id khac mo luot moi.
+	first.Status = StatusCompleted
+	finished := time.Now().UTC()
+	first.Finished = &finished
+	finishedRun, problem, existing := manager.TryStartRequest(47850, "req-1")
+	if finishedRun != first || !existing || problem != "" {
+		t.Fatalf("id cu sau khi xong phai tra luot cu: %+v %q %v", finishedRun, problem, existing)
+	}
+	other, problem, existing := manager.TryStartRequest(47850, "req-2")
+	if other == nil || other == first || existing || problem != "" {
+		t.Fatalf("id moi sau khi xong phai chay luot moi: %+v %q %v", other, problem, existing)
+	}
+
+	// ClientRequestID rong: hanh vi cu - chi chan luot dang chay.
+	if empty, problem, _ := manager.TryStartRequest(47850, ""); empty != nil || !strings.Contains(problem, "already in progress") {
+		t.Fatalf("id rong phai giu hanh vi cu: %+v %q", empty, problem)
+	}
+}
+
+func TestManagerClientRequestIDExpiresWithRetention(t *testing.T) {
+	manager := NewManager()
+	first, _, _ := manager.TryStartRequest(47852, "req-old")
+	if first == nil {
+		t.Fatal("TryStartRequest = nil")
+	}
+	first.Status = StatusCompleted
+	expired := time.Now().UTC().Add(-(RetentionMinutes + 1) * time.Minute)
+	first.Finished = &expired
+
+	// Qua RetentionMinutes: index da don, cung id mo luot moi thay vi tra ket qua cu.
+	again, problem, existing := manager.TryStartRequest(47852, "req-old")
+	if again == nil || again == first || existing || problem != "" {
+		t.Fatalf("id het han phai chay luot moi: %+v %q %v", again, problem, existing)
+	}
+	if again.ClientRequestID != "req-old" {
+		t.Fatalf("ClientRequestID = %q", again.ClientRequestID)
+	}
+}
+
 func TestManagerCancelRunning(t *testing.T) {
 	manager := NewManager()
 	first, _ := manager.TryStart(47840)
@@ -278,6 +338,37 @@ func TestParseRequestMode(t *testing.T) {
 	}
 	if _, problem := ParseRequest(base("ask")); !strings.Contains(problem, "'options.mode'") {
 		t.Fatalf("mode la phai bi tu choi: %q", problem)
+	}
+}
+
+// clientRequestId (va client_request_id) duoc cat khoang trang va gioi han 128 ky tu.
+func TestParseRequestClientRequestID(t *testing.T) {
+	for _, key := range []string{"clientRequestId", "client_request_id"} {
+		request, problem := ParseRequest(map[string]any{
+			"prompt": "x", "office": map[string]any{"port": float64(1)}, key: "  req-1  ",
+		})
+		if problem != "" || request.ClientRequestID != "req-1" {
+			t.Fatalf("%s: id=%q problem=%q", key, request.ClientRequestID, problem)
+		}
+	}
+	// clientRequestId thang client_request_id khi ca hai cung co.
+	request, _ := ParseRequest(map[string]any{
+		"prompt": "x", "office": map[string]any{"port": float64(1)},
+		"clientRequestId": "camel", "client_request_id": "snake",
+	})
+	if request.ClientRequestID != "camel" {
+		t.Fatalf("clientRequestId phai thang: %q", request.ClientRequestID)
+	}
+	long := strings.Repeat("a", ClientRequestIDMaxRunes+20)
+	request, _ = ParseRequest(map[string]any{
+		"prompt": "x", "office": map[string]any{"port": float64(1)}, "clientRequestId": long,
+	})
+	if got := len([]rune(request.ClientRequestID)); got != ClientRequestIDMaxRunes {
+		t.Fatalf("id dai %d ky tu, want %d", got, ClientRequestIDMaxRunes)
+	}
+	request, _ = ParseRequest(map[string]any{"prompt": "x", "office": map[string]any{"port": float64(1)}})
+	if request.ClientRequestID != "" {
+		t.Fatalf("khong gui id phai rong: %q", request.ClientRequestID)
 	}
 }
 

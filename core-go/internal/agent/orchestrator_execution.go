@@ -108,8 +108,14 @@ func (o *Orchestrator) prepareExecution(ctx context.Context, run *Run, request *
 		return nil
 	}
 
-	run.update(func() { run.ConversationID = conversation.ID })
-	o.Runs.Insert(run.ID, &conversation.ID, client.Model)
+	// Admit da tao hoi thoai + dong runs truoc khi goroutine chay (POST /v1/runs tra ngay);
+	// duong goi truc tiep khong qua Admit thi tao o day nhu cu.
+	if !run.isAdmitted() {
+		run.update(func() { run.ConversationID = conversation.ID })
+		if o.Runs != nil {
+			o.Runs.Insert(run.ID, &conversation.ID, client.Model)
+		}
+	}
 	mode := "act"
 	if request.Plan {
 		mode = "plan"
