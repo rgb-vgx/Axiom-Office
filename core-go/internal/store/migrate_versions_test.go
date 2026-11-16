@@ -7,10 +7,10 @@ import (
 	"testing"
 )
 
-// TestMigrateFromOlderVersions: nang cap tu v1..v4 len SchemaVersion hien tai phai tao du cac doi tuong
+// TestMigrateFromOlderVersions: nang cap tu v1..v5 len SchemaVersion hien tai phai tao du cac doi tuong
 // moi va dat user_version dung. Chi dung DB tam trong t.TempDir, khong dung core.db that.
 func TestMigrateFromOlderVersions(t *testing.T) {
-	for _, from := range []int{1, 2, 3, 4} {
+	for _, from := range []int{1, 2, 3, 4, 5} {
 		t.Run(fmt.Sprintf("from_v%d", from), func(t *testing.T) {
 			db, err := Open(filepath.Join(t.TempDir(), "core.db"))
 			if err != nil {
@@ -28,6 +28,9 @@ func TestMigrateFromOlderVersions(t *testing.T) {
 			}
 			if from >= 4 {
 				statements = append(statements, schemaV4)
+			}
+			if from >= 5 {
+				statements = append(statements, schemaV5)
 			}
 			for _, statement := range statements {
 				if _, err := db.SQL().Exec(statement); err != nil {
@@ -47,6 +50,7 @@ func TestMigrateFromOlderVersions(t *testing.T) {
 			}
 			for _, table := range []string{
 				"memories", "memories_fts", "web_sources", "web_sources_fts", "run_rounds", "permission_approvals",
+				"run_events",
 			} {
 				if !tableExists(t, db.SQL(), table) {
 					t.Errorf("thieu bang %q sau migrate tu v%d", table, from)

@@ -379,6 +379,14 @@ func (o *Orchestrator) finish(run *Run) {
 		o.Runs.Finish(run.ID, run.Status, run.Rounds, run.InputTokens, run.OutputTokens, run.CachedTokens,
 			o.errorPtr(run), nil)
 	}
+	// Don nhat ky SSE cua cac luot da qua RetentionMinutes (schema v6): core.db khong phinh mai, va
+	// cung mot moc retention voi ket qua luot trong RAM.
+	if o.Runs != nil {
+		cutoff := store.TimeText(now.Add(-RetentionMinutes * time.Minute))
+		if pruned := o.Runs.PruneRunEvents(cutoff); pruned > 0 {
+			corelog.Info("run events: pruned %d event(s) older than %d minutes", pruned, RetentionMinutes)
+		}
+	}
 	message := "run " + run.ID + " " + run.Status + ": " + strconv.Itoa(run.Rounds) + " rounds, " +
 		strconv.Itoa(run.ToolCalls) + " tool calls, " + strconv.Itoa(run.InputTokens) + "+" +
 		strconv.Itoa(run.OutputTokens) + " tokens, " + strconv.FormatFloat(run.Seconds, 'f', 1, 64) + "s"

@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"axiomoffice/core/internal/corelog"
+	"axiomoffice/core/internal/model"
 	"axiomoffice/core/internal/store"
 )
 
@@ -195,10 +197,30 @@ type Manager struct {
 	mu         sync.Mutex
 	runs       map[string]*Run
 	clientRuns map[runKey]*Run
+	// runEvents: nhat ky SSE ben (schema v6) de pane ket noi lai sau khi Core khoi dong lai. nil = chi RAM.
+	runEvents *store.Runs
 }
 
 func NewManager() *Manager {
 	return &Manager{runs: map[string]*Run{}, clientRuns: map[runKey]*Run{}}
+}
+
+// SetRunEvents: gan kho su kien ben. Moi Run tao sau do duoc gan sink ghi run_events; loi ghi chi log,
+// khong lam hong luot chay. Goi luc Core khoi dong khi kho du lieu san sang.
+func (m *Manager) SetRunEvents(runs *store.Runs) {
+	m.mu.Lock()
+	m.runEvents = runs
+	m.mu.Unlock()
+}
+
+// runEventSink: noi nhan su kien cua mot luot - ghi tung su kien vao run_events. data giu nguyen JSON
+// cua su kien; loi ghi (kho day, SQLITE_BUSY...) chi ghi log, luot chay van tiep tuc.
+func runEventSink(runs *store.Runs, runID string) func(Event) {
+	return func(event Event) {
+		if err := runs.AppendEvent(runID, event.Seq, event.Type, model.MarshalRelaxed(event.Data), event.At); err != nil {
+			corelog.Error("run %s: event %d (%s) not persisted: %v", runID, event.Seq, event.Type, err)
+		}
+	}
 }
 
 // TryStart: nhu TryStartRequest nhung khong co client request id - giu hanh vi cu (chi chan luot dang chay).
@@ -228,6 +250,9 @@ func (m *Manager) TryStartRequest(port int, clientRequestID string) (*Run, strin
 		}
 	}
 	run := newRun(store.NewID("r_"), port)
+	if m.runEvents != nil {
+		run.Events.SetSink(runEventSink(m.runEvents, run.ID))
+	}
 	run.ClientRequestID = clientRequestID
 	m.runs[run.ID] = run
 	if clientRequestID != "" {

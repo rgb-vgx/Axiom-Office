@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -301,13 +302,62 @@ func saveApproval(deps *Deps, action, resource string) (store.ApprovalRow, bool)
 }
 
 // serveRunEvents: SSE cua mot luot chay (dung chung cho /v1 va /wps).
+//
+// Luot con trong RAM: nghe truc tiep EventStream nhu cu. Luot khong con (Core vua khoi dong lai, hoac da
+// qua RetentionMinutes): phat lai run_events da luu tu ?after=/Last-Event-ID roi ket thuc - pane thay duoc
+// tien trinh va ky thuat ho tro xem lai duoc mot luot da xong. 404 chi khi khong co ca dong runs lan su kien.
 func serveRunEvents(w http.ResponseWriter, r *http.Request, deps *Deps, runID string) {
-	run := deps.Manager.Get(runID)
-	if run == nil {
+	if deps.Manager != nil {
+		if run := deps.Manager.Get(runID); run != nil {
+			streamEvents(w, r, run)
+			return
+		}
+	}
+	events, stored := storedRunEvents(deps, runID, parseAfter(r))
+	if !stored {
 		ErrorCode(w, http.StatusNotFound, CodeNotFound, "unknown run: "+runID)
 		return
 	}
-	streamEvents(w, r, run)
+	streamStoredEvents(w, events)
+}
+
+// storedRunEvents: su kien da luu cua mot luot (schema v6) sau moc after. stored = co dong runs hoac co
+// su kien nao do cua run id nay (ke ca khi tat ca deu <= after) - chi tra false khi khong co gi ca.
+func storedRunEvents(deps *Deps, runID string, after int64) ([]store.RunEventRow, bool) {
+	if deps.Stores == nil || !deps.Stores.Available || deps.Stores.Runs == nil {
+		return nil, false
+	}
+	events := deps.Stores.Runs.EventsSince(runID, after)
+	if deps.Stores.Runs.Get(runID) != nil || len(events) > 0 {
+		return events, true
+	}
+	// Client da o cuoi (after >= seq cuoi) nhung luot van co su kien: van la luot da biet.
+	if after > 0 && len(deps.Stores.Runs.EventsSince(runID, 0)) > 0 {
+		return events, true
+	}
+	return nil, false
+}
+
+// streamStoredEvents: SSE phat lai su kien da luu roi ket thuc (khong con gi de cho). Cung dinh dang
+// `id:` + `event:` + `data:` nhu stream song.
+func streamStoredEvents(w http.ResponseWriter, events []store.RunEventRow) {
+	w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("X-Accel-Buffering", "no")
+	w.WriteHeader(http.StatusOK)
+	for _, row := range events {
+		var data map[string]any
+		if row.DataJSON != "" && row.DataJSON != "null" {
+			_ = json.Unmarshal([]byte(row.DataJSON), &data)
+		}
+		item := agent.Event{Seq: row.Seq, Type: row.Type, Data: data, At: row.CreatedAt}
+		if writeEvent(w, item) != nil {
+			return
+		}
+	}
+	if flusher, ok := w.(http.Flusher); ok {
+		flusher.Flush()
+	}
 }
 
 // streamEvents: SSE - phat lai su kien cu (neu client ket noi lai voi ?after=) roi tiep tuc nghe.
