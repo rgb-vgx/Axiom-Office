@@ -1230,7 +1230,7 @@ tên mutex) nên add-in/extension/MCP không phải đổi gì. Chi tiết cài 
 | Method | Path | Mô tả |
 |---|---|---|
 | `GET` | `/health` | `pid`, `port`, `version`, `protocol`, `memory` (`on`/`off`/`unavailable`) |
-| `POST` | `/v1/runs` | Bắt đầu lượt chạy → `runId`, `conversationId` (chờ tối đa 10s để có hội thoại); `options.interactive=false` cho `ai.ask`, `options.mode="plan"` cho plan mode |
+| `POST` | `/v1/runs` | Bắt đầu lượt chạy → `runId`, `conversationId`, `status` **ngay** (hội thoại + dòng `runs` tạo đồng bộ trước khi chạy); `clientRequestId` là idempotency key; `options.interactive=false` cho `ai.ask`, `options.mode="plan"` cho plan mode |
 | `GET` | `/v1/runs/{id}` · `/events` | Kết quả · SSE (kết nối lại được với `?after=` hoặc `Last-Event-ID`) |
 | `POST` | `/v1/runs/{id}/cancel` · `/confirm` | Hủy · trả lời xác nhận `{confirmationId, approved}` |
 | `GET/DELETE` | `/v1/conversations[/{id}]` | Hội thoại theo tài liệu (`?documentKey=`) |
@@ -1267,6 +1267,11 @@ flowchart TD
 
 - Một lượt đang chạy cho mỗi port; **không trần thời gian mặc định** (`DefaultMaxSeconds = 0`;
   kiểm soát bằng `DefaultMaxRounds = 100` + nút Dừng; bên gọi vẫn đặt `maxSeconds`/`maxTokens` được).
+- `Orchestrator.Admit` tạo hội thoại + dòng `runs` trước khi goroutine `Execute` chạy, nên
+  `POST /v1/runs` trả ngay; `clientRequestId` trùng trên cùng port trả lại đúng lượt cũ trong
+  30 phút (`Manager.TryStartRequest`), không tạo lượt ghi thứ hai.
+- Event SSE lấy tên/payload từ `core-go/internal/protocol/events.json`; `make check-gen` sinh và
+  kiểm `src/AxiomOffice.WPS/protocol_gen.js` + `tests/core/protocol_gen.py`.
 - `ContextAssembler`: các lượt gần nhất trong ngân sách, vượt mốc 20 tin thì tóm tắt bằng LLM.
 - Vòng `RunAgent` (`internal/model/agent.go`) chỉ gọi model → chạy tool → hỏi chuỗi guard
   (`internal/model/guards.go`, 4 móc `onReply/beforeCall/afterTools/recover`): trả lời rỗng (nhắc 1 lần),
@@ -1312,6 +1317,10 @@ Tool gọi lệnh bridge **trực tiếp** khai hợp đồng `Required`/`Option
 catalog `/commands` của phiên thiếu một lệnh `Required` (ghi log), kể cả trong mô tả của chế độ lập kế hoạch — model
 không bao giờ được giao một tool sẽ hỏng giữa chừng trên backend đó. `needs_test.go` buộc mọi lệnh có trong mã nguồn
 của tool phải được khai.
+
+`internal/host` (16/11/2026) là seam độc lập app: `Kind`, `Family`, `Capabilities`, `Catalog`, `Document`,
+`Execute(ctx, ...)`; phase 1 bọc `office.Session`/`office.BridgeClient` và `wpsbridge.Client`, chưa thay call site.
+Bước tiếp theo là cho tool selection, policy và prompt dùng `Capabilities` thay các nhánh `appKind`.
 | `tavily_search` | Tavily REST | Chỉ khi `TavilyEnabled` và có `TavilyApiKey`; có cả trong plan mode (chỉ đọc web) |
 | `mcp__<server>__<tool>` | `Manager` + `WrapMCPTools` | Server ngoài cần xác nhận trừ khi `trusted`; làn file `office` hỏi khi ghi vào file đã có (plan mode chỉ còn tool đọc) |
 

@@ -5,6 +5,21 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — nền tảng agent: nhận lượt idempotent, event manifest, host seam (16/11/2026)
+
+- `POST /v1/runs` nhận `clientRequestId` (hoặc `client_request_id`): gửi lại cùng id trên cùng app
+  trong 30 phút trả về đúng lượt cũ, không tạo lượt ghi thứ hai. Hội thoại + dòng `runs` được tạo
+  đồng bộ trước khi chạy nên response trả `conversationId` ngay, bỏ vòng chờ 10 giây.
+- WPS: `Client.Enqueue`/`Bridge.Enqueue` nhận `context.Context`; bấm Dừng (hoặc Core dừng) bỏ lệnh
+  đang chờ ngay thay vì treo tới 300 giây, và trả rõ lệnh **chưa gửi** (an toàn thử lại) hay
+  **có thể đã áp dụng** (phải đọc lại tài liệu).
+- `core-go/internal/protocol`: manifest `events.json` là nguồn duy nhất cho event SSE; sinh
+  `src/AxiomOffice.WPS/protocol_gen.js` và `tests/core/protocol_gen.py`; `make check-gen` bắt lệch.
+- `core-go/internal/host`: seam host/app độc lập (Kind, Family, Capabilities, Catalog, Document,
+  Execute) cho giai đoạn chuyển tool/policy/prompt khỏi các nhánh `appKind`.
+- Test nền: import boundary, prompt golden theo app/mode, migration fixture v1–v3; thêm `AGENTS.md`
+  theo package cho core-go, tools, store, add-in Windows/WPS và tests.
+
 ### Added — WPS: soát phân trang, văn bản hành chính, "Tạo slide" ở Writer (01/11/2026)
 
 - `writer.checkLayout` + `writer.deleteParagraphs` trên WPS (TASK-000160, port bản Windows; đã chạy trên WPS thật: bắt
