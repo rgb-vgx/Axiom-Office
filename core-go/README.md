@@ -4,8 +4,8 @@ Agent Core của Axiom Office, phát hành dưới dạng **một file binary nh
 `-s -w`, thay cho ~52 MB single-file của bản .NET cũ hoặc 19 MB Native AOT — bản AOT làm hỏng JSON reflection).
 Bản .NET (`src/AxiomOffice.Core`) đã được **bỏ khỏi repo ngày 01/10/2026**; `git log` còn giữ lịch sử.
 
-Hợp đồng với phần còn lại **không đổi**: Core API v1, `core.json`, `core.db` (schema 5, 16/11/2026 — schema 4
-cộng `tool_calls.result_chars`, `runs.cached_tokens`, bảng `run_rounds`; schema 5 cộng `permission_approvals`),
+Hợp đồng với phần còn lại **không đổi**: Core API v1, `core.json`, `core.db` (schema 6, 16/11/2026 — schema 4
+cộng `tool_calls.result_chars`, `runs.cached_tokens`, bảng `run_rounds`; schema 5 cộng `permission_approvals`; schema 6 cộng `run_events`),
 nguồn cấu hình
 (`AXIOM_*` → HKCU / `~/.config/axiom-office/config.json` → mặc định), tên mutex một-phiên-bản. Nhờ vậy
 add-in, extension LibreOffice và MCP không phải đổi gì.

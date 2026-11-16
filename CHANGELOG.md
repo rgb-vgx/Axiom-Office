@@ -5,6 +5,18 @@ Format tham khảo [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — durable run journal, WPS always-allow, MCP headers (16/11/2026)
+
+- **Run journal** (schema 6, `run_events`): mỗi SSE event được ghi bền; `GET /v1/runs/{id}/events` phát
+  lại từ `?after=`/`Last-Event-ID` khi lượt không còn trong RAM (Core restart hoặc quá 30 phút);
+  `stream.lagged` báo khi buffer 1.000 event bị cuốn; event của lượt đã xong được dọn theo retention.
+  `/health.capabilities` thêm `events.durable`.
+- **WPS**: hộp thoại xác nhận có thêm “Luôn cho phép cho tài liệu này” khi event `confirm.required`
+  báo `approvable:true`; gửi `always:true` cùng `approved`, từ chối thì không bao giờ gửi.
+- **MCP**: `mcp.json` header nhận `{env:NAME}`; Core thay bằng biến môi trường, từ chối tên/giá trị
+  header không hợp lệ hoặc CR/LF, không log giá trị; header giao thức (`Content-Type`, `Accept`,
+  `MCP-Protocol-Version`, `Mcp-Session-Id`) luôn thắng header người dùng.
+
 ### Added — chính sách, feature flags, model capabilities (16/11/2026)
 
 - **Policy rules + saved approvals** (schema 5, `permission_approvals`): `policy.rules` trong cấu hình là

@@ -9,6 +9,7 @@ import (
 // cho nay (va cap nhat Protocol neu doi hop dong), de /health va client khong phai doan.
 var capabilityRegistry = []string{
 	"runs.idempotency",
+	"events.durable",
 	"approvals.saved",
 }
 
